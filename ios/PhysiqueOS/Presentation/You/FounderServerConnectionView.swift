@@ -367,7 +367,7 @@ private struct ProductionFounderConnectionView: View {
     @State private var isWorking = false
     @State private var profile: ProductionResponseEnvelope<ProductionProfileData>?
     @State private var contracts: ProductionContractManifest?
-    @State private var weight: ProductionResponseEnvelope<FounderWeightSummary>?
+    @State private var weight: ProductionResponseEnvelope<FounderProductionWeightSummary>?
     @State private var message: String?
 
     var body: some View {

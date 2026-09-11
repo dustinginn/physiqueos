@@ -12,6 +12,10 @@ struct FounderServerSession: Decodable, Sendable, Equatable {
     let refreshAbsoluteExpiresAt: String?
 }
 
+/// Backs the isolated Sandbox acceptance proof's own `/weight/summary`
+/// endpoint (`readCurrentWeight()`) — genuinely distinct from, and
+/// unaffected by, the Founder Production `weight` native resource's
+/// contract below despite the similar name.
 struct FounderWeightSummary: Decodable, Sendable, Equatable {
     let schemaVersion: String
     let currentWeight: CurrentWeight?
@@ -23,6 +27,38 @@ struct FounderWeightSummary: Decodable, Sendable, Equatable {
         /// A server-owned calendar date (`YYYY-MM-DD`), intentionally kept as
         /// a string so Pacific time can never shift it to an adjacent day.
         let measurementDate: String
+    }
+}
+
+/// Minimal decode of the completed `weight` native resource
+/// (`projectNativeWeightRead`) — this type backs only the "You → Founder
+/// device connection" pairing-verification smoke test
+/// (`FounderServerConnectionView`'s "Canonical Weight" card), which needs
+/// nothing beyond the current reading. The full Weight Evidence vertical
+/// decodes the complete contract itself in `WeightEvidenceAPI.swift`
+/// (history, rolling averages, extrema, DEXA context) — this struct is
+/// deliberately not extended to duplicate that.
+struct FounderProductionWeightSummary: Decodable, Sendable, Equatable {
+    let schemaVersion: String
+    let currentWeight: CurrentWeight?
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case currentWeight = "current"
+    }
+
+    struct CurrentWeight: Decodable, Sendable, Equatable {
+        let id: String
+        let value: Double
+        let unit: String
+        /// A server-owned calendar date (`YYYY-MM-DD`), intentionally kept as
+        /// a string so Pacific time can never shift it to an adjacent day.
+        let measurementDate: String
+
+        private enum CodingKeys: String, CodingKey {
+            case id, value, unit
+            case measurementDate = "date"
+        }
     }
 }
 

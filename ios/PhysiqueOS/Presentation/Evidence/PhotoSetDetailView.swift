@@ -77,9 +77,9 @@ struct PhotoSetDetailView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     header(for: set, view: view)
                 comparisonCard(view)
-                interpretationCard(view)
-                conditionsCard(view)
-                sourceHistoryCard(view)
+                if view.interpretationSummary != nil { interpretationCard(view) }
+                if view.conditionSummary != nil { conditionsCard(view) }
+                if view.sourceHistory != nil { sourceHistoryCard(view) }
                     viewPager(set: set, currentIndex: clampedIndex)
                 }
             }
@@ -159,14 +159,14 @@ struct PhotoSetDetailView: View {
                         evidencePhoto(
                             role: "Current",
                             date: TrainingDateFormatting.short(view.captureDate),
-                            source: environment.founderPhotoMediaStore.source(viewIdentity: view.id)
+                            source: environment.photoMediaSource(for: view)
                         )
                     }
                 } else {
                     evidencePhoto(
                         role: "Current",
                         date: TrainingDateFormatting.short(view.captureDate),
-                        source: environment.founderPhotoMediaStore.source(viewIdentity: view.id)
+                        source: environment.photoMediaSource(for: view)
                     )
                     Text(view.comparedAgainst)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -196,12 +196,14 @@ struct PhotoSetDetailView: View {
         CardContainer {
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeading("Interpretation")
-                Text(view.interpretationSummary)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if !view.comparisonBullets.isEmpty {
+                if let interpretationSummary = view.interpretationSummary {
+                    Text(interpretationSummary)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                }
+                if let bullets = view.comparisonBullets, !bullets.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        ForEach(view.comparisonBullets, id: \.self) { bullet in
+                        ForEach(bullets, id: \.self) { bullet in
                             HStack(alignment: .top, spacing: 6) {
                                 Text("•").foregroundStyle(PhysiqueOSTheme.textMuted)
                                 Text(bullet)
@@ -219,9 +221,11 @@ struct PhotoSetDetailView: View {
         CardContainer {
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeading("Capture Conditions")
-                Text(view.conditionSummary)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if let conditionSummary = view.conditionSummary {
+                    Text(conditionSummary)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
             }
         }
     }
@@ -243,8 +247,8 @@ struct PhotoSetDetailView: View {
                 }
                 .buttonStyle(.plain)
 
-                if isSourceHistoryExpanded {
-                    Text(view.sourceHistory)
+                if isSourceHistoryExpanded, let sourceHistory = view.sourceHistory {
+                    Text(sourceHistory)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         .padding(.top, 8)
@@ -254,6 +258,9 @@ struct PhotoSetDetailView: View {
     }
 
     private func previousSource(for view: PhotoViewRecord) -> PhotoMediaSource {
+        // Founder Production: the prior photo's opaque media id is already
+        // embedded on the view record itself — no lookup needed.
+        if let priorMediaId = view.priorMediaId { return .authenticatedProduction(mediaId: priorMediaId) }
         guard let item = environment.founderPhotoMediaStore.itemsByViewIdentity.values.first(where: {
             $0.poseId == view.poseId && TrainingDateFormatting.short($0.captureDate) == view.comparedAgainst
         }) else { return .placeholder }

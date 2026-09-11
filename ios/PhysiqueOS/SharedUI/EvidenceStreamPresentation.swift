@@ -26,6 +26,7 @@ enum EvidenceStreamPresentation {
         case "energy": Style(systemImage: "bolt.fill", color: Color(hex: 0xC4B5FD)) // Zap, violet
         case "recovery": Style(systemImage: "bed.double.fill", color: Color(hex: 0x5EEAD4)) // Activity (recovery), teal
         case "health-metrics": Style(systemImage: "heart.text.square.fill", color: Color(hex: 0x67E8F9)) // HeartPulse, cyan
+        case "timeline": Style(systemImage: "list.bullet.clipboard.fill", color: Color(hex: 0xA5B4FC)) // History, indigo — Founder Production only, no Sandbox equivalent
         default: Style(systemImage: "list.clipboard.fill", color: PhysiqueOSTheme.textSecondary) // ClipboardList default
         }
     }

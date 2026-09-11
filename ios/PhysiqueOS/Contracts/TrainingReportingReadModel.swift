@@ -25,9 +25,33 @@ struct TrainingReportingReadModel: Identifiable {
     var placeholderBody: String?
     /// Populated only for `resistance`.
     var resistance: TrainingResistanceReportReadModel?
-    /// Populated only for `history` — each row links directly to its
-    /// Training Day, matching `TrainingDayHistoryCard`.
+    /// Populated only for `history` under Sandbox — each row links
+    /// directly to its Training Day, matching `TrainingDayHistoryCard`.
     var historyDays: [TrainingDayReadModel]?
+    /// Populated only for `history` under Founder Production. The
+    /// completed `training-reporting` contract's own `history.days[]`
+    /// shape is deliberately thinner than the rich `training-day`
+    /// resource (`TrainingDayReadModel`) — just enough identity to link
+    /// into that resource's own detail screen, not a duplicate of its
+    /// full per-set content.
+    var productionHistoryDays: [TrainingReportingHistoryDay]? = nil
+}
+
+struct TrainingReportingHistorySession: Identifiable {
+    var sessionId: String
+    var label: String?
+    var occurrenceDate: String
+    var revision: Int?
+
+    var id: String { sessionId }
+    var destination: AppDestination { .trainingSession(sessionId: sessionId) }
+}
+
+struct TrainingReportingHistoryDay: Identifiable {
+    var id: String
+    var date: String
+    var label: String?
+    var sessions: [TrainingReportingHistorySession]
 }
 
 /// `getResistanceReportingContent`'s section data — a fixture-backed

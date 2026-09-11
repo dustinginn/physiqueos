@@ -142,6 +142,7 @@ final class AppEnvironment {
     let founderServerAPI: FounderServerAPI
     let productionNativeAPI: ProductionNativeAPI
     let founderPhotoMediaStore: FounderPhotoMediaStore
+    let founderProductionPhotoMediaStore: FounderProductionPhotoMediaStore
 
     var weightEvidenceAPI: WeightEvidenceAPI {
         switch nativeAuthority {
@@ -206,17 +207,32 @@ final class AppEnvironment {
         nativeAuthority == .founderProduction ? ProductionDEXAAPI(api: productionNativeAPI) : sandboxDEXAAPI
     }
 
-    /// Progress Photos has a genuine, narrow server-side gap under Founder
-    /// Production (the `photos` native resource strips `poseId`/
-    /// `comparisonStatus` before it reaches the wire, even though both
-    /// already exist on the server's own in-memory session objects — see
-    /// this task's final report). A prior revision left this a stored,
+    /// Progress Photos' prior server-side gap (`poseId`/`comparisonStatus`
+    /// stripped before the wire) is closed as of the Patch 3 continuation
+    /// contract (`getNativePhotosTimeline`) — see `ProductionPhotosAPI`'s
+    /// doc comment. A still-earlier revision left this a stored,
     /// never-authority-aware constant, so tapping into Photos under
     /// Founder Production silently rendered the bundled Sandbox fixture as
     /// if it were live — the same fixture-leak defect class already fixed
     /// for Evidence Hub/Log/Goal chronology.
     var photosAPI: PhotosAPI {
-        nativeAuthority == .founderProduction ? NotYetAvailablePhotosAPI() : sandboxPhotosAPI
+        nativeAuthority == .founderProduction ? ProductionPhotosAPI(api: productionNativeAPI) : sandboxPhotosAPI
+    }
+
+    /// Timeline is a genuinely new Founder Production feature (Patch 3
+    /// continuation) with no Sandbox precedent to mirror — Sandbox shows
+    /// an honest "not available" state.
+    var timelineAPI: TimelineAPI {
+        nativeAuthority == .founderProduction ? ProductionTimelineAPI(api: productionNativeAPI) : NotAvailableTimelineAPI()
+    }
+
+    /// Evidence Review detail is only ever reached via the `.evidenceReview`
+    /// destination, which only Founder Production's `ProductionLogAPI`
+    /// constructs — Sandbox's pending reviews always route through
+    /// `.localEvidenceReview` to `LocalEvidenceReviewView` instead, so the
+    /// Sandbox arm here should never actually be hit in practice.
+    var evidenceReviewAPI: EvidenceReviewAPI {
+        nativeAuthority == .founderProduction ? ProductionEvidenceReviewAPI(api: productionNativeAPI) : NotAvailableEvidenceReviewAPI()
     }
 
     init(
@@ -268,10 +284,23 @@ final class AppEnvironment {
         self.founderServerAPI = founderServerAPI
         self.productionNativeAPI = productionNativeAPI
         self.founderPhotoMediaStore = founderPhotoMediaStore ?? FounderPhotoMediaStore(api: founderServerAPI)
+        self.founderProductionPhotoMediaStore = FounderProductionPhotoMediaStore(api: productionNativeAPI)
     }
 
     func selectNativeAuthority(_ authority: NativeAPIEnvironment) {
         nativeAuthority = authority
         authoritySelectionStore.save(authority)
+    }
+
+    /// The one place a `PhotoViewRecord` becomes a renderable
+    /// `PhotoMediaSource` — Production records carry their own opaque
+    /// `mediaId` directly (no separate manifest lookup needed), while
+    /// Sandbox records resolve through the isolated photo-acceptance
+    /// bridge's view-identity manifest. Never mixed: a Production record
+    /// never has a Sandbox `viewIdentity` entry, and vice versa.
+    @MainActor
+    func photoMediaSource(for view: PhotoViewRecord) -> PhotoMediaSource {
+        if let mediaId = view.mediaId { return .authenticatedProduction(mediaId: mediaId) }
+        return founderPhotoMediaStore.source(viewIdentity: view.id)
     }
 }

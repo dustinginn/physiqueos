@@ -90,6 +90,7 @@ struct WeightHistoryView: View {
                 }
                 summaryGrid(report.summary)
                 trendCard(report.chart)
+                if let rollingAverages = report.rollingAverages { rollingAveragesCard(rollingAverages) }
                 weeklyAveragesCard(report.weeklyAverages)
                 historyCard(report.history)
             }
@@ -149,6 +150,47 @@ struct WeightHistoryView: View {
                 )
             }
         }
+    }
+
+    /// Founder Production only — canonical rolling 3-day/7-day averages
+    /// (`report.rollingAverages`), a server computation with no Sandbox
+    /// equivalent to mirror; Native only formats what the server already
+    /// resolved (at most one weigh-in per intended day).
+    private func rollingAveragesCard(_ averages: WeightRollingAverages) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 12) {
+                TrainingSectionHeaderView(title: "Rolling Averages")
+                HStack(spacing: 8) {
+                    rollingAverageTile(title: "3-Day Average", window: averages.threeDay)
+                    rollingAverageTile(title: "7-Day Average", window: averages.sevenDay)
+                }
+            }
+        }
+    }
+
+    private func rollingAverageTile(title: String, window: WeightRollingAverageWindow) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            if let value = window.value, let unit = window.unit {
+                Text(String(format: "%.1f %@", value, unit))
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            } else {
+                Text("Pending")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+            Text("\(window.observationCount) of \(window.requestedDays) days")
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
     }
 
     private func weeklyAveragesCard(_ weeks: [WeightWeeklyAverage]) -> some View {

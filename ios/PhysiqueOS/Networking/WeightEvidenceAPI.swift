@@ -102,71 +102,181 @@ struct FixtureWeightEvidenceAPI: WeightEvidenceAPI {
     }
 }
 
-/// Founder Production adapter for the Package 7 `weight` resource. The
-/// server has already selected the canonical Weight revision; Native maps
-/// that single DTO directly and never groups, sorts, or resolves same-day
-/// candidates itself.
+/// Founder Production adapter for the completed Package 7 `weight`
+/// resource (Patch 3 continuation) — a purpose-built Native projection
+/// (`projectNativeWeightRead`, server-side), not a mirror of
+/// `WeightReportScreen.jsx`'s web card layout. The server has already
+/// selected the canonical current revision, resolved same-day
+/// corrections, computed rolling 3-day/7-day averages, weekly averages,
+/// and decided which Goal-relevant extrema to surface; Native only
+/// decodes and formats this already-final output — it never re-selects a
+/// revision, re-groups by week, or recomputes an average itself.
 struct ProductionWeightEvidenceAPI: WeightEvidenceAPI {
     let api: ProductionNativeAPI
 
     func fetchWeightReport(scope: EvidenceScopeSelection) async throws -> WeightReportReadModel {
-        let envelope = try await api.readWeight()
-        guard envelope.data.schemaVersion == ProductionNativeAPI.contractVersion else {
-            throw ProductionNativeError.incompatibleContractVersion(
-                expected: ProductionNativeAPI.contractVersion,
-                actual: envelope.data.schemaVersion
-            )
-        }
-        return ProductionWeightReportAdapter.report(from: envelope.data.currentWeight, scope: scope)
+        let context = try ProductionContext.value(for: scope)
+        let envelope = try await api.readResource("weight", query: ["context": context], as: Payload.self)
+        return Self.report(from: envelope.data)
     }
-}
 
-enum ProductionWeightReportAdapter {
-    static func report(
-        from currentWeight: FounderWeightSummary.CurrentWeight?,
-        scope: EvidenceScopeSelection
-    ) -> WeightReportReadModel {
-        let entries = currentWeight.map {
-            [WeightEntryFixture(
-                id: $0.id,
-                date: $0.measurementDate,
-                value: $0.value,
-                unit: $0.unit,
-                isDefaultConditions: true
-            )]
-        } ?? []
-        let chartPoints = currentWeight.map {
-            [WeightChartPoint(
-                id: $0.id,
-                date: $0.measurementDate,
-                value: $0.value,
-                label: format($0),
-                detail: "Canonical Weight"
-            )]
-        } ?? []
-        let history = currentWeight.map {
-            [WeightHistoryEntry(
-                id: $0.id,
-                date: $0.measurementDate,
-                detail: "Canonical Weight",
-                value: format($0),
-                attributedScope: nil
-            )]
-        } ?? []
+    private static func report(from payload: Payload) -> WeightReportReadModel {
+        // History arrives newest-first from the server already — reused
+        // verbatim for the History list, and reversed only for the chart
+        // (which must render chronologically, oldest → newest).
+        let history = payload.history.map(\.readModel)
+        let chartPoints = payload.history.reversed().map { entry in
+            WeightChartPoint(id: entry.id, date: entry.date, value: entry.value, label: entry.label, detail: entry.detail)
+        }
+        let markers = payload.dexaContext.markers.map { $0.readModel }
 
         return WeightReportReadModel(
             title: "Weight",
             subtitle: "Weight evidence over time.",
-            scope: EvidenceChronology.scopeContext(selected: scope, allLabel: "All Weight"),
-            summary: WeightEvidenceCalculator.summary(scope: scope, allWeights: entries, scopedWeights: entries),
-            chart: WeightChartData(points: chartPoints, markers: []),
-            weeklyAverages: WeightEvidenceCalculator.weeklyAverages(scopedWeights: entries),
+            scope: payload.context.scope(allLabel: "All Weight"),
+            summary: Self.summary(from: payload),
+            chart: WeightChartData(points: chartPoints, markers: markers),
+            weeklyAverages: payload.weeklyAverages.map(\.readModel),
             history: history,
-            dataSources: [WeightDataSource(name: "PhysiqueOS", status: "Founder Production")]
+            dataSources: [WeightDataSource(name: "PhysiqueOS", status: "Founder Production")],
+            current: payload.current?.readModel,
+            recentWeighIns: payload.recentWeighIns.map(\.readModel),
+            rollingAverages: payload.rollingAverages?.readModel,
+            extrema: payload.extrema?.readModel,
+            dexaContext: WeightDEXAContextSection(latest: payload.dexaContext.latest?.readModel, markers: markers),
+            page: payload.page.readModel
         )
     }
 
-    private static func format(_ weight: FounderWeightSummary.CurrentWeight) -> String {
-        String(format: "%.1f %@", weight.value, weight.unit)
+    /// Which of Latest/Highest/Lowest to show is entirely a server
+    /// decision (`extrema.goalRelevant`) — this only picks which already-
+    /// computed cards to lay out, mirroring the summary-grid UI Sandbox's
+    /// hardcoded contextId lookup used to drive, now server-driven.
+    private static func summary(from payload: Payload) -> [WeightSummaryCard] {
+        var cards: [WeightSummaryCard] = []
+        if let current = payload.current {
+            cards.append(WeightSummaryCard(label: "Latest", value: current.label))
+        }
+        let goalRelevant = Set(payload.extrema?.goalRelevant ?? [])
+        if goalRelevant.contains("highest"), let highest = payload.extrema?.highest {
+            cards.append(WeightSummaryCard(label: "Highest", value: highest.formattedValue))
+        }
+        if goalRelevant.contains("lowest"), let lowest = payload.extrema?.lowest {
+            cards.append(WeightSummaryCard(label: "Lowest", value: lowest.formattedValue))
+        }
+        return cards
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable {
+        var context: NativeGoalPhaseContext
+        var current: HistoryPoint?
+        var recentWeighIns: [HistoryPoint]
+        var rollingAverages: RollingAverages?
+        var weeklyAverages: [WeeklyAverage]
+        var extrema: Extrema?
+        var dexaContext: DEXAContext
+        var history: [HistoryPoint]
+        var page: Page
+    }
+
+    private struct HistoryPoint: Decodable {
+        var id: String
+        var date: String
+        var value: Double
+        var unit: String
+        var revision: Int?
+        var label: String
+        var detail: String
+
+        var readModel: WeightHistoryEntry {
+            WeightHistoryEntry(id: id, date: date, detail: detail, value: label, attributedScope: nil)
+        }
+    }
+
+    private struct RollingAverageWindow: Decodable {
+        var requestedDays: Int
+        var observationCount: Int
+        var startDate: String?
+        var endDate: String?
+        var value: Double?
+        var unit: String?
+
+        var readModel: WeightRollingAverageWindow {
+            WeightRollingAverageWindow(
+                requestedDays: requestedDays, observationCount: observationCount,
+                startDate: startDate, endDate: endDate, value: value, unit: unit
+            )
+        }
+    }
+
+    private struct RollingAverages: Decodable {
+        var threeDay: RollingAverageWindow
+        var sevenDay: RollingAverageWindow
+
+        var readModel: WeightRollingAverages {
+            WeightRollingAverages(threeDay: threeDay.readModel, sevenDay: sevenDay.readModel)
+        }
+    }
+
+    private struct WeeklyAverage: Decodable {
+        var week: String
+        var average: Double
+        var weekOverWeek: Double?
+        var entries: Int
+
+        var readModel: WeightWeeklyAverage {
+            WeightWeeklyAverage(week: week, average: average, weekOverWeek: weekOverWeek, isBaseWeek: weekOverWeek == nil, entryCount: entries)
+        }
+    }
+
+    private struct ExtremePoint: Decodable {
+        var id: String
+        var date: String
+        var value: Double
+        var unit: String
+        var revision: Int?
+
+        var readModel: WeightExtremePoint {
+            WeightExtremePoint(id: id, date: date, value: value, unit: unit, revision: revision)
+        }
+
+        var formattedValue: String {
+            String(format: "%.1f %@", value, unit)
+        }
+    }
+
+    private struct Extrema: Decodable {
+        var goalRelevant: [String]
+        var highest: ExtremePoint?
+        var lowest: ExtremePoint?
+
+        var readModel: WeightExtremaContext {
+            WeightExtremaContext(goalRelevant: goalRelevant, highest: highest?.readModel, lowest: lowest?.readModel)
+        }
+    }
+
+    private struct Marker: Decodable {
+        var id: String
+        var date: String
+        var label: String
+
+        var readModel: WeightChartMarker {
+            WeightChartMarker(id: id, date: date, label: label)
+        }
+    }
+
+    private struct DEXAContext: Decodable {
+        var latest: Marker?
+        var markers: [Marker]
+    }
+
+    private struct Page: Decodable {
+        var limit: Int
+        var count: Int
+        var hasMore: Bool
+
+        var readModel: WeightHistoryPage {
+            WeightHistoryPage(limit: limit, count: count, hasMore: hasMore)
+        }
     }
 }

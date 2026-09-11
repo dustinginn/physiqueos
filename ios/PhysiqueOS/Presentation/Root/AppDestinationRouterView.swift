@@ -54,7 +54,7 @@ struct AppDestinationRouterView: View {
         case .localEvidenceReview(let reviewId):
             LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog, onNavigate: onNavigate)
         case .evidenceReview(let reviewId):
-            LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog, onNavigate: onNavigate)
+            EvidenceReviewDetailView(reviewId: reviewId)
         case .evidenceRecoveryUpload(let type, let occurrenceDateKey):
             EvidenceIntakeView(
                 initialScenario: type.evidenceScenario,
@@ -83,6 +83,8 @@ struct AppDestinationRouterView: View {
             DEXAHistoryView()
         case .progressStream(let streamId) where streamId == "photos":
             PhotosHistoryView()
+        case .progressStream(let streamId) where streamId == "timeline":
+            TimelineView()
         case .photoSetDetail(let setId, let poseId):
             PhotoSetDetailView(setId: setId, initialPoseId: poseId)
         case .progressStream(let streamId) where streamId == "energy":

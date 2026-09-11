@@ -123,7 +123,7 @@ struct PhotosHistoryView: View {
                             if let first = set.views.sorted(by: { $0.poseId.order < $1.poseId.order }).first {
                                 ProgressPhotoTile(
                                     roleLabel: first.poseId.label,
-                                    source: environment.founderPhotoMediaStore.source(viewIdentity: first.id),
+                                    source: environment.photoMediaSource(for: first),
                                     showsRoleLabel: false
                                 )
                                 .frame(width: 92, height: 118)
@@ -139,9 +139,11 @@ struct PhotosHistoryView: View {
                                 Text(TrainingDateFormatting.short(set.date))
                                     .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                Text(set.weightLabel)
-                                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                if let weightLabel = set.weightLabel {
+                                    Text(weightLabel)
+                                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                }
                                 Text("Compared against: \(set.comparisonAvailability)")
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                                     .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -223,7 +225,7 @@ private struct PhotoSetHistoryRow: View {
             if let representative = set.views.sorted(by: { $0.poseId.order < $1.poseId.order }).first {
                 ProgressPhotoTile(
                     roleLabel: representative.poseId.label,
-                    source: environment.founderPhotoMediaStore.source(viewIdentity: representative.id),
+                    source: environment.photoMediaSource(for: representative),
                     showsRoleLabel: false
                 )
                 .frame(width: 68, height: 82)
@@ -232,9 +234,11 @@ private struct PhotoSetHistoryRow: View {
                 Text(TrainingDateFormatting.short(set.date))
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(set.weightLabel)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                if let weightLabel = set.weightLabel {
+                    Text(weightLabel)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
                 Text("\(set.views.count) views · Compared against: \(set.comparisonAvailability)")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -285,7 +289,7 @@ struct PhotoPoseThumbnailStrip: View {
             ForEach(views.sorted { $0.poseId.order < $1.poseId.order }) { view in
                 ProgressPhotoTile(
                     roleLabel: view.poseId.label,
-                    source: environment.founderPhotoMediaStore.source(viewIdentity: view.id),
+                    source: environment.photoMediaSource(for: view),
                     showsRoleLabel: false
                 )
                     .frame(width: compact ? 32 : 44, height: compact ? 42 : 58)

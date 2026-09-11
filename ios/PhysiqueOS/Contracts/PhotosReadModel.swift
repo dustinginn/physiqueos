@@ -88,8 +88,12 @@ struct PhotoSetRecord: Codable, Equatable, Identifiable {
     var id: String
     var date: String
     /// `"179.4 lb"` or `"No same-day weight"`, matching the web's own
-    /// fallback text exactly.
-    var weightLabel: String
+    /// fallback text exactly. `nil` under Founder Production — the
+    /// completed native `photos` contract is deliberately identity/
+    /// comparison-focused (session, pose, media) and does not include
+    /// same-day weight; the view hides this row rather than fabricating
+    /// a value.
+    var weightLabel: String?
     var comparisonAvailability: String
     /// Ordered per `PhotoPoseID.order`.
     var views: [PhotoViewRecord]
@@ -126,16 +130,26 @@ struct PhotoViewRecord: Codable, Equatable, Identifiable {
     /// `"no_prior_matching_pose"` | `"prior_image_unavailable"` |
     /// `"insufficient_canonical_data"` — real `comparisonStatus` values.
     var comparisonStatus: String
-    var conditionSummary: String
-    var sourceHistory: String
-    var interpretationSummary: String
-    var comparisonBullets: [String]
+    /// Server-owned presentation prose (`GalleryInterpretationService`).
+    /// `nil` under Founder Production — the completed native `photos`
+    /// contract is identity/comparison-focused and does not include this
+    /// narrative (it lives only in the separate Photo Event Briefing);
+    /// the view omits these cards rather than fabricating copy.
+    var conditionSummary: String?
+    var sourceHistory: String?
+    var interpretationSummary: String?
+    var comparisonBullets: [String]?
     /// Whether a side-by-side Previous/Current comparison image pair is
     /// available (`comparisonStatus == "comparable" |
     /// "comparable_with_condition_differences"`). This gates the paired
     /// comparison layout independently of whether media is a fixture
     /// placeholder or authenticated acceptance image.
     var hasComparisonImage: Bool
+    /// Opaque production media identity (`ProductionNativeAPI.readMedia`)
+    /// — `nil` under Sandbox, which resolves its own media through
+    /// `FounderPhotoMediaStore`'s separate view-identity lookup instead.
+    var mediaId: String? = nil
+    var priorMediaId: String? = nil
 }
 
 struct PhotoDataSource: Codable, Equatable, Identifiable {

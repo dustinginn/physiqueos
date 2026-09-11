@@ -10,6 +10,10 @@ enum PhotoMediaSource: Equatable, Hashable {
     case assetName(String)
     case remoteURL(URL)
     case authenticatedSandbox(viewIdentity: String, mediaId: String)
+    /// Founder Production — the opaque `mediaId` comes embedded directly on
+    /// the `photos` resource's own response (no separate manifest fetch),
+    /// delivered through `ProductionNativeAPI.readMedia(mediaId:)`.
+    case authenticatedProduction(mediaId: String)
 }
 
 /// The single shared progress-photo rendering seam — used by BOTH Progress
@@ -45,6 +49,8 @@ struct ProgressPhotoTile: View {
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 case .authenticatedSandbox(let viewIdentity, let mediaId):
                     authenticatedImage(viewIdentity: viewIdentity, mediaId: mediaId)
+                case .authenticatedProduction(let mediaId):
+                    authenticatedProductionImage(mediaId: mediaId)
                 }
             }
             .aspectRatio(3.0 / 4.0, contentMode: .fit)
@@ -81,6 +87,34 @@ struct ProgressPhotoTile: View {
                         mediaId: mediaId
                     )
                 }
+            } label: {
+                VStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise.circle")
+                    Text("Retry photo")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                }
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private func authenticatedProductionImage(mediaId: String) -> some View {
+        switch environment.founderProductionPhotoMediaStore.imageStates[mediaId] ?? .idle {
+        case .loaded(let image):
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+        case .loading:
+            ProgressView().tint(PhysiqueOSTheme.accent)
+        case .idle:
+            ProgressView()
+                .tint(PhysiqueOSTheme.accent)
+                .task { await environment.founderProductionPhotoMediaStore.loadImage(mediaId: mediaId) }
+        case .failed:
+            Button {
+                Task { await environment.founderProductionPhotoMediaStore.retryImage(mediaId: mediaId) }
             } label: {
                 VStack(spacing: 6) {
                     Image(systemName: "arrow.clockwise.circle")

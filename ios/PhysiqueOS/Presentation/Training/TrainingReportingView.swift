@@ -66,6 +66,8 @@ struct TrainingReportingView: View {
                     resistanceSections(resistance)
                 } else if let days = report.historyDays {
                     historyCard(days)
+                } else if let days = report.productionHistoryDays {
+                    productionHistoryCard(days)
                 }
             }
         }
@@ -274,6 +276,35 @@ struct TrainingReportingView: View {
                                 TrainingLinkRow(
                                     label: day.label,
                                     detail: TrainingDayView.formatSummary(day.summary)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Founder Production's own thinner `history.days[]` shape (canonical
+    /// session identity, not full per-set content) — each row still links
+    /// straight into the rich `training-day` detail screen, which fetches
+    /// its own complete data independently.
+    private func productionHistoryCard(_ days: [TrainingReportingHistoryDay]) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 12) {
+                TrainingSectionHeaderView(title: "Recent Training History")
+                if days.isEmpty {
+                    Text("Training days will appear here.")
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(days.prefix(20)) { day in
+                            NavigationLink(value: AppDestination.trainingDay(date: day.date)) {
+                                TrainingLinkRow(
+                                    label: day.label ?? TrainingDateFormatting.short(day.date),
+                                    detail: day.sessions.compactMap(\.label).joined(separator: ", ")
                                 )
                             }
                             .buttonStyle(.plain)

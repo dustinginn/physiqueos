@@ -411,8 +411,8 @@ actor ProductionNativeAPI {
         return manifest
     }
 
-    func readWeight() async throws -> ProductionResponseEnvelope<FounderWeightSummary> {
-        try await readResource("weight", as: FounderWeightSummary.self)
+    func readWeight() async throws -> ProductionResponseEnvelope<FounderProductionWeightSummary> {
+        try await readResource("weight", as: FounderProductionWeightSummary.self)
     }
 
     func readResource<Payload: Decodable & Sendable>(

@@ -29,7 +29,7 @@ private struct ProductionTimeline: Decodable, @unchecked Sendable {
     }
 }
 
-private enum ProductionContext {
+enum ProductionContext {
     static func value(for scope: EvidenceScopeSelection) throws -> String {
         switch scope {
         case .all:
@@ -44,6 +44,40 @@ private enum ProductionContext {
                 throw ProductionDailyDriverError.unsupportedGoalContext(id: goalId)
             }
         }
+    }
+}
+
+/// The minimal Goal/Phase context shape shared by the Patch 3 continuation
+/// resources (`weight`, `photos`) — `projectGoalPhaseContext` server-side
+/// — which, unlike the richer `ProductionTimeline` above, does NOT include
+/// pre-built pill `options`/`dateRangeLabel` (only the raw
+/// `contextId`/`startDate`/`endDate` a Native picker needs to construct
+/// them). The 3-option pill set itself (All / Build Lean Mass / Visible
+/// Abs) is fixed UI chrome identical across every Evidence vertical —
+/// constructing it client-side from the server's own `selected` signal
+/// (`contextId`) is the same kind of presentation-only work
+/// `ProductionTimeline.scope(allLabel:)` already does, never a Goal/Phase
+/// chronology decision.
+struct NativeGoalPhaseContext: Decodable, Sendable {
+    var contextId: String
+    var startDate: String?
+    var endDate: String?
+
+    func scope(allLabel: String) -> TrainingScopeContext {
+        TrainingScopeContext(
+            options: [
+                TrainingScopeOption(id: "goal:build-lean-mass", label: "Build Lean Mass", selected: contextId == "build-lean-mass"),
+                TrainingScopeOption(id: "goal:visible-abs", label: "Visible Abs", selected: contextId == "visible-abs"),
+                TrainingScopeOption(id: "all", label: allLabel, selected: contextId == "all"),
+            ],
+            dateRangeLabel: Self.dateRangeLabel(startDate: startDate, endDate: endDate)
+        )
+    }
+
+    private static func dateRangeLabel(startDate: String?, endDate: String?) -> String {
+        guard let startDate else { return "Complete history" }
+        let endLabel = endDate.map(TrainingDateFormatting.short) ?? "Present"
+        return "\(TrainingDateFormatting.short(startDate)) → \(endLabel)"
     }
 }
 
@@ -805,16 +839,207 @@ struct ProductionTrainingAPI: TrainingAPI {
         )
     }
 
+    /// The completed `training-reporting` contract
+    /// (`TrainingReportingPresentationService`, Patch 3 continuation)
+    /// sends the server-composed status groups, PRs, highlights, attention
+    /// items, and category rollups directly — Native decodes and lays out
+    /// this already-final presentation; it never re-derives status
+    /// classification, PR detection, or rollup grouping from raw
+    /// performance observations itself. One payload covers all 6 report
+    /// ids (matching `availableReports`); Native selects the requested
+    /// section client-side, mirroring the real web's own
+    /// `getReportingContent` dispatch (there is no server-side
+    /// per-`reportId` filter).
     func fetchTrainingReporting(reportId: String, scope: EvidenceScopeSelection) async throws -> TrainingReportingReadModel? {
-        // The daily-driver patch consumes the server reporting resource for
-        // route/capability parity, while the accepted deep reporting
-        // presentation remains deferred until its report-specific adapter.
-        _ = try await api.readResource(
+        let envelope = try await api.readResource(
             "training-reporting",
             query: ["context": try ProductionContext.value(for: scope)],
-            as: DiscardedReport.self
+            as: ReportingPayload.self
         )
-        return nil
+        guard let link = envelope.data.reporting.availableReports.first(where: { $0.id == reportId }) else { return nil }
+        let reporting = envelope.data.reporting
+        switch reportId {
+        case "resistance":
+            return TrainingReportingReadModel(
+                id: reportId,
+                eyebrow: "Reporting",
+                title: reporting.resistance?.title ?? link.label,
+                summary: reporting.resistance?.summary ?? link.detail ?? "",
+                scope: envelope.data.context.scope(allLabel: "All Training"),
+                placeholderBody: nil,
+                resistance: reporting.resistance?.readModel,
+                historyDays: nil
+            )
+        case "history":
+            return TrainingReportingReadModel(
+                id: reportId,
+                eyebrow: "Reporting",
+                title: reporting.history?.title ?? link.label,
+                summary: reporting.history?.summary ?? link.detail ?? "",
+                scope: envelope.data.context.scope(allLabel: "All Training"),
+                placeholderBody: nil,
+                resistance: nil,
+                historyDays: nil,
+                productionHistoryDays: reporting.history?.days.map(\.readModel)
+            )
+        default:
+            return TrainingReportingReadModel(
+                id: reportId,
+                eyebrow: "Reporting",
+                title: link.label,
+                summary: link.detail ?? "",
+                scope: envelope.data.context.scope(allLabel: "All Training"),
+                placeholderBody: "This page is now a permanent destination. It will grow into graphs, trends, comparisons, goal impact, and historical analysis as more canonical training evidence accumulates.",
+                resistance: nil,
+                historyDays: nil
+            )
+        }
+    }
+
+    private struct ReportingPayload: Decodable, @unchecked Sendable {
+        var context: NativeGoalPhaseContext
+        var reporting: Reporting
+    }
+
+    private struct Reporting: Decodable {
+        var availableReports: [AvailableReport]
+        var resistance: Resistance?
+        var history: History?
+    }
+
+    private struct AvailableReport: Decodable {
+        var id: String
+        var label: String
+        var detail: String?
+    }
+
+    private struct Resistance: Decodable {
+        var title: String
+        var summary: String
+        var statusGroups: [StatusGroup]
+        var recentPrs: [LinkRow]
+        var highlights: [Highlight]
+        var needsAttention: [LinkRow]
+        var categories: [Category]
+
+        var readModel: TrainingResistanceReportReadModel {
+            TrainingResistanceReportReadModel(
+                statusGroups: statusGroups.map(\.readModel),
+                recentPrs: recentPrs.map { $0.readModel(destination: .trainingExercise(exerciseId: $0.canonicalExerciseId ?? "")) },
+                highlights: highlights.map(\.readModel),
+                needsAttention: needsAttention.map { $0.readModel(destination: .trainingExercise(exerciseId: $0.canonicalExerciseId ?? "")) },
+                categoryRollups: categories.map(\.readModel)
+            )
+        }
+    }
+
+    private struct StatusGroup: Decodable {
+        var status: String
+        var label: String
+        var count: Int
+        var exercises: [LinkRow]
+
+        private static let tones: [String: TrainingResistanceStatusTone] = [
+            "improving": .success, "stable": .stable, "plateauing": .warning,
+            "regressing": .danger, "insufficient_data": .stable,
+        ]
+
+        var readModel: TrainingResistanceStatusGroup {
+            TrainingResistanceStatusGroup(
+                label: label,
+                tone: Self.tones[status] ?? .stable,
+                items: exercises.map { $0.readModel(destination: .trainingExercise(exerciseId: $0.canonicalExerciseId ?? "")) }
+            )
+        }
+    }
+
+    private struct LinkRow: Decodable {
+        var canonicalExerciseId: String?
+        var label: String?
+        var status: String?
+        var latestEvidenceDate: String?
+        var detail: String?
+
+        func readModel(destination: AppDestination) -> TrainingReportingLinkRow {
+            TrainingReportingLinkRow(
+                id: canonicalExerciseId ?? label ?? UUID().uuidString,
+                label: label ?? "Exercise",
+                detail: detail,
+                destination: destination
+            )
+        }
+    }
+
+    private struct Highlight: Decodable {
+        var type: String
+        var canonicalExerciseId: String?
+        var categoryId: String?
+        var label: String?
+        var detail: String?
+
+        var readModel: TrainingReportingLinkRow {
+            let destination: AppDestination = type == "category"
+                ? .trainingExercise(exerciseId: categoryId ?? "")
+                : .trainingExercise(exerciseId: canonicalExerciseId ?? "")
+            return TrainingReportingLinkRow(
+                id: canonicalExerciseId ?? categoryId ?? label ?? UUID().uuidString,
+                label: label ?? "Highlight",
+                detail: detail,
+                destination: destination
+            )
+        }
+    }
+
+    private struct Category: Decodable {
+        var categoryId: String
+        var label: String
+        var status: String?
+        var latestEvidenceDate: String?
+        var exerciseCount: Int?
+        var latestKnownSets: Int?
+        var latestKnownVolume: Double?
+        var statusCounts: [String: Int]?
+
+        var readModel: TrainingReportingLinkRow {
+            var parts: [String] = []
+            if let latestEvidenceDate { parts.append("Latest \(TrainingDateFormatting.short(latestEvidenceDate))") }
+            if let exerciseCount { parts.append("\(exerciseCount) exercise\(exerciseCount == 1 ? "" : "s")") }
+            if let latestKnownSets, latestKnownSets > 0 { parts.append("\(latestKnownSets) set\(latestKnownSets == 1 ? "" : "s")") }
+            return TrainingReportingLinkRow(
+                id: categoryId,
+                label: label,
+                detail: parts.isEmpty ? nil : parts.joined(separator: " · "),
+                destination: .trainingExercise(exerciseId: categoryId)
+            )
+        }
+    }
+
+    private struct History: Decodable {
+        var title: String
+        var summary: String
+        var days: [HistoryDay]
+    }
+
+    private struct HistoryDay: Decodable {
+        var id: String
+        var date: String
+        var label: String?
+        var sessions: [HistorySession]
+
+        var readModel: TrainingReportingHistoryDay {
+            TrainingReportingHistoryDay(id: id, date: date, label: label, sessions: sessions.map(\.readModel))
+        }
+    }
+
+    private struct HistorySession: Decodable {
+        var sessionId: String
+        var label: String?
+        var occurrenceDate: String
+        var revision: Int?
+
+        var readModel: TrainingReportingHistorySession {
+            TrainingReportingHistorySession(sessionId: sessionId, label: label, occurrenceDate: occurrenceDate, revision: revision)
+        }
     }
 
     private static func relationship(
@@ -862,7 +1087,6 @@ struct ProductionTrainingAPI: TrainingAPI {
         var exerciseRecords: TrainingPerformanceRecordsReadModel?
     }
     private struct ExerciseReport: Decodable { var entries: [TrainingSessionDetailReadModel] }
-    private struct DiscardedReport: Decodable, @unchecked Sendable { var timeline: ProductionTimeline }
 }
 
 struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
@@ -1393,15 +1617,17 @@ struct ProductionEvidenceAPI: EvidenceAPI {
         let activity = try await ProductionActivityAPI(api: api).fetchActivityLanding(scope: .all)
         let energy = try await ProductionEnergyAPI(api: api).fetchEnergyReport(scope: .all)
         let dexa = try await ProductionDEXAAPI(api: api).fetchDEXAReport(scope: .all)
+        let photos = try await ProductionPhotosAPI(api: api).fetchPhotosLanding(scope: .all)
 
         let streams: [EvidenceStreamSummary] = [
             trainingStream(training),
             nutritionStream(nutrition),
             weightStream(weight),
-            notYetAvailableStream(id: "photos", title: "Progress Photos", tone: .primary),
+            photosStream(photos),
             dexaStream(dexa),
             activityStream(activity),
             energyStream(energy),
+            timelineStream(),
             comingSoonStream(id: "recovery", title: "Recovery", tone: .primary),
             comingSoonStream(id: "health-metrics", title: "Health Metrics", tone: .primary),
         ]
@@ -1460,6 +1686,31 @@ struct ProductionEvidenceAPI: EvidenceAPI {
             status: latest != nil ? .available : .placeholder,
             tone: .success,
             destination: .progressStream(streamId: "dexa")
+        )
+    }
+
+    private func photosStream(_ landing: PhotosLandingReadModel) -> EvidenceStreamSummary {
+        let latest = landing.latestSet
+        return EvidenceStreamSummary(
+            id: "photos", title: "Progress Photos",
+            metric: latest != nil ? "\(latest!.views.count) views" : "No sessions recorded",
+            trend: latest != nil ? "Last session \(latest!.date)" : "No sessions recorded",
+            lastUpdated: latest?.date,
+            status: latest != nil ? .available : .placeholder,
+            tone: .primary,
+            destination: .progressStream(streamId: "photos")
+        )
+    }
+
+    private func timelineStream() -> EvidenceStreamSummary {
+        EvidenceStreamSummary(
+            id: "timeline", title: "Timeline",
+            metric: "A chronological record of what PhysiqueOS has captured",
+            trend: "A chronological record of what PhysiqueOS has captured",
+            lastUpdated: nil,
+            status: .available,
+            tone: .primary,
+            destination: .progressStream(streamId: "timeline")
         )
     }
 

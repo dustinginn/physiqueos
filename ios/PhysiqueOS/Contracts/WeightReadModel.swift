@@ -34,6 +34,72 @@ struct WeightReportReadModel: Codable, Equatable {
     /// first), matching the web's own `[...points].reverse()`.
     var history: [WeightHistoryEntry]
     var dataSources: [WeightDataSource]
+
+    // MARK: - Founder Production only (Patch 3 continuation)
+    //
+    // The native `weight` resource (`projectNativeWeightRead`,
+    // server-side) is a purpose-built Native contract, not a mirror of
+    // `WeightReportScreen.jsx`'s web card layout — it additionally sends
+    // a revision-safe `current` reading, up to 7 `recentWeighIns`,
+    // canonical rolling 3-day/7-day averages, and a Goal-appropriate
+    // `extrema` selection (which of highest/lowest is relevant is a
+    // server decision — `extrema.goalRelevant` — never a Native
+    // hardcoded lookup). All are `nil` under Sandbox, which has no wire
+    // equivalent to decode them from.
+    var current: WeightHistoryEntry? = nil
+    var recentWeighIns: [WeightHistoryEntry]? = nil
+    var rollingAverages: WeightRollingAverages? = nil
+    var extrema: WeightExtremaContext? = nil
+    var dexaContext: WeightDEXAContextSection? = nil
+    var page: WeightHistoryPage? = nil
+}
+
+/// `rollingAverages.{threeDay,sevenDay}` — a canonical rolling window the
+/// server computed (at most one weigh-in per intended day); Native must
+/// never recompute this from raw history itself.
+struct WeightRollingAverageWindow: Codable, Equatable {
+    var requestedDays: Int
+    var observationCount: Int
+    var startDate: String?
+    var endDate: String?
+    var value: Double?
+    var unit: String?
+}
+
+struct WeightRollingAverages: Codable, Equatable {
+    var threeDay: WeightRollingAverageWindow
+    var sevenDay: WeightRollingAverageWindow
+}
+
+/// `extrema.{highest,lowest}` — a raw numeric point (not yet formatted
+/// into a display string, unlike `WeightHistoryEntry.value`).
+struct WeightExtremePoint: Codable, Equatable {
+    var id: String
+    var date: String
+    var value: Double
+    var unit: String
+    var revision: Int?
+}
+
+/// `extrema.goalRelevant` says which of `highest`/`lowest` the server
+/// considers relevant to the focused Goal (mirrors what used to be a
+/// Native-hardcoded `contextId` lookup table — now a server decision
+/// Native only renders, never recomputes).
+struct WeightExtremaContext: Codable, Equatable {
+    var goalRelevant: [String]
+    var highest: WeightExtremePoint?
+    var lowest: WeightExtremePoint?
+}
+
+struct WeightDEXAContextSection: Codable, Equatable {
+    var latest: WeightChartMarker?
+    var markers: [WeightChartMarker]
+}
+
+struct WeightHistoryPage: Codable, Equatable {
+    var limit: Int
+    var count: Int
+    var hasMore: Bool
 }
 
 /// `summaryMetric`/`summaryChange`'s rendered output — plain label+value;

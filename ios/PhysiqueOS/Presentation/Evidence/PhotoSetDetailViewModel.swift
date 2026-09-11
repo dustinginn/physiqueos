@@ -21,8 +21,6 @@ final class PhotoSetDetailViewModel {
     func load() async {
         do {
             state = .loaded(try await api.fetchPhotoSet(setId: setId))
-        } catch is NotYetAvailablePhotosAPI.NotYetAvailable {
-            state = .failed("Progress Photos reads are not yet available in Founder Production.")
         } catch {
             state = .failed("This photo set could not be loaded.")
         }

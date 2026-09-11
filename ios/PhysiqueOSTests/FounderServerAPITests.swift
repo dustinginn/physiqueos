@@ -146,19 +146,58 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertFalse(paths.contains("/api/v1/native/weight/summary"))
     }
 
-    func testProductionWeightAdapterMapsOnlyServerSelectedCanonicalDTO() {
-        let current = FounderWeightSummary.CurrentWeight(
-            id: "server-selected-revision",
-            value: 167.2,
-            unit: "lb",
-            measurementDate: "2026-09-10"
+    /// The completed `weight` contract (Patch 3 continuation) is a
+    /// purpose-built Native projection — current/recentWeighIns/rolling
+    /// averages/extrema/dexaContext are all server-computed and must be
+    /// decoded and rendered verbatim, never re-derived. `extrema.goalRelevant`
+    /// specifically replaces what used to be a Native-hardcoded contextId
+    /// lookup table for which of Highest/Lowest to show.
+    func testProductionWeightReportDecodesCompleteServerContractNotJustCurrentValue() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["weight": productionWeightFullJSON]
         )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
 
-        let report = ProductionWeightReportAdapter.report(from: current, scope: WeightScopeDefault.selection)
+        let report = try await ProductionWeightEvidenceAPI(api: native).fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
 
-        XCTAssertEqual(report.chart.points.map(\.id), ["server-selected-revision"])
-        XCTAssertEqual(report.history.map(\.id), ["server-selected-revision"])
-        XCTAssertEqual(report.history.first?.value, "167.2 lb")
+        XCTAssertEqual(report.current?.id, "weight-2")
+        XCTAssertEqual(report.current?.value, "168.3 lb")
+        XCTAssertEqual(report.recentWeighIns?.map(\.id), ["weight-2", "weight-1"])
+
+        let rolling = try XCTUnwrap(report.rollingAverages)
+        XCTAssertEqual(rolling.threeDay.value, 168.0)
+        XCTAssertEqual(rolling.sevenDay.value, 167.7)
+
+        // `extrema.goalRelevant` is server-decided (Build Lean Mass →
+        // highest only) — the summary grid must respect it, never fall
+        // back to a Native hardcoded lookup.
+        let extrema = try XCTUnwrap(report.extrema)
+        XCTAssertEqual(extrema.goalRelevant, ["highest"])
+        XCTAssertEqual(extrema.highest?.value, 168.3)
+        let summaryLabels = report.summary.map(\.label)
+        XCTAssertTrue(summaryLabels.contains("Highest"))
+        XCTAssertFalse(summaryLabels.contains("Lowest"))
+
+        XCTAssertEqual(report.dexaContext?.latest?.id, "dexa-scan-1")
+        XCTAssertEqual(report.dexaContext?.markers.count, 1)
+        XCTAssertEqual(report.chart.markers.count, 1)
+
+        // History arrives newest-first from the server; the chart must be
+        // reversed to chronological for correct left-to-right rendering.
+        XCTAssertEqual(report.history.map(\.id), ["weight-2", "weight-1"])
+        XCTAssertEqual(report.chart.points.map(\.id), ["weight-1", "weight-2"])
+
+        XCTAssertEqual(report.weeklyAverages.count, 1)
+        XCTAssertEqual(report.page?.count, 2)
+        XCTAssertEqual(report.page?.hasMore, false)
+
+        // The pill selector must still work even though the completed
+        // contract's `context` is the minimal shape (no server-sent
+        // `options`/`dateRangeLabel`) — Native constructs the fixed
+        // 3-pill chrome client-side from `contextId` alone.
+        XCTAssertTrue(report.scope.options.contains { $0.label == "Build Lean Mass" && $0.selected })
     }
 
     func testEnvelopeFailsClosedOnAuthorityAndResourceMismatch() async throws {
@@ -745,6 +784,7 @@ final class FounderServerAPITests: XCTestCase {
                 "activity": productionActivityJSON,
                 "energy": productionEnergyJSON,
                 "dexa": productionDexaJSON,
+                "photos": productionPhotosJSON,
             ]
         )
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
@@ -765,18 +805,19 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(streamsByID["activity"]?.metric, "650 active cal / 45 min")
         XCTAssertEqual(streamsByID["energy"]?.lastUpdated, "2026-09-10")
 
-        // Domains not yet wired to production reads must show an explicit
-        // safe state, never the bundled fixture's "available" values —
-        // this is not a Patch 3 wiring, it is honesty about what Founder
-        // Production actually has.
-        XCTAssertEqual(streamsByID["photos"]?.status, .placeholder)
-        XCTAssertEqual(streamsByID["photos"]?.metric, "Not yet available in Founder Production")
-
-        // DEXA is wired to real production reads (Patch 3) — must show the
-        // real latest scan, never the placeholder.
+        // DEXA and Photos are both wired to real production reads (Patch 3
+        // continuation) — must show the real latest scan/session, never a
+        // placeholder or stale fixture.
         XCTAssertEqual(streamsByID["dexa"]?.status, .available)
         XCTAssertEqual(streamsByID["dexa"]?.metric, "14.2%")
         XCTAssertEqual(streamsByID["dexa"]?.lastUpdated, "2026-09-01")
+        XCTAssertEqual(streamsByID["photos"]?.status, .available)
+        XCTAssertEqual(streamsByID["photos"]?.lastUpdated, "2026-09-01")
+
+        // Timeline is a genuinely new Founder Production feature with no
+        // Sandbox equivalent — always shown available under Production.
+        XCTAssertEqual(streamsByID["timeline"]?.status, .available)
+        XCTAssertEqual(streamsByID["timeline"]?.destination, .progressStream(streamId: "timeline"))
 
         // Never-built surfaces keep the same "Coming soon" placeholder
         // Sandbox already shows — no regression there either.
@@ -896,11 +937,12 @@ final class FounderServerAPITests: XCTestCase {
     /// tapping into Progress Photos under Founder Production silently
     /// rendered the bundled Sandbox fixture (photo sets, poses, dates) as
     /// if it were live data. Discovered via Simulator acceptance, not
-    /// static review. Progress Photos has a genuine, narrow server-side
-    /// gap (`poseId`/`comparisonStatus` missing from the wire), so the fix
-    /// is an honest "not yet available" failure, never fixture fallback.
+    /// static review. Progress Photos' prior server-side gap (`poseId`/
+    /// `comparisonStatus` missing from the wire) closed with the Patch 3
+    /// continuation contract, so Founder Production now decodes real
+    /// sessions through `ProductionPhotosAPI`, never a fixture fallback.
     @MainActor
-    func testAppEnvironmentPhotosAPISwitchesWithAuthorityAndFounderProductionNeverLeaksSandboxFixture() {
+    func testAppEnvironmentPhotosAPISwitchesWithAuthorityAndSandboxKeepsTheInjectedFixture() {
         let suite = "PhysiqueOS.PhotosAPIAuthoritySwitch.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -911,23 +953,184 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue((environment.photosAPI as? FixturePhotosAPI) != nil)
 
         environment.selectNativeAuthority(.founderProduction)
-        XCTAssertTrue(environment.photosAPI is NotYetAvailablePhotosAPI)
+        XCTAssertTrue(environment.photosAPI is ProductionPhotosAPI)
         XCTAssertNil(environment.photosAPI as? FixturePhotosAPI)
 
         environment.selectNativeAuthority(.sandbox)
         XCTAssertTrue(environment.photosAPI is FixturePhotosAPI)
     }
 
-    func testNotYetAvailablePhotosAPIThrowsRatherThanReturningFixtureData() async {
-        let api = NotYetAvailablePhotosAPI()
+    /// The completed `photos` contract sends canonical pose identity,
+    /// comparison status, and opaque current/prior media directly on each
+    /// session — Native decodes this verbatim and must never re-select a
+    /// same-pose comparison or fabricate a raw storage path/URL.
+    func testProductionPhotosDecodesPoseIdentityComparisonStatusAndOpaqueMedia() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["photos": productionPhotosJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let landing = try await ProductionPhotosAPI(api: native).fetchPhotosLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
+
+        XCTAssertEqual(landing.history.map(\.id), ["session-2", "session-1"])
+        XCTAssertNil(landing.latestSet?.weightLabel)
+        XCTAssertEqual(landing.latestSet?.comparisonAvailability, "1/2 poses have prior comparisons")
+
+        let views = try XCTUnwrap(landing.latestSet?.views)
+        let frontRelaxed = try XCTUnwrap(views.first { $0.poseId == .frontRelaxed })
+        XCTAssertEqual(frontRelaxed.comparisonStatus, "comparable")
+        XCTAssertEqual(frontRelaxed.comparedAgainst, "Aug 15")
+        XCTAssertEqual(frontRelaxed.mediaId, "media-front-2")
+        XCTAssertEqual(frontRelaxed.priorMediaId, "media-front-1")
+        XCTAssertTrue(frontRelaxed.hasComparisonImage)
+        // The completed contract carries no interpretation narrative —
+        // Native must not fabricate one.
+        XCTAssertNil(frontRelaxed.interpretationSummary)
+
+        let backFlexed = try XCTUnwrap(views.first { $0.poseId == .backFlexed })
+        XCTAssertEqual(backFlexed.comparisonStatus, "no_prior_matching_pose")
+        XCTAssertEqual(backFlexed.comparedAgainst, "No prior matching pose")
+        XCTAssertFalse(backFlexed.hasComparisonImage)
+        XCTAssertEqual(backFlexed.mediaId, "media-backflexed-2")
+        XCTAssertNil(backFlexed.priorMediaId)
+    }
+
+    /// The completed `training-reporting` contract sends server-composed
+    /// status groups/PRs/highlights/attention/categories directly
+    /// (`TrainingReportingPresentationService`) — Native must decode and
+    /// lay these out verbatim, never re-derive status classification or PR
+    /// detection from raw performance observations. One payload covers
+    /// every `reportId`; Native selects the requested section client-side.
+    func testProductionTrainingReportingDecodesServerComposedPresentationNotRawObservations() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["training-reporting": productionTrainingReportingJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionTrainingAPI(api: native)
+
+        let resistance = try await api.fetchTrainingReporting(reportId: "resistance", scope: .all)
+        let resistanceReport = try XCTUnwrap(resistance?.resistance)
+        XCTAssertEqual(resistance?.title, "Resistance Training")
+        let improving = try XCTUnwrap(resistanceReport.statusGroups.first { $0.label == "Improving" })
+        XCTAssertEqual(improving.items.map(\.label), ["Bench Press"])
+        XCTAssertEqual(improving.tone, .success)
+        XCTAssertEqual(resistanceReport.recentPrs.first?.detail, "New reps-at-load PR: 8 reps at 185 lb.")
+        XCTAssertEqual(resistanceReport.categoryRollups.first?.label, "Chest")
+
+        let history = try await api.fetchTrainingReporting(reportId: "history", scope: .all)
+        let productionDays = try XCTUnwrap(history?.productionHistoryDays)
+        XCTAssertEqual(productionDays.first?.label, "Sep 8")
+        XCTAssertEqual(productionDays.first?.sessions.first?.label, "Push Day")
+        XCTAssertNil(history?.historyDays)
+
+        // Cardio has no dedicated payload in this pass — must fall back to
+        // the same honest Foundation placeholder every other unimplemented
+        // report id already shows, never a fabricated analytics section.
+        let cardio = try await api.fetchTrainingReporting(reportId: "cardio", scope: .all)
+        XCTAssertNotNil(cardio?.placeholderBody)
+        XCTAssertNil(cardio?.resistance)
+    }
+
+    /// Timeline is a genuinely new Founder Production feature — the server
+    /// already resolves cross-domain identity/chronology; Native decodes
+    /// the one bounded page verbatim (newest-first, already server-sorted)
+    /// and never invents pagination beyond `hasMore`/`totalCount`.
+    func testProductionTimelineDecodesBoundedNewestFirstPage() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["timeline": productionTimelineJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let timeline = try await ProductionTimelineAPI(api: native).fetchTimeline()
+
+        XCTAssertEqual(timeline.items.map(\.id), ["item-2", "item-1"])
+        XCTAssertEqual(timeline.items.first?.tone, .evidence)
+        XCTAssertEqual(timeline.hasMore, false)
+        XCTAssertEqual(timeline.totalCount, 2)
+    }
+
+    @MainActor
+    func testAppEnvironmentTimelineAPISwitchesWithAuthorityAndSandboxIsHonestlyUnavailable() async {
+        let suite = "PhysiqueOS.TimelineAPIAuthoritySwitch.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UserDefaultsNativeAuthoritySelectionStore(defaults: defaults, key: "authority")
+        let environment = AppEnvironment(nativeAuthority: .sandbox, authoritySelectionStore: store)
+
+        XCTAssertTrue(environment.timelineAPI is NotAvailableTimelineAPI)
         do {
-            _ = try await api.fetchPhotosLanding()
-            XCTFail("Expected NotYetAvailable to be thrown")
-        } catch is NotYetAvailablePhotosAPI.NotYetAvailable {
+            _ = try await environment.timelineAPI.fetchTimeline()
+            XCTFail("Expected NotAvailable to be thrown under Sandbox")
+        } catch is NotAvailableTimelineAPI.NotAvailable {
             // expected
         } catch {
-            XCTFail("Expected NotYetAvailable, got \(error)")
+            XCTFail("Expected NotAvailable, got \(error)")
         }
+
+        environment.selectNativeAuthority(.founderProduction)
+        XCTAssertTrue(environment.timelineAPI is ProductionTimelineAPI)
+    }
+
+    /// The `evidence-review` detail resource sends the raw canonical review
+    /// record (unlike the already-presented `evidence-review-queue`) — no
+    /// confirm/correct/reject/dismiss affordance is decoded or exposed here.
+    func testProductionEvidenceReviewDecodesRawReviewWithoutWriteAffordances() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["evidence-review": productionEvidenceReviewJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let review = try await ProductionEvidenceReviewAPI(api: native).fetchReview(reviewId: "review-1")
+
+        XCTAssertEqual(review?.id, "review-1")
+        XCTAssertEqual(review?.status, "pending")
+        XCTAssertEqual(review?.version, 3)
+        XCTAssertEqual(review?.items.map(\.id), ["object-1", "object-2"])
+        XCTAssertEqual(review?.items.first?.type, "weight")
+        XCTAssertEqual(review?.items.first?.date, "2026-09-08")
+    }
+
+    func testProductionEvidenceReviewReturnsNilWhenReviewIsMissing() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["evidence-review": productionEnvelope(resource: "evidence-review", data: #"{"review":null}"#)]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let review = try await ProductionEvidenceReviewAPI(api: native).fetchReview(reviewId: "missing-review")
+
+        XCTAssertNil(review)
+    }
+
+    @MainActor
+    func testAppEnvironmentEvidenceReviewAPISwitchesWithAuthorityAndSandboxIsHonestlyUnavailable() async {
+        let suite = "PhysiqueOS.EvidenceReviewAPIAuthoritySwitch.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UserDefaultsNativeAuthoritySelectionStore(defaults: defaults, key: "authority")
+        let environment = AppEnvironment(nativeAuthority: .sandbox, authoritySelectionStore: store)
+
+        XCTAssertTrue(environment.evidenceReviewAPI is NotAvailableEvidenceReviewAPI)
+        do {
+            _ = try await environment.evidenceReviewAPI.fetchReview(reviewId: "review-1")
+            XCTFail("Expected NotAvailable to be thrown under Sandbox")
+        } catch is NotAvailableEvidenceReviewAPI.NotAvailable {
+            // expected
+        } catch {
+            XCTFail("Expected NotAvailable, got \(error)")
+        }
+
+        environment.selectNativeAuthority(.founderProduction)
+        XCTAssertTrue(environment.evidenceReviewAPI is ProductionEvidenceReviewAPI)
     }
 
     func testProductionMediaAcceptsAuthenticatedImageAndPDF() async throws {
@@ -1625,6 +1828,31 @@ private let productionActivityJSON = productionEnvelope(resource: "activity", da
 
 private let productionEnergyJSON = productionEnvelope(resource: "energy", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Energy","selected":true}]},"summary":{"averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDays":1,"evidenceDays":2},"days":[{"date":"2026-09-10","nutritionDayId":null,"activityDayId":"activity-1","calorieIntake":null,"activeCalories":500,"rmr":1700,"estimatedExpenditure":2200,"energyBalance":null,"completeness":"activity-only","sources":{"nutrition":[],"activity":["Activity"]}},{"date":"2026-09-09","nutritionDayId":"nutrition-1","activityDayId":"activity-2","calorieIntake":0,"activeCalories":600,"rmr":1700,"estimatedExpenditure":2300,"energyBalance":-2300,"completeness":"complete","sources":{"nutrition":["Web"],"activity":["Activity"]}}],"weeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"recentFourWeeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"latestEvidenceDate":"2026-09-10","dataSources":[{"name":"Nutrition","status":"Connected"}],"audit":{"nutritionDays":1,"activityDays":2,"overlappingDates":1}}"#)
 
+private let productionWeightFullJSON = productionEnvelope(resource: "weight", data: #"{"schemaVersion":"1","context":{"contextId":"build-lean-mass","type":"active_goal","goalId":"goal-canonical","goalRevision":null,"phaseId":"phase-canonical","phaseRevision":null,"startDate":"2026-07-19","endDate":null},"current":{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null,"label":"168.3 lb","detail":"Morning weight"},"recentWeighIns":[{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null,"label":"168.3 lb","detail":"Morning weight"},{"id":"weight-1","date":"2026-09-09","value":167.7,"unit":"lb","revision":null,"label":"167.7 lb","detail":"Morning weight"}],"rollingAverages":{"threeDay":{"requestedDays":3,"observationCount":2,"startDate":"2026-09-08","endDate":"2026-09-10","value":168.0,"unit":"lb"},"sevenDay":{"requestedDays":7,"observationCount":2,"startDate":"2026-09-04","endDate":"2026-09-10","value":167.7,"unit":"lb"}},"weeklyAverages":[{"week":"Sep 8","sortDate":"2026-09-08","average":168.0,"weekOverWeek":null,"entries":2}],"extrema":{"goalRelevant":["highest"],"highest":{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null},"lowest":{"id":"weight-1","date":"2026-09-09","value":167.7,"unit":"lb","revision":null}},"dexaContext":{"latest":{"id":"dexa-scan-1","date":"2026-09-01","label":"DEXA"},"markers":[{"id":"dexa-scan-1","date":"2026-09-01","label":"DEXA"}]},"history":[{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null,"label":"168.3 lb","detail":"Morning weight"},{"id":"weight-1","date":"2026-09-09","value":167.7,"unit":"lb","revision":null,"label":"167.7 lb","detail":"Morning weight"}],"page":{"limit":90,"count":2,"hasMore":false}}"#)
+
+private let productionPhotosJSON = productionEnvelope(resource: "photos", data: #"{"schemaVersion":"1","context":{"contextId":"build-lean-mass","type":"active_goal","goalId":"goal-canonical","goalRevision":null,"phaseId":"phase-canonical","phaseRevision":null,"startDate":"2026-07-19","endDate":null},"sessions":[{"sessionId":"session-2","revision":1,"intendedCaptureDate":"2026-09-01","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"1/2 poses have prior comparisons","photos":[{"photoId":"photo-front-2","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"comparable","media":{"mediaId":"media-front-2","deliveryPath":"/api/v1/native/media/media-front-2"},"prior":{"sessionId":"session-1","photoId":"photo-front-1","poseId":"front-relaxed","intendedCaptureDate":"2026-08-15","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"}}},{"photoId":"photo-backflexed-2","poseId":"back-flexed","pose":{"id":"back-flexed","label":"Back Flexed","view":"back","pose":"flexed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-backflexed-2","deliveryPath":"/api/v1/native/media/media-backflexed-2"},"prior":null}]},{"sessionId":"session-1","revision":1,"intendedCaptureDate":"2026-08-15","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"0/1 poses have prior comparisons","photos":[{"photoId":"photo-front-1","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-08-15","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"},"prior":null}]}],"page":{"limit":12,"count":2,"hasMore":false}}"#)
+
+private let productionTrainingReportingJSON = productionEnvelope(resource: "training-reporting", data: #"{"schemaVersion":"1","context":{"contextId":"all","type":"all_history","goalId":null,"goalRevision":null,"phaseId":null,"phaseRevision":null,"startDate":null,"endDate":null},"reporting":{"schemaVersion":"1","availableReports":[{"id":"resistance","label":"Resistance Training","detail":"Strength progression, PRs, and category momentum."},{"id":"history","label":"Training History","detail":"Recent canonical training days."},{"id":"cardio","label":"Cardio","detail":"Calories, distance, and heart-rate trends."}],"resistance":{"title":"Resistance Training","summary":"Strength progression, PRs, and category momentum from training history.","statusGroups":[{"status":"improving","label":"Improving","count":1,"exercises":[{"canonicalExerciseId":"bench-press","label":"Bench Press","status":"improving","latestEvidenceDate":"2026-09-08","detail":"Improving · Latest Sep 8, 2026"}]},{"status":"stable","label":"Stable","count":0,"exercises":[]},{"status":"plateauing","label":"Plateauing","count":0,"exercises":[]},{"status":"regressing","label":"Regressing","count":0,"exercises":[]},{"status":"insufficient_data","label":"Needs data","count":0,"exercises":[]}],"recentPrs":[{"canonicalExerciseId":"bench-press","label":"Bench Press","latestEvidenceDate":"2026-09-08","detail":"New reps-at-load PR: 8 reps at 185 lb."}],"highlights":[{"type":"exercise","canonicalExerciseId":"bench-press","label":"Bench Press","detail":"New reps-at-load PR: 8 reps at 185 lb."}],"needsAttention":[],"categories":[{"categoryId":"chest","label":"Chest","status":"improving","latestEvidenceDate":"2026-09-08","exerciseCount":3,"latestKnownSets":9,"latestKnownVolume":1200,"statusCounts":{"improving":2,"stable":1}}],"source":"canonical_training_sessions"},"history":{"title":"Training History","summary":"Recent canonical training days and their session identities.","days":[{"id":"day-2026-09-08","date":"2026-09-08","label":"Sep 8","sessions":[{"sessionId":"session-canonical-1","label":"Push Day","occurrenceDate":"2026-09-08","revision":1}]}]}}}"#)
+
+private let productionTimelineJSON = productionEnvelope(resource: "timeline", data: #"{"items":[{"id":"item-2","type":"Weight","date":"2026-09-10","title":"Weight logged","detail":"168.3 lb","tone":"evidence"},{"id":"item-1","type":"Daily Briefing","date":"2026-09-09","title":"Midweek Briefing","detail":"Review the week so far.","tone":"primary"}],"hasMore":false,"totalCount":2,"limit":120}"#)
+
+private let productionEvidenceReviewJSON = productionEnvelope(resource: "evidence-review", data: """
+{
+  "review": {
+    "id": "review-1",
+    "status": "pending",
+    "created_at": "2026-09-08T07:00:00.000Z",
+    "version": 3,
+    "interpreted_evidence": {
+      "evidence_objects": [
+        {"id": "object-1", "evidence_type": "weight", "observed_at": "2026-09-08"},
+        {"id": "object-2", "evidence_type": "photo_session", "date": "2026-09-07"}
+      ]
+    }
+  }
+}
+""")
+
 private let productionDexaJSON = productionEnvelope(resource: "dexa", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All DEXA","selected":true}]},"report":{"title":"DEXA","subtitle":"BodySpec body-composition scan history.","latestScan":{"date":"2026-09-01","sourceFileId":"media://scan-2","sourceHref":"/api/private-evidence/media/scan-2"},"summary":[{"label":"Body Fat","value":"14.2%"},{"label":"Fat Mass","value":"26.8 lb"},{"label":"Lean Mass","value":"156.4 lb"},{"label":"Weight","value":"183.2 lb"},{"label":"RMR","value":"1780 kcal"}],"delta":{"bodyFat":"-0.6","fatMass":"-1.1","leanMass":"+0.8"},"chart":{"points":[{"id":"scan-1","date":"2026-08-01","value":14.8},{"id":"scan-2","date":"2026-09-01","value":14.2}]},"charts":[{"id":"totalMass","label":"Weight","suffix":" lb","points":[{"id":"scan-1","date":"2026-08-01","value":184.3},{"id":"scan-2","date":"2026-09-01","value":183.2}]},{"id":"rmr","label":"RMR","suffix":" kcal","points":[{"id":"scan-1","date":"2026-08-01","value":1775},{"id":"scan-2","date":"2026-09-01","value":1780}]}],"regionalMassCharts":[{"id":"trunk-fatMass","label":"Trunk Fat Mass","suffix":" lb","points":[{"id":"scan-1","date":"2026-08-01","value":11.4},{"id":"scan-2","date":"2026-09-01","value":10.8}]}],"latestDetails":[["VAT Mass",1.8," lb",2],["Android Fat",18.4,"%"],["A/G Ratio",0.92,"",2],["T-score",null,""]],"history":[{"id":"scan-2","date":"2026-09-01","bodyFatPercentage":14.2,"totalMass":183.2,"fatMass":26.8,"leanMass":156.4,"rmr":1780,"sourceFileId":"media://scan-2","sourceHref":"/api/private-evidence/media/scan-2"},{"id":"scan-1","date":"2026-08-01","bodyFatPercentage":14.8,"totalMass":184.3,"fatMass":27.9,"leanMass":155.6,"rmr":1775,"sourceFileId":"media://scan-1","sourceHref":"/api/private-evidence/media/scan-1"}],"dataSources":[{"name":"BodySpec PDF Import","status":"Connected"}]}}"#)
 
 private let productionTrainingLandingJSON = productionEnvelope(resource: "training-landing", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Training","selected":true}]},"report":{"title":"Training","subtitle":"Training evidence","tone":"success","latestTrainingDay":{"date":"2026-09-09","label":"Sep 9","summary":"Biceps · Triceps","destination":{"id":"progress.stream","parameters":{"streamId":"training"}},"sessions":[]},"reportingLinks":[],"trainingDays":[],"currentProtocol":{"sourceOfTruth":"Server","dailyActivityTarget":"1000 cal","resistanceTraining":"3x/week","goal":"Build Lean Mass"},"relatedGoals":[],"sourceEvidence":[]}}"#)
@@ -1650,7 +1878,7 @@ private func productionWeightJSON(
     contractVersion: String = "1"
 ) -> String {
     """
-    {"contractVersion":"\(contractVersion)","resource":"\(resource)","authority":"\(authority)","generatedAt":"2026-09-10T15:00:00.000Z","data":{"schemaVersion":"1","currentWeight":{"id":"\(id)","value":\(value),"unit":"lb","measurementDate":"2026-09-10"}}}
+    {"contractVersion":"\(contractVersion)","resource":"\(resource)","authority":"\(authority)","generatedAt":"2026-09-10T15:00:00.000Z","data":{"schemaVersion":"1","context":{"contextId":"all","type":"all_history","goalId":null,"goalRevision":null,"phaseId":null,"phaseRevision":null,"startDate":null,"endDate":null},"current":{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null,"label":"\(value) lb","detail":"Morning weight"},"recentWeighIns":[{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null,"label":"\(value) lb","detail":"Morning weight"}],"rollingAverages":{"threeDay":{"requestedDays":3,"observationCount":1,"startDate":"2026-09-10","endDate":"2026-09-10","value":\(value),"unit":"lb"},"sevenDay":{"requestedDays":7,"observationCount":1,"startDate":"2026-09-10","endDate":"2026-09-10","value":\(value),"unit":"lb"}},"weeklyAverages":[],"extrema":{"goalRelevant":["highest","lowest"],"highest":{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null},"lowest":{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null}},"dexaContext":{"latest":null,"markers":[]},"history":[{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null,"label":"\(value) lb","detail":"Morning weight"}],"page":{"limit":90,"count":1,"hasMore":false}}}
     """
 }
 

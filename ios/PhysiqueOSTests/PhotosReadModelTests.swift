@@ -148,7 +148,7 @@ final class PhotosReadModelTests: XCTestCase {
     func testViewRecordCarriesFixturedInterpretationCopyNotAComputedField() async throws {
         let landing = try await api.fetchPhotosLanding(scope: .all)
         let view = try XCTUnwrap(landing.history.first?.views.first)
-        XCTAssertFalse(view.interpretationSummary.isEmpty)
+        XCTAssertFalse((view.interpretationSummary ?? "").isEmpty)
     }
 
     // MARK: - Stable identity through scope filtering/reordering (Part 1 verification)
