@@ -7,6 +7,22 @@ protocol FounderRefreshCredentialStore: Sendable {
     func deleteRefreshCredential() throws
 }
 
+enum FounderCredentialNamespace: String, Sendable, CaseIterable, Hashable {
+    case sandbox
+    case founderProduction
+
+    var keychainService: String {
+        switch self {
+        case .sandbox:
+            // Preserve the accepted Sandbox item so an existing Sandbox
+            // device session is not silently orphaned by this patch.
+            "com.physiqueos.native.dev.founder-auth"
+        case .founderProduction:
+            "com.physiqueos.native.founder-production-auth"
+        }
+    }
+}
+
 enum FounderCredentialStoreError: Error, Equatable {
     case keychain(OSStatus)
     case malformedValue
@@ -17,14 +33,20 @@ enum FounderCredentialStoreError: Error, Equatable {
 /// credential unavailable while the device is locked. Access credentials
 /// remain in `FounderServerAPI` memory and are never persisted here.
 final class KeychainFounderCredentialStore: FounderRefreshCredentialStore, @unchecked Sendable {
+    let namespace: FounderCredentialNamespace
     private let service: String
     private let account: String
 
+    var serviceIdentifier: String { service }
+    var accountIdentifier: String { account }
+
     init(
-        service: String = "com.physiqueos.native.dev.founder-auth",
+        namespace: FounderCredentialNamespace = .sandbox,
+        service: String? = nil,
         account: String = "rotating-refresh-credential"
     ) {
-        self.service = service
+        self.namespace = namespace
+        self.service = service ?? namespace.keychainService
         self.account = account
     }
 

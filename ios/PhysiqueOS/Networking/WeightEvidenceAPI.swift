@@ -101,3 +101,72 @@ struct FixtureWeightEvidenceAPI: WeightEvidenceAPI {
         String(format: "%.1f %@", entry.value, entry.unit)
     }
 }
+
+/// Founder Production adapter for the Package 7 `weight` resource. The
+/// server has already selected the canonical Weight revision; Native maps
+/// that single DTO directly and never groups, sorts, or resolves same-day
+/// candidates itself.
+struct ProductionWeightEvidenceAPI: WeightEvidenceAPI {
+    let api: ProductionNativeAPI
+
+    func fetchWeightReport(scope: EvidenceScopeSelection) async throws -> WeightReportReadModel {
+        let envelope = try await api.readWeight()
+        guard envelope.data.schemaVersion == ProductionNativeAPI.contractVersion else {
+            throw ProductionNativeError.incompatibleContractVersion(
+                expected: ProductionNativeAPI.contractVersion,
+                actual: envelope.data.schemaVersion
+            )
+        }
+        return ProductionWeightReportAdapter.report(from: envelope.data.currentWeight, scope: scope)
+    }
+}
+
+enum ProductionWeightReportAdapter {
+    static func report(
+        from currentWeight: FounderWeightSummary.CurrentWeight?,
+        scope: EvidenceScopeSelection
+    ) -> WeightReportReadModel {
+        let entries = currentWeight.map {
+            [WeightEntryFixture(
+                id: $0.id,
+                date: $0.measurementDate,
+                value: $0.value,
+                unit: $0.unit,
+                isDefaultConditions: true
+            )]
+        } ?? []
+        let chartPoints = currentWeight.map {
+            [WeightChartPoint(
+                id: $0.id,
+                date: $0.measurementDate,
+                value: $0.value,
+                label: format($0),
+                detail: "Canonical Weight"
+            )]
+        } ?? []
+        let history = currentWeight.map {
+            [WeightHistoryEntry(
+                id: $0.id,
+                date: $0.measurementDate,
+                detail: "Canonical Weight",
+                value: format($0),
+                attributedScope: nil
+            )]
+        } ?? []
+
+        return WeightReportReadModel(
+            title: "Weight",
+            subtitle: "Weight evidence over time.",
+            scope: EvidenceChronology.scopeContext(selected: scope, allLabel: "All Weight"),
+            summary: WeightEvidenceCalculator.summary(scope: scope, allWeights: entries, scopedWeights: entries),
+            chart: WeightChartData(points: chartPoints, markers: []),
+            weeklyAverages: WeightEvidenceCalculator.weeklyAverages(scopedWeights: entries),
+            history: history,
+            dataSources: [WeightDataSource(name: "PhysiqueOS", status: "Founder Production")]
+        )
+    }
+
+    private static func format(_ weight: FounderWeightSummary.CurrentWeight) -> String {
+        String(format: "%.1f %@", weight.value, weight.unit)
+    }
+}

@@ -1,10 +1,47 @@
 import SwiftUI
 import UIKit
 
+struct FounderServerConnectionView: View {
+    @Environment(AppEnvironment.self) private var environment
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Native authority", selection: authorityBinding) {
+                ForEach(NativeAPIEnvironment.allCases) { authority in
+                    Text(authority.displayName).tag(authority)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(PhysiqueOSTheme.background)
+
+            Divider().overlay(PhysiqueOSTheme.divider)
+
+            switch environment.nativeAuthority {
+            case .sandbox:
+                SandboxFounderServerConnectionView()
+            case .founderProduction:
+                ProductionFounderConnectionView()
+            }
+        }
+        .background(PhysiqueOSTheme.background)
+        .navigationTitle(environment.nativeAuthority.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var authorityBinding: Binding<NativeAPIEnvironment> {
+        Binding(
+            get: { environment.nativeAuthority },
+            set: { environment.selectNativeAuthority($0) }
+        )
+    }
+}
+
 /// A controlled transport-proof surface. It never mixes its live Weight
 /// result into fixture-backed Home/Log screens and does not expose any
 /// product write. Pairing requires a one-time Founder-controlled credential.
-struct FounderServerConnectionView: View {
+private struct SandboxFounderServerConnectionView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var pairingCredential = ""
     @State private var isConnected = false
@@ -320,5 +357,204 @@ struct FounderServerConnectionView: View {
     private static func elapsedMilliseconds(since instant: ContinuousClock.Instant) -> Int {
         let components = instant.duration(to: .now).components
         return max(0, Int(components.seconds * 1_000 + components.attoseconds / 1_000_000_000_000_000))
+    }
+}
+
+private struct ProductionFounderConnectionView: View {
+    @Environment(AppEnvironment.self) private var environment
+    @State private var pairingCredential = ""
+    @State private var isConnected = false
+    @State private var isWorking = false
+    @State private var profile: ProductionResponseEnvelope<ProductionProfileData>?
+    @State private var contracts: ProductionContractManifest?
+    @State private var weight: ProductionResponseEnvelope<FounderWeightSummary>?
+    @State private var message: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                OperatingPlanScreenHeader(
+                    eyebrow: "FOUNDER PRODUCTION",
+                    title: "Production read-only connection",
+                    subtitle: "Pair this iPhone with Founder Production, then verify Profile, Contracts, and canonical Weight reads. Product writes remain disabled."
+                )
+
+                StatusChip(
+                    text: isConnected ? "Production session available · read-only" : "Not connected",
+                    color: isConnected ? .success : .warning
+                )
+
+                if !isConnected {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("10-minute production pairing credential")
+                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        SecureField("Enter the Founder production credential", text: $pairingCredential)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .textContentType(.oneTimeCode)
+                            .padding(12)
+                            .background(PhysiqueOSTheme.surfaceMuted)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        PrimaryActionButton(
+                            title: "Connect to Founder Production",
+                            isEnabled: pairingCredential.count == 43 && !isWorking
+                        ) {
+                            connect()
+                        }
+                    }
+                } else {
+                    PrimaryActionButton(title: "Refresh production reads", isEnabled: !isWorking) {
+                        loadReads()
+                    }
+                }
+
+                if let profile {
+                    readResultCard(
+                        title: "Profile",
+                        value: profile.data.profile.identity?.displayName
+                            ?? profile.data.profile.identity?.firstName
+                            ?? profile.data.profile.identity?.id
+                            ?? "Founder",
+                        detail: "\(profile.data.authority.type) · read \(profile.data.capabilities.read ? "available" : "unavailable")"
+                    )
+                }
+
+                if let contracts {
+                    readResultCard(
+                        title: "Contracts",
+                        value: "v\(contracts.contractVersion)",
+                        detail: "\(contracts.reads.count) reads advertised · application remains read-only"
+                    )
+                }
+
+                if let current = weight?.data.currentWeight {
+                    readResultCard(
+                        title: "Canonical Weight",
+                        value: "\(current.value.formatted(.number.precision(.fractionLength(1)))) \(current.unit)",
+                        detail: "Measured \(current.measurementDate)"
+                    )
+                } else if weight != nil {
+                    readResultCard(title: "Canonical Weight", value: "No measurement", detail: "Founder Production returned an empty current Weight state.")
+                }
+
+                if let message {
+                    Text(message)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if isConnected {
+                    Button("Disconnect this production session", role: .destructive) {
+                        revoke()
+                    }
+                    .disabled(isWorking)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+        }
+        .physiqueOSScrollBottomClearance()
+        .background(PhysiqueOSTheme.background)
+        .task {
+            isConnected = (try? await environment.productionNativeAPI.hasStoredSession()) == true
+        }
+    }
+
+    private func readResultCard(title: String, value: String, detail: String) -> some View {
+        CardContainer(padding: .md) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(value)
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(detail)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func connect() {
+        let credential = pairingCredential
+        isWorking = true
+        message = nil
+        Task {
+            do {
+                _ = try await environment.productionNativeAPI.pair(
+                    pairingCredential: credential,
+                    displayName: UIDevice.current.name
+                )
+                await MainActor.run {
+                    pairingCredential = ""
+                    isConnected = true
+                    environment.selectNativeAuthority(.founderProduction)
+                }
+                await loadReadsAsync()
+            } catch {
+                await MainActor.run {
+                    message = (error as? LocalizedError)?.errorDescription ?? "This iPhone could not be connected to Founder Production."
+                    isWorking = false
+                }
+            }
+        }
+    }
+
+    private func loadReads() {
+        isWorking = true
+        message = nil
+        Task { await loadReadsAsync() }
+    }
+
+    private func loadReadsAsync() async {
+        do {
+            let api = environment.productionNativeAPI
+            async let loadedProfile = api.readProfile()
+            async let loadedContracts = api.readContracts()
+            async let loadedWeight = api.readWeight()
+            let results = try await (loadedProfile, loadedContracts, loadedWeight)
+            await MainActor.run {
+                profile = results.0
+                contracts = results.1
+                weight = results.2
+                message = "Founder Production reads succeeded."
+                isWorking = false
+            }
+        } catch {
+            await MainActor.run {
+                message = (error as? LocalizedError)?.errorDescription ?? "Founder Production reads could not be loaded."
+                if case ProductionNativeError.notPaired = error { isConnected = false }
+                if case ProductionNativeError.unauthenticated = error { isConnected = false }
+                isWorking = false
+            }
+        }
+    }
+
+    private func revoke() {
+        isWorking = true
+        message = nil
+        Task {
+            do {
+                try await environment.productionNativeAPI.revokeCurrentSession()
+                await MainActor.run {
+                    isConnected = false
+                    profile = nil
+                    contracts = nil
+                    weight = nil
+                    message = "Founder Production session revoked on this iPhone."
+                    isWorking = false
+                }
+            } catch {
+                await MainActor.run {
+                    message = (error as? LocalizedError)?.errorDescription ?? "The production session could not be revoked."
+                    isWorking = false
+                }
+            }
+        }
     }
 }

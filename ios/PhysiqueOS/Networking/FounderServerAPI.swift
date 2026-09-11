@@ -22,7 +22,7 @@ struct URLSessionFounderHTTPTransport: FounderHTTPTransport {
 /// every successful pairing/refresh atomically replaces the rotating refresh
 /// credential in the injected Keychain-backed store.
 actor FounderServerAPI {
-    static let sandboxOrigin = URL(string: "https://physiqueos-foundation-staging-a9or4.ondigitalocean.app")!
+    static let sandboxOrigin = NativeAPIEnvironment.sandbox.baseURL
     private static let sandboxRoutePrefix = "/api/v1/native/sandbox"
 
     private let baseURL: URL
@@ -314,6 +314,279 @@ actor FounderServerAPI {
     private func elapsedMilliseconds(since instant: ContinuousClock.Instant) -> Int {
         let components = instant.duration(to: .now).components
         return max(0, Int(components.seconds * 1_000 + components.attoseconds / 1_000_000_000_000_000))
+    }
+}
+
+/// The single authenticated transport boundary for Founder Production.
+/// It intentionally exposes reads, media, and auth lifecycle operations but
+/// no product command API; Founder Production is hard read-only in Patch 1.
+actor ProductionNativeAPI {
+    static let contractVersion = "1"
+
+    private let configuration: NativeAPIEnvironment
+    private let baseURL: URL
+    private let credentialStore: FounderRefreshCredentialStore
+    private let transport: FounderHTTPTransport
+    private let decoder = JSONDecoder()
+    private let encoder = JSONEncoder()
+    private var accessToken: String?
+    private var refreshTask: Task<String, Error>?
+
+    init(
+        configuration: NativeAPIEnvironment = .founderProduction,
+        baseURL: URL? = nil,
+        credentialStore: FounderRefreshCredentialStore? = nil,
+        transport: FounderHTTPTransport = URLSessionFounderHTTPTransport()
+    ) {
+        precondition(configuration == .founderProduction, "ProductionNativeAPI requires Founder Production authority.")
+        self.configuration = configuration
+        self.baseURL = baseURL ?? configuration.baseURL
+        self.credentialStore = credentialStore ?? KeychainFounderCredentialStore(namespace: configuration.credentialNamespace)
+        self.transport = transport
+    }
+
+    func hasStoredSession() throws -> Bool {
+        try credentialStore.loadRefreshCredential() != nil
+    }
+
+    @discardableResult
+    func pair(pairingCredential: String, displayName: String) async throws -> FounderServerSession {
+        let payload = PairRequest(pairingCredential: pairingCredential, platform: "ios", displayName: displayName)
+        let session: FounderServerSession = try await sendJSON(
+            path: "\(configuration.routeFamily)/auth/pair",
+            method: "POST",
+            body: payload,
+            bearer: nil
+        )
+        try persist(session)
+        return session
+    }
+
+    func revokeCurrentSession() async throws {
+        let response: RevocationResponse = try await authenticatedJSON(
+            path: "\(configuration.routeFamily)/auth/session",
+            method: "DELETE"
+        )
+        guard response.revoked else { throw ProductionNativeError.invalidResponse }
+        accessToken = nil
+        try credentialStore.deleteRefreshCredential()
+    }
+
+    func readProfile() async throws -> ProductionResponseEnvelope<ProductionProfileData> {
+        let envelope: ProductionResponseEnvelope<ProductionProfileData> = try await authenticatedJSON(
+            path: "\(configuration.routeFamily)/profile",
+            method: "GET"
+        )
+        try validate(envelope, expectedResource: "profile")
+        guard envelope.data.authority.type == configuration.expectedAuthority,
+              envelope.data.authority.sandbox == false
+        else {
+            throw ProductionNativeError.authorityMismatch(
+                expected: configuration.expectedAuthority,
+                actual: envelope.data.authority.type
+            )
+        }
+        return envelope
+    }
+
+    func readContracts() async throws -> ProductionContractManifest {
+        let manifest: ProductionContractManifest = try await authenticatedJSON(
+            path: "\(configuration.routeFamily)/contracts",
+            method: "GET"
+        )
+        guard manifest.contractVersion == Self.contractVersion else {
+            throw ProductionNativeError.incompatibleContractVersion(expected: Self.contractVersion, actual: manifest.contractVersion)
+        }
+        guard manifest.authority == configuration.expectedAuthority,
+              manifest.bootstrap.authority == configuration.expectedAuthority,
+              manifest.reads.allSatisfy({ $0.authority == configuration.expectedAuthority }),
+              manifest.writes.allSatisfy({ $0.authority == configuration.expectedAuthority })
+        else {
+            throw ProductionNativeError.authorityMismatch(expected: configuration.expectedAuthority, actual: manifest.authority)
+        }
+        return manifest
+    }
+
+    func readWeight() async throws -> ProductionResponseEnvelope<FounderWeightSummary> {
+        try await readResource("weight", as: FounderWeightSummary.self)
+    }
+
+    func readResource<Payload: Decodable & Sendable>(
+        _ resource: String,
+        as type: Payload.Type
+    ) async throws -> ProductionResponseEnvelope<Payload> {
+        guard resource.range(of: #"^[a-z][a-z0-9-]*$"#, options: .regularExpression) != nil else {
+            throw ProductionNativeError.invalidResponse
+        }
+        let envelope: ProductionResponseEnvelope<Payload> = try await authenticatedJSON(
+            path: "\(configuration.routeFamily)/read/\(resource)",
+            method: "GET"
+        )
+        try validate(envelope, expectedResource: resource)
+        return envelope
+    }
+
+    func readMedia(mediaId: String) async throws -> ProductionMediaPayload {
+        guard !mediaId.isEmpty,
+              mediaId.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil
+        else { throw ProductionNativeError.invalidResponse }
+
+        let (data, response) = try await authenticatedResponse(
+            path: "\(configuration.routeFamily)/media/\(mediaId)",
+            method: "GET",
+            accept: "image/jpeg,image/png,image/heic,image/webp,application/pdf"
+        )
+        let contentType = response.mimeType?.lowercased()
+        let supported = ["image/jpeg", "image/png", "image/heic", "image/webp", "application/pdf"]
+        guard let contentType, supported.contains(contentType) else {
+            throw ProductionNativeError.unsupportedMediaType(contentType)
+        }
+        guard !data.isEmpty else { throw ProductionNativeError.invalidResponse }
+        return ProductionMediaPayload(data: data, contentType: contentType)
+    }
+
+    private func validate<Payload>(_ envelope: ProductionResponseEnvelope<Payload>, expectedResource: String) throws {
+        guard envelope.contractVersion == Self.contractVersion else {
+            throw ProductionNativeError.incompatibleContractVersion(expected: Self.contractVersion, actual: envelope.contractVersion)
+        }
+        guard envelope.resource == expectedResource else {
+            throw ProductionNativeError.resourceMismatch(expected: expectedResource, actual: envelope.resource)
+        }
+        guard envelope.authority == configuration.expectedAuthority else {
+            throw ProductionNativeError.authorityMismatch(expected: configuration.expectedAuthority, actual: envelope.authority)
+        }
+    }
+
+    private func validAccessToken() async throws -> String {
+        if let accessToken { return accessToken }
+        return try await refreshAccessToken()
+    }
+
+    private func refreshAccessToken() async throws -> String {
+        if let refreshTask { return try await refreshTask.value }
+        let task = Task { try await self.rotateRefreshCredential() }
+        refreshTask = task
+        do {
+            let token = try await task.value
+            refreshTask = nil
+            return token
+        } catch {
+            refreshTask = nil
+            throw error
+        }
+    }
+
+    private func rotateRefreshCredential() async throws -> String {
+        guard let refreshCredential = try credentialStore.loadRefreshCredential() else {
+            throw ProductionNativeError.notPaired
+        }
+        do {
+            let session: FounderServerSession = try await sendJSON(
+                path: "\(configuration.routeFamily)/auth/refresh",
+                method: "POST",
+                body: RefreshRequest(refreshCredential: refreshCredential),
+                bearer: nil
+            )
+            try persist(session)
+            return session.accessToken
+        } catch {
+            if case ProductionNativeError.unauthenticated = error {
+                accessToken = nil
+                try? credentialStore.deleteRefreshCredential()
+            }
+            throw error
+        }
+    }
+
+    private func persist(_ session: FounderServerSession) throws {
+        try credentialStore.saveRefreshCredential(session.refreshCredential)
+        accessToken = session.accessToken
+    }
+
+    private func authenticatedJSON<Response: Decodable>(path: String, method: String) async throws -> Response {
+        let (data, _) = try await authenticatedResponse(path: path, method: method, accept: "application/json")
+        do { return try decoder.decode(Response.self, from: data) }
+        catch { throw ProductionNativeError.invalidResponse }
+    }
+
+    private func authenticatedResponse(
+        path: String,
+        method: String,
+        accept: String
+    ) async throws -> (Data, HTTPURLResponse) {
+        let token = try await validAccessToken()
+        var result = try await perform(path: path, method: method, body: nil, bearer: token, accept: accept)
+        if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
+            let refreshedToken = try await refreshAccessToken()
+            result = try await perform(path: path, method: method, body: nil, bearer: refreshedToken, accept: accept)
+        }
+        try validateHTTP(result.1, data: result.0)
+        return result
+    }
+
+    private func sendJSON<Response: Decodable, Body: Encodable>(
+        path: String,
+        method: String,
+        body: Body,
+        bearer: String?
+    ) async throws -> Response {
+        let encoded: Data
+        do { encoded = try encoder.encode(body) }
+        catch { throw ProductionNativeError.invalidResponse }
+        let (data, response) = try await perform(
+            path: path,
+            method: method,
+            body: encoded,
+            bearer: bearer,
+            accept: "application/json"
+        )
+        try validateHTTP(response, data: data)
+        do { return try decoder.decode(Response.self, from: data) }
+        catch { throw ProductionNativeError.invalidResponse }
+    }
+
+    private func perform(
+        path: String,
+        method: String,
+        body: Data?,
+        bearer: String?,
+        accept: String
+    ) async throws -> (Data, HTTPURLResponse) {
+        var request = URLRequest(url: baseURL.appending(path: path))
+        request.httpMethod = method
+        request.httpBody = body
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 15
+        request.setValue(accept, forHTTPHeaderField: "Accept")
+        if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        if let bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
+        do { return try await transport.data(for: request) }
+        catch { throw ProductionNativeError.networkFailure }
+    }
+
+    private func validateHTTP(_ response: HTTPURLResponse, data: Data) throws {
+        guard !(200..<300).contains(response.statusCode) else { return }
+        let problem = try? decoder.decode(ProductionProblemDetails.self, from: data)
+        switch response.statusCode {
+        case 401: throw ProductionNativeError.unauthenticated(problem)
+        case 404: throw ProductionNativeError.notFound(problem)
+        case 400:
+            if let problem { throw ProductionNativeError.validation(problem) }
+            throw ProductionNativeError.server(nil)
+        case 412:
+            if let problem { throw ProductionNativeError.failedPrecondition(problem) }
+            throw ProductionNativeError.server(nil)
+        case 409:
+            if let problem { throw ProductionNativeError.conflict(problem) }
+            throw ProductionNativeError.server(nil)
+        case 500...599: throw ProductionNativeError.temporaryServer(problem)
+        default: throw ProductionNativeError.server(problem)
+        }
+    }
+
+    private func isRefreshableAuthenticationProblem(data: Data) -> Bool {
+        guard let problem = try? decoder.decode(ProductionProblemDetails.self, from: data) else { return false }
+        return ["ACCESS_TOKEN_EXPIRED", "ACCESS_TOKEN_INVALID"].contains(problem.code)
     }
 }
 

@@ -165,6 +165,199 @@ enum FounderServerError: Error, Sendable, Equatable, LocalizedError {
     }
 }
 
+// MARK: - Founder production Native contracts
+
+struct ProductionResponseEnvelope<Payload: Decodable & Sendable>: Decodable, Sendable {
+    let contractVersion: String
+    let resource: String
+    let authority: String
+    let generatedAt: String
+    let data: Payload
+}
+
+struct ProductionProfileData: Decodable, Sendable, Equatable {
+    struct Profile: Decodable, Sendable, Equatable {
+        struct User: Decodable, Sendable, Equatable {
+            let id: String
+            let displayName: String?
+            let firstName: String?
+            let lastName: String?
+            let timezone: String?
+            let timeZone: String?
+        }
+
+        // The deployed profile payload is the client-safe You profile and
+        // nests canonical identity under `user`.
+        let user: User?
+        // Tolerate the narrow profile shape used by contract-boundary
+        // fixtures without weakening authority validation.
+        let id: String?
+        let displayName: String?
+        let timeZone: String?
+
+        var identity: User? {
+            if let user { return user }
+            guard let id else { return nil }
+            return User(id: id, displayName: displayName, firstName: nil, lastName: nil, timezone: nil, timeZone: timeZone)
+        }
+    }
+
+    struct Authority: Decodable, Sendable, Equatable {
+        let type: String
+        let sandbox: Bool
+    }
+
+    struct Capabilities: Decodable, Sendable, Equatable {
+        let read: Bool
+        let write: Bool
+        let media: Bool
+    }
+
+    let profile: Profile
+    let authority: Authority
+    let capabilities: Capabilities
+}
+
+struct ProductionContractManifest: Decodable, Sendable, Equatable {
+    struct Bootstrap: Decodable, Sendable, Equatable {
+        let issuerEndpoint: String
+        let issuerAuthentication: String
+        let pairEndpoint: String
+        let credentialLifetimeSeconds: Int
+        let credentialUse: String
+        let authority: String
+    }
+
+    struct Media: Decodable, Sendable, Equatable {
+        let endpoint: String
+        let identity: String
+        let authorization: String
+        let cache: String
+    }
+
+    struct Read: Decodable, Sendable, Equatable {
+        let resource: String
+        let endpoint: String
+        let service: String
+        let auth: String
+        let authority: String
+        let goalPhase: String
+        let media: String
+        let pagination: String
+    }
+
+    struct Command: Decodable, Sendable, Equatable {
+        let commandType: String
+        let endpoint: String
+        let auth: String
+        let authority: String
+        let idempotency: String
+        let revision: String
+    }
+
+    let contractVersion: String
+    let apiVersion: String
+    let authority: String
+    let authentication: String
+    let bootstrap: Bootstrap
+    let sandboxAuthority: String
+    let errorFormat: String
+    let dateSemantics: String
+    let media: Media
+    let reads: [Read]
+    let writes: [Command]
+}
+
+indirect enum ProductionJSONValue: Codable, Sendable, Equatable {
+    case object([String: ProductionJSONValue])
+    case array([ProductionJSONValue])
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() { self = .null }
+        else if let value = try? container.decode(Bool.self) { self = .bool(value) }
+        else if let value = try? container.decode(Double.self) { self = .number(value) }
+        else if let value = try? container.decode(String.self) { self = .string(value) }
+        else if let value = try? container.decode([String: ProductionJSONValue].self) { self = .object(value) }
+        else if let value = try? container.decode([ProductionJSONValue].self) { self = .array(value) }
+        else { throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported JSON value") }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .object(let value): try container.encode(value)
+        case .array(let value): try container.encode(value)
+        case .string(let value): try container.encode(value)
+        case .number(let value): try container.encode(value)
+        case .bool(let value): try container.encode(value)
+        case .null: try container.encodeNil()
+        }
+    }
+}
+
+struct ProductionProblemDetails: Decodable, Sendable, Equatable {
+    struct FieldError: Decodable, Sendable, Equatable {
+        let field: String
+        let code: String
+        let detail: String?
+    }
+
+    let problemVersion: String?
+    let type: String?
+    let title: String
+    let status: Int
+    let code: String
+    let detail: String?
+    let instance: String?
+    let requestId: String?
+    let fieldErrors: [FieldError]
+    let recovery: ProductionJSONValue?
+}
+
+struct ProductionMediaPayload: Sendable, Equatable {
+    let data: Data
+    let contentType: String
+}
+
+enum ProductionNativeError: Error, Sendable, Equatable, LocalizedError {
+    case notPaired
+    case unauthenticated(ProductionProblemDetails?)
+    case notFound(ProductionProblemDetails?)
+    case validation(ProductionProblemDetails)
+    case failedPrecondition(ProductionProblemDetails)
+    case conflict(ProductionProblemDetails)
+    case temporaryServer(ProductionProblemDetails?)
+    case server(ProductionProblemDetails?)
+    case networkFailure
+    case invalidResponse
+    case incompatibleContractVersion(expected: String, actual: String)
+    case resourceMismatch(expected: String, actual: String)
+    case authorityMismatch(expected: String, actual: String)
+    case unsupportedMediaType(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .notPaired: "Connect this iPhone to Founder Production before loading data."
+        case .unauthenticated: "The Founder Production session is no longer authenticated."
+        case .notFound: "The requested Founder Production resource is unavailable."
+        case .validation(let problem), .failedPrecondition(let problem), .conflict(let problem): problem.title
+        case .temporaryServer: "PhysiqueOS is temporarily unavailable."
+        case .server(let problem): problem?.title ?? "The Founder Production request failed."
+        case .networkFailure: "PhysiqueOS could not be reached. Check the connection and try again."
+        case .invalidResponse: "PhysiqueOS returned an unreadable response."
+        case .incompatibleContractVersion: "The Native production contract version is incompatible."
+        case .resourceMismatch: "The Native production resource identity did not match the request."
+        case .authorityMismatch: "The response did not come from Founder Production authority."
+        case .unsupportedMediaType: "The authenticated media type is not supported."
+        }
+    }
+}
+
 // MARK: - Founder photo visual-acceptance transport
 
 /// The deliberately narrow, Sandbox-only media manifest. The server owns

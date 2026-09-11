@@ -21,6 +21,7 @@ import SwiftUI
 struct WeightHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: WeightHistoryViewModel?
     @State private var isWeeklyAveragesExpanded = false
     @State private var isHistoryExpanded = false
@@ -54,9 +55,18 @@ struct WeightHistoryView: View {
                 }
             }
         }
-        .task {
-            if viewModel == nil { viewModel = WeightHistoryViewModel(api: environment.weightEvidenceAPI) }
+        .task(id: environment.nativeAuthority) {
+            // Recreate the provider when authority changes so a fixture
+            // result can never remain visible in Founder Production mode.
+            viewModel = WeightHistoryViewModel(api: environment.weightEvidenceAPI)
             await viewModel?.load()
+        }
+        .refreshable {
+            await viewModel?.load()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, let viewModel else { return }
+            Task { await viewModel.load() }
         }
     }
 
