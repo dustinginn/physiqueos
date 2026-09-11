@@ -78,7 +78,18 @@ struct ProgressPhotoTile: View {
         case .idle:
             ProgressView()
                 .tint(PhysiqueOSTheme.accent)
-                .task { await environment.founderPhotoMediaStore.loadImage(viewIdentity: viewIdentity, mediaId: mediaId) }
+                .onAppear {
+                    // Loading changes the observed state to `.loading`, which removes
+                    // this `.idle` branch. An attached SwiftUI `.task` is cancelled at
+                    // that point, so keep the transport request independent of the
+                    // branch's rendering lifetime.
+                    Task {
+                        await environment.founderPhotoMediaStore.loadImage(
+                            viewIdentity: viewIdentity,
+                            mediaId: mediaId
+                        )
+                    }
+                }
         case .failed:
             Button {
                 Task {
@@ -111,7 +122,13 @@ struct ProgressPhotoTile: View {
         case .idle:
             ProgressView()
                 .tint(PhysiqueOSTheme.accent)
-                .task { await environment.founderProductionPhotoMediaStore.loadImage(mediaId: mediaId) }
+                .onAppear {
+                    // The state transition to `.loading` replaces this branch. Keep
+                    // the authenticated request alive across that expected redraw.
+                    Task {
+                        await environment.founderProductionPhotoMediaStore.loadImage(mediaId: mediaId)
+                    }
+                }
         case .failed:
             Button {
                 Task { await environment.founderProductionPhotoMediaStore.retryImage(mediaId: mediaId) }

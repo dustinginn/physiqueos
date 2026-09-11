@@ -66,6 +66,10 @@ struct DEXAReportReadModel: Equatable {
 struct DEXALatestScan: Equatable {
     var date: String
     var sourceLabel: String
+    /// Founder Production only. The server projects the private BodySpec
+    /// report as an opaque Native media identity; Sandbox fixtures never
+    /// manufacture one.
+    var sourceMediaId: String? = nil
 }
 
 struct DEXASummaryItem: Equatable, Identifiable {
@@ -117,6 +121,9 @@ struct DEXAScanHistoryRow: Equatable, Identifiable {
     var restingMetabolicRate: String
     var sourceLabel: String
     var attributedScope: EvidenceScopeAttribution? = nil
+    /// Founder Production only; delivered through the authenticated media
+    /// transport rather than a provider URL, filesystem path, or object key.
+    var sourceMediaId: String? = nil
 }
 
 struct DEXADataSource: Codable, Equatable, Identifiable {

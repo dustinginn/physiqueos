@@ -1447,7 +1447,11 @@ struct ProductionDEXAAPI: DEXAAPI {
             subtitle: report.subtitle,
             scope: payload.timeline.scope(allLabel: allLabel),
             latestScan: report.latestScan.map {
-                DEXALatestScan(date: $0.date, sourceLabel: "BodySpec PDF Import")
+                DEXALatestScan(
+                    date: $0.date,
+                    sourceLabel: "BodySpec PDF Import",
+                    sourceMediaId: $0.sourceMedia?.mediaId
+                )
             },
             summary: report.summary.map { DEXASummaryItem(label: $0.label, value: $0.value) },
             delta: report.delta.map {
@@ -1535,7 +1539,10 @@ struct ProductionDEXAAPI: DEXAAPI {
         var dataSources: [DEXADataSource]
     }
 
-    private struct LatestScan: Decodable { var date: String }
+    private struct LatestScan: Decodable {
+        var date: String
+        var sourceMedia: MediaDescriptor?
+    }
     private struct SummaryItem: Decodable { var label: String; var value: String }
     private struct Delta: Decodable { var bodyFat: String; var fatMass: String; var leanMass: String }
     private struct Chart: Decodable { var points: [ChartPoint] }
@@ -1575,6 +1582,7 @@ struct ProductionDEXAAPI: DEXAAPI {
         var fatMass: Double?
         var leanMass: Double?
         var rmr: Double?
+        var sourceMedia: MediaDescriptor?
 
         var readModel: DEXAScanHistoryRow {
             DEXAScanHistoryRow(
@@ -1583,9 +1591,15 @@ struct ProductionDEXAAPI: DEXAAPI {
                 fatMass: fatMass.map { String(format: "%.1f lb", $0) } ?? "Pending",
                 leanMass: leanMass.map { String(format: "%.1f lb", $0) } ?? "Pending",
                 restingMetabolicRate: rmr.map { "\(Int($0.rounded())) kcal/day" } ?? "Pending",
-                sourceLabel: "BodySpec PDF Import"
+                sourceLabel: "BodySpec PDF Import",
+                sourceMediaId: sourceMedia?.mediaId
             )
         }
+    }
+
+    private struct MediaDescriptor: Decodable {
+        var mediaId: String
+        var deliveryPath: String
     }
 }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import PDFKit
 
 /// The DEXA Evidence page (`/progress/dexa`), reached from the Evidence
 /// tab's DEXA row. Like Weight, this is genuinely **one page** that is
@@ -39,6 +40,9 @@ struct DEXAHistoryView: View {
     @State private var isRegionalLeanExpanded = false
     @State private var isRegionalFatExpanded = false
     @State private var isHistoryExpanded = false
+    @State private var selectedPDF: DEXAPDFPresentation?
+    @State private var sourceMediaMessage: String?
+    @State private var loadingSourceMediaID: String?
 
     static let supplementalPreviewLimit = 3
     static let regionalPreviewLimit = 3
@@ -73,7 +77,13 @@ struct DEXAHistoryView: View {
         }
         .task(id: environment.nativeAuthority) {
             viewModel = DEXAHistoryViewModel(api: environment.dexaAPI)
+            selectedPDF = nil
+            sourceMediaMessage = nil
+            loadingSourceMediaID = nil
             await viewModel?.load()
+        }
+        .sheet(item: $selectedPDF) { presentation in
+            DEXAPDFSheet(presentation: presentation)
         }
     }
 
@@ -138,6 +148,14 @@ struct DEXAHistoryView: View {
                         Text(scan.sourceLabel)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                             .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    }
+                    if let mediaId = scan.sourceMediaId {
+                        sourceMediaButton(mediaId: mediaId)
+                    }
+                    if let sourceMediaMessage {
+                        Text(sourceMediaMessage)
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                 } else {
                     Text("No DEXA scans in this period.")
@@ -369,8 +387,60 @@ struct DEXAHistoryView: View {
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 } else {
                     VStack(spacing: 6) {
-                        ForEach(isHistoryExpanded ? rows : preview) { row in DEXAScanHistoryRowView(row: row) }
+                        ForEach(isHistoryExpanded ? rows : preview) { row in
+                            DEXAScanHistoryRowView(row: row) {
+                                guard let mediaId = row.sourceMediaId else { return }
+                                loadSourcePDF(mediaId: mediaId)
+                            }
+                        }
                     }
+                }
+            }
+        }
+    }
+
+    private func sourceMediaButton(mediaId: String) -> some View {
+        Button {
+            loadSourcePDF(mediaId: mediaId)
+        } label: {
+            HStack(spacing: 8) {
+                if loadingSourceMediaID == mediaId {
+                    ProgressView().tint(PhysiqueOSTheme.textPrimary)
+                } else {
+                    Image(systemName: "doc.richtext.fill")
+                }
+                Text("View BodySpec PDF")
+            }
+            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 11)
+            .background(PhysiqueOSTheme.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .disabled(loadingSourceMediaID != nil)
+        .accessibilityIdentifier("dexa.latestScan.viewPDF")
+    }
+
+    private func loadSourcePDF(mediaId: String) {
+        guard environment.nativeAuthority == .founderProduction else { return }
+        loadingSourceMediaID = mediaId
+        sourceMediaMessage = nil
+        Task {
+            do {
+                let payload = try await environment.productionNativeAPI.readMedia(mediaId: mediaId)
+                guard payload.contentType == "application/pdf", PDFDocument(data: payload.data) != nil else {
+                    throw ProductionNativeError.unsupportedMediaType(payload.contentType)
+                }
+                await MainActor.run {
+                    selectedPDF = DEXAPDFPresentation(mediaId: mediaId, data: payload.data)
+                    loadingSourceMediaID = nil
+                }
+            } catch {
+                await MainActor.run {
+                    sourceMediaMessage = (error as? LocalizedError)?.errorDescription ?? "The BodySpec PDF could not be loaded."
+                    loadingSourceMediaID = nil
                 }
             }
         }
@@ -379,6 +449,7 @@ struct DEXAHistoryView: View {
 
 private struct DEXAScanHistoryRowView: View {
     let row: DEXAScanHistoryRow
+    var onOpenSource: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -401,6 +472,13 @@ private struct DEXAScanHistoryRowView: View {
                 historyMetric(row.leanMass, suffix: " lean")
                 historyMetric(row.restingMetabolicRate, suffix: " RMR")
             }
+            if row.sourceMediaId != nil {
+                Button("View BodySpec PDF", action: onOpenSource)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("dexa.history.\(row.id).viewPDF")
+            }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -413,6 +491,51 @@ private struct DEXAScanHistoryRowView: View {
         Text("\(value)\(suffix)")
             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
             .foregroundStyle(PhysiqueOSTheme.textSecondary)
+    }
+}
+
+private struct DEXAPDFPresentation: Identifiable {
+    let mediaId: String
+    let data: Data
+    var id: String { mediaId }
+}
+
+private struct DEXAPDFSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let presentation: DEXAPDFPresentation
+
+    var body: some View {
+        NavigationStack {
+            DEXAPDFView(data: presentation.data)
+                .background(PhysiqueOSTheme.background)
+                .navigationTitle("BodySpec Report")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+        }
+    }
+}
+
+private struct DEXAPDFView: UIViewRepresentable {
+    let data: Data
+
+    func makeUIView(context: Context) -> PDFView {
+        let view = PDFView()
+        view.autoScales = true
+        view.displayMode = .singlePageContinuous
+        view.displayDirection = .vertical
+        view.backgroundColor = UIColor(PhysiqueOSTheme.background)
+        view.document = PDFDocument(data: data)
+        return view
+    }
+
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        if uiView.document?.dataRepresentation() != data {
+            uiView.document = PDFDocument(data: data)
+        }
     }
 }
 
