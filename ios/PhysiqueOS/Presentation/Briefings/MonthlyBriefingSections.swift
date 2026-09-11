@@ -22,9 +22,9 @@ struct MonthlyBriefingSections: View {
         VStack(alignment: .leading, spacing: 34) {
             hero
             if let goalMilestone = content.goalMilestone { goalMilestoneCard(goalMilestone) }
-            trainingProgressCard
-            energyEvolutionCard
-            newBaselineCard
+            if let trainingProgress = content.trainingProgress { trainingProgressCard(trainingProgress) }
+            if let energyEvolution = content.energyEvolution { energyEvolutionCard(energyEvolution) }
+            if let newBaseline = content.newBaseline { newBaselineCard(newBaseline) }
             if !(content.whatChangedSections ?? []).isEmpty || !content.whatChanged.isEmpty { whatChangedCard }
             if !(content.definingMomentDetails ?? []).isEmpty || !content.definingMoments.isEmpty { definingMomentsCard }
             if !(content.monthAheadActions ?? []).isEmpty || !content.monthAhead.isEmpty { monthAheadCard }
@@ -45,28 +45,28 @@ struct MonthlyBriefingSections: View {
 
     private var monthlyLeadFeatures: [BriefingLeadFeature] {
         [
-            BriefingLeadFeature(
+            content.trainingProgress.map { training in BriefingLeadFeature(
                 icon: "dumbbell.fill",
                 label: "Training",
                 value: "Early momentum",
-                detail: content.trainingProgress.headline ?? content.trainingProgress.narrative,
+                detail: training.headline ?? training.narrative,
                 tone: .effort
-            ),
-            BriefingLeadFeature(
+            ) },
+            content.newBaseline.map { baseline in BriefingLeadFeature(
                 icon: "scope",
                 label: "New Baseline",
-                value: content.newBaseline.bodyFatPercent + " body fat",
-                detail: "Future scans can be compared with the \(content.newBaseline.referenceDateLabel) baseline.",
+                value: baseline.bodyFatPercent + " body fat",
+                detail: "Future scans can be compared with the \(baseline.referenceDateLabel) baseline.",
                 tone: .primary
-            ),
-            BriefingLeadFeature(
+            ) },
+            content.energyEvolution.map { energy in BriefingLeadFeature(
                 icon: "bolt.fill",
                 label: "Calories",
-                value: signedCalories(content.energyEvolution.averageBalanceKcal) + " average balance",
-                detail: content.energyEvolution.phaseLabel ?? "The month established a repeatable energy pattern.",
+                value: signedCalories(energy.averageBalanceKcal) + " average balance",
+                detail: energy.phaseLabel ?? "The month established a repeatable energy pattern.",
                 tone: .evidence
-            )
-        ]
+            ) }
+        ].compactMap { $0 }
     }
 
     private func goalMilestoneCard(_ milestone: MonthlyGoalMilestoneSection) -> some View {
@@ -95,17 +95,17 @@ struct MonthlyBriefingSections: View {
         }
     }
 
-    private var trainingProgressCard: some View {
+    private func trainingProgressCard(_ trainingProgress: MonthlyTrainingProgressSection) -> some View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
             VStack(alignment: .leading, spacing: 22) {
                 editorialLabel("Training Progress", icon: "dumbbell.fill", color: PhysiqueOSTheme.chartEffort)
-                Text(content.trainingProgress.headline ?? content.trainingProgress.narrative)
+                Text(trainingProgress.headline ?? trainingProgress.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.editorialSection)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(content.trainingProgress.narrative)
+                Text(trainingProgress.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                if let highlights = content.trainingProgress.highlights, !highlights.isEmpty {
+                if let highlights = trainingProgress.highlights, !highlights.isEmpty {
                     monthlyFeaturedLift(highlights[0])
                     if highlights.count > 1 {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
@@ -115,53 +115,53 @@ struct MonthlyBriefingSections: View {
                         }
                     }
                 }
-                if let why = content.trainingProgress.whyItMatters {
+                if let why = trainingProgress.whyItMatters {
                     callout(title: "Why It Matters", text: why, color: PhysiqueOSTheme.chartEffort)
                 }
             }
         }
     }
 
-    private var energyEvolutionCard: some View {
+    private func energyEvolutionCard(_ energyEvolution: MonthlyEnergyEvolutionSection) -> some View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.monthlyEnergy, background: PhysiqueOSTheme.surfaceElevated) {
             VStack(alignment: .leading, spacing: 22) {
                 editorialLabel("Energy Evolution", icon: "bolt.fill", color: PhysiqueOSTheme.monthlyEnergy)
-                Text(content.energyEvolution.headline ?? "How did energy change across the month?")
+                Text(energyEvolution.headline ?? "How did energy change across the month?")
                     .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if let phase = content.energyEvolution.phaseLabel {
+                if let phase = energyEvolution.phaseLabel {
                     Text(phase)
                         .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                         .foregroundStyle(PhysiqueOSTheme.accent)
-                    Text(content.energyEvolution.phaseDateLabel ?? "")
+                    Text(energyEvolution.phaseDateLabel ?? "")
                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                if let narrative = content.energyEvolution.narrative {
+                if let narrative = energyEvolution.narrative {
                     Text(narrative)
                         .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    monthlyMetric("Avg Intake", "\(content.energyEvolution.averageIntakeKcal) kcal", color: PhysiqueOSTheme.energyIntake)
-                    monthlyMetric("Avg Expenditure", "\(content.energyEvolution.averageExpenditureKcal) kcal", color: PhysiqueOSTheme.energyExpenditure)
-                    monthlyMetric("Avg Balance", signedCalories(content.energyEvolution.averageBalanceKcal), color: PhysiqueOSTheme.chartSuccess)
-                    monthlyMetric("Balance Magnitude", "\(abs(content.energyEvolution.averageBalanceKcal)) kcal/day", color: PhysiqueOSTheme.accent)
+                    monthlyMetric("Avg Intake", "\(energyEvolution.averageIntakeKcal) kcal", color: PhysiqueOSTheme.energyIntake)
+                    monthlyMetric("Avg Expenditure", "\(energyEvolution.averageExpenditureKcal) kcal", color: PhysiqueOSTheme.energyExpenditure)
+                    monthlyMetric("Avg Balance", signedCalories(energyEvolution.averageBalanceKcal), color: PhysiqueOSTheme.chartSuccess)
+                    monthlyMetric("Balance Magnitude", "\(abs(energyEvolution.averageBalanceKcal)) kcal/day", color: PhysiqueOSTheme.accent)
                 }
-                if let insight = content.energyEvolution.insight {
+                if let insight = energyEvolution.insight {
                     callout(title: "What It Shows", text: insight, color: PhysiqueOSTheme.monthlyEnergy)
                 }
                 monthlyEnergyLegend
-                staticWeeklyBarChart
+                staticWeeklyBarChart(energyEvolution)
             }
         }
     }
 
     /// Static bars — no `.chartScrub` modifier, matching the real screen's
     /// non-interactive rendering (pure CSS bar heights, no hover/tap).
-    private var staticWeeklyBarChart: some View {
+    private func staticWeeklyBarChart(_ energyEvolution: MonthlyEnergyEvolutionSection) -> some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-            ForEach(content.energyEvolution.weeks) { week in
+            ForEach(energyEvolution.weeks) { week in
                 VStack(spacing: 10) {
                     Chart {
                         BarMark(x: .value("Series", "Intake"), y: .value("Value", week.averageIntakeKcal))
@@ -190,32 +190,32 @@ struct MonthlyBriefingSections: View {
                 .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(PhysiqueOSTheme.monthlyEnergy.opacity(0.20)))
             }
         }
-        .accessibilityLabel("Weekly average intake and expenditure across \(content.energyEvolution.weeks.count) weeks")
+        .accessibilityLabel("Weekly average intake and expenditure across \(energyEvolution.weeks.count) weeks")
     }
 
-    private var newBaselineCard: some View {
+    private func newBaselineCard(_ newBaseline: MonthlyNewBaselineSection) -> some View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     editorialLabel("New Baseline", icon: "scope", color: PhysiqueOSTheme.chartEvidence)
                     Spacer()
-                    Text(content.newBaseline.referenceDateLabel)
+                    Text(newBaseline.referenceDateLabel)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                Text(content.newBaseline.headline ?? "The next phase gained a clear baseline.")
+                Text(newBaseline.headline ?? "The next phase gained a clear baseline.")
                     .physiqueOSFont(PhysiqueOSTypography.editorialSection)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    monthlyMetric("Body Fat", content.newBaseline.bodyFatPercent, color: PhysiqueOSTheme.chartEvidence)
-                    monthlyMetric("Lean Mass", content.newBaseline.leanMassLb, color: PhysiqueOSTheme.chartEvidence)
-                    monthlyMetric("Fat Mass", content.newBaseline.fatMassLb, color: PhysiqueOSTheme.chartEvidence)
-                    monthlyMetric("Reference Date", content.newBaseline.referenceDateLabel, color: PhysiqueOSTheme.chartEvidence)
+                    monthlyMetric("Body Fat", newBaseline.bodyFatPercent, color: PhysiqueOSTheme.chartEvidence)
+                    monthlyMetric("Lean Mass", newBaseline.leanMassLb, color: PhysiqueOSTheme.chartEvidence)
+                    monthlyMetric("Fat Mass", newBaseline.fatMassLb, color: PhysiqueOSTheme.chartEvidence)
+                    monthlyMetric("Reference Date", newBaseline.referenceDateLabel, color: PhysiqueOSTheme.chartEvidence)
                 }
-                Text(content.newBaseline.narrative)
+                Text(newBaseline.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                if let interpretation = content.newBaseline.interpretation {
+                if let interpretation = newBaseline.interpretation {
                     callout(title: "Baseline Read", text: interpretation, color: PhysiqueOSTheme.chartEvidence)
                 }
             }

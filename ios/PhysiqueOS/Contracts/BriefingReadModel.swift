@@ -62,6 +62,47 @@ struct BriefingOccurrenceIdentity: Codable, Equatable {
     var value: String
 }
 
+/// One row of the bounded `briefing-history` native resource
+/// (`repositoryNativeSummary`/`nativeBriefingSummary` in
+/// `BriefingNavigationReadService.js`/`PostgresBriefingNavigationReadStore.js`)
+/// — deliberately thinner than `BriefingReadModel`: the server sends only
+/// `artifactId/artifactType/cadence/label/publicationDate/version` (plus
+/// raw-id-only `goalContext`/`confidence` fields Native does not surface
+/// here, matching the Sandbox History screen's own verified behavior of
+/// never showing Confidence or attribution in a row). `artifactType`
+/// distinguishes DEXA vs. Photo Event rows server-side
+/// (`"dexa_event"`/`"photo_event"`) — Native does not need to fetch full
+/// content just to pick the right icon/label the way `historyTitle`'s
+/// doc comment describes for the full-detail model.
+struct BriefingHistoryRowReadModel: Codable, Equatable, Identifiable {
+    var id: String { artifactId }
+    var artifactId: String
+    var artifactType: String?
+    var cadence: BriefingCadence
+    var label: String
+    var publicationDate: String?
+    var version: Int
+
+    var isDEXAEvent: Bool { cadence == .event && ["dexa_event", "dexa-event"].contains(artifactType) }
+    var isPhotoEvent: Bool { cadence == .event && ["photo_event", "photo-event"].contains(artifactType) }
+
+    var displayCadenceLabel: String {
+        if isDEXAEvent { return "DEXA Event Briefing" }
+        if isPhotoEvent { return "Photo Event Briefing" }
+        return cadence.label
+    }
+
+    var iconName: String {
+        switch cadence {
+        case .weekly: "calendar"
+        case .midweek: "calendar.badge.clock"
+        case .monthly: "calendar.circle"
+        case .daily: "sun.max"
+        case .event: isDEXAEvent ? "waveform.path.ecg" : "camera.fill"
+        }
+    }
+}
+
 struct BriefingEvidenceWindowReadModel: Codable, Equatable {
     var id: String
     var startDate: String
@@ -402,9 +443,9 @@ struct MonthlyBriefingContent: Codable, Equatable {
     var heroBody: String
     var heroGoalLabel: String
     var goalMilestone: MonthlyGoalMilestoneSection?
-    var trainingProgress: MonthlyTrainingProgressSection
-    var energyEvolution: MonthlyEnergyEvolutionSection
-    var newBaseline: MonthlyNewBaselineSection
+    var trainingProgress: MonthlyTrainingProgressSection?
+    var energyEvolution: MonthlyEnergyEvolutionSection?
+    var newBaseline: MonthlyNewBaselineSection?
     var whatChanged: [String]
     var definingMoments: [BriefingStat]
     var monthAhead: [String]
@@ -637,6 +678,10 @@ struct PhotoBriefingView: Codable, Equatable, Identifiable {
     var establishesBaseline: Bool
     /// `"primary"` | `"supporting"` — verified real field name.
     var goalRelevance: String
+    /// Opaque media identity projected by the Package 7 envelope. It is
+    /// absent from bundled fixtures and never contains a provider URL or
+    /// object key.
+    var mediaId: String? = nil
 }
 
 struct PhotoComparisonEntry: Codable, Equatable, Identifiable {
@@ -650,6 +695,8 @@ struct PhotoComparisonEntry: Codable, Equatable, Identifiable {
     /// for ordinary ones.
     var roleLabel: String?
     var narrative: String
+    var priorMediaId: String? = nil
+    var currentMediaId: String? = nil
 }
 
 struct PhotoNewBaselineEntry: Codable, Equatable, Identifiable {

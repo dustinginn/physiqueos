@@ -4,9 +4,18 @@ import XCTest
 final class TrainingAcceptanceUITests: XCTestCase {
     private let app = XCUIApplication()
 
-    private func launchTraining() {
+    private func launchInSandbox() {
         continueAfterFailure = false
+        // The app deliberately persists its selected Native authority.
+        // Acceptance journeys verify the bundled Sandbox presentation, so
+        // pin that authority in the process argument domain instead of
+        // inheriting a prior Founder Production selection from Simulator.
+        app.launchArguments += ["-physiqueos.native.authority-selection.v1", "sandbox"]
         app.launch()
+    }
+
+    private func launchTraining() {
+        launchInSandbox()
         openTrainingLanding()
     }
 
@@ -93,8 +102,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
     }
 
     func testCorrectedEvidenceJourneys() throws {
-        continueAfterFailure = false
-        app.launch()
+        launchInSandbox()
 
         openEvidenceStream(named: "Weight")
         assertText("Weekly Averages")
@@ -136,14 +144,13 @@ final class TrainingAcceptanceUITests: XCTestCase {
     }
 
     func testBriefingParityJourneys() throws {
-        continueAfterFailure = false
-        app.launch()
+        launchInSandbox()
 
-        let latestBriefing = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS[c] %@", "DEXA Analysis Ready")
-        ).firstMatch
-        XCTAssertTrue(latestBriefing.waitForExistence(timeout: 5), "Latest DEXA briefing was not available from Home.")
+        let latestBriefing = app.buttons["home.latestBriefing"]
+        XCTAssertTrue(latestBriefing.waitForExistence(timeout: 5), "The current Briefing was not available from Home.")
         latestBriefing.tap()
+        openBriefingHistory()
+        openBriefingFromHistory(containing: "Two weeks into the surplus, the gain is real")
         assertText("DEXA EVENT BRIEFING")
         assertText("Two weeks into the surplus, the gain is real — and mostly lean.")
         assertText("Current Scan")
@@ -192,12 +199,9 @@ final class TrainingAcceptanceUITests: XCTestCase {
     }
 
     func testFounderCorrectionMidweekTrainingResponseJourney() throws {
-        continueAfterFailure = false
-        app.launch()
+        launchInSandbox()
 
-        let latestBriefing = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS[c] %@", "DEXA Analysis Ready")
-        ).firstMatch
+        let latestBriefing = app.buttons["home.latestBriefing"]
         XCTAssertTrue(latestBriefing.waitForExistence(timeout: 5), "Latest Briefing was not available from Home.")
         latestBriefing.tap()
         openBriefingHistory()
@@ -209,8 +213,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
     }
 
     func testFounderCorrectionHomeConfidenceAndLoggerShoulders() throws {
-        continueAfterFailure = false
-        app.launch()
+        launchInSandbox()
 
         assertText("CONFIDENCE")
         attachScreenshot("23-home-confidence")

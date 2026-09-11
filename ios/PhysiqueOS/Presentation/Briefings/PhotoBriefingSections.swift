@@ -33,7 +33,11 @@ struct PhotoBriefingSections: View {
                 completionDecisionCard(experience.decision)
             }
         }
-        .task { await environment.founderPhotoMediaStore.loadManifestIfNeeded() }
+        .task(id: environment.nativeAuthority) {
+            if environment.nativeAuthority == .sandbox {
+                await environment.founderPhotoMediaStore.loadManifestIfNeeded()
+            }
+        }
     }
 
     private var hero: some View {
@@ -78,18 +82,13 @@ struct PhotoBriefingSections: View {
     private var photoGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
             ForEach(content.activeViews) { view in
-                let item = environment.founderPhotoMediaStore.resolvedItem(
-                    setId: view.setId,
-                    captureDate: view.captureDate,
-                    poseId: view.poseId
-                )
                 Button {
-                    onNavigate(.photoSetDetail(setId: item?.photoSessionId ?? view.setId, poseId: view.poseId))
+                    onNavigate(.photoSetDetail(setId: view.setId, poseId: view.poseId))
                 } label: {
                     ProgressPhotoTile(
                         roleLabel: view.poseId.label,
-                        source: item.map { environment.founderPhotoMediaStore.source(viewIdentity: $0.viewIdentity) } ?? .placeholder,
-                        caption: item.map { BriefingDateFormatting.shortDate($0.captureDate) }
+                        source: mediaSource(for: view),
+                        caption: BriefingDateFormatting.shortDate(view.captureDate)
                     )
                 }
                 .buttonStyle(.plain)
@@ -169,15 +168,6 @@ struct PhotoBriefingSections: View {
     private func comparisonList(_ entries: [PhotoComparisonEntry]) -> some View {
         VStack(spacing: 10) {
             ForEach(entries) { entry in
-                let resolved = environment.founderPhotoMediaStore.resolvedComparisonItems(
-                    priorSetId: entry.priorSetId,
-                    priorDate: entry.priorDate,
-                    currentSetId: entry.currentSetId,
-                    currentDate: entry.currentDate,
-                    poseId: entry.poseId
-                )
-                let priorItem = resolved.prior
-                let currentItem = resolved.current
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         if let roleLabel = entry.roleLabel {
@@ -187,8 +177,8 @@ struct PhotoBriefingSections: View {
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         Spacer(minLength: 8)
-                        if let priorDate = priorItem?.captureDate ?? entry.priorDate {
-                            Text("\(BriefingDateFormatting.shortDate(priorDate)) → \(BriefingDateFormatting.shortDate(currentItem?.captureDate ?? entry.currentDate))")
+                        if let priorDate = entry.priorDate {
+                            Text("\(BriefingDateFormatting.shortDate(priorDate)) → \(BriefingDateFormatting.shortDate(entry.currentDate))")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
                         }
@@ -199,13 +189,13 @@ struct PhotoBriefingSections: View {
                     HStack(spacing: 8) {
                         ProgressPhotoTile(
                             roleLabel: "Previous",
-                            source: priorItem.map { environment.founderPhotoMediaStore.source(viewIdentity: $0.viewIdentity) } ?? .placeholder,
-                            caption: priorItem.map { BriefingDateFormatting.shortDate($0.captureDate) } ?? entry.priorDate.map(BriefingDateFormatting.shortDate)
+                            source: comparisonMediaSource(entry, previous: true),
+                            caption: entry.priorDate.map(BriefingDateFormatting.shortDate)
                         )
                         ProgressPhotoTile(
                             roleLabel: "Current",
-                            source: currentItem.map { environment.founderPhotoMediaStore.source(viewIdentity: $0.viewIdentity) } ?? .placeholder,
-                            caption: BriefingDateFormatting.shortDate(currentItem?.captureDate ?? entry.currentDate)
+                            source: comparisonMediaSource(entry, previous: false),
+                            caption: BriefingDateFormatting.shortDate(entry.currentDate)
                         )
                     }
                     Text(entry.narrative)
@@ -215,6 +205,34 @@ struct PhotoBriefingSections: View {
                 .padding(.vertical, 8)
             }
         }
+    }
+
+    private func mediaSource(for view: PhotoBriefingView) -> PhotoMediaSource {
+        if environment.nativeAuthority == .founderProduction {
+            return view.mediaId.map(PhotoMediaSource.authenticatedProduction) ?? .placeholder
+        }
+        let item = environment.founderPhotoMediaStore.resolvedItem(
+            setId: view.setId,
+            captureDate: view.captureDate,
+            poseId: view.poseId
+        )
+        return item.map { environment.founderPhotoMediaStore.source(viewIdentity: $0.viewIdentity) } ?? .placeholder
+    }
+
+    private func comparisonMediaSource(_ entry: PhotoComparisonEntry, previous: Bool) -> PhotoMediaSource {
+        if environment.nativeAuthority == .founderProduction {
+            let mediaId = previous ? entry.priorMediaId : entry.currentMediaId
+            return mediaId.map(PhotoMediaSource.authenticatedProduction) ?? .placeholder
+        }
+        let resolved = environment.founderPhotoMediaStore.resolvedComparisonItems(
+            priorSetId: entry.priorSetId,
+            priorDate: entry.priorDate,
+            currentSetId: entry.currentSetId,
+            currentDate: entry.currentDate,
+            poseId: entry.poseId
+        )
+        let item = previous ? resolved.prior : resolved.current
+        return item.map { environment.founderPhotoMediaStore.source(viewIdentity: $0.viewIdentity) } ?? .placeholder
     }
 
     private func snapshotMetric(_ label: String, _ value: String) -> some View {

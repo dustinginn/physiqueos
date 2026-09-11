@@ -244,7 +244,7 @@ struct DEXABriefingSections: View {
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 if timeline.isSimulated { StatusChip(text: "Simulated", color: .warning) }
                 Spacer(minLength: 0)
-                Text("\(timeline.elapsedDays) days · \(timeline.scans.count) canonical scans")
+                Text("\(timeline.elapsedDays) days · \(timeline.scans.count) body-composition scans")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }

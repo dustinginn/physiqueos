@@ -14,8 +14,12 @@ struct BriefingSandboxError: Error, Equatable, LocalizedError {
 /// History lists, never a second Home-only fixture. A future live
 /// implementation replaces only this store's internals with an
 /// authenticated `BriefingAPI`; Home/History/Detail views do not change.
+/// `@unchecked Sendable`: `briefings` is populated once from the bundled
+/// fixture in `init` and never mutated afterward (`private(set)`, no
+/// mutating methods below) — safe to hand across the `BriefingAPI`
+/// protocol boundary the same way `KeychainFounderCredentialStore` is.
 @Observable
-final class BriefingSandboxStore {
+final class BriefingSandboxStore: @unchecked Sendable {
     private(set) var briefings: [BriefingReadModel]
 
     init(bundle: Bundle = .main) {

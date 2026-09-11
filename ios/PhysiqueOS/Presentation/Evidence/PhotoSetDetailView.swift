@@ -35,7 +35,9 @@ struct PhotoSetDetailView: View {
         .task(id: environment.nativeAuthority) {
             viewModel = PhotoSetDetailViewModel(api: environment.photosAPI, setId: setId)
             await viewModel?.load()
-            await environment.founderPhotoMediaStore.loadManifestIfNeeded()
+            if environment.nativeAuthority == .sandbox {
+                await environment.founderPhotoMediaStore.loadManifestIfNeeded()
+            }
         }
     }
 
@@ -52,7 +54,8 @@ struct PhotoSetDetailView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
-            if let set = environment.founderPhotoMediaStore.projectedSetsByID[setId] {
+            if environment.nativeAuthority == .sandbox,
+               let set = environment.founderPhotoMediaStore.projectedSetsByID[setId] {
                 setContent(set)
             } else {
                 Text("No photo set found for this date.")

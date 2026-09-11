@@ -235,6 +235,13 @@ final class AppEnvironment {
         nativeAuthority == .founderProduction ? ProductionEvidenceReviewAPI(api: productionNativeAPI) : NotAvailableEvidenceReviewAPI()
     }
 
+    /// Briefing History/Detail previously read `briefingSandboxStore`
+    /// directly with no authority switch at all — a fixture-leak-class gap
+    /// matching what Photos/Weight/Timeline had before this pass.
+    var briefingAPI: BriefingAPI {
+        nativeAuthority == .founderProduction ? ProductionBriefingAPI(api: productionNativeAPI) : FixtureBriefingAPI(store: briefingSandboxStore)
+    }
+
     init(
         nativeAuthority: NativeAPIEnvironment? = nil,
         authoritySelectionStore: NativeAuthoritySelectionStore = UserDefaultsNativeAuthoritySelectionStore(),

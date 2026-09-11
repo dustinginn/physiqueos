@@ -18,12 +18,17 @@ import SwiftUI
 /// path.
 struct BriefingDetailView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.scenePhase) private var scenePhase
     let briefingId: String
     var onNavigate: (AppDestination) -> Void = { _ in }
     var onReturnToHome: () -> Void = {}
 
-    private var briefing: BriefingReadModel? {
-        environment.briefingSandboxStore.briefing(id: briefingId)
+    @State private var state: LoadState = .loading
+
+    private enum LoadState {
+        case loading
+        case loaded(BriefingReadModel?)
+        case failed
     }
 
     var body: some View {
@@ -32,17 +37,30 @@ struct BriefingDetailView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
         }
+        .refreshable { await load(showLoading: false) }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .task(id: "\(environment.nativeAuthority.rawValue):\(briefingId)") {
+            await load(showLoading: true)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await load(showLoading: false) }
+        }
     }
 
     @ViewBuilder
     private var content: some View {
-        if let briefing {
+        switch state {
+        case .loading:
+            ProgressView()
+                .tint(PhysiqueOSTheme.accent)
+                .frame(maxWidth: .infinity, minHeight: 300)
+        case .loaded(let briefing?) :
             VStack(alignment: .leading, spacing: 24) {
                 BriefingDetailHeader(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
 
@@ -75,7 +93,7 @@ struct BriefingDetailView: View {
                     EmptyView()
                 }
             }
-        } else {
+        case .loaded(nil):
             VStack(spacing: 12) {
                 BriefingDetailHeader(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
                 Text("This Briefing is unavailable.")
@@ -83,6 +101,23 @@ struct BriefingDetailView: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     .frame(maxWidth: .infinity, minHeight: 200, alignment: .center)
             }
+        case .failed:
+            VStack(spacing: 16) {
+                BriefingDetailHeader(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
+                Text("Briefing could not be loaded.")
+                Button("Try Again") { Task { await load(showLoading: true) } }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    @MainActor
+    private func load(showLoading: Bool) async {
+        if showLoading { state = .loading }
+        do {
+            state = .loaded(try await environment.briefingAPI.fetchBriefing(artifactId: briefingId))
+        } catch {
+            state = .failed
         }
     }
 

@@ -1,24 +1,29 @@
 import SwiftUI
 
 /// `/briefings/review` — the complete chronological Briefing History.
-/// Reads through `BriefingSandboxStore.history`, the exact same collection
-/// Home's latest-Briefing projection is computed from (no second,
-/// History-only fixture) and sorted the same way the real repository sorts
-/// it: plain descending `generatedAt` string comparison, not array
-/// position (`DailyBriefingHistory.js`). Superseded (in-place-revised)
-/// artifacts are excluded here, mirroring the real repository's own
-/// `listDailyBriefings()` — verified real behavior: the prior version is
-/// hidden, not deleted (see `BriefingRevisionSnapshot`/`isRevised`).
+/// Reads through the authority-switching `BriefingAPI` (`briefing-history`
+/// under Founder Production, `BriefingSandboxStore.history` under
+/// Sandbox) — never a second History-only fixture. Server-sorted
+/// newest-first already (`ORDER BY observed_at DESC ..., record_id DESC`)
+/// — Native does not re-sort.
 ///
-/// Verified real behavior: History does NOT show Confidence in the row —
-/// only cadence, title, and date. This view intentionally does not add it.
+/// Verified real behavior: History does NOT show Confidence or Goal/Phase
+/// attribution in the row — only cadence, title, and date (the bounded
+/// `briefing-history` row genuinely has no resolved attribution title to
+/// show; see `BriefingHistoryRowReadModel`'s doc comment). This view
+/// intentionally does not add either.
 struct BriefingHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     var onNavigate: (AppDestination) -> Void = { _ in }
 
-    private var briefings: [BriefingReadModel] {
-        environment.briefingSandboxStore.history
+    @State private var state: LoadState = .loading
+
+    enum LoadState: Equatable {
+        case loading
+        case loaded([BriefingHistoryRowReadModel])
+        case failed(String)
     }
 
     var body: some View {
@@ -28,6 +33,7 @@ struct BriefingHistoryView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
+        .refreshable { await load(showLoading: false) }
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -43,32 +49,61 @@ struct BriefingHistoryView: View {
                 }
             }
         }
+        .task(id: environment.nativeAuthority) {
+            await load(showLoading: true)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await load(showLoading: false) }
+        }
+    }
+
+    @MainActor
+    private func load(showLoading: Bool) async {
+        if showLoading { state = .loading }
+        do {
+            state = .loaded(try await environment.briefingAPI.fetchHistory())
+        } catch {
+            state = .failed("Briefing History could not be loaded.")
+        }
     }
 
     @ViewBuilder
     private var content: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Briefing History")
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text("\(briefings.count) published \(briefings.count == 1 ? "briefing" : "briefings")")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-
-            if briefings.isEmpty {
-                CardContainer(padding: .md) {
-                    Text("No Briefings have been published yet.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+        switch state {
+        case .loading:
+            ProgressView()
+                .tint(PhysiqueOSTheme.accent)
+                .frame(maxWidth: .infinity, minHeight: 300)
+        case .failed(let message):
+            Text(message)
+                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .frame(maxWidth: .infinity, minHeight: 300)
+        case .loaded(let briefings):
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Briefing History")
+                        .physiqueOSFont(PhysiqueOSTypography.screenTitle)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text("\(briefings.count) published \(briefings.count == 1 ? "briefing" : "briefings")")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(briefings) { briefing in
-                        BriefingHistoryRow(briefing: briefing) {
-                            onNavigate(.briefingDetail(briefingId: briefing.id))
+
+                if briefings.isEmpty {
+                    CardContainer(padding: .md) {
+                        Text("No Briefings have been published yet.")
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+                    }
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(briefings) { briefing in
+                            BriefingHistoryRow(briefing: briefing) {
+                                onNavigate(.briefingDetail(briefingId: briefing.artifactId))
+                            }
                         }
                     }
                 }
@@ -78,32 +113,24 @@ struct BriefingHistoryView: View {
 }
 
 private struct BriefingHistoryRow: View {
-    let briefing: BriefingReadModel
+    let briefing: BriefingHistoryRowReadModel
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
             CardContainer(padding: .sm) {
                 HStack(alignment: .top, spacing: 12) {
-                    IconBadge(systemImage: iconName, color: .evidence)
+                    IconBadge(systemImage: briefing.iconName, color: .evidence)
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            BriefingCadenceBadge(briefing: briefing)
-                            if briefing.isRevised {
-                                StatusChip(text: "Revised", color: .muted)
-                            }
-                        }
-                        Text(briefing.historyTitle)
+                        StatusChip(text: briefing.displayCadenceLabel, color: .evidence)
+                        Text(briefing.label)
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             .multilineTextAlignment(.leading)
-                        Text(briefing.historySubtitle)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        if let attributionLabel {
-                            Text(attributionLabel)
+                        if let publicationDate = briefing.publicationDate {
+                            Text(BriefingDateFormatting.timestamp(publicationDate))
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .foregroundStyle(PhysiqueOSTheme.textMuted)
                         }
                     }
                     Spacer(minLength: 0)
@@ -115,22 +142,7 @@ private struct BriefingHistoryRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(briefing.cadence.label), \(briefing.historyTitle), \(briefing.historySubtitle)\(briefing.isRevised ? ", revised" : "")")
+        .accessibilityLabel("\(briefing.displayCadenceLabel), \(briefing.label)")
         .accessibilityAddTraits(.isButton)
-    }
-
-    private var iconName: String {
-        switch briefing.cadence {
-        case .weekly: "calendar"
-        case .midweek: "calendar.badge.clock"
-        case .monthly: "calendar.circle"
-        case .daily: "sun.max"
-        case .event: briefing.dexa != nil ? "waveform.path.ecg" : "camera.fill"
-        }
-    }
-
-    private var attributionLabel: String? {
-        guard let phaseName = briefing.attribution.phaseName else { return PresentationLanguage.displayName(briefing.attribution.goalTitle) }
-        return "\(PresentationLanguage.displayName(briefing.attribution.goalTitle)) · \(PresentationLanguage.displayName(phaseName))"
     }
 }

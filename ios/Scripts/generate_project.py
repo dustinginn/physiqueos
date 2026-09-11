@@ -86,6 +86,8 @@ app_files = [
     ("Networking", "EnergyAPI.swift"),
     ("Networking", "TimelineAPI.swift"),
     ("Networking", "EvidenceReviewAPI.swift"),
+    ("Networking", "BriefingAPI.swift"),
+    ("Networking", "ProductionBriefingMapper.swift"),
     ("Networking", "TrainingLoggerAPI.swift"),
     ("Networking", "TrainingExerciseCatalogLoader.swift"),
     ("Networking", "TrainingExerciseCanonicalizationCommand.swift"),

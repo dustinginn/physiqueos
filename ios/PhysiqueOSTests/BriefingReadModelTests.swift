@@ -135,9 +135,11 @@ final class BriefingReadModelTests: XCTestCase {
     func testMonthlyContentDecodesEveryRenderedSection() throws {
         let store = makeStore()
         let monthly = try XCTUnwrap(store.briefing(id: "monthly_briefing_2026-08")?.monthly)
+        let training = try XCTUnwrap(monthly.trainingProgress)
+        let energy = try XCTUnwrap(monthly.energyEvolution)
         XCTAssertNil(monthly.goalMilestone)
-        XCTAssertFalse(monthly.trainingProgress.stats.isEmpty)
-        XCTAssertFalse(monthly.energyEvolution.weeks.isEmpty)
+        XCTAssertFalse(training.stats.isEmpty)
+        XCTAssertFalse(energy.weeks.isEmpty)
         XCTAssertFalse(monthly.whatChanged.isEmpty)
         XCTAssertFalse(monthly.definingMoments.isEmpty)
         XCTAssertFalse(monthly.monthAhead.isEmpty)
@@ -145,14 +147,16 @@ final class BriefingReadModelTests: XCTestCase {
 
     func testFounderAcceptanceMonthCarriesRichTypedEditorialModules() throws {
         let monthly = try XCTUnwrap(makeStore().briefing(id: "monthly_briefing_2026-08")?.monthly)
-        XCTAssertGreaterThanOrEqual(monthly.trainingProgress.highlights?.count ?? 0, 3)
-        XCTAssertNotNil(monthly.trainingProgress.whyItMatters)
-        XCTAssertTrue(monthly.energyEvolution.weeks.allSatisfy { $0.averageBalanceKcal != nil })
-        XCTAssertNotNil(monthly.energyEvolution.insight)
+        let training = try XCTUnwrap(monthly.trainingProgress)
+        let energy = try XCTUnwrap(monthly.energyEvolution)
+        XCTAssertGreaterThanOrEqual(training.highlights?.count ?? 0, 3)
+        XCTAssertNotNil(training.whyItMatters)
+        XCTAssertTrue(energy.weeks.allSatisfy { $0.averageBalanceKcal != nil })
+        XCTAssertNotNil(energy.insight)
         XCTAssertEqual(monthly.whatChangedSections?.map(\.domain), ["training", "calories", "weight", "photos"])
         XCTAssertEqual(monthly.definingMomentDetails?.count, 4)
         XCTAssertEqual(monthly.monthAheadActions?.map(\.domain), ["training", "calories", "weight", "photos", "dexa"])
-        XCTAssertTrue(monthly.trainingProgress.highlights?.allSatisfy { $0.performanceValue != nil } == true)
+        XCTAssertTrue(training.highlights?.allSatisfy { $0.performanceValue != nil } == true)
     }
 
     func testMonthlyAndRecurringTrainingKeepDistinctPresentationCompositions() {
@@ -162,10 +166,13 @@ final class BriefingReadModelTests: XCTestCase {
 
     func testMonthlyOpeningRestoresThreeEvidenceFeatureCards() throws {
         let monthly = try XCTUnwrap(makeStore().briefing(id: "monthly_briefing_2026-08")?.monthly)
+        let training = try XCTUnwrap(monthly.trainingProgress)
+        let baseline = try XCTUnwrap(monthly.newBaseline)
+        let energy = try XCTUnwrap(monthly.energyEvolution)
         XCTAssertEqual(MonthlyBriefingSections.leadFeatureDomains, ["Training", "New Baseline", "Calories"])
-        XCTAssertFalse(monthly.trainingProgress.narrative.isEmpty)
-        XCTAssertFalse(monthly.newBaseline.referenceDateLabel.isEmpty)
-        XCTAssertFalse(monthly.energyEvolution.weeks.isEmpty)
+        XCTAssertFalse(training.narrative.isEmpty)
+        XCTAssertFalse(baseline.referenceDateLabel.isEmpty)
+        XCTAssertFalse(energy.weeks.isEmpty)
     }
 
     func testDEXAEvidenceSincePriorScanUsesThreeSymmetricalColumns() {

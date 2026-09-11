@@ -51,7 +51,9 @@ struct PhotosHistoryView: View {
         .task(id: environment.nativeAuthority) {
             viewModel = PhotosHistoryViewModel(api: environment.photosAPI)
             await viewModel?.load()
-            await environment.founderPhotoMediaStore.loadManifestIfNeeded()
+            if environment.nativeAuthority == .sandbox {
+                await environment.founderPhotoMediaStore.loadManifestIfNeeded()
+            }
         }
         .sheet(item: $selectedPhotoSet) { set in
             PhotoEvidenceDetailSheet(set: set)
@@ -71,10 +73,12 @@ struct PhotosHistoryView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
-            let displayed = environment.founderPhotoMediaStore.projectedLanding(
-                from: landing,
-                scope: viewModel?.scope ?? PhotosScopeDefault.selection
-            ) ?? landing
+            let displayed = environment.nativeAuthority == .sandbox
+                ? (environment.founderPhotoMediaStore.projectedLanding(
+                    from: landing,
+                    scope: viewModel?.scope ?? PhotosScopeDefault.selection
+                ) ?? landing)
+                : landing
             VStack(alignment: .leading, spacing: 24) {
                 header(for: displayed)
                 TrainingScopeSelectorView(scope: displayed.scope) { pillID in
@@ -155,7 +159,7 @@ struct PhotosHistoryView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(TrainingDateFormatting.short(set.date)) photo set. \(set.weightLabel). Compared against \(set.comparisonAvailability).")
+                    .accessibilityLabel("\(TrainingDateFormatting.short(set.date)) photo set. \(set.weightLabel ?? ""). Compared against \(set.comparisonAvailability).")
                     .accessibilityAddTraits(.isButton)
                 } else {
                     Text("Photo sets will appear here once matching photos are uploaded.")
@@ -204,6 +208,12 @@ struct PhotosHistoryView: View {
     }
 
     private func photoBriefingID(for set: PhotoSetRecord) -> String? {
+        if environment.nativeAuthority == .founderProduction {
+            // Canonical identity created by PhotoEventNarrativeService;
+            // ProductionBriefingAPI routes this to `photo-event` with the
+            // underlying session id and never consults bundled fixtures.
+            return "event_briefing_progress_photo_\(set.id)"
+        }
         let photoBriefings = environment.briefingSandboxStore.briefings.filter { $0.photo != nil }
         if let exact = photoBriefings.first(where: { $0.photo?.eventDate == set.date }) { return exact.id }
         // The acceptance manifest can project an authorized Founder

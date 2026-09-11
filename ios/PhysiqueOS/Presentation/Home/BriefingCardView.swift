@@ -48,6 +48,7 @@ struct BriefingCardView: View {
             }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home.latestBriefing")
         .accessibilityAddTraits(card.destination != nil ? .isButton : [])
     }
 
