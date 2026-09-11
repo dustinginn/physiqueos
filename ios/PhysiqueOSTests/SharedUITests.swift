@@ -200,4 +200,32 @@ final class SharedUITests: XCTestCase {
     func testEvidenceSourceOptionsRemainExactlyPhotosThenFiles() {
         XCTAssertEqual(EvidenceSourceOption.allCases, [.photos, .files])
     }
+
+    // MARK: - Training source evidence never exposes a raw internal identifier
+
+    /// A Training Logger draft-session id is an internal identifier, not
+    /// provenance a Founder should ever read — the server's own label
+    /// formatter falls back to it verbatim when it doesn't recognize the
+    /// artifact pattern (see `TrainingSourceEvidencePresentation`'s doc
+    /// comment), so Native must filter it out at the presentation boundary.
+    func testTrainingSourceEvidenceFiltersRawDraftIdentifiersButKeepsCleanLabels() {
+        let sources = [
+            "Training Logger Draft Training Logger Dc4e0ad0-2a13-4e28-A2ed-B37497d7b80a",
+            "Screenshot",
+        ]
+        XCTAssertEqual(TrainingSourceEvidencePresentation.filtered(sources), ["Screenshot"])
+    }
+
+    /// When every source label is an unpresentable raw identifier, the
+    /// filtered list must be empty — never fall back to showing the raw
+    /// value because there's nothing "nicer" available.
+    func testTrainingSourceEvidenceOmitsTheSourceLineEntirelyWhenNoSafeLabelExists() {
+        let sources = ["Training Logger Draft Training Logger Dc4e0ad0-2a13-4e28-A2ed-B37497d7b80a"]
+        XCTAssertEqual(TrainingSourceEvidencePresentation.filtered(sources), [])
+    }
+
+    func testTrainingSourceEvidenceLeavesOrdinaryLabelsUntouched() {
+        let sources = ["Screenshot", "Typed evidence", "Correction"]
+        XCTAssertEqual(TrainingSourceEvidencePresentation.filtered(sources), sources)
+    }
 }

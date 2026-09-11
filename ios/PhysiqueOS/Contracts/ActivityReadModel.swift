@@ -88,8 +88,37 @@ struct ActivityTrainingContextEntry: Codable, Equatable, Identifiable {
     var label: String
     var value: String
     var detail: String
-    var date: String
+    /// The Package 7 `activity` read resource's `linkedTrainingContext`
+    /// entries never carry `date`/`sourceEvidence` — `getLinkedActivityTrainingContext`
+    /// only emits `{id, label, value, detail}` since each entry is already
+    /// implicitly scoped to its parent Activity day. The fixture's fuller
+    /// shape predates that; `nil`/`[]` when absent rather than a Native
+    /// assumption that the keys are always present.
+    var date: String?
     var sourceEvidence: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id, label, value, detail, date, sourceEvidence
+    }
+
+    init(id: String, label: String, value: String, detail: String, date: String?, sourceEvidence: [String]) {
+        self.id = id
+        self.label = label
+        self.value = value
+        self.detail = detail
+        self.date = date
+        self.sourceEvidence = sourceEvidence
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        value = try container.decode(String.self, forKey: .value)
+        detail = try container.decode(String.self, forKey: .detail)
+        date = try container.decodeIfPresent(String.self, forKey: .date)
+        sourceEvidence = try container.decodeIfPresent([String].self, forKey: .sourceEvidence) ?? []
+    }
 }
 
 /// `getDataSources("activity")`'s `{name, status}` pairs — status

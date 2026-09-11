@@ -246,10 +246,15 @@ struct ProductionGoalsAPI: GoalsAPI {
         return nil
     }
 
+    /// Looks up any phase in the goal's full chronology, not only the
+    /// currently active one — `active.phases` now carries every completed
+    /// phase alongside the active one (see `ActivePayload.model`), so a
+    /// historical phase (e.g. a completed "Establish Maintenance") must
+    /// stay reachable here too, not just the phase matching
+    /// `activePhaseId`.
     func fetchGoalPhase(goalId: String, phaseId: String) async throws -> GoalPhaseDetailReadModel? {
         guard let active = try await fetchGoalDetail(goalId: goalId)?.active,
-              active.activePhaseId == phaseId,
-              let phase = active.activePhase else { return nil }
+              let phase = active.phases.first(where: { $0.id == phaseId }) else { return nil }
         return GoalPhaseDetailReadModel(
             goalId: goalId, goalTitle: active.title, phase: phase,
             goalProgress: active.goalProgress, confidence: active.confidence,
@@ -394,17 +399,37 @@ struct ProductionGoalsAPI: GoalsAPI {
                 label: currentPhase.progress,
                 detail: currentPhase.readiness
             )
-            let phase = GoalPhaseReadModel(
-                id: currentPhase.id,
-                order: max(0, (currentJourney?.number ?? 1) - 1),
-                name: currentPhase.title,
-                status: .active,
-                dates: currentJourney?.dates ?? currentPhase.review,
-                purpose: currentPhase.purpose,
-                progress: progress,
-                evidence: currentPhase.evidence,
-                strategy: [], successCriteria: [], guardrails: [guardrail.title]
-            )
+            // `journey[]` already carries the full canonical chronology —
+            // every phase the goal has ever had, completed ones included
+            // (confirmed directly against a real Package 7 `active-goal`
+            // response). A prior revision collapsed this down to a single
+            // synthesized phase from `currentPhase`, which silently dropped
+            // every completed phase and mis-numbered the active one (its
+            // `order` was `journeyNumber - 1`, not the canonical number
+            // itself — "Lean Mass Build" showed as "Phase 1" instead of
+            // "Phase 2"). Completed entries have no richer `currentPhase`-
+            // style object of their own on the wire, so their purpose/
+            // evidence/strategy stay empty rather than borrowing the
+            // active phase's — an honest "not provided" rather than a
+            // fabrication.
+            let phases: [GoalPhaseReadModel] = journey.map { entry in
+                let isCurrent = entry.number == currentJourney?.number
+                return GoalPhaseReadModel(
+                    id: isCurrent ? currentPhase.id : "\(goalId)-phase-\(entry.number)",
+                    order: entry.number,
+                    name: isCurrent ? currentPhase.title : entry.name,
+                    status: Self.phaseStatus(entry.status),
+                    dates: isCurrent ? (currentJourney?.dates ?? currentPhase.review) : entry.dates,
+                    purpose: isCurrent ? currentPhase.purpose : "",
+                    progress: GoalProgressReadModel(
+                        percentage: entry.percentage,
+                        label: isCurrent ? currentPhase.progress : entry.progress,
+                        detail: isCurrent ? currentPhase.readiness : ""
+                    ),
+                    evidence: isCurrent ? currentPhase.evidence : "",
+                    strategy: [], successCriteria: [], guardrails: isCurrent ? [guardrail.title] : []
+                )
+            }
             let anchor = evidence.goalBaseline ?? evidence.phaseStart
             let goalGuardrail = GoalGuardrailReadModel(
                 title: guardrail.title,
@@ -423,7 +448,7 @@ struct ProductionGoalsAPI: GoalsAPI {
                     explanation: confidence.summary ?? "", source: "Server"
                 ),
                 goalProgress: progress,
-                phases: [phase],
+                phases: phases,
                 activePhaseId: phaseId,
                 readiness: readiness,
                 guardrail: goalGuardrail,
@@ -451,11 +476,28 @@ struct ProductionGoalsAPI: GoalsAPI {
                 )
             )
         }
+
+        /// Maps the wire's free-text journey status ("Completed" /
+        /// "Active") to the closed presentation enum; anything else
+        /// (a future "Planned" phase, say) fails safe to `.planned`
+        /// rather than guessing.
+        private static func phaseStatus(_ raw: String) -> GoalPhaseStatus {
+            switch raw.lowercased() {
+            case "completed": .completed
+            case "active": .active
+            default: .planned
+            }
+        }
     }
 
     private struct Confidence: Decodable { var score: Int?; var band: String?; var summary: String? }
     private struct Hero: Decodable { var title: String; var status: String; var destination: String }
-    private struct Journey: Decodable { var name: String; var number: Int; var status: String; var dates: String; var progress: String; var support: String; var percentage: Int }
+    /// `support` is `null` for a completed journey entry (see
+    /// `Package7Server`'s `active-goal` response for the Establish
+    /// Maintenance phase) — genuinely optional on the wire, not a Native
+    /// assumption. Unused downstream in `model` today; decoded for
+    /// field-for-field fidelity only.
+    private struct Journey: Decodable { var name: String; var number: Int; var status: String; var dates: String; var progress: String; var support: String?; var percentage: Int }
     private struct CurrentPhase: Decodable { var id: String; var goalId: String; var title: String; var purpose: String; var progress: String; var review: String; var evidence: String; var readiness: String }
     private struct Guardrail: Decodable { var title: String; var scope: String; var body: String; var observation: Observation? }
     private struct Observation: Decodable { var label: String }
@@ -496,6 +538,83 @@ struct ProductionOperatingPlanAPI: OperatingPlanAPI {
     private struct Payload: Decodable, @unchecked Sendable { var sections: [Section] }
     private struct Section: Decodable { var iconKey: String; var tone: OperatingPlanSectionTone; var title: String; var subtitle: String; var items: [Item] }
     private struct Item: Decodable { var id: String; var title: String; var detail: String; var status: String? }
+}
+
+// MARK: - Log / Logged Today
+
+/// Founder Production adapter for `coreNavigation.getLog` — the Package 7
+/// `evidence-review-queue` resource actually serves the whole Log screen's
+/// read model (`Logged Today` + pending Evidence Review queue together;
+/// see `LogReadModel`'s own doc comment for the exact server service
+/// this mirrors). There is no second "logged today" resource — Native
+/// previously left `logAPI` a plain constant that never switched with
+/// authority, so Founder Production showed the bundled `LogFixture.json`
+/// (a fixed "Strength Training · 52 min" / "3 meals · 2,140 calories"
+/// regardless of what the Founder actually did today) instead of this.
+struct ProductionLogAPI: LogAPI {
+    let api: ProductionNativeAPI
+
+    func fetchLog() async throws -> LogReadModel {
+        let payload = try await api.readResource("evidence-review-queue", as: Payload.self).data
+        return LogReadModel(
+            localDate: payload.localDate,
+            loggedToday: payload.loggedToday.rows.map { row in
+                LoggedTodayRow(
+                    kind: row.id,
+                    summary: row.summary,
+                    context: row.context,
+                    destination: Self.destination(for: row, localDate: payload.localDate)
+                )
+            },
+            pendingEvidenceReviews: payload.pendingEvidenceReviews.map { review in
+                PendingEvidenceReview(
+                    id: review.id, title: review.title, date: review.date,
+                    summary: review.summary, likelyDuplicate: review.likelyDuplicate,
+                    destination: .evidenceReview(reviewId: review.id)
+                )
+            }
+        )
+    }
+
+    /// `recordId` is the real canonical record the row is about — Training
+    /// and Nutrition rows link straight to that record's own detail
+    /// screen; Activity has no per-record detail screen of its own on
+    /// Native, so it links to today's Activity Day (`localDate`, the
+    /// server's own computed "today", never a Native-derived date). A row
+    /// with no `recordId` (nothing logged) has no destination.
+    private static func destination(for row: RowPayload, localDate: String) -> AppDestination? {
+        guard let recordId = row.recordId else { return nil }
+        switch row.id {
+        case .training: return .trainingSession(sessionId: recordId)
+        case .nutrition: return .nutritionDay(dayId: recordId)
+        case .activity: return .activityDay(date: localDate)
+        }
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable {
+        var localDate: String
+        var loggedToday: LoggedTodayPayload
+        var pendingEvidenceReviews: [ReviewPayload]
+    }
+
+    private struct LoggedTodayPayload: Decodable {
+        var rows: [RowPayload]
+    }
+
+    private struct RowPayload: Decodable {
+        var id: LoggedTodayRowKind
+        var summary: String
+        var context: String?
+        var recordId: String?
+    }
+
+    private struct ReviewPayload: Decodable {
+        var id: String
+        var date: String
+        var title: String
+        var summary: String
+        var likelyDuplicate: Bool
+    }
 }
 
 // MARK: - Priority detail
@@ -742,16 +861,26 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
 
     private static func history(
         for exerciseID: String,
-        in sessions: [TrainingSessionDetailReadModel]
+        in sessions: [HistorySession]
     ) -> [TrainingLoggerHistoryRecord] {
         sessions.flatMap { session in
             session.exercises.filter { $0.canonicalExerciseId == exerciseID }.map { exercise in
                 TrainingLoggerHistoryRecord(
                     sessionId: session.id,
-                    workoutDate: String(session.date.prefix(10)),
+                    workoutDate: String(session.observedAt.prefix(10)),
                     executionVariant: exercise.executionVariant,
                     relationship: nil,
-                    sets: exercise.sets
+                    sets: exercise.sets.enumerated().map { index, set in
+                        TrainingSet(
+                            setNumber: index + 1,
+                            reps: set.reps,
+                            weight: set.weight,
+                            weightUnit: set.weightUnit,
+                            durationSeconds: nil,
+                            loadType: nil,
+                            setType: nil
+                        )
+                    }
                 )
             }
         }
@@ -759,8 +888,40 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
 
     private struct Payload: Decodable, @unchecked Sendable {
         var initialCanonicalExercises: [RawExercise]
-        var initialHistorySessions: [TrainingSessionDetailReadModel]
+        var initialHistorySessions: [HistorySession]
         var initialPerformedExerciseIds: [String]
+    }
+
+    /// `coreNavigation.getTrainingLogger`'s `initialHistorySessions` are a
+    /// distinct, leaner canonical projection (`projectTrainingHistorySession`)
+    /// from the full presentation shape `training-session` returns — they
+    /// exist only to drive "previously performed" set history in the
+    /// exercise picker, so the server strips them to
+    /// `{id, evidence_type, observed_at, exercises, exerciseRelationshipGroups}`
+    /// with each set reduced to `{reps, weight, weight_unit}`. Reusing
+    /// `TrainingSessionDetailReadModel` here was a Native-side type
+    /// mismatch, not a server contract gap.
+    private struct HistorySession: Decodable {
+        var id: String
+        var observedAt: String
+        var exercises: [HistoryExercise]
+    }
+
+    private struct HistoryExercise: Decodable {
+        var canonicalExerciseId: String?
+        var executionVariant: TrainingExecutionVariant?
+        var sets: [HistorySet]
+    }
+
+    /// No `set_number` on the wire for this lean projection (see
+    /// `HistorySession`'s doc comment) — display order is derived from
+    /// array position, mirroring the server's own `index + 1` fallback
+    /// wherever it lacks an explicit `set_number`, never a Native
+    /// invention.
+    private struct HistorySet: Decodable {
+        var reps: Double?
+        var weight: Double?
+        var weightUnit: String?
     }
     fileprivate struct RawExercise: Decodable {
         var id: String; var name: String; var equipment: String?
@@ -1000,5 +1161,140 @@ struct ProductionEnergyAPI: EnergyAPI {
                 energyBalance: energyBalance, completeness: completeness
             )
         }
+    }
+}
+
+// MARK: - Evidence Hub summary projection
+
+/// Composes the Evidence Hub's per-stream summary rows from the same
+/// production reads every individual Evidence surface already uses —
+/// Weight, Training, Nutrition, Activity, and Energy — rather than
+/// inventing a new server call the Package 7 native contract doesn't
+/// expose (there is no `evidence`/`progress-hub` read resource). DEXA and
+/// Progress Photos are real product surfaces but are not yet wired to
+/// production reads in this pass (Patch 3 scope, see `AppEnvironment`'s
+/// doc comment); their rows stay an explicit "not yet available" state
+/// rather than the bundled Sandbox fixture values, which would otherwise
+/// misrepresent stale fixture data as Founder Production truth. Recovery
+/// and Health Metrics have no backing resource at all yet, in either
+/// authority, and keep the same "Coming soon" placeholder Sandbox already
+/// shows.
+struct ProductionEvidenceAPI: EvidenceAPI {
+    let api: ProductionNativeAPI
+
+    func fetchEvidenceHub() async throws -> EvidenceHubReadModel {
+        // Sequential, not concurrent: `ProductionNativeAPI` serializes reads
+        // through one bearer-refresh path anyway, and a predictable request
+        // order keeps this composition straightforward to test.
+        let weight = try await ProductionWeightEvidenceAPI(api: api).fetchWeightReport(scope: .all)
+        let training = try await ProductionTrainingAPI(api: api).fetchTrainingLanding(scope: .all)
+        let nutrition = try await ProductionNutritionAPI(api: api).fetchNutritionLanding(scope: .all)
+        let activity = try await ProductionActivityAPI(api: api).fetchActivityLanding(scope: .all)
+        let energy = try await ProductionEnergyAPI(api: api).fetchEnergyReport(scope: .all)
+
+        let streams: [EvidenceStreamSummary] = [
+            trainingStream(training),
+            nutritionStream(nutrition),
+            weightStream(weight),
+            notYetAvailableStream(id: "photos", title: "Progress Photos", tone: .primary),
+            notYetAvailableStream(id: "dexa", title: "DEXA", tone: .success),
+            activityStream(activity),
+            energyStream(energy),
+            comingSoonStream(id: "recovery", title: "Recovery", tone: .primary),
+            comingSoonStream(id: "health-metrics", title: "Health Metrics", tone: .primary),
+        ]
+
+        return EvidenceHubReadModel(
+            title: "Evidence Hub",
+            subtitle: "PhysiqueOS organizes what it knows about your body, progress, and routines.",
+            streams: streams
+        )
+    }
+
+    private func trainingStream(_ landing: TrainingLandingReadModel) -> EvidenceStreamSummary {
+        EvidenceStreamSummary(
+            id: "training", title: "Training",
+            metric: landing.latestTrainingDay?.daySummary ?? "No training recorded",
+            trend: landing.latestTrainingDay?.daySummary ?? "No training recorded",
+            lastUpdated: landing.latestTrainingDay?.date,
+            status: landing.latestTrainingDay != nil ? .available : .placeholder,
+            tone: .primary,
+            destination: .progressStream(streamId: "training")
+        )
+    }
+
+    private func nutritionStream(_ landing: NutritionLandingReadModel) -> EvidenceStreamSummary {
+        EvidenceStreamSummary(
+            id: "nutrition", title: "Nutrition",
+            metric: landing.latestNutritionDay?.value ?? "No nutrition recorded",
+            trend: landing.latestNutritionDay?.detail ?? "No nutrition recorded",
+            lastUpdated: landing.latestNutritionDay?.date,
+            status: landing.latestNutritionDay != nil ? .available : .placeholder,
+            tone: .primary,
+            destination: .progressStream(streamId: "nutrition")
+        )
+    }
+
+    private func weightStream(_ report: WeightReportReadModel) -> EvidenceStreamSummary {
+        let latest = report.history.first
+        return EvidenceStreamSummary(
+            id: "weight", title: "Weight",
+            metric: latest?.value ?? "No weight recorded",
+            trend: latest?.detail ?? "No weight recorded",
+            lastUpdated: latest?.date,
+            status: latest != nil ? .available : .placeholder,
+            tone: .evidence,
+            destination: .progressStream(streamId: "weight")
+        )
+    }
+
+    private func activityStream(_ landing: ActivityLandingReadModel) -> EvidenceStreamSummary {
+        EvidenceStreamSummary(
+            id: "activity", title: "Activity",
+            metric: landing.latestActivityDay?.value ?? "No activity recorded",
+            trend: landing.latestActivityDay?.detail ?? "No activity recorded",
+            lastUpdated: landing.latestActivityDay?.date,
+            status: landing.latestActivityDay != nil ? .available : .placeholder,
+            tone: .primary,
+            destination: .progressStream(streamId: "activity")
+        )
+    }
+
+    private func energyStream(_ report: EnergyReportReadModel) -> EvidenceStreamSummary {
+        let latest = report.dailyHistory.first
+        return EvidenceStreamSummary(
+            id: "energy", title: "Energy",
+            metric: latest?.completeness ?? "No energy evidence recorded",
+            trend: "\(report.summary.completeDays) of \(report.summary.evidenceDays) evidence days complete",
+            lastUpdated: latest?.date,
+            status: latest != nil ? .available : .placeholder,
+            tone: .primary,
+            destination: .progressStream(streamId: "energy")
+        )
+    }
+
+    /// A Patch 3 surface that already exists in Sandbox but has no
+    /// production read wired up yet — honest about being unavailable
+    /// under Founder Production rather than showing the bundled fixture's
+    /// stale values.
+    private func notYetAvailableStream(id: String, title: String, tone: HomeColorToken) -> EvidenceStreamSummary {
+        EvidenceStreamSummary(
+            id: id, title: title,
+            metric: "Not yet available in Founder Production",
+            trend: "Not yet available in Founder Production",
+            lastUpdated: nil, status: .placeholder, tone: tone,
+            destination: .progressStream(streamId: id)
+        )
+    }
+
+    /// A surface with no backing resource yet in either authority —
+    /// mirrors `FixtureEvidenceAPI`'s own "Coming soon" row exactly.
+    private func comingSoonStream(id: String, title: String, tone: HomeColorToken) -> EvidenceStreamSummary {
+        EvidenceStreamSummary(
+            id: id, title: title,
+            metric: "Coming soon", trend: "Coming soon",
+            lastUpdated: nil, status: .placeholder, tone: tone,
+            destination: .progressStream(streamId: id)
+        )
     }
 }

@@ -130,6 +130,51 @@ struct NutritionMealRecord: Codable, Equatable, Identifiable {
     var totals: NutritionMacroTotals
     var foods: [NutritionFoodRecord]
     var additionalFoodsDetected: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, slot, name, completeness, totals, foods, additionalFoodsDetected
+    }
+
+    init(id: String, slot: NutritionMealSlot, name: String?, completeness: String, totals: NutritionMacroTotals, foods: [NutritionFoodRecord], additionalFoodsDetected: Bool) {
+        self.id = id
+        self.slot = slot
+        self.name = name
+        self.completeness = completeness
+        self.totals = totals
+        self.foods = foods
+        self.additionalFoodsDetected = additionalFoodsDetected
+    }
+
+    /// The Package 7 `nutrition` read resource's canonical meal shape never
+    /// carries a `slot` key — only a free-text `name` ("Breakfast", "Lunch",
+    /// "Dinner", "Snacks", verified directly against production responses).
+    /// The fixture's own `slot` key is a genuinely distinct, older shape
+    /// this port previously assumed was universal; when present (fixture),
+    /// it decodes directly, otherwise `slot` is derived from `name` — a
+    /// closed-set match against the same four labels, never a fabrication.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        if let decodedSlot = try container.decodeIfPresent(NutritionMealSlot.self, forKey: .slot) {
+            slot = decodedSlot
+        } else {
+            slot = NutritionMealSlot(mealName: name)
+        }
+        completeness = try container.decode(String.self, forKey: .completeness)
+        totals = try container.decode(NutritionMacroTotals.self, forKey: .totals)
+        foods = try container.decode([NutritionFoodRecord].self, forKey: .foods)
+        // The Package 7 resource sends `additional_foods_detected` as a
+        // count (e.g. `0`), not a boolean — the fixture's own boolean flag
+        // predates that. Unused by any current screen (decoded for
+        // field-for-field fidelity only), so the type stays `Bool`; the
+        // decode tolerates either representation, true meaning "count > 0".
+        if let flag = try? container.decode(Bool.self, forKey: .additionalFoodsDetected) {
+            additionalFoodsDetected = flag
+        } else {
+            additionalFoodsDetected = try container.decode(Int.self, forKey: .additionalFoodsDetected) > 0
+        }
+    }
 }
 
 /// The 4 fixed meal slots (`nutritionMealPresentation.js:8-41`) — a closed
@@ -137,6 +182,20 @@ struct NutritionMealRecord: Codable, Equatable, Identifiable {
 /// execution variants.
 enum NutritionMealSlot: String, Codable, Equatable {
     case breakfast, lunch, dinner, snacks
+
+    /// Derives the closed slot from a canonical meal `name` when the wire
+    /// payload carries no explicit `slot` (see `NutritionMealRecord`'s
+    /// custom decoder). Production names are always an exact match against
+    /// these four labels; anything unrecognized falls to `.snacks`, the
+    /// same catch-all bucket the label set already treats as "other."
+    init(mealName: String?) {
+        switch mealName?.lowercased() {
+        case "breakfast": self = .breakfast
+        case "lunch": self = .lunch
+        case "dinner": self = .dinner
+        default: self = .snacks
+        }
+    }
 
     var label: String {
         switch self {

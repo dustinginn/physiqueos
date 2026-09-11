@@ -103,8 +103,9 @@ struct TrainingSessionDetailView: View {
                 Text(session.detail)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if !session.sourceEvidence.isEmpty {
-                    Text(Self.formatSourceLine(session.sourceEvidence))
+                let sources = TrainingSourceEvidencePresentation.filtered(session.sourceEvidence)
+                if !sources.isEmpty {
+                    Text(Self.formatSourceLine(sources))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }

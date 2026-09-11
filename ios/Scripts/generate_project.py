@@ -111,6 +111,7 @@ app_files = [
     ("SharedUI", "EvidenceAttachment.swift"),
     ("SharedUI", "EvidenceSourcePicker.swift"),
     ("SharedUI", "EvidenceStreamPresentation.swift"),
+    ("SharedUI", "TrainingSourceEvidencePresentation.swift"),
     ("SharedUI", "InteractivePopGesture.swift"),
     ("SharedUI", "NumericEditField.swift"),
     ("SharedUI", "EvidenceScopeAttributionChip.swift"),

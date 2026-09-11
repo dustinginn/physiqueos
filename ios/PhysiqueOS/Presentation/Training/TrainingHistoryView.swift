@@ -516,8 +516,9 @@ private struct TrainingRecordPreviewRow: View {
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
             }
-            if !sourceEvidence.isEmpty {
-                Text("Source: \(sourceEvidence.joined(separator: " + "))")
+            let sources = TrainingSourceEvidencePresentation.filtered(sourceEvidence)
+            if !sources.isEmpty {
+                Text("Source: \(sources.joined(separator: " + "))")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }

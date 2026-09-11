@@ -105,8 +105,8 @@ final class AppEnvironment {
     private let authoritySelectionStore: NativeAuthoritySelectionStore
     private let sandboxHomeAPI: HomeAPI
     private let sandboxGoalsAPI: GoalsAPI
-    let logAPI: LogAPI
-    let evidenceAPI: EvidenceAPI
+    private let sandboxLogAPI: LogAPI
+    private let sandboxEvidenceAPI: EvidenceAPI
     private let sandboxTrainingAPI: TrainingAPI
     private let sandboxActivityAPI: ActivityAPI
     private let sandboxNutritionAPI: NutritionAPI
@@ -156,6 +156,22 @@ final class AppEnvironment {
 
     var goalsAPI: GoalsAPI {
         nativeAuthority == .founderProduction ? ProductionGoalsAPI(api: productionNativeAPI) : sandboxGoalsAPI
+    }
+
+    /// The Evidence Hub's summary projection — composed from the same
+    /// production reads each individual Evidence surface already uses
+    /// (see `ProductionEvidenceAPI`'s doc comment) rather than a single
+    /// fixture-only constant that never switched with authority.
+    var evidenceAPI: EvidenceAPI {
+        nativeAuthority == .founderProduction ? ProductionEvidenceAPI(api: productionNativeAPI) : sandboxEvidenceAPI
+    }
+
+    /// Log → Logged Today / pending Evidence Review queue — see
+    /// `ProductionLogAPI`'s doc comment for why this was still showing
+    /// fixture Training/Nutrition/Activity summaries under Founder
+    /// Production.
+    var logAPI: LogAPI {
+        nativeAuthority == .founderProduction ? ProductionLogAPI(api: productionNativeAPI) : sandboxLogAPI
     }
 
     var trainingAPI: TrainingAPI {
@@ -215,8 +231,8 @@ final class AppEnvironment {
         self.nativeAuthority = nativeAuthority ?? authoritySelectionStore.load() ?? .sandbox
         self.sandboxHomeAPI = homeAPI
         self.sandboxGoalsAPI = goalsAPI
-        self.logAPI = logAPI
-        self.evidenceAPI = evidenceAPI
+        self.sandboxLogAPI = logAPI
+        self.sandboxEvidenceAPI = evidenceAPI
         self.sandboxTrainingAPI = trainingAPI
         self.sandboxActivityAPI = activityAPI
         self.sandboxNutritionAPI = nutritionAPI

@@ -214,6 +214,32 @@ struct GoalTurningPointReadModel: Codable, Equatable, Identifiable {
     var date: String
     var title: String
     var body: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, date, title, body
+    }
+
+    init(id: String, date: String, title: String, body: String) {
+        self.id = id
+        self.date = date
+        self.title = title
+        self.body = body
+    }
+
+    /// The Package 7 `active-goal` resource's `turningPoints[]` entries
+    /// never carry an `id` — only `{title, body, date}` (confirmed against
+    /// a real production response). Turning points are a narrative
+    /// timeline never referenced elsewhere by identity, so a stable id
+    /// derived from the two fields that are always present (`date` and
+    /// `title`) is a safe SwiftUI list key, not a fabricated identity —
+    /// the fixture's own explicit `id` still decodes directly when present.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        date = try container.decode(String.self, forKey: .date)
+        title = try container.decode(String.self, forKey: .title)
+        body = try container.decode(String.self, forKey: .body)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? "\(date)-\(title)"
+    }
 }
 
 struct GoalStrategyItemReadModel: Codable, Equatable, Identifiable {

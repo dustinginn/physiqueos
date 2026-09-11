@@ -20,8 +20,8 @@ struct LogView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = LogViewModel(api: environment.logAPI) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = LogViewModel(api: environment.logAPI)
             await viewModel?.load()
         }
     }

@@ -376,9 +376,11 @@ private struct ActivityTrainingContextRow: View {
                     Text(entry.value)
                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text(TrainingDateFormatting.short(entry.date))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    if let date = entry.date {
+                        Text(TrainingDateFormatting.short(date))
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    }
                 }
             }
             if !entry.sourceEvidence.isEmpty {

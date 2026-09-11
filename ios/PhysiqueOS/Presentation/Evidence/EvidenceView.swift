@@ -24,8 +24,8 @@ struct EvidenceView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = EvidenceViewModel(api: environment.evidenceAPI) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = EvidenceViewModel(api: environment.evidenceAPI)
             await viewModel?.load()
         }
     }
