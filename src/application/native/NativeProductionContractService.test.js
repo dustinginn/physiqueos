@@ -65,16 +65,23 @@ function fixture(overrides = {}) {
     timeline: { getPage: call({ items: [], hasMore: false }) },
   };
   const executeCommand = vi.fn(async (input) => ({ outcome: "committed", commandType: input.commandType }));
+  const confirmEvidenceReview = vi.fn(async ({ reviewId }) => ({ state: "processing", reviewId }));
+  const evidenceIntake = {
+    accept: vi.fn(async () => ({ status: "processing", intakeId: "intake-1" })),
+    getStatus: vi.fn(async () => ({ status: "ready", intakeId: "intake-1", reviewId: "review-1" })),
+  };
   const openMedia = vi.fn(async () => ({ url: "https://private.invalid/read" }));
   const service = createNativeProductionContractService({
     authenticate: overrides.authenticate ?? vi.fn(async () => principal),
     ownerUserId: OWNER,
     readers,
     executeCommand,
+    confirmEvidenceReview,
+    evidenceIntake,
     openMedia,
     now: () => new Date("2026-09-09T12:00:00.000Z"),
   });
-  return { executeCommand, openMedia, readers, service };
+  return { confirmEvidenceReview, evidenceIntake, executeCommand, openMedia, readers, service };
 }
 describe("Native production contract boundary", () => {
   it("publishes a Founder-production profile without provider or database implementation identity", async () => {
@@ -254,6 +261,53 @@ describe("Native production contract boundary", () => {
     expect(current.executeCommand).toHaveBeenCalledWith(expect.objectContaining({ principal, commandType: "priority.complete.v1" }));
   });
 
+  it("rejects legacy or inert write aliases at the Native boundary", async () => {
+    const current = fixture();
+    await expect(current.service.command({
+      request: request(), commandType: "activity-day.sync.v1",
+      metadata: { idempotencyKey: "legacy-sync" }, payload: {},
+    })).rejects.toMatchObject({ status: 400, code: "NATIVE_COMMAND_UNAVAILABLE" });
+    expect(current.executeCommand).not.toHaveBeenCalled();
+  });
+
+  it("starts the real Evidence Review confirmation lifecycle after the canonical receipt commits", async () => {
+    const current = fixture();
+    current.executeCommand.mockResolvedValue({ outcome: "committed", receipt: { commandId: "command-7" } });
+    const result = await current.service.command({
+      request: request(), commandType: "evidence-review.commit.v1",
+      metadata: { idempotencyKey: "confirm-review-1", expectedVersion: "3" },
+      payload: { reviewId: "review-1" },
+    });
+    expect(current.confirmEvidenceReview).toHaveBeenCalledWith({
+      principal, reviewId: "review-1", commandId: "command-7",
+    });
+    expect(result.confirmation).toEqual({ state: "processing", reviewId: "review-1" });
+  });
+
+  it("routes a structured Training log through its staged Evidence Review lifecycle", async () => {
+    const current = fixture();
+    current.executeCommand.mockResolvedValue({
+      outcome: "committed",
+      receipt: { commandId: "command-training", result: { reviewId: "review-training", status: "confirmation_requested" } },
+    });
+    await current.service.command({
+      request: request(), commandType: "training-session.commit.v1",
+      metadata: { idempotencyKey: "training-one" },
+      payload: { sessionId: "session-one", localDate: "2026-09-09", exercises: [{ canonicalExerciseId: "bench_press", sets: [{ reps: 8, load: 185 }] }] },
+    });
+    expect(current.confirmEvidenceReview).toHaveBeenCalledWith({
+      principal, reviewId: "review-training", commandId: "command-training",
+    });
+  });
+
+  it("authorizes asynchronous evidence intake creation and status through the same owner boundary", async () => {
+    const current = fixture();
+    await expect(current.service.acceptEvidenceIntake({ request: request(), input: { submissionIdentity: "id" } }))
+      .resolves.toMatchObject({ intakeId: "intake-1", status: "processing" });
+    await expect(current.service.evidenceIntakeStatus({ request: request(), intakeId: "intake-1" }))
+      .resolves.toMatchObject({ reviewId: "review-1", status: "ready" });
+  });
+
   it("authorizes opaque media IDs without accepting storage paths", async () => {
     const current = fixture();
     await current.service.media({ request: request(), mediaId: "media-photo-1" });
@@ -264,6 +318,12 @@ describe("Native production contract boundary", () => {
     expect(nativeProductionContractManifest.reads.length).toBeGreaterThanOrEqual(28);
     expect(nativeProductionContractManifest.reads.every((item) => item.auth === "founder-device-bearer" && item.authority === "founder-production")).toBe(true);
     expect(nativeProductionContractManifest.writes.every((item) => item.idempotency.includes("Idempotency-Key"))).toBe(true);
+    expect(nativeProductionContractManifest.writes.map((item) => item.commandType)).toEqual([
+      "weight.submit.v1", "check-in.submit.v1", "priority.complete.v1",
+      "training-session.commit.v1", "nutrition-day.upsert.v1", "activity-day.upsert.v1",
+      "dexa-review.measurements.v1", "evidence-review.commit.v1",
+    ]);
+    expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/HealthKit|activity-day\.sync/);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/storage_key|Spaces|databaseName|provider-authoritative/);
   });
 });

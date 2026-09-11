@@ -16,17 +16,20 @@ import {
   getProductionProgressPhotosReadService,
   getProductionProviderMediaDelivery,
   getProductionTrainingNavigationReadService,
+  getProductionAsyncEvidenceIntakeService,
 } from "../../application/composition/productionApplicationComposition.js";
 
 let runtime;
 
-export function createNativeProductionContractRuntime({ founderAuthService, ownerUserId, readers, commands, media, now } = {}) {
+export function createNativeProductionContractRuntime({ founderAuthService, ownerUserId, readers, commands, media, evidenceIntake = null, confirmEvidenceReview = null, now } = {}) {
   const authenticator = createFounderBearerAuthenticator(founderAuthService);
   return createNativeProductionContractService({
     authenticate: (request) => authenticator.authenticate(request),
     ownerUserId,
     readers,
     executeCommand: (input) => commands.execute(input),
+    confirmEvidenceReview,
+    evidenceIntake,
     openMedia: (input) => media.openRead(input),
     now,
   });
@@ -53,6 +56,15 @@ export async function getProductionNativeContractRuntime(env = process.env) {
     }),
     commands: composition.commands,
     media: getProductionProviderMediaDelivery(env),
+    evidenceIntake: getProductionAsyncEvidenceIntakeService(env),
+    confirmEvidenceReview: async ({ principal, reviewId, commandId }) => {
+      const actions = await import("../../app/evidence/review/[reviewId]/actions.js");
+      return actions.beginNativeEvidenceReviewConfirmation({
+        reviewId,
+        confirmedBy: principal.userId,
+        operationId: `native-confirm:${commandId}`,
+      });
+    },
   });
   return runtime;
 }

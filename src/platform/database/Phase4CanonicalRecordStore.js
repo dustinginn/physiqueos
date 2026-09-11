@@ -102,7 +102,7 @@ function mapRecord(row) {
   return row ? Object.freeze({ ...row.payload, version: Number(row.version) }) : null;
 }
 function clone(value) { return value == null ? null : structuredClone(value); }
-function resolveRecordId(record, position) { return String(record?.id ?? record?.package_id ?? record?.review_id ?? `@index:${position}`); }
+function resolveRecordId(record, position) { return String(record?.id ?? record?.canonicalId ?? record?.package_id ?? record?.review_id ?? `@index:${position}`); }
 function normalizeVersion(value) { const number = Number(value); return Number.isSafeInteger(number) && number > 0 ? number : 1; }
 function nullable(value) { return value == null || value === "" ? null : String(value); }
 function calendarDate(value) { const text = nullable(value); return text && /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null; }

@@ -4,9 +4,9 @@ import { createCanonicalPersistenceCommandPorts } from "../commands/CanonicalPer
 
 const OWNER = "user_founder_001";
 
-describe("Native daily evidence canonical command contracts", () => {
+describe("daily evidence canonical command ports", () => {
   it("keeps Nutrition same-day identity, exact retry, and correction history canonical", async () => {
-    const records = createInMemoryCanonicalRecordStore({ canonicalEvidenceObjects: [], goals: [] });
+    const records = recordStore();
     const ports = createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-09T18:00:00.000Z") });
     const first = await ports.upsertNutritionDay(context("nutrition-one", {
       localDate: "2026-09-09", dailyTotals: { calories: 2400, protein_g: 180 },
@@ -19,15 +19,15 @@ describe("Native daily evidence canonical command contracts", () => {
       expectedSemanticFingerprint: first.result.semanticFingerprint,
     }));
     const snapshot = records.snapshot().canonicalEvidenceObjects;
-    expect(first.result).toMatchObject({ status: "changed", canonicalId: "nutrition|2026-09-09|nutrition-day", revision: 1 });
-    expect(replay.result.status).toBe("unchanged");
-    expect(correction.result).toMatchObject({ status: "changed", canonicalId: first.result.canonicalId, revision: 2 });
+    expect(first.result).toMatchObject({ status: "source_committed_work_enqueued", canonicalId: "nutrition|2026-09-09|nutrition-day", revision: 1 });
+    expect(replay.result.status).toBe("source_matched");
+    expect(correction.result).toMatchObject({ status: "source_committed_work_enqueued", canonicalId: first.result.canonicalId, revision: 2 });
     expect(snapshot).toHaveLength(1);
     expect(snapshot[0].nutritionRevisionHistory).toHaveLength(1);
   });
 
-  it("preserves HealthKit fingerprint, precedence, and replay-safe Activity identity", async () => {
-    const records = createInMemoryCanonicalRecordStore({ canonicalEvidenceObjects: [], goals: [] });
+  it("retains the non-Native legacy HealthKit port for Phase 3 compatibility", async () => {
+    const records = recordStore();
     const ports = createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-09T18:00:00.000Z") });
     const payload = {
       localDate: "2026-09-09", sourceIdentity: "healthkit-day-2026-09-09",
@@ -45,7 +45,7 @@ describe("Native daily evidence canonical command contracts", () => {
   });
 
   it("fails stale Nutrition and Activity corrections closed", async () => {
-    const records = createInMemoryCanonicalRecordStore({ canonicalEvidenceObjects: [], goals: [] });
+    const records = recordStore();
     const ports = createCanonicalPersistenceCommandPorts({ records });
     await ports.upsertNutritionDay(context("nutrition-first", { localDate: "2026-09-09", dailyTotals: { calories: 2400 } }));
     await expect(ports.upsertNutritionDay(context("nutrition-stale", {
@@ -65,4 +65,16 @@ function context(idempotencyKey, payload) {
     principal: { userId: OWNER, deviceId: "native-device", sessionId: "native-session" },
     metadata: { idempotencyKey, clientTimeZone: "America/Los_Angeles" },
   };
+}
+
+function recordStore() {
+  return createInMemoryCanonicalRecordStore({
+    user: [{ id: OWNER, timeZone: "America/Los_Angeles", version: 1 }],
+    goals: [{ id: "goal-one", userId: OWNER, primary: true, status: "active", operatingState: { value: "build_lean_mass" }, phases: [{
+      id: "phase-one", goalId: "goal-one", status: "active", startDate: "2026-09-01", startedAt: "2026-09-01",
+      plannedReviewAt: "2026-10-01", reviewState: "scheduled", completionDecisionRequired: true, revision: 1,
+    }] }],
+    protocols: [], protocolVersions: [], dailyBriefings: [], evidencePackages: [], canonicalExerciseLibrary: [],
+    canonicalEvidenceObjects: [], piEnergyConfidenceWorkItems: [], piTrainingConfidenceWorkItems: [], briefingReconciliationWorkItems: [],
+  });
 }

@@ -6,7 +6,7 @@ import { createPhase3CommandService, listPhase3CommandContracts, Phase3Command }
 const principal = createAuthenticationPrincipal({ userId: "owner-one", deviceId: "device-one", sessionId: "session-one" });
 const payloads = {
   [Phase3Command.SUBMIT_WEIGHT]: { localDate: "2026-08-11", value: 180 },
-  [Phase3Command.SUBMIT_CHECK_IN]: { localDate: "2026-08-11", energy: 4 },
+  [Phase3Command.SUBMIT_CHECK_IN]: { localDate: "2026-08-11", value: 180, energy: 4 },
   [Phase3Command.CREATE_EVIDENCE_INTAKE]: { submissionId: "submission-one", artifacts: ["object-one"] },
   [Phase3Command.EDIT_EVIDENCE_REVIEW]: { reviewId: "review-one", corrections: [] },
   [Phase3Command.CONFIRM_EVIDENCE_REVIEW]: { reviewId: "review-one" },
@@ -24,6 +24,10 @@ const payloads = {
   [Phase3Command.CONFIRM_DEXA]: { reviewId: "review-dexa" },
   [Phase3Command.UPSERT_NUTRITION_DAY]: { localDate: "2026-08-11", dailyTotals: { calories: 2400, protein_g: 180 } },
   [Phase3Command.SYNC_ACTIVITY_DAY]: { localDate: "2026-08-11", dailyActivity: { move_calories: 700 }, sourceIdentity: "healthkit-day-2026-08-11" },
+  [Phase3Command.COMMIT_TRAINING_SESSION]: { sessionId: "session-native", localDate: "2026-08-11", exercises: [{ canonicalExerciseId: "barbell-bench-press", sets: [{ reps: 8, load: 185, unit: "lb" }] }] },
+  [Phase3Command.UPSERT_ACTIVITY_DAY]: { localDate: "2026-08-11", dailyActivity: { move_calories: 700 }, sourceIdentity: "screenshot-day-2026-08-11", source: { modality: "screenshot", application: "Apple Fitness" } },
+  [Phase3Command.EDIT_DEXA_REVIEW]: { reviewId: "review-dexa", evidenceObjectId: "dexa-one", measurements: { measuredAt: "2026-08-11", totalMass: 180 } },
+  [Phase3Command.COMMIT_EVIDENCE_REVIEW]: { reviewId: "review-dexa" },
 };
 
 describe("Phase 3 task command parity boundary", () => {
@@ -101,6 +105,8 @@ function commandPort(commandType) {
     [Phase3Command.CORRECT_TRAINING_SESSION]: "correctTrainingSession", [Phase3Command.COMPLETE_TRAINING_LOGGER]: "completeTrainingLogger", [Phase3Command.CONFIRM_NUTRITION]: "confirmNutritionEvidence",
     [Phase3Command.CONFIRM_PHOTO]: "confirmPhotoEvidence", [Phase3Command.CONFIRM_DEXA]: "confirmDexaEvidence",
     [Phase3Command.UPSERT_NUTRITION_DAY]: "upsertNutritionDay", [Phase3Command.SYNC_ACTIVITY_DAY]: "syncActivityDay",
+    [Phase3Command.COMMIT_TRAINING_SESSION]: "commitTrainingSession", [Phase3Command.UPSERT_ACTIVITY_DAY]: "upsertActivityDay",
+    [Phase3Command.EDIT_DEXA_REVIEW]: "editDexaReview", [Phase3Command.COMMIT_EVIDENCE_REVIEW]: "requestEvidenceReviewConfirmation",
   })[commandType];
 }
 

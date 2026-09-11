@@ -2,6 +2,12 @@
 
 This document is the server-owned handoff for production Native integration. Swift is a client of these contracts; it does not own canonical identity, chronology, Energy derivation, Confidence reasoning, briefing selection, or media storage resolution.
 
+## Package authority
+
+- Implementation base: exact commit `392b42c9998373573fc68d3c229d0d9835af8735` from `origin/combined-app-platform-cutover`.
+- Verified deployment at implementation start: deployment `b2f67fb1-b003-4022-ae9e-80690fbcf23d` was `ACTIVE` for DigitalOcean app `bf57cf56-48cc-4cd6-90e4-a23ee5381741`; both `/api/v1/health/live` and `/api/v1/health/ready` returned HTTP 200.
+- Scope: server contract, canonical persistence adapters, intake endpoints, lifecycle reuse, tests, and provider-build evidence only. This package performs no deployment, schema migration, backfill, infrastructure mutation, production-data write, or Native Swift change.
+
 ## Authority and authentication
 
 - An authenticated Founder web session creates a one-time production pairing credential with `POST /api/v1/native/auth/pairing-credentials`. The request must come from the configured application origin. The server chooses the canonical production owner; the request cannot name or override an owner.
@@ -65,22 +71,22 @@ Weekly and Midweek `briefing` detail is a frozen, artifact-bound finished presen
 
 ## Write matrix
 
-Writes use `POST /api/v1/native/commands` with `{ commandType, metadata?, payload }` plus `Idempotency-Key`.
+Structured writes use `POST /api/v1/native/commands` with `{ commandType, metadata?, payload }` plus `Idempotency-Key`. The production Native allowlist is exactly the eight commands below; legacy Phase 3 command names are not accepted by this boundary.
 
 | Domain | Command | Canonical rule |
 |---|---|---|
-| Weight | `weight.submit.v1` | same intended day; direct/Morning context is explicit in payload |
-| Morning Check-In | `check-in.submit.v1` | intended local date and canonical reconciliation payload |
-| Priority | `priority.complete.v1` | canonical Priority ID + occurrence date; optional typed execution context |
-| Evidence intake | `evidence-intake.create.v1` | staged source identity; no direct canonical mutation |
-| Evidence Review | `evidence-review.edit.v1`, `.confirm.v1`, `.dispose.v1` | expected version; confirmation resolves through the canonical review command boundary |
-| Training | `training-session.create.v1`, `.correct.v1`, `training-logger.complete.v1` | canonical exercise/session IDs; expected version for correction/completion |
-| Nutrition day | `nutrition-day.upsert.v1` | one owner/date lineage; complete-day correction; semantic-fingerprint precondition |
-| Activity day / HealthKit | `activity-day.sync.v1` | one owner/date lineage; source identity + checkpoint; semantic-fingerprint precondition |
-| Goal/strategy | `goal.edit.v1`, `goal.transition.v1`, `protocol.edit.v1` | expected version and server-owned Goal/Phase rules |
-| Evidence confirmation aliases | `nutrition-evidence.confirm.v1`, `photo-evidence.confirm.v1`, `dexa-evidence.confirm.v1` | review ID and expected version |
+| Weight | `weight.submit.v1` | intended local date + positive value; uses the same Morning Check-In persistence service as web; changed same-day value requires `If-Match` |
+| Morning Check-In | `check-in.submit.v1` | intended local date + weight value and optional daily context/reconciliation; creates the canonical Weight, Check-In, analysis, and briefing reconciliation records |
+| Priority | `priority.complete.v1` | canonical reminder ID + occurrence date; first completion requires `If-Match`; replay of that occurrence is a no-op |
+| Training | `training-session.commit.v1` | canonical exercise IDs and performed sets; validates unit and superset occurrence identities, then commits the same Training evidence package used by web |
+| Nutrition day | `nutrition-day.upsert.v1` | one owner/date lineage; full-day replacement; optional prior semantic fingerprint; server freezes Goal/Phase attribution and stages Energy/briefing continuation work |
+| Activity day | `activity-day.upsert.v1` | one owner/date lineage with explicit `manual`, `typed`, or `screenshot` provenance; direct device-health and HealthKit writes are rejected |
+| DEXA review measurements | `dexa-review.measurements.v1` | canonical review + DEXA object IDs and validated measurements; every edit requires `If-Match` |
+| Evidence Review commit | `evidence-review.commit.v1` | canonical review ID; `If-Match` starts or resumes the existing web confirmation lifecycle, including canonical commit and durable continuation |
 
-HealthKit sends a recomputed canonical day for additions, source corrections, and deletions. Replaying the same source identity and payload is a no-op. A changed daily aggregate must include the prior semantic fingerprint, which creates one Activity revision while preserving provenance and precedence. The checkpoint is opaque client synchronization state; it is not evidence identity.
+DEXA PDF, Nutrition screenshot, and Activity screenshot intake use `POST /api/v1/native/evidence/intakes` as `multipart/form-data`; status is read at `GET /api/v1/native/evidence/intakes/{intakeId}`. `Idempotency-Key` must equal the UUID submission identity. DEXA accepts exactly one signature-validated PDF. Nutrition and Activity accept one to four signature-validated PNG, JPEG, or WebP screenshots. The foreground stores verified artifacts and returns a durable processing receipt; provider worker interpretation stages the ordinary Evidence Review. Native edits DEXA measurements there and confirms through the same canonical lifecycle as web.
+
+Activity has no Native HealthKit/direct-device path in this package. Manual structured entry uses `activity-day.upsert.v1`; screenshots use asynchronous intake and Evidence Review. Replaying identical daily evidence is provenance-only/no-op as determined by canonical reconciliation. A changed day creates one canonical revision and preserves its originally frozen Goal/Phase attribution.
 
 ## Native/provider implementation invariants
 
@@ -91,7 +97,9 @@ HealthKit sends a recomputed canonical day for additions, source corrections, an
 - Weekly, Midweek, Monthly, DEXA Event, and Photo Event artifacts are returned as persisted artifacts; Native does not regenerate them.
 - Weekly and Midweek persisted artifacts are passed through their artifact-only server presentation composers before delivery; no live evidence is read to revise historical meaning.
 - Native Weight, Photos, Briefing detail, Energy, and Training Reporting are finished server projections. Native renders these contracts and does not derive chronology, comparisons, rolling averages, extrema, narrative selection, Confidence, or reporting group semantics.
-- Nutrition/Activity corrections flow through Package 4 canonical reconciliation. Energy remains a read projection from Nutrition, Activity, and applicable DEXA RMR.
+- Training, Nutrition, and Activity structured writes flow through the lower-level canonical evidence commit service, which stages PI Energy/Training and briefing reconciliation work without running those continuations inside the request.
+- Weight and Morning Check-In use the web Morning Check-In service. Priority completion uses the canonical reminder occurrence repository. DEXA confirmation uses the web Evidence Review lifecycle and its durable continuation worker.
+- Energy remains a read projection from Nutrition, Activity, and applicable DEXA RMR.
 - No API route calls OpenAI or PI at render time.
 
 ## Staged integration order
@@ -102,4 +110,4 @@ HealthKit sends a recomputed canonical day for additions, source corrections, an
 4. Enable one write domain at a time with idempotency and stale-revision acceptance.
 5. Keep Sandbox credentials, URLs, and data stores separate throughout.
 
-This manifest is a technical readiness contract. It does not itself enable Founder data in Native or authorize a production write acceptance.
+This package makes the server contract production-write-capable after its commit is deployed. It does not deploy itself, alter infrastructure, migrate schema, backfill records, or mutate production Founder data.

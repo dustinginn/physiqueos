@@ -261,7 +261,7 @@
         "additionalProperties": false,
         "required": ["commandType", "payloadVersion", "requiredPayloadFields", "expectedVersionRequired"],
         "properties": {
-          "commandType": { "type": "string", "enum": ["weight.submit.v1", "check-in.submit.v1", "evidence-intake.create.v1", "evidence-review.edit.v1", "evidence-review.confirm.v1", "evidence-review.dispose.v1", "priority.complete.v1", "previous-day.reconcile.v1", "protocol.edit.v1", "goal.edit.v1", "goal.transition.v1", "training-session.create.v1", "training-session.correct.v1", "training-logger.complete.v1", "nutrition-evidence.confirm.v1", "photo-evidence.confirm.v1", "dexa-evidence.confirm.v1", "nutrition-day.upsert.v1", "activity-day.sync.v1"] },
+          "commandType": { "type": "string", "enum": ["weight.submit.v1", "check-in.submit.v1", "evidence-intake.create.v1", "evidence-review.edit.v1", "evidence-review.confirm.v1", "evidence-review.dispose.v1", "priority.complete.v1", "previous-day.reconcile.v1", "protocol.edit.v1", "goal.edit.v1", "goal.transition.v1", "training-session.create.v1", "training-session.correct.v1", "training-logger.complete.v1", "nutrition-evidence.confirm.v1", "photo-evidence.confirm.v1", "dexa-evidence.confirm.v1", "nutrition-day.upsert.v1", "activity-day.sync.v1", "training-session.commit.v1", "activity-day.upsert.v1", "dexa-review.measurements.v1", "evidence-review.commit.v1"] },
           "payloadVersion": { "const": "1" },
           "requiredPayloadFields": { "type": "array", "items": { "type": "string" } },
           "expectedVersionRequired": { "type": "boolean" }

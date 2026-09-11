@@ -23,11 +23,15 @@ export const Phase3Command = Object.freeze({
   CONFIRM_DEXA: "dexa-evidence.confirm.v1",
   UPSERT_NUTRITION_DAY: "nutrition-day.upsert.v1",
   SYNC_ACTIVITY_DAY: "activity-day.sync.v1",
+  COMMIT_TRAINING_SESSION: "training-session.commit.v1",
+  UPSERT_ACTIVITY_DAY: "activity-day.upsert.v1",
+  EDIT_DEXA_REVIEW: "dexa-review.measurements.v1",
+  COMMIT_EVIDENCE_REVIEW: "evidence-review.commit.v1",
 });
 
 const DEFINITIONS = Object.freeze({
   [Phase3Command.SUBMIT_WEIGHT]: define("submitWeight", ["localDate", "value"], false),
-  [Phase3Command.SUBMIT_CHECK_IN]: define("submitCheckIn", ["localDate"], false),
+  [Phase3Command.SUBMIT_CHECK_IN]: define("submitCheckIn", ["localDate", "value"], false),
   [Phase3Command.CREATE_EVIDENCE_INTAKE]: define("createEvidenceIntake", ["submissionId"], false),
   [Phase3Command.EDIT_EVIDENCE_REVIEW]: define("editEvidenceReview", ["reviewId"], true),
   [Phase3Command.CONFIRM_EVIDENCE_REVIEW]: define("confirmEvidenceReview", ["reviewId"], true),
@@ -45,6 +49,10 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.CONFIRM_DEXA]: define("confirmDexaEvidence", ["reviewId"], true),
   [Phase3Command.UPSERT_NUTRITION_DAY]: define("upsertNutritionDay", ["localDate", "dailyTotals"], false),
   [Phase3Command.SYNC_ACTIVITY_DAY]: define("syncActivityDay", ["localDate", "dailyActivity", "sourceIdentity"], false),
+  [Phase3Command.COMMIT_TRAINING_SESSION]: define("commitTrainingSession", ["sessionId", "localDate", "exercises"], false),
+  [Phase3Command.UPSERT_ACTIVITY_DAY]: define("upsertActivityDay", ["localDate", "dailyActivity", "sourceIdentity", "source"], false),
+  [Phase3Command.EDIT_DEXA_REVIEW]: define("editDexaReview", ["reviewId", "evidenceObjectId", "measurements"], true),
+  [Phase3Command.COMMIT_EVIDENCE_REVIEW]: define("requestEvidenceReviewConfirmation", ["reviewId"], true),
 });
 
 export function createPhase3CommandService({ transactionRunner, ports, writeFence = null } = {}) {
@@ -112,8 +120,10 @@ function validatePayload(commandType, payload) {
   if (payload.items != null && !Array.isArray(payload.items)) throw validation("items", "items must be an array.");
   if (payload.dailyTotals != null && (!payload.dailyTotals || typeof payload.dailyTotals !== "object" || Array.isArray(payload.dailyTotals))) throw validation("dailyTotals", "dailyTotals must be an object.");
   if (payload.dailyActivity != null && (!payload.dailyActivity || typeof payload.dailyActivity !== "object" || Array.isArray(payload.dailyActivity))) throw validation("dailyActivity", "dailyActivity must be an object.");
+  if (payload.measurements != null && (!payload.measurements || typeof payload.measurements !== "object" || Array.isArray(payload.measurements))) throw validation("measurements", "measurements must be an object.");
+  if (payload.exercises != null && (!Array.isArray(payload.exercises) || payload.exercises.length === 0)) throw validation("exercises", "exercises must be a non-empty array.");
   if (payload.observedAt != null && Number.isNaN(Date.parse(payload.observedAt))) throw validation("observedAt", "observedAt must be an ISO date-time.");
-  for (const field of ["submissionId", "reviewId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId"]) {
+  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId"]) {
     if (payload[field] != null && !String(payload[field]).trim()) throw validation(field, `${field} must be a non-empty identity.`);
   }
 }

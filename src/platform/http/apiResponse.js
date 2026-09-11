@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { toProblemDetails } from "../../contracts/v1/problem";
 import { resolveCorrelationId } from "../observability/correlation";
 
-export async function executeApiRequest(request, handler, { buildIdentity, logger } = {}) {
+export async function executeApiRequest(request, handler, { buildIdentity, logger, successStatus = 200 } = {}) {
   const requestId = resolveCorrelationId(request.headers.get("x-request-id"));
   try {
     const value = await handler({ requestId });
-    return json(value, 200, requestId, buildIdentity);
+    return json(value, successStatus, requestId, buildIdentity);
   } catch (error) {
     const problem = toProblemDetails(error, { requestId, instance: new URL(request.url).pathname });
     logger?.warn("api.request.failed", { requestId, code: problem.code, status: problem.status, error });

@@ -64,14 +64,16 @@ const reads = Object.freeze([
   read("timeline", "/api/v1/native/read/timeline", "evidenceTimeline.getPage", { pagination: "limit:1-200" }),
 ]);
 
-const writes = Object.freeze(Object.values(Phase3Command).map((commandType) => Object.freeze({
-  commandType,
-  endpoint: "/api/v1/native/commands",
-  auth: "founder-device-bearer",
-  authority: "founder-production",
-  idempotency: "Idempotency-Key and canonical command receipt",
-  revision: "If-Match required for correction commands",
-})));
+const writes = Object.freeze([
+  write(Phase3Command.SUBMIT_WEIGHT, ["localDate", "value"], "If-Match required only when replacing a changed same-day Weight"),
+  write(Phase3Command.SUBMIT_CHECK_IN, ["localDate", "value"], "If-Match required only when replacing a changed same-day Weight"),
+  write(Phase3Command.COMPLETE_PRIORITY, ["priorityId", "occurrenceDate"], "If-Match required for the first occurrence completion; exact replay is a no-op"),
+  write(Phase3Command.COMMIT_TRAINING_SESSION, ["sessionId", "localDate", "exercises"], "If-Match required when correcting an existing canonical Training session"),
+  write(Phase3Command.UPSERT_NUTRITION_DAY, ["localDate", "dailyTotals"], "semantic fingerprint protects replacements; server assigns Goal and Phase"),
+  write(Phase3Command.UPSERT_ACTIVITY_DAY, ["localDate", "dailyActivity", "sourceIdentity", "source"], "manual, typed, or screenshot provenance only; direct device-health sync is forbidden"),
+  write(Phase3Command.EDIT_DEXA_REVIEW, ["reviewId", "evidenceObjectId", "measurements"], "If-Match required for every edit"),
+  write(Phase3Command.COMMIT_EVIDENCE_REVIEW, ["reviewId"], "If-Match required to start the canonical Evidence Review lifecycle"),
+]);
 
 export const nativeProductionContractManifest = Object.freeze({
   contractVersion: "1",
@@ -95,6 +97,17 @@ export const nativeProductionContractManifest = Object.freeze({
     authorization: "bearer, owner-scoped",
     cache: "private, no-store",
   }),
+  evidenceIntake: Object.freeze({
+    createEndpoint: "/api/v1/native/evidence/intakes",
+    statusEndpoint: "/api/v1/native/evidence/intakes/{intakeId}",
+    contentType: "multipart/form-data",
+    acceptedEvidenceTypes: Object.freeze(["dexa_scan", "nutrition", "activity_day"]),
+    activitySources: Object.freeze(["screenshot", "manual-command"]),
+    dexa: "one validated BodySpec PDF; asynchronous interpretation stages an Evidence Review",
+    idempotency: "Idempotency-Key equals submissionIdentity; durable receipt replay",
+    authority: "founder-production",
+    auth: "founder-device-bearer",
+  }),
   reads,
   writes,
 });
@@ -109,5 +122,18 @@ function read(resource, endpoint, service, extra = {}) {
     goalPhase: "server-resolved and historically frozen where applicable",
     media: "opaque references only",
     pagination: extra.pagination ?? "bounded by canonical read service",
+  });
+}
+
+function write(commandType, requiredPayloadFields, revision) {
+  return Object.freeze({
+    commandType,
+    endpoint: "/api/v1/native/commands",
+    requiredPayloadFields: Object.freeze(requiredPayloadFields),
+    auth: "founder-device-bearer",
+    authority: "founder-production",
+    idempotency: "Idempotency-Key and canonical command receipt",
+    revision,
+    response: "canonical identity, outcome, current revision, and continuation work identities when created",
   });
 }

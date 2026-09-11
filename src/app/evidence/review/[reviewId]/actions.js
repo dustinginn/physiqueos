@@ -138,12 +138,28 @@ export async function continueEvidenceReviewInBackground({
   });
 }
 
+export async function beginNativeEvidenceReviewConfirmation({
+  reviewId,
+  confirmedBy,
+  operationId,
+}) {
+  const formData = new FormData();
+  formData.set("reviewId", String(reviewId ?? ""));
+  return executeEvidenceReviewConfirmation(formData, {
+    mode: "native",
+    confirmedBy: String(confirmedBy ?? ""),
+    operationId: String(operationId ?? ""),
+  });
+}
+
 async function executeEvidenceReviewConfirmation(formData, {
   mode,
   continuationKey = null,
   operationId: requestedOperationId = null,
+  confirmedBy = null,
 }) {
-  const background = mode === "background";
+  const background = mode === "background" || mode === "native";
+  const nativeStart = mode === "native";
   const reviewId = String(formData.get("reviewId") ?? "");
   const operationId = requestedOperationId ?? randomUUID();
   const service = createEvidenceReviewService({ repositories: FounderRepositories });
@@ -169,11 +185,19 @@ async function executeEvidenceReviewConfirmation(formData, {
     };
   }, { readModel: "action.evidence-review-confirmation-start" });
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  if (nativeStart && confirmedBy !== user.id) throw new Error("Evidence review is unavailable.");
+  if (nativeStart && ["committing", "partially_committed"].includes(review.status)) {
+    return Object.freeze({
+      state: "processing",
+      reviewId,
+      continuationKey: createEvidenceReviewContinuationKey(review),
+    });
+  }
   if (background) {
     const currentContinuationKey = createEvidenceReviewContinuationKey(review);
     const sameRecoverableOperation = ["in_progress", "failed"].includes(review.commitClaim?.status) &&
       review.commitClaim?.operationId === operationId;
-    if (!sameRecoverableOperation && continuationKey !== currentContinuationKey) {
+    if (!nativeStart && !sameRecoverableOperation && continuationKey !== currentContinuationKey) {
       return Object.freeze({ state: "stale", reviewId, continuationKey: currentContinuationKey });
     }
   }
@@ -190,11 +214,13 @@ async function executeEvidenceReviewConfirmation(formData, {
     (background && isEvidenceReviewCanonicalSaveComplete(review));
   let evidencePackage = structuredClone(review.interpretedEvidence);
   if (!resuming) {
-    try { evidencePackage = JSON.parse(String(formData.get("evidenceJson") ?? "")); }
-    catch { throw new Error("The reviewed evidence contains invalid JSON."); }
-    let submittedItemDecisions;
-    try { submittedItemDecisions = JSON.parse(String(formData.get("itemDecisionsJson") ?? "{}")); }
-    catch { throw new Error("The evidence selection is invalid."); }
+    let submittedItemDecisions = review.itemDecisions ?? {};
+    if (!nativeStart) {
+      try { evidencePackage = JSON.parse(String(formData.get("evidenceJson") ?? "")); }
+      catch { throw new Error("The reviewed evidence contains invalid JSON."); }
+      try { submittedItemDecisions = JSON.parse(String(formData.get("itemDecisionsJson") ?? "{}")); }
+      catch { throw new Error("The evidence selection is invalid."); }
+    }
     evidencePackage = mergeAuthoritativePhotoSessions(evidencePackage, review.interpretedEvidence);
     evidencePackage = mergeAuthoritativeTrainingSessions(evidencePackage, review.interpretedEvidence);
     evidencePackage = mergeAuthoritativeDexaScans(evidencePackage, review.interpretedEvidence);

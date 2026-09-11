@@ -8,15 +8,28 @@ import {
   projectNativeTrainingReportingRead,
   projectNativeWeightRead,
 } from "./NativeReadProjectionService.js";
+import { Phase3Command } from "../commands/Phase3CommandService.js";
 
 const RESOURCES = new Set(Object.values(NativeProductionResource));
 const CONTEXTS = new Set(["all", "build-lean-mass", "visible-abs"]);
+const NATIVE_WRITE_COMMANDS = new Set([
+  Phase3Command.SUBMIT_WEIGHT,
+  Phase3Command.SUBMIT_CHECK_IN,
+  Phase3Command.COMPLETE_PRIORITY,
+  Phase3Command.COMMIT_TRAINING_SESSION,
+  Phase3Command.UPSERT_NUTRITION_DAY,
+  Phase3Command.UPSERT_ACTIVITY_DAY,
+  Phase3Command.EDIT_DEXA_REVIEW,
+  Phase3Command.COMMIT_EVIDENCE_REVIEW,
+]);
 
 export function createNativeProductionContractService({
   authenticate,
   ownerUserId,
   readers,
   executeCommand,
+  confirmEvidenceReview,
+  evidenceIntake,
   openMedia,
   now = () => new Date(),
 } = {}) {
@@ -121,7 +134,36 @@ export function createNativeProductionContractService({
     async command({ request, commandType, metadata, payload }) {
       const principal = await authorize(request, "founder:write");
       if (typeof executeCommand !== "function") throw unavailableResource();
-      return executeCommand({ commandType, principal, metadata, payload });
+      if (!NATIVE_WRITE_COMMANDS.has(commandType)) {
+        throw new ApplicationProblem({
+          status: 400,
+          code: "NATIVE_COMMAND_UNAVAILABLE",
+          title: "This command is not a canonical Native production write.",
+        });
+      }
+      const result = await executeCommand({ commandType, principal, metadata, payload });
+      if (![Phase3Command.COMMIT_EVIDENCE_REVIEW, Phase3Command.COMMIT_TRAINING_SESSION].includes(commandType)) return result;
+      if (typeof confirmEvidenceReview !== "function") throw unavailableResource();
+      const confirmation = await confirmEvidenceReview({
+        principal,
+        reviewId: payload.reviewId ?? result.receipt?.result?.reviewId,
+        commandId: result.receipt?.commandId ?? metadata.commandId,
+      });
+      return Object.freeze({ ...result, confirmation });
+    },
+
+    async acceptEvidenceIntake({ request, input }) {
+      const principal = await authorize(request, "founder:write");
+      if (!evidenceIntake?.accept) throw unavailableResource();
+      return evidenceIntake.accept({ ...input, ownerUserId: principal.userId });
+    },
+
+    async evidenceIntakeStatus({ request, intakeId }) {
+      await authorize(request, "founder:read");
+      if (!evidenceIntake?.getStatus) throw unavailableResource();
+      const status = await evidenceIntake.getStatus(required(intakeId, "intakeId"));
+      if (!status) throw unavailableResource();
+      return status;
     },
 
     async media({ request, mediaId }) {
