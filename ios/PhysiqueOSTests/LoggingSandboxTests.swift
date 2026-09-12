@@ -109,6 +109,26 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertNil(attachment.loadError)
     }
 
+    /// Real production regression: a PDF picked via `.fileImporter` reports
+    /// its UTType identifier ("com.adobe.pdf") through `.contentTypeKey`,
+    /// NOT a MIME type. `files()` previously stored that identifier
+    /// verbatim as the attachment's `contentType`, which became the
+    /// multipart Content-Type header for the DEXA upload — a value the
+    /// server's `ProviderCanonicalUploadService` MIME-type validation
+    /// (which requires a "type/subtype" shape) correctly rejects, but
+    /// which the server threw as a bare, code-less Error, collapsing into
+    /// a silent 500 ("PhysiqueOS is temporarily unavailable") for the real
+    /// Founder DEXA upload. `files()` must convert the UTI to its
+    /// preferred MIME type first, exactly like `photos()` already does.
+    func testFilesLoaderConvertsUTTypeIdentifierToAMIMETypeNotRawUTI() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("physiqueos-dexa-content-type-test.pdf")
+        try Data("%PDF-1.7\nreal-dexa-pdf-bytes".utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let attachment = try XCTUnwrap(EvidenceAttachmentLoader.files([url]).first)
+        XCTAssertEqual(attachment.contentType, "application/pdf", "Native must never send a raw UTType identifier (e.g. \"com.adobe.pdf\") as a multipart Content-Type.")
+    }
+
     func testInterpretationPreservesOrderAndSkipsFailedAttachments() async {
         var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
         draft.attachments = [

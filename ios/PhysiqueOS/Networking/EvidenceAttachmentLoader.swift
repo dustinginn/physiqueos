@@ -65,7 +65,7 @@ enum EvidenceAttachmentLoader {
                     id: UUID().uuidString,
                     displayName: url.lastPathComponent,
                     source: .files,
-                    contentType: values?.contentType?.identifier,
+                    contentType: preferredMIMEType(for: values?.contentType?.identifier),
                     data: try Data(contentsOf: url, options: .mappedIfSafe)
                 )
             } catch {

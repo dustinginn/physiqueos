@@ -451,6 +451,14 @@ struct ProductionEvidenceUploadView: View {
         let note: String?
         switch categories.first {
         case _ where categories.count > 1:
+            // Bounded diagnostic: only the matched CATEGORY NAMES (a fixed,
+            // small enum) — never the document's extracted text, filename,
+            // or any other content — so a real ambiguous classification can
+            // be understood from the device console without exposing the
+            // Founder's evidence. This is what should be captured the next
+            // time Automatic reports "more than one kind of evidence" on a
+            // real document, instead of guessing at more keywords blind.
+            print("EvidenceClassification: ambiguous categories=\(categories.map(\.rawValue).sorted())")
             scenario = nil
             note = "This looks like more than one kind of evidence. Choose the right one below."
         case .nutrition: scenario = .nutrition; note = "Detected: Nutrition."
