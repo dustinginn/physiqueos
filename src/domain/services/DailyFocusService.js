@@ -152,7 +152,7 @@ export function createDailyFocusService() {
       );
       const sessionPriorities = sessions
         .filter((session) => session.pendingCount > 0 || session.items.some((item) => item.satisfiedByEvidence))
-        .map(mapSessionToPriority);
+        .map((session) => mapSessionToPriority(session, today));
       const primaryItems = highPriorityItems.filter(
         (item) => !item.completed && !sessionItemIds.has(item.id)
       );
@@ -653,7 +653,7 @@ function getDailySessionsFromItems(items) {
   });
 }
 
-function mapSessionToPriority(session) {
+function mapSessionToPriority(session, occurrenceDate) {
   return {
     id: session.id,
     label: session.label,
@@ -663,6 +663,7 @@ function mapSessionToPriority(session) {
     icon: session.icon,
     color: session.color,
     completed: session.completed,
+    occurrenceDate,
     sessionItems: session.items.map((item) => ({
       completed: item.completed,
       id: item.id,
