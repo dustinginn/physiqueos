@@ -61,6 +61,11 @@ final class LogReadModelTests: XCTestCase {
                 )
             case .nutrition, .activity:
                 XCTAssertEqual(destination.serverDestinationId, "progress.stream")
+            case .weight:
+                // Founder-Production-only, synthesized locally — never
+                // present in the bundled Sandbox fixture this test loads,
+                // but the switch must stay exhaustive.
+                XCTAssertEqual(destination.serverDestinationId, "progress.stream")
             }
         }
     }

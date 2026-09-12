@@ -249,6 +249,105 @@ final class TrainingAcceptanceUITests: XCTestCase {
         )
     }
 
+    /// Build 21 item 2 acceptance: Save & Leave must persist the complete
+    /// in-progress draft, and reopening Workout Logger — a fresh push of
+    /// the same view, exactly like the Founder backgrounding and
+    /// reopening the app — must offer to resume that exact draft rather
+    /// than silently losing it or starting over.
+    func testSaveAndLeavePersistsAndReopeningWorkoutLoggerRestoresTheDraft() throws {
+        launchInSandbox()
+
+        openWorkoutLoggerFromLog()
+        tapButton(identifier: "trainingLogger.start")
+        tapButton(identifier: "trainingLogger.area.shoulders")
+        tapText("Choose exercises")
+        tapButton(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        tapButton(identifier: "trainingLogger.startLogging")
+
+        let markComplete = app.buttons["Mark set complete"].firstMatch
+        XCTAssertTrue(markComplete.waitForExistence(timeout: 3), "Set-completion control was not reachable.")
+        markComplete.tap()
+        XCTAssertTrue(app.buttons["Mark set incomplete"].firstMatch.waitForExistence(timeout: 3), "Marking a set complete did not update its control.")
+        attachScreenshot("26-workout-in-progress-before-save-and-leave")
+
+        tapButton(identifier: "trainingLogger.inlineSaveAndLeave")
+        XCTAssertTrue(app.tabBars.buttons["Log"].waitForExistence(timeout: 3), "Save & Leave did not return to Log.")
+
+        // Reopen Workout Logger as an entirely fresh push — this is the
+        // real regression: the Founder's Build 20 report was specifically
+        // that the draft did NOT restore after Save & Leave and reopen.
+        openWorkoutLoggerFromLog()
+        assertText("Saved workout")
+        let resume = app.buttons["trainingLogger.resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 3), "Resume workout control was not offered after reopening.")
+        attachScreenshot("27-saved-workout-offered-after-reopen")
+
+        resume.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["trainingLogger.workoutIdentity"].waitForExistence(timeout: 3),
+            "Resuming did not return to the in-progress workout."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["trainingLogger.exerciseCard.Shoulder Press Machine"].waitForExistence(timeout: 3),
+            "The exact exercise added before Save & Leave was not restored."
+        )
+        XCTAssertTrue(app.buttons["Mark set incomplete"].firstMatch.waitForExistence(timeout: 3), "The completed-set state was not restored exactly.")
+        attachScreenshot("28-resumed-workout-matches-saved-draft")
+    }
+
+    /// Build 21 item 1 acceptance: the screenshot-attachment card Workout
+    /// Review promises ("Check every completed set and add optional Apple
+    /// Health screenshots") must actually be reachable, and a workout with
+    /// no attachment must still say so honestly on the confirmation
+    /// screen — never silently omitting the line Build 20 always showed
+    /// in Sandbox.
+    func testWorkoutReviewScreenshotCardIsReachableThroughConfirmation() throws {
+        launchInSandbox()
+
+        openWorkoutLoggerFromLog()
+        tapButton(identifier: "trainingLogger.start")
+        tapButton(identifier: "trainingLogger.area.shoulders")
+        tapText("Choose exercises")
+        tapButton(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        tapButton(identifier: "trainingLogger.startLogging")
+        fillFirstSet(reps: "10", load: "45")
+        app.buttons["Mark set complete"].firstMatch.tap()
+
+        tapButton(identifier: "trainingLogger.finishWorkout")
+        assertText("Review your workout")
+        assertText("Supporting workout screenshots")
+        XCTAssertTrue(app.buttons["Photos"].firstMatch.waitForExistence(timeout: 3), "The screenshot attachment picker was not reachable from Workout Review.")
+        XCTAssertTrue(app.buttons["Files"].firstMatch.waitForExistence(timeout: 3), "The file attachment picker was not reachable from Workout Review.")
+        attachScreenshot("29-workout-review-screenshot-card")
+
+        tapButton(identifier: "trainingLogger.finishReview")
+        assertText("Finish this workout?")
+        assertText("No supporting screenshots attached")
+        attachScreenshot("30-confirmation-honest-no-attachment")
+
+        tapButton(identifier: "trainingLogger.completeLocal")
+        assertText("Workout logged")
+    }
+
+    private func fillFirstSet(reps: String, load: String) {
+        let repsField = app.textFields["Set 1 reps"]
+        XCTAssertTrue(repsField.waitForExistence(timeout: 3), "Set 1 reps field was not reachable.")
+        repsField.tap()
+        repsField.typeText(reps)
+        let loadField = app.textFields["Set 1 load"]
+        XCTAssertTrue(loadField.waitForExistence(timeout: 3), "Set 1 load field was not reachable.")
+        loadField.tap()
+        loadField.typeText(load)
+        if app.keyboards.firstMatch.exists { app.buttons["Done"].firstMatch.tap() }
+    }
+
+    private func openWorkoutLoggerFromLog() {
+        app.tabBars.buttons["Log"].tap()
+        let logger = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Training Logger")).firstMatch
+        XCTAssertTrue(logger.waitForExistence(timeout: 5), "Training Logger was not available from Log.")
+        logger.tap()
+    }
+
     private func openTrainingLanding() {
         let evidenceTab = app.tabBars.buttons["Evidence"]
         XCTAssertTrue(evidenceTab.waitForExistence(timeout: 5), "Evidence tab was not available.")

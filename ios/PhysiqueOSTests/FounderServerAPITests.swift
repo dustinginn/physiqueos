@@ -360,11 +360,27 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(first.goals.first?.id, "goal-server")
         XCTAssertEqual(first.goals.first?.current, "148.3")
         XCTAssertEqual(first.goals.first?.target, "10")
-        // Home Phase Parity: the same canonical `order`/`phaseName` Goals
-        // Detail uses ("Phase 2 · Lean Mass Build") must surface here too,
-        // not just a bare percentage — this is the exact gap that made
-        // Home look like a single, unnumbered phase.
-        XCTAssertEqual(first.goals.first?.presentation, .primary(progress: 8, phaseLabel: "Phase 2 · Lean Mass Build"))
+        // Home Phase Parity (Build 21 regression): Founder Production's
+        // real Home renders EVERY phase of a two-phase goal — not just a
+        // single collapsed active-phase summary line — matching
+        // `GoalRow.jsx`'s `PhaseTrajectoryGoal` component (confirmed via a
+        // live production comparison against physiqueos.dustinginn.com,
+        // which showed both a completed "Phase 1 · Establish Maintenance"
+        // card and an active "Phase 2 · Lean Mass Build" card, plus the
+        // goal's guardrail, directly on Home). `order` is the server's
+        // raw, ZERO-based phase index in both phase entries (confirmed
+        // against the server's own test fixtures) — the `+ 1` display
+        // ordinal is applied only by the view, never baked into the read
+        // model, so this asserts the RAW order values survive the decode.
+        XCTAssertEqual(first.goals.first?.presentation, .phaseTrajectory(HomePhaseTrajectory(
+            targetDescription: "Build 10 lb of lean mass",
+            overallTargetDate: "2026-10-31",
+            guardrail: "Maintain approximately 8-9% body fat.",
+            phases: [
+                HomeGoalPhase(id: "phase-maintenance", order: 0, phaseName: "Establish Maintenance", status: "completed", presentationTone: "gold", progressType: "outcome", clampedProgressPercentage: 100, presentationLabel: "Completed", progressStatus: nil),
+                HomeGoalPhase(id: "phase-lean-mass", order: 1, phaseName: "Lean Mass Build", status: "active", presentationTone: "green", progressType: "outcome", clampedProgressPercentage: 8, presentationLabel: "0.8 of 10 lb gained", progressStatus: "measured"),
+            ]
+        )))
         XCTAssertEqual(first.todaysFocus.map(\.id), ["priority-server-old"])
         XCTAssertFalse(first.todaysFocus[0].completable)
         XCTAssertNil(first.todaysFocus[0].completionContext)
@@ -528,7 +544,12 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(priority.executionItemId, "execution-canonical")
         XCTAssertEqual(priority.date, "2026-09-10")
         XCTAssertFalse(priority.completable)
-        XCTAssertNil(priority.completionContext)
+        // Build 21 regression: `completionContext` was decoded from the
+        // wire and then explicitly discarded (`completionContext: nil`
+        // hardcoded) — it must now survive, even though completion
+        // itself stays guarded (`.priorityCompletion` remains disabled).
+        XCTAssertEqual(priority.completionContext, PriorityCompletionContext(occurrenceDate: "2026-09-10", dose: nil, protocolId: nil))
+        XCTAssertEqual(priority.detailSections, [PrioritySectionReadModel(title: "Context", items: [PriorityDetailFieldReadModel(label: "Goal", detail: "Build Lean Mass")])])
         let requests = await transport.requests
         XCTAssertEqual(requests[1].url?.path, "/api/v1/native/read/operating-plan")
         XCTAssertEqual(requests[2].url?.path, "/api/v1/native/read/priority")
@@ -536,6 +557,81 @@ final class FounderServerAPITests: XCTestCase {
                        [URLQueryItem(name: "priorityId", value: "priority-canonical")])
         XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
         XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.operatingPlan, in: .founderProduction))
+    }
+
+    /// Build 21 item 11 (Priority Detail timing parity): confirmed against
+    /// the server's own `PriorityDetailService.js` — when a reminder's
+    /// `schedule.timeOfDay` is an explicit `HH:MM` clock value (not a
+    /// daypart keyword), the server's own "When" section text already
+    /// says so verbatim (e.g. "Scheduled for 5:00 PM."). Native must
+    /// never re-derive this from a vaguer field like a daypart label or
+    /// the word "Tonight" — it only has to render whatever the "When"
+    /// section already says, which `detailSections` already carries
+    /// end-to-end since Build 21's full-sections decode. This fixture
+    /// reproduces the real "Foam Rolling" recurring-protocol shape.
+    func testProductionPriorityDetailSurfacesExplicitScheduledClockTimeVerbatim() async throws {
+        let foamRollingJSON = productionEnvelope(resource: "priority", data: #"{"id":"foam-rolling","title":"Foam Rolling","subtitle":"Tonight","status":"Upcoming","sections":[{"title":"When","items":[{"label":"Schedule","detail":"Foam Rolling is scheduled Daily · 5:00 PM"}]},{"title":"Why it matters","items":[{"label":"Purpose","detail":"Supports recovery between resistance sessions."}]}],"completionContext":null,"executionContract":{"priorityId":"foam-rolling","occurrenceDate":"2026-09-11","occurrenceKey":"foam-rolling:2026-09-11","workflow":"priority_detail","destination":{"id":"priority.detail","parameters":{"priorityId":"foam-rolling"}}},"executionProjection":{"executionId":"execution-foam-rolling"}}"#)
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["priority": foamRollingJSON])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionPriorityAPI(api: native).fetchPriority(priorityId: "foam-rolling")
+        let priority = try XCTUnwrap(fetched)
+
+        let whenSection = try XCTUnwrap(priority.detailSections?.first { $0.title == "When" })
+        XCTAssertEqual(whenSection.items.first?.detail, "Foam Rolling is scheduled Daily · 5:00 PM")
+        // The explicit clock time must survive completely untouched —
+        // Native never invents, reformats, or derives a time from "Tonight".
+        XCTAssertTrue(whenSection.items.first?.detail?.contains("5:00 PM") == true)
+    }
+
+    /// Build 21 item 11 (Morning Check-In Priority Detail): the exact
+    /// canonical occurrence/evidence relationship, never a generic or
+    /// "latest" guess. `PriorityDetailViewModel` must fetch the
+    /// `morning-check-in` resource's own date-matched weight ONLY when
+    /// the occurrence being viewed genuinely IS the morning weigh-in —
+    /// fetching it (or worse, showing it) for an unrelated priority like
+    /// Foam Rolling would be exactly the kind of "wrong occurrence"
+    /// mistake this task guards against.
+    @MainActor
+    func testPriorityDetailViewModelFetchesMorningCheckInOnlyForTheMorningWeighInOccurrence() async throws {
+        struct StubPriorityAPI: PriorityAPI {
+            let occurrence: PriorityOccurrence
+            func fetchExecutionItems() async throws -> [ExecutionItemFixture] { [] }
+            func fetchPriority(priorityId: String) async throws -> PriorityOccurrence? { occurrence }
+        }
+        struct StubMorningCheckInAPI: MorningCheckInAPI {
+            func fetchMorningCheckIn() async throws -> MorningCheckInReadModel {
+                MorningCheckInReadModel(today: "2026-09-11", existingWeight: 172.9, previousWeight: 171.0, reconciliationItems: [])
+            }
+        }
+
+        let morningWeighIn = PriorityOccurrence(
+            id: "priority-morning", executionItemId: "execution_morning_weigh_in", date: "2026-09-11",
+            title: "Morning Check-In", subtitle: nil, metadata: nil, changeLabel: nil,
+            icon: .target, color: .primary, urgency: .available, completed: false, completable: false,
+            actionLabel: nil, completionContext: nil, continueActionDestination: nil
+        )
+        let morningViewModel = PriorityDetailViewModel(
+            api: StubPriorityAPI(occurrence: morningWeighIn), morningCheckInAPI: StubMorningCheckInAPI(),
+            store: LoggingSandboxStore(), authority: .founderProduction, priorityId: "priority-morning"
+        )
+        await morningViewModel.load()
+        XCTAssertEqual(morningViewModel.morningCheckIn?.existingWeight, 172.9)
+        XCTAssertEqual(morningViewModel.morningCheckIn?.today, "2026-09-11")
+
+        let foamRolling = PriorityOccurrence(
+            id: "priority-foam-rolling", executionItemId: "execution_foam_roll", date: "2026-09-11",
+            title: "Foam Rolling", subtitle: nil, metadata: nil, changeLabel: nil,
+            icon: .target, color: .primary, urgency: .available, completed: false, completable: false,
+            actionLabel: nil, completionContext: nil, continueActionDestination: nil
+        )
+        let unrelatedViewModel = PriorityDetailViewModel(
+            api: StubPriorityAPI(occurrence: foamRolling), morningCheckInAPI: StubMorningCheckInAPI(),
+            store: LoggingSandboxStore(), authority: .founderProduction, priorityId: "priority-foam-rolling"
+        )
+        await unrelatedViewModel.load()
+        XCTAssertNil(unrelatedViewModel.morningCheckIn, "Morning Check-In's same-day weight must never surface for an unrelated priority.")
     }
 
     /// `LogFixture.json`'s exact bundled values ("Strength Training · 52
@@ -548,16 +644,22 @@ final class FounderServerAPITests: XCTestCase {
     /// instead, and specifically that none of the fixture's values leak
     /// through.
     func testProductionLogReflectsCanonicalTodayNotFixtureTrainingNutritionOrActivity() async throws {
-        let transport = SequencedFounderTransport([
-            .json(200, sessionJSON(access: "a", refresh: "r")),
-            .json(200, productionLogJSON),
-        ])
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["evidence-review-queue": productionLogJSON, "weight": productionWeightForLogJSON(date: "2026-09-10", value: 172.9)]
+        )
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
 
         let log = try await ProductionLogAPI(api: native).fetchLog()
         XCTAssertEqual(log.localDate, "2026-09-10")
-        XCTAssertEqual(log.loggedToday.map(\.kind), [.training, .nutrition, .activity])
+        XCTAssertEqual(log.loggedToday.map(\.kind), [.training, .nutrition, .activity, .weight])
+        // Logged Today's 4th row (Build 21): exact intended-date canonical
+        // Weight, never a "latest weight" fallback — the fixture's
+        // `current.date` matches `localDate` exactly.
+        let weightRow = log.loggedToday[3]
+        XCTAssertEqual(weightRow.summary, "172.9 lb")
+        XCTAssertEqual(weightRow.destination, .progressStream(streamId: "weight"))
 
         let training = log.loggedToday[0]
         XCTAssertNotEqual(training.summary, "Strength Training · 52 min")
@@ -588,15 +690,25 @@ final class FounderServerAPITests: XCTestCase {
     /// own "Nothing logged yet" / an empty review queue) rather than
     /// falling back to fixture content to fill the screen.
     func testProductionLogWithNothingLoggedYetShowsHonestEmptyStateNotFixtureFallback() async throws {
-        let transport = SequencedFounderTransport([
-            .json(200, sessionJSON(access: "a", refresh: "r")),
-            .json(200, productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-10","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[]}"#)),
-        ])
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-10","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[]}"#),
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+            ]
+        )
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
 
         let log = try await ProductionLogAPI(api: native).fetchLog()
-        XCTAssertTrue(log.loggedToday.allSatisfy { $0.summary == "Nothing logged yet" && $0.destination == nil })
+        XCTAssertTrue(log.loggedToday.allSatisfy { $0.summary == "Nothing logged yet" })
+        // The synthesized Weight row is still tappable (it always points at
+        // the Weight progress stream) even with nothing logged today — only
+        // the wire-decoded training/nutrition/activity rows go fully inert
+        // (`destination == nil`) in the honest empty state.
+        XCTAssertTrue(log.loggedToday.filter { $0.kind != .weight }.allSatisfy { $0.destination == nil })
+        let weightRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .weight })
+        XCTAssertEqual(weightRow.destination, .progressStream(streamId: "weight"))
         XCTAssertTrue(log.pendingEvidenceReviews.isEmpty)
         XCTAssertFalse(log.hasPendingEvidenceReviews)
     }
@@ -1711,6 +1823,45 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requestCount, 3)
     }
 
+    /// Build 21's central async-intake correction (item 6): a real Build 20
+    /// defect was reporting "PhysiqueOS could not be reached" after a
+    /// canonical write had actually succeeded, because Native conflated
+    /// "the commit command itself failed" with "confirmation is still
+    /// being polled." `awaitConfirmation` must throw `.timedOut` — never
+    /// `.commitFailed` — when the review simply hasn't reached a terminal
+    /// state within the polling budget, and must throw `.commitFailed`
+    /// immediately, without exhausting the polling budget, when the server
+    /// reports the review's commit itself failed.
+    func testAwaitConfirmationDistinguishesStillProcessingFromGenuineCommitFailure() async throws {
+        actor StuckReviewAPI: EvidenceReviewAPI {
+            let status: String
+            private(set) var fetchCount = 0
+            init(status: String) { self.status = status }
+            func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel? {
+                fetchCount += 1
+                return EvidenceReviewDetailReadModel(id: reviewId, status: status, createdAt: nil, version: 1, items: [])
+            }
+        }
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: [:])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        let stillProcessing = StuckReviewAPI(status: "pending")
+        await XCTAssertThrowsErrorAsync(try await pipeline.awaitConfirmation(reviewAPI: stillProcessing, reviewId: "review-1", pollInterval: .zero, maxPolls: 2)) { error in
+            XCTAssertEqual(error as? ProductionEvidenceIntakePipeline.Error, .timedOut)
+        }
+
+        let genuinelyFailed = StuckReviewAPI(status: "commit_failed")
+        await XCTAssertThrowsErrorAsync(try await pipeline.awaitConfirmation(reviewAPI: genuinelyFailed, reviewId: "review-1", pollInterval: .zero, maxPolls: 30)) { error in
+            XCTAssertEqual(error as? ProductionEvidenceIntakePipeline.Error, .commitFailed)
+        }
+        // The genuine failure must be reported on the very first read, not
+        // after exhausting the entire polling budget.
+        let failedFetchCount = await genuinelyFailed.fetchCount
+        XCTAssertEqual(failedFetchCount, 1)
+    }
+
     @MainActor
     func testAppEnvironmentWeightWriteAPISwitchesWithAuthorityAndSandboxIsHonestlyUnavailable() async {
         let suite = "PhysiqueOS.WeightWriteAPIAuthoritySwitch.\(UUID().uuidString)"
@@ -2294,7 +2445,7 @@ private func productionHomeJSON(priorityID: String, goalID: String, confidence: 
       "hero":{"mode":"phase_trajectory","goalLabel":"Current Goal","headline":"Server headline","supportLine":"Server support","confidence":\(confidence),"confidenceDetail":null,"primaryTimeline":"4 weeks remaining","plannedReviewDate":"2026-10-08"},
       "nextBestAction":{"title":"Server action","icon":"target","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}}},
       "briefingCards":[],
-      "goals":[{"id":"\(goalID)","title":"Server Goal","icon":"dumbbell","color":"success","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}},"presentation":{"mode":"phase_trajectory_goal","trajectory":{"goalProgress":{"baselineValue":147.5,"latestValue":148.3,"targetAmount":10,"unit":"lb","clampedProgressPercentage":8},"activePhase":{"order":2,"phaseName":"Lean Mass Build"}}}}],
+      "goals":[{"id":"\(goalID)","title":"Server Goal","icon":"dumbbell","color":"success","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}},"presentation":{"mode":"phase_trajectory_goal","guardrail":"Maintain approximately 8-9% body fat.","trajectory":{"goalProgress":{"baselineValue":147.5,"latestValue":148.3,"targetAmount":10,"unit":"lb","clampedProgressPercentage":8},"activePhase":{"order":1,"phaseName":"Lean Mass Build"},"overallGoal":{"targetDescription":"Build 10 lb of lean mass","overallTargetDate":"2026-10-31"},"phases":[{"phaseId":"phase-maintenance","order":0,"phaseName":"Establish Maintenance","status":"completed","presentationTone":"gold","progress":{"progressType":"outcome","clampedProgressPercentage":100,"presentationLabel":"Completed"}},{"phaseId":"phase-lean-mass","order":1,"phaseName":"Lean Mass Build","status":"active","presentationTone":"green","progress":{"progressType":"outcome","clampedProgressPercentage":8,"presentationLabel":"0.8 of 10 lb gained","status":"measured"}}]}}}],
       "todaysFocus":[{"id":"\(priorityID)","completionId":"completion-canonical","executionId":"execution-canonical","occurrenceDate":"2026-09-10","label":"Server Priority","subtitle":"Server-owned occurrence","metadata":"Production","changeLabel":null,"icon":"target","color":"primary","state":"available","completed":false,"actionLabel":"Complete","completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null}}]
     }
     """)
@@ -2416,6 +2567,11 @@ private let productionEmptyTrainingLibraryJSON = productionEnvelope(resource: "t
 /// `loggedToday` rows (training, nutrition, activity, in that order),
 /// each with `{id, summary, context, recordId}`; `recordId` is the
 /// canonical record's own id, not a native-shaped destination object.
+private func productionWeightForLogJSON(date: String?, value: Double?) -> String {
+    let current = date.map { "{\"date\":\"\($0)\",\"value\":\(value ?? 0),\"unit\":\"lb\"}" } ?? "null"
+    return productionEnvelope(resource: "weight", data: #"{"current":\#(current),"recentWeighIns":[],"weeklyAverages":[],"history":[],"dexaContext":{"latest":null,"markers":[]},"page":{"limit":90,"count":0,"hasMore":false},"context":{"contextId":"all","startDate":null,"endDate":null}}"#)
+}
+
 private let productionLogJSON = productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-10","loggedToday":{"rows":[{"id":"training","summary":"Traditional Strength Training · 45 min","context":null,"recordId":"session-canonical"},{"id":"nutrition","summary":"4 meals · 2300 calories","context":null,"recordId":"nutrition-day-canonical"},{"id":"activity","summary":"650 active calories","context":null,"recordId":"activity-day-canonical"}]},"pendingEvidenceReviews":[{"id":"review-canonical","date":"Thursday, September 10","title":"Check-in ready to review","summary":"1 weight entry","likelyDuplicate":false}]}"#)
 
 private let productionProfileJSON = #"{"contractVersion":"1","resource":"profile","authority":"founder-production","generatedAt":"2026-09-10T15:00:00.000Z","data":{"profile":{"user":{"id":"user-founder","displayName":"Founder","firstName":"Dustin","lastName":null,"timezone":"America/Los_Angeles"},"operatingStatus":{"goals":1},"evidenceSources":[]},"authority":{"type":"founder-production","sandbox":false},"capabilities":{"read":true,"write":true,"media":true}}}"#

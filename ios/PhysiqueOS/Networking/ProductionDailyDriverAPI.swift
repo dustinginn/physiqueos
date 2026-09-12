@@ -153,12 +153,32 @@ struct ProductionHomeAPI: HomeAPI {
         var presentation: Presentation?
 
         func readModel() throws -> HomeGoal {
-            if presentation?.mode == "phase_trajectory_goal" {
-                let serverProgress = presentation?.trajectory?.goalProgress ?? presentation?.trajectory?.activePhase?.progress
-                let activePhase = presentation?.trajectory?.activePhase
-                let phaseLabel = activePhase?.order.map { order in
-                    activePhase?.phaseName.map { "Phase \(order) · \($0)" } ?? "Phase \(order)"
-                } ?? activePhase?.phaseName
+            if presentation?.mode == "phase_trajectory_goal", let trajectory = presentation?.trajectory {
+                let serverProgress = trajectory.goalProgress ?? trajectory.activePhase?.progress
+                // Every phase gets its own card — Founder Production's real
+                // Home (unlike this slice's prior collapsed single-line
+                // summary) shows the full multi-phase journey (e.g. "Phase 1
+                // Establish Maintenance · Completed" AND "Phase 2 Lean Mass
+                // Build · Active") plus the goal's guardrail, matching
+                // `GoalRow.jsx`'s `PhaseTrajectoryGoal` component exactly.
+                // `order` here is the server's raw, ZERO-based phase index
+                // (confirmed against the server's own test fixtures) — the
+                // `+ 1` display-ordinal conversion happens only in the view,
+                // never here, so the read model keeps the authoritative
+                // server value.
+                let phases = (trajectory.phases ?? []).map { phase in
+                    HomeGoalPhase(
+                        id: phase.phaseId ?? phase.phaseName ?? UUID().uuidString,
+                        order: phase.order ?? 0,
+                        phaseName: phase.phaseName ?? "Phase unavailable",
+                        status: phase.status ?? "unavailable",
+                        presentationTone: phase.presentationTone ?? "neutral",
+                        progressType: phase.progress?.progressType,
+                        clampedProgressPercentage: phase.progress?.clampedProgressPercentage,
+                        presentationLabel: phase.progress?.presentationLabel,
+                        progressStatus: phase.progress?.status
+                    )
+                }
                 return HomeGoal(
                     id: id,
                     title: title,
@@ -167,7 +187,12 @@ struct ProductionHomeAPI: HomeAPI {
                     unit: serverProgress?.unit ?? "",
                     icon: icon,
                     color: color,
-                    presentation: .primary(progress: serverProgress?.clampedProgressPercentage ?? 0, phaseLabel: phaseLabel),
+                    presentation: .phaseTrajectory(HomePhaseTrajectory(
+                        targetDescription: trajectory.overallGoal?.targetDescription,
+                        overallTargetDate: trajectory.overallGoal?.overallTargetDate,
+                        guardrail: presentation?.guardrail,
+                        phases: phases
+                    )),
                     destination: destination
                 )
             }
@@ -194,15 +219,31 @@ struct ProductionHomeAPI: HomeAPI {
         }
     }
 
-    private struct Presentation: Decodable { var mode: String; var trajectory: Trajectory? }
-    private struct Trajectory: Decodable { var goalProgress: ServerProgress?; var activePhase: ActivePhase? }
-    private struct ActivePhase: Decodable { var progress: ServerProgress?; var order: Int?; var phaseName: String? }
+    private struct Presentation: Decodable { var mode: String; var trajectory: Trajectory?; var guardrail: String? }
+    private struct Trajectory: Decodable {
+        var goalProgress: ServerProgress?
+        var activePhase: ActivePhase?
+        var phases: [ActivePhase]?
+        var overallGoal: OverallGoal?
+    }
+    private struct OverallGoal: Decodable { var targetDescription: String?; var overallTargetDate: String? }
+    private struct ActivePhase: Decodable {
+        var phaseId: String?
+        var progress: ServerProgress?
+        var order: Int?
+        var phaseName: String?
+        var status: String?
+        var presentationTone: String?
+    }
     private struct ServerProgress: Decodable {
         var baselineValue: Double?
         var latestValue: Double?
         var targetAmount: Double?
         var unit: String?
         var clampedProgressPercentage: Int?
+        var progressType: String?
+        var presentationLabel: String?
+        var status: String?
     }
 
     private struct Priority: Decodable, @unchecked Sendable {
@@ -619,21 +660,39 @@ struct ProductionOperatingPlanAPI: OperatingPlanAPI {
 /// authority, so Founder Production showed the bundled `LogFixture.json`
 /// (a fixed "Strength Training · 52 min" / "3 meals · 2,140 calories"
 /// regardless of what the Founder actually did today) instead of this.
+///
+/// **Weight row (Build 21) — confirmed narrow server gap, worked around
+/// client-side.** `evidence-review-queue`'s own `loggedToday.rows` sends
+/// exactly Training/Nutrition/Activity, never Weight. The smallest server
+/// fix would be adding a 4th row to that same resource (one round trip,
+/// consistent with the other three). Until then, Native performs a
+/// second, already-existing read (`weight`, the same resource
+/// `ProductionWeightEvidenceAPI` already uses) and checks its `current`
+/// entry's OWN date against this response's `localDate` — never a
+/// "latest weight" fallback, and never a Swift-side same-day-revision
+/// selection (the server's `current` is already revision-safe).
 struct ProductionLogAPI: LogAPI {
     let api: ProductionNativeAPI
 
     func fetchLog() async throws -> LogReadModel {
-        let payload = try await api.readResource("evidence-review-queue", as: Payload.self).data
+        async let logRead = api.readResource("evidence-review-queue", as: Payload.self)
+        async let weightRead = api.readResource("weight", query: ["context": "all"], as: WeightPayload.self)
+        let payload = try await logRead.data
+        let weightPayload = try? await weightRead.data
+
+        var rows = payload.loggedToday.rows.map { row in
+            LoggedTodayRow(
+                kind: row.id,
+                summary: row.summary,
+                context: row.context,
+                destination: Self.destination(for: row, localDate: payload.localDate)
+            )
+        }
+        rows.append(Self.weightRow(weightPayload, localDate: payload.localDate))
+
         return LogReadModel(
             localDate: payload.localDate,
-            loggedToday: payload.loggedToday.rows.map { row in
-                LoggedTodayRow(
-                    kind: row.id,
-                    summary: row.summary,
-                    context: row.context,
-                    destination: Self.destination(for: row, localDate: payload.localDate)
-                )
-            },
+            loggedToday: rows,
             pendingEvidenceReviews: payload.pendingEvidenceReviews.map { review in
                 PendingEvidenceReview(
                     id: review.id, title: review.title, date: review.date,
@@ -656,7 +715,30 @@ struct ProductionLogAPI: LogAPI {
         case .training: return .trainingSession(sessionId: recordId)
         case .nutrition: return .nutritionDay(dayId: recordId)
         case .activity: return .activityDay(date: localDate)
+        case .weight: return nil
         }
+    }
+
+    /// `nil` weight payload (e.g. a transient failure on the second read)
+    /// degrades to an honest "Nothing logged yet" rather than surfacing an
+    /// error for the whole Log screen over one non-critical row.
+    private static func weightRow(_ weight: WeightPayload?, localDate: String) -> LoggedTodayRow {
+        guard let current = weight?.current, current.date == localDate else {
+            return LoggedTodayRow(kind: .weight, summary: "Nothing logged yet", context: nil, destination: .progressStream(streamId: "weight"))
+        }
+        let unit = current.unit ?? "lb"
+        let formatted = current.value.rounded() == current.value ? String(Int(current.value)) : String(format: "%.1f", current.value)
+        return LoggedTodayRow(kind: .weight, summary: "\(formatted) \(unit)", context: nil, destination: .progressStream(streamId: "weight"))
+    }
+
+    private struct WeightPayload: Decodable, @unchecked Sendable {
+        var current: CurrentWeight?
+    }
+
+    private struct CurrentWeight: Decodable {
+        var date: String
+        var value: Double
+        var unit: String?
     }
 
     private struct Payload: Decodable, @unchecked Sendable {
@@ -697,16 +779,29 @@ struct ProductionPriorityAPI: PriorityAPI {
         guard value.id == priorityId else {
             throw ProductionDailyDriverError.inconsistentCanonicalIdentity(expected: priorityId, actual: value.id)
         }
+        // `getPriorityDetail(priorityId)` never accepts an occurrence date —
+        // it always resolves "today" from the SERVER's own clock/stored
+        // user timeZone at request time (`PriorityDetailService.js`'s
+        // internal `getLocalDateKey(now(), ...)` calls, one per priority
+        // variant). If that resolved date ever disagrees with what Home
+        // showed a moment earlier (a timezone-profile lag, a midnight-
+        // boundary race), this `date` will legitimately differ from the
+        // Founder's own notion of "today" — Native has no server-accepted
+        // way to force a specific occurrence day for anything but a DEXA
+        // appointment (whose id already encodes the date). This is a
+        // confirmed server-side gap, not a Native decode bug — see this
+        // task's final report.
         let date = value.completionContext?.occurrenceDate ?? value.executionContract?.occurrenceDate ?? String(ISO8601DateFormatter().string(from: Date()).prefix(10))
         return PriorityOccurrence(
             id: value.id, executionItemId: value.executionProjection?.executionId ?? value.id,
             date: date, title: value.title, subtitle: value.subtitle,
             metadata: value.sections.first?.items.first?.detail,
             changeLabel: nil, icon: .target, color: .primary,
-            urgency: value.status == "Completed" ? .available : .available,
+            urgency: value.status == "Upcoming" ? .upcoming : .available,
             completed: value.status == "Completed", completable: false,
-            actionLabel: nil, completionContext: nil,
-            continueActionDestination: nil, attributedScope: nil
+            actionLabel: value.action?.label, completionContext: value.completionContext,
+            continueActionDestination: Self.destination(forActionHref: value.action?.href), attributedScope: nil,
+            detailSections: value.sections.map { PrioritySectionReadModel(title: $0.title, items: $0.items.map { PriorityDetailFieldReadModel(label: $0.label, detail: $0.detail) }) }
         )
     }
 
@@ -715,12 +810,26 @@ struct ProductionPriorityAPI: PriorityAPI {
         var completionContext: PriorityCompletionContext?
         var executionContract: ExecutionContract?
         var executionProjection: ExecutionProjection?
+        var action: ActionPayload?
         var sections: [Section]
     }
     private struct ExecutionContract: Decodable { var occurrenceDate: String? }
     private struct ExecutionProjection: Decodable { var executionId: String? }
+    private struct ActionPayload: Decodable { var label: String?; var href: String? }
     private struct Section: Decodable { var title: String; var items: [Item] }
     private struct Item: Decodable { var label: String; var detail: String? }
+
+    /// A narrow, honest mapping for the ONE real web `action.href` this
+    /// task confirmed (`createMorningWeighInPriorityDetail`'s
+    /// `action: {label:"Log Weight", href:"/check-in/morning"}`) — not a
+    /// general web-route-to-`AppDestination` router. An unrecognized href
+    /// stays `nil` rather than guessing.
+    private static func destination(forActionHref href: String?) -> AppDestination? {
+        switch href {
+        case "/check-in/morning": .checkIn(checkInType: "morning")
+        default: nil
+        }
+    }
 }
 
 // MARK: - Training and canonical exercise registry agreement

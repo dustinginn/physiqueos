@@ -491,16 +491,112 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(draft.summary(), .init(exerciseCount: 2, completedSetCount: 2, variantCount: 1, supersetCount: 1))
     }
 
+    // MARK: - Build 21: Save & Leave draft survives a full reopen, attachments included
+
+    /// Reproduces "reopen the app after Save & Leave" with two independently
+    /// constructed view models sharing only the on-disk-shaped draft store
+    /// (never the same in-memory instance) — the first view model's process
+    /// is gone by the time the second one calls `load()`/`resume()`, exactly
+    /// like a real relaunch. Every field needed to resume exactly (date,
+    /// exercise identity/ordering, sets, reps, load, variant, superset
+    /// relationship, and a pending screenshot attachment) must survive.
+    @MainActor
+    func testResumeAfterReopenRestoresCompleteDraftIncludingPendingAttachments() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let first = TrainingLoggerViewModel(api: api, draftStore: store, authority: .sandbox)
+        await first.load()
+        first.start(mode: .live)
+        first.update { $0.workoutDate = "2026-08-30" }
+        let config = try await api.fetchConfiguration()
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_fly" })
+        first.update {
+            $0.addExercise(bench)
+            $0.addExercise(fly)
+            $0.applyVariant(config.variants[1], to: $0.exercises[0].id, catalog: config.exercises)
+            $0.setSuperset(firstId: $0.exercises[0].id, secondId: $0.exercises[1].id, catalog: config.exercises)
+            $0.exercises[0].sets[0].reps = 11
+            $0.exercises[0].sets[0].load = 155
+            $0.addSupportingEvidence([TrainingLoggerSupportingEvidence(id: "asset-1", displayName: "IMG_0001.jpg", source: .photos)])
+        }
+        let persisted = try XCTUnwrap(first.draft)
+
+        // Simulate the app being reopened: a brand-new view model, backed by
+        // the same durable store, with no in-memory link to `first`.
+        let reopened = TrainingLoggerViewModel(api: api, draftStore: store, authority: .sandbox)
+        await reopened.load()
+        XCTAssertEqual(reopened.savedDraft, persisted, "Reopening must see the exact persisted draft before resume() is even called.")
+        reopened.resume()
+        XCTAssertEqual(reopened.draft, persisted)
+        XCTAssertEqual(reopened.draft?.workoutDate, "2026-08-30")
+        XCTAssertEqual(reopened.draft?.exercises.map(\.id), persisted.exercises.map(\.id))
+        XCTAssertEqual(reopened.draft?.relationships, persisted.relationships)
+        XCTAssertEqual(reopened.draft?.supportingEvidenceAssets, persisted.supportingEvidenceAssets)
+        XCTAssertEqual(reopened.draft?.exercises.first?.sets.first?.reps, 11)
+        XCTAssertEqual(reopened.draft?.exercises.first?.sets.first?.load, 155)
+    }
+
+    // MARK: - Build 21: submission outcome controls draft lifecycle
+
+    private struct StubSucceedingTrainingWriteAPI: TrainingWriteAPI {
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
+            TrainingCommitResult(status: "confirmed", reviewId: "review-1", reviewRevision: 1, sessionId: draft.id, intendedDate: draft.workoutDate, exerciseIds: draft.exercises.map(\.id))
+        }
+    }
+
+    private struct StubFailingTrainingWriteAPI: TrainingWriteAPI {
+        struct Failure: LocalizedError { var errorDescription: String? { "This workout could not be saved." } }
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult { throw Failure() }
+    }
+
+    /// A successful canonical submission must clear the device-only draft —
+    /// there is nothing left to resume once the server holds the canonical
+    /// session. This exercises the exact `submit()` → `completeLocalCapture()`
+    /// → `draftStore.discard()` path in `TrainingLoggerViewModel.swift`.
+    @MainActor
+    func testSuccessfulSubmissionClearsThePersistedDraft() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: StubSucceedingTrainingWriteAPI(), draftStore: store, authority: .founderProduction)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        viewModel.update { $0.exercises = [] }
+        XCTAssertNotNil(store.load())
+
+        await viewModel.submit()
+
+        XCTAssertNil(store.load(), "A confirmed canonical submission must clear the local draft.")
+        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertNil(viewModel.validationMessage)
+    }
+
+    /// A failed canonical submission must preserve the exact draft so the
+    /// Founder never loses in-progress work to a transient server/network
+    /// failure — only success clears it.
+    @MainActor
+    func testFailedSubmissionPreservesThePersistedDraft() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: StubFailingTrainingWriteAPI(), draftStore: store, authority: .founderProduction)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        let beforeSubmit = viewModel.draft
+
+        await viewModel.submit()
+
+        XCTAssertEqual(store.load(), beforeSubmit, "A failed submission must preserve the exact draft, not just some draft.")
+        XCTAssertEqual(viewModel.draft, beforeSubmit)
+        XCTAssertNotNil(viewModel.validationMessage)
+    }
+
     func testInteractivePopPolicyEnablesOnlyPushedDestinations() {
         XCTAssertFalse(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 1))
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildNineteenInSourceControlledConfiguration() throws {
+    func testAppDeclaresExemptEncryptionAndBuildTwentyOneInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "20")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "21")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }

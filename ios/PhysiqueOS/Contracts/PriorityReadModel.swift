@@ -196,12 +196,53 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     /// matching the same "honestly unattributed" policy every other
     /// Evidence vertical this session already established.
     var attributedScope: EvidenceScopeAttribution? = nil
+    /// Founder Production only — the real `priority` resource's full
+    /// `sections[]` (What/When/Why it matters/Related Goals/Completion,
+    /// though not every variant sends every section — `getPriorityDetail`
+    /// never guarantees a fixed set). `nil` under Sandbox, which has no
+    /// wire equivalent to decode from and keeps using `metadata` directly.
+    /// Native renders every section verbatim rather than assuming a fixed
+    /// four-section shape or re-deriving any of it (a section's own
+    /// `label`/`detail` already carries the server's fully-formatted text
+    /// — including any real scheduled clock time — so Native never
+    /// invents a time from a daypart word like "Tonight").
+    var detailSections: [PrioritySectionReadModel]? = nil
 
     var destination: AppDestination {
-        executionItemId == "execution_morning_weigh_in"
+        Self.isMorningWeighIn(executionItemId: executionItemId, id: id)
             ? .checkIn(checkInType: "morning")
             : .priorityDetail(priorityId: id)
     }
+
+    /// Checked against both `executionItemId` and `id` because the exact
+    /// field the real `home` resource uses for this comparison was only
+    /// verified against founder-seed fixture data, not confirmed live
+    /// production wire data (see `ExecutionItemFixture`'s doc comment) —
+    /// matching either the fixture-verified id or the server's own
+    /// canonical `reminder_morning_weight` constant
+    /// (`MORNING_WEIGH_IN_REMINDER_ID`) avoids silently falling through to
+    /// generic Priority Detail if production sends the other one.
+    static func isMorningWeighIn(executionItemId: String, id: String) -> Bool {
+        let candidates: Set<String> = ["execution_morning_weigh_in", "reminder_morning_weight"]
+        return candidates.contains(executionItemId) || candidates.contains(id)
+    }
+}
+
+/// One `priority` resource `sections[]` entry (`PriorityDetailService.js`).
+/// Titles vary by priority type and are NOT guaranteed present (the plain
+/// reminder path has no "Why it matters"; the unresolved-id fallback has
+/// only "Why it matters") — Native renders whatever arrives, in order,
+/// rather than assuming a fixed set.
+struct PrioritySectionReadModel: Codable, Equatable, Identifiable {
+    var id: String { title }
+    var title: String
+    var items: [PriorityDetailFieldReadModel]
+}
+
+struct PriorityDetailFieldReadModel: Codable, Equatable, Identifiable {
+    var id: String { label }
+    var label: String
+    var detail: String?
 }
 
 // MARK: - Completion / reconciliation records (the one real persisted state)

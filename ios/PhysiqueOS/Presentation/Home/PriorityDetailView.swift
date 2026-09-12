@@ -48,6 +48,7 @@ struct PriorityDetailView: View {
         .task(id: environment.nativeAuthority) {
             viewModel = PriorityDetailViewModel(
                 api: environment.priorityAPI,
+                morningCheckInAPI: environment.morningCheckInAPI,
                 store: environment.loggingSandboxStore,
                 authority: environment.nativeAuthority,
                 priorityId: priorityId
@@ -72,16 +73,50 @@ struct PriorityDetailView: View {
         case .loaded(.some(let priority)):
             VStack(alignment: .leading, spacing: 16) {
                 header(for: priority)
-                whatCard(priority)
-                if let attribution = priority.attributedScope {
-                    CardContainer {
-                        VStack(alignment: .leading, spacing: 4) {
-                            SectionHeading("Related Goal")
-                            EvidenceScopeAttributionChip(attribution: attribution)
+                if let morningCheckIn = viewModel?.morningCheckIn {
+                    morningWeightCard(morningCheckIn)
+                }
+                if let sections = priority.detailSections, !sections.isEmpty {
+                    ForEach(sections) { section in sectionCard(section) }
+                } else {
+                    whatCard(priority)
+                    if let attribution = priority.attributedScope {
+                        CardContainer {
+                            VStack(alignment: .leading, spacing: 4) {
+                                SectionHeading("Related Goal")
+                                EvidenceScopeAttributionChip(attribution: attribution)
+                            }
                         }
                     }
                 }
                 actionSection(priority)
+            }
+        }
+    }
+
+    /// Founder Production's real, complete information hierarchy —
+    /// renders every `sections[]` entry the `priority` resource sends
+    /// verbatim (What/When/Why it matters/Related Goals/Completion, though
+    /// not every priority type sends every section). A section's own
+    /// `label`/`detail` text already carries whatever the server decided
+    /// to say — including a real scheduled clock time when one exists —
+    /// so this never re-derives or guesses at timing.
+    private func sectionCard(_ section: PrioritySectionReadModel) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeading(section.title)
+                ForEach(section.items) { item in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.label)
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        if let detail = item.detail, !detail.isEmpty {
+                            Text(detail)
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
+                }
             }
         }
     }
@@ -144,6 +179,35 @@ struct PriorityDetailView: View {
                 onNavigate(destination)
             }
         }
+    }
+
+    /// Canonical same-day Weight, resolved server-side by exact intended-
+    /// date match (`morning-check-in`'s `existingWeight`/`today`) — never
+    /// a "latest weight" fallback Native picks itself.
+    private func morningWeightCard(_ morningCheckIn: MorningCheckInReadModel) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 6) {
+                SectionHeading("Today's Weight")
+                if let weight = morningCheckIn.existingWeight {
+                    Text("\(Self.formatWeight(weight)) lb")
+                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text("Recorded for \(TrainingDateFormatting.short(morningCheckIn.today)).")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    Button("View Weight evidence") { onNavigate(.progressStream(streamId: "weight")) }
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                } else {
+                    Text("Nothing logged yet for \(TrainingDateFormatting.short(morningCheckIn.today)).")
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            }
+        }
+    }
+
+    private static func formatWeight(_ value: Double) -> String {
+        value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 
     private func urgencyColor(_ urgency: PriorityUrgency) -> Color {

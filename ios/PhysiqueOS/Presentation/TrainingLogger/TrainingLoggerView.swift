@@ -216,8 +216,13 @@ struct TrainingLoggerView: View {
             }
 
             if viewModel.savedDraft != nil {
-                if viewModel.authority == .sandbox {
-                    CardContainer {
+                // Build 20 regression: this card (and therefore the only
+                // way to reach `resume()`) was gated to Sandbox even
+                // though `savedDraft`/`canWrite` are both already valid
+                // under Founder Production — Save & Leave genuinely
+                // persisted the draft, but nothing in Production could
+                // ever surface it again. Restoring for both authorities.
+                CardContainer {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Saved workout")
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
@@ -230,7 +235,6 @@ struct TrainingLoggerView: View {
                         Button("Discard saved draft", role: .destructive) { viewModel.discardSavedDraft() }
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     }
-                }
                 }
             }
 
@@ -783,14 +787,27 @@ struct TrainingLoggerView: View {
                     }
                 }
 
-                if viewModel.authority == .sandbox {
+                do {
+                    // Build 20 regression: this whole card (and the only
+                    // picker for it) was Sandbox-only despite
+                    // `TrainingLoggerDraft`/`EvidenceLocalInterpretation`
+                    // being fully authority-agnostic. Restored for both —
+                    // see the Production-only disclosure below for the one
+                    // real gap this doesn't paper over: `training-session.commit.v1`
+                    // has no media/attachment field today, so these screenshots
+                    // stay a local drafting aid until the server adds one.
                     CardContainer {
                         VStack(alignment: .leading, spacing: 12) {
-                        Text("Supporting Apple Health screenshots")
+                        Text("Supporting workout screenshots")
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        Text("Optional · attach screenshots from the matching Apple Health workout.")
+                        Text("Optional · attach a screenshot of your workout summary to cross-check sets on this device.")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        if viewModel.authority == .founderProduction {
+                            Text("These stay on this device for now — Founder Production's workout submission does not yet carry attachments.")
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                        }
                         HStack(spacing: 10) {
                             Button { isSupportingPhotosPickerPresented = true } label: { Label("Photos", systemImage: "photo.on.rectangle").frame(maxWidth: .infinity) }
                             Button { isSupportingFilePickerPresented = true } label: { Label("Files", systemImage: "folder").frame(maxWidth: .infinity) }
@@ -882,12 +899,10 @@ struct TrainingLoggerView: View {
                     if let draft = viewModel.draft {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(draft.exercises.count) exercises · \(draft.completedSetCount) completed sets")
-                            if viewModel.authority == .sandbox, !draft.supportingWorkoutObservations.isEmpty {
+                            if !draft.supportingWorkoutObservations.isEmpty {
                                 Text("\(draft.supportingWorkoutObservations.count) supporting cardio workout\(draft.supportingWorkoutObservations.count == 1 ? "" : "s")")
                             }
-                            if viewModel.authority == .sandbox {
-                                Text(draft.supportingEvidenceAssets.isEmpty ? "No supporting screenshots attached" : "\(draft.supportingEvidenceAssets.count) supporting screenshot\(draft.supportingEvidenceAssets.count == 1 ? "" : "s") attached")
-                            }
+                            Text(draft.supportingEvidenceAssets.isEmpty ? "No supporting screenshots attached" : "\(draft.supportingEvidenceAssets.count) supporting screenshot\(draft.supportingEvidenceAssets.count == 1 ? "" : "s") attached")
                         }
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)

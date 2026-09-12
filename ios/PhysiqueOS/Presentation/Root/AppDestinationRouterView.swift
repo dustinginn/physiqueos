@@ -48,7 +48,7 @@ struct AppDestinationRouterView: View {
             ManualWeighInView(onReturnToLog: onReturnToLog)
         case .evidenceIntake:
             if environment.nativeAuthority == .founderProduction {
-                ProductionEvidenceUploadView(onReturnToLog: onReturnToLog)
+                ProductionEvidenceUploadView(onNavigate: onNavigate, onReturnToLog: onReturnToLog)
             } else {
                 EvidenceIntakeView(onNavigate: onNavigate)
             }
@@ -60,7 +60,7 @@ struct AppDestinationRouterView: View {
             }
         case .dexaUpload:
             if environment.nativeAuthority == .founderProduction {
-                ProductionEvidenceUploadView(fixedScenario: .dexa, onReturnToLog: onReturnToLog)
+                ProductionEvidenceUploadView(fixedScenario: .dexa, onNavigate: onNavigate, onReturnToLog: onReturnToLog)
             } else {
                 EvidenceIntakeView(initialScenario: .dexa, onNavigate: onNavigate)
             }

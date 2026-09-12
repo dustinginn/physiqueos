@@ -1,19 +1,43 @@
 import SwiftUI
 
-/// Founder Production's read-only Evidence Review detail — deliberately
-/// minimal (see `EvidenceReviewDetailReadModel`'s doc comment for why).
-/// No confirm/correct/reject/dismiss affordance exists here; those remain
-/// the isolated Sandbox write flow (`LocalEvidenceReviewView`), which
-/// Founder Production never routes to.
+/// Founder Production's Evidence Review detail. Confirm is wired against
+/// the real, deployed `evidence-review.commit.v1` command (plus, for a
+/// DEXA scan specifically, `dexa-review.measurements.v1` full-replace
+/// correction beforehand) — both already exist and are production-
+/// authorized (`ProductionEvidenceIntakePipeline`/`DEXAWriteAPI`).
+///
+/// Dismiss is deliberately NOT wired: the server's write allowlist
+/// (`NATIVE_WRITE_COMMANDS`, `NativeProductionContractService.js`) does
+/// not include `evidence-review.dispose.v1` — only `evidence-review.commit.v1`,
+/// `dexa-review.measurements.v1`, and six other unrelated commands are
+/// accepted. Calling dispose would 400 `NATIVE_COMMAND_UNAVAILABLE`. The
+/// smallest server fix is adding `Phase3Command.DISPOSE_EVIDENCE_REVIEW`
+/// to that allowlist — the underlying `disposeEvidenceReview` port already
+/// exists and works, it just isn't reachable from Native today. Until
+/// then this screen says so plainly rather than faking a local-only
+/// dismiss that would leave the review canonically untouched.
 struct EvidenceReviewDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     let reviewId: String
     @State private var state: LoadState = .loading
+    @State private var actionState: ActionState = .idle
+    @State private var editedMeasurements: DEXAScanMeasurements?
+    @State private var measurementTexts: [String: String] = [:]
 
     enum LoadState: Equatable {
         case loading
         case loaded(EvidenceReviewDetailReadModel?)
+        case failed(String)
+    }
+
+    enum ActionState: Equatable {
+        case idle
+        case editingMeasurements
+        case savingMeasurements
+        case confirming(String)
+        case confirmed
+        case stillProcessing
         case failed(String)
     }
 
@@ -42,13 +66,15 @@ struct EvidenceReviewDetailView: View {
                 }
             }
         }
-        .task(id: environment.nativeAuthority) {
-            state = .loading
-            do {
-                state = .loaded(try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId))
-            } catch {
-                state = .failed("This Evidence Review could not be loaded.")
-            }
+        .task(id: environment.nativeAuthority) { await load() }
+    }
+
+    private func load() async {
+        state = .loading
+        do {
+            state = .loaded(try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId))
+        } catch {
+            state = .failed("This Evidence Review could not be loaded.")
         }
     }
 
@@ -73,10 +99,13 @@ struct EvidenceReviewDetailView: View {
             VStack(alignment: .leading, spacing: 18) {
                 header(for: review)
                 itemsCard(review.items)
-                Text("Read-only in Founder Production. Confirming, correcting, or dismissing this review is not available here.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                if let dexaItem = review.items.first(where: { $0.dexaMeasurements != nil }), actionState == .editingMeasurements {
+                    dexaMeasurementCard(review: review, item: dexaItem)
+                }
+                actionSection(for: review)
+                dismissNotice
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -127,11 +156,216 @@ struct EvidenceReviewDetailView: View {
                                 }
                             }
                             .padding(.vertical, 6)
+                            if let measurements = item.dexaMeasurements, actionState != .editingMeasurements {
+                                dexaMeasurementSummary(measurements)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    private func dexaMeasurementSummary(_ measurements: DEXAScanMeasurements) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let totalMass = measurements.totalMassLb { Text("Total mass: \(Self.formatNumber(totalMass)) lb") }
+            if let bodyFat = measurements.bodyFatPercentage { Text("Body fat: \(Self.formatNumber(bodyFat))%") }
+            if let leanMass = measurements.leanMassLb { Text("Lean mass: \(Self.formatNumber(leanMass)) lb") }
+            if let fatMass = measurements.fatMassLb { Text("Fat mass: \(Self.formatNumber(fatMass)) lb") }
+        }
+        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        .padding(.leading, 4)
+    }
+
+    @ViewBuilder
+    private func actionSection(for review: EvidenceReviewDetailReadModel) -> some View {
+        switch actionState {
+        case .idle:
+            if Self.isActionable(review.status) {
+                VStack(spacing: 10) {
+                    if review.items.contains(where: { $0.dexaMeasurements != nil }) {
+                        Button("Correct Measurements") { beginEditingMeasurements(review: review) }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("evidenceReview.correctMeasurements")
+                    }
+                    PrimaryActionButton(title: "Confirm", tone: .accent) {
+                        Task { await confirm(review: review) }
+                    }.accessibilityIdentifier("evidenceReview.confirm")
+                }
+            } else if review.status == "confirmed" {
+                Label("Already confirmed", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+            }
+        case .editingMeasurements:
+            EmptyView() // the measurement card itself carries its own Save action
+        case .savingMeasurements:
+            CardContainer { VStack(alignment: .leading, spacing: 8) {
+                ProgressView().tint(PhysiqueOSTheme.accent)
+                Text("Saving corrections…")
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }.frame(maxWidth: .infinity, alignment: .leading) }
+        case .confirming(let message):
+            CardContainer { VStack(alignment: .leading, spacing: 8) {
+                ProgressView().tint(PhysiqueOSTheme.accent)
+                Text(message)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }.frame(maxWidth: .infinity, alignment: .leading) }
+        case .confirmed:
+            Label("Confirmed", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess)
+        case .stillProcessing:
+            CardContainer { VStack(alignment: .leading, spacing: 6) {
+                Text("Still confirming").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                Text("This is taking longer than usual. Reopen this review in a moment to check its status — confirmation continues on the server regardless of this screen.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Button("Check Now") { Task { await load(); actionState = .idle } }
+            }.frame(maxWidth: .infinity, alignment: .leading) }
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 10) {
+                Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(PhysiqueOSTheme.destructive)
+                PrimaryActionButton(title: "Try Again", tone: .accent) { actionState = .idle }
+            }
+        }
+    }
+
+    private var dismissNotice: some View {
+        Text("Dismiss isn't available in Founder Production yet — the server's canonical command allowlist doesn't include Evidence Review dismissal.")
+            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+            .foregroundStyle(PhysiqueOSTheme.textMuted)
+    }
+
+    // MARK: - DEXA correction
+
+    private func beginEditingMeasurements(review: EvidenceReviewDetailReadModel) {
+        guard let item = review.items.first(where: { $0.dexaMeasurements != nil }), let measurements = item.dexaMeasurements else { return }
+        editedMeasurements = measurements
+        measurementTexts = [
+            "measuredAt": measurements.measuredAt ?? "",
+            "totalMass": measurements.totalMassLb.map(Self.formatNumber) ?? "",
+            "bodyFat": measurements.bodyFatPercentage.map(Self.formatNumber) ?? "",
+            "fatMass": measurements.fatMassLb.map(Self.formatNumber) ?? "",
+            "leanMass": measurements.leanMassLb.map(Self.formatNumber) ?? "",
+            "boneMineral": measurements.boneMineralContentLb.map(Self.formatNumber) ?? "",
+            "rmr": measurements.restingMetabolicRateKcal.map(Self.formatNumber) ?? "",
+            "vatMass": measurements.visceralAdiposeTissueMassLb.map(Self.formatNumber) ?? "",
+            "vatVolume": measurements.visceralAdiposeTissueVolumeIn3.map(Self.formatNumber) ?? "",
+        ]
+        actionState = .editingMeasurements
+    }
+
+    private func dexaMeasurementCard(review: EvidenceReviewDetailReadModel, item: EvidenceReviewDetailItem) -> some View {
+        CardContainer { VStack(alignment: .leading, spacing: 12) {
+            Text("Correct the interpreted scan").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+            Text("Every field is resent together — the server replaces the full measurement set, it does not merge.")
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            measurementField("Measured date (YYYY-MM-DD)", key: "measuredAt")
+            measurementField("Total mass (lb)", key: "totalMass")
+            measurementField("Body fat (%)", key: "bodyFat")
+            measurementField("Fat mass (lb)", key: "fatMass")
+            measurementField("Lean mass (lb)", key: "leanMass")
+            measurementField("Bone mineral content (lb)", key: "boneMineral")
+            measurementField("Resting metabolic rate (kcal/day)", key: "rmr")
+            measurementField("Visceral fat mass (lb)", key: "vatMass")
+            measurementField("Visceral fat volume (in³)", key: "vatVolume")
+            HStack(spacing: 10) {
+                Button("Cancel") { actionState = .idle }.buttonStyle(.bordered)
+                PrimaryActionButton(title: "Save Corrections", tone: .accent) {
+                    Task { await saveMeasurements(review: review, item: item) }
+                }.accessibilityIdentifier("evidenceReview.saveMeasurements")
+            }
+        } }
+    }
+
+    private func measurementField(_ label: String, key: String) -> some View {
+        HStack {
+            Text(label).physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            Spacer()
+            NumericEditField(text: Binding(get: { measurementTexts[key] ?? "" }, set: { measurementTexts[key] = $0 }), accessibilityLabel: label)
+                .frame(width: 110, height: 36)
+        }
+    }
+
+    private func saveMeasurements(review: EvidenceReviewDetailReadModel, item: EvidenceReviewDetailItem) async {
+        guard let version = review.version else { return }
+        actionState = .savingMeasurements
+        let measurements = DEXAScanMeasurements(
+            measuredAt: (measurementTexts["measuredAt"] ?? "").isEmpty ? nil : measurementTexts["measuredAt"],
+            totalMassLb: Double(measurementTexts["totalMass"] ?? ""),
+            bodyFatPercentage: Double(measurementTexts["bodyFat"] ?? ""),
+            fatMassLb: Double(measurementTexts["fatMass"] ?? ""),
+            leanMassLb: Double(measurementTexts["leanMass"] ?? ""),
+            boneMineralContentLb: Double(measurementTexts["boneMineral"] ?? ""),
+            restingMetabolicRateKcal: Double(measurementTexts["rmr"] ?? ""),
+            visceralAdiposeTissueMassLb: Double(measurementTexts["vatMass"] ?? ""),
+            visceralAdiposeTissueVolumeIn3: Double(measurementTexts["vatVolume"] ?? "")
+        )
+        do {
+            _ = try await environment.dexaWriteAPI.editMeasurements(
+                reviewId: reviewId, evidenceObjectId: item.id, expectedVersion: String(version), measurements: measurements
+            )
+            actionState = .idle
+            await load()
+        } catch {
+            actionState = .failed(Self.errorMessage(for: error))
+        }
+    }
+
+    // MARK: - Confirm
+
+    private func confirm(review: EvidenceReviewDetailReadModel) async {
+        guard let version = review.version else { return }
+        let domain = Self.domain(for: review)
+        actionState = .confirming("Confirming…")
+        do {
+            let confirmation = try await environment.evidenceIntakePipeline.commitReview(
+                domain: domain, reviewId: reviewId, expectedVersion: String(version)
+            )
+            if confirmation?.state == "confirmed" {
+                actionState = .confirmed
+                return
+            }
+        } catch {
+            // The commit call itself failed — nothing was kicked off.
+            actionState = .failed(Self.errorMessage(for: error))
+            return
+        }
+        // The commit call succeeded and is now processing durably on the
+        // server (a background worker drives it forward regardless of
+        // this screen). A failure from HERE on is never reported as "this
+        // failed" — only as "still processing," since the confirm attempt
+        // itself already landed.
+        do {
+            try await environment.evidenceIntakePipeline.awaitConfirmation(reviewAPI: environment.evidenceReviewAPI, reviewId: reviewId) { status in
+                Task { @MainActor in actionState = .confirming("Confirming (\(Self.statusLabel(status)))…") }
+            }
+            actionState = .confirmed
+        } catch ProductionEvidenceIntakePipeline.Error.commitFailed {
+            actionState = .failed("This review needs another look — the canonical commit failed. Reopen it to try again.")
+        } catch {
+            actionState = .stillProcessing
+        }
+    }
+
+    private static func isActionable(_ status: String) -> Bool {
+        ["pending", "commit_failed", "partially_committed"].contains(status)
+    }
+
+    private static func domain(for review: EvidenceReviewDetailReadModel) -> NativeProductWriteDomain {
+        switch review.items.first?.type {
+        case "nutrition": .nutrition
+        case "activity_day", "activity": .activityEvidence
+        case "dexa_scan", "dexa", "body_composition": .dexa
+        default: .evidenceReview
+        }
+    }
+
+    private static func formatNumber(_ value: Double) -> String {
+        value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+    }
+
+    private static func errorMessage(for error: Error) -> String {
+        if let productionError = error as? ProductionNativeError { return productionError.errorDescription ?? "This review could not be updated." }
+        return "This review could not be updated."
     }
 
     private static func statusLabel(_ status: String) -> String {

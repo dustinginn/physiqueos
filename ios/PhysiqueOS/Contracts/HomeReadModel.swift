@@ -134,11 +134,15 @@ enum HomeGoalIcon: String, Codable {
     case activity, compass, dumbbell, shield, target
 }
 
-/// Mirrors the two `GoalRow.jsx` presentation modes this slice exercises:
-/// a primary goal (progress bar + percentage) and a supporting objective
-/// (status + detail pair). `terminal`, `calibration`, and
-/// `phase_trajectory` goal presentations exist on the web but are deferred
-/// — see the Native V1 doc update for this slice.
+/// Mirrors the `GoalRow.jsx` presentation modes this slice exercises:
+/// a primary goal (progress bar + percentage), a supporting objective
+/// (status + detail pair), and — as of Build 21 — the full multi-phase
+/// `phase_trajectory_goal` layout (`PhaseTrajectoryGoal`/`PhaseRow`/
+/// `GuardrailCallout` in `GoalRow.jsx`) that Founder Production's real
+/// Home actually renders for a two-phase Build Lean Mass goal: every
+/// phase's own card (not just the active one), each with its own status
+/// and progress, plus the goal's guardrail. `terminal` and `calibration`
+/// goal presentations still exist on the web but remain deferred.
 enum HomeGoalPresentation: Equatable {
     /// `phaseLabel` — e.g. "Phase 2 · Lean Mass Build" — mirrors the same
     /// canonical phase order/name Goals Detail shows in "Your Journey",
@@ -148,6 +152,48 @@ enum HomeGoalPresentation: Equatable {
     /// ordinal.
     case primary(progress: Int, phaseLabel: String? = nil)
     case supporting(status: String, detail: String)
+    case phaseTrajectory(HomePhaseTrajectory)
+}
+
+/// Mirrors `presentation.trajectory` (`HomeGoalTrajectoryService.js`'s
+/// return value) as surfaced through `home.goals[0].presentation` when
+/// `mode === "phase_trajectory_goal"`. Every phase in `phases` is kept —
+/// not just the active one — so Home can render the same "every phase
+/// gets its own card" layout the web's `PhaseTrajectoryGoal` component
+/// does, instead of collapsing the goal down to a single active-phase
+/// summary line.
+struct HomePhaseTrajectory: Codable, Equatable {
+    var targetDescription: String?
+    var overallTargetDate: String?
+    var guardrail: String?
+    var phases: [HomeGoalPhase]
+}
+
+struct HomeGoalPhase: Codable, Equatable, Identifiable {
+    var id: String
+    /// Raw, zero-based server order — a display ordinal is always
+    /// `order + 1` (`Phase {order + 1}`), mirroring the exact convention
+    /// `ProductionHomeAPI.Goal.readModel()` already applies for the
+    /// collapsed `.primary` phase label.
+    var order: Int
+    var phaseName: String
+    /// `"completed" | "active" | "upcoming" | "planned" | "skipped"` —
+    /// rendered verbatim as the status pill's text (title-cased), never
+    /// re-interpreted into a Native-invented vocabulary.
+    var status: String
+    /// `"gold" | "green" | "orange" | "neutral"` — `HomeGoalTrajectoryService.js`'s
+    /// `phasePresentationTone`.
+    var presentationTone: String
+    /// `"outcome" | "planned_time" | "qualitative" | "unavailable"`.
+    var progressType: String?
+    var clampedProgressPercentage: Int?
+    /// Already display-formatted (e.g. "0.8 of 10 lb gained", "Completed") —
+    /// presentation text the server composes, not recomputed here.
+    var presentationLabel: String?
+    /// `progress.status` (e.g. `"awaiting_follow_up"`) — used only to
+    /// choose the outcome sub-caption ("Awaiting next DEXA" vs. "DEXA
+    /// measurements anchor progress"), matching `PhaseRow`'s own check.
+    var progressStatus: String?
 }
 
 struct HomeGoal: Codable, Equatable, Identifiable {
@@ -165,7 +211,7 @@ struct HomeGoal: Codable, Equatable, Identifiable {
 extension HomeGoal {
     private enum CodingKeys: String, CodingKey {
         case id, title, current, target, unit, icon, color, destination
-        case presentationMode, progress, status, detail, phaseLabel
+        case presentationMode, progress, status, detail, phaseLabel, phaseTrajectory
     }
 
     init(from decoder: Decoder) throws {
@@ -190,6 +236,8 @@ extension HomeGoal {
                 status: try container.decode(String.self, forKey: .status),
                 detail: try container.decode(String.self, forKey: .detail)
             )
+        case "phaseTrajectory":
+            presentation = .phaseTrajectory(try container.decode(HomePhaseTrajectory.self, forKey: .phaseTrajectory))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .presentationMode, in: container,
@@ -217,6 +265,9 @@ extension HomeGoal {
             try container.encode("supporting", forKey: .presentationMode)
             try container.encode(status, forKey: .status)
             try container.encode(detail, forKey: .detail)
+        case .phaseTrajectory(let trajectory):
+            try container.encode("phaseTrajectory", forKey: .presentationMode)
+            try container.encode(trajectory, forKey: .phaseTrajectory)
         }
     }
 }

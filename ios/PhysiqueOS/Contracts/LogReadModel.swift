@@ -23,6 +23,14 @@ struct LogReadModel: Codable, Equatable {
 
 enum LoggedTodayRowKind: String, Codable {
     case training, nutrition, activity
+    /// Founder Production only, Build 21 — synthesized locally, never
+    /// decoded from the wire: `evidence-review-queue`'s own
+    /// `loggedToday.rows` doesn't send a Weight row today (a confirmed,
+    /// narrow server gap — see `ProductionLogAPI.fetchLog()`'s doc
+    /// comment for the exact fix). Native composes this 4th row itself
+    /// from a second, already-existing read (`weight`'s own exact-date
+    /// `current`), never from a "latest weight" guess.
+    case weight
 
     /// `LOGGED_TODAY_ICONS` in `LogHubScreen.jsx`.
     var systemImage: String {
@@ -30,6 +38,7 @@ enum LoggedTodayRowKind: String, Codable {
         case .training: "figure.strengthtraining.traditional"
         case .nutrition: "fork.knife"
         case .activity: "waveform.path.ecg"
+        case .weight: "scalemass"
         }
     }
 
@@ -38,6 +47,7 @@ enum LoggedTodayRowKind: String, Codable {
         case .training: "Training"
         case .nutrition: "Nutrition"
         case .activity: "Activity"
+        case .weight: "Weight"
         }
     }
 }
