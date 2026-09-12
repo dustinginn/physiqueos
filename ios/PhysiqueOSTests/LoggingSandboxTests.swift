@@ -278,6 +278,61 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(EvidenceSandboxRouter.scenario(for: nutrition), .mixed)
     }
 
+    // MARK: - Build 25: strong DEXA signal takes precedence over incidental generic keywords
+    //
+    // Regression coverage for a real Founder-reported DEXA classification
+    // issue: Automatic mode reported "This looks like more than one kind of
+    // evidence" for a real BodySpec DEXA PDF because a single incidental
+    // generic-category keyword (e.g. "sleep") elsewhere in the same report
+    // was enough to add a second category to a flat OR-matched list, with no
+    // notion that DEXA's own vocabulary is far more specific/unambiguous.
+
+    func testStrongDexaSignalAloneClassifiesAsDexa() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+        draft.details = "BodySpec DEXA Body Composition Report\nLean Tissue 142.3 lb\nFat Tissue 38.1 lb\nBone Mineral Content 6.9 lb"
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: draft), [.dexa])
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: draft), .dexa)
+    }
+
+    func testStrongDexaSignalWithIncidentalGenericKeywordStillClassifiesAsDexaAlone() {
+        // "sleep"/"steps"/a bare weight reading/a pose-photo phrase are each
+        // sufficient on their own to trigger Recovery/Activity/Weight/Progress
+        // Photos — but a real DEXA report's lifestyle-notes section can
+        // easily contain any of them incidentally. None may override a
+        // strong DEXA match from the same source.
+        let incidentalGenericPhrases = [
+            "For better results, prioritize sleep and recovery.",
+            "Pair this scan with your daily steps for a full picture.",
+            "front relaxed pose photos taken the same morning",
+        ]
+        for incidental in incidentalGenericPhrases {
+            var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+            draft.details = "BodySpec DEXA Body Composition Report\nLean Tissue 142.3 lb\nFat Mass 38.1 lb\n\(incidental)"
+            XCTAssertEqual(
+                EvidenceSandboxRouter.detectedCategories(for: draft), [.dexa],
+                "Incidental phrase '\(incidental)' must not turn a strong DEXA match into an ambiguous one."
+            )
+            XCTAssertEqual(EvidenceSandboxRouter.scenario(for: draft), .dexa)
+        }
+    }
+
+    func testGenuinelyDistinctStrongSignalsFromTwoFamiliesRemainAmbiguous() {
+        // Labs' own keyword set is just as specific/branded as DEXA's — a
+        // real co-occurrence of both is genuine ambiguity, not something the
+        // DEXA-precedence rule should silently resolve.
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+        draft.details = "BodySpec DEXA Body Composition Report\nLean Tissue 142.3 lb\n\nLab Panel Results\nCholesterol 178 Testosterone 612"
+        XCTAssertEqual(Set(EvidenceSandboxRouter.detectedCategories(for: draft)), Set([.dexa, .labs]))
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: draft), .mixed)
+    }
+
+    func testNoStrongSignalDoesNotClassifyAsDexa() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+        draft.details = "For better results, prioritize sleep and recovery."
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: draft), [.recovery])
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: draft), .recovery)
+    }
+
     // MARK: - Multi-domain package reconciliation
     //
     // Regression coverage for a real Founder-reported bug: a single upload

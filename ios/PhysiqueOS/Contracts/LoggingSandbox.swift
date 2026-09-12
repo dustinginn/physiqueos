@@ -401,10 +401,25 @@ enum EvidenceSandboxRouter {
         func add(_ category: EvidenceCategory, when condition: Bool) {
             if condition, !result.contains(category) { result.append(category) }
         }
-        add(.dexa, when: containsAny(text, ["dexa", "bodyspec", "body composition", "lean tissue", "fat tissue", "bone mineral content", "vat volume"]))
+        // DEXA's own vocabulary is highly specific to a body-composition scan
+        // report and essentially never appears incidentally in another
+        // evidence type — unlike, say, "sleep" or "steps," which can turn up
+        // anywhere in a multi-section report's lifestyle notes. A strong DEXA
+        // match therefore takes precedence over Recovery/Activity/Progress
+        // Photos/Weight's more generic single-word or common-phrase signals
+        // from the SAME source (mirrors the pre-existing Weight-vs-DEXA
+        // suppression below) rather than treating the pairing as ambiguous.
+        // It deliberately does NOT suppress Labs/Nutrition/Training, whose
+        // own keyword sets are similarly specific — a real co-occurrence of
+        // two such strong, distinct signals is genuine ambiguity worth
+        // surfacing, not something to silently resolve.
+        add(.dexa, when: containsAny(text, [
+            "dexa", "bodyspec", "body composition", "lean tissue", "fat tissue",
+            "fat mass", "body fat", "regional lean", "regional fat", "bone mineral content", "vat volume",
+        ]))
         add(.labs, when: containsAny(text, ["lab panel", "bloodwork", "blood test", "hemoglobin", "cholesterol", "testosterone"]))
-        add(.recovery, when: containsAny(text, ["sleep", "hrv", "readiness", "recovery score", "time asleep"]))
-        add(.progressPhotos, when: containsAny(text, ["progress photo", "front relaxed", "rear relaxed", "side relaxed", "pose photo"]))
+        add(.recovery, when: containsAny(text, ["sleep", "hrv", "readiness", "recovery score", "time asleep"]) && !result.contains(.dexa))
+        add(.progressPhotos, when: containsAny(text, ["progress photo", "front relaxed", "rear relaxed", "side relaxed", "pose photo"]) && !result.contains(.dexa))
         // A calorie value appears on both Apple workout summaries and Nutrition
         // screens. It is therefore deliberately not a Nutrition signal on its
         // own. Nutrition requires domain-specific context such as macros, food,
@@ -423,7 +438,7 @@ enum EvidenceSandboxRouter {
             "indoor run", "cycling", "elliptical", "rowing", "hiking",
         ]) || text.range(of: #"(?im)^\s*\d+(?:\.\d+)?\s*(?:p|lb|lbs|pounds?)\s+\d+(?:\.\d+)?\s*(?:r|reps?)\s*[x×]\s*\d+\s*$"#, options: .regularExpression) != nil
         add(.training, when: trainingSignal)
-        add(.activity, when: containsAny(text, ["activity rings", "move goal", "stand hours", "exercise minutes", "steps"]) && !trainingSignal)
+        add(.activity, when: containsAny(text, ["activity rings", "move goal", "stand hours", "exercise minutes", "steps"]) && !trainingSignal && !result.contains(.dexa))
         let weightSignal = containsAny(text, ["morning weight", "body weight", "weighed in", "scale weight"]) || text.range(of: #"(?m)^\s*\d{2,3}(?:\.\d+)?\s*(?:lb|lbs|kg)\s*$"#, options: .regularExpression) != nil
         add(.weight, when: weightSignal && !trainingSignal && !result.contains(.dexa))
         return result

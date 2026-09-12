@@ -931,6 +931,11 @@ struct TrainingLoggerView: View {
     private func complete(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             loggerHeader(eyebrow: "Workout Complete", title: "Workout logged", subtitle: "Your workout review is complete.")
+            if let warning = viewModel.refreshWarning {
+                Text(warning)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
             if let achievements = viewModel.draft?.performanceAchievementLines, !achievements.isEmpty {
                 CardContainer(background: PhysiqueOSTheme.chartSuccess.opacity(0.12)) {
                     VStack(alignment: .leading, spacing: 8) {

@@ -23,6 +23,10 @@ final class TrainingLoggerViewModel {
     var isBrowsingAllExercises = false
     var validationMessage: String?
     var isSubmitting = false
+    /// Set only when a workout already committed canonically but a
+    /// subsequent, non-authoritative refresh (e.g. `fetchConfiguration()`)
+    /// failed. Never implies the workout itself needs to be resubmitted.
+    var refreshWarning: String?
 
     init(
         api: TrainingLoggerAPI,
@@ -151,13 +155,28 @@ final class TrainingLoggerViewModel {
         }
         isSubmitting = true
         validationMessage = nil
+        refreshWarning = nil
         defer { isSubmitting = false }
         do {
             _ = try await writeAPI.commit(draft)
-            configuration = try await api.fetchConfiguration()
-            completeLocalCapture()
         } catch {
+            // The mutation itself did not reach canonical success — this is
+            // the only branch allowed to report the submission as failed,
+            // and the only one that leaves the draft in place.
             validationMessage = (error as? LocalizedError)?.errorDescription ?? "This workout could not be saved."
+            return
+        }
+        // `commit` returning means the canonical write is already durable.
+        // Nothing past this point may retroactively report the submission
+        // as failed or resurrect the local draft — nothing after this point
+        // is authoritative over that.
+        completeLocalCapture()
+        do {
+            configuration = try await api.fetchConfiguration()
+        } catch {
+            // Non-destructive: the workout is already saved. A later screen
+            // load will retry this same read.
+            refreshWarning = "Workout saved. Some details may be out of date until you return to Training."
         }
     }
 

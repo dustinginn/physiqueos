@@ -616,16 +616,156 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertNotNil(viewModel.validationMessage)
     }
 
+    // MARK: - Build 25: canonical commit success must be final regardless of a later refresh
+
+    /// A `TrainingLoggerAPI` whose `fetchConfiguration()` succeeds up to
+    /// `failFromCall` and then throws `error` on every call after — used to
+    /// let `load()`'s configuration fetch succeed while `submit()`'s
+    /// post-commit refresh fails, without touching the real network.
+    private actor RefreshFailingTrainingLoggerAPI: TrainingLoggerAPI {
+        private let fixture = FixtureTrainingLoggerAPI()
+        private let failFromCall: Int
+        private let error: Error
+        private var callCount = 0
+        init(failFromCall: Int, error: Error) {
+            self.failFromCall = failFromCall
+            self.error = error
+        }
+        func fetchConfiguration() async throws -> TrainingLoggerConfiguration {
+            callCount += 1
+            if callCount >= failFromCall { throw error }
+            return try await fixture.fetchConfiguration()
+        }
+    }
+
+    @MainActor
+    private func submittedDraftViewModel(
+        refreshAPI: TrainingLoggerAPI, store: MemoryTrainingLoggerDraftStore
+    ) -> TrainingLoggerViewModel {
+        let viewModel = TrainingLoggerViewModel(
+            api: refreshAPI, writeAPI: StubSucceedingTrainingWriteAPI(), draftStore: store, authority: .founderProduction
+        )
+        return viewModel
+    }
+
+    /// The baseline: commit succeeds, the post-success refresh also
+    /// succeeds — everything behaves as before this fix.
+    @MainActor
+    func testCommitSucceedsAndConfigurationRefreshSucceeds() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = submittedDraftViewModel(refreshAPI: FixtureTrainingLoggerAPI(), store: store)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+
+        await viewModel.submit()
+
+        XCTAssertNil(store.load())
+        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertNil(viewModel.validationMessage)
+        XCTAssertNil(viewModel.refreshWarning)
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+    }
+
+    /// The proven Build 24/25 defect: once `commit(draft)` has already
+    /// succeeded, a plain network failure on the unrelated post-success
+    /// `fetchConfiguration()` refresh must NOT be reported as "this workout
+    /// could not be saved," and must NOT resurrect the local draft.
+    @MainActor
+    func testCommitSucceedsButConfigurationRefreshNetworkFailureIsNonDestructive() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = submittedDraftViewModel(
+            refreshAPI: RefreshFailingTrainingLoggerAPI(failFromCall: 2, error: ProductionNativeError.networkFailure),
+            store: store
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        XCTAssertNotNil(store.load())
+
+        await viewModel.submit()
+
+        XCTAssertNil(store.load(), "A canonically-successful commit must clear the draft even if the refresh afterward fails.")
+        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertNil(viewModel.validationMessage, "A post-success refresh failure must never be reported as a submission failure.")
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+        XCTAssertNotNil(viewModel.refreshWarning, "The refresh failure must surface as a separate, non-destructive notice.")
+    }
+
+    /// Same invariant when the refresh fails because of an expired/failed
+    /// token refresh (401), the exact mechanism behind the real production
+    /// incident ("PhysiqueOS could not be reached" after a real commit).
+    @MainActor
+    func testCommitSucceedsButConfigurationRefreshAuthFailureIsNonDestructive() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = submittedDraftViewModel(
+            refreshAPI: RefreshFailingTrainingLoggerAPI(failFromCall: 2, error: ProductionNativeError.unauthenticated(nil)),
+            store: store
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live)
+
+        await viewModel.submit()
+
+        XCTAssertNil(store.load())
+        XCTAssertNil(viewModel.validationMessage)
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+        XCTAssertNotNil(viewModel.refreshWarning)
+    }
+
+    /// Same invariant when the refresh simply times out.
+    @MainActor
+    func testCommitSucceedsButConfigurationRefreshTimeoutIsNonDestructive() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = submittedDraftViewModel(
+            refreshAPI: RefreshFailingTrainingLoggerAPI(failFromCall: 2, error: URLError(.timedOut)),
+            store: store
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live)
+
+        await viewModel.submit()
+
+        XCTAssertNil(store.load())
+        XCTAssertNil(viewModel.validationMessage)
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+        XCTAssertNotNil(viewModel.refreshWarning)
+    }
+
+    /// A genuine commit failure (including a stale/idempotency conflict
+    /// surfaced by the write API) must still report failure and must still
+    /// preserve the draft — this fix must not weaken that existing
+    /// invariant, only the unrelated post-success refresh.
+    @MainActor
+    func testActualCommitFailureStillReportsFailureAndPreservesDraft() async throws {
+        struct ConflictFailure: LocalizedError {
+            var errorDescription: String? { "The resource changed after it was loaded." }
+        }
+        struct ConflictWriteAPI: TrainingWriteAPI {
+            func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult { throw ConflictFailure() }
+        }
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: ConflictWriteAPI(), draftStore: store, authority: .founderProduction)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        let beforeSubmit = viewModel.draft
+
+        await viewModel.submit()
+
+        XCTAssertEqual(store.load(), beforeSubmit)
+        XCTAssertEqual(viewModel.draft, beforeSubmit)
+        XCTAssertEqual(viewModel.validationMessage, "The resource changed after it was loaded.")
+        XCTAssertNil(viewModel.refreshWarning)
+    }
+
     func testInteractivePopPolicyEnablesOnlyPushedDestinations() {
         XCTAssertFalse(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 1))
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildTwentyFourInSourceControlledConfiguration() throws {
+    func testAppDeclaresExemptEncryptionAndBuildTwentyFiveInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "24")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "25")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }
