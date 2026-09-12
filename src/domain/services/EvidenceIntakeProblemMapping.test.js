@@ -6,6 +6,7 @@ import {
   assertEvidenceUploadReceiptMatchesManifest,
   createEvidenceUploadArtifactManifest,
 } from "./EvidenceUploadArtifactManifest.js";
+import { createProviderCanonicalUploadService } from "../../application/media/ProviderCanonicalUploadService.js";
 
 function thrown(fn) {
   try {
@@ -74,6 +75,44 @@ describe("toEvidenceIntakeProblem", () => {
     expect(problem).toBeInstanceOf(ApplicationProblem);
     expect(problem.status).toBe(409);
     expect(problem.code).toBe(code);
+  });
+
+  it("maps the real production content-type defect (a UTI, not a MIME type) to a 400 ApplicationProblem", async () => {
+    // Reproduces the exact real incident end-to-end using the actual
+    // throwing function, not a synthetic Error.
+    const service = createProviderCanonicalUploadService({
+      pool: { connect: async () => ({ query: async () => ({ rows: [], rowCount: 0 }), release: () => undefined }), query: async () => ({ rows: [], rowCount: 0 }) },
+      objectProvider: { beginMultipartUpload: async () => ({}) },
+      authorityStore: { claimCanonicalWriteBoundary: async () => ({}) },
+      fetchImpl: async () => new Response(null, { status: 200 }),
+    });
+    let error = null;
+    try {
+      await service.store({
+        ownerUserId: "user_founder_001",
+        bytes: Buffer.from("%PDF-1.7\nreal-dexa-pdf-bytes"),
+        contentType: "com.adobe.pdf",
+        originalFilename: "BodySpec.pdf",
+        category: "evidenceIntakes",
+        relationshipId: "intake-1",
+      });
+    } catch (thrown) {
+      error = thrown;
+    }
+    expect(error).not.toBeNull();
+    expect(error).not.toBeInstanceOf(ApplicationProblem);
+    const problem = toEvidenceIntakeProblem(error);
+    expect(problem).toBeInstanceOf(ApplicationProblem);
+    expect(problem.status).toBe(400);
+    expect(problem.code).toBe("PROVIDER_UPLOAD_CONTENT_TYPE_INVALID");
+  });
+
+  it("maps MULTIPART_PARSE_FAILED to a distinct-code 500 ApplicationProblem, not the generic UNCLASSIFIED_ERROR shape", () => {
+    const error = Object.assign(new Error("The upload could not be read."), { code: "MULTIPART_PARSE_FAILED" });
+    const problem = toEvidenceIntakeProblem(error);
+    expect(problem).toBeInstanceOf(ApplicationProblem);
+    expect(problem.status).toBe(500);
+    expect(problem.code).toBe("MULTIPART_PARSE_FAILED");
   });
 
   it("leaves an existing ApplicationProblem unchanged", () => {

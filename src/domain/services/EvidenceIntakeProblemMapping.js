@@ -17,7 +17,17 @@ const VALIDATION_PROBLEMS = new Map([
   ["DEXA_PDF_TOO_LARGE", { status: 413, title: "The DEXA PDF is larger than 50 MB." }],
   ["DEXA_PDF_INVALID", { status: 400, title: "Choose a valid PDF exported by BodySpec." }],
   ["EVIDENCE_INTAKE_SUBMISSION_ID_INVALID", { status: 400, title: "The evidence submission identity is invalid." }],
+  ["MULTIPART_BOUNDARY_MISSING", { status: 400, title: "The upload request is missing its multipart boundary." }],
+  ["MULTIPART_REQUEST_TOO_LARGE", { status: 413, title: "The upload is larger than PhysiqueOS accepts." }],
+  ["PROVIDER_UPLOAD_CONTENT_TYPE_INVALID", { status: 400, title: "The uploaded file's declared type is invalid." }],
 ]);
+
+// A parser/storage failure whose cause IS understood (unlike a true unknown
+// bug), but that is not the Founder's mistake to fix by resubmitting the
+// same way — it stays a real internal error (500) rather than being
+// reported as a 400, but keeps its own specific code instead of collapsing
+// into the generic, indistinguishable UNCLASSIFIED_ERROR.
+const INTERNAL_DIAGNOSTIC_PROBLEMS = new Set(["MULTIPART_PARSE_FAILED"]);
 
 // These indicate the request conflicts with durable state already recorded
 // for this submission (a retried/replayed intake whose identity, stored
@@ -49,6 +59,9 @@ export function toEvidenceIntakeProblem(error) {
   }
   if (typeof code === "string" && CONFLICT_PROBLEMS.has(code)) {
     return new ApplicationProblem({ status: 409, code, title: CONFLICT_PROBLEMS.get(code), cause: error });
+  }
+  if (typeof code === "string" && INTERNAL_DIAGNOSTIC_PROBLEMS.has(code)) {
+    return new ApplicationProblem({ status: 500, code, title: "The upload could not be completed. Try again.", cause: error });
   }
   return error;
 }

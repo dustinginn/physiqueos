@@ -4,16 +4,36 @@ import {
   createEvidenceUploadArtifactManifest,
 } from "../../domain/services/EvidenceUploadArtifactManifest.js";
 import { validateDexaPdfUpload } from "../../domain/services/DexaPdfIntakeService.js";
+import { foundationLogger } from "../../platform/foundation/runtime.js";
 
 const TYPES = new Set(["dexa_scan", "nutrition", "activity_day", "training"]);
 const MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024;
 const MAX_SCREENSHOTS = 4;
+// The largest single accepted file (the 50 MB DEXA PDF) plus headroom for
+// multipart framing overhead (other form fields, boundaries, headers).
+const MAX_REQUEST_BYTES = 51 * 1024 * 1024;
 
 export async function parseNativeEvidenceIntakeRequest(request) {
-  if (!/^multipart\/form-data(?:;|$)/i.test(request.headers.get("content-type") ?? "")) {
+  const contentTypeHeader = request.headers.get("content-type") ?? "";
+  if (!/^multipart\/form-data(?:;|$)/i.test(contentTypeHeader)) {
     throw problem(400, "CONTENT_TYPE_REQUIRED", "A multipart evidence intake is required.");
   }
-  const formData = await request.formData();
+  if (!/boundary=/i.test(contentTypeHeader)) {
+    throw problem(400, "MULTIPART_BOUNDARY_MISSING", "The upload request is missing its multipart boundary.");
+  }
+  const declaredLength = Number(request.headers.get("content-length") ?? NaN);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
+    throw problem(413, "MULTIPART_REQUEST_TOO_LARGE", "The upload is larger than PhysiqueOS accepts.");
+  }
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch (error) {
+    logMultipartParseFailure({ request, contentTypeHeader, declaredLength, error });
+    const failure = new Error("The upload could not be read.");
+    failure.code = "MULTIPART_PARSE_FAILED";
+    throw failure;
+  }
   const submissionIdentity = required(formData.get("submissionIdentity"), "submissionIdentity");
   const idempotencyKey = required(request.headers.get("idempotency-key"), "Idempotency-Key");
   if (idempotencyKey !== submissionIdentity) {
@@ -87,4 +107,24 @@ function isCalendarDate(value) {
 
 function problem(status, code, title) {
   return new ApplicationProblem({ status, code, title });
+}
+
+// Logs only facts that are safe to record: header presence/shape and error
+// class, never the PDF/image bytes, the multipart body, or the raw parser
+// message (which can echo back fragments of the body it failed to parse).
+function logMultipartParseFailure({ request, contentTypeHeader, declaredLength, error }) {
+  let path = null;
+  try {
+    path = new URL(request.url).pathname;
+  } catch {
+    path = null;
+  }
+  foundationLogger?.warn("evidence.intake.multipart.parse_failed", {
+    method: request.method,
+    path,
+    multipartDeclared: /^multipart\/form-data(?:;|$)/i.test(contentTypeHeader),
+    boundaryDeclared: /boundary=/i.test(contentTypeHeader),
+    declaredLength: Number.isFinite(declaredLength) ? declaredLength : null,
+    errorName: error?.name ?? null,
+  });
 }

@@ -217,7 +217,11 @@ function validateUpload({ ownerUserId, buffer, contentType, originalFilename, ca
   if (!Buffer.isBuffer(buffer) || buffer.length === 0 || buffer.length > MAX_UPLOAD_BYTES) {
     throw new Error("Provider upload size is outside the accepted range.");
   }
-  if (!/^[-\w.+]+\/[-\w.+]+$/.test(String(contentType ?? ""))) throw new Error("Provider upload MIME type is invalid.");
+  if (!/^[-\w.+]+\/[-\w.+]+$/.test(String(contentType ?? ""))) {
+    const error = new Error("Provider upload MIME type is invalid.");
+    error.code = "PROVIDER_UPLOAD_CONTENT_TYPE_INVALID";
+    throw error;
+  }
   if (!String(originalFilename ?? "").trim()) throw new Error("Provider upload filename is required.");
 }
 

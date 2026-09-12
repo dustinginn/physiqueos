@@ -82,6 +82,32 @@ describe("provider canonical uploads", () => {
     expect(database.canonicalMedia).toHaveLength(0);
   });
 
+  it("rejects the real production DEXA-intake defect shape (a UTI, not a MIME type) with a distinct diagnosable code before any write", async () => {
+    // The real Build 24/25 incident: Native's file picker declared the PDF's
+    // multipart Content-Type as the raw UTType identifier "com.adobe.pdf"
+    // instead of converting it to "application/pdf" first. This previously
+    // threw a bare, code-less Error here, which collapsed into a silent
+    // 500/UNCLASSIFIED_ERROR indistinguishable from a genuine bug.
+    const database = fakeDatabase();
+    const objectProvider = fakeObjectProvider();
+    const service = createProviderCanonicalUploadService({
+      pool: database.pool,
+      objectProvider,
+      authorityStore: { claimCanonicalWriteBoundary: vi.fn(async () => ({ outcome: "recorded" })) },
+      fetchImpl: async () => new Response(null, { status: 200, headers: { etag: '"etag"' } }),
+    });
+    await expect(service.store({
+      ownerUserId: "phase5-synthetic-user",
+      bytes: Buffer.from("%PDF-1.7\nreal-dexa-pdf-bytes"),
+      contentType: "com.adobe.pdf",
+      originalFilename: "BodySpec.pdf",
+      category: "evidenceIntakes",
+      relationshipId: "intake-1",
+    })).rejects.toMatchObject({ code: "PROVIDER_UPLOAD_CONTENT_TYPE_INVALID" });
+    expect(objectProvider.beginMultipartUpload).not.toHaveBeenCalled();
+    expect(database.canonicalMedia).toHaveLength(0);
+  });
+
   it("commits a verified upload under an explicitly accepted compatibility authority", async () => {
     const database = fakeDatabase();
     const objectProvider = fakeObjectProvider();
