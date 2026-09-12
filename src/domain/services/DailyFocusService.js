@@ -164,9 +164,9 @@ export function createDailyFocusService() {
         now,
       })
         ? [
-            getProteinItem({ todaysCheckIn }),
-            getActivityItem({ todaysCheckIn }),
-            getSleepItem({ todaysCheckIn }),
+            getProteinItem({ todaysCheckIn, today }),
+            getActivityItem({ todaysCheckIn, today }),
+            getSleepItem({ todaysCheckIn, today }),
           ]
         : [];
       const candidates = [...sessionPriorities, ...primaryItems, ...fallbackItems].filter(Boolean);
@@ -914,7 +914,7 @@ function getLegacyReminderOnlyDoseChangeItem({
   };
 }
 
-function getProteinItem({ todaysCheckIn }) {
+function getProteinItem({ todaysCheckIn, today }) {
   const completed = todaysCheckIn?.nutrition?.proteinTargetHit === true;
 
   return {
@@ -926,11 +926,12 @@ function getProteinItem({ todaysCheckIn }) {
     icon: "utensils",
     color: "success",
     completed,
+    occurrenceDate: today,
     priority: completed ? 80 : 65,
   };
 }
 
-function getActivityItem({ todaysCheckIn }) {
+function getActivityItem({ todaysCheckIn, today }) {
   const completed = todaysCheckIn?.activity?.activityRingClosed === true;
 
   return {
@@ -942,11 +943,12 @@ function getActivityItem({ todaysCheckIn }) {
     icon: "activity",
     color: "warning",
     completed,
+    occurrenceDate: today,
     priority: completed ? 85 : 70,
   };
 }
 
-function getSleepItem({ todaysCheckIn }) {
+function getSleepItem({ todaysCheckIn, today }) {
   const completed = todaysCheckIn?.recovery?.sleepTargetHit === true;
 
   return {
@@ -958,6 +960,7 @@ function getSleepItem({ todaysCheckIn }) {
     icon: "moon",
     color: "primary",
     completed,
+    occurrenceDate: today,
     priority: completed ? 90 : 75,
   };
 }
