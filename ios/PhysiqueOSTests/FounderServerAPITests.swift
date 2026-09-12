@@ -412,6 +412,21 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(occurrence.destination, .priorityOccurrence(priorityId: "morning-check-in", occurrenceDate: "2026-09-09"))
     }
 
+    func testProductionHomeAcceptsCanonicalStringExecutionDestinationAndKeepsExactOccurrenceIdentity() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["home": productionHomeJSON(priorityID: "reminder_foam_roll_daily", goalID: "goal-server", confidence: 74)]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let home = try await ProductionHomeAPI(api: native).fetchHome()
+        let occurrence = try XCTUnwrap(home.todaysFocus.first)
+
+        XCTAssertEqual(occurrence.date, "2026-09-10")
+        XCTAssertEqual(occurrence.destination, .priorityOccurrence(priorityId: "completion-canonical", occurrenceDate: "2026-09-10"))
+    }
+
     func testProductionGoalsHandlesEmptyActiveStateAndPreservesCanonicalGoalPhaseIDs() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
@@ -2616,7 +2631,7 @@ private func productionHomeJSON(priorityID: String, goalID: String, confidence: 
       "nextBestAction":{"title":"Server action","icon":"target","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}}},
       "briefingCards":[],
       "goals":[{"id":"\(goalID)","title":"Server Goal","icon":"dumbbell","color":"success","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}},"presentation":{"mode":"phase_trajectory_goal","guardrail":"Maintain approximately 8-9% body fat.","trajectory":{"goalProgress":{"baselineValue":147.5,"latestValue":148.3,"targetAmount":10,"unit":"lb","clampedProgressPercentage":8},"activePhase":{"order":1,"phaseName":"Lean Mass Build"},"overallGoal":{"targetDescription":"Build 10 lb of lean mass","overallTargetDate":"2026-10-31"},"phases":[{"phaseId":"phase-maintenance","order":0,"phaseName":"Establish Maintenance","status":"completed","presentationTone":"gold","progress":{"progressType":"outcome","clampedProgressPercentage":100,"presentationLabel":"Completed"}},{"phaseId":"phase-lean-mass","order":1,"phaseName":"Lean Mass Build","status":"active","presentationTone":"green","progress":{"progressType":"outcome","clampedProgressPercentage":8,"presentationLabel":"0.8 of 10 lb gained","status":"measured"}}]}}}],
-      "todaysFocus":[{"id":"\(priorityID)","completionId":"completion-canonical","executionId":"execution-canonical","occurrenceDate":"2026-09-10","label":"Server Priority","subtitle":"Server-owned occurrence","metadata":"Production","changeLabel":null,"icon":"target","color":"primary","state":"available","completed":false,"actionLabel":"Complete","completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null}}]
+      "todaysFocus":[{"id":"\(priorityID)","completionId":"completion-canonical","executionId":"execution-canonical","occurrenceDate":"2026-09-10","label":"Server Priority","subtitle":"Server-owned occurrence","metadata":"Production","changeLabel":null,"icon":"target","color":"primary","state":"available","completed":false,"actionLabel":"Complete","completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null},"executionContract":{"priorityId":"completion-canonical","occurrenceDate":"2026-09-10","occurrenceKey":"completion-canonical:2026-09-10","workflow":"priority_detail","destination":"/priorities/completion-canonical"}}]
     }
     """)
 }

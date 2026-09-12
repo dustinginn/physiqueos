@@ -272,18 +272,10 @@ struct ProductionHomeAPI: HomeAPI {
         struct ExecutionContract: Decodable {
             var priorityId: String?
             var occurrenceDate: String?
-            var destination: Destination?
-
-            struct Destination: Decodable {
-                var parameters: Parameters?
-
-                struct Parameters: Decodable { var priorityId: String? }
-            }
         }
 
         var readOnlyOccurrence: PriorityOccurrence {
             let canonicalPriorityId = executionContract?.priorityId
-                ?? executionContract?.destination?.parameters?.priorityId
                 ?? completionId
                 ?? id
             let canonicalOccurrenceDate = occurrenceDate
