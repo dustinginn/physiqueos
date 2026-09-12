@@ -140,7 +140,7 @@ function boundedEvidenceWindow(value) {
 
 function repositoryNativeSummary(artifact) {
   const cadence = artifact.cadence ?? null;
-  const artifactType = artifact.artifactType ?? (cadence ? "scheduled" : null);
+  const artifactType = nativeArtifactType(artifact);
   return Object.freeze({
     artifactId: artifact.id,
     artifactType,
@@ -161,4 +161,12 @@ function repositoryNativeSummary(artifact) {
     detail: Object.freeze({ resource: "briefing", artifactId: artifact.id }),
     version: Number(artifact.version ?? 1),
   });
+}
+
+function nativeArtifactType(artifact) {
+  if (artifact.cadence !== "event") return artifact.artifactType ?? (artifact.cadence ? "scheduled" : null);
+  const evidenceType = artifact.trigger?.evidenceType ?? artifact.trigger?.type ?? null;
+  if (["dexa", "dexa_scan", "body_composition"].includes(evidenceType) || artifact.briefing?.dexaEventNarrative) return "dexa_event";
+  if (["photo", "photo_session", "progress_photo"].includes(evidenceType) || artifact.briefing?.photoEventNarrative) return "photo_event";
+  return artifact.artifactType ?? "event";
 }

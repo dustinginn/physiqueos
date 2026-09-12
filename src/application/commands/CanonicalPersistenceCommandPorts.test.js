@@ -88,6 +88,52 @@ describe("Phase 4 canonical command persistence ports", () => {
     expect(snapshot.piEnergyConfidenceWorkItems.length).toBeGreaterThan(0);
   });
 
+  it("stages a Founder-created Native exercise with its canonical definition and resolves duplicate names", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const first = await ports.commitTrainingSession(commandContext({
+      sessionId: "native-new-exercise", localDate: "2026-08-11",
+      exercises: [{
+        occurrenceId: "zercher-1",
+        provisionalExercise: { name: "Zercher Squat", primaryMuscleGroupId: "quads" },
+        sets: [{ setId: "set-1", reps: 8, load: 135, unit: "lb" }],
+      }],
+    }, null, "new-exercise"));
+    expect(first.result.exerciseIds).toEqual(["zercher_squat"]);
+    const staged = records.snapshot().evidenceReviews.find((item) => item.id === first.result.reviewId)
+      .interpretedEvidence.evidence_objects.find((item) => item.evidence_type === "training")
+      .exercises[0];
+    expect(staged).toMatchObject({
+      canonicalExerciseId: "zercher_squat",
+      resolutionStatus: "resolved_new_canonical",
+      provisionalExercise: {
+        resolutionStatus: "resolved_new_canonical",
+        confirmedDefinition: {
+          id: "zercher_squat", name: "Zercher Squat", primary_muscle_group_id: "quads",
+        },
+      },
+    });
+
+    await records.put({
+      ownerUserId, collection: "canonicalExerciseLibrary", recordId: "zercher_squat",
+      payload: staged.provisionalExercise.confirmedDefinition,
+    });
+    const duplicate = await ports.commitTrainingSession(commandContext({
+      sessionId: "native-existing-exercise", localDate: "2026-08-11",
+      exercises: [{
+        occurrenceId: "zercher-2",
+        provisionalExercise: { name: "Zercher Squat", primaryMuscleGroupId: "quads" },
+        sets: [{ reps: 6, load: 155, unit: "lb" }],
+      }],
+    }, null, "existing-exercise"));
+    expect(duplicate.result.exerciseIds).toEqual(["zercher_squat"]);
+    const resolved = records.snapshot().evidenceReviews.find((item) => item.id === duplicate.result.reviewId)
+      .interpretedEvidence.evidence_objects.find((item) => item.evidence_type === "training")
+      .exercises[0];
+    expect(resolved).toMatchObject({ canonicalExerciseId: "zercher_squat", resolutionStatus: "resolved_existing_canonical" });
+    expect(resolved.provisionalExercise).toBeNull();
+  });
+
   it("rejects direct device-health Activity and version-safely edits a staged DEXA review", async () => {
     const records = fixture();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });

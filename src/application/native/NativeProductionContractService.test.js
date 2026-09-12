@@ -84,6 +84,20 @@ function fixture(overrides = {}) {
   return { confirmEvidenceReview, evidenceIntake, executeCommand, openMedia, readers, service };
 }
 describe("Native production contract boundary", () => {
+  it("returns an accepted command receipt when confirmation continuation throws", async () => {
+    const current = fixture();
+    current.confirmEvidenceReview.mockRejectedValueOnce(Object.assign(new Error("worker unavailable"), { code: "WORKER_PENDING" }));
+    const result = await current.service.command({
+      request: request(),
+      commandType: "evidence-review.commit.v1",
+      metadata: { commandId: "command-accepted", idempotencyKey: "accepted-once" },
+      payload: { reviewId: "review-1" },
+    });
+    expect(result).toMatchObject({
+      outcome: "committed",
+      confirmation: { state: "processing", reviewId: "review-1", accepted: true, continuationWarning: "WORKER_PENDING" },
+    });
+  });
   it("publishes a Founder-production profile without provider or database implementation identity", async () => {
     const result = await fixture().service.profile({ request: request() });
     expect(result).toMatchObject({

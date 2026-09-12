@@ -2,6 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 import { createBriefingNavigationReadService } from "./BriefingNavigationReadService.js";
 
 describe("Native Briefing detail composition", () => {
+  it("classifies repository-backed DEXA and Photo events without relying on artifact id prefixes", async () => {
+    const historyStore = {
+      listHistory: vi.fn(async () => ({ artifacts: [
+        { id: "opaque-a", artifactType: "event", cadence: "event", generatedAt: "2026-09-01T12:00:00.000Z", trigger: { type: "dexa_scan" } },
+        { id: "opaque-b", artifactType: "event", cadence: "event", generatedAt: "2026-08-15T12:00:00.000Z", briefing: { photoEventNarrative: { photoSessionId: "photo-1" } } },
+      ], hasMore: false, nextCursor: null })),
+      getArtifact: vi.fn(),
+      getAnalysis: vi.fn(),
+    };
+    const result = await createBriefingNavigationReadService({ store: historyStore }).listNativeHistory({ limit: 50 });
+    expect(result.items.map((item) => item.artifactType)).toEqual(["dexa_event", "photo_event"]);
+  });
+
   it("returns the artifact-bound finished Weekly screen presentation instead of the raw artifact", async () => {
     const artifact = weeklyArtifact();
     const service = createBriefingNavigationReadService({ store: store(artifact) });

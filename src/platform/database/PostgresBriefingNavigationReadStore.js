@@ -62,6 +62,9 @@ export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, o
         `SELECT record_id,version,
                 COALESCE(payload->>'id',record_id) AS artifact_id,
                 payload->>'artifactType' AS artifact_type,
+                payload#>>'{trigger,evidenceType}' AS trigger_evidence_type,
+                (payload#>'{briefing,dexaEventNarrative}') IS NOT NULL AS has_dexa_narrative,
+                (payload#>'{briefing,photoEventNarrative}') IS NOT NULL AS has_photo_narrative,
                 payload->>'cadence' AS cadence,
                 payload->>'title' AS title,
                 COALESCE(payload->>'deliveryDate',payload->>'generatedAt',payload->>'createdAt',observed_at::text) AS publication_date,
@@ -195,7 +198,7 @@ function confidenceAssessmentId(artifact) {
 }
 
 function nativeBriefingSummary(row) {
-  const artifactType = row.artifact_type ?? (row.cadence ? "scheduled" : null);
+  const artifactType = nativeArtifactType(row);
   const cadence = row.cadence ?? null;
   return Object.freeze({
     artifactId: row.artifact_id,
@@ -215,6 +218,13 @@ function nativeBriefingSummary(row) {
     detail: Object.freeze({ resource: "briefing", artifactId: row.artifact_id }),
     version: Number(row.version),
   });
+}
+
+function nativeArtifactType(row) {
+  if (row.cadence !== "event") return row.artifact_type ?? (row.cadence ? "scheduled" : null);
+  if (["dexa", "dexa_scan", "body_composition"].includes(row.trigger_evidence_type) || row.has_dexa_narrative) return "dexa_event";
+  if (["photo", "photo_session", "progress_photo"].includes(row.trigger_evidence_type) || row.has_photo_narrative) return "photo_event";
+  return row.artifact_type ?? "event";
 }
 
 function boundedEvidenceWindow(value) {

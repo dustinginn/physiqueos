@@ -167,11 +167,25 @@ export function createNativeProductionContractService({
       const result = await executeCommand({ commandType, principal, metadata, payload });
       if (![Phase3Command.COMMIT_EVIDENCE_REVIEW, Phase3Command.COMMIT_TRAINING_SESSION].includes(commandType)) return result;
       if (typeof confirmEvidenceReview !== "function") throw unavailableResource();
-      const confirmation = await confirmEvidenceReview({
-        principal,
-        reviewId: payload.reviewId ?? result.receipt?.result?.reviewId,
-        commandId: result.receipt?.commandId ?? metadata.commandId,
-      });
+      const reviewId = payload.reviewId ?? result.receipt?.result?.reviewId;
+      let confirmation;
+      try {
+        confirmation = await confirmEvidenceReview({
+          principal,
+          reviewId,
+          commandId: result.receipt?.commandId ?? metadata.commandId,
+        });
+      } catch (error) {
+        // The canonical command receipt already committed. A synchronous
+        // continuation failure must not turn that accepted write into an
+        // HTTP failure that invites clients to mutate again.
+        confirmation = Object.freeze({
+          state: "processing",
+          reviewId,
+          accepted: true,
+          continuationWarning: error?.code ?? "confirmation_continuation_pending",
+        });
+      }
       return Object.freeze({ ...result, confirmation });
     },
 

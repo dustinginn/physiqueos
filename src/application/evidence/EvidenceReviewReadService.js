@@ -1,3 +1,5 @@
+import { createEvidenceReviewPresentation } from "../../domain/services/EvidenceReviewPresentationService.js";
+
 export function createEvidenceReviewReadService({ store } = {}) {
   if (!store?.run) throw new Error("Evidence Review reads require a read store.");
 
@@ -27,7 +29,11 @@ export function createEvidenceReviewReadService({ store } = {}) {
           store.getPackage(packageId),
           store.listRelevantCanonicalObjects({ packageId, nutritionDates }),
         ]);
-        return Object.freeze({ review, evidencePackage, canonicalObjects });
+        const presentation = createEvidenceReviewPresentation({
+          evidencePackage: review.interpretedEvidence ?? evidencePackage ?? {},
+          itemDecisions: review.itemDecisions ?? {},
+        });
+        return Object.freeze({ review, evidencePackage, canonicalObjects, presentation });
       });
     },
   });

@@ -13,6 +13,10 @@ import {
 import { listCanonicalTrainingExerciseIdentities } from "../../domain/models/trainingExerciseIdentity.js";
 import { normalizeTrainingExecutionVariant } from "../../domain/models/trainingExecutionVariant.js";
 import { createTrainingExerciseRelationshipGroup } from "../../domain/models/trainingExerciseRelationship.js";
+import {
+  createCanonicalExerciseDefinition,
+  findCanonicalExerciseConflict,
+} from "../../domain/services/CanonicalExerciseLibraryService.js";
 import { applyDexaReviewMeasurements } from "../../domain/services/DexaPdfIntakeService.js";
 import { assertValidDexaScan } from "../../domain/services/DEXAContract.js";
 import { createReminderRepository } from "../../data/repositories/ReminderRepository.js";
@@ -532,7 +536,22 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       ...runtimeDefinitions,
     ].map((item) => [item.id, item]));
     const occurrences = context.payload.exercises.map((exercise, index) => {
-      const definition = definitions.get(String(exercise.canonicalExerciseId));
+      let definition = definitions.get(String(exercise.canonicalExerciseId));
+      let createsCanonicalDefinition = false;
+      if (!definition && exercise.provisionalExercise) {
+        let candidate;
+        try {
+          candidate = createCanonicalExerciseDefinition({
+            canonicalName: exercise.provisionalExercise.name,
+            primaryMuscleGroupId: exercise.provisionalExercise.primaryMuscleGroupId,
+          });
+        } catch (error) {
+          throw canonicalValidationProblem(error);
+        }
+        definition = findCanonicalExerciseConflict(candidate, runtimeDefinitions) ?? candidate;
+        createsCanonicalDefinition = definition === candidate;
+        definitions.set(definition.id, definition);
+      }
       if (!definition) {
         throw problem(400, "CANONICAL_EXERCISE_UNAVAILABLE", `Exercise ${index + 1} does not identify a canonical exercise.`);
       }
@@ -556,7 +575,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         };
       });
       if (sets.length === 0) throw problem(400, "TRAINING_SETS_REQUIRED", `Exercise ${index + 1} requires at least one performed set.`);
-      return {
+      const occurrence = {
         id: occurrenceId,
         canonicalExerciseId: definition.id,
         name: definition.name,
@@ -567,6 +586,23 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           : null,
         sets,
       };
+      if (exercise.provisionalExercise) {
+        occurrence.resolutionStatus = createsCanonicalDefinition
+          ? "resolved_new_canonical"
+          : "resolved_existing_canonical";
+        if (createsCanonicalDefinition) {
+          occurrence.provisionalExercise = {
+            provisionalExerciseId: `native_${context.payload.sessionId}_${occurrenceId}`,
+            rawSubmittedName: exercise.provisionalExercise.name,
+            normalizedDisplayName: definition.name,
+            resolutionStatus: "resolved_new_canonical",
+            resolutionMode: "new",
+            resolvedCanonicalExerciseId: definition.id,
+            confirmedDefinition: definition,
+          };
+        }
+      }
+      return occurrence;
     });
     const occurrenceIds = new Set(occurrences.map((item) => item.id));
     const exerciseRelationshipGroups = (context.payload.supersets ?? []).map((group, index) => {
