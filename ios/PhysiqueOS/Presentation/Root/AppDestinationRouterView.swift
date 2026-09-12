@@ -8,6 +8,7 @@ import SwiftUI
 /// matter which tab pushed it. A destination without a real screen yet
 /// falls through to the existing `DestinationPlaceholderView`.
 struct AppDestinationRouterView: View {
+    @Environment(AppEnvironment.self) private var environment
     let destination: AppDestination
     var onReturnToLog: () -> Void = {}
     var onReturnToHome: () -> Void = {}
@@ -46,21 +47,37 @@ struct AppDestinationRouterView: View {
         case .manualWeighIn:
             ManualWeighInView(onReturnToLog: onReturnToLog)
         case .evidenceIntake:
-            EvidenceIntakeView(onNavigate: onNavigate)
+            if environment.nativeAuthority == .founderProduction {
+                ProductionEvidenceUploadView(onReturnToLog: onReturnToLog)
+            } else {
+                EvidenceIntakeView(onNavigate: onNavigate)
+            }
         case .photoUpload:
-            EvidenceIntakeView(initialScenario: .progressPhotos, onNavigate: onNavigate)
+            if environment.nativeAuthority == .founderProduction {
+                DestinationPlaceholderView(destination: destination)
+            } else {
+                EvidenceIntakeView(initialScenario: .progressPhotos, onNavigate: onNavigate)
+            }
         case .dexaUpload:
-            EvidenceIntakeView(initialScenario: .dexa, onNavigate: onNavigate)
+            if environment.nativeAuthority == .founderProduction {
+                ProductionEvidenceUploadView(fixedScenario: .dexa, onReturnToLog: onReturnToLog)
+            } else {
+                EvidenceIntakeView(initialScenario: .dexa, onNavigate: onNavigate)
+            }
         case .localEvidenceReview(let reviewId):
             LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog, onNavigate: onNavigate)
         case .evidenceReview(let reviewId):
             EvidenceReviewDetailView(reviewId: reviewId)
         case .evidenceRecoveryUpload(let type, let occurrenceDateKey):
-            EvidenceIntakeView(
-                initialScenario: type.evidenceScenario,
-                initialRecoveryContext: .init(evidenceType: type, occurrenceDateKey: occurrenceDateKey),
-                onNavigate: onNavigate
-            )
+            if environment.nativeAuthority == .founderProduction {
+                DestinationPlaceholderView(destination: destination)
+            } else {
+                EvidenceIntakeView(
+                    initialScenario: type.evidenceScenario,
+                    initialRecoveryContext: .init(evidenceType: type, occurrenceDateKey: occurrenceDateKey),
+                    onNavigate: onNavigate
+                )
+            }
         case .trainingLogger:
             TrainingLoggerView()
         case .trainingSession(let sessionId):

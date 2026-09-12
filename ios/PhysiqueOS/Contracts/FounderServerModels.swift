@@ -366,6 +366,14 @@ enum ProductionNativeError: Error, Sendable, Equatable, LocalizedError {
     case notFound(ProductionProblemDetails?)
     case validation(ProductionProblemDetails)
     case failedPrecondition(ProductionProblemDetails)
+    /// HTTP 428 — a correction-style command omitted `If-Match` entirely
+    /// (`PRECONDITION_REQUIRED`), distinct from `.failedPrecondition`'s 412
+    /// (an `If-Match` was sent but no longer matches canonical state). A
+    /// correctly-behaving Native client should never trigger this — every
+    /// call site that can correct an existing value must always populate
+    /// `expectedVersion` — but it's mapped explicitly rather than falling
+    /// through to `.server` so a real bug here is diagnosable.
+    case preconditionRequired(ProductionProblemDetails)
     case conflict(ProductionProblemDetails)
     case temporaryServer(ProductionProblemDetails?)
     case server(ProductionProblemDetails?)
@@ -381,7 +389,7 @@ enum ProductionNativeError: Error, Sendable, Equatable, LocalizedError {
         case .notPaired: "Connect this iPhone to Founder Production before loading data."
         case .unauthenticated: "The Founder Production session is no longer authenticated."
         case .notFound: "The requested Founder Production resource is unavailable."
-        case .validation(let problem), .failedPrecondition(let problem), .conflict(let problem): problem.title
+        case .validation(let problem), .failedPrecondition(let problem), .preconditionRequired(let problem), .conflict(let problem): problem.title
         case .temporaryServer: "PhysiqueOS is temporarily unavailable."
         case .server(let problem): problem?.title ?? "The Founder Production request failed."
         case .networkFailure: "PhysiqueOS could not be reached. Check the connection and try again."

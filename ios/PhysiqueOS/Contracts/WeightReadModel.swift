@@ -52,6 +52,18 @@ struct WeightReportReadModel: Codable, Equatable {
     var extrema: WeightExtremaContext? = nil
     var dexaContext: WeightDEXAContextSection? = nil
     var page: WeightHistoryPage? = nil
+
+    /// The revision Native must echo back as `If-Match` to correct an
+    /// existing entry on `dateKey` — searches `current`/`recentWeighIns`/
+    /// `history` (in that order, all already decoded from one fetch) for
+    /// an exact date match. `nil` means no canonical entry exists yet for
+    /// that date (a brand-new weigh-in, no `expectedVersion` needed) —
+    /// never guessed or fabricated when absent.
+    func revision(forDateKey dateKey: String) -> Int? {
+        if current?.date == dateKey { return current?.revision }
+        if let match = recentWeighIns?.first(where: { $0.date == dateKey }) { return match.revision }
+        return history.first(where: { $0.date == dateKey })?.revision
+    }
 }
 
 /// `rollingAverages.{threeDay,sevenDay}` — a canonical rolling window the
@@ -165,6 +177,15 @@ struct WeightHistoryEntry: Codable, Equatable, Identifiable {
     var detail: String
     var value: String
     var attributedScope: EvidenceScopeAttribution? = nil
+    /// The canonical `weightEntries` record's Postgres revision — present
+    /// only under Founder Production (`current`/`recentWeighIns`/`history`
+    /// entries there each carry it; Sandbox has no wire equivalent). This
+    /// is the exact value Native must echo back as `If-Match` when
+    /// `weight.submit.v1`/`check-in.submit.v1` corrects an existing
+    /// same-day value — always re-read fresh immediately before
+    /// submitting a correction rather than trusting a cached copy, since
+    /// a web-side edit can bump it without Native's knowledge.
+    var revision: Int? = nil
 }
 
 struct WeightDataSource: Codable, Equatable, Identifiable {

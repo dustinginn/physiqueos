@@ -33,7 +33,7 @@ struct YouPlaceholderView: View {
                         iconKey: "tracking",
                         color: .evidence,
                         title: "Founder device connection",
-                        detail: "Verify the live, read-only server connection"
+                        detail: "Manage the live Founder Production connection"
                     )
                 }
                 .buttonStyle(.plain)

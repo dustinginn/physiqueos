@@ -451,6 +451,50 @@ actor ProductionNativeAPI {
         return ProductionMediaPayload(data: data, contentType: contentType)
     }
 
+    /// `POST /api/v1/native/evidence/intakes` — DEXA PDF / Nutrition &
+    /// Activity screenshot intake (`NativeEvidenceIntakeRequest.js`). The
+    /// server REQUIRES `Idempotency-Key` to equal the `submissionIdentity`
+    /// form field exactly (`IDEMPOTENCY_IDENTITY_MISMATCH` otherwise) and
+    /// validates it as a UUID — always pass a plain `UUID().uuidString`.
+    /// Returns HTTP 202; the artifact is verified/stored synchronously but
+    /// interpretation (producing a `reviewId`) happens asynchronously —
+    /// poll `fetchEvidenceIntakeStatus(intakeId:)`.
+    func submitEvidenceIntake(
+        submissionIdentity: String,
+        effectiveDate: String,
+        expectedEvidenceType: String,
+        files: [(filename: String, contentType: String, data: Data)]
+    ) async throws -> ProductionEvidenceIntakeStatus {
+        let boundary = "PhysiqueOSNativeIntake\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        var body = Data()
+        body.appendMultipartField(name: "submissionIdentity", value: Data(submissionIdentity.utf8), boundary: boundary, contentType: "text/plain")
+        body.appendMultipartField(name: "effectiveDate", value: Data(effectiveDate.utf8), boundary: boundary, contentType: "text/plain")
+        body.appendMultipartField(name: "expectedEvidenceType", value: Data(expectedEvidenceType.utf8), boundary: boundary, contentType: "text/plain")
+        for file in files {
+            body.appendMultipartFile(name: "evidenceFiles", filename: file.filename, contentType: file.contentType, data: file.data, boundary: boundary)
+        }
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        let headers = [
+            "Idempotency-Key": submissionIdentity,
+            "Content-Type": "multipart/form-data; boundary=\(boundary)",
+        ]
+        let path = "\(configuration.routeFamily)/evidence/intakes"
+        let token = try await validAccessToken()
+        var result = try await perform(path: path, method: "POST", body: body, bearer: token, accept: "application/json", headers: headers)
+        if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
+            let refreshedToken = try await refreshAccessToken()
+            result = try await perform(path: path, method: "POST", body: body, bearer: refreshedToken, accept: "application/json", headers: headers)
+        }
+        try validateHTTP(result.1, data: result.0)
+        do { return try decoder.decode(ProductionEvidenceIntakeStatus.self, from: result.0) }
+        catch { throw ProductionNativeError.invalidResponse }
+    }
+
+    func fetchEvidenceIntakeStatus(intakeId: String) async throws -> ProductionEvidenceIntakeStatus {
+        try await authenticatedJSON(path: "\(configuration.routeFamily)/evidence/intakes/\(intakeId)", method: "GET")
+    }
+
     private func validate<Payload>(_ envelope: ProductionResponseEnvelope<Payload>, expectedResource: String) throws {
         guard envelope.contractVersion == Self.contractVersion else {
             throw ProductionNativeError.incompatibleContractVersion(expected: Self.contractVersion, actual: envelope.contractVersion)
@@ -653,6 +697,9 @@ actor ProductionNativeAPI {
         case 412:
             if let problem { throw ProductionNativeError.failedPrecondition(problem) }
             throw ProductionNativeError.server(nil)
+        case 428:
+            if let problem { throw ProductionNativeError.preconditionRequired(problem) }
+            throw ProductionNativeError.server(nil)
         case 409:
             if let problem { throw ProductionNativeError.conflict(problem) }
             throw ProductionNativeError.server(nil)
@@ -667,7 +714,7 @@ actor ProductionNativeAPI {
     }
 }
 
-private extension Data {
+extension Data {
     mutating func appendMultipartField(name: String, value: Data, boundary: String, contentType: String) {
         append("--\(boundary)\r\n".data(using: .utf8)!)
         append("Content-Disposition: form-data; name=\"\(name)\"\r\n".data(using: .utf8)!)

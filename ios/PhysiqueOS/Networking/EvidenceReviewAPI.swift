@@ -38,7 +38,8 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
                 EvidenceReviewDetailItem(
                     id: object.id ?? UUID().uuidString,
                     type: object.evidenceType ?? "evidence",
-                    date: object.observedAt ?? object.date
+                    date: object.observedAt ?? object.date,
+                    dexaMeasurements: object.dexaMeasurements
                 )
             }
         )
@@ -69,5 +70,60 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
         var evidenceType: String?
         var observedAt: String?
         var date: String?
+        var measuredAt: String?
+        var totalMass: MassValue?
+        var bodyFatPercentage: Double?
+        var fatMass: MassValue?
+        var leanMass: MassValue?
+        var boneMineralContent: MassValue?
+        var restingMetabolicRate: MassValue?
+        var visceralAdiposeTissue: VisceralAdiposeTissue?
+
+        /// `applyDexaReviewMeasurements`'s exact stored shape
+        /// (`DexaPdfIntakeService.js`) — only present when `evidenceType`
+        /// is a DEXA scan. Optional throughout: an object that hasn't
+        /// finished interpretation yet (or isn't DEXA at all) simply
+        /// decodes every field to `nil`, never a decode failure.
+        var dexaMeasurements: DEXAScanMeasurements? {
+            guard ["dexa_scan", "dexa", "body_composition"].contains(evidenceType) else { return nil }
+            return DEXAScanMeasurements(
+                measuredAt: measuredAt ?? observedAt ?? date,
+                totalMassLb: totalMass?.value,
+                bodyFatPercentage: bodyFatPercentage,
+                fatMassLb: fatMass?.value,
+                leanMassLb: leanMass?.value,
+                boneMineralContentLb: boneMineralContent?.value,
+                restingMetabolicRateKcal: restingMetabolicRate?.value,
+                visceralAdiposeTissueMassLb: visceralAdiposeTissue?.mass?.value,
+                visceralAdiposeTissueVolumeIn3: visceralAdiposeTissue?.volume?.value
+            )
+        }
     }
+
+    private struct MassValue: Decodable {
+        var value: Double?
+        var unit: String?
+    }
+
+    private struct VisceralAdiposeTissue: Decodable {
+        var mass: MassValue?
+        var volume: MassValue?
+    }
+}
+
+/// `dexa-review.measurements.v1`'s exact input/output shape
+/// (`applyDexaReviewMeasurements`, `DexaPdfIntakeService.js`) — every
+/// field Native must resend on every edit, since the server does a full
+/// replace, not a merge (an omitted field is silently nulled on the
+/// canonical scan, RMR/VAT included).
+struct DEXAScanMeasurements: Equatable, Sendable {
+    var measuredAt: String?
+    var totalMassLb: Double?
+    var bodyFatPercentage: Double?
+    var fatMassLb: Double?
+    var leanMassLb: Double?
+    var boneMineralContentLb: Double?
+    var restingMetabolicRateKcal: Double?
+    var visceralAdiposeTissueMassLb: Double?
+    var visceralAdiposeTissueVolumeIn3: Double?
 }

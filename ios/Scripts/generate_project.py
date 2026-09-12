@@ -64,6 +64,7 @@ app_files = [
     ("Contracts", "TrainingLoggerReadModel.swift"),
     ("Contracts", "LoggingSandbox.swift"),
     ("Contracts", "MorningCheckInModel.swift"),
+    ("Contracts", "MorningCheckInReadModel.swift"),
     ("Contracts", "BriefingReadModel.swift"),
     ("Contracts", "TimelineReadModel.swift"),
     ("Contracts", "EvidenceReviewDetailReadModel.swift"),
@@ -81,6 +82,12 @@ app_files = [
     ("Networking", "ActivityAPI.swift"),
     ("Networking", "NutritionAPI.swift"),
     ("Networking", "WeightEvidenceAPI.swift"),
+    ("Networking", "WeightWriteAPI.swift"),
+    ("Networking", "MorningCheckInAPI.swift"),
+    ("Networking", "ProductionEvidenceIntakePipeline.swift"),
+    ("Networking", "DEXAWriteAPI.swift"),
+    ("Networking", "TrainingWriteAPI.swift"),
+    ("Networking", "DailyEvidenceWriteAPI.swift"),
     ("Networking", "DEXAAPI.swift"),
     ("Networking", "PhotosAPI.swift"),
     ("Networking", "EnergyAPI.swift"),
@@ -233,6 +240,7 @@ app_files = [
     ("Presentation/TrainingLogger", "TrainingLoggerViewModel.swift"),
     ("Presentation/Logging", "ManualWeighInView.swift"),
     ("Presentation/Logging", "EvidenceIntakeView.swift"),
+    ("Presentation/Logging", "ProductionEvidenceUploadView.swift"),
     ("Presentation/Logging", "LocalEvidenceReviewView.swift"),
 ]
 

@@ -56,6 +56,7 @@ struct TrainingLoggerView: View {
         .task(id: environment.nativeAuthority) {
             viewModel = TrainingLoggerViewModel(
                 api: environment.trainingLoggerAPI,
+                writeAPI: environment.trainingWriteAPI,
                 draftStore: environment.trainingLoggerDraftStore,
                 authority: environment.nativeAuthority
             )
@@ -215,7 +216,8 @@ struct TrainingLoggerView: View {
             }
 
             if viewModel.savedDraft != nil {
-                CardContainer {
+                if viewModel.authority == .sandbox {
+                    CardContainer {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Saved workout")
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
@@ -228,6 +230,7 @@ struct TrainingLoggerView: View {
                         Button("Discard saved draft", role: .destructive) { viewModel.discardSavedDraft() }
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     }
+                }
                 }
             }
 
@@ -780,8 +783,9 @@ struct TrainingLoggerView: View {
                     }
                 }
 
-                CardContainer {
-                    VStack(alignment: .leading, spacing: 12) {
+                if viewModel.authority == .sandbox {
+                    CardContainer {
+                        VStack(alignment: .leading, spacing: 12) {
                         Text("Supporting Apple Health screenshots")
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                         Text("Optional · attach screenshots from the matching Apple Health workout.")
@@ -847,6 +851,7 @@ struct TrainingLoggerView: View {
                             }
                             .accessibilityIdentifier("trainingLogger.supportingWorkout.failed.\(asset.id)")
                         }
+                        }
                     }
                 }
             }
@@ -862,7 +867,13 @@ struct TrainingLoggerView: View {
 
     private func review(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            loggerHeader(eyebrow: "Final Confirmation", title: "Finish this workout?", subtitle: "Confirm the workout and any supporting screenshots together.")
+            loggerHeader(
+                eyebrow: "Final Confirmation",
+                title: "Finish this workout?",
+                subtitle: viewModel.authority == .founderProduction
+                    ? "Confirm the canonical exercises and performed sets."
+                    : "Confirm the workout and any supporting screenshots together."
+            )
             CardContainer {
                 VStack(alignment: .leading, spacing: 10) {
                     Label("Workout ready", systemImage: "checkmark.circle")
@@ -871,22 +882,32 @@ struct TrainingLoggerView: View {
                     if let draft = viewModel.draft {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(draft.exercises.count) exercises · \(draft.completedSetCount) completed sets")
-                            if !draft.supportingWorkoutObservations.isEmpty {
+                            if viewModel.authority == .sandbox, !draft.supportingWorkoutObservations.isEmpty {
                                 Text("\(draft.supportingWorkoutObservations.count) supporting cardio workout\(draft.supportingWorkoutObservations.count == 1 ? "" : "s")")
                             }
-                            Text(draft.supportingEvidenceAssets.isEmpty ? "No supporting screenshots attached" : "\(draft.supportingEvidenceAssets.count) supporting screenshot\(draft.supportingEvidenceAssets.count == 1 ? "" : "s") attached")
+                            if viewModel.authority == .sandbox {
+                                Text(draft.supportingEvidenceAssets.isEmpty ? "No supporting screenshots attached" : "\(draft.supportingEvidenceAssets.count) supporting screenshot\(draft.supportingEvidenceAssets.count == 1 ? "" : "s") attached")
+                            }
                         }
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
-                    if viewModel.draft?.exercises.contains(where: \.isProvisional) == true {
+                    if viewModel.authority == .sandbox, viewModel.draft?.exercises.contains(where: \.isProvisional) == true {
                         Text("New exercises will remain attached to this workout.")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                             .foregroundStyle(PhysiqueOSTheme.chartEffort)
                     }
                 }
             }
-            PrimaryActionButton(title: "Finish Workout") { viewModel.completeLocalCapture() }
+            if let message = viewModel.validationMessage {
+                Text(message)
+                    .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
+                    .foregroundStyle(PhysiqueOSTheme.destructive)
+            }
+            PrimaryActionButton(title: viewModel.isSubmitting ? "Saving…" : "Finish Workout") {
+                Task { await viewModel.submit() }
+            }
+                .disabled(viewModel.isSubmitting)
                 .accessibilityIdentifier("trainingLogger.completeLocal")
             secondaryButton("Back to Workout Review") { viewModel.go(to: .summary) }
         }

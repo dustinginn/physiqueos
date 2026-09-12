@@ -74,7 +74,9 @@ final class TrainingAcceptanceUITests: XCTestCase {
         assertText("Wednesday, August 26")
         attachScreenshot("09-recent-training-history-show-all")
 
-        tapText("Wednesday, August 26")
+        let august26 = app.staticTexts["Wednesday, August 26"].firstMatch
+        XCTAssertTrue(august26.waitForExistence(timeout: 3) && august26.isHittable, "Training history date was not actionable.")
+        august26.tap()
         assertText("TRAINING DAY")
         assertText("Aug 26, 2026")
         attachScreenshot("10-training-day")
@@ -88,6 +90,8 @@ final class TrainingAcceptanceUITests: XCTestCase {
         let editor = app.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 3), "Correction editor was not reachable.")
         editor.tap()
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 1) { editor.tap() }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 2), "The correction editor did not receive keyboard focus.")
         editor.typeText("Cable row\n12 x 100 lb")
         let done = app.buttons["Done"]
         XCTAssertTrue(done.waitForExistence(timeout: 3), "The correction editor keyboard dismissal control was missing.")

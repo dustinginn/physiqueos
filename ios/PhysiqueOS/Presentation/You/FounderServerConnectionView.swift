@@ -375,12 +375,12 @@ private struct ProductionFounderConnectionView: View {
             VStack(alignment: .leading, spacing: 18) {
                 OperatingPlanScreenHeader(
                     eyebrow: "FOUNDER PRODUCTION",
-                    title: "Production read-only connection",
-                    subtitle: "Pair this iPhone with Founder Production, then verify Profile, Contracts, and canonical Weight reads. Product writes remain disabled."
+                    title: "Founder Production connection",
+                    subtitle: "Pair this iPhone at runtime for canonical reads and the accepted Weight, Check-In, Training, Nutrition, manual Activity, and DEXA write flows. Unsupported writes remain blocked."
                 )
 
                 StatusChip(
-                    text: isConnected ? "Production session available · read-only" : "Not connected",
+                    text: isConnected ? "Production session available" : "Not connected",
                     color: isConnected ? .success : .warning
                 )
 
@@ -424,7 +424,7 @@ private struct ProductionFounderConnectionView: View {
                     readResultCard(
                         title: "Contracts",
                         value: "v\(contracts.contractVersion)",
-                        detail: "\(contracts.reads.count) reads advertised · application remains read-only"
+                        detail: "\(contracts.reads.count) reads advertised · bounded Native write guard active"
                     )
                 }
 

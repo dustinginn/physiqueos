@@ -85,38 +85,27 @@ enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
     /// stays reserved for a future general Evidence Review accept/reject
     /// UI, which this build does not add.
     ///
-    /// EVERY domain in this task's requested scope was found blocked by a
-    /// genuine, confirmed server-side gap during the Daily Driver Write
-    /// Build investigation — none are enabled. Per this task's own "STOP
-    /// on that domain and report the smallest server correction required"
-    /// rule, this is left empty rather than shipping any write path known
-    /// to silently fail, corrupt read/write identity, or bypass the real
-    /// canonical-commit pipeline. See the task's final report for the
-    /// full per-domain findings and the specific server fix each needs:
-    /// - `.morningCheckInAndWeight`: `submitWeight` writes a different
-    ///   weight-entry id scheme than the web's own weigh-in, with no
-    ///   correction path.
-    /// - `.priorityCompletion`: `completePriority` writes to the wrong
-    ///   canonical collection (`executionItems` instead of `reminders`,
-    ///   which is all the read side ever consults) — 500s or silently
-    ///   no-ops, never shows as completed.
-    /// - `.workoutLogger`: `createTrainingSession`/`correctTrainingSession`/
-    ///   `completeTrainingLogger` write to `trainingPerformanceEvents`, a
-    ///   collection completely disconnected from every Training read view.
-    /// - `.nutrition` / `.activityEvidence`: the screenshot/manual evidence
-    ///   intake pipeline (`CREATE_EVIDENCE_INTAKE` → interpretation →
-    ///   confirm) is a disconnected stub with no media upload endpoint and
-    ///   no interpretation trigger; `CONFIRM_NUTRITION`/`CONFIRM_PHOTO`/
-    ///   `CONFIRM_DEXA`/`CONFIRM_EVIDENCE_REVIEW` are all the same one-line
-    ///   status-flip stub that never performs the real canonical commit.
-    ///   The direct `UPSERT_NUTRITION_DAY`/`SYNC_ACTIVITY_DAY` commands ARE
-    ///   real for a first-time day, but corrections 500 (a required
-    ///   `expectedSemanticFingerprint` isn't exposed on any read model),
-    ///   and neither matches the task's required "existing Native logging
-    ///   workflow."
-    /// - `.dexa`: no direct-write command exists at all; `CONFIRM_DEXA` is
-    ///   the same inert stub — not ready for tomorrow's scan.
-    static let enabledUnderFounderProduction: Set<NativeProductWriteDomain> = []
+    /// A prior pass (server authority `67267032`'s predecessor) found
+    /// EVERY domain blocked by a genuine server-side gap and shipped none
+    /// of them. Server commit `67267032` ("Add canonical Native production
+    /// writes") fixed the write architecture: a real eight-command
+    /// allowlist, correct canonical collections, the same persistence
+    /// services the web app uses, and a working async evidence-intake
+    /// pipeline. `.priorityCompletion` remains excluded — investigation
+    /// confirmed `priority.complete.v1` requires `If-Match` on every first
+    /// completion (not just corrections), and no read resource anywhere
+    /// exposes the `reminders` record's version needed to supply it; see
+    /// the task's final report for the exact server fix needed (expose
+    /// that version on the `priority`/`home` read resources, mirroring the
+    /// precedent already set for Weight's `current.revision` and
+    /// Training's `HistorySession.revision`).
+    static let enabledUnderFounderProduction: Set<NativeProductWriteDomain> = [
+        .morningCheckInAndWeight,
+        .workoutLogger,
+        .nutrition,
+        .activityEvidence,
+        .dexa,
+    ]
 }
 
 enum NativeWriteGuardError: Error, Equatable {
@@ -194,7 +183,12 @@ final class AppEnvironment {
     /// today's fixture-only screens call it directly.
     private let sandboxPriorityAPI: PriorityAPI
     private let sandboxTrainingLoggerAPI: TrainingLoggerAPI
-    let trainingLoggerDraftStore: TrainingLoggerDraftStore
+    private let sandboxTrainingLoggerDraftStore: TrainingLoggerDraftStore
+    private let founderProductionTrainingLoggerDraftStore: TrainingLoggerDraftStore
+
+    var trainingLoggerDraftStore: TrainingLoggerDraftStore {
+        nativeAuthority == .founderProduction ? founderProductionTrainingLoggerDraftStore : sandboxTrainingLoggerDraftStore
+    }
     let loggingSandboxStore: LoggingSandboxStore
     let operatingPlanStore: OperatingPlanSandboxStore
     let goalsSandboxStore: GoalsSandboxStore
@@ -209,12 +203,70 @@ final class AppEnvironment {
     let productionNativeAPI: ProductionNativeAPI
     let founderPhotoMediaStore: FounderPhotoMediaStore
     let founderProductionPhotoMediaStore: FounderProductionPhotoMediaStore
+    /// Shared across every Production write domain — see
+    /// `ProductionIdempotencyKeyStore`'s doc comment.
+    let productionIdempotencyKeyStore: ProductionIdempotencyKeyStore
 
     var weightEvidenceAPI: WeightEvidenceAPI {
         switch nativeAuthority {
         case .sandbox: sandboxWeightEvidenceAPI
         case .founderProduction: productionWeightEvidenceAPI
         }
+    }
+
+    /// `.morningCheckInAndWeight` is enabled — see
+    /// `NativeProductWriteDomain.enabledUnderFounderProduction`. Sandbox
+    /// never calls this seam (Weight/Morning Check-In views write straight
+    /// into `loggingSandboxStore` under Sandbox, matching every other
+    /// domain's established pattern) — `NotAvailableWeightWriteAPI` exists
+    /// only so the property is total.
+    var weightWriteAPI: WeightWriteAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableWeightWriteAPI()
+        case .founderProduction: ProductionWeightWriteAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
+        }
+    }
+
+    var morningCheckInAPI: MorningCheckInAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableMorningCheckInAPI()
+        case .founderProduction: ProductionMorningCheckInAPI(api: productionNativeAPI)
+        }
+    }
+
+    var dexaWriteAPI: DEXAWriteAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableDEXAWriteAPI()
+        case .founderProduction: ProductionDEXAWriteAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
+        }
+    }
+
+    var trainingWriteAPI: TrainingWriteAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableTrainingWriteAPI()
+        case .founderProduction:
+            ProductionTrainingWriteAPI(
+                api: productionNativeAPI,
+                reviewAPI: ProductionEvidenceReviewAPI(api: productionNativeAPI),
+                idempotencyStore: productionIdempotencyKeyStore
+            )
+        }
+    }
+
+    var dailyEvidenceWriteAPI: DailyEvidenceWriteAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableDailyEvidenceWriteAPI()
+        case .founderProduction:
+            ProductionDailyEvidenceWriteAPI(
+                api: productionNativeAPI,
+                idempotencyStore: productionIdempotencyKeyStore,
+                revisionStore: ProductionDailyEvidenceRevisionStore()
+            )
+        }
+    }
+
+    var evidenceIntakePipeline: ProductionEvidenceIntakePipeline {
+        ProductionEvidenceIntakePipeline(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
     }
 
     var homeAPI: HomeAPI {
@@ -325,6 +377,7 @@ final class AppEnvironment {
         priorityAPI: PriorityAPI = FixturePriorityAPI(),
         trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
+        founderProductionTrainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(key: "physiqueos.founder-production.trainingLogger.localDraft.v1"),
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
         operatingPlanStore: OperatingPlanSandboxStore = OperatingPlanSandboxStore(),
         goalsSandboxStore: GoalsSandboxStore = GoalsSandboxStore(),
@@ -349,7 +402,8 @@ final class AppEnvironment {
         self.sandboxEnergyAPI = energyAPI
         self.sandboxPriorityAPI = priorityAPI
         self.sandboxTrainingLoggerAPI = trainingLoggerAPI
-        self.trainingLoggerDraftStore = trainingLoggerDraftStore
+        self.sandboxTrainingLoggerDraftStore = trainingLoggerDraftStore
+        self.founderProductionTrainingLoggerDraftStore = founderProductionTrainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore
         self.operatingPlanStore = operatingPlanStore
         self.goalsSandboxStore = goalsSandboxStore
@@ -358,6 +412,7 @@ final class AppEnvironment {
         self.productionNativeAPI = productionNativeAPI
         self.founderPhotoMediaStore = founderPhotoMediaStore ?? FounderPhotoMediaStore(api: founderServerAPI)
         self.founderProductionPhotoMediaStore = FounderProductionPhotoMediaStore(api: productionNativeAPI)
+        self.productionIdempotencyKeyStore = ProductionIdempotencyKeyStore()
     }
 
     func selectNativeAuthority(_ authority: NativeAPIEnvironment) {

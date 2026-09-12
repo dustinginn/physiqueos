@@ -43,6 +43,10 @@ struct UploadCardView: View {
                     }
 
                     EvidenceSourceMenu { option in
+                        if environment.nativeAuthority == .founderProduction {
+                            onNavigate(.evidenceIntake)
+                            return
+                        }
                         prepareDraftDateIfNeeded()
                         switch option {
                         case .photos: isPhotosPickerPresented = true
@@ -80,7 +84,7 @@ struct UploadCardView: View {
                     }
                     .buttonStyle(.plain)
 
-                    if store.evidenceDraft.hasContent {
+                    if environment.nativeAuthority == .sandbox, store.evidenceDraft.hasContent {
                         Button { onNavigate(.evidenceIntake) } label: {
                             HStack(spacing: 7) {
                                 Image(systemName: "doc.text.fill")

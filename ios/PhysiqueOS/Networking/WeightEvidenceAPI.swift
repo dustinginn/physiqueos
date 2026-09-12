@@ -189,7 +189,7 @@ struct ProductionWeightEvidenceAPI: WeightEvidenceAPI {
         var detail: String
 
         var readModel: WeightHistoryEntry {
-            WeightHistoryEntry(id: id, date: date, detail: detail, value: label, attributedScope: nil)
+            WeightHistoryEntry(id: id, date: date, detail: detail, value: label, attributedScope: nil, revision: revision)
         }
     }
 

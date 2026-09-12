@@ -10,6 +10,7 @@ final class TrainingLoggerViewModel {
     }
 
     private let api: TrainingLoggerAPI
+    private let writeAPI: TrainingWriteAPI
     private let draftStore: TrainingLoggerDraftStore
     let authority: NativeAPIEnvironment
 
@@ -20,13 +21,16 @@ final class TrainingLoggerViewModel {
     var searchText = ""
     var isBrowsingAllExercises = false
     var validationMessage: String?
+    var isSubmitting = false
 
     init(
         api: TrainingLoggerAPI,
+        writeAPI: TrainingWriteAPI = NotAvailableTrainingWriteAPI(),
         draftStore: TrainingLoggerDraftStore,
         authority: NativeAPIEnvironment = .sandbox
     ) {
         self.api = api
+        self.writeAPI = writeAPI
         self.draftStore = draftStore
         self.authority = authority
     }
@@ -131,6 +135,24 @@ final class TrainingLoggerViewModel {
         self.draft = draft
         draftStore.discard()
         savedDraft = nil
+    }
+
+    func submit() async {
+        guard canWrite, let draft, !isSubmitting else { return }
+        guard authority == .founderProduction else {
+            completeLocalCapture()
+            return
+        }
+        isSubmitting = true
+        validationMessage = nil
+        defer { isSubmitting = false }
+        do {
+            _ = try await writeAPI.commit(draft)
+            configuration = try await api.fetchConfiguration()
+            completeLocalCapture()
+        } catch {
+            validationMessage = (error as? LocalizedError)?.errorDescription ?? "This workout could not be saved."
+        }
     }
 
     func persist() {

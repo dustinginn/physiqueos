@@ -312,25 +312,27 @@ final class FounderServerAPITests: XCTestCase {
     /// Daily Driver Write Build: the guard moved from a blanket authority
     /// check to per-domain enablement — a real, contained mechanism ready
     /// for whichever domains a future patch enables. But this task's own
-    /// server investigation found EVERY requested domain blocked by a
-    /// genuine, confirmed server-side gap (see `enabledUnderFounderProduction`'s
-    /// doc comment and this task's final report for specifics: Weight's
-    /// divergent id scheme, Priority's wrong canonical collection, Workout
-    /// Logger's disconnected-from-every-read-view collection, the
-    /// evidence-intake pipeline's missing media upload/interpretation
-    /// trigger and inert confirm stubs, DEXA's complete absence of a real
-    /// write path) — so the enabled set stays empty and Founder Production
-    /// remains fully read-only, same as before this task. This regression
-    /// test proves Sandbox stays unconditionally permitted while Founder
-    /// Production denies every domain.
+    /// The deployed canonical command boundary enables only the accepted
+    /// Daily Driver write domains. Sandbox remains independently writable.
     func testFounderProductionWriteGuardEnablesOnlyTheAcceptedDailyDriverDomainsAndSandboxRemainsIsolated() throws {
-        XCTAssertTrue(NativeProductWriteDomain.enabledUnderFounderProduction.isEmpty)
+        XCTAssertEqual(
+            NativeProductWriteDomain.enabledUnderFounderProduction,
+            [.morningCheckInAndWeight, .workoutLogger, .nutrition, .activityEvidence, .dexa]
+        )
         for domain in NativeProductWriteDomain.allCases {
-            XCTAssertThrowsError(try NativeProductWriteGuard.authorize(domain, in: .founderProduction)) { error in
-                XCTAssertEqual(error as? NativeWriteGuardError, .productionReadOnly(domain))
+            if NativeProductWriteDomain.enabledUnderFounderProduction.contains(domain) {
+                XCTAssertNoThrow(try NativeProductWriteGuard.authorize(domain, in: .founderProduction), "\(domain) should be enabled under Founder Production")
+            } else {
+                XCTAssertThrowsError(try NativeProductWriteGuard.authorize(domain, in: .founderProduction)) { error in
+                    XCTAssertEqual(error as? NativeWriteGuardError, .productionReadOnly(domain))
+                }
             }
             XCTAssertNoThrow(try NativeProductWriteGuard.authorize(domain, in: .sandbox))
         }
+        // Regression: .priorityCompletion stays denied even after this
+        // pass — no read resource exposes the reminders version its
+        // `If-Match` precondition requires on every first completion.
+        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
     }
 
     @MainActor
@@ -658,7 +660,7 @@ final class FounderServerAPITests: XCTestCase {
             XCTAssertEqual(error as? ProductionDailyDriverError,
                            .unknownCanonicalExerciseArea(exerciseID: "canonical-unknown", muscleGroupID: "Unmapped Muscle"))
         }
-        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.workoutLogger, in: .founderProduction))
+        XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.workoutLogger, in: .founderProduction))
     }
 
     func testProductionTrainingExerciseUsesCanonicalCatalogAndServerPerformanceRecords() async throws {
@@ -752,8 +754,8 @@ final class FounderServerAPITests: XCTestCase {
             XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems,
                            [URLQueryItem(name: "context", value: "all")])
         }
-        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.nutrition, in: .founderProduction))
-        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.activityEvidence, in: .founderProduction))
+        XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.nutrition, in: .founderProduction))
+        XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.activityEvidence, in: .founderProduction))
     }
 
     func testProductionEnergyUsesFinishedServerReportPreservingMissingZeroPartialAndWeeklyValues() async throws {
@@ -1385,6 +1387,361 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(report.history.first?.value, "167.2 lb")
         let requestCount = await transport.requests.count
         XCTAssertEqual(requestCount, 3)
+    }
+
+    // MARK: - Daily Driver Write Build: production commands
+
+    func testProductionSubmitWeightSendsIdempotencyKeyUUIDv7CommandIdAndDecodesResult() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionCommandOutcomeJSON(result: #"{"status":"committed","weightId":"weight_2026_09_11","weightRevision":1,"checkInId":null,"checkInRevision":null,"analysisId":null,"intendedDate":"2026-09-11","goalIds":[],"continuationWorkItemIds":[]}"#)),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionWeightWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        let result = try await writeAPI.submitWeight(localDate: "2026-09-11", value: 168.4, expectedVersion: nil)
+
+        XCTAssertEqual(result.status, "committed")
+        XCTAssertEqual(result.weightRevision, 1)
+        let requests = await transport.requests
+        let commandRequest = requests[1]
+        XCTAssertEqual(commandRequest.url?.path, "/api/v1/native/commands")
+        let idempotencyKey = commandRequest.value(forHTTPHeaderField: "Idempotency-Key")
+        XCTAssertNotNil(idempotencyKey)
+        XCTAssertNil(commandRequest.value(forHTTPHeaderField: "If-Match"))
+        let body = try XCTUnwrap(commandRequest.httpBody)
+        let decoded = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        XCTAssertEqual(decoded?["commandType"] as? String, "weight.submit.v1")
+        let metadata = decoded?["metadata"] as? [String: Any]
+        XCTAssertEqual(metadata?["idempotencyKey"] as? String, idempotencyKey)
+        let commandId = try XCTUnwrap(metadata?["commandId"] as? String)
+        XCTAssertTrue(isUUIDv7(commandId), "commandId '\(commandId)' must be a real UUIDv7")
+        let payload = decoded?["payload"] as? [String: Any]
+        XCTAssertEqual(payload?["localDate"] as? String, "2026-09-11")
+        XCTAssertEqual(payload?["value"] as? Double, 168.4)
+    }
+
+    func testProductionSubmitWeightSendsIfMatchWhenExpectedVersionProvided() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionCommandOutcomeJSON(result: #"{"status":"committed","weightId":"weight_2026_09_11","weightRevision":2,"checkInId":null,"checkInRevision":null,"analysisId":null,"intendedDate":"2026-09-11","goalIds":[],"continuationWorkItemIds":[]}"#)),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionWeightWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        _ = try await writeAPI.submitWeight(localDate: "2026-09-11", value: 169.0, expectedVersion: "1")
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"1\"")
+    }
+
+    func testProductionMorningCheckInPreservesServerOccurrenceIdentityAndRevision() async throws {
+        let result = #"{"status":"committed","weightId":"weight_2026_09_11","weightRevision":2,"checkInId":"check-in-1","checkInRevision":1,"analysisId":null,"intendedDate":"2026-09-11","goalIds":["goal-1"],"continuationWorkItemIds":[]}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionCommandOutcomeJSON(result: result)),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionWeightWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        _ = try await writeAPI.submitMorningCheckIn(
+            localDate: "2026-09-11",
+            value: 168.4,
+            expectedVersion: "1",
+            reconciliationSubmissions: [MorningCheckInReconciliationSubmission(
+                priorityId: "priority-1",
+                occurrenceDate: "2026-09-10",
+                occurrenceKey: "server-owned-occurrence-key",
+                disposition: "completed",
+                note: "Done"
+            )]
+        )
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"1\"")
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        XCTAssertEqual(json["commandType"] as? String, "check-in.submit.v1")
+        let payload = try XCTUnwrap(json["payload"] as? [String: Any])
+        let submissions = try XCTUnwrap(payload["reconciliationSubmissions"] as? [[String: Any]])
+        XCTAssertEqual(submissions.first?["occurrenceKey"] as? String, "server-owned-occurrence-key")
+        XCTAssertEqual(submissions.first?["priorityId"] as? String, "priority-1")
+    }
+
+    func testProductionSubmitWeightMapsStaleVersionAndPreconditionRequired() async throws {
+        for (status, code): (Int, String) in [(412, "STALE_VERSION"), (428, "PRECONDITION_REQUIRED")] {
+            let transport = SequencedFounderTransport([
+                .json(200, sessionJSON(access: "a", refresh: "r")),
+                .json(status, productionProblemJSON(status: status, code: code)),
+            ])
+            let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+            _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+            let writeAPI = ProductionWeightWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+            await XCTAssertThrowsErrorAsync(try await writeAPI.submitWeight(localDate: "2026-09-11", value: 169.0, expectedVersion: "1")) { error in
+                switch (status, error as? ProductionNativeError) {
+                case (412, .failedPrecondition(let problem)): XCTAssertEqual(problem.code, "STALE_VERSION")
+                case (428, .preconditionRequired(let problem)): XCTAssertEqual(problem.code, "PRECONDITION_REQUIRED")
+                default: XCTFail("Unexpected error for status \(status): \(String(describing: error))")
+                }
+            }
+        }
+    }
+
+    /// A retry of the exact same logical write (same date/value) MUST
+    /// reuse the same idempotency key so the server's own command-receipt
+    /// replay — not a second client-generated key — is what prevents a
+    /// duplicate mutation. A genuinely different value mints a fresh key.
+    func testProductionIdempotencyKeyStoreReusesKeyOnlyForIdenticalSignature() {
+        let store = ProductionIdempotencyKeyStore(defaults: Self.freshDefaults())
+        let firstKey = store.resolvedKey(scope: "weight-submit.2026-09-11", signature: "weight.submit.v1\u{1F}2026-09-11\u{1F}168.4\u{1F}")
+        let retryKey = store.resolvedKey(scope: "weight-submit.2026-09-11", signature: "weight.submit.v1\u{1F}2026-09-11\u{1F}168.4\u{1F}")
+        let correctionKey = store.resolvedKey(scope: "weight-submit.2026-09-11", signature: "weight.submit.v1\u{1F}2026-09-11\u{1F}169.0\u{1F}")
+
+        XCTAssertEqual(firstKey, retryKey)
+        XCTAssertNotEqual(firstKey, correctionKey)
+    }
+
+    func testProductionMorningCheckInReadDecodesCanonicalOccurrenceIdentity() async throws {
+        let body = #"{"contractVersion":"1","resource":"morning-check-in","authority":"founder-production","generatedAt":"2026-09-11T12:00:00.000Z","data":{"today":"2026-09-11","existingWeight":168.4,"previousWeight":168.8,"reconciliationItems":[{"id":"reminder-1","occurrenceKey":"reminder-1:2026-09-10","date":"2026-09-10","title":"Train","context":"Phase 2","kind":"execution"}]}}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, body)])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let result = try await ProductionMorningCheckInAPI(api: api).fetchMorningCheckIn()
+
+        XCTAssertEqual(result.today, "2026-09-11")
+        XCTAssertEqual(result.unfinishedPriorities.first?.id, "reminder-1")
+        XCTAssertEqual(result.unfinishedPriorities.first?.occurrenceKey, "reminder-1:2026-09-10")
+    }
+
+    func testProductionTrainingCommitUsesCanonicalIDsAndWaitsForConfirmedOutcome() async throws {
+        let result = #"{"status":"confirmation_requested","reviewId":"review-1","reviewRevision":1,"sessionId":"native-session-1","intendedDate":"2026-09-11","exerciseIds":["barbell_bench_press"]}"#
+        let response = #"{"outcome":"committed","receipt":{"status":"committed","result":"# + result + #", "operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"},"confirmation":{"state":"confirmed","reviewId":"review-1","continuationKey":null,"completedStep":"complete","publication":null}}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, response)])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionTrainingWriteAPI(
+            api: api,
+            reviewAPI: NotAvailableEvidenceReviewAPI(),
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults())
+        )
+        let draft = TrainingLoggerDraft(
+            id: "native-session-1", mode: .live, workoutDate: "2026-09-11", selectedAreaIds: ["chest"],
+            exercises: [TrainingLoggerDraftExercise(
+                id: "occurrence-1", canonicalExerciseId: "barbell_bench_press", name: "Barbell Bench Press",
+                areaId: "chest", measurement: .repsLoad, executionVariant: nil,
+                sets: [TrainingLoggerDraftSet(id: "set-1", setNumber: 1, reps: 8, load: 185, durationSeconds: nil, isCompleted: true)],
+                previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
+                isProvisional: false, provenance: nil
+            )],
+            relationships: [], step: .review, exercisePickerReturnStep: nil,
+            exercisePickerExistingExerciseIds: nil, supportingEvidence: nil, supportingWorkouts: nil,
+            supportingWorkoutFailureAssetIds: nil
+        )
+
+        let committed = try await writeAPI.commit(draft)
+
+        XCTAssertEqual(committed.exerciseIds, ["barbell_bench_press"])
+        let requests = await transport.requests
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        XCTAssertEqual(json["commandType"] as? String, "training-session.commit.v1")
+        let payload = try XCTUnwrap(json["payload"] as? [String: Any])
+        let exercises = try XCTUnwrap(payload["exercises"] as? [[String: Any]])
+        XCTAssertEqual(exercises.first?["canonicalExerciseId"] as? String, "barbell_bench_press")
+        XCTAssertEqual((exercises.first?["sets"] as? [[String: Any]])?.first?["unit"] as? String, "lb")
+    }
+
+    func testProductionTrainingCommitRejectsFixtureOnlyIdentityBeforeNetwork() async throws {
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r"))])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionTrainingWriteAPI(api: api, reviewAPI: NotAvailableEvidenceReviewAPI(), idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let draft = TrainingLoggerDraft(
+            id: "session", mode: .past, workoutDate: "2026-09-10", selectedAreaIds: ["chest"],
+            exercises: [TrainingLoggerDraftExercise(
+                id: "occurrence", canonicalExerciseId: nil, name: "Fixture-only exercise", areaId: "chest",
+                measurement: .repsLoad, executionVariant: nil,
+                sets: [TrainingLoggerDraftSet(id: "set", setNumber: 1, reps: 8, load: 100, durationSeconds: nil, isCompleted: true)],
+                previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil, isProvisional: true, provenance: nil
+            )], relationships: [], step: .review, exercisePickerReturnStep: nil, exercisePickerExistingExerciseIds: nil,
+            supportingEvidence: nil, supportingWorkouts: nil, supportingWorkoutFailureAssetIds: nil
+        )
+
+        await XCTAssertThrowsErrorAsync(try await writeAPI.commit(draft)) { error in
+            XCTAssertEqual(error as? TrainingWriteError, .missingCanonicalExercise("Fixture-only exercise"))
+        }
+        let requestCount = await transport.requests.count
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    func testProductionNutritionWriteUsesFullDayReplacementAndPersistsReturnedFingerprint() async throws {
+        let result = #"{"status":"source_committed_work_enqueued","canonicalId":"nutrition|2026-09-11|nutrition-day","revision":1,"recordVersion":1,"semanticFingerprint":"sha256_first","intendedDate":"2026-09-11","goalId":"goal-1","phaseId":"phase-1","continuationWorkItemIds":[],"lowerLevelWorkItemIds":[]}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, productionCommandOutcomeJSON(result: result))])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let defaults = Self.freshDefaults()
+        let revisions = ProductionDailyEvidenceRevisionStore(defaults: defaults)
+        let writeAPI = ProductionDailyEvidenceWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults), revisionStore: revisions)
+
+        let output = try await writeAPI.upsertNutrition(
+            NutritionDayWrite(localDate: "2026-09-11", calories: 2400, proteinG: 190, carbsG: nil, fatG: nil, fiberG: nil),
+            existingDayPresent: false
+        )
+
+        XCTAssertEqual(output.semanticFingerprint, "sha256_first")
+        XCTAssertEqual(revisions.fingerprint(domain: "nutrition", date: "2026-09-11"), "sha256_first")
+        let requests = await transport.requests
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        let payload = try XCTUnwrap(json["payload"] as? [String: Any])
+        let totals = try XCTUnwrap(payload["dailyTotals"] as? [String: Any])
+        XCTAssertEqual(totals["protein_g"] as? Double, 190)
+        XCTAssertEqual((payload["source"] as? [String: String])?["modality"], "typed")
+    }
+
+    func testProductionTypedDailyCorrectionWithoutCanonicalFingerprintFailsClosed() async throws {
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r"))])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let defaults = Self.freshDefaults()
+        let writeAPI = ProductionDailyEvidenceWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults), revisionStore: ProductionDailyEvidenceRevisionStore(defaults: defaults))
+
+        await XCTAssertThrowsErrorAsync(try await writeAPI.upsertActivity(
+            ActivityDayWrite(localDate: "2026-09-11", activeCalories: 700, totalCalories: nil, exerciseMinutes: nil, standHours: nil, moveGoal: nil),
+            existingDayPresent: true
+        )) { error in
+            XCTAssertEqual(error as? DailyEvidenceWriteError, .missingCorrectionFingerprint(domain: "Activity", date: "2026-09-11"))
+        }
+        let requestCount = await transport.requests.count
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    func testProductionActivityWriteDeclaresManualSourceAndNeverHealthKit() async throws {
+        let result = #"{"status":"changed","canonicalId":"activity_day|2026-09-11","revision":1,"recordVersion":1,"semanticFingerprint":"sha256_activity","intendedDate":"2026-09-11","goalId":"goal-1","phaseId":"phase-1","continuationWorkItemIds":[],"lowerLevelWorkItemIds":[]}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, productionCommandOutcomeJSON(result: result))])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let defaults = Self.freshDefaults()
+        let writeAPI = ProductionDailyEvidenceWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults), revisionStore: ProductionDailyEvidenceRevisionStore(defaults: defaults))
+
+        _ = try await writeAPI.upsertActivity(
+            ActivityDayWrite(localDate: "2026-09-11", activeCalories: 700, totalCalories: 2800, exerciseMinutes: 45, standHours: 12, moveGoal: 650),
+            existingDayPresent: false
+        )
+
+        let requests = await transport.requests
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        let payload = try XCTUnwrap(json["payload"] as? [String: Any])
+        XCTAssertEqual((payload["source"] as? [String: String])?["modality"], "manual")
+        XCTAssertFalse(String(data: try XCTUnwrap(requests[1].httpBody), encoding: .utf8)?.localizedCaseInsensitiveContains("healthkit") == true)
+    }
+
+    func testProductionDEXAEditSendsFullReplacementAndStableRetryIdentity() async throws {
+        let result = #"{"status":"updated","reviewId":"review-1","revision":3,"updatedAt":"2026-09-11T12:00:00.000Z"}"#
+        let response = productionCommandOutcomeJSON(result: result)
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, response), .json(200, response)])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionDEXAWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let measurements = DEXAScanMeasurements(
+            measuredAt: "2026-09-11", totalMassLb: 170, bodyFatPercentage: 14,
+            fatMassLb: 23.8, leanMassLb: 140, boneMineralContentLb: 6.2,
+            restingMetabolicRateKcal: nil, visceralAdiposeTissueMassLb: nil,
+            visceralAdiposeTissueVolumeIn3: nil
+        )
+
+        _ = try await writeAPI.editMeasurements(reviewId: "review-1", evidenceObjectId: "dexa-1", expectedVersion: "2", measurements: measurements)
+        _ = try await writeAPI.editMeasurements(reviewId: "review-1", evidenceObjectId: "dexa-1", expectedVersion: "2", measurements: measurements)
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"2\"")
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        let payload = try XCTUnwrap(json["payload"] as? [String: Any])
+        let sent = try XCTUnwrap(payload["measurements"] as? [String: Any])
+        XCTAssertEqual(Set(sent.keys), Set(["measuredAt", "totalMass", "bodyFatPercentage", "fatMass", "leanMass", "boneMineralContent", "restingMetabolicRate", "vatMass", "vatVolume"]))
+        XCTAssertTrue(sent["restingMetabolicRate"] is NSNull)
+    }
+
+    func testProductionEvidenceIntakeContentFingerprintDistinguishesEqualLengthFiles() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(202, #"{"intakeId":"intake-1","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/one"}"#),
+            .json(202, #"{"intakeId":"intake-2","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/two"}"#),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        _ = try await pipeline.submitIntake(scope: "nutrition-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "nutrition", files: [("one.png", "image/png", Data([1, 2, 3]))])
+        _ = try await pipeline.submitIntake(scope: "nutrition-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "nutrition", files: [("one.png", "image/png", Data([3, 2, 1]))])
+
+        let requests = await transport.requests
+        XCTAssertNotEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), multipartField(named: "submissionIdentity", from: try XCTUnwrap(requests[1].httpBody)))
+    }
+
+    func testProductionEvidenceIntakeGuardAcceptsOnlyEnabledActivityAndDEXATypes() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(202, #"{"intakeId":"activity-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/activity"}"#),
+            .json(202, #"{"intakeId":"dexa-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/dexa"}"#),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        _ = try await pipeline.submitIntake(
+            scope: "activity-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "activity_day",
+            files: [("activity.png", "image/png", Data([1, 2, 3]))]
+        )
+        _ = try await pipeline.submitIntake(
+            scope: "dexa-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "dexa_scan",
+            files: [("scan.pdf", "application/pdf", Data([0x25, 0x50, 0x44, 0x46]))]
+        )
+        await XCTAssertThrowsErrorAsync(try await pipeline.submitIntake(
+            scope: "unsupported-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "lab_panel",
+            files: [("lab.png", "image/png", Data([1]))]
+        )) { error in
+            XCTAssertEqual(error as? NativeWriteGuardError, .productionReadOnly(.evidenceReview))
+        }
+        let requestCount = await transport.requests.count
+        XCTAssertEqual(requestCount, 3)
+    }
+
+    @MainActor
+    func testAppEnvironmentWeightWriteAPISwitchesWithAuthorityAndSandboxIsHonestlyUnavailable() async {
+        let suite = "PhysiqueOS.WeightWriteAPIAuthoritySwitch.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UserDefaultsNativeAuthoritySelectionStore(defaults: defaults, key: "authority")
+        let environment = AppEnvironment(nativeAuthority: .sandbox, authoritySelectionStore: store)
+
+        XCTAssertTrue(environment.weightWriteAPI is NotAvailableWeightWriteAPI)
+        do {
+            _ = try await environment.weightWriteAPI.submitWeight(localDate: "2026-09-11", value: 168, expectedVersion: nil)
+            XCTFail("Expected NotAvailable to be thrown under Sandbox")
+        } catch is NotAvailableWeightWriteAPI.NotAvailable {
+            // expected
+        } catch {
+            XCTFail("Expected NotAvailable, got \(error)")
+        }
+
+        environment.selectNativeAuthority(.founderProduction)
+        XCTAssertTrue(environment.weightWriteAPI is ProductionWeightWriteAPI)
+    }
+
+    private static func freshDefaults() -> UserDefaults {
+        let suite = "PhysiqueOS.IdempotencyStoreTests.\(UUID().uuidString)"
+        return UserDefaults(suiteName: suite)!
+    }
+
+    private func isUUIDv7(_ value: String) -> Bool {
+        guard let uuid = UUID(uuidString: value) else { return false }
+        var bytes = withUnsafeBytes(of: uuid.uuid) { Array($0) }
+        return (bytes[6] & 0xF0) == 0x70 && (bytes[8] & 0xC0) == 0x80
     }
 
     func testProductionFailuresNeverExposeCredentialMaterialInDescriptions() async throws {
@@ -2074,6 +2431,22 @@ private func productionWeightJSON(
     """
     {"contractVersion":"\(contractVersion)","resource":"\(resource)","authority":"\(authority)","generatedAt":"2026-09-10T15:00:00.000Z","data":{"schemaVersion":"1","context":{"contextId":"all","type":"all_history","goalId":null,"goalRevision":null,"phaseId":null,"phaseRevision":null,"startDate":null,"endDate":null},"current":{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null,"label":"\(value) lb","detail":"Morning weight"},"recentWeighIns":[{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null,"label":"\(value) lb","detail":"Morning weight"}],"rollingAverages":{"threeDay":{"requestedDays":3,"observationCount":1,"startDate":"2026-09-10","endDate":"2026-09-10","value":\(value),"unit":"lb"},"sevenDay":{"requestedDays":7,"observationCount":1,"startDate":"2026-09-10","endDate":"2026-09-10","value":\(value),"unit":"lb"}},"weeklyAverages":[],"extrema":{"goalRelevant":["highest","lowest"],"highest":{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null},"lowest":{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null}},"dexaContext":{"latest":null,"markers":[]},"history":[{"id":"\(id)","date":"2026-09-10","value":\(value),"unit":"lb","revision":null,"label":"\(value) lb","detail":"Morning weight"}],"page":{"limit":90,"count":1,"hasMore":false}}}
     """
+}
+
+private func productionCommandOutcomeJSON(result: String, outcome: String = "committed") -> String {
+    """
+    {"outcome":"\(outcome)","receipt":{"status":"committed","result":\(result),"operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"}}
+    """
+}
+
+private func multipartField(named name: String, from data: Data) -> String? {
+    guard let body = String(data: data, encoding: .utf8),
+          let marker = body.range(of: "name=\"\(name)\"") else { return nil }
+    let suffix = body[marker.upperBound...]
+    guard let valueStart = suffix.range(of: "\r\n\r\n")?.upperBound else { return nil }
+    let value = suffix[valueStart...]
+    guard let valueEnd = value.range(of: "\r\n")?.lowerBound else { return nil }
+    return String(value[..<valueEnd])
 }
 
 private func productionProblemJSON(status: Int, code: String) -> String {
