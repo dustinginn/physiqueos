@@ -6,16 +6,8 @@ import SwiftUI
 /// correction beforehand) — both already exist and are production-
 /// authorized (`ProductionEvidenceIntakePipeline`/`DEXAWriteAPI`).
 ///
-/// Dismiss is deliberately NOT wired: the server's write allowlist
-/// (`NATIVE_WRITE_COMMANDS`, `NativeProductionContractService.js`) does
-/// not include `evidence-review.dispose.v1` — only `evidence-review.commit.v1`,
-/// `dexa-review.measurements.v1`, and six other unrelated commands are
-/// accepted. Calling dispose would 400 `NATIVE_COMMAND_UNAVAILABLE`. The
-/// smallest server fix is adding `Phase3Command.DISPOSE_EVIDENCE_REVIEW`
-/// to that allowlist — the underlying `disposeEvidenceReview` port already
-/// exists and works, it just isn't reachable from Native today. Until
-/// then this screen says so plainly rather than faking a local-only
-/// dismiss that would leave the review canonically untouched.
+/// Dismiss uses the bounded, version-protected production dispose command;
+/// it never deletes evidence locally or creates canonical history.
 struct EvidenceReviewDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -24,6 +16,7 @@ struct EvidenceReviewDetailView: View {
     @State private var actionState: ActionState = .idle
     @State private var editedMeasurements: DEXAScanMeasurements?
     @State private var measurementTexts: [String: String] = [:]
+    @State private var showingDismissConfirmation = false
 
     enum LoadState: Equatable {
         case loading
@@ -36,6 +29,8 @@ struct EvidenceReviewDetailView: View {
         case editingMeasurements
         case savingMeasurements
         case confirming(String)
+        case dismissing
+        case dismissed
         case confirmed
         case stillProcessing
         case failed(String)
@@ -67,6 +62,19 @@ struct EvidenceReviewDetailView: View {
             }
         }
         .task(id: environment.nativeAuthority) { await load() }
+        .confirmationDialog(
+            "Dismiss this Evidence Review?",
+            isPresented: $showingDismissConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Dismiss Review", role: .destructive) {
+                guard case .loaded(.some(let review)) = state else { return }
+                Task { await dismissReview(review: review) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The pending review will be discarded without changing canonical history.")
+        }
     }
 
     private func load() async {
@@ -103,7 +111,6 @@ struct EvidenceReviewDetailView: View {
                     dexaMeasurementCard(review: review, item: dexaItem)
                 }
                 actionSection(for: review)
-                dismissNotice
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -192,6 +199,11 @@ struct EvidenceReviewDetailView: View {
                     PrimaryActionButton(title: "Confirm", tone: .accent) {
                         Task { await confirm(review: review) }
                     }.accessibilityIdentifier("evidenceReview.confirm")
+                    if ["pending", "commit_failed"].contains(review.status) {
+                        Button("Dismiss", role: .destructive) { showingDismissConfirmation = true }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("evidenceReview.dismiss")
+                    }
                 }
             } else if review.status == "confirmed" {
                 Label("Already confirmed", systemImage: "checkmark.circle.fill")
@@ -211,6 +223,14 @@ struct EvidenceReviewDetailView: View {
                 Text(message)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading) }
+        case .dismissing:
+            CardContainer { VStack(alignment: .leading, spacing: 8) {
+                ProgressView().tint(PhysiqueOSTheme.accent)
+                Text("Dismissing review…")
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }.frame(maxWidth: .infinity, alignment: .leading) }
+        case .dismissed:
+            Label("Dismissed", systemImage: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.textSecondary)
         case .confirmed:
             Label("Confirmed", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess)
         case .stillProcessing:
@@ -226,12 +246,6 @@ struct EvidenceReviewDetailView: View {
                 PrimaryActionButton(title: "Try Again", tone: .accent) { actionState = .idle }
             }
         }
-    }
-
-    private var dismissNotice: some View {
-        Text("Dismiss isn't available in Founder Production yet — the server's canonical command allowlist doesn't include Evidence Review dismissal.")
-            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(PhysiqueOSTheme.textMuted)
     }
 
     // MARK: - DEXA correction
@@ -346,6 +360,19 @@ struct EvidenceReviewDetailView: View {
         }
     }
 
+    private func dismissReview(review: EvidenceReviewDetailReadModel) async {
+        guard let version = review.version else { return }
+        actionState = .dismissing
+        do {
+            try await environment.evidenceIntakePipeline.dismissReview(
+                domain: Self.domain(for: review), reviewId: reviewId, expectedVersion: String(version)
+            )
+            actionState = .dismissed
+        } catch {
+            actionState = .failed(Self.errorMessage(for: error))
+        }
+    }
+
     private static func isActionable(_ status: String) -> Bool {
         ["pending", "commit_failed", "partially_committed"].contains(status)
     }
@@ -354,6 +381,7 @@ struct EvidenceReviewDetailView: View {
         switch review.items.first?.type {
         case "nutrition": .nutrition
         case "activity_day", "activity": .activityEvidence
+        case "training": .workoutLogger
         case "dexa_scan", "dexa", "body_composition": .dexa
         default: .evidenceReview
         }

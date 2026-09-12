@@ -76,7 +76,21 @@ struct TrainingSessionDetailView: View {
                 if !session.exercises.isEmpty {
                     exercisesCard(for: session)
                 }
+                if let media = session.supportingMedia, !media.isEmpty {
+                    supportingMediaCard(media)
+                }
                 correctionCard(for: session)
+            }
+        }
+    }
+
+    private func supportingMediaCard(_ media: [TrainingSessionSupportingMedia]) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeading("Supporting Screenshots")
+                ForEach(media) { item in
+                    TrainingSupportingMediaImage(mediaId: item.media.mediaId)
+                }
             }
         }
     }
@@ -224,6 +238,28 @@ struct TrainingSessionDetailView: View {
             return display.string(from: date)
         }
         return String(value.prefix(10))
+    }
+}
+
+private struct TrainingSupportingMediaImage: View {
+    @Environment(AppEnvironment.self) private var environment
+    let mediaId: String
+
+    var body: some View {
+        Group {
+            switch environment.founderProductionPhotoMediaStore.imageStates[mediaId] ?? .idle {
+            case .idle, .loading:
+                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 120)
+            case .loaded(let image):
+                Image(uiImage: image).resizable().scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            case .failed:
+                Button("Retry screenshot") {
+                    Task { await environment.founderProductionPhotoMediaStore.retryImage(mediaId: mediaId) }
+                }
+            }
+        }
+        .task(id: mediaId) { await environment.founderProductionPhotoMediaStore.loadImage(mediaId: mediaId) }
     }
 }
 

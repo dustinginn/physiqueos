@@ -207,11 +207,16 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     /// — including any real scheduled clock time — so Native never
     /// invents a time from a daypart word like "Tonight").
     var detailSections: [PrioritySectionReadModel]? = nil
+    /// Founder Production's exact server-resolved Weight relationship for
+    /// this Morning Check-In occurrence. It is intentionally occurrence-
+    /// bound and never populated from a generic latest/today read.
+    var relatedWeight: PriorityRelatedWeight? = nil
 
     var destination: AppDestination {
-        Self.isMorningWeighIn(executionItemId: executionItemId, id: id)
-            ? .checkIn(checkInType: "morning")
-            : .priorityDetail(priorityId: id)
+        if Self.isMorningWeighIn(executionItemId: executionItemId, id: id), !completed {
+            return .checkIn(checkInType: "morning")
+        }
+        return .priorityOccurrence(priorityId: id, occurrenceDate: date)
     }
 
     /// Checked against both `executionItemId` and `id` because the exact
@@ -226,6 +231,14 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
         let candidates: Set<String> = ["execution_morning_weigh_in", "reminder_morning_weight"]
         return candidates.contains(executionItemId) || candidates.contains(id)
     }
+}
+
+struct PriorityRelatedWeight: Codable, Equatable {
+    var canonicalId: String
+    var date: String
+    var value: Double
+    var unit: String
+    var version: Int?
 }
 
 /// One `priority` resource `sections[]` entry (`PriorityDetailService.js`).

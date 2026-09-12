@@ -11,7 +11,7 @@ extension AppDestination {
     private enum ParameterKeys: String, CodingKey {
         case goalId, phaseId, focus, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
         case strategyType, strategyId, protocolId, executionId, setId, poseId, category
-        case evidenceRecoveryType, occurrenceDateKey
+        case evidenceRecoveryType, occurrenceDateKey, occurrenceDate
     }
 
     init(from decoder: Decoder) throws {
@@ -68,6 +68,12 @@ extension AppDestination {
         case "priority.detail":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .priorityDetail(priorityId: try parameters.decode(String.self, forKey: .priorityId))
+        case "native.priority.occurrence":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .priorityOccurrence(
+                priorityId: try parameters.decode(String.self, forKey: .priorityId),
+                occurrenceDate: try parameters.decode(String.self, forKey: .occurrenceDate)
+            )
         case "evidence.review":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .evidenceReview(reviewId: try parameters.decode(String.self, forKey: .reviewId))
@@ -180,6 +186,9 @@ extension AppDestination {
         case .checkIn(let checkInType): try parameters.encode(checkInType, forKey: .checkInType)
         case .briefingDetail(let briefingId): try parameters.encode(briefingId, forKey: .briefingId)
         case .priorityDetail(let priorityId): try parameters.encode(priorityId, forKey: .priorityId)
+        case .priorityOccurrence(let priorityId, let occurrenceDate):
+            try parameters.encode(priorityId, forKey: .priorityId)
+            try parameters.encode(occurrenceDate, forKey: .occurrenceDate)
         case .evidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
         case .trainingSession(let sessionId): try parameters.encode(sessionId, forKey: .sessionId)
         case .trainingExercise(let exerciseId): try parameters.encode(exerciseId, forKey: .exerciseId)

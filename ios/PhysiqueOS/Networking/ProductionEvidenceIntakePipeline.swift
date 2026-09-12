@@ -35,6 +35,7 @@ struct ProductionEvidenceIntakePipeline {
         switch expectedEvidenceType {
         case "nutrition": domain = .nutrition
         case "activity", "activity_day": domain = .activityEvidence
+        case "training": domain = .workoutLogger
         case "dexa", "dexa_scan": domain = .dexa
         default: domain = .evidenceReview
         }
@@ -102,6 +103,29 @@ struct ProductionEvidenceIntakePipeline {
             payload: ["reviewId": reviewId]
         )
         return outcome.confirmation
+    }
+
+    /// Canonically discards an approved pending review. The same review
+    /// version used by Confirm is required, so a stale screen cannot
+    /// dismiss evidence that changed after it was loaded. Disposition is
+    /// deliberately fixed rather than accepted from presentation code.
+    func dismissReview(
+        domain: NativeProductWriteDomain,
+        reviewId: String,
+        expectedVersion: String
+    ) async throws {
+        try NativeProductWriteGuard.authorize(domain, in: .founderProduction)
+        let scope = "evidence-review.dispose.\(reviewId)"
+        let signature = ProductionIdempotentSubmission.signature([
+            ProductionCommandType.disposeEvidenceReview, reviewId, expectedVersion, "discarded",
+        ])
+        let outcome: ProductionCommandOutcome<ProductionJSONValue> = try await api.submitCommand(
+            ProductionCommandType.disposeEvidenceReview,
+            idempotencyKey: idempotencyStore.resolvedKey(scope: scope, signature: signature),
+            expectedVersion: expectedVersion,
+            payload: ["reviewId": reviewId, "disposition": "discarded"]
+        )
+        guard outcome.outcome != .pending else { throw Error.stillProcessing }
     }
 
     /// Step 4 — poll the review's own read resource until canonical commit

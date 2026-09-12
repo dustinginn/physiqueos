@@ -12,6 +12,7 @@ final class TrainingLoggerViewModel {
     private let api: TrainingLoggerAPI
     private let writeAPI: TrainingWriteAPI
     private let draftStore: TrainingLoggerDraftStore
+    private let attachmentStore: TrainingLoggerAttachmentStore
     let authority: NativeAPIEnvironment
 
     var loadState: LoadState = .loading
@@ -27,11 +28,13 @@ final class TrainingLoggerViewModel {
         api: TrainingLoggerAPI,
         writeAPI: TrainingWriteAPI = NotAvailableTrainingWriteAPI(),
         draftStore: TrainingLoggerDraftStore,
+        attachmentStore: TrainingLoggerAttachmentStore = FileTrainingLoggerAttachmentStore(),
         authority: NativeAPIEnvironment = .sandbox
     ) {
         self.api = api
         self.writeAPI = writeAPI
         self.draftStore = draftStore
+        self.attachmentStore = attachmentStore
         self.authority = authority
     }
 
@@ -66,6 +69,7 @@ final class TrainingLoggerViewModel {
 
     func discardSavedDraft() {
         guard canWrite else { return }
+        if let draftId = savedDraft?.id { attachmentStore.removeAll(draftId: draftId) }
         draftStore.discard()
         savedDraft = nil
         draft = nil
@@ -73,6 +77,7 @@ final class TrainingLoggerViewModel {
 
     func cancelWorkout() {
         guard canWrite else { return }
+        if let draftId = draft?.id { attachmentStore.removeAll(draftId: draftId) }
         draftStore.discard()
         savedDraft = nil
         draft = nil
@@ -133,6 +138,7 @@ final class TrainingLoggerViewModel {
         guard var draft else { return }
         draft.step = .complete
         self.draft = draft
+        attachmentStore.removeAll(draftId: draft.id)
         draftStore.discard()
         savedDraft = nil
     }
@@ -160,6 +166,25 @@ final class TrainingLoggerViewModel {
         guard let draft, draft.step != .complete else { return }
         draftStore.save(draft)
         savedDraft = draft
+    }
+
+    func retainSupportingEvidence(assetId: String, data: Data, contentType: String) throws {
+        guard let draft, let asset = draft.supportingEvidenceAssets.first(where: { $0.id == assetId }) else {
+            throw TrainingLoggerAttachmentStoreError.unavailable
+        }
+        let reference = try attachmentStore.save(
+            data: data, draftId: draft.id, assetId: assetId, displayName: asset.displayName
+        )
+        update { $0.retainSupportingEvidenceFile(assetId: assetId, reference: reference, contentType: contentType) }
+    }
+
+    func removeSupportingEvidence(assetId: String) {
+        guard let reference = draft?.supportingEvidenceAssets.first(where: { $0.id == assetId })?.storageReference else {
+            update { $0.removeSupportingEvidence(id: assetId) }
+            return
+        }
+        attachmentStore.remove(reference: reference)
+        update { $0.removeSupportingEvidence(id: assetId) }
     }
 
     func pickerExercises() -> [TrainingLoggerCatalogExercise] {

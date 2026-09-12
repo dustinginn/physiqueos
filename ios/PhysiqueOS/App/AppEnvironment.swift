@@ -88,7 +88,7 @@ enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
     /// A prior pass (server authority `67267032`'s predecessor) found
     /// EVERY domain blocked by a genuine server-side gap and shipped none
     /// of them. Server commit `67267032` ("Add canonical Native production
-    /// writes") fixed the write architecture: a real eight-command
+    /// writes") fixed the original write architecture; the bounded
     /// allowlist, correct canonical collections, the same persistence
     /// services the web app uses, and a working async evidence-intake
     /// pipeline. `.priorityCompletion` remains excluded — investigation
@@ -185,6 +185,8 @@ final class AppEnvironment {
     private let sandboxTrainingLoggerAPI: TrainingLoggerAPI
     private let sandboxTrainingLoggerDraftStore: TrainingLoggerDraftStore
     private let founderProductionTrainingLoggerDraftStore: TrainingLoggerDraftStore
+    let trainingLoggerAttachmentStore: TrainingLoggerAttachmentStore
+    private let trainingEvidenceBindingStore: TrainingEvidenceBindingStore
 
     var trainingLoggerDraftStore: TrainingLoggerDraftStore {
         nativeAuthority == .founderProduction ? founderProductionTrainingLoggerDraftStore : sandboxTrainingLoggerDraftStore
@@ -248,7 +250,9 @@ final class AppEnvironment {
             ProductionTrainingWriteAPI(
                 api: productionNativeAPI,
                 reviewAPI: ProductionEvidenceReviewAPI(api: productionNativeAPI),
-                idempotencyStore: productionIdempotencyKeyStore
+                idempotencyStore: productionIdempotencyKeyStore,
+                attachmentStore: trainingLoggerAttachmentStore,
+                bindingStore: trainingEvidenceBindingStore
             )
         }
     }
@@ -378,6 +382,8 @@ final class AppEnvironment {
         trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
         founderProductionTrainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(key: "physiqueos.founder-production.trainingLogger.localDraft.v1"),
+        trainingLoggerAttachmentStore: TrainingLoggerAttachmentStore = FileTrainingLoggerAttachmentStore(),
+        trainingEvidenceBindingStore: TrainingEvidenceBindingStore = TrainingEvidenceBindingStore(),
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
         operatingPlanStore: OperatingPlanSandboxStore = OperatingPlanSandboxStore(),
         goalsSandboxStore: GoalsSandboxStore = GoalsSandboxStore(),
@@ -404,6 +410,8 @@ final class AppEnvironment {
         self.sandboxTrainingLoggerAPI = trainingLoggerAPI
         self.sandboxTrainingLoggerDraftStore = trainingLoggerDraftStore
         self.founderProductionTrainingLoggerDraftStore = founderProductionTrainingLoggerDraftStore
+        self.trainingLoggerAttachmentStore = trainingLoggerAttachmentStore
+        self.trainingEvidenceBindingStore = trainingEvidenceBindingStore
         self.loggingSandboxStore = loggingSandboxStore
         self.operatingPlanStore = operatingPlanStore
         self.goalsSandboxStore = goalsSandboxStore

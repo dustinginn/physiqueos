@@ -58,6 +58,7 @@ struct TrainingLoggerView: View {
                 api: environment.trainingLoggerAPI,
                 writeAPI: environment.trainingWriteAPI,
                 draftStore: environment.trainingLoggerDraftStore,
+                attachmentStore: environment.trainingLoggerAttachmentStore,
                 authority: environment.nativeAuthority
             )
             await viewModel?.load()
@@ -70,7 +71,7 @@ struct TrainingLoggerView: View {
             supportingPhotoItems = []
             attachAndInterpretPhotos(items)
         }
-        .fileImporter(isPresented: $isSupportingFilePickerPresented, allowedContentTypes: [.image, .pdf], allowsMultipleSelection: true) { result in
+        .fileImporter(isPresented: $isSupportingFilePickerPresented, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
             attachAndInterpretFiles(urls)
         }
@@ -84,14 +85,15 @@ struct TrainingLoggerView: View {
         guard !items.isEmpty else { return }
         let start = viewModel?.draft?.supportingEvidenceAssets.filter { $0.source == .photos }.count ?? 0
         let newAssets = items.indices.map { index in
-            TrainingLoggerSupportingEvidence(id: UUID().uuidString, displayName: "Apple Health Screenshot \(start + index + 1)", source: .photos)
+            TrainingLoggerSupportingEvidence(id: UUID().uuidString, displayName: "Apple Health Screenshot \(start + index + 1).jpg", source: .photos)
         }
         viewModel?.update { $0.addSupportingEvidence(newAssets) }
         for (asset, item) in zip(newAssets, items) {
             pendingInterpretationAssetIDs.insert(asset.id)
             Task {
                 let data = try? await item.loadTransferable(type: Data.self)
-                await interpretAndStoreSupportingEvidence(assetId: asset.id, data: data, contentType: "image/jpeg", source: .photos)
+                let contentType = item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
+                await interpretAndStoreSupportingEvidence(assetId: asset.id, data: data, contentType: contentType, source: .photos)
             }
         }
     }
@@ -108,7 +110,7 @@ struct TrainingLoggerView: View {
                 let accessed = url.startAccessingSecurityScopedResource()
                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                 let data = try? Data(contentsOf: url)
-                await interpretAndStoreSupportingEvidence(assetId: asset.id, data: data, contentType: nil, filename: url.lastPathComponent, source: .files)
+                await interpretAndStoreSupportingEvidence(assetId: asset.id, data: data, contentType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType, filename: url.lastPathComponent, source: .files)
             }
         }
     }
@@ -132,7 +134,14 @@ struct TrainingLoggerView: View {
             viewModel?.update { $0.setSupportingWorkoutInterpretation(assetId: assetId, workout: nil) }
             return
         }
-        let attachment = SandboxAttachment(id: assetId, displayName: filename ?? assetId, source: source, contentType: contentType, data: data)
+        let resolvedContentType = contentType ?? "application/octet-stream"
+        do {
+            try viewModel?.retainSupportingEvidence(assetId: assetId, data: data, contentType: resolvedContentType)
+        } catch {
+            viewModel?.update { $0.setSupportingWorkoutInterpretation(assetId: assetId, workout: nil) }
+            return
+        }
+        let attachment = SandboxAttachment(id: assetId, displayName: filename ?? assetId, source: source, contentType: resolvedContentType, data: data)
         let prepared = await EvidenceLocalInterpretation.prepare(attachment)
         let workout = prepared.extractedText.flatMap {
             EvidenceLocalInterpretation.supportingWorkout(id: "supporting-\(assetId)", sourceEvidenceIds: [assetId], from: $0)
@@ -791,23 +800,14 @@ struct TrainingLoggerView: View {
                     // Build 20 regression: this whole card (and the only
                     // picker for it) was Sandbox-only despite
                     // `TrainingLoggerDraft`/`EvidenceLocalInterpretation`
-                    // being fully authority-agnostic. Restored for both —
-                    // see the Production-only disclosure below for the one
-                    // real gap this doesn't paper over: `training-session.commit.v1`
-                    // has no media/attachment field today, so these screenshots
-                    // stay a local drafting aid until the server adds one.
+                    // being fully authority-agnostic. Restored for both.
                     CardContainer {
                         VStack(alignment: .leading, spacing: 12) {
                         Text("Supporting workout screenshots")
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        Text("Optional · attach a screenshot of your workout summary to cross-check sets on this device.")
+                        Text("Optional · attach Apple Health screenshots to the exact workout.")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        if viewModel.authority == .founderProduction {
-                            Text("These stay on this device for now — Founder Production's workout submission does not yet carry attachments.")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.chartEffort)
-                        }
                         HStack(spacing: 10) {
                             Button { isSupportingPhotosPickerPresented = true } label: { Label("Photos", systemImage: "photo.on.rectangle").frame(maxWidth: .infinity) }
                             Button { isSupportingFilePickerPresented = true } label: { Label("Files", systemImage: "folder").frame(maxWidth: .infinity) }
@@ -819,7 +819,7 @@ struct TrainingLoggerView: View {
                                 Image(systemName: asset.source == .photos ? "photo" : "doc")
                                 Text(asset.displayName).lineLimit(1)
                                 Spacer()
-                                Button { viewModel.update { $0.removeSupportingEvidence(id: asset.id) } } label: { Image(systemName: "xmark.circle.fill") }
+                                Button { viewModel.removeSupportingEvidence(assetId: asset.id) } label: { Image(systemName: "xmark.circle.fill") }
                             }
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)

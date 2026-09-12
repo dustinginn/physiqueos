@@ -40,6 +40,8 @@ struct AppDestinationRouterView: View {
             MorningCheckInView(onNavigate: onNavigate)
         case .priorityDetail(let priorityId):
             PriorityDetailView(onNavigate: onNavigate, priorityId: priorityId)
+        case .priorityOccurrence(let priorityId, let occurrenceDate):
+            PriorityDetailView(onNavigate: onNavigate, priorityId: priorityId, occurrenceDate: occurrenceDate)
         case .briefingDetail(let briefingId):
             BriefingDetailView(briefingId: briefingId, onNavigate: onNavigate, onReturnToHome: onReturnToHome)
         case .briefingList:

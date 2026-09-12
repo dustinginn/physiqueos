@@ -346,12 +346,24 @@ struct TrainingSessionDetailReadModel: Codable, Equatable, Identifiable {
     var sourceEvidence: [String]
     var exercises: [TrainingExerciseOccurrence]
     var exerciseRelationshipGroups: [TrainingExerciseRelationshipGroup]
+    /// Authenticated opaque screenshot descriptors canonically bound to
+    /// this exact session. No storage URL/object key is exposed.
+    var supportingMedia: [TrainingSessionSupportingMedia]? = nil
     /// Goal/Phase chronology backfill — same gap as `TrainingDayReadModel`:
     /// `getPlaceholderReport("training")` here is called fully unscoped
     /// (verified directly from `session/[sessionId]/page.js`), so a
     /// session's own Goal/Phase context was previously undiscoverable.
     /// Computed by `FixtureTrainingAPI` from `date`.
     var attributedScope: EvidenceScopeAttribution? = nil
+}
+
+struct TrainingSessionSupportingMedia: Codable, Equatable, Identifiable {
+    struct Media: Codable, Equatable {
+        var mediaId: String
+        var deliveryPath: String?
+    }
+    var media: Media
+    var id: String { media.mediaId }
 }
 
 /// Mirrors `normalizeTrainingExercises`'s per-occurrence shape

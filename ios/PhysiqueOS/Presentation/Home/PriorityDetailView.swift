@@ -19,6 +19,7 @@ struct PriorityDetailView: View {
     var onNavigate: (AppDestination) -> Void
     @State private var viewModel: PriorityDetailViewModel?
     let priorityId: String
+    var occurrenceDate: String? = nil
 
     var body: some View {
         ScrollView {
@@ -51,7 +52,8 @@ struct PriorityDetailView: View {
                 morningCheckInAPI: environment.morningCheckInAPI,
                 store: environment.loggingSandboxStore,
                 authority: environment.nativeAuthority,
-                priorityId: priorityId
+                priorityId: priorityId,
+                occurrenceDate: occurrenceDate
             )
             await viewModel?.load()
         }
@@ -73,7 +75,9 @@ struct PriorityDetailView: View {
         case .loaded(.some(let priority)):
             VStack(alignment: .leading, spacing: 16) {
                 header(for: priority)
-                if let morningCheckIn = viewModel?.morningCheckIn {
+                if let relatedWeight = priority.relatedWeight {
+                    relatedWeightCard(relatedWeight)
+                } else if let morningCheckIn = viewModel?.morningCheckIn {
                     morningWeightCard(morningCheckIn)
                 }
                 if let sections = priority.detailSections, !sections.isEmpty {
@@ -202,6 +206,22 @@ struct PriorityDetailView: View {
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
+            }
+        }
+    }
+
+    private func relatedWeightCard(_ weight: PriorityRelatedWeight) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 6) {
+                SectionHeading("Occurrence Weight")
+                Text("\(Self.formatWeight(weight.value)) \(weight.unit)")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text("Recorded for \(TrainingDateFormatting.short(weight.date)).")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Button("View Weight evidence") { onNavigate(.progressStream(streamId: "weight")) }
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
             }
         }
     }

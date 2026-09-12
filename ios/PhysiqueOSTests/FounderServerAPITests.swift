@@ -538,7 +538,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertNil(plan.sections.first?.items.first?.destination)
         XCTAssertFalse(plan.sections.first?.supplementsAction == true)
 
-        let fetchedPriority = try await ProductionPriorityAPI(api: native).fetchPriority(priorityId: "priority-canonical")
+        let fetchedPriority = try await ProductionPriorityAPI(api: native).fetchPriority(priorityId: "priority-canonical", occurrenceDate: "2026-09-10")
         let priority = try XCTUnwrap(fetchedPriority)
         XCTAssertEqual(priority.id, "priority-canonical")
         XCTAssertEqual(priority.executionItemId, "execution-canonical")
@@ -554,7 +554,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requests[1].url?.path, "/api/v1/native/read/operating-plan")
         XCTAssertEqual(requests[2].url?.path, "/api/v1/native/read/priority")
         XCTAssertEqual(URLComponents(url: requests[2].url!, resolvingAgainstBaseURL: false)?.queryItems,
-                       [URLQueryItem(name: "priorityId", value: "priority-canonical")])
+                       [URLQueryItem(name: "occurrenceDate", value: "2026-09-10"), URLQueryItem(name: "priorityId", value: "priority-canonical")])
         XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
         XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.operatingPlan, in: .founderProduction))
     }
@@ -585,53 +585,43 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(whenSection.items.first?.detail?.contains("5:00 PM") == true)
     }
 
-    /// Build 21 item 11 (Morning Check-In Priority Detail): the exact
-    /// canonical occurrence/evidence relationship, never a generic or
-    /// "latest" guess. `PriorityDetailViewModel` must fetch the
-    /// `morning-check-in` resource's own date-matched weight ONLY when
-    /// the occurrence being viewed genuinely IS the morning weigh-in —
-    /// fetching it (or worse, showing it) for an unrelated priority like
-    /// Foam Rolling would be exactly the kind of "wrong occurrence"
-    /// mistake this task guards against.
+    /// Build 22: production Priority detail carries its own exact-date
+    /// Weight relationship. Native must not issue the current-day
+    /// Morning Check-In read when a historical occurrence is opened.
     @MainActor
-    func testPriorityDetailViewModelFetchesMorningCheckInOnlyForTheMorningWeighInOccurrence() async throws {
+    func testPriorityDetailViewModelUsesOccurrenceBoundWeightWithoutCurrentDayFallback() async throws {
         struct StubPriorityAPI: PriorityAPI {
             let occurrence: PriorityOccurrence
             func fetchExecutionItems() async throws -> [ExecutionItemFixture] { [] }
-            func fetchPriority(priorityId: String) async throws -> PriorityOccurrence? { occurrence }
+            func fetchPriority(priorityId: String, occurrenceDate: String?) async throws -> PriorityOccurrence? {
+                XCTAssertEqual(occurrenceDate, "2026-09-10")
+                return occurrence
+            }
         }
         struct StubMorningCheckInAPI: MorningCheckInAPI {
             func fetchMorningCheckIn() async throws -> MorningCheckInReadModel {
-                MorningCheckInReadModel(today: "2026-09-11", existingWeight: 172.9, previousWeight: 171.0, reconciliationItems: [])
+                XCTFail("Production historical Priority must not fetch current Morning Check-In")
+                throw NotAvailableMorningCheckInAPI.NotAvailable()
             }
         }
 
         let morningWeighIn = PriorityOccurrence(
-            id: "priority-morning", executionItemId: "execution_morning_weigh_in", date: "2026-09-11",
+            id: "priority-morning", executionItemId: "execution_morning_weigh_in", date: "2026-09-10",
             title: "Morning Check-In", subtitle: nil, metadata: nil, changeLabel: nil,
-            icon: .target, color: .primary, urgency: .available, completed: false, completable: false,
-            actionLabel: nil, completionContext: nil, continueActionDestination: nil
+            icon: .target, color: .primary, urgency: .available, completed: true, completable: false,
+            actionLabel: nil, completionContext: nil, continueActionDestination: nil,
+            relatedWeight: PriorityRelatedWeight(canonicalId: "weight-1", date: "2026-09-10", value: 172.9, unit: "lb", version: 2)
         )
         let morningViewModel = PriorityDetailViewModel(
             api: StubPriorityAPI(occurrence: morningWeighIn), morningCheckInAPI: StubMorningCheckInAPI(),
-            store: LoggingSandboxStore(), authority: .founderProduction, priorityId: "priority-morning"
+            store: LoggingSandboxStore(), authority: .founderProduction, priorityId: "priority-morning", occurrenceDate: "2026-09-10"
         )
         await morningViewModel.load()
-        XCTAssertEqual(morningViewModel.morningCheckIn?.existingWeight, 172.9)
-        XCTAssertEqual(morningViewModel.morningCheckIn?.today, "2026-09-11")
-
-        let foamRolling = PriorityOccurrence(
-            id: "priority-foam-rolling", executionItemId: "execution_foam_roll", date: "2026-09-11",
-            title: "Foam Rolling", subtitle: nil, metadata: nil, changeLabel: nil,
-            icon: .target, color: .primary, urgency: .available, completed: false, completable: false,
-            actionLabel: nil, completionContext: nil, continueActionDestination: nil
-        )
-        let unrelatedViewModel = PriorityDetailViewModel(
-            api: StubPriorityAPI(occurrence: foamRolling), morningCheckInAPI: StubMorningCheckInAPI(),
-            store: LoggingSandboxStore(), authority: .founderProduction, priorityId: "priority-foam-rolling"
-        )
-        await unrelatedViewModel.load()
-        XCTAssertNil(unrelatedViewModel.morningCheckIn, "Morning Check-In's same-day weight must never surface for an unrelated priority.")
+        guard case .loaded(.some(let loaded)) = morningViewModel.state else { return XCTFail("Expected occurrence") }
+        XCTAssertEqual(loaded.relatedWeight?.canonicalId, "weight-1")
+        XCTAssertEqual(loaded.relatedWeight?.date, "2026-09-10")
+        XCTAssertNil(morningViewModel.morningCheckIn)
+        XCTAssertEqual(loaded.destination, .priorityOccurrence(priorityId: "priority-morning", occurrenceDate: "2026-09-10"))
     }
 
     /// `LogFixture.json`'s exact bundled values ("Strength Training · 52
@@ -1666,6 +1656,57 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual((exercises.first?["sets"] as? [[String: Any]])?.first?["unit"] as? String, "lb")
     }
 
+    func testProductionTrainingCommitUploadsPrivateScreenshotAndBindsVersionedReview() async throws {
+        let result = #"{"status":"confirmation_requested","reviewId":"review-training","reviewRevision":2,"sessionId":"native-session-media","intendedDate":"2026-09-11","exerciseIds":["barbell_bench_press"]}"#
+        let response = #"{"outcome":"committed","receipt":{"status":"committed","result":"# + result + #", "operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"},"confirmation":{"state":"confirmed","reviewId":"review-training","continuationKey":null,"completedStep":"complete","publication":null}}"#
+        let review = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-training","status":"pending","createdAt":"2026-09-11T12:00:00.000Z","version":1,"interpretedEvidence":{"evidence_objects":[{"id":"training-object","evidence_type":"training","observed_at":"2026-09-11"}]}}}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(202, #"{"intakeId":"intake-training","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/api/v1/native/evidence/intakes/intake-training"}"#),
+            .json(200, #"{"intakeId":"intake-training","status":"ready","reviewId":"review-training","reviewUrl":"/review","processingUrl":"/status"}"#),
+            .json(200, review), .json(200, response),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let attachments = MemoryTrainingLoggerAttachmentStore()
+        let reference = try attachments.save(data: Data([1, 2, 3]), draftId: "native-session-media", assetId: "asset-1", displayName: "Workout.png")
+        let defaults = Self.freshDefaults()
+        let writeAPI = ProductionTrainingWriteAPI(
+            api: native,
+            reviewAPI: ProductionEvidenceReviewAPI(api: native),
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults),
+            attachmentStore: attachments,
+            bindingStore: TrainingEvidenceBindingStore(defaults: defaults)
+        )
+        let draft = TrainingLoggerDraft(
+            id: "native-session-media", mode: .live, workoutDate: "2026-09-11", selectedAreaIds: ["chest"],
+            exercises: [TrainingLoggerDraftExercise(
+                id: "occurrence-1", canonicalExerciseId: "barbell_bench_press", name: "Barbell Bench Press",
+                areaId: "chest", measurement: .repsLoad, executionVariant: nil,
+                sets: [TrainingLoggerDraftSet(id: "set-1", setNumber: 1, reps: 8, load: 185, durationSeconds: nil, isCompleted: true)],
+                previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
+                isProvisional: false, provenance: nil
+            )], relationships: [], step: .review, exercisePickerReturnStep: nil,
+            exercisePickerExistingExerciseIds: nil,
+            supportingEvidence: [TrainingLoggerSupportingEvidence(id: "asset-1", displayName: "Workout.png", source: .photos, storageReference: reference, contentType: "image/png")],
+            supportingWorkouts: nil, supportingWorkoutFailureAssetIds: nil
+        )
+
+        _ = try await writeAPI.commit(draft)
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map { $0.url?.path }, [
+            "/api/v1/native/auth/pair", "/api/v1/native/evidence/intakes",
+            "/api/v1/native/evidence/intakes/intake-training", "/api/v1/native/read/evidence-review",
+            "/api/v1/native/commands",
+        ])
+        let command = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests.last?.httpBody)) as? [String: Any])
+        let payload = try XCTUnwrap(command["payload"] as? [String: Any])
+        XCTAssertEqual(payload["supportingEvidenceReviewId"] as? String, "review-training")
+        XCTAssertEqual(payload["supportingEvidenceReviewVersion"] as? Int, 1)
+        XCTAssertFalse(String(data: try XCTUnwrap(requests.last?.httpBody), encoding: .utf8)?.contains(reference) == true)
+    }
+
     func testProductionTrainingCommitRejectsFixtureOnlyIdentityBeforeNetwork() async throws {
         let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r"))])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
@@ -1687,6 +1728,25 @@ final class FounderServerAPITests: XCTestCase {
         }
         let requestCount = await transport.requests.count
         XCTAssertEqual(requestCount, 1)
+    }
+
+    func testProductionTrainingSessionDecodesOnlyOpaqueSupportingMedia() async throws {
+        let data = #"{"id":"session-1","label":"Strength","value":"45 min","detail":"3 exercises","date":"2026-09-11","sourceEvidence":[],"exercises":[],"exerciseRelationshipGroups":[],"supportingMedia":[{"media":{"mediaId":"01999999-9999-4999-8999-999999999999","deliveryPath":"/api/v1/native/media/01999999-9999-4999-8999-999999999999"}}]}"#
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["training-session": productionEnvelope(resource: "training-session", data: data)]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionTrainingAPI(api: native).fetchTrainingSession(sessionId: "session-1")
+        let session = try XCTUnwrap(fetched)
+
+        XCTAssertEqual(session.supportingMedia?.first?.media.mediaId, "01999999-9999-4999-8999-999999999999")
+        let encoded = try JSONEncoder().encode(session)
+        let text = try XCTUnwrap(String(data: encoded, encoding: .utf8))
+        XCTAssertFalse(text.contains("media://"))
+        XCTAssertFalse(text.localizedCaseInsensitiveContains("spaces"))
     }
 
     func testProductionNutritionWriteUsesFullDayReplacementAndPersistsReturnedFingerprint() async throws {
@@ -1795,11 +1855,12 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), multipartField(named: "submissionIdentity", from: try XCTUnwrap(requests[1].httpBody)))
     }
 
-    func testProductionEvidenceIntakeGuardAcceptsOnlyEnabledActivityAndDEXATypes() async throws {
+    func testProductionEvidenceIntakeGuardAcceptsEnabledActivityDEXAAndTrainingTypes() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(202, #"{"intakeId":"activity-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/activity"}"#),
             .json(202, #"{"intakeId":"dexa-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/dexa"}"#),
+            .json(202, #"{"intakeId":"training-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/training"}"#),
         ])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
@@ -1808,6 +1869,10 @@ final class FounderServerAPITests: XCTestCase {
         _ = try await pipeline.submitIntake(
             scope: "activity-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "activity_day",
             files: [("activity.png", "image/png", Data([1, 2, 3]))]
+        )
+        _ = try await pipeline.submitIntake(
+            scope: "training-intake.session-1", effectiveDate: "2026-09-11", expectedEvidenceType: "training",
+            files: [("workout.png", "image/png", Data([1, 2, 3]))]
         )
         _ = try await pipeline.submitIntake(
             scope: "dexa-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "dexa_scan",
@@ -1820,7 +1885,28 @@ final class FounderServerAPITests: XCTestCase {
             XCTAssertEqual(error as? NativeWriteGuardError, .productionReadOnly(.evidenceReview))
         }
         let requestCount = await transport.requests.count
-        XCTAssertEqual(requestCount, 3)
+        XCTAssertEqual(requestCount, 4)
+    }
+
+    func testProductionEvidenceReviewDismissUsesVersionAndStableIdempotency() async throws {
+        let result = #"{"status":"discarded","reviewId":"review-1","revision":2,"updatedAt":"2026-09-11T12:00:00.000Z"}"#
+        let response = productionCommandOutcomeJSON(result: result)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, response), .json(200, response),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let pipeline = ProductionEvidenceIntakePipeline(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        try await pipeline.dismissReview(domain: .activityEvidence, reviewId: "review-1", expectedVersion: "1")
+        try await pipeline.dismissReview(domain: .activityEvidence, reviewId: "review-1", expectedVersion: "1")
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"1\"")
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        XCTAssertEqual(json["commandType"] as? String, "evidence-review.dispose.v1")
+        XCTAssertEqual((json["payload"] as? [String: String])?["disposition"], "discarded")
     }
 
     /// Build 21's central async-intake correction (item 6): a real Build 20

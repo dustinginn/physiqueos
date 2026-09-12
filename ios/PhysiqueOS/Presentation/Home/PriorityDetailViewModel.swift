@@ -12,25 +12,23 @@ final class PriorityDetailViewModel {
     }
 
     private(set) var state: LoadState = .loading
-    /// Only ever populated for the Morning Weigh-In priority under
-    /// Founder Production — `getPriorityDetail` has no weight cross-
-    /// reference of its own (`createMorningWeighInPriorityDetail`'s
-    /// "Completion" section is static copy, no value/date/id), so this is
-    /// a second, explicit read of the `morning-check-in` resource's own
-    /// date-matched (never "latest") same-day weight.
+    /// Sandbox-only compatibility. Founder Production receives its exact
+    /// occurrence-bound Weight relationship inside the Priority detail.
     private(set) var morningCheckIn: MorningCheckInReadModel?
     private let api: PriorityAPI
     private let morningCheckInAPI: MorningCheckInAPI
     private let store: LoggingSandboxStore
     private let authority: NativeAPIEnvironment
     private let priorityId: String
+    private let occurrenceDate: String?
 
-    init(api: PriorityAPI, morningCheckInAPI: MorningCheckInAPI, store: LoggingSandboxStore, authority: NativeAPIEnvironment, priorityId: String) {
+    init(api: PriorityAPI, morningCheckInAPI: MorningCheckInAPI, store: LoggingSandboxStore, authority: NativeAPIEnvironment, priorityId: String, occurrenceDate: String? = nil) {
         self.api = api
         self.morningCheckInAPI = morningCheckInAPI
         self.store = store
         self.authority = authority
         self.priorityId = priorityId
+        self.occurrenceDate = occurrenceDate
     }
 
     func load() async {
@@ -38,11 +36,8 @@ final class PriorityDetailViewModel {
             state = .loaded(store.priorityOccurrence(id: priorityId))
             return
         }
-        let occurrence = try? await api.fetchPriority(priorityId: priorityId)
+        let occurrence = try? await api.fetchPriority(priorityId: priorityId, occurrenceDate: occurrenceDate)
         state = .loaded(occurrence)
-        if let occurrence, PriorityOccurrence.isMorningWeighIn(executionItemId: occurrence.executionItemId, id: occurrence.id) {
-            morningCheckIn = try? await morningCheckInAPI.fetchMorningCheckIn()
-        }
     }
 
     /// `completePriority` (`src/app/priorities/[priorityId]/actions.js`) —

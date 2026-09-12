@@ -179,6 +179,11 @@ struct TrainingLoggerSupportingEvidence: Codable, Equatable, Identifiable {
     var id: String
     var displayName: String
     var source: Source
+    /// Local Application Support reference only. The bytes are uploaded
+    /// through the authenticated evidence-intake transport and this value
+    /// is never sent to the server.
+    var storageReference: String? = nil
+    var contentType: String? = nil
 }
 
 enum TrainingLoggerWorkoutRecordOwner: String, Codable, Equatable {
@@ -424,6 +429,14 @@ extension TrainingLoggerDraft {
         supportingWorkouts = supportingWorkoutObservations.filter { !$0.sourceEvidenceIds.contains(id) }
         let remainingFailures = supportingWorkoutFailureIds.filter { $0 != id }
         supportingWorkoutFailureAssetIds = remainingFailures.isEmpty ? nil : remainingFailures
+    }
+
+    mutating func retainSupportingEvidenceFile(assetId: String, reference: String, contentType: String) {
+        guard let index = supportingEvidenceAssets.firstIndex(where: { $0.id == assetId }) else { return }
+        var assets = supportingEvidenceAssets
+        assets[index].storageReference = reference
+        assets[index].contentType = contentType
+        supportingEvidence = assets
     }
 
     /// Attaches one supporting-evidence asset's real, locally interpreted

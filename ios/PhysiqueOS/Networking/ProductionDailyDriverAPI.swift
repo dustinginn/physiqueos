@@ -5,6 +5,7 @@ enum ProductionDailyDriverError: Error, Equatable {
     case inconsistentCanonicalIdentity(expected: String, actual: String?)
     case unsupportedGoalContext(id: String)
     case unsupportedHomeGoalPresentation(id: String)
+    case missingCanonicalIdentity(String)
 }
 
 private struct ProductionTimeline: Decodable, @unchecked Sendable {
@@ -774,24 +775,16 @@ struct ProductionPriorityAPI: PriorityAPI {
 
     func fetchExecutionItems() async throws -> [ExecutionItemFixture] { [] }
 
-    func fetchPriority(priorityId: String) async throws -> PriorityOccurrence? {
-        let value = try await api.readResource("priority", query: ["priorityId": priorityId], as: Payload.self).data
+    func fetchPriority(priorityId: String, occurrenceDate: String?) async throws -> PriorityOccurrence? {
+        var query = ["priorityId": priorityId]
+        if let occurrenceDate { query["occurrenceDate"] = occurrenceDate }
+        let value = try await api.readResource("priority", query: query, as: Payload.self).data
         guard value.id == priorityId else {
             throw ProductionDailyDriverError.inconsistentCanonicalIdentity(expected: priorityId, actual: value.id)
         }
-        // `getPriorityDetail(priorityId)` never accepts an occurrence date —
-        // it always resolves "today" from the SERVER's own clock/stored
-        // user timeZone at request time (`PriorityDetailService.js`'s
-        // internal `getLocalDateKey(now(), ...)` calls, one per priority
-        // variant). If that resolved date ever disagrees with what Home
-        // showed a moment earlier (a timezone-profile lag, a midnight-
-        // boundary race), this `date` will legitimately differ from the
-        // Founder's own notion of "today" — Native has no server-accepted
-        // way to force a specific occurrence day for anything but a DEXA
-        // appointment (whose id already encodes the date). This is a
-        // confirmed server-side gap, not a Native decode bug — see this
-        // task's final report.
-        let date = value.completionContext?.occurrenceDate ?? value.executionContract?.occurrenceDate ?? String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        guard let date = value.completionContext?.occurrenceDate ?? value.executionContract?.occurrenceDate else {
+            throw ProductionDailyDriverError.missingCanonicalIdentity("priority occurrence date")
+        }
         return PriorityOccurrence(
             id: value.id, executionItemId: value.executionProjection?.executionId ?? value.id,
             date: date, title: value.title, subtitle: value.subtitle,
@@ -801,7 +794,8 @@ struct ProductionPriorityAPI: PriorityAPI {
             completed: value.status == "Completed", completable: false,
             actionLabel: value.action?.label, completionContext: value.completionContext,
             continueActionDestination: Self.destination(forActionHref: value.action?.href), attributedScope: nil,
-            detailSections: value.sections.map { PrioritySectionReadModel(title: $0.title, items: $0.items.map { PriorityDetailFieldReadModel(label: $0.label, detail: $0.detail) }) }
+            detailSections: value.sections.map { PrioritySectionReadModel(title: $0.title, items: $0.items.map { PriorityDetailFieldReadModel(label: $0.label, detail: $0.detail) }) },
+            relatedWeight: value.relatedWeight
         )
     }
 
@@ -812,6 +806,7 @@ struct ProductionPriorityAPI: PriorityAPI {
         var executionProjection: ExecutionProjection?
         var action: ActionPayload?
         var sections: [Section]
+        var relatedWeight: PriorityRelatedWeight?
     }
     private struct ExecutionContract: Decodable { var occurrenceDate: String? }
     private struct ExecutionProjection: Decodable { var executionId: String? }

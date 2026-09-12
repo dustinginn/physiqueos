@@ -17,6 +17,8 @@ enum TrainingWriteError: Error, Equatable, LocalizedError {
     case missingCanonicalExercise(String)
     case unsupportedDurationExercise(String)
     case noCompletedSets
+    case attachmentUnavailable(String)
+    case attachmentReviewUnavailable
     case confirmationTimedOut
 
     var errorDescription: String? {
@@ -24,6 +26,8 @@ enum TrainingWriteError: Error, Equatable, LocalizedError {
         case .missingCanonicalExercise(let name): "\(name) does not have a canonical Production exercise identity."
         case .unsupportedDurationExercise(let name): "\(name) cannot be submitted because the current Production command does not accept duration sets."
         case .noCompletedSets: "Complete at least one valid set before submitting."
+        case .attachmentUnavailable(let name): "\(name) could not be uploaded. The workout draft is still saved."
+        case .attachmentReviewUnavailable: "The supporting workout screenshots could not be prepared. The workout draft is still saved."
         case .confirmationTimedOut: "The workout is still processing. Check Training history shortly."
         }
     }
@@ -33,6 +37,22 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
     let api: ProductionNativeAPI
     let reviewAPI: EvidenceReviewAPI
     let idempotencyStore: ProductionIdempotencyKeyStore
+    let attachmentStore: TrainingLoggerAttachmentStore
+    let bindingStore: TrainingEvidenceBindingStore
+
+    init(
+        api: ProductionNativeAPI,
+        reviewAPI: EvidenceReviewAPI,
+        idempotencyStore: ProductionIdempotencyKeyStore,
+        attachmentStore: TrainingLoggerAttachmentStore = FileTrainingLoggerAttachmentStore(),
+        bindingStore: TrainingEvidenceBindingStore = TrainingEvidenceBindingStore()
+    ) {
+        self.api = api
+        self.reviewAPI = reviewAPI
+        self.idempotencyStore = idempotencyStore
+        self.attachmentStore = attachmentStore
+        self.bindingStore = bindingStore
+    }
 
     func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
         try NativeProductWriteGuard.authorize(.workoutLogger, in: .founderProduction)
@@ -58,12 +78,15 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         let supersets = draft.relationships.map {
             Superset(id: $0.id, memberExerciseIds: $0.memberExerciseIds)
         }
+        let supportingBinding = try await prepareSupportingEvidence(for: draft)
         let payload = Payload(
             sessionId: draft.id,
             localDate: draft.workoutDate,
             mode: draft.mode == .live ? "live" : "retrospective",
             exercises: exercises,
-            supersets: supersets
+            supersets: supersets,
+            supportingEvidenceReviewId: supportingBinding?.reviewId,
+            supportingEvidenceReviewVersion: supportingBinding?.reviewVersion
         )
         let signature = ProductionIdempotentSubmission.signature([
             ProductionCommandType.commitTrainingSession,
@@ -74,6 +97,8 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                 return "\(exercise.canonicalExerciseId)|\(exercise.occurrenceId)|\(exercise.executionVariant?.key ?? "ordinary")|\(sets)"
             }.joined(separator: ";"),
             supersets.map { "\($0.id):\($0.memberExerciseIds.joined(separator: ","))" }.joined(separator: ";"),
+            supportingBinding?.reviewId ?? "no-supporting-evidence",
+            supportingBinding.map { String($0.reviewVersion) } ?? "",
         ])
         let key = idempotencyStore.resolvedKey(scope: "training-session.\(draft.id)", signature: signature)
         let outcome: ProductionCommandOutcome<TrainingCommitResult> = try await api.submitCommand(
@@ -92,7 +117,37 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                 throw TrainingWriteError.confirmationTimedOut
             }
         }
+        bindingStore.remove(draftId: draft.id)
         return result
+    }
+
+    private func prepareSupportingEvidence(for draft: TrainingLoggerDraft) async throws -> TrainingEvidenceBinding? {
+        guard !draft.supportingEvidenceAssets.isEmpty else { return nil }
+        if let existing = bindingStore.load(draftId: draft.id) { return existing }
+
+        let files = try draft.supportingEvidenceAssets.map { asset -> (filename: String, contentType: String, data: Data) in
+            guard let reference = asset.storageReference, let contentType = asset.contentType else {
+                throw TrainingWriteError.attachmentUnavailable(asset.displayName)
+            }
+            let data: Data
+            do { data = try attachmentStore.load(reference: reference) }
+            catch { throw TrainingWriteError.attachmentUnavailable(asset.displayName) }
+            return (asset.displayName, contentType, data)
+        }
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: idempotencyStore)
+        let intake = try await pipeline.submitIntake(
+            scope: "training-evidence.\(draft.id)",
+            effectiveDate: draft.workoutDate,
+            expectedEvidenceType: "training",
+            files: files
+        )
+        let reviewId = try await pipeline.awaitReadyIntake(intakeId: intake.intakeId)
+        guard let review = try await reviewAPI.fetchReview(reviewId: reviewId), let version = review.version else {
+            throw TrainingWriteError.attachmentReviewUnavailable
+        }
+        let binding = TrainingEvidenceBinding(reviewId: reviewId, reviewVersion: version)
+        bindingStore.save(binding, draftId: draft.id)
+        return binding
     }
 
     private struct Payload: Encodable {
@@ -101,6 +156,8 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         var mode: String
         var exercises: [Exercise]
         var supersets: [Superset]
+        var supportingEvidenceReviewId: String?
+        var supportingEvidenceReviewVersion: Int?
     }
 
     private struct Exercise: Encodable {

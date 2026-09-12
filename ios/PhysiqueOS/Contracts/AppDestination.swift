@@ -38,6 +38,10 @@ enum AppDestination: Hashable, Codable {
     case briefingDetail(briefingId: String)
     case briefingList
     case priorityDetail(priorityId: String)
+    /// Native-only route retaining the exact canonical occurrence opened
+    /// from Home/history. The production server resolves the detail for
+    /// this explicit date; Native never substitutes today/latest.
+    case priorityOccurrence(priorityId: String, occurrenceDate: String)
     case evidenceReview(reviewId: String)
     case trainingSession(sessionId: String)
     /// `training.exercise` — a Training Area row's own destination
@@ -172,6 +176,7 @@ enum AppDestination: Hashable, Codable {
         case .briefingDetail: "briefing.detail"
         case .briefingList: "briefing.list"
         case .priorityDetail: "priority.detail"
+        case .priorityOccurrence: "native.priority.occurrence"
         case .evidenceReview: "evidence.review"
         case .trainingSession: "training.session"
         case .trainingExercise: "training.exercise"

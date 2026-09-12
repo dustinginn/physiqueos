@@ -1,6 +1,6 @@
 import Foundation
 
-/// The exact eight-command production Native write allowlist
+/// The bounded production Native write allowlist
 /// (`NATIVE_WRITE_COMMANDS` in `server/src/application/native/NativeProductionContractService.js`).
 /// Every other command type defined server-side in `Phase3CommandService.js`
 /// (there are many legacy ones, e.g. `training-session.create.v1`,
@@ -18,6 +18,7 @@ enum ProductionCommandType {
     static let upsertActivityDay = "activity-day.upsert.v1"
     static let editDexaReviewMeasurements = "dexa-review.measurements.v1"
     static let commitEvidenceReview = "evidence-review.commit.v1"
+    static let disposeEvidenceReview = "evidence-review.dispose.v1"
 }
 
 struct ProductionCommandRequestMetadata: Encodable {

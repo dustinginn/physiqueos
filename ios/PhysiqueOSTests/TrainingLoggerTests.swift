@@ -536,6 +536,35 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(reopened.draft?.exercises.first?.sets.first?.load, 155)
     }
 
+    @MainActor
+    func testResumeAfterReopenRetainsPrivateAttachmentBytesForCanonicalUpload() async throws {
+        let draftStore = MemoryTrainingLoggerDraftStore()
+        let attachmentStore = MemoryTrainingLoggerAttachmentStore()
+        let first = TrainingLoggerViewModel(
+            api: api, draftStore: draftStore, attachmentStore: attachmentStore, authority: .founderProduction
+        )
+        await first.load()
+        first.start(mode: .live)
+        first.update {
+            $0.addSupportingEvidence([
+                TrainingLoggerSupportingEvidence(id: "asset-private", displayName: "Workout.png", source: .photos),
+            ])
+        }
+        try first.retainSupportingEvidence(
+            assetId: "asset-private", data: Data([0x89, 0x50, 0x4E, 0x47]), contentType: "image/png"
+        )
+        let reference = try XCTUnwrap(first.draft?.supportingEvidenceAssets.first?.storageReference)
+
+        let reopened = TrainingLoggerViewModel(
+            api: api, draftStore: draftStore, attachmentStore: attachmentStore, authority: .founderProduction
+        )
+        await reopened.load()
+        reopened.resume()
+
+        XCTAssertEqual(reopened.draft?.supportingEvidenceAssets.first?.storageReference, reference)
+        XCTAssertEqual(try attachmentStore.load(reference: reference), Data([0x89, 0x50, 0x4E, 0x47]))
+    }
+
     // MARK: - Build 21: submission outcome controls draft lifecycle
 
     private struct StubSucceedingTrainingWriteAPI: TrainingWriteAPI {
@@ -592,11 +621,11 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildTwentyOneInSourceControlledConfiguration() throws {
+    func testAppDeclaresExemptEncryptionAndBuildTwentyTwoInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "21")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "22")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }
