@@ -120,9 +120,9 @@ private struct BriefingHistoryRow: View {
         Button(action: onTap) {
             CardContainer(padding: .sm) {
                 HStack(alignment: .top, spacing: 12) {
-                    IconBadge(systemImage: briefing.iconName, color: .evidence)
+                    IconBadge(systemImage: briefing.iconName, color: briefing.colorToken)
                     VStack(alignment: .leading, spacing: 4) {
-                        StatusChip(text: briefing.displayCadenceLabel, color: .evidence)
+                        StatusChip(text: briefing.displayCadenceLabel, color: briefing.colorToken)
                         Text(briefing.label)
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)

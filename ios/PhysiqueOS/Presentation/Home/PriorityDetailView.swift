@@ -72,6 +72,11 @@ struct PriorityDetailView: View {
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
+        case .failed(let message):
+            Text(message)
+                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let priority)):
             VStack(alignment: .leading, spacing: 16) {
                 header(for: priority)

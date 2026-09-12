@@ -154,51 +154,72 @@ final class TrainingAcceptanceUITests: XCTestCase {
         XCTAssertTrue(latestBriefing.waitForExistence(timeout: 5), "The current Briefing was not available from Home.")
         latestBriefing.tap()
         openBriefingHistory()
+        attachScreenshot("18a-briefing-history-identities-and-colors")
         openBriefingFromHistory(containing: "Two weeks into the surplus, the gain is real")
         assertText("DEXA EVENT BRIEFING")
         assertText("Two weeks into the surplus, the gain is real — and mostly lean.")
         assertText("Current Scan")
         attachScreenshot("18-dexa-event-briefing")
-        scrollToText("What Measurably Changed")
+        scrollToLabel(containing: "What Measurably Changed")
         attachScreenshot("18b-dexa-what-measurably-changed")
+        scrollToLabel(containing: "Regional Fat Change", maxSwipes: 20)
+        attachScreenshot("18c-dexa-regional-fat")
+        scrollToLabel(containing: "Measured Lean Tissue Change", maxSwipes: 20)
+        attachScreenshot("18d-dexa-regional-lean")
+        scrollToLabel(containing: "Since Starting the Lean Mass Phase", maxSwipes: 20)
+        attachScreenshot("18e-dexa-body-composition-timeline")
+        scrollToLabel(containing: "What This Scan Means", maxSwipes: 20)
+        attachScreenshot("18f-dexa-meaning")
+        scrollToLabel(containing: "Coach's Insight", maxSwipes: 20)
+        attachScreenshot("18g-dexa-coach-insight")
         openBriefingHistory()
 
         openBriefingFromHistory(containing: "Monthly Briefing · August 2026")
         assertText("August established the starting line for building muscle.")
         attachScreenshot("19-monthly-opening")
-        scrollToText("TRAINING PROGRESS")
+        scrollToLabel(containing: "Training Progress")
         attachScreenshot("19b-monthly-training")
-        scrollToText("ENERGY EVOLUTION")
+        scrollToLabel(containing: "Energy Evolution")
         attachScreenshot("19c-monthly-energy-evolution")
-        scrollToText("NEW BASELINE")
+        scrollToLabel(containing: "Future scans can now be compared", maxSwipes: 40)
         attachScreenshot("19d-monthly-new-baseline")
-        scrollToText("WHAT CHANGED")
+        scrollToLabel(containing: "What Changed")
         attachScreenshot("19d2-monthly-what-changed")
-        scrollToText("DEFINING MOMENTS")
+        scrollToLabel(containing: "Defining Moments")
         attachScreenshot("19e-monthly-defining-moments")
-        scrollToText("MONTH AHEAD")
+        scrollToLabel(containing: "Month Ahead")
         attachScreenshot("19f-monthly-month-ahead")
         openBriefingHistory()
 
         openBriefingFromHistory(containing: "Midweek Briefing")
         assertText("Nothing here changes last week's plan.")
         attachScreenshot("20-midweek-briefing")
+        scrollToLabel(containing: "Energy Balance")
+        attachScreenshot("20a-midweek-energy")
+        scrollToLabel(containing: "Weight Context")
+        attachScreenshot("20a2-midweek-weight")
+        scrollToLabel(containing: "7,500 lb", maxSwipes: 30)
+        attachScreenshot("20b-midweek-training")
+        scrollToLabel(containing: "Body Composition")
+        attachScreenshot("20c-midweek-body-composition")
+        scrollToLabel(containing: "Coach's Take")
+        attachScreenshot("20d-midweek-coachs-take")
         openBriefingHistory()
 
         openBriefingFromHistory(containing: "Two straight weeks of clean progression.")
         assertText("Two straight weeks of clean progression.")
-        scrollToText("ENERGY BALANCE")
+        scrollToLabel(containing: "Energy Balance")
         attachScreenshot("21-weekly-energy")
-        scrollToElement(identifier: "briefing.trainingResponse", maxSwipes: 30)
+        scrollToLabel(containing: "3,340 lb volume", maxSwipes: 30)
         attachScreenshot("21b-weekly-training")
-        scrollToText("COACH'S TAKE")
+        scrollToLabel(containing: "Coach's Take")
         attachScreenshot("21c-coachs-take")
         openBriefingHistory()
 
         openBriefingFromHistory(containing: "Four poses in, the visual story matches the scan.")
         assertText("PHOTO EVENT")
         assertText("Four poses in, the visual story matches the scan.")
-        scrollToText("What Changed")
+        scrollToLabel(containing: "Matching historical views show what changed")
         attachScreenshot("22-photo-event-comparison")
     }
 
@@ -211,9 +232,28 @@ final class TrainingAcceptanceUITests: XCTestCase {
         openBriefingHistory()
         openBriefingFromHistory(containing: "Midweek Briefing")
         assertText("Nothing here changes last week's plan.")
-        scrollToElement(identifier: "briefing.trainingResponse", maxSwipes: 30)
-        assertText("3,620 lb volume")
+        scrollToLabel(containing: "7,500 lb", maxSwipes: 30)
+        assertText("7,500 lb")
+        scrollToLabel(containing: "Machine lateral raises have been stable")
         attachScreenshot("20b-midweek-training")
+    }
+
+    func testFounderCorrectionWeeklyAndPhotoBriefingJourney() throws {
+        launchInSandbox()
+
+        let latestBriefing = app.buttons["home.latestBriefing"]
+        XCTAssertTrue(latestBriefing.waitForExistence(timeout: 5), "Latest Briefing was not available from Home.")
+        latestBriefing.tap()
+        openBriefingHistory()
+        openBriefingFromHistory(containing: "Two straight weeks of clean progression.")
+        scrollToLabel(containing: "Energy Balance")
+        scrollToLabel(containing: "3,340 lb volume", maxSwipes: 30)
+        assertText("3,340 lb volume")
+        openBriefingHistory()
+
+        openBriefingFromHistory(containing: "Four poses in, the visual story matches the scan.")
+        scrollToLabel(containing: "Matching historical views show what changed")
+        attachScreenshot("22-photo-event-comparison")
     }
 
     func testFounderCorrectionHomeConfidenceAndLoggerShoulders() throws {
@@ -385,7 +425,13 @@ final class TrainingAcceptanceUITests: XCTestCase {
 
     private func openBriefingHistory() {
         let history = app.buttons["Briefing History"]
+        for _ in 0..<40 where !history.exists || !history.isHittable {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.965, dy: 0.22))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.965, dy: 0.78))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0.02)
+        }
         XCTAssertTrue(history.waitForExistence(timeout: 5), "Briefing History action was missing.")
+        XCTAssertTrue(history.isHittable, "Briefing History action could not be brought on screen.")
         history.tap()
         assertText("Briefing History")
     }
@@ -428,12 +474,24 @@ final class TrainingAcceptanceUITests: XCTestCase {
     }
 
     @discardableResult
+    private func scrollToLabel(containing text: String, maxSwipes: Int = 40) -> XCUIElement {
+        let element = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS[c] %@", text)
+        ).firstMatch
+        for _ in 0..<maxSwipes where !element.exists || !element.isHittable {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.965, dy: 0.78))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.965, dy: 0.22))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0.02)
+        }
+        XCTAssertTrue(element.exists && element.isHittable, "Could not scroll to visible label containing: \(text)")
+        return element
+    }
+
+    @discardableResult
     private func scrollToElement(identifier: String, maxSwipes: Int = 12) -> XCUIElement {
         let element = app.descendants(matching: .any)[identifier]
         for _ in 0..<maxSwipes where !element.exists || !element.isHittable {
-            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.82))
-            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.20))
-            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0.02)
+            app.swipeUp(velocity: .fast)
         }
         XCTAssertTrue(element.exists && element.isHittable, "Could not scroll to visible element: \(identifier)")
         return element

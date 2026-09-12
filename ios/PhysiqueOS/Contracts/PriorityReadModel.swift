@@ -176,6 +176,10 @@ struct PriorityCompletionContext: Codable, Equatable {
 /// to the exact same identity.
 struct PriorityOccurrence: Codable, Equatable, Identifiable {
     var id: String
+    /// Canonical reminder identity used by the occurrence-bound detail
+    /// resource. Completed Home rows can have a presentation/history id
+    /// in `id`; routing must continue to use the server's priority id.
+    var routePriorityId: String? = nil
     var executionItemId: String
     var date: String
     var title: String
@@ -216,7 +220,7 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
         if Self.isMorningWeighIn(executionItemId: executionItemId, id: id), !completed {
             return .checkIn(checkInType: "morning")
         }
-        return .priorityOccurrence(priorityId: id, occurrenceDate: date)
+        return .priorityOccurrence(priorityId: routePriorityId ?? id, occurrenceDate: date)
     }
 
     /// Checked against both `executionItemId` and `id` because the exact

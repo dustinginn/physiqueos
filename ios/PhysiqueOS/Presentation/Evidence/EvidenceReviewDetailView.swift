@@ -33,6 +33,7 @@ struct EvidenceReviewDetailView: View {
         case dismissed
         case confirmed
         case stillProcessing
+        case refreshRequired(String)
         case failed(String)
     }
 
@@ -106,7 +107,7 @@ struct EvidenceReviewDetailView: View {
         case .loaded(.some(let review)):
             VStack(alignment: .leading, spacing: 18) {
                 header(for: review)
-                itemsCard(review.items)
+                itemsCard(review)
                 if let dexaItem = review.items.first(where: { $0.dexaMeasurements != nil }), actionState == .editingMeasurements {
                     dexaMeasurementCard(review: review, item: dexaItem)
                 }
@@ -140,37 +141,128 @@ struct EvidenceReviewDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func itemsCard(_ items: [EvidenceReviewDetailItem]) -> some View {
+    private func itemsCard(_ review: EvidenceReviewDetailReadModel) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 10) {
                 TrainingSectionHeaderView(title: "Captured Evidence")
-                if items.isEmpty {
+                if let summary = review.summary {
+                    Text(summary)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+                if let excluded = review.excludedSummary {
+                    Label(excluded, systemImage: "minus.circle")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
+                if review.items.isEmpty {
                     Text("No evidence items are attached to this review.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 } else {
                     VStack(spacing: 6) {
-                        ForEach(items) { item in
-                            HStack {
-                                Text(Self.typeLabel(item.type))
+                        ForEach(review.items) { item in
+                            VStack(alignment: .leading, spacing: 9) {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.title ?? Self.typeLabel(item.type))
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    if let source = item.sourceLabel {
+                                        Text(source)
+                                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                    }
+                                }
                                 Spacer(minLength: 8)
-                                if let date = item.date {
-                                    Text(TrainingDateFormatting.short(date))
-                                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                VStack(alignment: .trailing, spacing: 3) {
+                                    Label(item.included ? "Included" : "Excluded", systemImage: item.included ? "checkmark.circle.fill" : "minus.circle.fill")
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                        .foregroundStyle(item.included ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textMuted)
+                                    if let date = item.date {
+                                        Text(date.contains(",") ? date : TrainingDateFormatting.short(date))
+                                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                    }
                                 }
                             }
-                            .padding(.vertical, 6)
+                            if !item.metrics.isEmpty {
+                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                                    ForEach(item.metrics) { metric in
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(metric.label.uppercased())
+                                                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                                .foregroundStyle(PhysiqueOSTheme.accent)
+                                            Text(metric.value)
+                                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        }
+                                        .padding(10)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(PhysiqueOSTheme.surfaceMuted)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    }
+                                }
+                            }
+                            ForEach(item.exercises) { exercise in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(exercise.name)
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    if let occurrence = exercise.occurrenceLabel { detailText(occurrence) }
+                                    if let variant = exercise.variantLabel { detailText(variant) }
+                                    if !exercise.sets.isEmpty { detailText(exercise.sets.joined(separator: " · ")) }
+                                    if exercise.proposedNewExercise {
+                                        Label("New exercise definition", systemImage: "plus.circle.fill")
+                                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                            .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                                    }
+                                    if !exercise.supersetWith.isEmpty { detailText("Superset with \(exercise.supersetWith.joined(separator: ", "))") }
+                                }
+                            }
+                            ForEach(item.meals) { meal in
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(meal.name)
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    if !meal.summary.isEmpty { detailText(meal.summary) }
+                                    ForEach(meal.foods) { food in
+                                        let details = [food.brand, food.serving, food.calories].compactMap { $0 }.joined(separator: " · ")
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(food.name).physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                            if !details.isEmpty { detailText(details) }
+                                        }
+                                        .padding(.leading, 8)
+                                    }
+                                }
+                                .padding(.top, 2)
+                            }
+                            if let reconciliation = item.reconciliation { detailText(reconciliation) }
+                            if let typedEvidence = item.typedEvidence, !typedEvidence.isEmpty {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("SUBMITTED TEXT")
+                                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                        .foregroundStyle(PhysiqueOSTheme.accent)
+                                    detailText(typedEvidence)
+                                }
+                            }
+                            if !item.sourceFiles.isEmpty { detailText("Sources: \(item.sourceFiles.joined(separator: ", "))") }
                             if let measurements = item.dexaMeasurements, actionState != .editingMeasurements {
                                 dexaMeasurementSummary(measurements)
                             }
+                            }
+                            .padding(.vertical, 8)
                         }
                     }
                 }
             }
         }
+    }
+
+    private func detailText(_ value: String) -> some View {
+        Text(value)
+            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+            .foregroundStyle(PhysiqueOSTheme.textSecondary)
     }
 
     private func dexaMeasurementSummary(_ measurements: DEXAScanMeasurements) -> some View {
@@ -239,6 +331,14 @@ struct EvidenceReviewDetailView: View {
                 Text("This is taking longer than usual. Reopen this review in a moment to check its status — confirmation continues on the server regardless of this screen.")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
                 Button("Check Now") { Task { await load(); actionState = .idle } }
+            }.frame(maxWidth: .infinity, alignment: .leading) }
+        case .refreshRequired(let message):
+            CardContainer { VStack(alignment: .leading, spacing: 8) {
+                Text("Refresh required").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                Text(message)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Button("Refresh Review") { Task { actionState = .idle; await load() } }
             }.frame(maxWidth: .infinity, alignment: .leading) }
         case .failed(let message):
             VStack(alignment: .leading, spacing: 10) {
@@ -320,7 +420,21 @@ struct EvidenceReviewDetailView: View {
             actionState = .idle
             await load()
         } catch {
-            actionState = .failed(Self.errorMessage(for: error))
+            if ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) {
+                do {
+                    let refreshed = try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId)
+                    if let refreshed, refreshed.version != review.version {
+                        state = .loaded(refreshed)
+                        actionState = .idle
+                    } else {
+                        actionState = .refreshRequired("The correction may have been accepted, but its final state could not be verified. Refresh before making another change.")
+                    }
+                } catch {
+                    actionState = .refreshRequired("The correction may have been accepted, but its final state could not be verified. Refresh before making another change.")
+                }
+            } else {
+                actionState = .failed(Self.errorMessage(for: error))
+            }
         }
     }
 
@@ -339,9 +453,13 @@ struct EvidenceReviewDetailView: View {
                 return
             }
         } catch {
-            // The commit call itself failed — nothing was kicked off.
-            actionState = .failed(Self.errorMessage(for: error))
-            return
+            if !ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) {
+                actionState = .failed(Self.errorMessage(for: error))
+                return
+            }
+            // The response is ambiguous after dispatch. Poll the canonical
+            // review before allowing any retry; the stable idempotency key
+            // remains the sole identity for this attempt.
         }
         // The commit call succeeded and is now processing durably on the
         // server (a background worker drives it forward regardless of
@@ -369,7 +487,21 @@ struct EvidenceReviewDetailView: View {
             )
             actionState = .dismissed
         } catch {
-            actionState = .failed(Self.errorMessage(for: error))
+            if ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) {
+                do {
+                    let refreshed = try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId)
+                    if refreshed == nil || refreshed?.status == "discarded" {
+                        actionState = .dismissed
+                    } else {
+                        if let refreshed { state = .loaded(refreshed) }
+                        actionState = .refreshRequired("Dismissal may have been accepted. Refresh its canonical status before attempting another action.")
+                    }
+                } catch {
+                    actionState = .refreshRequired("Dismissal may have been accepted. Refresh its canonical status before attempting another action.")
+                }
+            } else {
+                actionState = .failed(Self.errorMessage(for: error))
+            }
         }
     }
 

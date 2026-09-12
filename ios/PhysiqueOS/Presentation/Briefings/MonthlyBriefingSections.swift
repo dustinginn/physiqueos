@@ -44,7 +44,18 @@ struct MonthlyBriefingSections: View {
     }
 
     private var monthlyLeadFeatures: [BriefingLeadFeature] {
-        [
+        if let highlights = content.heroHighlights, !highlights.isEmpty {
+            return highlights.map { item in
+                BriefingLeadFeature(
+                    icon: item.icon,
+                    label: item.label,
+                    value: item.value,
+                    detail: item.detail,
+                    tone: tone(item.tone)
+                )
+            }
+        }
+        return [
             content.trainingProgress.map { training in BriefingLeadFeature(
                 icon: "dumbbell.fill",
                 label: "Training",
@@ -105,6 +116,29 @@ struct MonthlyBriefingSections: View {
                 Text(trainingProgress.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if !trainingProgress.stats.isEmpty {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                        ForEach(trainingProgress.stats) { stat in
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(stat.label.uppercased())
+                                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                                    .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                                Text(stat.value)
+                                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                if let detail = stat.detail {
+                                    Text(detail)
+                                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                }
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, minHeight: 110, alignment: .topLeading)
+                            .background(PhysiqueOSTheme.surfaceMuted)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                    }
+                }
                 if let highlights = trainingProgress.highlights, !highlights.isEmpty {
                     monthlyFeaturedLift(highlights[0])
                     if highlights.count > 1 {
@@ -220,6 +254,7 @@ struct MonthlyBriefingSections: View {
                 }
             }
         }
+        .accessibilityIdentifier("briefing.monthly.newBaseline")
     }
 
     private var definingMomentsCard: some View {
@@ -415,6 +450,15 @@ struct MonthlyBriefingSections: View {
             Text(label)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
+        }
+    }
+
+    private func tone(_ raw: String) -> HomeColorToken {
+        switch raw {
+        case "finish", "success": .success
+        case "transformation", "training": .effort
+        case "confirmation", "evidence": .evidence
+        default: .primary
         }
     }
 

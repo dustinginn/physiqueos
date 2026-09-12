@@ -3,6 +3,10 @@ import XCTest
 
 @MainActor
 final class BriefingReadModelTests: XCTestCase {
+    func testHomeAndHistoryRetainTheSharedArtifactDetailRendererArchitecture() {
+        XCTAssertEqual(BriefingDetailView.architectureInvariant, "shared-artifact-detail-renderer")
+    }
+
     func testEveryBriefingKeepsItsCompleteEditorialSectionInventory() {
         XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"])
         XCTAssertEqual(MidweekBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"])
@@ -31,7 +35,7 @@ final class BriefingReadModelTests: XCTestCase {
         XCTAssertTrue(ids.contains("weekly_briefing_2026-07-19_2026-07-25"))
         XCTAssertTrue(ids.contains("midweek_briefing_2026-08-02_2026-08-04"))
         XCTAssertTrue(ids.contains("weekly_briefing_2026-08-23_2026-08-29"))
-        XCTAssertTrue(ids.contains("midweek_briefing_2026-08-30_2026-09-01"))
+        XCTAssertTrue(ids.contains("midweek_briefing_2026-09-06_2026-09-08"))
         XCTAssertTrue(ids.contains("monthly_briefing_2026-08"))
         XCTAssertTrue(ids.contains("weekly_briefing_2026-10-26_2026-11-01"))
         XCTAssertTrue(ids.contains("monthly_briefing_2026-10"))
@@ -103,19 +107,31 @@ final class BriefingReadModelTests: XCTestCase {
         // Midweek-only computation path exists in Swift to test against);
         // this asserts the fixture models that continuity explicitly.
         let store = makeStore()
-        let midweekConfidence = try XCTUnwrap(store.briefing(id: "midweek_briefing_2026-08-30_2026-09-01")?.confidence)
+        let midweekConfidence = try XCTUnwrap(store.briefing(id: "midweek_briefing_2026-09-06_2026-09-08")?.confidence)
         XCTAssertEqual(midweekConfidence.movementDirection, .held)
         XCTAssertEqual(midweekConfidence.delta, 0)
+        XCTAssertEqual(midweekConfidence.movementLabel, "No meaningful change")
     }
 
     func testFounderAcceptanceMidweekCarriesDailyEnergyWeightAndTrainingInsteadOfNarrativeOnly() throws {
-        let midweek = try XCTUnwrap(makeStore().briefing(id: "midweek_briefing_2026-08-30_2026-09-01")?.midweek)
+        let midweek = try XCTUnwrap(makeStore().briefing(id: "midweek_briefing_2026-09-06_2026-09-08")?.midweek)
         XCTAssertEqual(midweek.energy?.dailyBalances?.count, 3)
+        XCTAssertEqual(midweek.energy?.pairedDayCount, 2)
+        XCTAssertEqual(midweek.energy?.averageIntakeKcal, 2_954)
+        XCTAssertEqual(midweek.energy?.averageExpenditureKcal, 2_856)
+        XCTAssertEqual(midweek.energy?.averageBalanceKcal, 99)
+        XCTAssertEqual(midweek.energy?.dailyBalances?.map(\.balanceKcal), [nil, 598, -401])
         XCTAssertEqual(midweek.weight?.averageWeightLb, 171.2)
-        XCTAssertEqual(midweek.training?.highlights?.first?.canonicalExerciseId, "lat-pulldown")
-        XCTAssertEqual(midweek.training?.highlights?.count, 3)
-        XCTAssertEqual(midweek.training?.highlights?.map(\.performanceValue), ["3,620 lb volume", "14 reps at 50 lb", "3,480 lb volume"])
-        XCTAssertEqual(midweek.training?.priorityGroups?.map(\.areaId), ["back", "shoulders", "chest"])
+        XCTAssertEqual(midweek.training?.headline, "This week produced measurable training progress")
+        XCTAssertEqual(midweek.training?.highlights?.map(\.canonicalExerciseId), ["cable_machine_front_raise", "shoulder_press_machine"])
+        XCTAssertEqual(midweek.training?.highlights?.map(\.performanceValue), ["10 reps", "7,500 lb"])
+        XCTAssertEqual(midweek.training?.watch?.message, "Machine lateral raises have been stable for several sessions. Consider increasing difficulty before adding more of the same work.")
+        XCTAssertEqual(midweek.training?.priorityGroups?.map(\.areaId), ["core"])
+        XCTAssertEqual(midweek.bodyComposition?.scanDate, "2026-08-15")
+        XCTAssertEqual(midweek.bodyComposition?.bodyFatPercent, "7.6%")
+        XCTAssertEqual(midweek.bodyComposition?.leanMassLb, "148.3 lb")
+        XCTAssertEqual(midweek.bodyComposition?.fatMassLb, "12.8 lb")
+        XCTAssertEqual(midweek.coachRecommendation, "Keep calories and activity steady through Sunday. The full week will give us a better basis for deciding whether intake needs to change.")
     }
 
     func testFounderAcceptanceMidweekTrainingIsBackedByDatedCanonicalSessions() async throws {
@@ -234,9 +250,9 @@ final class BriefingReadModelTests: XCTestCase {
         XCTAssertEqual(decreased.delta, -13)
         XCTAssertTrue(decreased.movementLabel.contains("Down 13"))
 
-        let held = try XCTUnwrap(store.briefing(id: "midweek_briefing_2026-08-30_2026-09-01")?.confidence)
+        let held = try XCTUnwrap(store.briefing(id: "midweek_briefing_2026-09-06_2026-09-08")?.confidence)
         XCTAssertEqual(held.movementDirection, .held)
-        XCTAssertEqual(held.movementLabel, "— No change from last assessment")
+        XCTAssertEqual(held.movementLabel, "No meaningful change")
     }
 
     func testConfidenceBandLabelsFormatKnownAndUnknownBandsCorrectly() throws {
@@ -341,7 +357,7 @@ final class BriefingReadModelTests: XCTestCase {
         // targets is exercised in isolation, exactly as originally intended.
         let store = makeStore()
         let latest = store.latestForHome(now: pacificNoon(2026, 9, 15))
-        XCTAssertEqual(latest?.id, "midweek_briefing_2026-08-30_2026-09-01")
+        XCTAssertEqual(latest?.id, "midweek_briefing_2026-09-06_2026-09-08")
     }
 
     func testLatestForHomeFromBundledFixtureOnTheMonthlyCollisionDayIsTheMonthly() {

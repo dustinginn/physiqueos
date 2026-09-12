@@ -59,8 +59,16 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         let exercises = try draft.exercises.compactMap { exercise -> Exercise? in
             let completed = exercise.sets.filter(\.isCompleted)
             guard !completed.isEmpty else { return nil }
-            guard let canonicalID = exercise.canonicalExerciseId, !canonicalID.isEmpty else {
-                throw TrainingWriteError.missingCanonicalExercise(exercise.name)
+            let canonicalID = exercise.canonicalExerciseId?.isEmpty == false ? exercise.canonicalExerciseId : nil
+            let provisional: ProvisionalExercise?
+            if canonicalID == nil {
+                guard exercise.isProvisional,
+                      !exercise.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      !exercise.areaId.isEmpty
+                else { throw TrainingWriteError.missingCanonicalExercise(exercise.name) }
+                provisional = .init(name: exercise.name, primaryMuscleGroupId: exercise.areaId)
+            } else {
+                provisional = nil
             }
             guard exercise.measurement != .duration else {
                 throw TrainingWriteError.unsupportedDurationExercise(exercise.name)
@@ -68,6 +76,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             let unit = exercise.measurement == .bodyweightReps ? "bodyweight" : "lb"
             return Exercise(
                 canonicalExerciseId: canonicalID,
+                provisionalExercise: provisional,
                 occurrenceId: exercise.id,
                 executionVariant: exercise.executionVariant,
                 sets: completed.map { SetPayload(setId: $0.id, reps: $0.reps ?? 0, load: unit == "bodyweight" ? 0 : ($0.load ?? 0), unit: unit) }
@@ -94,7 +103,8 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             draft.workoutDate,
             exercises.map { exercise in
                 let sets = exercise.sets.map { "\($0.setId):\($0.reps):\($0.load):\($0.unit)" }.joined(separator: ",")
-                return "\(exercise.canonicalExerciseId)|\(exercise.occurrenceId)|\(exercise.executionVariant?.key ?? "ordinary")|\(sets)"
+                let identity = exercise.canonicalExerciseId ?? "new:\(exercise.provisionalExercise?.name ?? ""):\(exercise.provisionalExercise?.primaryMuscleGroupId ?? "")"
+                return "\(identity)|\(exercise.occurrenceId)|\(exercise.executionVariant?.key ?? "ordinary")|\(sets)"
             }.joined(separator: ";"),
             supersets.map { "\($0.id):\($0.memberExerciseIds.joined(separator: ","))" }.joined(separator: ";"),
             supportingBinding?.reviewId ?? "no-supporting-evidence",
@@ -161,10 +171,16 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
     }
 
     private struct Exercise: Encodable {
-        var canonicalExerciseId: String
+        var canonicalExerciseId: String?
+        var provisionalExercise: ProvisionalExercise?
         var occurrenceId: String
         var executionVariant: TrainingExecutionVariant?
         var sets: [SetPayload]
+    }
+
+    private struct ProvisionalExercise: Encodable {
+        var name: String
+        var primaryMuscleGroupId: String
     }
 
     private struct SetPayload: Encodable {

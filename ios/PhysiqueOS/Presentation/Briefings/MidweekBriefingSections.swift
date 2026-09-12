@@ -102,7 +102,7 @@ struct MidweekBriefingSections: View {
     private var coachTakeCard: some View {
         BriefingCoachFinale(
             takeaway: content.coachTakeNarrative,
-            recommendation: "Keep the current plan intact until the complete week can be reviewed.",
+            recommendation: content.coachRecommendation ?? "",
             actionTitle: "Through Sunday",
             actions: content.prioritiesThroughSunday
         )

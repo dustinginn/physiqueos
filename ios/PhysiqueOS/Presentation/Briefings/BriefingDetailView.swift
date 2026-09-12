@@ -17,6 +17,11 @@ import SwiftUI
 /// `briefingId`-keyed lookup rather than building a second navigation
 /// path.
 struct BriefingDetailView: View {
+    /// Regression-visible declaration of the routing invariant: Home and
+    /// History both enter this one artifact renderer; only the published
+    /// cadence section body varies below.
+    static let architectureInvariant = "shared-artifact-detail-renderer"
+
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
     let briefingId: String

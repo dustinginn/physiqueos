@@ -225,20 +225,27 @@ enum ProductionBriefingMapper {
         case "held", "no_meaningful_change", "stable": movement = .held
         default: movement = .initial
         }
+        let presentationExplanation = value["presentationExplanation"]?.string
+            ?? value["explanationModel"]?["summary"]?.string
+        let primaryReason = presentationExplanation ?? value["primaryReason"]?.string ?? ""
+        let presentationMovementLabel = value["movementLabel"]?.string
+            ?? value["explanationModel"]?["movementLabel"]?.string
         return .init(
             score: score,
             band: band,
             priorScore: value["priorScore"]?.int,
             delta: value["delta"]?.int,
             movementDirection: movement,
-            primaryReason: value["primaryReason"]?.string ?? value["presentationExplanation"]?.string ?? "",
+            primaryReason: primaryReason,
             supportingReasons: strings(value["supportingReasons"]),
             limitingReasons: strings(value["limitingReasons"]),
             unresolvedUncertainty: strings(value["unresolvedUncertainty"]),
             goalId: value["goalId"]?.string ?? value["assessmentContext"]?["goalId"]?.string ?? "historical-goal",
             phaseId: value["phaseId"]?.string ?? value["assessmentContext"]?["phaseId"]?.string,
             capturedAt: value["assessmentDate"]?.string ?? value["assessmentTimestamp"]?.string ?? value["capturedAt"]?.string ?? "",
-            source: value["source"]?.string ?? "canonical_pi_snapshot"
+            source: value["source"]?.string ?? "canonical_pi_snapshot",
+            presentationExplanation: presentationExplanation,
+            presentationMovementLabel: presentationMovementLabel
         )
     }
 
@@ -252,7 +259,59 @@ enum ProductionBriefingMapper {
         let coach = value["coachInsight"]
         let period = hero?["periodLabel"]?.string ?? "Completed week"
         let periodParts = period.split(separator: "\n", maxSplits: 1).map(String.init)
-        return .init(
+        let energySection: WeeklyEnergySection?
+        if let averageIntake = energy?["averageIntake"]?.int,
+           let averageExpenditure = energy?["averageExpenditure"]?.int {
+            let energyDays = energy?["days"]?.array ?? []
+            let pairedDayCount = energy?["pairedDayCount"]?.int ?? energyDays.filter { $0["complete"]?.bool == true }.count
+            let eligibleDayCount = energy?["eligibleDayCount"]?.int ?? energyDays.count
+            let averageBalance = energy?["averageBalance"]?.int ?? (averageIntake - averageExpenditure)
+            let narrative = energy?["narrative"]?.string ?? ""
+            let dailyBalances = dailyEnergyPoints(energy?["days"])
+            let headline = energy?["headline"]?.string ?? energy?["title"]?.string
+            let balanceHeadline = energy?["balanceHeadline"]?.string ?? energy?["primaryResult"]?.string
+            let comparisonNarrative = energy?["comparisonNarrative"]?.string ?? energy?["comparison"]?["narrative"]?.string
+            let methodology = energy?["methodology"]?.string ?? energy?["methodologyNote"]?.string
+            energySection = WeeklyEnergySection(
+                pairedDayCount: pairedDayCount,
+                eligibleDayCount: eligibleDayCount,
+                averageIntakeKcal: averageIntake,
+                averageExpenditureKcal: averageExpenditure,
+                averageBalanceKcal: averageBalance,
+                narrative: narrative,
+                dailyBalances: dailyBalances,
+                headline: headline,
+                balanceHeadline: balanceHeadline,
+                comparisonNarrative: comparisonNarrative,
+                methodology: methodology
+            )
+        } else {
+            energySection = nil
+        }
+        let weightSection: WeeklyWeightSection?
+        if let averageWeight = weight?["weeklyAverage"]?.double ?? weight?["averageWeight"]?.double {
+            weightSection = .init(
+                averageWeightLb: averageWeight,
+                changeLb: weight?["change"]?.double ?? weight?["changeFromPriorComparable"]?.double ?? 0,
+                narrative: weight?["narrative"]?.string ?? ""
+            )
+        } else {
+            weightSection = nil
+        }
+        let photosSection: WeeklyPhotosSection? = photos?.object == nil ? nil : .init(
+            narrative: photos?["narrative"]?.string ?? photos?["summary"]?.string ?? "",
+            photoEventDestination: nil
+        )
+        let trainingReadModel: WeeklyTrainingSection? = training?.object == nil ? nil : trainingSection(training)
+        let bodySection: WeeklyBodyCompositionSection? = body?.object == nil ? nil : .init(
+            scanDate: body?["date"]?.string ?? "",
+            bodyFatPercent: measurement(body?["bodyFat"]?.double, suffix: "%"),
+            leanMassLb: measurement(body?["leanMass"]?.double, suffix: " lb"),
+            fatMassLb: measurement(body?["fatMass"]?.double, suffix: " lb"),
+            objective: body?["objective"]?.string ?? "",
+            narrative: body?["narrative"]?.string ?? ""
+        )
+        return WeeklyBriefingContent(
             periodLabel: periodParts.first ?? "Completed week",
             reportingRangeLabel: periodParts.count > 1 ? periodParts[1] : period,
             heroHeadline: hero?["headline"]?.string ?? "Weekly Briefing",
@@ -260,30 +319,11 @@ enum ProductionBriefingMapper {
             strategyPhaseLabel: hero?["strategy"]?["name"]?.string,
             strategyWeekLabel: hero?["strategy"]?["weekLabel"]?.string,
             strategyNextMilestone: hero?["strategy"]?["reviewLabel"]?.string,
-            energy: energy?.object == nil ? nil : .init(
-                pairedDayCount: energy?["pairedDayCount"]?.int ?? 0,
-                eligibleDayCount: energy?["eligibleDayCount"]?.int ?? 7,
-                averageIntakeKcal: Int(energy?["averageIntake"]?.double ?? 0),
-                averageExpenditureKcal: Int(energy?["averageExpenditure"]?.double ?? 0),
-                averageBalanceKcal: Int(energy?["averageBalance"]?.double ?? 0),
-                narrative: energy?["narrative"]?.string ?? "",
-                dailyBalances: dailyEnergyPoints(energy?["days"])
-            ),
-            weight: weight?.object == nil ? nil : .init(
-                averageWeightLb: weight?["weeklyAverage"]?.double ?? weight?["averageWeight"]?.double ?? 0,
-                changeLb: weight?["change"]?.double ?? 0,
-                narrative: weight?["narrative"]?.string ?? ""
-            ),
-            photos: photos?.object == nil ? nil : .init(narrative: photos?["narrative"]?.string ?? photos?["summary"]?.string ?? "", photoEventDestination: nil),
-            training: training?.object == nil ? nil : trainingSection(training),
-            bodyComposition: body?.object == nil ? nil : .init(
-                scanDate: body?["date"]?.string ?? "",
-                bodyFatPercent: measurement(body?["bodyFat"]?.double, suffix: "%"),
-                leanMassLb: measurement(body?["leanMass"]?.double, suffix: " lb"),
-                fatMassLb: measurement(body?["fatMass"]?.double, suffix: " lb"),
-                objective: body?["objective"]?.string ?? "",
-                narrative: body?["narrative"]?.string ?? ""
-            ),
+            energy: energySection,
+            weight: weightSection,
+            photos: photosSection,
+            training: trainingReadModel,
+            bodyComposition: bodySection,
             coachTake: .init(
                 biggestTakeaway: coach?["biggestWin"]?.string ?? "",
                 recommendation: coach?["keepBuilding"]?.string ?? coach?["watchNextWeek"]?.string ?? "",
@@ -296,28 +336,56 @@ enum ProductionBriefingMapper {
         let energy = value["energyBalance"]
         let training = value["training"]
         let coach = value["coachTake"]
-        let energySection: WeeklyEnergySection? = energy?.object == nil ? nil : .init(
-            pairedDayCount: energy?["pairedDayCount"]?.int ?? energy?["chartPoints"]?.array.count ?? 0,
-            eligibleDayCount: energy?["eligibleDayCount"]?.int ?? 3,
-            averageIntakeKcal: Int(energy?["averageIntake"]?.double ?? 0),
-            averageExpenditureKcal: Int(energy?["averageExpenditure"]?.double ?? 0),
-            averageBalanceKcal: Int(energy?["estimatedDailyBalanceMidpoint"]?.double ?? energy?["averageBalance"]?.double ?? 0),
+        let intake = energy?["averageIntake"]?.int ?? energy?["comparison"]?["averageIntake"]?.int
+        let expenditure = energy?["estimatedAverageExpenditure"]?.int ?? energy?["comparison"]?["averageExpenditure"]?.int
+        let balance = energy?["estimatedDailyBalanceMidpoint"]?.int ?? energy?["estimatedAverageDailyBalance"]?.int ?? energy?["comparison"]?["averageBalance"]?.int
+        let energySection: WeeklyEnergySection? = intake == nil || expenditure == nil || balance == nil ? nil : .init(
+            pairedDayCount: energy?["comparableDays"]?.int ?? energy?["chartPoints"]?.array.filter { $0["complete"]?.bool == true }.count ?? 0,
+            eligibleDayCount: energy?["chartPoints"]?.array.count ?? 0,
+            averageIntakeKcal: intake!,
+            averageExpenditureKcal: expenditure!,
+            averageBalanceKcal: balance!,
             narrative: energy?["interpretation"]?.string ?? energy?["summary"]?.string ?? "",
-            dailyBalances: dailyEnergyPoints(energy?["chartPoints"])
+            dailyBalances: dailyEnergyPoints(energy?["chartPoints"]),
+            headline: energy?["headline"]?.string,
+            balanceHeadline: energy?["balanceDirection"]?.string,
+            comparisonNarrative: energy?["comparison"]?["narrative"]?.string,
+            methodology: energy?["rmrProvenance"]?["strategy"]?.string
         )
-        let coachNarrative = [coach?["biggestTakeaway"]?.string, coach?["recommendation"]?.string]
-            .compactMap { $0 }
-            .joined(separator: " ")
-        return .init(
+        let weight = value["weightContext"]
+        let body = value["bodyComposition"]
+        let bodyScan = body?["newScan"] ?? body?["baseline"]
+        let weightSection: WeeklyWeightSection?
+        if let averageWeight = weight?["averageWeight"]?.double {
+            weightSection = .init(
+                averageWeightLb: averageWeight,
+                changeLb: weight?["changeFromPriorComparable"]?.double ?? 0,
+                narrative: weight?["interpretation"]?.string ?? ""
+            )
+        } else {
+            weightSection = nil
+        }
+        let trainingReadModel: WeeklyTrainingSection? = training?.object == nil ? nil : trainingSection(training)
+        let bodySection: WeeklyBodyCompositionSection? = bodyScan?.object == nil ? nil : .init(
+            scanDate: bodyScan?["date"]?.string ?? "",
+            bodyFatPercent: measurement(bodyScan?["bodyFatPercentage"]?.double ?? bodyScan?["bodyFat"]?.double, suffix: "%"),
+            leanMassLb: measurement(bodyScan?["leanMass"]?.double, suffix: " lb"),
+            fatMassLb: measurement(bodyScan?["fatMass"]?.double, suffix: " lb"),
+            objective: body?["objective"]?.string ?? "",
+            narrative: body?["interpretation"]?.string ?? ""
+        )
+        return MidweekBriefingContent(
             reportingRangeLabel: dateRange(window.startDate, window.endDate),
             heroVerdict: value["hero"]?["verdict"]?.string ?? "Midweek Briefing",
             heroSummary: value["hero"]?["summary"]?.string ?? "",
             energy: energySection,
-            weightContextNarrative: value["weightContext"]?["narrative"]?.string ?? value["weightContext"]?["summary"]?.string,
+            weightContextNarrative: weight?["interpretation"]?.string ?? weight?["narrative"]?.string ?? weight?["summary"]?.string,
             trainingResponseNarrative: training?["interpretation"]?.string,
-            training: training?.object == nil ? nil : trainingSection(training),
-            bodyComposition: nil,
-            coachTakeNarrative: coachNarrative,
+            weight: weightSection,
+            training: trainingReadModel,
+            bodyComposition: bodySection,
+            coachTakeNarrative: coach?["biggestTakeaway"]?.string ?? "",
+            coachRecommendation: coach?["recommendation"]?.string,
             prioritiesThroughSunday: strings(value["prioritiesThroughSunday"])
         )
     }
@@ -325,35 +393,44 @@ enum ProductionBriefingMapper {
     private static func trainingSection(_ value: BriefingJSONValue?) -> WeeklyTrainingSection {
         let status = value?["status"]
         return .init(
-            comparableCategoryCount: value?["comparableCategoryCount"]?.int ?? 0,
-            improvingCount: status?["improving"]?.int ?? 0,
-            steadyCount: status?["stable"]?.int ?? status?["steady"]?.int ?? 0,
+            comparableCategoryCount: value?["comparableCategoryCount"]?.int ?? value?["prioritySignals"]?.array.count ?? value?["highlights"]?.array.count ?? 0,
+            improvingCount: status?["improving"]?.int ?? value?["prioritySignals"]?.array.filter { $0["status"]?.string == "improving" }.count ?? 0,
+            steadyCount: status?["stable"]?.int ?? status?["steady"]?.int ?? value?["prioritySignals"]?.array.filter { ["stable", "steady"].contains($0["status"]?.string ?? "") }.count ?? 0,
             narrative: value?["conclusion"]?.string ?? value?["interpretation"]?.string ?? "",
-            headline: value?["title"]?.string,
-            trainingDayCount: value?["trainingDayCount"]?.int,
+            headline: value?["performanceHeadline"]?.string ?? value?["title"]?.string,
+            trainingDayCount: value?["sessionsCompleted"]?.int ?? value?["trainingDayCount"]?.int,
             plateauingCount: status?["plateauing"]?.int,
             insufficientCount: value?["insufficientCount"]?.int,
             highlights: value?["highlights"]?.array.compactMap(trainingHighlight),
-            priorityGroups: value?["priorityCategories"]?.array.compactMap(trainingPriority)
+            priorityGroups: (value?["priorityCategories"] ?? value?["prioritySignals"])?.array.compactMap(trainingPriority),
+            watch: value?["watch"]?.object == nil ? nil : .init(
+                exercise: value?["watch"]?["exercise"]?.string,
+                status: value?["watch"]?["status"]?.string,
+                message: value?["watch"]?["message"]?.string ?? ""
+            )
         )
     }
 
     private static func trainingHighlight(_ value: BriefingJSONValue) -> BriefingTrainingHighlight? {
-        guard let id = value["canonicalExerciseId"]?.string ?? value["exerciseId"]?.string else { return nil }
+        guard let id = value["canonicalExerciseId"]?.string ?? value["exerciseId"]?.string ?? value["exercise"]?.string else { return nil }
+        let rawValue = value["performanceValue"]?.string ?? value["value"]?.string
+            ?? value["value"]?.double.map { measurement($0, suffix: value["unit"]?.string.map { " \($0)" } ?? "") }
+        let delta = value["delta"]?.string ?? value["delta"]?.double.map { measurement($0, suffix: value["unit"]?.string.map { " \($0)" } ?? "") }
+            ?? value["percentChange"]?.double.map { measurement($0, suffix: "%") } ?? ""
         return .init(
             canonicalExerciseId: id,
             exerciseName: value["exerciseName"]?.string ?? value["label"]?.string ?? value["exercise"]?.string ?? "Exercise",
             recordType: value["recordType"]?.string ?? value["type"]?.string ?? "Performance",
-            performanceValue: value["performanceValue"]?.string ?? value["value"]?.string,
+            performanceValue: rawValue,
             headline: value["headline"]?.string ?? value["detail"]?.string ?? "",
             detail: value["detail"]?.string ?? value["message"]?.string ?? "",
-            delta: value["delta"]?.string ?? "",
+            delta: delta,
             tone: value["tone"]?.string ?? "evidence"
         )
     }
 
     private static func trainingPriority(_ value: BriefingJSONValue) -> BriefingTrainingPriorityGroup? {
-        guard let id = value["areaId"]?.string ?? value["categoryId"]?.string ?? value["id"]?.string else { return nil }
+        guard let id = value["areaId"]?.string ?? value["categoryId"]?.string ?? value["id"]?.string ?? value["key"]?.string else { return nil }
         return .init(
             areaId: id,
             label: value["label"]?.string ?? "Training area",
@@ -387,25 +464,29 @@ enum ProductionBriefingMapper {
             narrative: training?["summary"]?.string ?? "",
             stats: (training?["stats"]?.array ?? []).compactMap(stat),
             headline: training?["title"]?.string,
-            highlights: nil,
+            highlights: training?["highlights"]?.array.compactMap(trainingHighlight),
             whyItMatters: training?["interpretation"]?.string ?? training?["next"]?.string
         )
         let weeks: [MonthlyEnergyEvolutionSection.WeekBar] = (energy?["weekly"]?.array ?? [])
             .filter { $0["missing"]?.bool != true }
-            .map { week in
-                .init(
+            .compactMap { week in
+                guard let intake = week["intake"]?.int, let expenditure = week["expenditure"]?.int else { return nil }
+                return .init(
                     weekLabel: week["label"]?.string ?? "Week",
-                    averageIntakeKcal: week["intake"]?.int ?? 0,
-                    averageExpenditureKcal: week["expenditure"]?.int ?? 0,
+                    averageIntakeKcal: intake,
+                    averageExpenditureKcal: expenditure,
                     averageBalanceKcal: week["balance"]?.int,
-                    coverageLabel: nil
+                    coverageLabel: week["observedCount"]?.int.map { "\($0) observed days" }
                 )
             }
-        let energyEvolution: MonthlyEnergyEvolutionSection? = energy?.object == nil ? nil : .init(
+        let summaryIntake = summaryMetric("Avg intake", in: energy)
+        let summaryExpenditure = summaryMetric("Avg expenditure", in: energy)
+        let summaryBalance = summaryMetric("Avg balance", in: energy)
+        let energyEvolution: MonthlyEnergyEvolutionSection? = summaryIntake == nil || summaryExpenditure == nil || summaryBalance == nil ? nil : .init(
             weeks: weeks,
-            averageIntakeKcal: summaryMetric("Avg intake", in: energy),
-            averageExpenditureKcal: summaryMetric("Avg expenditure", in: energy),
-            averageBalanceKcal: summaryMetric("Avg balance", in: energy),
+            averageIntakeKcal: summaryIntake!,
+            averageExpenditureKcal: summaryExpenditure!,
+            averageBalanceKcal: summaryBalance!,
             headline: energy?["title"]?.string,
             phaseLabel: energy?["phaseLabel"]?.string,
             phaseDateLabel: energy?["phaseDates"]?.string,
@@ -427,10 +508,10 @@ enum ProductionBriefingMapper {
         }
         let momentDetails: [MonthlyDefiningMoment] = moments.compactMap { item in
             guard let date = item["date"]?.string, let title = item["label"]?.string else { return nil }
-            return .init(dateLabel: date, title: title, narrative: item["body"]?.string ?? "", icon: "calendar")
+            return .init(dateLabel: date, title: title, narrative: item["body"]?.string ?? "", icon: monthlyIcon(item["tone"]?.string))
         }
         let actions: [MonthlyActionCard] = (ahead?["guidance"]?.array ?? []).enumerated().map { index, item in
-            .init(domain: item["tone"]?.string ?? "action-\(index)", title: item["label"]?.string ?? "Next", narrative: item["detail"]?.string ?? item["value"]?.string ?? "", icon: "target")
+            .init(domain: item["tone"]?.string ?? "action-\(index)", title: item["label"]?.string ?? "Next", narrative: [item["value"]?.string, item["detail"]?.string].compactMap { $0 }.joined(separator: " · "), icon: monthlyIcon(item["tone"]?.string))
         }
         return .init(
             monthLabel: monthLabel,
@@ -450,7 +531,17 @@ enum ProductionBriefingMapper {
             whatChangedSections: changedSections,
             definingMomentDetails: momentDetails,
             monthAheadIntroduction: ahead?["thesis"]?.string,
-            monthAheadActions: actions
+            monthAheadActions: actions,
+            heroHighlights: (hero?["highlights"]?.array ?? []).compactMap { item in
+                guard let label = item["label"]?.string, let displayValue = item["value"]?.string else { return nil }
+                return .init(
+                    label: label,
+                    value: displayValue,
+                    detail: item["detail"]?.string ?? "",
+                    icon: monthlyIcon(item["icon"]?.string),
+                    tone: item["tone"]?.string ?? "primary"
+                )
+            }
         )
     }
 
@@ -478,11 +569,11 @@ enum ProductionBriefingMapper {
             snapshot: .init(
                 scanDate: snapshot?["scanDate"]?.string ?? "",
                 daysBetweenScans: snapshot?["daysBetweenScans"]?.int ?? 0,
-                weightLb: metricText(snapshot?["weight"], suffix: " lb"),
-                bodyFatPercent: metricText(snapshot?["bodyFat"] ?? snapshot?["bodyFatPercentage"], suffix: "%"),
-                fatMassLb: metricText(snapshot?["fatMass"], suffix: " lb"),
-                leanMassLb: metricText(snapshot?["leanMass"], suffix: " lb"),
-                restingMetabolicRateKcal: optionalMetricText(snapshot?["rmr"] ?? snapshot?["restingMetabolicRate"], suffix: " kcal")
+                weightLb: metricText(snapshot?["weight"], suffix: " lb", precision: 1),
+                bodyFatPercent: metricText(snapshot?["bodyFat"] ?? snapshot?["bodyFatPercentage"], suffix: "%", precision: 1),
+                fatMassLb: metricText(snapshot?["fatMass"], suffix: " lb", precision: 1),
+                leanMassLb: metricText(snapshot?["leanMass"], suffix: " lb", precision: 1),
+                restingMetabolicRateKcal: optionalMetricText(snapshot?["rmr"] ?? snapshot?["restingMetabolicRate"], suffix: " cal/day", precision: 0)
             ),
             progress: .init(
                 headline: comparisons(progress?["headline"]),
@@ -490,14 +581,14 @@ enum ProductionBriefingMapper {
                 regionalLean: regional(progress?["regionalLean"]),
                 supplemental: comparisons(progress?["supplemental"]),
                 timeline: .init(
-                    timelineLabel: timeline?["label"]?.string ?? timeline?["timelineLabel"]?.string ?? "Body-composition timeline",
+                    timelineLabel: progress?["timelineLabel"]?.string ?? timeline?["label"]?.string ?? timeline?["timelineLabel"]?.string ?? "Body-composition timeline",
                     isSimulated: timeline?["simulated"]?.bool ?? false,
                     baselineDate: timeline?["scans"]?.array.first?["date"]?.string ?? "",
                     currentDate: timeline?["scans"]?.array.last?["date"]?.string ?? "",
                     elapsedDays: timeline?["elapsedDays"]?.int ?? 0,
                     scans: timeline?["scans"]?.array.compactMap(timelinePoint) ?? [],
                     metrics: (timeline?["metrics"]?.array ?? []).compactMap(timelineMetric),
-                    summary: timeline?["summaryText"]?.string ?? interpretation?["opening"]?.string ?? ""
+                    summary: dexaTimelineSummary(timeline?["summary"])
                 )
             ),
             interpretation: .init(
@@ -617,7 +708,9 @@ enum ProductionBriefingMapper {
                 date: date,
                 intakeKcal: item["intake"]?.int ?? item["intakeKcal"]?.int,
                 expenditureKcal: item["expenditure"]?.int ?? item["expenditureKcal"]?.int,
-                hasPairedData: item["complete"]?.bool ?? item["hasPairedData"]?.bool ?? false
+                hasPairedData: item["complete"]?.bool ?? item["hasPairedData"]?.bool ?? false,
+                balanceKcal: item["balance"]?.int,
+                label: item["label"]?.string
             )
         } ?? []
         return points.isEmpty ? nil : points
@@ -625,31 +718,51 @@ enum ProductionBriefingMapper {
 
     private static func stat(_ value: BriefingJSONValue) -> BriefingStat? {
         guard let label = value["label"]?.string else { return nil }
-        return .init(label: label, value: value["value"]?.string ?? "")
+        return .init(label: label, value: value["value"]?.string ?? "", detail: value["detail"]?.string)
     }
 
-    private static func summaryMetric(_ label: String, in energy: BriefingJSONValue?) -> Int {
-        energy?["summaryMetrics"]?.array.first(where: { $0["label"]?.string == label })?["value"]?.int ?? 0
+    private static func summaryMetric(_ label: String, in energy: BriefingJSONValue?) -> Int? {
+        energy?["summaryMetrics"]?.array.first(where: { $0["label"]?.string == label })?["value"]?.int
+    }
+
+    private static func monthlyIcon(_ value: String?) -> String {
+        switch value {
+        case "training": "dumbbell.fill"
+        case "energy": "bolt.fill"
+        case "weight": "scalemass.fill"
+        case "photos": "camera.fill"
+        case "baseline": "scope"
+        case "completion": "trophy.fill"
+        default: "sparkles"
+        }
     }
 
     private static func comparisons(_ value: BriefingJSONValue?) -> [DEXAComparisonMetric] {
         value?.array.compactMap { item in
             guard let label = item["label"]?.string else { return nil }
-            let suffix = item["unit"]?.string.map { $0 == "%" ? "%" : " \($0)" } ?? ""
-            return .init(label: label, previous: metricText(item["previous"], suffix: suffix), current: metricText(item["current"], suffix: suffix), delta: metricText(item["delta"], suffix: suffix))
+            let unit = item["displayUnit"]?.string ?? item["unit"]?.string ?? ""
+            let suffix = unit == "%" ? "%" : unit.isEmpty ? "" : " \(unit)"
+            let precision = item["precision"]?.int ?? (unit == "cal/day" ? 0 : unit.isEmpty ? 2 : 1)
+            return .init(
+                label: label,
+                previous: metricText(item["previous"], suffix: suffix, precision: precision),
+                current: metricText(item["current"], suffix: suffix, precision: precision),
+                delta: signedMetricText(item["delta"], suffix: item["unit"]?.string.map { $0.isEmpty ? "" : " \($0)" } ?? suffix, precision: precision)
+            )
         } ?? []
     }
 
     private static func regional(_ value: BriefingJSONValue?) -> [DEXARegionalChangeMetric] {
         value?.array.compactMap { item in
             guard let region = item["region"]?.string ?? item["label"]?.string else { return nil }
-            return .init(region: region, previous: metricText(item["previous"], suffix: " lb"), current: metricText(item["current"], suffix: " lb"), delta: metricText(item["delta"], suffix: " lb"))
+            let precision = item["precision"]?.int ?? 1
+            return .init(region: region, previous: metricText(item["previous"], suffix: " lb", precision: precision), current: metricText(item["current"], suffix: " lb", precision: precision), delta: signedMetricText(item["delta"], suffix: " lb", precision: precision))
         } ?? []
     }
 
     private static func timelinePoint(_ value: BriefingJSONValue) -> DEXATimelinePoint? {
         guard let id = value["scanId"]?.string ?? value["id"]?.string, let date = value["date"]?.string else { return nil }
-        return .init(scanId: id, date: date, value: metricText(value["value"] ?? value["bodyFat"], suffix: ""))
+        return .init(scanId: id, date: date, value: metricText(value["value"] ?? value["bodyFat"], suffix: "", precision: 1))
     }
 
     private static func timelineMetric(_ value: BriefingJSONValue) -> DEXATimelineMetricTrack? {
@@ -658,24 +771,41 @@ enum ProductionBriefingMapper {
             label: label,
             unit: value["unit"]?.string ?? "",
             points: value["points"]?.array.compactMap(timelinePoint) ?? [],
-            delta: metricText(value["delta"], suffix: "")
+            delta: signedMetricText(value["delta"], suffix: value["unit"]?.string.map { $0.isEmpty ? "" : " \($0)" } ?? "", precision: 1)
         )
     }
 
-    private static func metricText(_ value: BriefingJSONValue?, suffix: String) -> String {
+    private static func metricText(_ value: BriefingJSONValue?, suffix: String, precision: Int? = nil) -> String {
         if let string = value?.string, value?.double == nil { return string }
-        return measurement(value?.double, suffix: suffix)
+        let number = value?.double ?? value?["value"]?.double
+        return measurement(number, suffix: suffix, precision: precision)
     }
 
-    private static func optionalMetricText(_ value: BriefingJSONValue?, suffix: String) -> String? {
+    private static func signedMetricText(_ value: BriefingJSONValue?, suffix: String, precision: Int) -> String {
+        guard let number = value?.double ?? value?["value"]?.double else { return "—" }
+        let sign = number > 0 ? "+" : number < 0 ? "−" : ""
+        return sign + measurement(abs(number), suffix: suffix, precision: precision)
+    }
+
+    private static func optionalMetricText(_ value: BriefingJSONValue?, suffix: String, precision: Int? = nil) -> String? {
         guard value != nil, value?.object != nil || value?.double != nil || value?.string != nil else { return nil }
-        return metricText(value, suffix: suffix)
+        return metricText(value, suffix: suffix, precision: precision)
     }
 
-    private static func measurement(_ value: Double?, suffix: String) -> String {
+    private static func measurement(_ value: Double?, suffix: String, precision: Int? = nil) -> String {
         guard let value else { return "—" }
-        let formatted = value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+        let formatted: String
+        if let precision {
+            formatted = String(format: "%.*f", precision, value)
+        } else {
+            formatted = value.rounded() == value ? String(Int(value)) : String(format: "%.2f", value).replacingOccurrences(of: #"0+$"#, with: "", options: .regularExpression).replacingOccurrences(of: #"\.$"#, with: "", options: .regularExpression)
+        }
         return formatted + suffix
+    }
+
+    private static func dexaTimelineSummary(_ value: BriefingJSONValue?) -> String {
+        guard let bodyFat = value?["bodyFat"], let fatMass = value?["fatMass"], let leanMass = value?["leanMass"] else { return "" }
+        return "Across this body-composition timeline, body fat moved from \(metricText(bodyFat["previous"], suffix: "%", precision: 1)) to \(metricText(bodyFat["current"], suffix: "%", precision: 1)), fat mass changed \(signedMetricText(fatMass["delta"], suffix: " lb", precision: 1)), and measured lean tissue changed \(signedMetricText(leanMass["delta"], suffix: " lb", precision: 1))."
     }
 
     private static func strings(_ value: BriefingJSONValue?) -> [String] {

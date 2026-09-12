@@ -203,6 +203,17 @@ struct BriefingTrainingResponseCard: View {
                         }
                     }
                 }
+                if let watch = training.watch, !watch.message.isEmpty {
+                    Divider().overlay(PhysiqueOSTheme.divider)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text([watch.exercise, watch.status].compactMap { $0 }.joined(separator: " · ").uppercased())
+                            .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                            .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                        Text(watch.message)
+                            .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                }
             }
         }
     }
@@ -284,7 +295,7 @@ struct WeeklyEnergyCard: View {
                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                Text("Calories need more context.")
+                Text(section.headline ?? "Energy Balance")
                     .physiqueOSFont(PhysiqueOSTypography.editorialSection)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(balanceStatement)
@@ -293,6 +304,11 @@ struct WeeklyEnergyCard: View {
                 Text(section.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if let comparison = section.comparisonNarrative, !comparison.isEmpty {
+                    Text(comparison)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     energyMetric("Avg Intake", "\(section.averageIntakeKcal) kcal", color: PhysiqueOSTheme.energyIntake)
                     energyMetric("Avg Expenditure", "\(section.averageExpenditureKcal) kcal", color: PhysiqueOSTheme.energyExpenditure)
@@ -307,6 +323,7 @@ struct WeeklyEnergyCard: View {
     }
 
     private var balanceStatement: String {
+        if let authored = section.balanceHeadline, !authored.isEmpty { return authored }
         let balance = section.averageBalanceKcal
         if abs(balance) <= 100 { return "About even day to day" }
         return balance > 0 ? "A controlled daily surplus" : "A consistent daily deficit"

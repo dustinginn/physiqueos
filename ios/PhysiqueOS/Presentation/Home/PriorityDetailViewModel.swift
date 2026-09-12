@@ -9,6 +9,7 @@ final class PriorityDetailViewModel {
     enum LoadState: Equatable {
         case loading
         case loaded(PriorityOccurrence?)
+        case failed(String)
     }
 
     private(set) var state: LoadState = .loading
@@ -36,8 +37,11 @@ final class PriorityDetailViewModel {
             state = .loaded(store.priorityOccurrence(id: priorityId))
             return
         }
-        let occurrence = try? await api.fetchPriority(priorityId: priorityId, occurrenceDate: occurrenceDate)
-        state = .loaded(occurrence)
+        do {
+            state = .loaded(try await api.fetchPriority(priorityId: priorityId, occurrenceDate: occurrenceDate))
+        } catch {
+            state = .failed("This priority could not be loaded. Pull to refresh and try again.")
+        }
     }
 
     /// `completePriority` (`src/app/priorities/[priorityId]/actions.js`) —

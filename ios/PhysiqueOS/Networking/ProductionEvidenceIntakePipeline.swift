@@ -21,6 +21,20 @@ struct ProductionEvidenceIntakePipeline {
         case timedOut
     }
 
+    /// A POST may reach canonical authority even when its response is lost
+    /// or a synchronous continuation fails afterward. These errors mean
+    /// “acceptance unknown”; callers must refresh/poll with the same
+    /// idempotency identity and must not offer a blind mutation retry.
+    static func acceptanceIsUncertain(after error: Swift.Error) -> Bool {
+        guard let error = error as? ProductionNativeError else { return false }
+        switch error {
+        case .networkFailure, .invalidResponse, .temporaryServer, .server:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Step 1 — upload the file(s). `scope` should uniquely identify this
     /// logical submission (e.g. `"dexa-intake.\(effectiveDate)"`) so a
     /// retry after a dropped response reuses the same `submissionIdentity`

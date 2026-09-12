@@ -568,17 +568,17 @@
     }
   },
   {
-    "id": "midweek_briefing_2026-08-30_2026-09-01",
+    "id": "midweek_briefing_2026-09-06_2026-09-08",
     "occurrence": {
-      "value": "founder|scheduled|midweek|midweek:2026-08-30_2026-09-01"
+      "value": "founder|scheduled|midweek|midweek:2026-09-06_2026-09-08"
     },
     "cadence": "midweek",
-    "generatedAt": "2026-09-02T13:00:00.000Z",
+    "generatedAt": "2026-09-09T13:00:00.000Z",
     "evidenceWindow": {
-      "id": "midweek:2026-08-30_2026-09-01",
-      "startDate": "2026-08-30",
-      "endDate": "2026-09-01",
-      "briefingDate": "2026-09-02",
+      "id": "midweek:2026-09-06_2026-09-08",
+      "startDate": "2026-09-06",
+      "endDate": "2026-09-08",
+      "briefingDate": "2026-09-09",
       "relativeLabel": "Sunday through Tuesday",
       "timeZone": "America/Los_Angeles"
     },
@@ -590,95 +590,102 @@
       "phaseName": "Lean Mass Build"
     },
     "confidence": {
-      "score": 68,
+      "score": 62,
       "band": "moderate",
-      "priorScore": 68,
+      "priorScore": 62,
       "delta": 0,
       "movementDirection": "held",
-      "primaryReason": "Nothing in the first three days of this week changes last week's conclusion — this is the expected in-between-Briefings state.",
-      "supportingReasons": [],
-      "limitingReasons": [],
+      "presentationMovementLabel": "No meaningful change",
+      "presentationExplanation": "Training is moving in the right direction, but the week is still early. Hold the plan steady and let the full week establish whether progress is holding.",
+      "primaryReason": "Training is moving in the right direction, but the week is still early. Hold the plan steady and let the full week establish whether progress is holding.",
+      "supportingReasons": ["Two published training records moved forward."],
+      "limitingReasons": ["Only Monday and Tuesday have paired energy data so far."],
       "unresolvedUncertainty": [],
       "goalId": "goal_fixture_build_lean_mass",
       "phaseId": "phase_fixture_lean_mass_build",
-      "capturedAt": "2026-09-02T13:00:00.000Z",
+      "capturedAt": "2026-09-09T13:00:00.000Z",
       "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": null,
     "replacedHistory": [],
     "midweek": {
-      "reportingRangeLabel": "Sun–Tue, Aug 30–Sep 1",
+      "reportingRangeLabel": "Sun–Tue, Sep 6–8",
       "heroVerdict": "Nothing here changes last week's plan.",
-      "heroSummary": "Intake is sitting right where it's been for three weeks. Keep logging through Saturday — Sunday's review will have the fuller picture.",
+      "heroSummary": "Training is moving in the right direction while the week is still early. Hold the plan steady and let the full week establish whether progress is holding.",
       "energy": {
-        "pairedDayCount": 3,
+        "pairedDayCount": 2,
         "eligibleDayCount": 3,
-        "averageIntakeKcal": 2805,
-        "averageExpenditureKcal": 2445,
-        "averageBalanceKcal": 360,
-        "narrative": "Right in the middle of the target surplus range for all three paired days.",
+        "averageIntakeKcal": 2954,
+        "averageExpenditureKcal": 2856,
+        "averageBalanceKcal": 99,
+        "narrative": "Monday landed 598 kcal above estimated expenditure and Tuesday landed 401 kcal below. Sunday is intentionally excluded because paired intake and expenditure are missing.",
         "dailyBalances": [
-          { "date": "2026-08-30", "intakeKcal": 2810, "expenditureKcal": 2440, "hasPairedData": true },
-          { "date": "2026-08-31", "intakeKcal": 2785, "expenditureKcal": 2460, "hasPairedData": true },
-          { "date": "2026-09-01", "intakeKcal": 2820, "expenditureKcal": 2435, "hasPairedData": true }
-        ]
+          { "date": "2026-09-06", "intakeKcal": null, "expenditureKcal": null, "hasPairedData": false, "balanceKcal": null, "label": "Sun · Missing paired data" },
+          { "date": "2026-09-07", "intakeKcal": 3220, "expenditureKcal": 2622, "hasPairedData": true, "balanceKcal": 598, "label": "Mon · +598 kcal" },
+          { "date": "2026-09-08", "intakeKcal": 2688, "expenditureKcal": 3089, "hasPairedData": true, "balanceKcal": -401, "label": "Tue · −401 kcal" }
+        ],
+        "headline": "Intake and expenditure are close",
+        "balanceHeadline": "99 kcal/day above",
+        "comparisonNarrative": "The prior comparable period averaged 371 kcal/day above estimated expenditure.",
+        "methodology": "Estimated expenditure uses the accepted DEXA resting metabolic rate plus recorded activity."
       },
-      "weightContextNarrative": "Weight is up slightly, consistent with the ongoing controlled surplus.",
-      "trainingResponseNarrative": "Monday's session matched last week's working weights.",
+      "weightContextNarrative": "The early-week weight pattern remains context, not a verdict; the complete weekly average should own the decision.",
+      "trainingResponseNarrative": "Two published records show measurable progress while the full week is still forming.",
       "weight": {
         "averageWeightLb": 171.2,
         "changeLb": 0.6,
         "narrative": "The early-week average is up 0.6 lb. That remains compatible with the controlled-surplus pace, but Sunday’s complete average should own the decision."
       },
       "training": {
-        "comparableCategoryCount": 3,
+        "comparableCategoryCount": 2,
         "improvingCount": 2,
-        "steadyCount": 1,
-        "narrative": "Two early-week sessions preserved last week’s working loads while back volume, shoulder repetitions, and chest volume each moved forward. The sample is useful, but Sunday’s complete window should own the conclusion.",
-        "headline": "Early sessions extended last week’s progression.",
+        "steadyCount": 0,
+        "narrative": "Cable front raises added a repetition and shoulder press added 300 lb of volume. Those are useful early signals, while Sunday’s complete window should own the conclusion.",
+        "headline": "This week produced measurable training progress",
         "trainingDayCount": 2,
-        "plateauingCount": 0,
-        "insufficientCount": 2,
+        "plateauingCount": 1,
+        "insufficientCount": 0,
         "highlights": [
           {
-            "canonicalExerciseId": "lat-pulldown",
-            "exerciseName": "Lat Pulldown",
-            "recordType": "Volume PR",
-            "performanceValue": "3,620 lb volume",
-            "headline": "Back volume held its lead",
-            "detail": "The August 31 session added another 280 lb above the August 24 working-volume benchmark.",
-            "delta": "+280 lb",
+            "canonicalExerciseId": "cable_machine_front_raise",
+            "exerciseName": "Cable Machine Front Raises",
+            "recordType": "New performance record",
+            "performanceValue": "10 reps",
+            "headline": "Cable front raises added a repetition",
+            "detail": "The top comparable set moved from 9 to 10 repetitions.",
+            "delta": "+1 rep (+11.1%)",
             "tone": "success"
           },
           {
-            "canonicalExerciseId": "face-pull",
-            "exerciseName": "Face Pull",
-            "recordType": "Reps at Load",
-            "performanceValue": "14 reps at 50 lb",
-            "headline": "Shoulder work added two repetitions",
-            "detail": "The top set moved from 12 to 14 repetitions at the same working load.",
-            "delta": "+2 reps",
+            "canonicalExerciseId": "shoulder_press_machine",
+            "exerciseName": "Shoulder Press Machine",
+            "recordType": "New volume-load record",
+            "performanceValue": "7,500 lb",
+            "headline": "Shoulder press volume moved forward",
+            "detail": "Published session volume increased from 7,200 lb to 7,500 lb.",
+            "delta": "+300 lb (+4.2%)",
             "tone": "evidence"
-          },
-          {
-            "canonicalExerciseId": "bench-press",
-            "exerciseName": "Bench Press",
-            "recordType": "Session Volume PR",
-            "performanceValue": "3,480 lb volume",
-            "headline": "Chest volume opened the week higher",
-            "detail": "The September 1 session added 310 lb while preserving the top working load.",
-            "delta": "+310 lb",
-            "tone": "success"
           }
         ],
+        "watch": {
+          "exercise": "Lateral Raises Machine",
+          "status": "plateauing",
+          "message": "Machine lateral raises have been stable for several sessions. Consider increasing difficulty before adding more of the same work."
+        },
         "priorityGroups": [
-          { "areaId": "back", "label": "Back", "statusLabel": "Improving", "comparableExerciseCount": 4, "tone": "success" },
-          { "areaId": "shoulders", "label": "Shoulders", "statusLabel": "Steady", "comparableExerciseCount": 3, "tone": "evidence" },
-          { "areaId": "chest", "label": "Chest", "statusLabel": "Improving", "comparableExerciseCount": 3, "tone": "success" }
+          { "areaId": "core", "label": "Core", "statusLabel": "Leading this week’s progress", "comparableExerciseCount": 2, "tone": "success" }
         ]
       },
-      "bodyComposition": null,
-      "coachTakeNarrative": "Steady is the right word here — no reason to touch anything before Sunday.",
+      "bodyComposition": {
+        "scanDate": "2026-08-15",
+        "bodyFatPercent": "7.6%",
+        "leanMassLb": "148.3 lb",
+        "fatMassLb": "12.8 lb",
+        "objective": "Maintain approximately the same body-fat level while gradually increasing lean mass.",
+        "narrative": "The August 15 DEXA is the accepted phase starting point for judging future lean-mass progress."
+      },
+      "coachTakeNarrative": "Your training is progressing the way we want while building muscle. Protect that momentum instead of reacting to a few days of calorie math.",
+      "coachRecommendation": "Keep calories and activity steady through Sunday. The full week will give us a better basis for deciding whether intake needs to change.",
       "prioritiesThroughSunday": [
         "Keep logging every meal through Saturday.",
         "No calorie changes before Sunday."

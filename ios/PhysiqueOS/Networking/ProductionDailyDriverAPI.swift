@@ -6,6 +6,7 @@ enum ProductionDailyDriverError: Error, Equatable {
     case unsupportedGoalContext(id: String)
     case unsupportedHomeGoalPresentation(id: String)
     case missingCanonicalIdentity(String)
+    case missingPriorityOccurrenceDate(String)
 }
 
 private struct ProductionTimeline: Decodable, @unchecked Sendable {
@@ -89,13 +90,17 @@ struct ProductionHomeAPI: HomeAPI {
 
     func fetchHome() async throws -> HomeReadModel {
         let envelope = try await api.readResource("home", as: Payload.self)
+        let priorities = envelope.data.todaysFocus.map { $0.readOnlyOccurrence }
+        if let invalid = priorities.first(where: { $0.date.isEmpty }) {
+            throw ProductionDailyDriverError.missingPriorityOccurrenceDate(invalid.id)
+        }
         return HomeReadModel(
             header: envelope.data.header,
             hero: envelope.data.hero.readModel,
             nextBestAction: envelope.data.nextBestAction,
             briefingCards: envelope.data.briefingCards,
             goals: try envelope.data.goals.map { try $0.readModel() },
-            todaysFocus: envelope.data.todaysFocus.map { $0.readOnlyOccurrence }
+            todaysFocus: priorities
         )
     }
 
@@ -262,12 +267,36 @@ struct ProductionHomeAPI: HomeAPI {
         var completed: Bool
         var actionLabel: String?
         var completionContext: PriorityCompletionContext?
+        var executionContract: ExecutionContract?
+
+        struct ExecutionContract: Decodable {
+            var priorityId: String?
+            var occurrenceDate: String?
+            var destination: Destination?
+
+            struct Destination: Decodable {
+                var parameters: Parameters?
+
+                struct Parameters: Decodable { var priorityId: String? }
+            }
+        }
 
         var readOnlyOccurrence: PriorityOccurrence {
-            PriorityOccurrence(
+            let canonicalPriorityId = executionContract?.priorityId
+                ?? executionContract?.destination?.parameters?.priorityId
+                ?? completionId
+                ?? id
+            let canonicalOccurrenceDate = occurrenceDate
+                ?? completionContext?.occurrenceDate
+                ?? executionContract?.occurrenceDate
+            return PriorityOccurrence(
                 id: id,
-                executionItemId: executionId ?? completionId ?? id,
-                date: occurrenceDate ?? completionContext?.occurrenceDate ?? String(ISO8601DateFormatter().string(from: Date()).prefix(10)),
+                routePriorityId: canonicalPriorityId,
+                executionItemId: executionId ?? canonicalPriorityId,
+                // The production Home contract is occurrence-bound. An
+                // absent date is invalid transport data, not permission to
+                // substitute the device clock and silently open another day.
+                date: canonicalOccurrenceDate ?? "",
                 title: label,
                 subtitle: subtitle,
                 metadata: metadata,

@@ -141,6 +141,7 @@ struct DEXABriefingSections: View {
             Text(title.uppercased())
                 .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .accessibilityIdentifier(title == "Regional Fat Change" ? "briefing.dexa.regionalFat" : title == "Measured Lean Tissue Change" ? "briefing.dexa.regionalLean" : "briefing.dexa.supplemental")
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(items) { item in
                     VStack(alignment: .leading, spacing: 12) {
@@ -242,6 +243,7 @@ struct DEXABriefingSections: View {
                 Text(timeline.timelineLabel.uppercased())
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .accessibilityIdentifier("briefing.dexa.timeline")
                 if timeline.isSimulated { StatusChip(text: "Simulated", color: .warning) }
                 Spacer(minLength: 0)
                 Text("\(timeline.elapsedDays) days · \(timeline.scans.count) body-composition scans")
@@ -295,6 +297,7 @@ struct DEXABriefingSections: View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
             VStack(alignment: .leading, spacing: 18) {
                 BriefingEditorialHeading(title: "What This Scan Means")
+                    .accessibilityIdentifier("briefing.dexa.interpretation")
                 Text(content.interpretation.opening)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -409,6 +412,7 @@ struct DEXABriefingSections: View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort, background: PhysiqueOSTheme.surfaceAccent) {
             VStack(alignment: .leading, spacing: 18) {
                 BriefingEditorialHeading(title: "Coach's Insight")
+                    .accessibilityIdentifier("briefing.dexa.coachInsight")
                 labeledParagraph("🎉 Biggest Win", content.coachInsight.biggestWin)
                 labeledParagraph("💪 Protect", content.coachInsight.protect)
                 labeledParagraph("👀 What to Watch", content.coachInsight.watch)

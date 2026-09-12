@@ -47,29 +47,34 @@ struct FixtureBriefingAPI: BriefingAPI {
 
 /// The `briefing-history` native resource — bounded, already-sorted
 /// (newest-first, `ORDER BY observed_at DESC ... record_id DESC`) summary
-/// rows. Native fetches one page and does not invent additional
-/// client-side pagination beyond the server's own `hasMore`/`nextCursor`
-/// (manifest bound: `limit` 1–50, default 20) — matching the same
-/// contract shape `TimelineAPI`/`ProductionPhotosAPI` already establish.
+/// rows. History is a complete archive, so Native follows the server's
+/// bounded cursor until `hasMore == false` (manifest bound: 50 per page).
 struct ProductionBriefingAPI: BriefingAPI {
     let api: ProductionNativeAPI
 
     func fetchHistory() async throws -> [BriefingHistoryRowReadModel] {
-        let envelope = try await api.readResource("briefing-history", as: HistoryPayload.self)
-        return envelope.data.items.map(\.readModel)
+        var cursor: String?
+        var rows: [BriefingHistoryRowReadModel] = []
+        var seenCursors = Set<String>()
+        repeat {
+            var query = ["limit": "50"]
+            if let cursor { query["cursor"] = cursor }
+            let envelope = try await api.readResource("briefing-history", query: query, as: HistoryPayload.self)
+            rows.append(contentsOf: envelope.data.items.map(\.readModel))
+            guard envelope.data.page?.hasMore == true,
+                  let next = envelope.data.page?.nextCursor,
+                  !next.isEmpty,
+                  seenCursors.insert(next).inserted
+            else { break }
+            cursor = next
+        } while true
+        return rows
     }
 
     func fetchBriefing(artifactId: String) async throws -> BriefingReadModel? {
-        // Event artifact ids are canonical and mechanically contain their
-        // source identity. Prefer the event-specific read contracts so
-        // historical media is resolved by the server before it reaches
-        // Native. Scheduled cadences use the shared artifact-detail read.
-        if artifactId.hasPrefix("dexa_event_") {
-            return try await fetchDEXAEvent(scanId: String(artifactId.dropFirst("dexa_event_".count)))
-        }
-        if artifactId.hasPrefix("event_briefing_progress_photo_") {
-            return try await fetchPhotoEvent(sessionId: String(artifactId.dropFirst("event_briefing_progress_photo_".count)))
-        }
+        // History owns an artifact identity, not a source-id naming
+        // convention. The shared detail read resolves every scheduled and
+        // event artifact by that exact id, including older event id formats.
         let envelope = try await api.readResource(
             "briefing",
             query: ["artifactId": artifactId],
@@ -98,6 +103,12 @@ struct ProductionBriefingAPI: BriefingAPI {
 
     private struct HistoryPayload: Decodable, @unchecked Sendable {
         var items: [Row]
+        var page: Page?
+
+        struct Page: Decodable {
+            var hasMore: Bool
+            var nextCursor: String?
+        }
     }
 
     private struct Row: Decodable {

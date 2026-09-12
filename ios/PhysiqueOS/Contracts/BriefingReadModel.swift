@@ -101,6 +101,16 @@ struct BriefingHistoryRowReadModel: Codable, Equatable, Identifiable {
         case .event: isDEXAEvent ? "waveform.path.ecg" : "camera.fill"
         }
     }
+
+    var colorToken: HomeColorToken {
+        switch cadence {
+        case .weekly: .evidence
+        case .midweek: .effort
+        case .monthly: .primary
+        case .daily: .warning
+        case .event: isDEXAEvent ? .success : .primary
+        }
+    }
 }
 
 struct BriefingEvidenceWindowReadModel: Codable, Equatable {
@@ -166,6 +176,10 @@ struct BriefingConfidenceReadModel: Codable, Equatable {
     /// Opaque provenance marker (`"canonical_pi_snapshot"` on web) —
     /// carried through, never interpreted.
     var source: String
+    /// Server-authored surface explanation and movement label. Older
+    /// persisted fixtures omit these and retain the compatibility fallbacks.
+    var presentationExplanation: String? = nil
+    var presentationMovementLabel: String? = nil
 
     var bandLabel: String {
         switch band {
@@ -177,11 +191,14 @@ struct BriefingConfidenceReadModel: Codable, Equatable {
     }
 
     var movementLabel: String {
+        if let presentationMovementLabel, !presentationMovementLabel.isEmpty {
+            return presentationMovementLabel
+        }
         switch movementDirection {
-        case .increased: "▲ Up \(delta.map { "\($0)" } ?? "") from last assessment"
-        case .decreased: "▼ Down \(delta.map { "\(abs($0))" } ?? "") from last assessment"
-        case .held: "— No change from last assessment"
-        case .initial: "Initial assessment"
+        case .increased: return "▲ Up \(delta.map { "\($0)" } ?? "") from last assessment"
+        case .decreased: return "▼ Down \(delta.map { "\(abs($0))" } ?? "") from last assessment"
+        case .held: return "— No change from last assessment"
+        case .initial: return "Initial assessment"
         }
     }
 }
@@ -225,6 +242,10 @@ struct WeeklyEnergySection: Codable, Equatable {
     /// screen would fall back to the static coverage-grid variant
     /// (`chart.summaryOnly`).
     var dailyBalances: [BriefingDailyEnergyPoint]?
+    var headline: String? = nil
+    var balanceHeadline: String? = nil
+    var comparisonNarrative: String? = nil
+    var methodology: String? = nil
 }
 
 struct BriefingDailyEnergyPoint: Codable, Equatable, Identifiable {
@@ -233,6 +254,8 @@ struct BriefingDailyEnergyPoint: Codable, Equatable, Identifiable {
     var intakeKcal: Int?
     var expenditureKcal: Int?
     var hasPairedData: Bool
+    var balanceKcal: Int? = nil
+    var label: String? = nil
 }
 
 struct WeeklyWeightSection: Codable, Equatable {
@@ -260,6 +283,13 @@ struct WeeklyTrainingSection: Codable, Equatable {
     var insufficientCount: Int? = nil
     var highlights: [BriefingTrainingHighlight]? = nil
     var priorityGroups: [BriefingTrainingPriorityGroup]? = nil
+    var watch: BriefingTrainingWatch? = nil
+}
+
+struct BriefingTrainingWatch: Codable, Equatable {
+    var exercise: String?
+    var status: String?
+    var message: String
 }
 
 struct BriefingTrainingHighlight: Codable, Equatable, Identifiable {
@@ -338,6 +368,7 @@ struct MidweekBriefingContent: Codable, Equatable {
     var training: WeeklyTrainingSection? = nil
     var bodyComposition: WeeklyBodyCompositionSection?
     var coachTakeNarrative: String
+    var coachRecommendation: String? = nil
     /// "Priorities Through Sunday" — verified plain, non-navigable
     /// numbered list (max 3 on the real product).
     var prioritiesThroughSunday: [String]
@@ -370,6 +401,16 @@ struct BriefingStat: Codable, Equatable, Identifiable {
     var id: String { label }
     var label: String
     var value: String
+    var detail: String? = nil
+}
+
+struct MonthlyHeroHighlight: Codable, Equatable, Identifiable {
+    var id: String { label }
+    var label: String
+    var value: String
+    var detail: String
+    var icon: String
+    var tone: String
 }
 
 /// Static weekly-aggregate bars — verified NOT interactive on the real
@@ -453,6 +494,7 @@ struct MonthlyBriefingContent: Codable, Equatable {
     var definingMomentDetails: [MonthlyDefiningMoment]? = nil
     var monthAheadIntroduction: String? = nil
     var monthAheadActions: [MonthlyActionCard]? = nil
+    var heroHighlights: [MonthlyHeroHighlight]? = nil
 }
 
 // MARK: - DEXA Event content (verified section list: Hero [title/body/
