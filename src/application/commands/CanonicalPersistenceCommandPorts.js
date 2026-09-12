@@ -6,7 +6,10 @@ import {
   createMorningCheckInPersistenceService,
 } from "../../domain/services/MorningCheckInPersistenceService.js";
 import { createPILowerLevelCanonicalEvidenceCommitService } from "../../domain/services/PILowerLevelCanonicalEvidenceCommitService.js";
-import { buildTrainingLoggerEvidencePackage } from "../../domain/services/TrainingLoggerAppleHealthService.js";
+import {
+  buildTrainingLoggerEvidencePackage,
+  createProductionAppleHealthReconciliation,
+} from "../../domain/services/TrainingLoggerAppleHealthService.js";
 import { listCanonicalTrainingExerciseIdentities } from "../../domain/models/trainingExerciseIdentity.js";
 import { normalizeTrainingExecutionVariant } from "../../domain/models/trainingExecutionVariant.js";
 import { createTrainingExerciseRelationshipGroup } from "../../domain/models/trainingExerciseRelationship.js";
@@ -47,7 +50,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     }, context.payload.sourceIdentity ?? context.payload.submissionId),
     editEvidenceReview: edit("evidenceReviews", "reviewId"),
     confirmEvidenceReview: review("confirmed"),
-    disposeEvidenceReview: async (context) => mutateExisting(context, "evidenceReviews", context.payload.reviewId, { status: context.payload.disposition }),
+    disposeEvidenceReview,
     completePriority: completeCanonicalPriority,
     reconcilePreviousDay: async (context) => create(context, "dailyCheckIns", `reconciliation:${context.payload.localDate}`, {
       id: `reconciliation:${context.payload.localDate}`, userId: context.ownerUserId,
@@ -260,7 +263,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
   }
 
   async function commitTrainingSession(context) {
-    const packageAndObject = await createNativeTrainingPackage(context);
+    const prepared = await createNativeTrainingPackage(context);
+    const packageAndObject = prepared.evidencePackage;
+    const supportingReview = prepared.supportingReview;
     const existingCanonicalObjects = await records.list({
       ownerUserId: context.ownerUserId,
       collection: "canonicalEvidenceObjects",
@@ -283,13 +288,14 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       const existing = existingById.get(changed.canonicalId);
       if (existing) requireExpectedVersion(context, existing, `training-session:${changed.canonicalId}`);
     }
-    const reviewId = `native_training_review_${context.metadata.commandId}`;
+    const reviewId = supportingReview?.id ?? `native_training_review_${context.metadata.commandId}`;
     const existingReview = await records.get({
       ownerUserId: context.ownerUserId,
       collection: "evidenceReviews",
       recordId: reviewId,
     });
-    if (!existingReview) {
+    let reviewRevision = existingReview?.version ?? 1;
+    if (!existingReview || supportingReview) {
       const packageId = `${packageAndObject.package_id}_${context.metadata.commandId}`;
       const evidencePackage = {
         ...packageAndObject,
@@ -306,33 +312,56 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         sourceIdentity: context.metadata.idempotencyKey,
         payload: evidencePackage,
       });
-      await records.put({
-        ownerUserId: context.ownerUserId,
-        collection: "evidenceReviews",
-        recordId: reviewId,
-        sourceIdentity: context.metadata.idempotencyKey,
-        payload: {
-          id: reviewId,
-          userId: context.ownerUserId,
-          source: "training_logger",
-          status: "pending",
-          createdAt: now().toISOString(),
-          updatedAt: now().toISOString(),
-          interpretedEvidence: evidencePackage,
-          evidenceTypes: ["training"],
-          confirmation: null,
-          commitProgress: {},
-          itemDecisions: {},
-          provenance: commandProvenance(context),
-        },
-      });
+      if (!existingReview) {
+        await records.put({
+          ownerUserId: context.ownerUserId,
+          collection: "evidenceReviews",
+          recordId: reviewId,
+          sourceIdentity: context.metadata.idempotencyKey,
+          payload: {
+            id: reviewId,
+            userId: context.ownerUserId,
+            source: "training_logger",
+            status: "pending",
+            createdAt: now().toISOString(),
+            updatedAt: now().toISOString(),
+            interpretedEvidence: evidencePackage,
+            evidenceTypes: ["training"],
+            confirmation: null,
+            commitProgress: {},
+            itemDecisions: {},
+            provenance: commandProvenance(context),
+          },
+        });
+      } else {
+        const updated = await records.put({
+          ownerUserId: context.ownerUserId,
+          collection: "evidenceReviews",
+          recordId: reviewId,
+          expectedVersion: existingReview.version,
+          sourceIdentity: context.metadata.idempotencyKey,
+          payload: {
+            ...existingReview,
+            source: "training_logger",
+            status: "pending",
+            updatedAt: now().toISOString(),
+            interpretedEvidence: evidencePackage,
+            evidenceTypes: ["training"],
+            confirmation: null,
+            commitProgress: {},
+            itemDecisions: {},
+            provenance: commandProvenance(context),
+          },
+        });
+        reviewRevision = updated.version;
+      }
     }
     return {
       status: "committed",
       result: {
-        status: existingReview ? "confirmation_resumed" : "confirmation_requested",
+        status: supportingReview ? "confirmation_requested" : existingReview ? "confirmation_resumed" : "confirmation_requested",
         reviewId,
-        reviewRevision: existingReview?.version ?? 1,
+        reviewRevision,
         sessionId: context.payload.sessionId,
         intendedDate: context.payload.localDate,
         exerciseIds: packageAndObject.evidence_objects
@@ -429,7 +458,71 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     };
   }
 
+  async function disposeEvidenceReview(context) {
+    const review = await ownedRecord(context, "evidenceReviews", context.payload.reviewId);
+    requireExpectedVersion(context, review, `evidence-review:${review.id}`);
+    if (!["pending", "commit_failed"].includes(review.status)) {
+      throw problem(409, "EVIDENCE_REVIEW_NOT_DISMISSIBLE", "This evidence review cannot be dismissed.");
+    }
+    const updatedAt = now().toISOString();
+    const updated = await records.put({
+      ownerUserId: context.ownerUserId,
+      collection: "evidenceReviews",
+      recordId: review.id,
+      expectedVersion: review.version,
+      payload: {
+        ...review,
+        status: "discarded",
+        updatedAt,
+        disposition: { discardedAt: updatedAt, discardedBy: context.ownerUserId },
+        provenance: commandProvenance(context),
+      },
+    });
+    return {
+      status: "committed",
+      result: { status: "discarded", reviewId: review.id, revision: updated.version, updatedAt },
+      outbox: [],
+    };
+  }
+
   async function createNativeTrainingPackage(context) {
+    const supportingReviewId = context.payload.supportingEvidenceReviewId ?? null;
+    const supportingReviewVersion = context.payload.supportingEvidenceReviewVersion ?? null;
+    if (Boolean(supportingReviewId) !== (supportingReviewVersion != null)) {
+      throw problem(400, "TRAINING_SUPPORTING_EVIDENCE_INCOMPLETE", "Supporting workout evidence requires both review identity and version.");
+    }
+    let supportingReview = null;
+    if (supportingReviewId) {
+      supportingReview = await ownedRecord(context, "evidenceReviews", supportingReviewId);
+      if (Number(supportingReviewVersion) !== Number(supportingReview.version)) {
+        throw staleVersionProblem({
+          expectedVersion: supportingReviewVersion,
+          actualVersion: supportingReview.version,
+          resource: `evidence-review:${supportingReview.id}`,
+        });
+      }
+      if (!["pending", "commit_failed"].includes(supportingReview.status)) {
+        throw problem(409, "TRAINING_SUPPORTING_EVIDENCE_UNAVAILABLE", "The supporting workout evidence is no longer available.");
+      }
+      const boundSessionId = supportingReview.interpretedEvidence?.review_metadata?.nativeTrainingSessionId;
+      if (boundSessionId && String(boundSessionId) !== String(context.payload.sessionId)) {
+        throw problem(409, "TRAINING_SUPPORTING_EVIDENCE_ALREADY_BOUND", "The supporting evidence is already bound to another Training session.");
+      }
+      const evidenceTypes = new Set([
+        ...(supportingReview.evidenceTypes ?? []),
+        ...(supportingReview.interpretedEvidence?.evidence_objects ?? []).map((item) => item?.evidence_type),
+      ].filter(Boolean));
+      if (evidenceTypes.size === 0 || [...evidenceTypes].some((type) => type !== "training")) {
+        throw problem(400, "TRAINING_SUPPORTING_EVIDENCE_TYPE_MISMATCH", "Only Training screenshot evidence can be bound to a Training session.");
+      }
+      const evidenceDate = String(
+        supportingReview.interpretedEvidence?.observed_date ??
+        supportingReview.interpretedEvidence?.provenance?.evidence_date ?? "",
+      ).slice(0, 10);
+      if (evidenceDate !== context.payload.localDate) {
+        throw problem(409, "TRAINING_SUPPORTING_EVIDENCE_DATE_MISMATCH", "Supporting evidence must match the Training session date.");
+      }
+    }
     const runtimeDefinitions = await records.list({
       ownerUserId: context.ownerUserId,
       collection: "canonicalExerciseLibrary",
@@ -489,8 +582,18 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       });
     });
     const capturedAt = context.payload.capturedAt ?? context.metadata.clientOccurredAt ?? `${context.payload.localDate}T12:00:00.000Z`;
+    const canonicalObjects = await records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" });
+    const supportingReconciliation = supportingReview ? createProductionAppleHealthReconciliation({
+      batchId: supportingReview.interpretedEvidence?.package_id,
+      canonicalObjects,
+      evidenceObjects: supportingReview.interpretedEvidence?.evidence_objects ?? [],
+      workoutDate: context.payload.localDate,
+    }) : null;
+    if (supportingReconciliation && supportingReconciliation.matchState !== "strong_match") {
+      throw problem(409, "TRAINING_SUPPORTING_EVIDENCE_MATCH_REQUIRED", "Supporting screenshots must identify exactly one unlinked strength workout for this date.");
+    }
     const evidencePackage = buildTrainingLoggerEvidencePackage({
-      canonicalObjects: await records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
+      canonicalObjects,
       draft: {
         draftVersion: "training_logger_web_v1",
         draftId: context.payload.sessionId,
@@ -500,7 +603,10 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         finishedAt: context.payload.finishedAt ?? null,
         exercises: occurrences,
         exerciseRelationshipGroups,
-        reconciliation: {
+        reconciliation: supportingReconciliation ? {
+          ...supportingReconciliation,
+          finalized: true,
+        } : {
           normalizedEvidence: [],
           selectedStrengthSourceId: null,
           continueWithoutStrength: true,
@@ -508,20 +614,26 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           finalized: true,
         },
       },
+      sourcePackage: supportingReview?.interpretedEvidence ?? null,
       userId: context.ownerUserId,
     });
     return {
-      ...evidencePackage,
-      captured_at: capturedAt,
-      review_metadata: {
-        ...(evidencePackage.review_metadata ?? {}),
-        confirmedAt: capturedAt,
-        origin: "native_training_logger",
-      },
-      evidence_objects: evidencePackage.evidence_objects.map((item) => ({
-        ...item,
+      supportingReview,
+      evidencePackage: {
+        ...evidencePackage,
         captured_at: capturedAt,
-      })),
+        review_metadata: {
+          ...(evidencePackage.review_metadata ?? {}),
+          confirmedAt: capturedAt,
+          origin: "native_training_logger",
+          nativeTrainingSessionId: context.payload.sessionId,
+          supportingEvidenceReviewId: supportingReview?.id ?? null,
+        },
+        evidence_objects: evidencePackage.evidence_objects.map((item) => ({
+          ...item,
+          captured_at: capturedAt,
+        })),
+      },
     };
   }
 

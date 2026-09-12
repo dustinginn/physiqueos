@@ -102,6 +102,28 @@ describe("Execution-backed priority detail", () => {
     expect(section(detail, "Completion")).toBeUndefined();
   });
 
+  it("resolves the exact historical occurrence instead of silently substituting server-clock today", async () => {
+    const detail = await service({
+      executionItems: [execution({ timeline: [phase("0.75")] })],
+      protocol,
+      reminderRecord: {
+        ...reminder,
+        completionHistory: [{ occurrenceDate: "2026-07-23", completedAt: "2026-07-23T19:15:00Z" }],
+      },
+    }).getPriorityDetail(reminder.id, undefined, { occurrenceDate: "2026-07-23" });
+
+    expect(detail).toMatchObject({
+      status: "Completed",
+      completable: false,
+      executionContract: {
+        occurrenceDate: "2026-07-23",
+        occurrenceKey: `${reminder.id}:2026-07-23`,
+      },
+      executionProjection: { localDate: "2026-07-23", exactLocalTime: "21:45" },
+    });
+    expect(section(detail, "When").items[0].label).toBe("Thu · 9:45 PM");
+  });
+
   it("returns missing-Execution setup detail without reading protocol doseHistory", async () => {
     const detail = await service({
       executionItems: [],

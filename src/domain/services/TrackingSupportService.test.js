@@ -77,6 +77,28 @@ describe("Morning Weigh-In Tracking Support", () => {
     const withoutNotes = await detailService(data).getPriorityDetail("reminder_morning_weight");
     expect(section(withoutNotes, "Execution Notes")).toBeUndefined();
   });
+
+  it("resolves a historical Morning Check-In occurrence and its exact-date canonical Weight", async () => {
+    const data = fixture();
+    data.reminders[0].completionHistory = [{ occurrenceDate: "2026-08-06", completedAt: "2026-08-06T15:00:00.000Z" }];
+    const detail = await detailService(data, [
+      { id: "weight_2026_08_06", userId: "user", measuredAt: "2026-08-06", weight: { value: 173.4, unit: "lb" }, version: 4 },
+      { id: "weight_2026_08_07", userId: "user", measuredAt: "2026-08-07", weight: { value: 172.8, unit: "lb" }, version: 2 },
+    ]).getPriorityDetail("reminder_morning_weight", undefined, { occurrenceDate: "2026-08-06" });
+    expect(detail).toMatchObject({
+      status: "Completed",
+      executionContract: { occurrenceDate: "2026-08-06", occurrenceKey: "reminder_morning_weight:2026-08-06" },
+      relatedWeight: {
+        canonicalId: "weight_2026_08_06", date: "2026-08-06",
+        measuredAt: "2026-08-06", value: 173.4, unit: "lb", version: 4,
+      },
+    });
+    expect(section(detail, "Completion").items[0]).toEqual({
+      label: "173.4 lb recorded",
+      detail: "Canonical Weight for 2026-08-06 satisfies this occurrence.",
+    });
+    expect(JSON.stringify(detail)).not.toContain("172.8");
+  });
 });
 
 function fixture() {
@@ -110,7 +132,7 @@ function findMorning(items) {
     ?? items.find((item) => item.id === "reminder_morning_weight");
 }
 
-function detailService(data) {
+function detailService(data, weightEntries = []) {
   return createPriorityDetailService({
     repositories: {
       users: { getCurrentUser: async () => ({ id: "user", timeZone: "America/Los_Angeles" }) },
@@ -119,6 +141,7 @@ function detailService(data) {
       protocols: { listProtocols: async () => data.protocols },
       operatingPlan: { getOperatingPlan: async () => null },
       executionItems: { listExecutionItems: async () => data.executionItems },
+      weightEntries: { listWeightEntries: async () => weightEntries },
     },
   });
 }

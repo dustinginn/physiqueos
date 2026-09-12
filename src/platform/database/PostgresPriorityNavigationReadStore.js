@@ -19,13 +19,14 @@ export function createPostgresPriorityNavigationReadStore({ pool, ownerUserId, o
       });
       const list = (collection) => records.list({ ownerUserId, collection });
       try {
-        const [users, goals, reminder, protocols, operatingPlans, executionItems] = await Promise.all([
+        const [users, goals, reminder, protocols, operatingPlans, executionItems, weightEntries] = await Promise.all([
           list("user"),
           list("goals"),
           records.get({ ownerUserId, collection: "reminders", recordId: priorityId }),
           list("protocols"),
           list("operatingPlan"),
           list("executionItems"),
+          list("weightEntries"),
         ]);
         return Object.freeze({
           user: users.find((item) => item.id === ownerUserId) ?? users[0] ?? null,
@@ -35,6 +36,7 @@ export function createPostgresPriorityNavigationReadStore({ pool, ownerUserId, o
           operatingPlan: operatingPlans.at(-1) ?? null,
           operatingRhythm: null,
           executionItems,
+          weightEntries,
         });
       } finally {
         onComplete?.({
@@ -55,15 +57,16 @@ export function createRepositoryPriorityNavigationReadStore({ repositories } = {
   return Object.freeze({
     async load({ priorityId }) {
       const user = await repositories.users.getCurrentUser();
-      const [goals, reminder, protocols, operatingPlan, operatingRhythm, executionItems] = await Promise.all([
+      const [goals, reminder, protocols, operatingPlan, operatingRhythm, executionItems, weightEntries] = await Promise.all([
         repositories.goals.listGoals(user?.id),
         repositories.reminders.getReminderById(priorityId),
         repositories.protocols.listProtocols(user?.id),
         repositories.operatingPlan?.getOperatingPlan(user?.id) ?? null,
         repositories.operatingRhythm?.getOperatingRhythm(user?.id) ?? null,
         repositories.executionItems?.listExecutionItems?.(user?.id) ?? [],
+        repositories.weightEntries?.listWeightEntries?.(user?.id) ?? [],
       ]);
-      return Object.freeze({ user, goals, reminder, protocols, operatingPlan, operatingRhythm, executionItems });
+      return Object.freeze({ user, goals, reminder, protocols, operatingPlan, operatingRhythm, executionItems, weightEntries });
     },
   });
 }

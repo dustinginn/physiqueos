@@ -61,7 +61,7 @@ function fixture(overrides = {}) {
     photos: { getNativePhotosTimeline: call({ sessions: [], page: { limit: 12, count: 0, hasMore: false } }) },
     briefings: { listNativeHistory: call({ items: [], page: { limit: 20, hasMore: false, nextCursor: null } }), getNativeArtifact: call({ artifact: { artifactId: "briefing-1" } }), getDexaArtifact: call({ artifact: { id: "dexa-event-1" } }) },
     photoEvents: { getPhotoEvent: call({ artifact: { id: "photo-event-1" } }) },
-    evidenceReview: { getReview: call({ review: { id: "review-1" } }) },
+    evidenceReview: { getReview: call({ review: { id: "review-1", evidenceTypes: ["activity_day"] } }) },
     timeline: { getPage: call({ items: [], hasMore: false }) },
   };
   const executeCommand = vi.fn(async (input) => ({ outcome: "committed", commandType: input.commandType }));
@@ -196,6 +196,22 @@ describe("Native production contract boundary", () => {
     expect(JSON.stringify(result.data)).not.toMatch(/private-evidence|storage|spaces|objectKey/i);
   });
 
+  it("projects Training-session screenshot media as authenticated opaque descriptors", async () => {
+    const current = fixture();
+    const mediaId = "01999999-9999-4999-8999-999999999999";
+    current.readers.training.getSession.mockResolvedValue({
+      id: "session-1",
+      supportingMedia: [{ mediaReference: `media://${mediaId}` }],
+    });
+    const result = await current.service.read({
+      request: request(), resource: "training-session", input: { sessionId: "session-1" },
+    });
+    expect(result.data.supportingMedia).toEqual([{
+      media: { mediaId, deliveryPath: `/api/v1/native/media/${mediaId}` },
+    }]);
+    expect(JSON.stringify(result.data)).not.toContain("media://");
+  });
+
   it("keeps every manifest resource routable, including current Confidence", async () => {
     const current = fixture();
     const inputs = {
@@ -249,6 +265,21 @@ describe("Native production contract boundary", () => {
       .rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
   });
 
+  it("passes an explicit canonical Priority occurrence date and rejects an invalid one", async () => {
+    const current = fixture();
+    await current.service.read({
+      request: request(), resource: "priority",
+      input: { priorityId: "priority-1", occurrenceDate: "2026-09-08" },
+    });
+    expect(current.readers.priorities.getPriorityDetail).toHaveBeenCalledWith(
+      "priority-1", { occurrenceDate: "2026-09-08" },
+    );
+    await expect(current.service.read({
+      request: request(), resource: "priority",
+      input: { priorityId: "priority-1", occurrenceDate: "tonight" },
+    })).rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
+  });
+
   it("delegates idempotent writes to the existing canonical command service", async () => {
     const current = fixture();
     const result = await current.service.command({
@@ -282,6 +313,29 @@ describe("Native production contract boundary", () => {
       principal, reviewId: "review-1", commandId: "command-7",
     });
     expect(result.confirmation).toEqual({ state: "processing", reviewId: "review-1" });
+  });
+
+  it("allows versioned Native dismissal only for approved Evidence Review families", async () => {
+    const current = fixture();
+    await current.service.command({
+      request: request(), commandType: "evidence-review.dispose.v1",
+      metadata: { idempotencyKey: "dismiss-review-1", expectedVersion: "3" },
+      payload: { reviewId: "review-1", disposition: "discarded" },
+    });
+    expect(current.executeCommand).toHaveBeenCalledWith(expect.objectContaining({
+      commandType: "evidence-review.dispose.v1",
+      metadata: expect.objectContaining({ expectedVersion: "3" }),
+      payload: { reviewId: "review-1", disposition: "discarded" },
+    }));
+
+    current.readers.evidenceReview.getReview.mockResolvedValue({
+      review: { id: "review-photo", evidenceTypes: ["progress_photo"] },
+    });
+    await expect(current.service.command({
+      request: request(), commandType: "evidence-review.dispose.v1",
+      metadata: { idempotencyKey: "dismiss-photo", expectedVersion: "1" },
+      payload: { reviewId: "review-photo", disposition: "discarded" },
+    })).rejects.toMatchObject({ status: 400, code: "NATIVE_EVIDENCE_REVIEW_UNAVAILABLE" });
   });
 
   it("routes a structured Training log through its staged Evidence Review lifecycle", async () => {
@@ -321,7 +375,7 @@ describe("Native production contract boundary", () => {
     expect(nativeProductionContractManifest.writes.map((item) => item.commandType)).toEqual([
       "weight.submit.v1", "check-in.submit.v1", "priority.complete.v1",
       "training-session.commit.v1", "nutrition-day.upsert.v1", "activity-day.upsert.v1",
-      "dexa-review.measurements.v1", "evidence-review.commit.v1",
+      "dexa-review.measurements.v1", "evidence-review.commit.v1", "evidence-review.dispose.v1",
     ]);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/HealthKit|activity-day\.sync/);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/storage_key|Spaces|databaseName|provider-authoritative/);

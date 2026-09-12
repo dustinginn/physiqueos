@@ -40,7 +40,7 @@ All reads below use `GET /api/v1/native/read/{resource}` unless a different rout
 | Active Goal / Phases / Confidence | `active-goal` | `ActiveGoalReadService.getPreview` | `currentDate` optional; includes canonical `goalId` and `phaseId` | Ready |
 | Completed Visible Abs Goal | `completed-goal` | `CompletedGoalReadService.getVisibleAbs` | none | Ready |
 | Operating Plan | `operating-plan` | `CoreNavigationReadService.getOperatingPlan` | none | Ready |
-| Priority detail | `priority` | `PriorityNavigationReadService.getPriorityDetail` | `priorityId` | Ready |
+| Priority detail | `priority` | `PriorityNavigationReadService.getPriorityDetail` | `priorityId`; optional exact `occurrenceDate` | Ready |
 | Morning Check-In context | `morning-check-in` | `CoreNavigationReadService.getMorningCheckIn` | none | Ready |
 | Weight reporting/history | `weight` | `ProgressEvidenceReadService.getWeight` + bounded Native projection | Goal context; history `limit` 1–365, default 90 | Ready; server-derived |
 | Training Logger support | `training-logger` | `CoreNavigationReadService.getTrainingLogger` | none | Ready |
@@ -71,20 +71,23 @@ Weekly and Midweek `briefing` detail is a frozen, artifact-bound finished presen
 
 ## Write matrix
 
-Structured writes use `POST /api/v1/native/commands` with `{ commandType, metadata?, payload }` plus `Idempotency-Key`. The production Native allowlist is exactly the eight commands below; legacy Phase 3 command names are not accepted by this boundary.
+Structured writes use `POST /api/v1/native/commands` with `{ commandType, metadata?, payload }` plus `Idempotency-Key`. The production Native allowlist is exactly the nine commands below; legacy Phase 3 command names are not accepted by this boundary.
 
 | Domain | Command | Canonical rule |
 |---|---|---|
 | Weight | `weight.submit.v1` | intended local date + positive value; uses the same Morning Check-In persistence service as web; changed same-day value requires `If-Match` |
 | Morning Check-In | `check-in.submit.v1` | intended local date + weight value and optional daily context/reconciliation; creates the canonical Weight, Check-In, analysis, and briefing reconciliation records |
 | Priority | `priority.complete.v1` | canonical reminder ID + occurrence date; first completion requires `If-Match`; replay of that occurrence is a no-op |
-| Training | `training-session.commit.v1` | canonical exercise IDs and performed sets; validates unit and superset occurrence identities, then commits the same Training evidence package used by web |
+| Training | `training-session.commit.v1` | canonical exercise IDs and performed sets; validates unit and superset occurrence identities; may bind an exact versioned Training screenshot review to the exact session, then commits the same Training evidence package used by web |
 | Nutrition day | `nutrition-day.upsert.v1` | one owner/date lineage; full-day replacement; optional prior semantic fingerprint; server freezes Goal/Phase attribution and stages Energy/briefing continuation work |
 | Activity day | `activity-day.upsert.v1` | one owner/date lineage with explicit `manual`, `typed`, or `screenshot` provenance; direct device-health and HealthKit writes are rejected |
 | DEXA review measurements | `dexa-review.measurements.v1` | canonical review + DEXA object IDs and validated measurements; every edit requires `If-Match` |
 | Evidence Review commit | `evidence-review.commit.v1` | canonical review ID; `If-Match` starts or resumes the existing web confirmation lifecycle, including canonical commit and durable continuation |
+| Evidence Review dismiss | `evidence-review.dispose.v1` | approved Nutrition, Activity, Training, or DEXA review ID; `If-Match` is required; marks pending evidence discarded without creating or modifying canonical history |
 
-DEXA PDF, Nutrition screenshot, and Activity screenshot intake use `POST /api/v1/native/evidence/intakes` as `multipart/form-data`; status is read at `GET /api/v1/native/evidence/intakes/{intakeId}`. `Idempotency-Key` must equal the UUID submission identity. DEXA accepts exactly one signature-validated PDF. Nutrition and Activity accept one to four signature-validated PNG, JPEG, or WebP screenshots. The foreground stores verified artifacts and returns a durable processing receipt; provider worker interpretation stages the ordinary Evidence Review. Native edits DEXA measurements there and confirms through the same canonical lifecycle as web.
+DEXA PDF and Nutrition, Activity, or Training screenshot intake use `POST /api/v1/native/evidence/intakes` as `multipart/form-data`; status is read at `GET /api/v1/native/evidence/intakes/{intakeId}`. `Idempotency-Key` must equal the UUID submission identity. DEXA accepts exactly one signature-validated PDF. Nutrition, Activity, and Training accept one to four signature-validated PNG, JPEG, or WebP screenshots. The foreground stores verified artifacts and returns a durable processing receipt; provider worker interpretation stages the ordinary Evidence Review. Native edits DEXA measurements there and confirms through the same canonical lifecycle as web. Training Logger can bind one exact, versioned Training review to the exact committed session; the resulting private screenshots remain discoverable through authenticated opaque media descriptors on that session.
+
+When `occurrenceDate` is supplied to the `priority` read, all status, schedule, and related evidence are resolved for that exact canonical occurrence. Morning Check-In returns only the canonical Weight matching that occurrence date. Omitting the date retains current-occurrence behavior; clients must not substitute latest Weight or independently select another occurrence. Priority completion remains unavailable to Native until a deliberate read projection exposes the canonical reminder record version required by its first-write `If-Match` contract.
 
 Activity has no Native HealthKit/direct-device path in this package. Manual structured entry uses `activity-day.upsert.v1`; screenshots use asynchronous intake and Evidence Review. Replaying identical daily evidence is provenance-only/no-op as determined by canonical reconciliation. A changed day creates one canonical revision and preserves its originally frozen Goal/Phase attribution.
 

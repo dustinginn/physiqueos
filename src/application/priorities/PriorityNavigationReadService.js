@@ -3,11 +3,11 @@ import { createPriorityDetailService } from "../../domain/services/PriorityDetai
 export function createPriorityNavigationReadService({ store } = {}) {
   if (!store?.load) throw new Error("Priority navigation requires a read store.");
   return Object.freeze({
-    async getPriorityDetail(priorityId) {
-      const input = await store.load({ priorityId });
+    async getPriorityDetail(priorityId, { occurrenceDate = null } = {}) {
+      const input = await store.load({ priorityId, occurrenceDate });
       if (!input.user) return null;
       return createPriorityDetailService({ repositories: repositoriesFrom(input) })
-        .getPriorityDetail(priorityId, input.user.id);
+        .getPriorityDetail(priorityId, input.user.id, { occurrenceDate });
     },
   });
 }
@@ -21,5 +21,6 @@ function repositoriesFrom(input) {
     operatingPlan: { getOperatingPlan: async () => input.operatingPlan },
     operatingRhythm: { getOperatingRhythm: async () => input.operatingRhythm },
     executionItems: { listExecutionItems: async () => input.executionItems },
+    weightEntries: { listWeightEntries: async () => input.weightEntries ?? [] },
   });
 }

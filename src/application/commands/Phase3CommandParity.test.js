@@ -10,7 +10,7 @@ const payloads = {
   [Phase3Command.CREATE_EVIDENCE_INTAKE]: { submissionId: "submission-one", artifacts: ["object-one"] },
   [Phase3Command.EDIT_EVIDENCE_REVIEW]: { reviewId: "review-one", corrections: [] },
   [Phase3Command.CONFIRM_EVIDENCE_REVIEW]: { reviewId: "review-one" },
-  [Phase3Command.DISPOSE_EVIDENCE_REVIEW]: { reviewId: "review-one", disposition: "rejected" },
+  [Phase3Command.DISPOSE_EVIDENCE_REVIEW]: { reviewId: "review-one", disposition: "discarded" },
   [Phase3Command.COMPLETE_PRIORITY]: { priorityId: "priority-one", occurrenceDate: "2026-08-11" },
   [Phase3Command.RECONCILE_PREVIOUS_DAY]: { localDate: "2026-08-10", items: [{ id: "item-one", complete: true }] },
   [Phase3Command.EDIT_PROTOCOL]: { protocolId: "protocol-one", patch: { active: true } },
@@ -68,6 +68,12 @@ describe("Phase 3 task command parity boundary", () => {
     await expect(service.execute({ commandType: Phase3Command.SUBMIT_WEIGHT, principal, metadata: { idempotencyKey: "phase3-owner-spoof-0001" }, payload: { ...payloads[Phase3Command.SUBMIT_WEIGHT], userId: "other" } })).rejects.toMatchObject({ status: 400 });
     await expect(service.execute({ commandType: Phase3Command.SUBMIT_WEIGHT, principal, metadata: { idempotencyKey: "phase3-missing-value-001" }, payload: { localDate: "2026-08-11" } })).rejects.toMatchObject({ status: 400 });
     await expect(service.execute({ commandType: Phase3Command.EDIT_GOAL, principal, metadata: { idempotencyKey: "phase3-missing-version-01" }, payload: payloads[Phase3Command.EDIT_GOAL] })).rejects.toMatchObject({ status: 400 });
+    await expect(service.execute({
+      commandType: Phase3Command.DISPOSE_EVIDENCE_REVIEW,
+      principal,
+      metadata: { idempotencyKey: "phase3-invalid-disposition", expectedVersion: "1" },
+      payload: { reviewId: "review-one", disposition: "confirmed" },
+    })).rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
   });
 
   it("matches direct canonical mutation state and downstream effects for representative daily writes", async () => {

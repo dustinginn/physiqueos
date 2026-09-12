@@ -254,6 +254,18 @@ describe("provider-native Training navigation", () => {
     expect(store.listCanonicalTrainingEvidenceObjects).not.toHaveBeenCalled();
   });
 
+  it("projects exact-session private supporting media without selecting a different workout", async () => {
+    const record = training("canonical-session-media", "2026-08-26");
+    record.payload.metadata.supporting_media = [
+      { mediaReference: "media://01999999-9999-4999-8999-999999999999" },
+    ];
+    const session = await createTrainingNavigationReadService({ store: navigationStore([record]) })
+      .getSession({ sessionId: "canonical-session-media" });
+    expect(session.supportingMedia).toEqual([
+      { mediaReference: "media://01999999-9999-4999-8999-999999999999" },
+    ]);
+  });
+
   it("loads only one exercise's occurrences and events with unchanged scoped ordering", async () => {
     const records = [training("older", "2026-08-20"), training("newer", "2026-08-26")];
     const events = [performanceEvent("2026-08-26")];

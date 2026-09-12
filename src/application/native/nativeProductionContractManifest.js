@@ -73,6 +73,7 @@ const writes = Object.freeze([
   write(Phase3Command.UPSERT_ACTIVITY_DAY, ["localDate", "dailyActivity", "sourceIdentity", "source"], "manual, typed, or screenshot provenance only; direct device-health sync is forbidden"),
   write(Phase3Command.EDIT_DEXA_REVIEW, ["reviewId", "evidenceObjectId", "measurements"], "If-Match required for every edit"),
   write(Phase3Command.COMMIT_EVIDENCE_REVIEW, ["reviewId"], "If-Match required to start the canonical Evidence Review lifecycle"),
+  write(Phase3Command.DISPOSE_EVIDENCE_REVIEW, ["reviewId", "disposition"], "If-Match required; disposition must be discarded"),
 ]);
 
 export const nativeProductionContractManifest = Object.freeze({

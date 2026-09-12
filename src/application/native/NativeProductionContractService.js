@@ -12,6 +12,9 @@ import { Phase3Command } from "../commands/Phase3CommandService.js";
 
 const RESOURCES = new Set(Object.values(NativeProductionResource));
 const CONTEXTS = new Set(["all", "build-lean-mass", "visible-abs"]);
+const NATIVE_EVIDENCE_REVIEW_TYPES = new Set([
+  "nutrition", "activity", "activity_day", "training", "dexa", "dexa_scan", "body_composition",
+]);
 const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.SUBMIT_WEIGHT,
   Phase3Command.SUBMIT_CHECK_IN,
@@ -21,6 +24,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.UPSERT_ACTIVITY_DAY,
   Phase3Command.EDIT_DEXA_REVIEW,
   Phase3Command.COMMIT_EVIDENCE_REVIEW,
+  Phase3Command.DISPOSE_EVIDENCE_REVIEW,
 ]);
 
 export function createNativeProductionContractService({
@@ -73,7 +77,10 @@ export function createNativeProductionContractService({
         case "active-goal": data = await readers.activeGoal.getPreview({ currentDate }); break;
         case "completed-goal": data = await readers.completedGoal.getVisibleAbs(); break;
         case "operating-plan": data = await readers.core.getOperatingPlan(); break;
-        case "priority": data = await readers.priorities.getPriorityDetail(required(input.priorityId, "priorityId")); break;
+        case "priority": data = await readers.priorities.getPriorityDetail(
+          required(input.priorityId, "priorityId"),
+          { occurrenceDate: input.occurrenceDate ? dateKey(input.occurrenceDate, "occurrenceDate") : null },
+        ); break;
         case "morning-check-in": data = await readers.core.getMorningCheckIn(); break;
         case "weight": {
           const limit = boundedResourceLimit(input.limit, { fallback: 90, maximum: 365 });
@@ -140,6 +147,22 @@ export function createNativeProductionContractService({
           code: "NATIVE_COMMAND_UNAVAILABLE",
           title: "This command is not a canonical Native production write.",
         });
+      }
+      if ([Phase3Command.COMMIT_EVIDENCE_REVIEW, Phase3Command.DISPOSE_EVIDENCE_REVIEW].includes(commandType)) {
+        const detail = await readers.evidenceReview.getReview(required(payload.reviewId, "reviewId"));
+        const review = detail?.review;
+        if (!review) throw unavailableResource();
+        const evidenceTypes = new Set([
+          ...(review.evidenceTypes ?? []),
+          ...(review.interpretedEvidence?.evidence_objects ?? []).map((item) => item?.evidence_type),
+        ].filter(Boolean));
+        if (evidenceTypes.size === 0 || [...evidenceTypes].some((type) => !NATIVE_EVIDENCE_REVIEW_TYPES.has(type))) {
+          throw new ApplicationProblem({
+            status: 400,
+            code: "NATIVE_EVIDENCE_REVIEW_UNAVAILABLE",
+            title: "This Evidence Review is not available to the Native production workflow.",
+          });
+        }
       }
       const result = await executeCommand({ commandType, principal, metadata, payload });
       if (![Phase3Command.COMMIT_EVIDENCE_REVIEW, Phase3Command.COMMIT_TRAINING_SESSION].includes(commandType)) return result;

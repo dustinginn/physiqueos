@@ -5,7 +5,7 @@ import {
 } from "../../domain/services/EvidenceUploadArtifactManifest.js";
 import { validateDexaPdfUpload } from "../../domain/services/DexaPdfIntakeService.js";
 
-const TYPES = new Set(["dexa_scan", "nutrition", "activity_day"]);
+const TYPES = new Set(["dexa_scan", "nutrition", "activity_day", "training"]);
 const MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024;
 const MAX_SCREENSHOTS = 4;
 
@@ -25,7 +25,7 @@ export async function parseNativeEvidenceIntakeRequest(request) {
   }
   const expectedEvidenceType = String(formData.get("expectedEvidenceType") ?? "").trim();
   if (!TYPES.has(expectedEvidenceType)) {
-    throw problem(400, "EVIDENCE_TYPE_UNAVAILABLE", "Native intake accepts dexa_scan, nutrition, or activity_day evidence only.");
+    throw problem(400, "EVIDENCE_TYPE_UNAVAILABLE", "Native intake accepts dexa_scan, nutrition, activity_day, or training evidence only.");
   }
   const files = formData.getAll("evidenceFiles")
     .filter((file) => typeof file?.arrayBuffer === "function" && file.size > 0);

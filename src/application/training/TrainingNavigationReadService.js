@@ -192,10 +192,19 @@ export function createTrainingNavigationReadService({
       return store.run("training.navigation.session", async () => {
         await ensureCanonicalExerciseRegistry();
         const exact = await store.getCanonicalEvidenceObject(sessionId);
-        if (exact) return findSession(createTrainingNavigationReport({ canonicalEvidenceObjects: [exact] }), sessionId);
+        if (exact) return withSupportingMedia(
+          findSession(createTrainingNavigationReport({ canonicalEvidenceObjects: [exact] }), sessionId),
+          exact,
+        );
         const canonicalEvidenceObjects = await store.listCanonicalTrainingEvidenceObjects();
         let session = findSession(createTrainingNavigationReport({ canonicalEvidenceObjects }), sessionId);
-        if (session || canonicalEvidenceObjects.length > 0) return session;
+        if (session || canonicalEvidenceObjects.length > 0) {
+          const record = canonicalEvidenceObjects.find((item) => [
+            item.canonicalId, item.id, item.payload?.id,
+            ...(item.provenance?.contributing_evidence_object_ids ?? []),
+          ].some((candidate) => String(candidate) === String(sessionId)));
+          return withSupportingMedia(session, record);
+        }
         session = findSession(createTrainingNavigationReport({
           evidencePackages: await store.listEvidencePackages(),
         }), sessionId);
@@ -230,6 +239,12 @@ export function createTrainingNavigationReadService({
       });
     },
   });
+}
+
+function withSupportingMedia(session, record) {
+  if (!session) return null;
+  const supportingMedia = record?.payload?.metadata?.supporting_media ?? record?.metadata?.supporting_media ?? [];
+  return Object.freeze({ ...session, supportingMedia: structuredClone(supportingMedia) });
 }
 
 function projectCanonicalExerciseRegistry(exercises = []) {

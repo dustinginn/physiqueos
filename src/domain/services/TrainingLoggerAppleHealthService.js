@@ -118,7 +118,16 @@ export function buildTrainingLoggerEvidencePackage({
   ]));
   const matchedStrength = normalizedById.get(reconciliation.selectedStrengthSourceId) ?? null;
   const draftArtifactId = `training_logger_draft_${cleanId(draft.draftId)}`;
-  const detailed = createDetailedTrainingSession({ draft, draftArtifactId, matchedStrength });
+  const supportingArtifacts = sourcePackage?.provenance?.source_artifacts ?? [];
+  const supportingMediaByArtifactId = Object.fromEntries(supportingArtifacts
+    .map((artifact) => [artifact.id, artifact.storage_path ?? artifact.storagePath])
+    .filter(([id, reference]) => id && /^media:\/\/[A-Za-z0-9_-]+$/.test(String(reference ?? ""))));
+  const detailed = createDetailedTrainingSession({
+    draft,
+    draftArtifactId,
+    matchedStrength,
+    supportingMediaByArtifactId,
+  });
   const additional = (reconciliation.additionalEvidenceActions ?? [])
     .filter((action) => action.included)
     .map((action) => {
@@ -218,9 +227,15 @@ export function listConsumedSourceWorkoutIds(canonicalObjects = []) {
   return values;
 }
 
-function createDetailedTrainingSession({ draft, draftArtifactId, matchedStrength }) {
+function createDetailedTrainingSession({
+  draft,
+  draftArtifactId,
+  matchedStrength,
+  supportingMediaByArtifactId = {},
+}) {
   const appleRefs = matchedStrength?.sourceArtifactRefs ?? [];
   const sourceArtifactRefs = [...new Set([draftArtifactId, ...appleRefs])];
+  const supportingMediaReferences = appleRefs.map((ref) => supportingMediaByArtifactId[ref]).filter(Boolean);
   const liveTiming = !matchedStrength && draft.mode === "live" && draft.startedAt
     ? {
         start_time: draft.startedAt,
@@ -240,6 +255,7 @@ function createDetailedTrainingSession({ draft, draftArtifactId, matchedStrength
     logger_mode: draft.mode,
     logger_origin: "training_logger",
     source_workout_id: matchedStrength?.sourceWorkoutId ?? null,
+    supporting_media: supportingMediaReferences.map((mediaReference) => ({ mediaReference })),
   };
   const object = createTrainingSessionEvidenceObject({
     capturedAt: new Date().toISOString(),

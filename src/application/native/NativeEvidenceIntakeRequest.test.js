@@ -13,7 +13,7 @@ describe("Native production Evidence intake", () => {
     ]);
   });
 
-  it.each(["nutrition", "activity_day"])("accepts a valid %s screenshot", async (type) => {
+  it.each(["nutrition", "activity_day", "training"])("accepts a valid %s screenshot", async (type) => {
     const file = new File([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])], "screen.png", { type: "image/png" });
     await expect(parseNativeEvidenceIntakeRequest(request(type, file)))
       .resolves.toMatchObject({ expectedEvidenceType: type, files: [file] });

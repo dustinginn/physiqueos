@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createInMemoryCanonicalRecordStore } from "../../platform/database/Phase4CanonicalRecordStore.js";
 import { createCanonicalPersistenceCommandPorts } from "./CanonicalPersistenceCommandPorts.js";
+import { createPhase3CommandService, Phase3Command } from "./Phase3CommandService.js";
+import { createInMemoryFoundationTransactionStore } from "../../platform/commands/InMemoryFoundationTransactionStore.js";
 
 const ownerUserId = "owner-one";
 const principal = { userId: ownerUserId, deviceId: "device-one", sessionId: "session-one" };
@@ -98,10 +100,166 @@ describe("Phase 4 canonical command persistence ports", () => {
       measurements: { measuredAt: "2026-08-10", totalMass: 180, bodyFatPercentage: 12, fatMass: 21.6, leanMass: 151, boneMineralContent: 7.4 },
     }, "1", "dexa-edit"));
     expect(edited.result).toMatchObject({ status: "updated", reviewId: "review-dexa", revision: 2 });
+    const correctedDexa = records.snapshot().evidenceReviews.find((item) => item.id === "review-dexa")
+      .interpretedEvidence.evidence_objects[0];
+    expect(correctedDexa).toMatchObject({
+      measuredAt: "2026-08-10",
+      totalMass: { value: 180, unit: "lb" },
+      bodyFatPercentage: 12,
+      fatMass: { value: 21.6, unit: "lb" },
+      leanMass: { value: 151, unit: "lb" },
+      boneMineralContent: { value: 7.4, unit: "lb" },
+      restingMetabolicRate: { value: null, unit: "kcal/day" },
+      visceralAdiposeTissue: {
+        mass: { value: null, unit: "lb" },
+        volume: { value: null, unit: "in3" },
+      },
+    });
     await expect(ports.editDexaReview(commandContext({
       reviewId: "review-dexa", evidenceObjectId: "dexa-one",
       measurements: { measuredAt: "2026-08-10", totalMass: 181 },
     }, "1", "dexa-stale"))).rejects.toMatchObject({ code: "STALE_VERSION" });
+  });
+
+  it("dismisses only the owned current review without creating or changing canonical history", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const beforeCanonical = structuredClone(records.snapshot().canonicalEvidenceObjects);
+    const dismissed = await ports.disposeEvidenceReview(commandContext({
+      reviewId: "review-one", disposition: "discarded",
+    }, "1", "dismiss-review"));
+    expect(dismissed.result).toMatchObject({ status: "discarded", reviewId: "review-one", revision: 2 });
+    const snapshot = records.snapshot();
+    expect(snapshot.evidenceReviews.find((item) => item.id === "review-one")).toMatchObject({
+      status: "discarded",
+      disposition: { discardedAt: "2026-08-11T12:00:00.000Z", discardedBy: ownerUserId },
+    });
+    expect(snapshot.canonicalEvidenceObjects).toEqual(beforeCanonical);
+    await expect(ports.disposeEvidenceReview(commandContext({
+      reviewId: "review-dexa", disposition: "discarded",
+    }, "9", "dismiss-stale"))).rejects.toMatchObject({ code: "STALE_VERSION" });
+    await expect(ports.disposeEvidenceReview({
+      ...commandContext({ reviewId: "review-one", disposition: "discarded" }, "1", "wrong-owner"),
+      ownerUserId: "other-owner",
+      principal: { ...principal, userId: "other-owner" },
+    })).rejects.toMatchObject({ code: "RESOURCE_NOT_FOUND" });
+  });
+
+  it("replays an identical Evidence Review dismissal without a second transition", async () => {
+    const records = fixture();
+    const service = createPhase3CommandService({
+      transactionRunner: createInMemoryFoundationTransactionStore(),
+      ports: createCanonicalPersistenceCommandPorts({ records, now }),
+    });
+    const input = {
+      commandType: Phase3Command.DISPOSE_EVIDENCE_REVIEW,
+      principal,
+      metadata: { idempotencyKey: "dismiss-review-retry", expectedVersion: "1" },
+      payload: { reviewId: "review-one", disposition: "discarded" },
+    };
+    expect((await service.execute(input)).outcome).toBe("committed");
+    expect((await service.execute(input)).outcome).toBe("replayed");
+    const review = records.snapshot().evidenceReviews.find((item) => item.id === "review-one");
+    expect(review).toMatchObject({ status: "discarded", version: 2 });
+  });
+
+  it("binds owned private screenshot evidence to exactly one Native Training session", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const payload = {
+      sessionId: "native-session-media", localDate: "2026-08-11",
+      supportingEvidenceReviewId: "review-training-support", supportingEvidenceReviewVersion: 1,
+      exercises: [{ canonicalExerciseId: "bench_press", sets: [{ reps: 8, load: 185, unit: "lb" }] }],
+    };
+    const result = await ports.commitTrainingSession(commandContext(payload, null, "training-media"));
+    expect(result.result).toMatchObject({
+      status: "confirmation_requested", reviewId: "review-training-support",
+      reviewRevision: 2, sessionId: "native-session-media",
+    });
+    const review = records.snapshot().evidenceReviews.find((item) => item.id === "review-training-support");
+    expect(review).toMatchObject({
+      status: "pending",
+      interpretedEvidence: {
+        review_metadata: {
+          nativeTrainingSessionId: "native-session-media",
+          supportingEvidenceReviewId: "review-training-support",
+        },
+        provenance: { source_artifacts: [
+          expect.objectContaining({ id: "training-screen-1", storage_path: "media://01999999-9999-4999-8999-999999999999" }),
+          expect.objectContaining({ kind: "structured_training_logger_draft" }),
+        ] },
+      },
+    });
+    const session = review.interpretedEvidence.evidence_objects.find((item) => item.evidence_type === "training");
+    expect(session.provenance.source_artifact_refs).toEqual(expect.arrayContaining([
+      "training-screen-1", "training_logger_draft_native-session-media",
+    ]));
+    expect(session.metadata.supporting_media).toEqual([
+      { mediaReference: "media://01999999-9999-4999-8999-999999999999" },
+    ]);
+  });
+
+  it("rejects stale, wrong-owner, wrong-date, and cross-session Training screenshot bindings", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const base = {
+      sessionId: "native-session-media", localDate: "2026-08-11",
+      supportingEvidenceReviewId: "review-training-support", supportingEvidenceReviewVersion: 1,
+      exercises: [{ canonicalExerciseId: "bench_press", sets: [{ reps: 8, load: 185, unit: "lb" }] }],
+    };
+    await expect(ports.commitTrainingSession(commandContext({ ...base, supportingEvidenceReviewVersion: 9 }, null, "stale-media")))
+      .rejects.toMatchObject({ code: "STALE_VERSION" });
+    await expect(ports.commitTrainingSession({
+      ...commandContext(base, null, "wrong-owner-media"), ownerUserId: "other-owner",
+      principal: { ...principal, userId: "other-owner" },
+    })).rejects.toMatchObject({ code: "RESOURCE_NOT_FOUND" });
+    await expect(ports.commitTrainingSession(commandContext({ ...base, localDate: "2026-08-10" }, null, "wrong-date-media")))
+      .rejects.toMatchObject({ code: "TRAINING_SUPPORTING_EVIDENCE_DATE_MISMATCH" });
+
+    const bound = records.snapshot().evidenceReviews.find((item) => item.id === "review-training-support");
+    await records.put({
+      ownerUserId, collection: "evidenceReviews", recordId: bound.id, expectedVersion: bound.version,
+      payload: { ...bound, interpretedEvidence: { ...bound.interpretedEvidence, review_metadata: { nativeTrainingSessionId: "another-session" } } },
+    });
+    await expect(ports.commitTrainingSession(commandContext({ ...base, supportingEvidenceReviewVersion: 2 }, null, "wrong-session-media")))
+      .rejects.toMatchObject({ code: "TRAINING_SUPPORTING_EVIDENCE_ALREADY_BOUND" });
+  });
+
+  it("replays a Training screenshot commit without duplicating its review or attachment", async () => {
+    const records = fixture();
+    const service = createPhase3CommandService({
+      transactionRunner: createInMemoryFoundationTransactionStore(),
+      ports: createCanonicalPersistenceCommandPorts({ records, now }),
+    });
+    const input = {
+      commandType: Phase3Command.COMMIT_TRAINING_SESSION,
+      principal,
+      metadata: { idempotencyKey: "native-training-media-retry" },
+      payload: {
+        sessionId: "native-session-media", localDate: "2026-08-11",
+        supportingEvidenceReviewId: "review-training-support", supportingEvidenceReviewVersion: 1,
+        exercises: [{ canonicalExerciseId: "bench_press", sets: [{ reps: 8, load: 185, unit: "lb" }] }],
+      },
+    };
+    expect((await service.execute(input)).outcome).toBe("committed");
+    expect((await service.execute(input)).outcome).toBe("replayed");
+    const review = records.snapshot().evidenceReviews.find((item) => item.id === "review-training-support");
+    expect(review.version).toBe(2);
+    expect(review.interpretedEvidence.provenance.source_artifacts.filter((item) => item.id === "training-screen-1")).toHaveLength(1);
+  });
+
+  it("does not bind supporting media when the Training commit fails validation", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.commitTrainingSession(commandContext({
+      sessionId: "native-session-invalid", localDate: "2026-08-11",
+      supportingEvidenceReviewId: "review-training-support", supportingEvidenceReviewVersion: 1,
+      exercises: [{ canonicalExerciseId: "unknown-exercise", sets: [{ reps: 8, load: 185, unit: "lb" }] }],
+    }, null, "training-media-invalid"))).rejects.toMatchObject({ code: "CANONICAL_EXERCISE_UNAVAILABLE" });
+    const review = records.snapshot().evidenceReviews.find((item) => item.id === "review-training-support");
+    expect(review.version).toBe(1);
+    expect(review.interpretedEvidence.review_metadata?.nativeTrainingSessionId).toBeUndefined();
+    expect(records.snapshot().evidencePackages).toEqual([]);
   });
 });
 
@@ -116,11 +274,27 @@ function fixture() {
     executionItems: [{ id: "priority-one", userId: ownerUserId, completionHistory: [], version: 1 }],
     reminders: [{ id: "priority-one", userId: ownerUserId, title: "Priority", active: true, completionHistory: [], version: 1 }],
     evidenceReviews: [
-      { id: "review-one", userId: ownerUserId, status: "pending", version: 1 },
+      { id: "review-one", userId: ownerUserId, status: "pending", version: 1, evidenceTypes: ["activity_day"] },
+      { id: "review-training-support", userId: ownerUserId, status: "pending", version: 1,
+        evidenceTypes: ["training"], interpretedEvidence: {
+          package_id: "training-support-package", observed_date: "2026-08-11",
+          provenance: { evidence_date: "2026-08-11", source_artifacts: [{
+            id: "training-screen-1", storage_path: "media://01999999-9999-4999-8999-999999999999", mime_type: "image/png",
+          }] },
+          evidence_objects: [{
+            id: "apple-training-1", evidence_type: "training", observed_at: "2026-08-11",
+            source: { application: "Apple Fitness", source_artifact_refs: ["training-screen-1"] },
+            provenance: { source_artifact_refs: ["training-screen-1"] },
+            metadata: { activity_type: "Traditional Strength Training", duration_seconds: 3600 },
+            exercises: [],
+          }],
+        } },
       { id: "review-dexa", userId: ownerUserId, status: "pending", version: 1, interpretedEvidence: { package_id: "dexa-package", evidence_objects: [{
         id: "dexa-one", userId: ownerUserId, evidence_type: "dexa_scan", provider: "BodySpec", measuredAt: "2026-08-10", observed_at: "2026-08-10",
         totalMass: { value: 179, unit: "lb" }, bodyFatPercentage: 12, fatMass: { value: 21.5, unit: "lb" }, leanMass: { value: 150, unit: "lb" },
-        boneMineralContent: { value: 7.5, unit: "lb" }, source: { type: "dexa", name: "BodySpec" }, provenance: { extraction_engine: "pdfjs-dist", fixture: false, source_artifact_refs: ["pdf-one"] },
+        boneMineralContent: { value: 7.5, unit: "lb" }, restingMetabolicRate: { value: 1810, unit: "kcal/day" },
+        visceralAdiposeTissue: { mass: { value: 0.7, unit: "lb" }, volume: { value: 19, unit: "in3" } },
+        source: { type: "dexa", name: "BodySpec" }, provenance: { extraction_engine: "pdfjs-dist", fixture: false, source_artifact_refs: ["pdf-one"] },
       }] } },
     ],
     trainingPerformanceEvents: [{ id: "training-one", userId: ownerUserId, version: 1 }],

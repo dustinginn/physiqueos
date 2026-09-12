@@ -126,7 +126,16 @@ function projectSessionSummary(record) {
     href: `/progress/training/session/${encodeURIComponent(id)}`,
   });
 }
-function projectSessionDetail(record) { const session = record.payload ?? record; return Object.freeze({ ...projectSessionSummary(record), exercises: structuredClone(session.exercises ?? []), exerciseRelationshipGroups: structuredClone(session.exerciseRelationshipGroups ?? []), metadata: structuredClone(session.metadata ?? {}) }); }
+function projectSessionDetail(record) {
+  const session = record.payload ?? record;
+  return Object.freeze({
+    ...projectSessionSummary(record),
+    exercises: structuredClone(session.exercises ?? []),
+    exerciseRelationshipGroups: structuredClone(session.exerciseRelationshipGroups ?? []),
+    metadata: structuredClone(session.metadata ?? {}),
+    supportingMedia: structuredClone(session.metadata?.supporting_media ?? []),
+  });
+}
 function sessionIdentity(record) { const session = record.payload ?? record; return String(record.canonicalId ?? session.id ?? record.id); }
 function projectExercise(item) { return Object.freeze({ id: item.id, name: item.name, bodyRegion: item.body_region ?? null, equipment: item.equipment ?? null, href: `/progress/training/library/${encodeURIComponent(item.id)}` }); }
 

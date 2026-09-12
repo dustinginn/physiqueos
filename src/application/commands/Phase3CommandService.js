@@ -121,9 +121,15 @@ function validatePayload(commandType, payload) {
   if (payload.dailyTotals != null && (!payload.dailyTotals || typeof payload.dailyTotals !== "object" || Array.isArray(payload.dailyTotals))) throw validation("dailyTotals", "dailyTotals must be an object.");
   if (payload.dailyActivity != null && (!payload.dailyActivity || typeof payload.dailyActivity !== "object" || Array.isArray(payload.dailyActivity))) throw validation("dailyActivity", "dailyActivity must be an object.");
   if (payload.measurements != null && (!payload.measurements || typeof payload.measurements !== "object" || Array.isArray(payload.measurements))) throw validation("measurements", "measurements must be an object.");
+  if (commandType === Phase3Command.DISPOSE_EVIDENCE_REVIEW && payload.disposition !== "discarded") {
+    throw validation("disposition", "Evidence Review disposition must be discarded.");
+  }
   if (payload.exercises != null && (!Array.isArray(payload.exercises) || payload.exercises.length === 0)) throw validation("exercises", "exercises must be a non-empty array.");
+  if (payload.supportingEvidenceReviewVersion != null && (!Number.isInteger(Number(payload.supportingEvidenceReviewVersion)) || Number(payload.supportingEvidenceReviewVersion) < 1)) {
+    throw validation("supportingEvidenceReviewVersion", "supportingEvidenceReviewVersion must be a positive integer.");
+  }
   if (payload.observedAt != null && Number.isNaN(Date.parse(payload.observedAt))) throw validation("observedAt", "observedAt must be an ISO date-time.");
-  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId"]) {
+  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId"]) {
     if (payload[field] != null && !String(payload[field]).trim()) throw validation(field, `${field} must be a non-empty identity.`);
   }
 }

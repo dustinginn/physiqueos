@@ -32,16 +32,20 @@ import {
   resolveCanonicalGoalRelationships,
   selectCanonicalActiveGoal,
 } from "./CanonicalGoalRelationshipService.js";
+import { canonicalWeightEntries } from "../weight/canonicalWeight.js";
 
 export function createPriorityDetailService({ repositories, now = () => new Date() }) {
   return scopeRepositoryReadService({ repositories, namespace: "priority-detail", service: {
-    async getPriorityDetail(priorityId, userId) {
+    async getPriorityDetail(priorityId, userId, { occurrenceDate: requestedOccurrenceDate = null } = {}) {
       const user = userId
         ? await repositories.users.getUserById(userId)
         : await repositories.users.getCurrentUser();
       const resolvedUserId = user?.id ?? userId;
 
       if (!resolvedUserId) return null;
+
+      const timeZone = resolveLocalTimeZone(user?.timeZone ?? user?.timezone);
+      const occurrenceDate = requestedOccurrenceDate ?? getLocalDateKey(now(), timeZone);
 
       const [
         goals,
@@ -50,6 +54,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
         operatingPlan,
         operatingRhythm,
         executionItems,
+        weightEntries,
       ] =
         await Promise.all([
           repositories.goals.listGoals(resolvedUserId),
@@ -58,10 +63,12 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           repositories.operatingPlan?.getOperatingPlan(resolvedUserId) ?? null,
           repositories.operatingRhythm?.getOperatingRhythm(resolvedUserId) ?? null,
           repositories.executionItems?.listExecutionItems?.(resolvedUserId) ?? [],
+          repositories.weightEntries?.listWeightEntries?.(resolvedUserId) ?? [],
         ]);
 
       const dexaPriority = parseDexaPriorityId(priorityId);
       if (dexaPriority) {
+        if (requestedOccurrenceDate && requestedOccurrenceDate !== dexaPriority.scheduledDate) return null;
         const appointment = executionItems.find((item) => item.id === "execution_next_dexa");
         if (isCurrentScheduledDexaAppointment(appointment) &&
             appointment.preferredSchedule?.date === dexaPriority.scheduledDate) {
@@ -82,9 +89,16 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           reminders: [reminder],
           userId: resolvedUserId,
         });
-        const occurrenceDate = getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone));
         return support
-          ? withExecutionContract(createMorningWeighInPriorityDetail({ goals, operatingPlan, support }), reminder, occurrenceDate)
+          ? withExecutionContract(createMorningWeighInPriorityDetail({
+              goals,
+              operatingPlan,
+              support,
+              occurrenceDate,
+              timeZone,
+              weightEntry: canonicalWeightEntries(weightEntries)
+                .find((entry) => String(entry.measuredAt).slice(0, 10) === occurrenceDate) ?? null,
+            }), reminder, occurrenceDate)
           : null;
       }
 
@@ -100,13 +114,10 @@ export function createPriorityDetailService({ repositories, now = () => new Date
             executionItems,
             protocol.id
           );
-          const timeZone = resolveLocalTimeZone(
-            user?.timeZone ?? user?.timezone
-          );
           const currentInstant = now();
           const projection = projectExecutionPriority({
             executionItem: match.executionItem,
-            localDate: getLocalDateKey(currentInstant, timeZone),
+            localDate: occurrenceDate,
             now: currentInstant,
             protocol,
             reminder,
@@ -139,7 +150,6 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           return withExecutionContract(detail, reminder, projection.localDate);
         }
 
-        const occurrenceDate = getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone));
         return withExecutionContract(createLegacyReminderOnlyProtocolPriorityDetail({
           reminder,
           protocol,
@@ -147,12 +157,11 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           operatingPlan,
           operatingRhythm,
           occurrenceDate,
-          timeZone: resolveLocalTimeZone(user?.timeZone ?? user?.timezone),
+          timeZone,
         }), reminder, occurrenceDate);
       }
 
       if (reminder?.linkedEvidenceType === "progress_photo") {
-        const occurrenceDate = getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone));
         return withExecutionContract(createProgressPhotoPriorityDetail({
           executionItem: executionItems.find((item) => item.id === "execution_progress_photos"),
           reminder,
@@ -162,13 +171,12 @@ export function createPriorityDetailService({ repositories, now = () => new Date
       }
 
       if (reminder) {
-        const occurrenceDate = getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone));
         return withExecutionContract(createReminderPriorityDetail({
           reminder,
           goals,
           operatingPlan,
           occurrenceDate,
-          timeZone: resolveLocalTimeZone(user?.timeZone ?? user?.timezone),
+          timeZone,
         }), reminder, occurrenceDate);
       }
 
@@ -521,21 +529,31 @@ function getExecutionNotesSections(executionItem) {
     : [];
 }
 
-function createMorningWeighInPriorityDetail({ goals, operatingPlan, support }) {
+function createMorningWeighInPriorityDetail({ goals, operatingPlan, support, occurrenceDate, timeZone, weightEntry }) {
+  const relatedWeight = weightEntry ? {
+    canonicalId: weightEntry.id,
+    date: occurrenceDate,
+    measuredAt: weightEntry.measuredAt,
+    value: weightEntry.weight?.value ?? null,
+    unit: weightEntry.weight?.unit ?? null,
+    version: weightEntry.version ?? null,
+  } : null;
+  const completed = Boolean(relatedWeight) || isReminderOccurrenceCompleted(support.reminder, { occurrenceDate, timeZone });
   return {
     id: support.reminder.id,
     title: "Morning Weigh-In",
     eyebrow: "Priority Detail",
     subtitle: support.supportSummary,
-    status: support.reminder.active ? "Open" : "Reminder off",
+    status: completed ? "Completed" : support.reminder.active ? "Open" : "Reminder off",
     completable: false,
     action: { label: "Log Weight", href: "/check-in/morning" },
+    relatedWeight,
     sections: [
       {
         title: "What",
         items: [{
           label: "Record your weight",
-          detail: "A valid weight recorded for today satisfies this routine automatically.",
+          detail: `A valid Weight recorded for ${occurrenceDate} satisfies this routine automatically.`,
         }],
       },
       {
@@ -560,12 +578,20 @@ function createMorningWeighInPriorityDetail({ goals, operatingPlan, support }) {
       {
         title: "Completion",
         items: [{
-          label: "Evidence-driven",
-          detail: "No separate completion is needed after today's valid weight is recorded.",
+          label: relatedWeight ? `${formatWeight(relatedWeight.value)} ${relatedWeight.unit ?? "lb"} recorded` : "Evidence-driven",
+          detail: relatedWeight
+            ? `Canonical Weight for ${occurrenceDate} satisfies this occurrence.`
+            : `No separate completion is needed after a valid Weight is recorded for ${occurrenceDate}.`,
         }],
       },
     ],
   };
+}
+
+function formatWeight(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "Weight";
+  return number % 1 === 0 ? String(number) : number.toFixed(1);
 }
 
 // Reminder-only protocols retain their existing detail until they gain a
