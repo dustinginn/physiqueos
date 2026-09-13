@@ -413,35 +413,86 @@ enum EvidenceSandboxRouter {
         // own keyword sets are similarly specific — a real co-occurrence of
         // two such strong, distinct signals is genuine ambiguity worth
         // surfacing, not something to silently resolve.
-        add(.dexa, when: containsAny(text, [
-            "dexa", "bodyspec", "body composition", "lean tissue", "fat tissue",
-            "fat mass", "body fat", "regional lean", "regional fat", "bone mineral content", "vat volume",
-        ]))
-        add(.labs, when: containsAny(text, ["lab panel", "bloodwork", "blood test", "hemoglobin", "cholesterol", "testosterone"]))
-        add(.recovery, when: containsAny(text, ["sleep", "hrv", "readiness", "recovery score", "time asleep"]) && !result.contains(.dexa))
-        add(.progressPhotos, when: containsAny(text, ["progress photo", "front relaxed", "rear relaxed", "side relaxed", "pose photo"]) && !result.contains(.dexa))
+        add(.dexa, when: containsAny(text, dexaTerms))
+        add(.labs, when: containsAny(text, labsTerms))
+        add(.recovery, when: containsAny(text, recoveryTerms) && !result.contains(.dexa))
+        add(.progressPhotos, when: containsAny(text, progressPhotoTerms) && !result.contains(.dexa))
         // A calorie value appears on both Apple workout summaries and Nutrition
         // screens. It is therefore deliberately not a Nutrition signal on its
         // own. Nutrition requires domain-specific context such as macros, food,
         // meals, or a daily diary/summary.
-        let nutritionSignal = containsAny(text, [
-            "nutrition", "protein", "carbohydrate", "carbs", "macros", "meal",
-            "breakfast", "lunch", "dinner", "snacks", "food diary", "daily nutrition",
-            "fiber", "sodium", "serving size", "myfitnesspal", "cronometer",
-        ])
+        let nutritionSignal = containsAny(text, nutritionTerms)
         add(.nutrition, when: nutritionSignal)
-        let trainingSignal = containsAny(text, [
-            "workout", "training", "traditional strength", "functional strength",
-            "sets", "reps", "active calories", "workout time", "duration", "average heart rate",
-            "shoulder press", "bench press", "lateral raise", "squat", "deadlift", "curl",
-            "treadmill", "stair stepper", "outdoor walk", "indoor walk", "outdoor run",
-            "indoor run", "cycling", "elliptical", "rowing", "hiking",
-        ]) || text.range(of: #"(?im)^\s*\d+(?:\.\d+)?\s*(?:p|lb|lbs|pounds?)\s+\d+(?:\.\d+)?\s*(?:r|reps?)\s*[x×]\s*\d+\s*$"#, options: .regularExpression) != nil
+        let trainingSignal = containsAny(text, trainingTerms) || text.range(of: trainingSetPattern, options: .regularExpression) != nil
         add(.training, when: trainingSignal)
-        add(.activity, when: containsAny(text, ["activity rings", "move goal", "stand hours", "exercise minutes", "steps"]) && !trainingSignal && !result.contains(.dexa))
-        let weightSignal = containsAny(text, ["morning weight", "body weight", "weighed in", "scale weight"]) || text.range(of: #"(?m)^\s*\d{2,3}(?:\.\d+)?\s*(?:lb|lbs|kg)\s*$"#, options: .regularExpression) != nil
+        add(.activity, when: containsAny(text, activityTerms) && !trainingSignal && !result.contains(.dexa))
+        let weightSignal = containsAny(text, weightTerms) || text.range(of: weightReadingPattern, options: .regularExpression) != nil
         add(.weight, when: weightSignal && !trainingSignal && !result.contains(.dexa))
         return result
+    }
+
+    // The keyword sets below are shared verbatim by the classification
+    // decision above and by `detectedSignals(for:)` below, so the diagnostic
+    // can never drift from the logic it explains.
+    static let dexaTerms = [
+        "dexa", "bodyspec", "body composition", "lean tissue", "fat tissue",
+        "fat mass", "body fat", "regional lean", "regional fat", "bone mineral content", "vat volume",
+    ]
+    static let labsTerms = ["lab panel", "bloodwork", "blood test", "hemoglobin", "cholesterol", "testosterone"]
+    static let recoveryTerms = ["sleep", "hrv", "readiness", "recovery score", "time asleep"]
+    static let progressPhotoTerms = ["progress photo", "front relaxed", "rear relaxed", "side relaxed", "pose photo"]
+    static let nutritionTerms = [
+        "nutrition", "protein", "carbohydrate", "carbs", "macros", "meal",
+        "breakfast", "lunch", "dinner", "snacks", "food diary", "daily nutrition",
+        "fiber", "sodium", "serving size", "myfitnesspal", "cronometer",
+    ]
+    static let trainingTerms = [
+        "workout", "training", "traditional strength", "functional strength",
+        "sets", "reps", "active calories", "workout time", "duration", "average heart rate",
+        "shoulder press", "bench press", "lateral raise", "squat", "deadlift", "curl",
+        "treadmill", "stair stepper", "outdoor walk", "indoor walk", "outdoor run",
+        "indoor run", "cycling", "elliptical", "rowing", "hiking",
+    ]
+    static let activityTerms = ["activity rings", "move goal", "stand hours", "exercise minutes", "steps"]
+    static let weightTerms = ["morning weight", "body weight", "weighed in", "scale weight"]
+    static let trainingSetPattern = #"(?im)^\s*\d+(?:\.\d+)?\s*(?:p|lb|lbs|pounds?)\s+\d+(?:\.\d+)?\s*(?:r|reps?)\s*[x×]\s*\d+\s*$"#
+    static let weightReadingPattern = #"(?m)^\s*\d{2,3}(?:\.\d+)?\s*(?:lb|lbs|kg)\s*$"#
+
+    /// Bounded classification diagnostic: reports WHICH fixed signal caused
+    /// each category to match, as stable identifiers drawn from our own
+    /// keyword tables (e.g. `nutrition.keyword.protein`) — never the
+    /// surrounding document text. This exists because Build 25 and Build 26
+    /// both "corrected" Automatic precedence against an *inferred* keyword
+    /// collision that turned out not to be the real one; the next real
+    /// ambiguous document must report its actual collision rather than be
+    /// guessed at again.
+    static func detectedSignals(for draft: EvidenceIntakeDraft) -> [String] {
+        var signals: [String] = []
+        func record(_ category: EvidenceCategory, _ terms: [String], in text: String) {
+            for term in terms where text.contains(term) {
+                let identifier = "\(category.rawValue).keyword.\(term.replacingOccurrences(of: " ", with: "_"))"
+                if !signals.contains(identifier) { signals.append(identifier) }
+            }
+        }
+        for source in classificationSources(for: draft) {
+            let text = source.classificationText
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            record(.dexa, dexaTerms, in: text)
+            record(.labs, labsTerms, in: text)
+            record(.recovery, recoveryTerms, in: text)
+            record(.progressPhotos, progressPhotoTerms, in: text)
+            record(.nutrition, nutritionTerms, in: text)
+            record(.training, trainingTerms, in: text)
+            record(.activity, activityTerms, in: text)
+            record(.weight, weightTerms, in: text)
+            if text.range(of: trainingSetPattern, options: .regularExpression) != nil, !signals.contains("training.pattern.set_line") {
+                signals.append("training.pattern.set_line")
+            }
+            if text.range(of: weightReadingPattern, options: .regularExpression) != nil, !signals.contains("weight.pattern.reading_line") {
+                signals.append("weight.pattern.reading_line")
+            }
+        }
+        return signals
     }
 
     private static func containsAny(_ text: String, _ terms: [String]) -> Bool {

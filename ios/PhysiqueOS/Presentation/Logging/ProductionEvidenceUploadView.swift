@@ -136,6 +136,9 @@ struct ProductionEvidenceUploadView: View {
     /// attachment UI and submission, never `domainChoice` directly.
     @State private var resolvedScenario: Scenario?
     @State private var classificationNote: String?
+    /// Fixed signal identifiers (e.g. "nutrition.keyword.protein") explaining
+    /// an ambiguous Automatic classification. Never document content.
+    @State private var classificationSignals: [String] = []
     @State private var captureMode: CaptureMode = .screenshot
     @State private var effectiveDate = Date()
     @State private var attachments: [SandboxAttachment] = []
@@ -246,6 +249,7 @@ struct ProductionEvidenceUploadView: View {
                     domainChoice = choice
                     resolvedScenario = choice.scenario
                     classificationNote = nil
+                    classificationSignals = []
                 } label: {
                     HStack {
                         Text(choice.label).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -278,9 +282,15 @@ struct ProductionEvidenceUploadView: View {
             } }
         }
         if let note = classificationNote {
-            CardContainer {
+            CardContainer { VStack(alignment: .leading, spacing: 6) {
                 Text(note).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.chartEffort)
-            }
+                if !classificationSignals.isEmpty {
+                    Text("Signals: \(classificationSignals.joined(separator: ", "))")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .accessibilityIdentifier("productionEvidenceUpload.classificationSignals")
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading) }
         }
         if resolvedScenario == .dexa || domainChoice == .automatic || captureMode == .screenshot {
             attachmentCard
@@ -451,16 +461,24 @@ struct ProductionEvidenceUploadView: View {
         let note: String?
         switch categories.first {
         case _ where categories.count > 1:
-            // Bounded diagnostic: only the matched CATEGORY NAMES (a fixed,
-            // small enum) — never the document's extracted text, filename,
-            // or any other content — so a real ambiguous classification can
-            // be understood from the device console without exposing the
-            // Founder's evidence. This is what should be captured the next
-            // time Automatic reports "more than one kind of evidence" on a
-            // real document, instead of guessing at more keywords blind.
-            print("EvidenceClassification: ambiguous categories=\(categories.map(\.rawValue).sorted())")
+            // Bounded diagnostic. Build 25 and Build 26 each "corrected"
+            // Automatic precedence against an INFERRED keyword collision,
+            // and the real document still came back ambiguous both times —
+            // so the collision must be reported, not guessed at again.
+            //
+            // Both the matched category names and the matched signal
+            // identifiers come from our own fixed keyword tables (e.g.
+            // "nutrition.keyword.protein"); the document's extracted text,
+            // filename, and contents are never logged or displayed. This is
+            // surfaced in the UI as well as the console so the next real
+            // ambiguous document identifies itself without the phone being
+            // attached to Xcode.
+            let matched = categories.map(\.rawValue).sorted()
+            let signals = EvidenceSandboxRouter.detectedSignals(for: draft)
+            print("EvidenceClassification: ambiguous categories=\(matched) signals=\(signals)")
+            classificationSignals = signals
             scenario = nil
-            note = "This looks like more than one kind of evidence. Choose the right one below."
+            note = "This looks like more than one kind of evidence (matched: \(matched.joined(separator: ", "))). Choose the right one below."
         case .nutrition: scenario = .nutrition; note = "Detected: Nutrition."
         case .activity: scenario = .activity; note = "Detected: Activity."
         case .dexa: scenario = .dexa; note = "Detected: DEXA."

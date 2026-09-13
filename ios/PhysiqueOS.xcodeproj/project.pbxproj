@@ -241,7 +241,7 @@
 		0000000000000000000011D0 /* BriefingsFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011CF /* BriefingsFixture.json */; };
 		0000000000000000000011D2 /* PlusJakartaSans[wght].ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D1 /* PlusJakartaSans[wght].ttf */; };
 		0000000000000000000011D4 /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D3 /* OFL.txt */; };
-		000000000000000000001249 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001248 /* Assets.xcassets */; };
+		00000000000000000000124B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000124A /* Assets.xcassets */; };
 		0000000000000000000011D7 /* AppTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D6 /* AppTabTests.swift */; };
 		0000000000000000000011D9 /* HomeReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D8 /* HomeReadModelTests.swift */; };
 		0000000000000000000011DB /* PriorityReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011DA /* PriorityReadModelTests.swift */; };
@@ -270,22 +270,23 @@
 		000000000000000000001209 /* LoggingSandboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001208 /* LoggingSandboxTests.swift */; };
 		00000000000000000000120B /* MorningCheckInModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000120A /* MorningCheckInModelTests.swift */; };
 		00000000000000000000120D /* FounderServerAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000120C /* FounderServerAPITests.swift */; };
-		00000000000000000000123C /* TrainingAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000123B /* TrainingAcceptanceUITests.swift */; };
+		00000000000000000000120F /* EvidenceAttachmentContentTypeProbeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000120E /* EvidenceAttachmentContentTypeProbeTests.swift */; };
+		00000000000000000000123E /* TrainingAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000123D /* TrainingAcceptanceUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		00000000000000000000123A /* PBXContainerItemProxy */ = {
+		00000000000000000000123C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 000000000000000000001227 /* Project object */;
+			containerPortal = 000000000000000000001229 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 00000000000000000000122B;
+			remoteGlobalIDString = 00000000000000000000122D;
 			remoteInfo = PhysiqueOS;
 		};
-		000000000000000000001247 /* PBXContainerItemProxy */ = {
+		000000000000000000001249 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 000000000000000000001227 /* Project object */;
+			containerPortal = 000000000000000000001229 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 00000000000000000000122B;
+			remoteGlobalIDString = 00000000000000000000122D;
 			remoteInfo = PhysiqueOS;
 		};
 /* End PBXContainerItemProxy section */
@@ -525,7 +526,7 @@
 		0000000000000000000011CF /* BriefingsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "BriefingsFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011D1 /* PlusJakartaSans[wght].ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlusJakartaSans[wght].ttf"; sourceTree = "<group>"; };
 		0000000000000000000011D3 /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL.txt"; sourceTree = "<group>"; };
-		000000000000000000001248 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
+		00000000000000000000124A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
 		0000000000000000000011D5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		0000000000000000000011D6 /* AppTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTabTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000011D8 /* HomeReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModelTests.swift"; sourceTree = "<group>"; };
@@ -555,28 +556,29 @@
 		000000000000000000001208 /* LoggingSandboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggingSandboxTests.swift"; sourceTree = "<group>"; };
 		00000000000000000000120A /* MorningCheckInModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MorningCheckInModelTests.swift"; sourceTree = "<group>"; };
 		00000000000000000000120C /* FounderServerAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderServerAPITests.swift"; sourceTree = "<group>"; };
-		00000000000000000000123B /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
-		000000000000000000001225 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000001226 /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		00000000000000000000123D /* PhysiqueOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		00000000000000000000120E /* EvidenceAttachmentContentTypeProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceAttachmentContentTypeProbeTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000123D /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
+		000000000000000000001227 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001228 /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		00000000000000000000123F /* PhysiqueOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		000000000000000000001230 /* Frameworks */ = {
+		000000000000000000001232 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001237 /* Frameworks */ = {
+		000000000000000000001239 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001244 /* Frameworks */ = {
+		000000000000000000001246 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -586,21 +588,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		000000000000000000001210 /* PhysiqueOS */ = {
+		000000000000000000001212 /* PhysiqueOS */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001212 /* App */,
-				000000000000000000001213 /* Contracts */,
-				000000000000000000001214 /* Networking */,
-				000000000000000000001217 /* SharedUI */,
-				000000000000000000001215 /* Presentation */,
-				000000000000000000001216 /* Resources */,
-				000000000000000000001218 /* Supporting */,
+				000000000000000000001214 /* App */,
+				000000000000000000001215 /* Contracts */,
+				000000000000000000001216 /* Networking */,
+				000000000000000000001219 /* SharedUI */,
+				000000000000000000001217 /* Presentation */,
+				000000000000000000001218 /* Resources */,
+				00000000000000000000121A /* Supporting */,
 			);
 			path = PhysiqueOS;
 			sourceTree = "<group>";
 		};
-		000000000000000000001212 /* App */ = {
+		000000000000000000001214 /* App */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001001 /* PhysiqueOSApp.swift */,
@@ -609,7 +611,7 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		000000000000000000001213 /* Contracts */ = {
+		000000000000000000001215 /* Contracts */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001005 /* AppTab.swift */,
@@ -657,7 +659,7 @@
 			path = Contracts;
 			sourceTree = "<group>";
 		};
-		000000000000000000001214 /* Networking */ = {
+		000000000000000000001216 /* Networking */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001057 /* HomeAPI.swift */,
@@ -704,28 +706,28 @@
 			path = Networking;
 			sourceTree = "<group>";
 		};
-		000000000000000000001215 /* Presentation */ = {
+		000000000000000000001217 /* Presentation */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001219 /* Briefings */,
-				00000000000000000000121A /* Evidence */,
-				00000000000000000000121B /* Goals */,
-				00000000000000000000121C /* Home */,
-				00000000000000000000121D /* Log */,
-				00000000000000000000121E /* Logging */,
-				00000000000000000000121F /* OperatingPlan */,
-				000000000000000000001220 /* Root */,
-				000000000000000000001221 /* Training */,
-				000000000000000000001222 /* TrainingLogger */,
-				000000000000000000001223 /* You */,
+				00000000000000000000121B /* Briefings */,
+				00000000000000000000121C /* Evidence */,
+				00000000000000000000121D /* Goals */,
+				00000000000000000000121E /* Home */,
+				00000000000000000000121F /* Log */,
+				000000000000000000001220 /* Logging */,
+				000000000000000000001221 /* OperatingPlan */,
+				000000000000000000001222 /* Root */,
+				000000000000000000001223 /* Training */,
+				000000000000000000001224 /* TrainingLogger */,
+				000000000000000000001225 /* You */,
 			);
 			path = Presentation;
 			sourceTree = "<group>";
 		};
-		000000000000000000001216 /* Resources */ = {
+		000000000000000000001218 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001224 /* Fonts */,
+				000000000000000000001226 /* Fonts */,
 				0000000000000000000011B1 /* HomeFixture.json */,
 				0000000000000000000011B3 /* PriorityFixture.json */,
 				0000000000000000000011B5 /* GoalsFixture.json */,
@@ -742,12 +744,12 @@
 				0000000000000000000011CB /* EnergyFixture.json */,
 				0000000000000000000011CD /* TrainingLoggerFixture.json */,
 				0000000000000000000011CF /* BriefingsFixture.json */,
-				000000000000000000001248 /* Assets.xcassets */,
+				00000000000000000000124A /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		000000000000000000001217 /* SharedUI */ = {
+		000000000000000000001219 /* SharedUI */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000010A7 /* PhysiqueOSTheme.swift */,
@@ -778,7 +780,7 @@
 			path = SharedUI;
 			sourceTree = "<group>";
 		};
-		000000000000000000001218 /* Supporting */ = {
+		00000000000000000000121A /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000011D5 /* Info.plist */,
@@ -786,7 +788,7 @@
 			path = Supporting;
 			sourceTree = "<group>";
 		};
-		000000000000000000001219 /* Briefings */ = {
+		00000000000000000000121B /* Briefings */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000010F5 /* BriefingHistoryView.swift */,
@@ -800,7 +802,7 @@
 			path = Briefings;
 			sourceTree = "<group>";
 		};
-		00000000000000000000121A /* Evidence */ = {
+		00000000000000000000121C /* Evidence */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001149 /* EvidenceView.swift */,
@@ -838,7 +840,7 @@
 			path = Evidence;
 			sourceTree = "<group>";
 		};
-		00000000000000000000121B /* Goals */ = {
+		00000000000000000000121D /* Goals */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001111 /* GoalsView.swift */,
@@ -857,7 +859,7 @@
 			path = Goals;
 			sourceTree = "<group>";
 		};
-		00000000000000000000121C /* Home */ = {
+		00000000000000000000121E /* Home */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000010DD /* HomeView.swift */,
@@ -876,7 +878,7 @@
 			path = Home;
 			sourceTree = "<group>";
 		};
-		00000000000000000000121D /* Log */ = {
+		00000000000000000000121F /* Log */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001103 /* LogView.swift */,
@@ -890,7 +892,7 @@
 			path = Log;
 			sourceTree = "<group>";
 		};
-		00000000000000000000121E /* Logging */ = {
+		000000000000000000001220 /* Logging */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000011A9 /* ManualWeighInView.swift */,
@@ -901,7 +903,7 @@
 			path = Logging;
 			sourceTree = "<group>";
 		};
-		00000000000000000000121F /* OperatingPlan */ = {
+		000000000000000000001221 /* OperatingPlan */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001129 /* OperatingPlanComponents.swift */,
@@ -922,7 +924,7 @@
 			path = OperatingPlan;
 			sourceTree = "<group>";
 		};
-		000000000000000000001220 /* Root */ = {
+		000000000000000000001222 /* Root */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000010D7 /* RootTabView.swift */,
@@ -932,7 +934,7 @@
 			path = Root;
 			sourceTree = "<group>";
 		};
-		000000000000000000001221 /* Training */ = {
+		000000000000000000001223 /* Training */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001187 /* TrainingHistoryView.swift */,
@@ -954,7 +956,7 @@
 			path = Training;
 			sourceTree = "<group>";
 		};
-		000000000000000000001222 /* TrainingLogger */ = {
+		000000000000000000001224 /* TrainingLogger */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000011A5 /* TrainingLoggerView.swift */,
@@ -963,7 +965,7 @@
 			path = TrainingLogger;
 			sourceTree = "<group>";
 		};
-		000000000000000000001223 /* You */ = {
+		000000000000000000001225 /* You */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001145 /* YouPlaceholderView.swift */,
@@ -972,7 +974,7 @@
 			path = You;
 			sourceTree = "<group>";
 		};
-		000000000000000000001224 /* Fonts */ = {
+		000000000000000000001226 /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000011D1 /* PlusJakartaSans[wght].ttf */,
@@ -981,7 +983,7 @@
 			path = Fonts;
 			sourceTree = "<group>";
 		};
-		000000000000000000001211 /* PhysiqueOSTests */ = {
+		000000000000000000001213 /* PhysiqueOSTests */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000011D6 /* AppTabTests.swift */,
@@ -1012,48 +1014,49 @@
 				000000000000000000001208 /* LoggingSandboxTests.swift */,
 				00000000000000000000120A /* MorningCheckInModelTests.swift */,
 				00000000000000000000120C /* FounderServerAPITests.swift */,
+				00000000000000000000120E /* EvidenceAttachmentContentTypeProbeTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
 		};
-		00000000000000000000123E /* PhysiqueOSUITests */ = {
+		000000000000000000001240 /* PhysiqueOSUITests */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000123B /* TrainingAcceptanceUITests.swift */,
+				00000000000000000000123D /* TrainingAcceptanceUITests.swift */,
 			);
 			path = PhysiqueOSUITests;
 			sourceTree = "<group>";
 		};
-		00000000000000000000120F /* Products */ = {
+		000000000000000000001211 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001225 /* PhysiqueOS.app */,
-				000000000000000000001226 /* PhysiqueOSTests.xctest */,
-				00000000000000000000123D /* PhysiqueOSUITests.xctest */,
+				000000000000000000001227 /* PhysiqueOS.app */,
+				000000000000000000001228 /* PhysiqueOSTests.xctest */,
+				00000000000000000000123F /* PhysiqueOSUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		00000000000000000000120E /* Main */ = {
+		000000000000000000001210 /* Main */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001210 /* PhysiqueOS */,
-				000000000000000000001211 /* PhysiqueOSTests */,
-				00000000000000000000123E /* PhysiqueOSUITests */,
-				00000000000000000000120F /* Products */,
+				000000000000000000001212 /* PhysiqueOS */,
+				000000000000000000001213 /* PhysiqueOSTests */,
+				000000000000000000001240 /* PhysiqueOSUITests */,
+				000000000000000000001211 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		00000000000000000000122B /* PhysiqueOS */ = {
+		00000000000000000000122D /* PhysiqueOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 00000000000000000000122C /* Build configuration list for PBXNativeTarget "PhysiqueOS" */;
+			buildConfigurationList = 00000000000000000000122E /* Build configuration list for PBXNativeTarget "PhysiqueOS" */;
 			buildPhases = (
-				00000000000000000000122F /* Sources */,
-				000000000000000000001230 /* Frameworks */,
-				000000000000000000001231 /* Resources */,
+				000000000000000000001231 /* Sources */,
+				000000000000000000001232 /* Frameworks */,
+				000000000000000000001233 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -1061,69 +1064,69 @@
 			);
 			name = PhysiqueOS;
 			productName = PhysiqueOS;
-			productReference = 000000000000000000001225 /* PhysiqueOS.app */;
+			productReference = 000000000000000000001227 /* PhysiqueOS.app */;
 			productType = "com.apple.product-type.application";
 		};
-		000000000000000000001232 /* PhysiqueOSTests */ = {
+		000000000000000000001234 /* PhysiqueOSTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001233 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */;
+			buildConfigurationList = 000000000000000000001235 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */;
 			buildPhases = (
-				000000000000000000001236 /* Sources */,
-				000000000000000000001237 /* Frameworks */,
-				000000000000000000001238 /* Resources */,
+				000000000000000000001238 /* Sources */,
+				000000000000000000001239 /* Frameworks */,
+				00000000000000000000123A /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				000000000000000000001239 /* PBXTargetDependency */,
+				00000000000000000000123B /* PBXTargetDependency */,
 			);
 			name = PhysiqueOSTests;
 			productName = PhysiqueOSTests;
-			productReference = 000000000000000000001226 /* PhysiqueOSTests.xctest */;
+			productReference = 000000000000000000001228 /* PhysiqueOSTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		00000000000000000000123F /* PhysiqueOSUITests */ = {
+		000000000000000000001241 /* PhysiqueOSUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001240 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */;
+			buildConfigurationList = 000000000000000000001242 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */;
 			buildPhases = (
-				000000000000000000001243 /* Sources */,
-				000000000000000000001244 /* Frameworks */,
-				000000000000000000001245 /* Resources */,
+				000000000000000000001245 /* Sources */,
+				000000000000000000001246 /* Frameworks */,
+				000000000000000000001247 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				000000000000000000001246 /* PBXTargetDependency */,
+				000000000000000000001248 /* PBXTargetDependency */,
 			);
 			name = PhysiqueOSUITests;
 			productName = PhysiqueOSUITests;
-			productReference = 00000000000000000000123D /* PhysiqueOSUITests.xctest */;
+			productReference = 00000000000000000000123F /* PhysiqueOSUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		000000000000000000001227 /* Project object */ = {
+		000000000000000000001229 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
-					00000000000000000000122B = {
+					00000000000000000000122D = {
 						CreatedOnToolsVersion = 26.0;
 					};
-					000000000000000000001232 = {
+					000000000000000000001234 = {
 						CreatedOnToolsVersion = 26.0;
-						TestTargetID = 00000000000000000000122B;
+						TestTargetID = 00000000000000000000122D;
 					};
-					00000000000000000000123F = {
+					000000000000000000001241 = {
 						CreatedOnToolsVersion = 26.0;
-						TestTargetID = 00000000000000000000122B;
+						TestTargetID = 00000000000000000000122D;
 					};
 				};
 			};
-			buildConfigurationList = 000000000000000000001228 /* Build configuration list for PBXProject "PhysiqueOS" */;
+			buildConfigurationList = 00000000000000000000122A /* Build configuration list for PBXProject "PhysiqueOS" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -1131,20 +1134,20 @@
 				en,
 				Base,
 			);
-			mainGroup = 00000000000000000000120E;
-			productRefGroup = 00000000000000000000120F /* Products */;
+			mainGroup = 000000000000000000001210;
+			productRefGroup = 000000000000000000001211 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				00000000000000000000122B /* PhysiqueOS */,
-				000000000000000000001232 /* PhysiqueOSTests */,
-				00000000000000000000123F /* PhysiqueOSUITests */,
+				00000000000000000000122D /* PhysiqueOS */,
+				000000000000000000001234 /* PhysiqueOSTests */,
+				000000000000000000001241 /* PhysiqueOSUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		000000000000000000001231 /* Resources */ = {
+		000000000000000000001233 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1166,18 +1169,18 @@
 				0000000000000000000011D0 /* BriefingsFixture.json in Resources */,
 				0000000000000000000011D2 /* PlusJakartaSans[wght].ttf in Resources */,
 				0000000000000000000011D4 /* OFL.txt in Resources */,
-				000000000000000000001249 /* Assets.xcassets in Resources */,
+				00000000000000000000124B /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001238 /* Resources */ = {
+		00000000000000000000123A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001245 /* Resources */ = {
+		000000000000000000001247 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1187,7 +1190,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		00000000000000000000122F /* Sources */ = {
+		000000000000000000001231 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1410,7 +1413,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001236 /* Sources */ = {
+		000000000000000000001238 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1442,34 +1445,35 @@
 				000000000000000000001209 /* LoggingSandboxTests.swift in Sources */,
 				00000000000000000000120B /* MorningCheckInModelTests.swift in Sources */,
 				00000000000000000000120D /* FounderServerAPITests.swift in Sources */,
+				00000000000000000000120F /* EvidenceAttachmentContentTypeProbeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001243 /* Sources */ = {
+		000000000000000000001245 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00000000000000000000123C /* TrainingAcceptanceUITests.swift in Sources */,
+				00000000000000000000123E /* TrainingAcceptanceUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		000000000000000000001239 /* PBXTargetDependency */ = {
+		00000000000000000000123B /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 00000000000000000000122B /* PhysiqueOS */;
-			targetProxy = 00000000000000000000123A /* PBXContainerItemProxy */;
+			target = 00000000000000000000122D /* PhysiqueOS */;
+			targetProxy = 00000000000000000000123C /* PBXContainerItemProxy */;
 		};
-		000000000000000000001246 /* PBXTargetDependency */ = {
+		000000000000000000001248 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 00000000000000000000122B /* PhysiqueOS */;
-			targetProxy = 000000000000000000001247 /* PBXContainerItemProxy */;
+			target = 00000000000000000000122D /* PhysiqueOS */;
+			targetProxy = 000000000000000000001249 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		000000000000000000001229 /* Debug */ = {
+		00000000000000000000122B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1530,7 +1534,7 @@
 			};
 			name = Debug;
 		};
-		00000000000000000000122A /* Release */ = {
+		00000000000000000000122C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1585,13 +1589,13 @@
 			};
 			name = Release;
 		};
-		00000000000000000000122D /* Debug */ = {
+		00000000000000000000122F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOS/Supporting/Info.plist";
@@ -1612,13 +1616,13 @@
 			};
 			name = Debug;
 		};
-		00000000000000000000122E /* Release */ = {
+		000000000000000000001230 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOS/Supporting/Info.plist";
@@ -1639,7 +1643,7 @@
 			};
 			name = Release;
 		};
-		000000000000000000001234 /* Debug */ = {
+		000000000000000000001236 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -1656,7 +1660,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001235 /* Release */ = {
+		000000000000000000001237 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -1673,7 +1677,7 @@
 			};
 			name = Release;
 		};
-		000000000000000000001241 /* Debug */ = {
+		000000000000000000001243 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -1689,7 +1693,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001242 /* Release */ = {
+		000000000000000000001244 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -1708,43 +1712,43 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		000000000000000000001228 /* Build configuration list for PBXProject "PhysiqueOS" */ = {
+		00000000000000000000122A /* Build configuration list for PBXProject "PhysiqueOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001229 /* Debug */,
-				00000000000000000000122A /* Release */,
+				00000000000000000000122B /* Debug */,
+				00000000000000000000122C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		00000000000000000000122C /* Build configuration list for PBXNativeTarget "PhysiqueOS" */ = {
+		00000000000000000000122E /* Build configuration list for PBXNativeTarget "PhysiqueOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				00000000000000000000122D /* Debug */,
-				00000000000000000000122E /* Release */,
+				00000000000000000000122F /* Debug */,
+				000000000000000000001230 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001233 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */ = {
+		000000000000000000001235 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001234 /* Debug */,
-				000000000000000000001235 /* Release */,
+				000000000000000000001236 /* Debug */,
+				000000000000000000001237 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001240 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */ = {
+		000000000000000000001242 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001241 /* Debug */,
-				000000000000000000001242 /* Release */,
+				000000000000000000001243 /* Debug */,
+				000000000000000000001244 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 000000000000000000001227 /* Project object */;
+	rootObject = 000000000000000000001229 /* Project object */;
 }

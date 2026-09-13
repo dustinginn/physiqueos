@@ -65,7 +65,7 @@ enum EvidenceAttachmentLoader {
                     id: UUID().uuidString,
                     displayName: url.lastPathComponent,
                     source: .files,
-                    contentType: preferredMIMEType(for: values?.contentType?.identifier),
+                    contentType: preferredMIMEType(for: values?.contentType?.identifier, filenameExtension: url.pathExtension),
                     data: try Data(contentsOf: url, options: .mappedIfSafe)
                 )
             } catch {
@@ -91,9 +91,28 @@ enum EvidenceAttachmentLoader {
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
-    private static func preferredMIMEType(for identifier: String?) -> String? {
-        guard let identifier else { return nil }
-        return UTType(identifier)?.preferredMIMEType ?? identifier
+    /// Converts a platform UTType identifier into an HTTP MIME type for the
+    /// upload wire contract.
+    ///
+    /// A UTType identifier is NOT a MIME type, and the server uses this
+    /// value verbatim as the stored object's HTTP Content-Type — so a
+    /// platform identifier must never reach it. Many perfectly ordinary
+    /// UTTypes have no `preferredMIMEType` at all (`public.data`,
+    /// `public.content`, and every dynamic `dyn.…` type), which is exactly
+    /// how the real Founder DEXA upload failed: a Files-provider URL whose
+    /// `.contentTypeKey` resolved to such a type previously fell through to
+    /// the raw identifier and was rejected server-side as
+    /// PROVIDER_UPLOAD_CONTENT_TYPE_INVALID.
+    ///
+    /// Resolution order: the type's own MIME mapping, then the filename
+    /// extension's, then `nil` — never the raw identifier. Callers treat
+    /// `nil` as "unknown", which is honest and has a safe default; a
+    /// platform identifier masquerading as a MIME type does not.
+    static func preferredMIMEType(for identifier: String?, filenameExtension: String? = nil) -> String? {
+        if let identifier, let mime = UTType(identifier)?.preferredMIMEType { return mime }
+        let fileExtension = String(filenameExtension ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !fileExtension.isEmpty, let mime = UTType(filenameExtension: fileExtension)?.preferredMIMEType { return mime }
+        return nil
     }
 
     private static func failedPhoto(id: String, offset: Int, index: Int, type: String?, message: String) -> SandboxAttachment {

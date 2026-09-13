@@ -346,6 +346,61 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(EvidenceSandboxRouter.scenario(for: draft), .mixed)
     }
 
+    // MARK: - Bounded classification diagnostic
+    //
+    // Build 25 and Build 26 each "corrected" Automatic precedence against an
+    // INFERRED keyword collision, and the Founder's real DEXA PDF still came
+    // back ambiguous both times. The collision must therefore be reported by
+    // the app rather than guessed at again. These tests pin the diagnostic's
+    // contract: it names the matched signals using our own fixed keyword
+    // table, and never echoes document text.
+
+    func testDetectedSignalsNamesTheExactMatchedKeywordsPerCategory() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+        draft.details = "BodySpec DEXA Body Composition Report. Lean Tissue 142.3 lb. Recommendation: increase protein and continue resistance training."
+
+        let signals = EvidenceSandboxRouter.detectedSignals(for: draft)
+
+        XCTAssertTrue(signals.contains("dexa.keyword.dexa"), "signals: \(signals)")
+        XCTAssertTrue(signals.contains("dexa.keyword.bodyspec"), "signals: \(signals)")
+        XCTAssertTrue(signals.contains("nutrition.keyword.protein"), "signals: \(signals)")
+        XCTAssertTrue(signals.contains("training.keyword.training"), "signals: \(signals)")
+    }
+
+    /// The diagnostic must expose which families collided, so an ambiguous
+    /// real document explains itself instead of requiring another guess.
+    func testDetectedSignalsExplainsAnAmbiguousClassification() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+        draft.details = "BodySpec DEXA Body Composition. Aim for more protein each day."
+
+        let categories = EvidenceSandboxRouter.detectedCategories(for: draft)
+        let signals = EvidenceSandboxRouter.detectedSignals(for: draft)
+
+        XCTAssertGreaterThan(categories.count, 1, "this fixture is deliberately ambiguous")
+        for category in categories {
+            XCTAssertTrue(
+                signals.contains { $0.hasPrefix("\(category.rawValue).") },
+                "every matched category must be explained by at least one signal; categories=\(categories) signals=\(signals)"
+            )
+        }
+    }
+
+    /// Signal identifiers are drawn from our fixed keyword tables — they must
+    /// never carry the document's surrounding text.
+    func testDetectedSignalsNeverEchoesDocumentText() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+        draft.details = "BodySpec DEXA for PATIENT-PRIVATE-9999 measured at Clinic Road"
+
+        let signals = EvidenceSandboxRouter.detectedSignals(for: draft)
+
+        XCTAssertFalse(signals.isEmpty)
+        for signal in signals {
+            XCTAssertFalse(signal.lowercased().contains("patient"), "signal leaked document text: \(signal)")
+            XCTAssertFalse(signal.lowercased().contains("9999"), "signal leaked document text: \(signal)")
+            XCTAssertFalse(signal.lowercased().contains("clinic"), "signal leaked document text: \(signal)")
+        }
+    }
+
     func testNoStrongSignalDoesNotClassifyAsDexa() {
         var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
         draft.details = "For better results, prioritize sleep and recovery."
