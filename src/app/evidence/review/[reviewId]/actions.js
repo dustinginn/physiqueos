@@ -186,7 +186,21 @@ async function executeEvidenceReviewConfirmation(formData, {
   }, { readModel: "action.evidence-review-confirmation-start" });
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   if (nativeStart && confirmedBy !== user.id) throw new Error("Evidence review is unavailable.");
-  if (nativeStart && ["committing", "partially_committed"].includes(review.status)) {
+  // `committing` means a commit is genuinely in flight — report progress and
+  // leave it alone. `partially_committed` does NOT: it is the terminal state
+  // written by failCommit after the post-confirmation run threw, and a
+  // continuation is only ever enqueued on release, never on failure. Treating
+  // it as "in flight" is what made the real Sep 12 DEXA unrecoverable — the
+  // worker dead-lettered after three attempts and every later Confirm
+  // short-circuited here, so nothing could ever resume it.
+  //
+  // Falling through resumes through the path that already exists: beginCommit
+  // accepts `partially_committed`, and PostConfirmationOrchestrator skips
+  // every step already marked completed, so this continues from the first
+  // incomplete step and never replays canonical_commit. Ownership
+  // (confirmedBy), If-Match version protection and commitProgress
+  // auditability are all unchanged.
+  if (nativeStart && review.status === "committing") {
     return Object.freeze({
       state: "processing",
       reviewId,
@@ -758,7 +772,16 @@ function createHandlers({ evidencePackage, reviewId, user,
         ...scopedResult.report,
       };
     },
-    compatibility_writes: async () => ({ status: "completed", records: await commitCompatibilityRepositories({ canonical, evidencePackage, user }) }),
+    compatibility_writes: async () => {
+      // `canonical` is only assigned as a side effect of canonical_commit
+      // running in THIS process. A resumed confirmation skips that step
+      // (it is already completed), so the variable is still null here —
+      // which is exactly how the real Sep 12 DEXA confirmation died:
+      // commitCompatibilityRepositories' DEXA branch calls canonical.find().
+      // Load it the same way scheduled_completion and analysis already do.
+      canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+      return { status: "completed", records: await commitCompatibilityRepositories({ canonical, evidencePackage, user }) };
+    },
     scheduled_completion: async () => {
       canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
       const results = evaluateScheduledCompletion({ canonicalObjects: canonical, evidencePackage });
@@ -1133,7 +1156,19 @@ function publishPostConfirmationRefreshes(orchestrationResult) {
   }
 }
 
-async function commitCompatibilityRepositories({ canonical = [], evidencePackage, user }) {
+async function commitCompatibilityRepositories({ canonical, evidencePackage, user }) {
+  // Deliberately NOT defaulted to []. An empty list is not a safe stand-in
+  // for "not loaded": the DEXA branch below looks up the just-committed
+  // canonical record to carry its canonicalId, dexaRevision and
+  // goalPhaseAttribution onto the compatibility row. Silently passing []
+  // would still "succeed" while writing a degraded DEXA read model, which
+  // is worse than failing loudly.
+  if (!Array.isArray(canonical)) {
+    throw Object.assign(
+      new Error("Compatibility writes require the owner's canonical evidence objects."),
+      { code: "COMPATIBILITY_WRITES_CANONICAL_UNAVAILABLE" }
+    );
+  }
   const records = [];
   for (const object of evidencePackage.evidence_objects ?? []) {
     if (object.removed === true) continue;
