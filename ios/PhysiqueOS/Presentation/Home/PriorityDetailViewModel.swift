@@ -17,14 +17,16 @@ final class PriorityDetailViewModel {
     /// occurrence-bound Weight relationship inside the Priority detail.
     private(set) var morningCheckIn: MorningCheckInReadModel?
     private let api: PriorityAPI
+    private let writeAPI: PriorityCompletionWriteAPI
     private let morningCheckInAPI: MorningCheckInAPI
     private let store: LoggingSandboxStore
     private let authority: NativeAPIEnvironment
     private let priorityId: String
     private let occurrenceDate: String?
 
-    init(api: PriorityAPI, morningCheckInAPI: MorningCheckInAPI, store: LoggingSandboxStore, authority: NativeAPIEnvironment, priorityId: String, occurrenceDate: String? = nil) {
+    init(api: PriorityAPI, writeAPI: PriorityCompletionWriteAPI = NotAvailablePriorityCompletionWriteAPI(), morningCheckInAPI: MorningCheckInAPI, store: LoggingSandboxStore, authority: NativeAPIEnvironment, priorityId: String, occurrenceDate: String? = nil) {
         self.api = api
+        self.writeAPI = writeAPI
         self.morningCheckInAPI = morningCheckInAPI
         self.store = store
         self.authority = authority
@@ -48,10 +50,37 @@ final class PriorityDetailViewModel {
     /// evidence-aware when the occurrence carries a completion context
     /// (dose/protocol), a plain completion otherwise, matching the real
     /// server's own branch exactly.
-    func complete() {
+    func complete() async {
         guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: authority)) != nil else { return }
         guard case .loaded(.some(let occurrence)) = state else { return }
-        store.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
-        state = .loaded(store.priorityOccurrence(id: priorityId))
+        if authority == .sandbox {
+            store.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
+            state = .loaded(store.priorityOccurrence(id: priorityId))
+            return
+        }
+        guard let version = occurrence.expectedVersion else {
+            state = .failed("Refresh this priority before completing it.")
+            return
+        }
+        do {
+            try await writeAPI.complete(
+                priorityId: occurrence.routePriorityId ?? occurrence.id,
+                occurrenceDate: occurrence.date,
+                context: occurrence.completionContext,
+                expectedVersion: version
+            )
+            var acknowledged = occurrence
+            acknowledged.completed = true
+            acknowledged.completable = false
+            state = .loaded(acknowledged)
+            do {
+                state = .loaded(try await api.fetchPriority(priorityId: priorityId, occurrenceDate: occurrenceDate))
+            } catch {
+                // The durable command already succeeded. Keep the canonical
+                // acknowledged state instead of presenting a false failure.
+            }
+        } catch {
+            state = .failed("This priority was not marked complete. Refresh before retrying.")
+        }
     }
 }

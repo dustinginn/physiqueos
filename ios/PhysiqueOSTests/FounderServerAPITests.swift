@@ -317,7 +317,7 @@ final class FounderServerAPITests: XCTestCase {
     func testFounderProductionWriteGuardEnablesOnlyTheAcceptedDailyDriverDomainsAndSandboxRemainsIsolated() throws {
         XCTAssertEqual(
             NativeProductWriteDomain.enabledUnderFounderProduction,
-            [.morningCheckInAndWeight, .workoutLogger, .nutrition, .activityEvidence, .dexa]
+            [.morningCheckInAndWeight, .workoutLogger, .nutrition, .activityEvidence, .dexa, .priorityCompletion]
         )
         for domain in NativeProductWriteDomain.allCases {
             if NativeProductWriteDomain.enabledUnderFounderProduction.contains(domain) {
@@ -329,10 +329,9 @@ final class FounderServerAPITests: XCTestCase {
             }
             XCTAssertNoThrow(try NativeProductWriteGuard.authorize(domain, in: .sandbox))
         }
-        // Regression: .priorityCompletion stays denied even after this
-        // pass — no read resource exposes the reminders version its
-        // `If-Match` precondition requires on every first completion.
-        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
+        // Build 30 enables priority completion only after the read contract
+        // supplies the canonical reminder version required by If-Match.
+        XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
     }
 
     @MainActor
@@ -355,8 +354,9 @@ final class FounderServerAPITests: XCTestCase {
         await viewModel.load()
         guard case .loaded(let first) = viewModel.state else { return XCTFail("Expected production Home") }
         XCTAssertEqual(first.hero.confidence, 71)
-        XCTAssertEqual(first.hero.mode, .active)
-        XCTAssertEqual(first.hero.daysRemaining, "4 weeks remaining")
+        XCTAssertEqual(first.hero.mode, .phaseTrajectory)
+        XCTAssertEqual(first.hero.primaryTimeline, "4 weeks remaining")
+        XCTAssertNil(first.hero.daysRemaining)
         XCTAssertEqual(first.goals.first?.id, "goal-server")
         XCTAssertEqual(first.goals.first?.current, "148.3")
         XCTAssertEqual(first.goals.first?.target, "10")
@@ -382,8 +382,9 @@ final class FounderServerAPITests: XCTestCase {
             ]
         )))
         XCTAssertEqual(first.todaysFocus.map(\.id), ["priority-server-old"])
-        XCTAssertFalse(first.todaysFocus[0].completable)
-        XCTAssertNil(first.todaysFocus[0].completionContext)
+        XCTAssertTrue(first.todaysFocus[0].completable)
+        XCTAssertEqual(first.todaysFocus[0].expectedVersion, 7)
+        XCTAssertEqual(first.todaysFocus[0].completionContext, .init(occurrenceDate: "2026-09-10", dose: nil, protocolId: nil))
         XCTAssertEqual(first.todaysFocus[0].destination, .priorityOccurrence(priorityId: "completion-canonical", occurrenceDate: "2026-09-10"))
 
         await viewModel.load()
@@ -410,6 +411,23 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(occurrence.completed)
         XCTAssertEqual(occurrence.date, "2026-09-09")
         XCTAssertEqual(occurrence.destination, .priorityOccurrence(priorityId: "morning-check-in", occurrenceDate: "2026-09-09"))
+    }
+
+    func testProductionHomePreservesGroupedMorningSessionPresentation() async throws {
+        let homeJSON = productionEnvelope(resource: "home", data: #"{"header":{"greeting":"Good morning","name":"Founder"},"hero":{"mode":"phase_trajectory","goalLabel":"Build Lean Mass","headline":"Lean Mass Build","supportLine":"Canonical trajectory","primaryTimeline":"7 weeks to goal target"},"nextBestAction":{"title":"Foam Rolling","icon":"activity","destination":{"id":"priority.detail","parameters":{"priorityId":"foam-rolling","occurrenceDate":"2026-09-13"}}},"briefingCards":[],"goals":[],"todaysFocus":[{"id":"morning-check-in","completionId":null,"executionId":"morning-check-in","occurrenceDate":"2026-09-13","label":"Morning Check-In","subtitle":"Complete today's scheduled morning evidence.","metadata":null,"changeLabel":null,"icon":"target","color":"primary","state":"available","completed":false,"completable":false,"actionLabel":null,"completionContext":null,"sessionItems":[{"id":"morning-weight","label":"Morning Weigh-In","completed":true,"satisfiedByEvidence":true},{"id":"sleep","label":"Sleep","completed":false,"satisfiedByEvidence":false}],"executionContract":{"priorityId":"morning-check-in","occurrenceDate":"2026-09-13","expectedVersion":12,"workflow":"morning_check_in","destination":"/check-in/morning"}}]}"#)
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["home": homeJSON])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let home = try await ProductionHomeAPI(api: native).fetchHome()
+        let occurrence = try XCTUnwrap(home.todaysFocus.first)
+        XCTAssertEqual(home.hero.mode, .phaseTrajectory)
+        XCTAssertEqual(home.hero.primaryTimeline, "7 weeks to goal target")
+        XCTAssertEqual(occurrence.sessionItems, [
+            PrioritySessionItem(id: "morning-weight", label: "Morning Weigh-In", completed: true, satisfiedByEvidence: true),
+            PrioritySessionItem(id: "sleep", label: "Sleep", completed: false, satisfiedByEvidence: false),
+        ])
+        XCTAssertEqual(occurrence.destination, .checkIn(checkInType: "morning"))
     }
 
     func testProductionHomeAcceptsCanonicalStringExecutionDestinationAndKeepsExactOccurrenceIdentity() async throws {
@@ -571,7 +589,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(Array(paths.suffix(2)), ["/api/v1/native/read/goals", "/api/v1/native/read/completed-goal"])
     }
 
-    func testProductionOperatingPlanAndPriorityUseCanonicalReadsAndRemainReadOnly() async throws {
+    func testProductionOperatingPlanAndPriorityUseCanonicalReadsAndVersionedCompletion() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(200, productionOperatingPlanJSON),
@@ -590,11 +608,8 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(priority.id, "priority-canonical")
         XCTAssertEqual(priority.executionItemId, "execution-canonical")
         XCTAssertEqual(priority.date, "2026-09-10")
-        XCTAssertFalse(priority.completable)
-        // Build 21 regression: `completionContext` was decoded from the
-        // wire and then explicitly discarded (`completionContext: nil`
-        // hardcoded) — it must now survive, even though completion
-        // itself stays guarded (`.priorityCompletion` remains disabled).
+        XCTAssertTrue(priority.completable)
+        XCTAssertEqual(priority.expectedVersion, 11)
         XCTAssertEqual(priority.completionContext, PriorityCompletionContext(occurrenceDate: "2026-09-10", dose: nil, protocolId: nil))
         XCTAssertEqual(priority.detailSections, [PrioritySectionReadModel(title: "Context", items: [PriorityDetailFieldReadModel(label: "Goal", detail: "Build Lean Mass")])])
         let requests = await transport.requests
@@ -602,7 +617,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requests[2].url?.path, "/api/v1/native/read/priority")
         XCTAssertEqual(URLComponents(url: requests[2].url!, resolvingAgainstBaseURL: false)?.queryItems,
                        [URLQueryItem(name: "occurrenceDate", value: "2026-09-10"), URLQueryItem(name: "priorityId", value: "priority-canonical")])
-        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
+        XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
         XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.operatingPlan, in: .founderProduction))
     }
 
@@ -669,6 +684,65 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(loaded.relatedWeight?.date, "2026-09-10")
         XCTAssertNil(morningViewModel.morningCheckIn)
         XCTAssertEqual(loaded.destination, .priorityOccurrence(priorityId: "priority-morning", occurrenceDate: "2026-09-10"))
+    }
+
+    @MainActor
+    func testPriorityDetailKeepsDurableCompletionWhenImmediateRefreshFails() async throws {
+        let occurrence = PriorityOccurrence(
+            id: "foam", routePriorityId: "reminder-foam", executionItemId: "execution-foam", date: "2026-09-13",
+            title: "Foam Rolling", subtitle: "Tonight", metadata: nil, changeLabel: nil,
+            icon: .activity, color: .success, urgency: .available, completed: false, completable: true,
+            expectedVersion: 4, actionLabel: nil,
+            completionContext: .init(occurrenceDate: "2026-09-13", dose: nil, protocolId: nil),
+            continueActionDestination: nil
+        )
+        let priorityAPI = FirstPriorityThenFailureAPI(occurrence: occurrence)
+        let writer = RecordingPriorityCompletionAPI()
+        let viewModel = PriorityDetailViewModel(
+            api: priorityAPI, writeAPI: writer, morningCheckInAPI: NotAvailableMorningCheckInAPI(),
+            store: LoggingSandboxStore(), authority: .founderProduction,
+            priorityId: "reminder-foam", occurrenceDate: "2026-09-13"
+        )
+
+        await viewModel.load()
+        await viewModel.complete()
+
+        guard case .loaded(.some(let acknowledged)) = viewModel.state else {
+            return XCTFail("Durable completion must survive a later read outage")
+        }
+        XCTAssertTrue(acknowledged.completed)
+        XCTAssertFalse(acknowledged.completable)
+        let submissionCount = await writer.submissionCount
+        XCTAssertEqual(submissionCount, 1)
+    }
+
+    @MainActor
+    func testHomeKeepsDurablePriorityCompletionWhenReconciliationReadFails() async throws {
+        let occurrence = PriorityOccurrence(
+            id: "foam", routePriorityId: "reminder-foam", executionItemId: "execution-foam", date: "2026-09-13",
+            title: "Foam Rolling", subtitle: "Tonight", metadata: nil, changeLabel: nil,
+            icon: .activity, color: .success, urgency: .available, completed: false, completable: true,
+            expectedVersion: 4, actionLabel: nil, completionContext: nil, continueActionDestination: nil
+        )
+        let initial = HomeReadModel(
+            header: .init(greeting: "Good afternoon", name: "Founder"),
+            hero: .init(mode: .phaseTrajectory, goalLabel: "Build Lean Mass", headline: "Lean Mass Build", supportLine: "Canonical", confidence: 62, confidenceDetail: nil, primaryTimeline: "7 weeks to goal target", projectedFinish: nil, daysRemaining: nil, actionLabel: nil, actionDestination: nil),
+            nextBestAction: .init(title: "Foam Rolling", icon: .activity, destination: occurrence.destination),
+            briefingCards: [], goals: [], todaysFocus: [occurrence]
+        )
+        let api = FirstHomeThenFailureAPI(home: initial)
+        let viewModel = HomeViewModel(
+            api: api, priorityStore: LoggingSandboxStore(), goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(), appliesSandboxProjections: false
+        )
+
+        await viewModel.load()
+        await viewModel.reconcileAfterConfirmedPriorityCompletion(occurrenceID: "foam")
+
+        guard case .loaded(let home) = viewModel.state else {
+            return XCTFail("Durable completion must not become a Home load failure")
+        }
+        XCTAssertFalse(home.todaysFocus.contains { $0.id == "foam" })
     }
 
     /// `LogFixture.json`'s exact bundled values ("Strength Training · 52
@@ -1153,9 +1227,10 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(frontRelaxed.mediaId, "media-front-2")
         XCTAssertEqual(frontRelaxed.priorMediaId, "media-front-1")
         XCTAssertTrue(frontRelaxed.hasComparisonImage)
-        // The completed contract carries no interpretation narrative —
-        // Native must not fabricate one.
-        XCTAssertNil(frontRelaxed.interpretationSummary)
+        XCTAssertEqual(frontRelaxed.interpretationSummary, "Canonical interpretation.")
+        XCTAssertEqual(frontRelaxed.comparisonBullets, ["Waist looks tighter."])
+        XCTAssertEqual(frontRelaxed.conditionSummary, "Comparable light and distance.")
+        XCTAssertEqual(frontRelaxed.sourceHistory, "Compared Aug 15 and Sep 1.")
 
         let backFlexed = try XCTUnwrap(views.first { $0.poseId == .backFlexed })
         XCTAssertEqual(backFlexed.comparisonStatus, "no_prior_matching_pose")
@@ -1397,6 +1472,20 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(secondCursor, "older-2")
     }
 
+    func testProductionBriefingHistoryReconcilesEverySupportedFamilyTogether() async throws {
+        let mixed = productionEnvelope(resource: "briefing-history", data: #"{"items":[{"artifactId":"weekly-new","artifactType":"scheduled","cadence":"weekly","label":"Weekly Briefing","publicationDate":"2026-09-13T12:00:00Z","version":1},{"artifactId":"midweek-one","artifactType":"scheduled","cadence":"midweek","label":"Midweek Briefing","publicationDate":"2026-09-09T12:00:00Z","version":1},{"artifactId":"monthly-one","artifactType":"scheduled","cadence":"monthly","label":"Monthly Briefing","publicationDate":"2026-09-01T12:00:00Z","version":1},{"artifactId":"dexa-one","artifactType":"dexa_event","cadence":"event","label":"DEXA Event","publicationDate":"2026-08-15T12:00:00Z","version":1},{"artifactId":"photo-one","artifactType":"photo_event","cadence":"event","label":"Photo Event","publicationDate":"2026-08-08T12:00:00Z","version":1},{"artifactId":"weekly-old","artifactType":"scheduled","cadence":"weekly","label":"Weekly Briefing","publicationDate":"2026-08-02T12:00:00Z","version":1},{"artifactId":"photo-old","artifactType":"photo_event","cadence":"event","label":"Photo Event","publicationDate":"2026-07-25T12:00:00Z","version":1},{"artifactId":"legacy-unsupported","artifactType":null,"cadence":null,"label":"Briefing","publicationDate":"2026-07-01T12:00:00Z","version":1}],"page":{"limit":50,"hasMore":false,"nextCursor":null}}"#)
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["briefing-history": mixed])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let rows = try await ProductionBriefingAPI(api: native).fetchHistory()
+
+        XCTAssertEqual(Set(rows.map(\.artifactId)), Set(["weekly-new", "midweek-one", "monthly-one", "dexa-one", "photo-one", "weekly-old", "photo-old"]))
+        XCTAssertEqual(rows.filter { $0.cadence == .weekly }.count, 2)
+        XCTAssertEqual(rows.filter(\.isPhotoEvent).count, 2)
+        XCTAssertEqual(Set(rows.map(\.displayCadenceLabel)), Set(["Weekly Briefing", "Midweek Briefing", "Monthly Briefing", "DEXA Event Briefing", "Photo Event Briefing"]))
+    }
+
     func testProductionWeeklyBriefingUsesFinishedServerPresentation() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),
@@ -1415,6 +1504,30 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.confidence?.score, 71)
         let request = await transport.requests.last
         XCTAssertEqual(URLComponents(url: try XCTUnwrap(request?.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "artifactId" })?.value, "weekly-1")
+    }
+
+    func testProductionWeeklyBriefingPreservesExactLiveEnergyAndTrainingShape() async throws {
+        let live = productionEnvelope(resource: "briefing", data: #"{"schemaVersion":"1","artifact":{"artifactId":"weekly-live","artifactType":"scheduled","cadence":"weekly","version":1,"evidenceWindow":{"id":"weekly:2026-09-06:2026-09-12:America/Los_Angeles","startDate":"2026-09-06","endDate":"2026-09-12","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-13T07:02:58.048Z"},"goalPhaseAttribution":{"goalId":"goal","phaseId":"phase"},"historical":{"frozen":true,"artifactBound":true},"presentation":{"hero":{"periodLabel":"Completed week\nSep 6–Sep 12","goalLabel":"Build Lean Mass","headline":"Training moved forward, but calories still look low.","body":"Canonical weekly narrative.","confidence":{"score":62,"band":"moderate","priorScore":62,"delta":0,"movementDirection":"held","presentationExplanation":"Canonical explanation.","primaryReason":"Raw reason.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"goalId":"goal","phaseId":"phase","assessmentDate":"2026-09-13T07:02:58.048Z","source":"canonical_confidence_v2_snapshot"},"strategy":{"name":"Lean Mass Build","weekLabel":"Week 5","reviewLabel":""}},"energy":{"chart":{"title":"Daily intake vs estimated expenditure","points":[{"date":"2026-09-06","label":"Su","intake":3920,"expenditure":2188,"balance":1732,"complete":true},{"date":"2026-09-12","label":"Sa","intake":null,"expenditure":2838,"balance":null,"complete":false}]},"title":"Calories need more context.","averageIntake":2685.8,"averageExpenditure":2561.4,"averageBalance":170.5,"pairedDayCount":6,"eligibleDayCount":7,"narrative":"Canonical energy narrative."},"weight":null,"photos":null,"training":{"title":"Training progressed across most areas.","conclusion":"Canonical training narrative.","trainingDayCount":6,"status":{"stable":0,"improving":7,"plateauing":1,"regressing":1,"insufficient":0},"comparableCategoryCount":9,"insufficientCount":0,"highlights":[{"icon":"🏆","kind":"Record","unit":"lb volume","delta":675,"label":"New session-volume mark","value":4800,"exercise":"Hyperextension Machine","previous":4125,"percentChange":16.4}],"priorityCategories":[{"id":"triceps","label":"Triceps","status":"plateauing","statusLabel":"Plateauing","statusTone":"warning","comparableExerciseCount":3}],"available":true},"bodyComposition":null,"coachInsight":{"biggestWin":"Win.","keepBuilding":"Build.","watchNextWeek":"Watch.","actionItems":[]}}}"#)
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["briefing": live])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionBriefingAPI(api: native).fetchBriefing(artifactId: "weekly-live")
+        let result = try XCTUnwrap(fetched)
+        XCTAssertEqual(result.confidence?.presentationExplanation, "Canonical explanation.")
+        XCTAssertEqual(result.weekly?.energy?.averageIntakeKcal, 2686)
+        XCTAssertEqual(result.weekly?.energy?.averageExpenditureKcal, 2561)
+        XCTAssertEqual(result.weekly?.energy?.averageBalanceKcal, 171)
+        XCTAssertEqual(result.weekly?.energy?.dailyBalances?.map(\.date), ["2026-09-06", "2026-09-12"])
+        XCTAssertEqual(result.weekly?.energy?.dailyBalances?.last?.hasPairedData, false)
+        XCTAssertEqual(result.weekly?.training?.trainingDayCount, 6)
+        let highlight = try XCTUnwrap(result.weekly?.training?.highlights?.first)
+        XCTAssertEqual(highlight.exerciseName, "Hyperextension Machine")
+        XCTAssertEqual(highlight.recordType, "New session-volume mark")
+        XCTAssertEqual(highlight.performanceValue, "4,800 lb volume")
+        XCTAssertEqual(highlight.absoluteDelta, 675)
+        XCTAssertEqual(highlight.percentChange, 16.4)
+        XCTAssertEqual(result.weekly?.training?.priorityGroups?.first?.tone, "warning")
     }
 
     func testProductionMidweekBriefingPreservesDistinctFinishedPresentation() async throws {
@@ -1527,6 +1640,29 @@ final class FounderServerAPITests: XCTestCase {
         let request = await transport.requests.last
         XCTAssertEqual(request?.url?.path, "/api/v1/native/read/photo-event")
         XCTAssertEqual(URLComponents(url: try XCTUnwrap(request?.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "sessionId" })?.value, "session-canonical")
+    }
+
+    func testProductionPhotoEventResolvesCanonicalCurrentAndPriorMediaForEveryPose() async throws {
+        let views = PhotoPoseID.allCases.map { pose in
+            #"{"id":"view-\#(pose.rawValue)","poseId":"\#(pose.rawValue)","headline":"Canonical","supportingObservations":[],"comparisonStatus":"comparable","establishesBaseline":false,"goalRelevance":"primary","media":{"mediaId":"current-\#(pose.rawValue)","deliveryPath":"/api/v1/native/media/current-\#(pose.rawValue)"}}"#
+        }.joined(separator: ",")
+        let comparisons = PhotoPoseID.allCases.map { pose in
+            #"{"id":"comparison-\#(pose.rawValue)","poseId":"\#(pose.rawValue)","photoSessionId":"current-session","previousSessionId":"prior-session","previousDate":"2026-08-08","headline":"Canonical comparison","previousMedia":{"mediaId":"prior-\#(pose.rawValue)","deliveryPath":"/api/v1/native/media/prior-\#(pose.rawValue)"},"media":{"mediaId":"current-\#(pose.rawValue)","deliveryPath":"/api/v1/native/media/current-\#(pose.rawValue)"}}"#
+        }.joined(separator: ",")
+        let payload = productionEnvelope(resource: "photo-event", data: """
+        {"artifactId":"photo-all-poses","completion":null,"narrative":{"photoSessionId":"current-session","eventDate":"2026-09-01","completion":"7/7 complete","supportingEvidence":{},"activeViews":[\(views)],"cardContent":{"hero":{"title":"Canonical hero","body":"Canonical body"},"snapshot":{"title":"Snapshot","poses":[],"conditions":"Canonical conditions"},"progress":{"title":"Progress","body":"Canonical progress","comparisons":[\(comparisons)]},"interpretation":{"title":"Interpretation","paragraphs":[]},"coachInsight":{"body":"Canonical coach"}}}}
+        """)
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["photo-event": payload])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionBriefingAPI(api: native).fetchPhotoEvent(sessionId: "current-session")
+        let photo = try XCTUnwrap(fetched?.photo)
+
+        XCTAssertEqual(Set(photo.activeViews.map(\.poseId)), Set(PhotoPoseID.allCases))
+        XCTAssertEqual(Set(photo.activeViews.compactMap(\.mediaId)), Set(PhotoPoseID.allCases.map { "current-\($0.rawValue)" }))
+        XCTAssertEqual(Set(photo.ordinaryComparisons.compactMap(\.priorMediaId)), Set(PhotoPoseID.allCases.map { "prior-\($0.rawValue)" }))
+        XCTAssertEqual(Set(photo.ordinaryComparisons.compactMap(\.currentMediaId)), Set(PhotoPoseID.allCases.map { "current-\($0.rawValue)" }))
     }
 
     @MainActor
@@ -1741,6 +1877,53 @@ final class FounderServerAPITests: XCTestCase {
 
         XCTAssertEqual(firstKey, retryKey)
         XCTAssertNotEqual(firstKey, correctionKey)
+    }
+
+    func testProductionPriorityCompletionPreservesCanonicalIdentityVersionAndDoseContext() async throws {
+        let result = #"{"status":"committed","record":{"id":"ignored"}}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionCommandOutcomeJSON(result: result)),
+            .json(200, productionCommandOutcomeJSON(result: result)),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionPriorityCompletionWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        try await writeAPI.complete(priorityId: "reminder-foam", occurrenceDate: "2026-09-13", context: .init(occurrenceDate: "2026-09-13", dose: nil, protocolId: nil), expectedVersion: 4)
+        try await writeAPI.complete(priorityId: "reminder-tesamorelin", occurrenceDate: "2026-09-13", context: .init(occurrenceDate: "2026-09-13", dose: "0.5 mg", protocolId: "protocol-tesamorelin"), expectedVersion: 8)
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"4\"")
+        XCTAssertEqual(requests[2].value(forHTTPHeaderField: "If-Match"), "\"8\"")
+        let ordinary = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        let ordinaryPayload = try XCTUnwrap(ordinary["payload"] as? [String: Any])
+        XCTAssertEqual(ordinary["commandType"] as? String, "priority.complete.v1")
+        XCTAssertEqual(ordinaryPayload["priorityId"] as? String, "reminder-foam")
+        XCTAssertEqual(ordinaryPayload["occurrenceDate"] as? String, "2026-09-13")
+        let specialized = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[2].httpBody)) as? [String: Any])
+        let specializedPayload = try XCTUnwrap(specialized["payload"] as? [String: Any])
+        XCTAssertEqual(specializedPayload["dose"] as? String, "0.5 mg")
+        XCTAssertEqual(specializedPayload["protocolId"] as? String, "protocol-tesamorelin")
+    }
+
+    func testProductionPriorityCompletionFailureIsNotAcceptedAsSuccess() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(412, productionProblemJSON(status: 412, code: "STALE_VERSION")),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionPriorityCompletionWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        await XCTAssertThrowsErrorAsync(try await writeAPI.complete(priorityId: "reminder-foam", occurrenceDate: "2026-09-13", context: nil, expectedVersion: 4)) { error in
+            switch error as? ProductionNativeError {
+            case .failedPrecondition(let problem):
+                XCTAssertEqual(problem.code, "STALE_VERSION")
+            default:
+                XCTFail("Expected stale-version failure")
+            }
+        }
     }
 
     func testProductionMorningCheckInReadDecodesCanonicalOccurrenceIdentity() async throws {
@@ -2696,6 +2879,44 @@ final class FounderServerAPITests: XCTestCase {
     }
 }
 
+private enum FocusedReadFailure: Error { case unavailable }
+
+private actor FirstPriorityThenFailureAPI: PriorityAPI {
+    let occurrence: PriorityOccurrence
+    private var reads = 0
+
+    init(occurrence: PriorityOccurrence) { self.occurrence = occurrence }
+
+    func fetchExecutionItems() async throws -> [ExecutionItemFixture] { [] }
+
+    func fetchPriority(priorityId: String, occurrenceDate: String?) async throws -> PriorityOccurrence? {
+        reads += 1
+        guard reads == 1 else { throw FocusedReadFailure.unavailable }
+        return occurrence
+    }
+}
+
+private actor RecordingPriorityCompletionAPI: PriorityCompletionWriteAPI {
+    private(set) var submissionCount = 0
+
+    func complete(priorityId: String, occurrenceDate: String, context: PriorityCompletionContext?, expectedVersion: Int) async throws {
+        submissionCount += 1
+    }
+}
+
+private actor FirstHomeThenFailureAPI: HomeAPI {
+    let home: HomeReadModel
+    private var reads = 0
+
+    init(home: HomeReadModel) { self.home = home }
+
+    func fetchHome() async throws -> HomeReadModel {
+        reads += 1
+        guard reads == 1 else { throw FocusedReadFailure.unavailable }
+        return home
+    }
+}
+
 private let testOrigin = URL(string: "https://example.invalid")!
 private let weightJSON = #"{"schemaVersion":"1","currentWeight":{"id":"weight-1","value":168.4,"unit":"lb","measurementDate":"2026-08-31"}}"#
 private let manualWeightResultJSON = #"{"schemaVersion":"1","id":"weight-manual-1","status":"confirmed","measurementDate":"2026-08-31","value":168.4,"unit":"lb"}"#
@@ -2713,7 +2934,7 @@ private func productionHomeJSON(priorityID: String, goalID: String, confidence: 
       "nextBestAction":{"title":"Server action","icon":"target","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}}},
       "briefingCards":[],
       "goals":[{"id":"\(goalID)","title":"Server Goal","icon":"dumbbell","color":"success","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}},"presentation":{"mode":"phase_trajectory_goal","guardrail":"Maintain approximately 8-9% body fat.","trajectory":{"goalProgress":{"baselineValue":147.5,"latestValue":148.3,"targetAmount":10,"unit":"lb","clampedProgressPercentage":8},"activePhase":{"order":1,"phaseName":"Lean Mass Build"},"overallGoal":{"targetDescription":"Build 10 lb of lean mass","overallTargetDate":"2026-10-31"},"phases":[{"phaseId":"phase-maintenance","order":0,"phaseName":"Establish Maintenance","status":"completed","presentationTone":"gold","progress":{"progressType":"outcome","clampedProgressPercentage":100,"presentationLabel":"Completed"}},{"phaseId":"phase-lean-mass","order":1,"phaseName":"Lean Mass Build","status":"active","presentationTone":"green","startDate":"2026-08-16","calculatedPlannedReviewDate":"2026-10-08","timelineProgressState":"review_due","progress":{"progressType":"outcome","clampedProgressPercentage":8,"presentationLabel":"0.8 of 10 lb gained","status":"measured"}}]}}}],
-      "todaysFocus":[{"id":"\(priorityID)","completionId":"completion-canonical","executionId":"execution-canonical","occurrenceDate":"2026-09-10","label":"Server Priority","subtitle":"Server-owned occurrence","metadata":"Production","changeLabel":null,"icon":"target","color":"primary","state":"available","completed":false,"actionLabel":"Complete","completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null},"executionContract":{"priorityId":"completion-canonical","occurrenceDate":"2026-09-10","occurrenceKey":"completion-canonical:2026-09-10","workflow":"priority_detail","destination":"/priorities/completion-canonical"}}]
+      "todaysFocus":[{"id":"\(priorityID)","completionId":"completion-canonical","executionId":"execution-canonical","occurrenceDate":"2026-09-10","label":"Server Priority","subtitle":"Server-owned occurrence","metadata":"Production","changeLabel":null,"icon":"target","color":"primary","state":"available","completed":false,"completable":true,"actionLabel":"Complete","completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null},"executionContract":{"priorityId":"completion-canonical","occurrenceDate":"2026-09-10","occurrenceKey":"completion-canonical:2026-09-10","expectedVersion":7,"workflow":"priority_detail","destination":"/priorities/completion-canonical"}}]
     }
     """)
 }
@@ -2735,7 +2956,7 @@ private let productionActiveGoalJSON = productionEnvelope(resource: "active-goal
 
 private let productionOperatingPlanJSON = productionEnvelope(resource: "operating-plan", data: #"{"sections":[{"iconKey":"energy","tone":"primary","title":"Energy Strategy","subtitle":"Active","items":[{"id":"energy-canonical","title":"Phase Execution","detail":"2300 kcal/day intake","status":"Active","destination":{"id":"operating-plan","parameters":{}}}]}],"sourceVersions":{"energy":"4"},"relationshipContext":{"activeGoalId":"goal-canonical","activePhaseId":"phase-canonical"}}"#)
 
-private let productionPriorityJSON = productionEnvelope(resource: "priority", data: #"{"id":"priority-canonical","title":"Morning weigh-in","subtitle":"Today","status":"Available","sections":[{"title":"Context","items":[{"label":"Goal","detail":"Build Lean Mass"}]}],"completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null},"executionContract":{"priorityId":"priority-canonical","occurrenceDate":"2026-09-10","occurrenceKey":"priority-canonical:2026-09-10","workflow":"priority_detail","destination":{"id":"priority.detail","parameters":{"priorityId":"priority-canonical"}}},"executionProjection":{"executionId":"execution-canonical"}}"#)
+private let productionPriorityJSON = productionEnvelope(resource: "priority", data: #"{"id":"priority-canonical","title":"Morning weigh-in","subtitle":"Today","status":"Available","sections":[{"title":"Context","items":[{"label":"Goal","detail":"Build Lean Mass"}]}],"completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null},"executionContract":{"priorityId":"priority-canonical","occurrenceDate":"2026-09-10","occurrenceKey":"priority-canonical:2026-09-10","expectedVersion":11,"workflow":"priority_detail","destination":{"id":"priority.detail","parameters":{"priorityId":"priority-canonical"}}},"executionProjection":{"executionId":"execution-canonical"}}"#)
 
 private func productionTrainingLibraryJSON(exerciseID: String, muscleGroup: String) -> String {
     productionEnvelope(resource: "training-library", data: """
@@ -2778,7 +2999,7 @@ private let productionEnergyJSON = productionEnvelope(resource: "energy", data: 
 
 private let productionWeightFullJSON = productionEnvelope(resource: "weight", data: #"{"schemaVersion":"1","context":{"contextId":"build-lean-mass","type":"active_goal","goalId":"goal-canonical","goalRevision":null,"phaseId":"phase-canonical","phaseRevision":null,"startDate":"2026-07-19","endDate":null},"current":{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null,"label":"168.3 lb","detail":"Morning weight"},"recentWeighIns":[{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null,"label":"168.3 lb","detail":"Morning weight"},{"id":"weight-1","date":"2026-09-09","value":167.7,"unit":"lb","revision":null,"label":"167.7 lb","detail":"Morning weight"}],"rollingAverages":{"threeDay":{"requestedDays":3,"observationCount":2,"startDate":"2026-09-08","endDate":"2026-09-10","value":168.0,"unit":"lb"},"sevenDay":{"requestedDays":7,"observationCount":2,"startDate":"2026-09-04","endDate":"2026-09-10","value":167.7,"unit":"lb"}},"weeklyAverages":[{"week":"Sep 8","sortDate":"2026-09-08","average":168.0,"weekOverWeek":null,"entries":2}],"extrema":{"goalRelevant":["highest"],"highest":{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null},"lowest":{"id":"weight-1","date":"2026-09-09","value":167.7,"unit":"lb","revision":null}},"dexaContext":{"latest":{"id":"dexa-scan-1","date":"2026-09-01","label":"DEXA"},"markers":[{"id":"dexa-scan-1","date":"2026-09-01","label":"DEXA"}]},"history":[{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null,"label":"168.3 lb","detail":"Morning weight"},{"id":"weight-1","date":"2026-09-09","value":167.7,"unit":"lb","revision":null,"label":"167.7 lb","detail":"Morning weight"}],"page":{"limit":90,"count":2,"hasMore":false}}"#)
 
-private let productionPhotosJSON = productionEnvelope(resource: "photos", data: #"{"schemaVersion":"1","context":{"contextId":"build-lean-mass","type":"active_goal","goalId":"goal-canonical","goalRevision":null,"phaseId":"phase-canonical","phaseRevision":null,"startDate":"2026-07-19","endDate":null},"sessions":[{"sessionId":"session-2","revision":1,"intendedCaptureDate":"2026-09-01","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"1/2 poses have prior comparisons","photos":[{"photoId":"photo-front-2","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"comparable","media":{"mediaId":"media-front-2","deliveryPath":"/api/v1/native/media/media-front-2"},"prior":{"sessionId":"session-1","photoId":"photo-front-1","poseId":"front-relaxed","intendedCaptureDate":"2026-08-15","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"}}},{"photoId":"photo-backflexed-2","poseId":"back-flexed","pose":{"id":"back-flexed","label":"Back Flexed","view":"back","pose":"flexed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-backflexed-2","deliveryPath":"/api/v1/native/media/media-backflexed-2"},"prior":null}]},{"sessionId":"session-1","revision":1,"intendedCaptureDate":"2026-08-15","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"0/1 poses have prior comparisons","photos":[{"photoId":"photo-front-1","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-08-15","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"},"prior":null}]}],"page":{"limit":12,"count":2,"hasMore":false}}"#)
+private let productionPhotosJSON = productionEnvelope(resource: "photos", data: #"{"schemaVersion":"1","context":{"contextId":"build-lean-mass","type":"active_goal","goalId":"goal-canonical","goalRevision":null,"phaseId":"phase-canonical","phaseRevision":null,"startDate":"2026-07-19","endDate":null},"sessions":[{"sessionId":"session-2","revision":1,"intendedCaptureDate":"2026-09-01","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"1/2 poses have prior comparisons","photos":[{"photoId":"photo-front-2","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"comparable","media":{"mediaId":"media-front-2","deliveryPath":"/api/v1/native/media/media-front-2"},"galleryInterpretation":{"summary":"Canonical interpretation.","comparisonBullets":["Waist looks tighter."],"conditionSummary":"Comparable light and distance."},"sourceHistory":"Compared Aug 15 and Sep 1.","prior":{"sessionId":"session-1","photoId":"photo-front-1","poseId":"front-relaxed","intendedCaptureDate":"2026-08-15","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"}}},{"photoId":"photo-backflexed-2","poseId":"back-flexed","pose":{"id":"back-flexed","label":"Back Flexed","view":"back","pose":"flexed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-backflexed-2","deliveryPath":"/api/v1/native/media/media-backflexed-2"},"prior":null}]},{"sessionId":"session-1","revision":1,"intendedCaptureDate":"2026-08-15","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"0/1 poses have prior comparisons","photos":[{"photoId":"photo-front-1","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-08-15","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"},"prior":null}]}],"page":{"limit":12,"count":2,"hasMore":false}}"#)
 
 private let productionTrainingReportingJSON = productionEnvelope(resource: "training-reporting", data: #"{"schemaVersion":"1","context":{"contextId":"all","type":"all_history","goalId":null,"goalRevision":null,"phaseId":null,"phaseRevision":null,"startDate":null,"endDate":null},"reporting":{"schemaVersion":"1","availableReports":[{"id":"resistance","label":"Resistance Training","detail":"Strength progression, PRs, and category momentum."},{"id":"history","label":"Training History","detail":"Recent canonical training days."},{"id":"cardio","label":"Cardio","detail":"Calories, distance, and heart-rate trends."}],"resistance":{"title":"Resistance Training","summary":"Strength progression, PRs, and category momentum from training history.","statusGroups":[{"status":"improving","label":"Improving","count":1,"exercises":[{"canonicalExerciseId":"bench-press","label":"Bench Press","status":"improving","latestEvidenceDate":"2026-09-08","detail":"Improving · Latest Sep 8, 2026"}]},{"status":"stable","label":"Stable","count":0,"exercises":[]},{"status":"plateauing","label":"Plateauing","count":0,"exercises":[]},{"status":"regressing","label":"Regressing","count":0,"exercises":[]},{"status":"insufficient_data","label":"Needs data","count":0,"exercises":[]}],"recentPrs":[{"canonicalExerciseId":"bench-press","label":"Bench Press","latestEvidenceDate":"2026-09-08","detail":"New reps-at-load PR: 8 reps at 185 lb."}],"highlights":[{"type":"exercise","canonicalExerciseId":"bench-press","label":"Bench Press","detail":"New reps-at-load PR: 8 reps at 185 lb."}],"needsAttention":[],"categories":[{"categoryId":"chest","label":"Chest","status":"improving","latestEvidenceDate":"2026-09-08","exerciseCount":3,"latestKnownSets":9,"latestKnownVolume":1200,"statusCounts":{"improving":2,"stable":1}}],"source":"canonical_training_sessions"},"history":{"title":"Training History","summary":"Recent canonical training days and their session identities.","days":[{"id":"day-2026-09-08","date":"2026-09-08","label":"Sep 8","sessions":[{"sessionId":"session-canonical-1","label":"Push Day","occurrenceDate":"2026-09-08","revision":1}]}]}}}"#)
 

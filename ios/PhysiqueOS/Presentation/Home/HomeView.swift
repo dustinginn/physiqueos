@@ -13,6 +13,7 @@ struct HomeView: View {
     @State private var viewModel: HomeViewModel?
     @State private var confidenceDetailPresentation: (confidence: Int, detail: ConfidenceDetail)?
     @State private var completingPriorityIDs: Set<String> = []
+    @State private var completionError: String?
     var onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -38,6 +39,14 @@ struct HomeView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await viewModel?.load() }
+        }
+        .alert("Priority could not be completed", isPresented: Binding(
+            get: { completionError != nil },
+            set: { if !$0 { completionError = nil } }
+        )) {
+            Button("OK", role: .cancel) { completionError = nil }
+        } message: {
+            Text(completionError ?? "Please try again.")
         }
         .sheet(item: Binding(
             get: { confidenceDetailPresentation.map(ConfidenceDetailPresentation.init) },
@@ -86,10 +95,27 @@ struct HomeView: View {
                         guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: environment.nativeAuthority)) != nil else { return }
                         completingPriorityIDs.insert(occurrence.id)
                         Task { @MainActor in
-                            environment.loggingSandboxStore.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
-                            try? await Task.sleep(for: .milliseconds(500))
-                            viewModel?.refreshTodaysFocus()
-                            completingPriorityIDs.remove(occurrence.id)
+                            defer { completingPriorityIDs.remove(occurrence.id) }
+                            if environment.nativeAuthority == .sandbox {
+                                environment.loggingSandboxStore.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
+                                viewModel?.refreshTodaysFocus()
+                                return
+                            }
+                            guard let version = occurrence.expectedVersion else {
+                                completionError = "Refresh Home to obtain the current priority version."
+                                return
+                            }
+                            do {
+                                try await environment.priorityCompletionWriteAPI.complete(
+                                    priorityId: occurrence.routePriorityId ?? occurrence.id,
+                                    occurrenceDate: occurrence.date,
+                                    context: occurrence.completionContext,
+                                    expectedVersion: version
+                                )
+                                await viewModel?.reconcileAfterConfirmedPriorityCompletion(occurrenceID: occurrence.id)
+                            } catch {
+                                completionError = "The priority was not marked complete. Refresh before retrying."
+                            }
                         }
                     }
                 }

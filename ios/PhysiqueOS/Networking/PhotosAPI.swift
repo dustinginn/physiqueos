@@ -101,6 +101,8 @@ struct ProductionPhotosAPI: PhotosAPI {
         var comparisonStatus: String
         var media: MediaDescriptor?
         var prior: Prior?
+        var galleryInterpretation: GalleryInterpretation?
+        var sourceHistory: String?
 
         func readModel(sessionId: String, sessionDate: String) -> PhotoViewRecord {
             PhotoViewRecord(
@@ -110,10 +112,10 @@ struct ProductionPhotosAPI: PhotosAPI {
                 captureDate: intendedCaptureDate,
                 comparedAgainst: Self.comparedAgainstLabel(status: comparisonStatus, priorDate: prior?.intendedCaptureDate),
                 comparisonStatus: comparisonStatus,
-                conditionSummary: nil,
-                sourceHistory: nil,
-                interpretationSummary: nil,
-                comparisonBullets: nil,
+                conditionSummary: galleryInterpretation?.conditionSummary,
+                sourceHistory: sourceHistory,
+                interpretationSummary: galleryInterpretation?.summary,
+                comparisonBullets: galleryInterpretation?.comparisonBullets,
                 hasComparisonImage: prior?.media != nil,
                 mediaId: media?.mediaId,
                 priorMediaId: prior?.media?.mediaId
@@ -137,6 +139,12 @@ struct ProductionPhotosAPI: PhotosAPI {
                 return "No prior matching pose"
             }
         }
+    }
+
+    private struct GalleryInterpretation: Decodable {
+        var summary: String?
+        var comparisonBullets: [String]?
+        var conditionSummary: String?
     }
 
     private struct Pose: Decodable {

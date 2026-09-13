@@ -138,14 +138,15 @@ struct ProductionHomeAPI: HomeAPI {
 
         var readModel: HomeHero {
             HomeHero(
-                mode: mode == "terminal" ? .terminal : .active,
+                mode: HomeHeroMode(rawValue: mode) ?? .active,
                 goalLabel: goalLabel,
                 headline: headline,
                 supportLine: supportLine,
                 confidence: confidence,
                 confidenceDetail: confidenceDetail,
+                primaryTimeline: primaryTimeline,
                 projectedFinish: projectedFinish ?? plannedReviewDate,
-                daysRemaining: daysRemaining ?? primaryTimeline,
+                daysRemaining: daysRemaining,
                 actionLabel: actionLabel,
                 actionDestination: actionDestination
             )
@@ -280,13 +281,16 @@ struct ProductionHomeAPI: HomeAPI {
         var color: HomeColorToken
         var state: String?
         var completed: Bool
+        var completable: Bool?
         var actionLabel: String?
         var completionContext: PriorityCompletionContext?
+        var sessionItems: [PrioritySessionItem]?
         var executionContract: ExecutionContract?
 
         struct ExecutionContract: Decodable {
             var priorityId: String?
             var occurrenceDate: String?
+            var expectedVersion: Int?
         }
 
         var readOnlyOccurrence: PriorityOccurrence {
@@ -312,9 +316,11 @@ struct ProductionHomeAPI: HomeAPI {
                 color: color,
                 urgency: PriorityUrgency(rawValue: state ?? "") ?? .available,
                 completed: completed,
-                completable: false,
+                completable: completable == true && !completed && executionContract?.expectedVersion != nil,
+                expectedVersion: executionContract?.expectedVersion,
                 actionLabel: actionLabel,
-                completionContext: nil,
+                completionContext: completionContext,
+                sessionItems: sessionItems,
                 continueActionDestination: nil,
                 attributedScope: nil
             )
@@ -822,12 +828,15 @@ struct ProductionPriorityAPI: PriorityAPI {
             throw ProductionDailyDriverError.missingCanonicalIdentity("priority occurrence date")
         }
         return PriorityOccurrence(
-            id: value.id, executionItemId: value.executionProjection?.executionId ?? value.id,
+            id: value.id, routePriorityId: value.executionContract?.priorityId ?? value.id,
+            executionItemId: value.executionProjection?.executionId ?? value.id,
             date: date, title: value.title, subtitle: value.subtitle,
             metadata: value.sections.first?.items.first?.detail,
             changeLabel: nil, icon: .target, color: .primary,
             urgency: value.status == "Upcoming" ? .upcoming : .available,
-            completed: value.status == "Completed", completable: false,
+            completed: value.status == "Completed",
+            completable: value.status != "Completed" && value.executionContract?.expectedVersion != nil,
+            expectedVersion: value.executionContract?.expectedVersion,
             actionLabel: value.action?.label, completionContext: value.completionContext,
             continueActionDestination: Self.destination(forActionHref: value.action?.href), attributedScope: nil,
             detailSections: value.sections.map { PrioritySectionReadModel(title: $0.title, items: $0.items.map { PriorityDetailFieldReadModel(label: $0.label, detail: $0.detail) }) },
@@ -844,7 +853,7 @@ struct ProductionPriorityAPI: PriorityAPI {
         var sections: [Section]
         var relatedWeight: PriorityRelatedWeight?
     }
-    private struct ExecutionContract: Decodable { var occurrenceDate: String? }
+    private struct ExecutionContract: Decodable { var priorityId: String?; var occurrenceDate: String?; var expectedVersion: Int? }
     private struct ExecutionProjection: Decodable { var executionId: String? }
     private struct ActionPayload: Decodable { var label: String?; var href: String? }
     private struct Section: Decodable { var title: String; var items: [Item] }

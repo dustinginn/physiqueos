@@ -72,6 +72,79 @@ struct ProductionCommandOutcome<Result: Decodable & Sendable>: Decodable, Sendab
     var isConfirmed: Bool { outcome != .pending }
 }
 
+/// Canonical occurrence completion. The read-side supplies both exact
+/// occurrence identity and Reminder revision; Native never substitutes its
+/// device date or guesses a version. Dose/protocol context is preserved for
+/// specialized peptide occurrences while ordinary reminders use the same
+/// canonical command without those optional fields.
+protocol PriorityCompletionWriteAPI: Sendable {
+    func complete(
+        priorityId: String,
+        occurrenceDate: String,
+        context: PriorityCompletionContext?,
+        expectedVersion: Int
+    ) async throws
+}
+
+struct ProductionPriorityCompletionWriteAPI: PriorityCompletionWriteAPI {
+    let api: ProductionNativeAPI
+    let idempotencyStore: ProductionIdempotencyKeyStore
+
+    func complete(
+        priorityId: String,
+        occurrenceDate: String,
+        context: PriorityCompletionContext?,
+        expectedVersion: Int
+    ) async throws {
+        try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction)
+        guard context?.occurrenceDate == nil || context?.occurrenceDate == occurrenceDate else {
+            throw ProductionNativeError.invalidResponse
+        }
+        let signature = ProductionIdempotentSubmission.signature([
+            ProductionCommandType.completePriority, priorityId, occurrenceDate,
+            context?.dose ?? "", context?.protocolId ?? "", String(expectedVersion),
+        ])
+        let scope = "priority-complete.\(priorityId).\(occurrenceDate)"
+        let outcome: ProductionCommandOutcome<PriorityCompletionResult> = try await api.submitCommand(
+            ProductionCommandType.completePriority,
+            idempotencyKey: idempotencyStore.resolvedKey(scope: scope, signature: signature),
+            expectedVersion: String(expectedVersion),
+            payload: PriorityCompletionPayload(
+                priorityId: priorityId,
+                occurrenceDate: occurrenceDate,
+                dose: context?.dose,
+                protocolId: context?.protocolId
+            )
+        )
+        guard outcome.isConfirmed, outcome.receipt.result != nil else {
+            throw ProductionNativeError.invalidResponse
+        }
+    }
+}
+
+private struct PriorityCompletionPayload: Encodable {
+    var priorityId: String
+    var occurrenceDate: String
+    var dose: String?
+    var protocolId: String?
+}
+
+private struct PriorityCompletionResult: Decodable, Sendable {
+    var status: String
+}
+
+struct NotAvailablePriorityCompletionWriteAPI: PriorityCompletionWriteAPI {
+    struct NotAvailable: Error {}
+    func complete(
+        priorityId: String,
+        occurrenceDate: String,
+        context: PriorityCompletionContext?,
+        expectedVersion: Int
+    ) async throws {
+        throw NotAvailable()
+    }
+}
+
 /// `executeEvidenceReviewConfirmation(mode:"native")`'s result
 /// (`server/src/app/evidence/review/[reviewId]/actions.js`). `"confirmed"`
 /// means the full 9-step canonical commit orchestration (canonical commit,

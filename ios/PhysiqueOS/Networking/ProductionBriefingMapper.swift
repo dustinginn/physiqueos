@@ -38,6 +38,7 @@ indirect enum BriefingJSONValue: Decodable, Sendable {
         default: nil
         }
     }
+    var literalString: String? { if case .string(let value) = self { value } else { nil } }
     var double: Double? {
         switch self {
         case .number(let value): value
@@ -260,14 +261,16 @@ enum ProductionBriefingMapper {
         let period = hero?["periodLabel"]?.string ?? "Completed week"
         let periodParts = period.split(separator: "\n", maxSplits: 1).map(String.init)
         let energySection: WeeklyEnergySection?
-        if let averageIntake = energy?["averageIntake"]?.int,
-           let averageExpenditure = energy?["averageExpenditure"]?.int {
-            let energyDays = energy?["days"]?.array ?? []
+        if let averageIntakeValue = energy?["averageIntake"]?.double,
+           let averageExpenditureValue = energy?["averageExpenditure"]?.double {
+            let averageIntake = Int(averageIntakeValue.rounded())
+            let averageExpenditure = Int(averageExpenditureValue.rounded())
+            let energyDays = energy?["chart"]?["points"]?.array ?? energy?["days"]?.array ?? []
             let pairedDayCount = energy?["pairedDayCount"]?.int ?? energyDays.filter { $0["complete"]?.bool == true }.count
             let eligibleDayCount = energy?["eligibleDayCount"]?.int ?? energyDays.count
-            let averageBalance = energy?["averageBalance"]?.int ?? (averageIntake - averageExpenditure)
+            let averageBalance = energy?["averageBalance"]?.double.map { Int($0.rounded()) } ?? (averageIntake - averageExpenditure)
             let narrative = energy?["narrative"]?.string ?? ""
-            let dailyBalances = dailyEnergyPoints(energy?["days"])
+            let dailyBalances = dailyEnergyPoints(energy?["chart"]?["points"] ?? energy?["days"])
             let headline = energy?["headline"]?.string ?? energy?["title"]?.string
             let balanceHeadline = energy?["balanceHeadline"]?.string ?? energy?["primaryResult"]?.string
             let comparisonNarrative = energy?["comparisonNarrative"]?.string ?? energy?["comparison"]?["narrative"]?.string
@@ -398,8 +401,9 @@ enum ProductionBriefingMapper {
             steadyCount: status?["stable"]?.int ?? status?["steady"]?.int ?? value?["prioritySignals"]?.array.filter { ["stable", "steady"].contains($0["status"]?.string ?? "") }.count ?? 0,
             narrative: value?["conclusion"]?.string ?? value?["interpretation"]?.string ?? "",
             headline: value?["performanceHeadline"]?.string ?? value?["title"]?.string,
-            trainingDayCount: value?["sessionsCompleted"]?.int ?? value?["trainingDayCount"]?.int,
+            trainingDayCount: value?["trainingDayCount"]?.int ?? value?["completedSessionCount"]?.int ?? value?["sessionsCompleted"]?.int,
             plateauingCount: status?["plateauing"]?.int,
+            regressingCount: status?["regressing"]?.int,
             insufficientCount: value?["insufficientCount"]?.int,
             highlights: value?["highlights"]?.array.compactMap(trainingHighlight),
             priorityGroups: (value?["priorityCategories"] ?? value?["prioritySignals"])?.array.compactMap(trainingPriority),
@@ -413,19 +417,28 @@ enum ProductionBriefingMapper {
 
     private static func trainingHighlight(_ value: BriefingJSONValue) -> BriefingTrainingHighlight? {
         guard let id = value["canonicalExerciseId"]?.string ?? value["exerciseId"]?.string ?? value["exercise"]?.string else { return nil }
-        let rawValue = value["performanceValue"]?.string ?? value["value"]?.string
-            ?? value["value"]?.double.map { measurement($0, suffix: value["unit"]?.string.map { " \($0)" } ?? "") }
-        let delta = value["delta"]?.string ?? value["delta"]?.double.map { measurement($0, suffix: value["unit"]?.string.map { " \($0)" } ?? "") }
-            ?? value["percentChange"]?.double.map { measurement($0, suffix: "%") } ?? ""
+        let rawValue = value["performanceValue"]?.literalString ?? value["value"]?.literalString
+            ?? value["value"]?.double.map { groupedMeasurement($0, suffix: value["unit"]?.string.map { " \($0)" } ?? "") }
+        let unit = value["unit"]?.string
+        let absoluteDelta = value["delta"]?.double
+        let percentChange = value["percentChange"]?.double
+        let delta = value["delta"]?.string
+            ?? absoluteDelta.map { signedMeasurement($0, suffix: unit.map { " \($0)" } ?? "") }
+            ?? percentChange.map { signedMeasurement($0, suffix: "%") }
+            ?? ""
         return .init(
             canonicalExerciseId: id,
-            exerciseName: value["exerciseName"]?.string ?? value["label"]?.string ?? value["exercise"]?.string ?? "Exercise",
-            recordType: value["recordType"]?.string ?? value["type"]?.string ?? "Performance",
+            exerciseName: value["exerciseName"]?.string ?? value["exercise"]?.string ?? value["label"]?.string ?? "Exercise",
+            recordType: value["recordType"]?.string ?? value["label"]?.string ?? value["type"]?.string ?? "Performance",
             performanceValue: rawValue,
+            absoluteDelta: absoluteDelta,
+            percentChange: percentChange,
+            unit: unit,
+            icon: value["icon"]?.string,
             headline: value["headline"]?.string ?? value["detail"]?.string ?? "",
             detail: value["detail"]?.string ?? value["message"]?.string ?? "",
             delta: delta,
-            tone: value["tone"]?.string ?? "evidence"
+            tone: value["tone"]?.string ?? value["statusTone"]?.string ?? "evidence"
         )
     }
 
@@ -436,7 +449,7 @@ enum ProductionBriefingMapper {
             label: value["label"]?.string ?? "Training area",
             statusLabel: value["statusLabel"]?.string ?? value["status"]?.string ?? "",
             comparableExerciseCount: value["comparableExerciseCount"]?.int ?? value["exerciseCount"]?.int ?? 0,
-            tone: value["tone"]?.string ?? "evidence"
+            tone: value["tone"]?.string ?? value["statusTone"]?.string ?? "evidence"
         )
     }
 
@@ -801,6 +814,19 @@ enum ProductionBriefingMapper {
             formatted = value.rounded() == value ? String(Int(value)) : String(format: "%.2f", value).replacingOccurrences(of: #"0+$"#, with: "", options: .regularExpression).replacingOccurrences(of: #"\.$"#, with: "", options: .regularExpression)
         }
         return formatted + suffix
+    }
+
+    private static func signedMeasurement(_ value: Double, suffix: String) -> String {
+        let sign = value > 0 ? "+" : value < 0 ? "−" : ""
+        return sign + measurement(abs(value), suffix: suffix)
+    }
+
+    private static func groupedMeasurement(_ value: Double, suffix: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = value.rounded() == value ? 0 : 2
+        formatter.minimumFractionDigits = 0
+        return (formatter.string(from: NSNumber(value: value)) ?? measurement(value, suffix: "")) + suffix
     }
 
     private static func dexaTimelineSummary(_ value: BriefingJSONValue?) -> String {

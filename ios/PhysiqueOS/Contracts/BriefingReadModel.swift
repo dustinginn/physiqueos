@@ -280,6 +280,7 @@ struct WeeklyTrainingSection: Codable, Equatable {
     var headline: String? = nil
     var trainingDayCount: Int? = nil
     var plateauingCount: Int? = nil
+    var regressingCount: Int? = nil
     var insufficientCount: Int? = nil
     var highlights: [BriefingTrainingHighlight]? = nil
     var priorityGroups: [BriefingTrainingPriorityGroup]? = nil
@@ -301,6 +302,12 @@ struct BriefingTrainingHighlight: Codable, Equatable, Identifiable {
     /// (for example session volume or reps at load). Kept distinct from
     /// `delta`, which describes movement from the prior comparison.
     var performanceValue: String? = nil
+    /// Canonical structured movement values from the published artifact.
+    /// Keeping both avoids the prior lossy "absolute OR percent" adapter.
+    var absoluteDelta: Double? = nil
+    var percentChange: Double? = nil
+    var unit: String? = nil
+    var icon: String? = nil
     var headline: String
     var detail: String
     var delta: String

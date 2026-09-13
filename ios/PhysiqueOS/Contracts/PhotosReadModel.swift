@@ -43,7 +43,7 @@ struct PhotosLandingReadModel: Equatable {
 /// The 7 canonical pose ids (`CanonicalProgressPhotoCategories`,
 /// `progressPhotoPoseVocabulary.js`), in the web's own `POSE_ORDER`
 /// display order.
-enum PhotoPoseID: String, Codable, Equatable, CaseIterable, Identifiable {
+enum PhotoPoseID: String, Codable, Equatable, Hashable, CaseIterable, Identifiable {
     case frontRelaxed = "front-relaxed"
     case backRelaxed = "back-relaxed"
     case backFlexed = "back-flexed"

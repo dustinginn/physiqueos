@@ -164,6 +164,13 @@ struct PriorityCompletionContext: Codable, Equatable {
     var protocolId: String?
 }
 
+struct PrioritySessionItem: Codable, Equatable, Identifiable {
+    var id: String
+    var label: String
+    var completed: Bool
+    var satisfiedByEvidence: Bool?
+}
+
 /// The one shared occurrence view Home, the Priority detail screen, and
 /// Morning Check-In's reconciliation list all read — computed by
 /// `PriorityOccurrenceCalculator.project`, never independently re-derived
@@ -191,8 +198,12 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     var urgency: PriorityUrgency
     var completed: Bool
     var completable: Bool
+    /// Canonical Reminder revision required by `priority.complete.v1`.
+    var expectedVersion: Int? = nil
     var actionLabel: String?
     var completionContext: PriorityCompletionContext?
+    /// Server-owned composite/session children, such as Morning Check-In.
+    var sessionItems: [PrioritySessionItem]? = nil
     var continueActionDestination: AppDestination?
     /// Goal/Phase ownership for *this occurrence's own date* — resolved via
     /// the shared `EvidenceChronology`, never a second chronology system.
@@ -217,6 +228,9 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     var relatedWeight: PriorityRelatedWeight? = nil
 
     var destination: AppDestination {
+        if sessionItems != nil, id == "morning-check-in" {
+            return .checkIn(checkInType: "morning")
+        }
         if Self.isMorningWeighIn(executionItemId: executionItemId, id: id), !completed {
             return .checkIn(checkInType: "morning")
         }

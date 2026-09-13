@@ -91,16 +91,12 @@ enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
     /// writes") fixed the original write architecture; the bounded
     /// allowlist, correct canonical collections, the same persistence
     /// services the web app uses, and a working async evidence-intake
-    /// pipeline. `.priorityCompletion` remains excluded — investigation
-    /// confirmed `priority.complete.v1` requires `If-Match` on every first
-    /// completion (not just corrections), and no read resource anywhere
-    /// exposes the `reminders` record's version needed to supply it; see
-    /// the task's final report for the exact server fix needed (expose
-    /// that version on the `priority`/`home` read resources, mirroring the
-    /// precedent already set for Weight's `current.revision` and
-    /// Training's `HistorySession.revision`).
+    /// pipeline. `.priorityCompletion` is enabled only because the
+    /// canonical Home/Priority projections now expose the Reminder version
+    /// required by `priority.complete.v1`'s If-Match contract.
     static let enabledUnderFounderProduction: Set<NativeProductWriteDomain> = [
         .morningCheckInAndWeight,
+        .priorityCompletion,
         .workoutLogger,
         .nutrition,
         .activityEvidence,
@@ -275,6 +271,14 @@ final class AppEnvironment {
 
     var homeAPI: HomeAPI {
         nativeAuthority == .founderProduction ? ProductionHomeAPI(api: productionNativeAPI) : sandboxHomeAPI
+    }
+
+    var priorityCompletionWriteAPI: PriorityCompletionWriteAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailablePriorityCompletionWriteAPI()
+        case .founderProduction:
+            ProductionPriorityCompletionWriteAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
+        }
     }
 
     var goalsAPI: GoalsAPI {

@@ -49,6 +49,7 @@ struct PriorityDetailView: View {
         .task(id: environment.nativeAuthority) {
             viewModel = PriorityDetailViewModel(
                 api: environment.priorityAPI,
+                writeAPI: environment.priorityCompletionWriteAPI,
                 morningCheckInAPI: environment.morningCheckInAPI,
                 store: environment.loggingSandboxStore,
                 authority: environment.nativeAuthority,
@@ -179,7 +180,7 @@ struct PriorityDetailView: View {
                 }
             } else {
                 PrimaryActionButton(title: "Mark Complete") {
-                    viewModel?.complete()
+                    Task { await viewModel?.complete() }
                 }
                 .accessibilityIdentifier("priorityDetail.markComplete")
             }

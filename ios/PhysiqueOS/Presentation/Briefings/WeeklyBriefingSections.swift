@@ -190,14 +190,11 @@ struct BriefingTrainingResponseCard: View {
                                     Text(group.label)
                                         .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    Text("\(group.comparableExerciseCount) exercises reviewed")
+                                    Text("\(group.statusLabel) across \(group.comparableExerciseCount) exercises.")
                                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                                 }
                                 Spacer(minLength: 8)
-                                Text(group.statusLabel)
-                                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                                    .foregroundStyle(toneColor(group.tone))
                             }
                             .padding(.vertical, 12)
                         }
@@ -219,8 +216,13 @@ struct BriefingTrainingResponseCard: View {
     }
 
     private var coverage: String {
-        var parts = ["\(training.trainingDayCount ?? 0) training days", "\(training.comparableCategoryCount) areas reviewed", "\(training.improvingCount) improving", "\(training.steadyCount) steady"]
+        var parts: [String] = []
+        if let trainingDayCount = training.trainingDayCount { parts.append("\(trainingDayCount) training days") }
+        parts.append("\(training.comparableCategoryCount) reviewed categories")
+        parts.append("\(training.improvingCount) improving")
+        if training.steadyCount > 0 { parts.append("\(training.steadyCount) steady") }
         if let plateauing = training.plateauingCount { parts.append("\(plateauing) plateauing") }
+        if let regressing = training.regressingCount, regressing > 0 { parts.append("\(regressing) regressing") }
         if let insufficient = training.insufficientCount { parts.append("\(insufficient) building evidence") }
         return parts.joined(separator: " · ")
     }
@@ -242,23 +244,38 @@ struct BriefingTrainingResponseCard: View {
                     Text(highlight.recordType)
                         .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
                         .foregroundStyle(color)
+                        .textCase(.uppercase)
                 }
             }
             Text(highlight.performanceValue ?? highlight.headline)
                 .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text("▲  \(highlight.delta)")
+            Text(highlightMovement(highlight))
                 .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                 .foregroundStyle(color)
-            Text(highlight.detail)
-                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            if !highlight.detail.isEmpty {
+                Text(highlight.detail)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted.opacity(0.62))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(color.opacity(0.58), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(PhysiqueOSTheme.textSecondary.opacity(0.85), lineWidth: 1))
+    }
+
+    private func highlightMovement(_ highlight: BriefingTrainingHighlight) -> String {
+        guard let absolute = highlight.absoluteDelta else { return "▲ \(highlight.delta)" }
+        let sign = absolute > 0 ? "+" : absolute < 0 ? "−" : ""
+        let absoluteText = absolute.rounded() == absolute ? String(Int(abs(absolute))) : String(format: "%.1f", abs(absolute))
+        let unit = highlight.unit.map { " \($0)" } ?? ""
+        let percent = highlight.percentChange.map { value in
+            let percentSign = value > 0 ? "+" : value < 0 ? "−" : ""
+            return " (\(percentSign)\(String(format: "%.1f", abs(value)))%)"
+        } ?? ""
+        return "▲ \(sign)\(absoluteText)\(unit)\(percent)"
     }
 
     private func toneColor(_ tone: String) -> Color {
@@ -266,6 +283,8 @@ struct BriefingTrainingResponseCard: View {
         case "success", "improving": PhysiqueOSTheme.chartSuccess
         case "evidence", "steady": PhysiqueOSTheme.chartEvidence
         case "warning", "plateauing": PhysiqueOSTheme.chartEffort
+        case "danger", "error", "regressing": PhysiqueOSTheme.destructive
+        case "neutral", "insufficient", "insufficient_data", "building": PhysiqueOSTheme.textMuted
         default: PhysiqueOSTheme.accent
         }
     }
@@ -309,12 +328,17 @@ struct WeeklyEnergyCard: View {
                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                Divider().overlay(PhysiqueOSTheme.divider)
+                HStack(alignment: .top, spacing: 8) {
                     energyMetric("Avg Intake", "\(section.averageIntakeKcal) kcal", color: PhysiqueOSTheme.energyIntake)
                     energyMetric("Avg Expenditure", "\(section.averageExpenditureKcal) kcal", color: PhysiqueOSTheme.energyExpenditure)
                     energyMetric("Avg Balance", "\(section.averageBalanceKcal >= 0 ? "+" : "")\(section.averageBalanceKcal) kcal", color: PhysiqueOSTheme.chartSuccess)
                 }
+                Divider().overlay(PhysiqueOSTheme.divider)
                 if let dailyBalances = section.dailyBalances, !dailyBalances.isEmpty {
+                    Text("Daily intake vs estimated expenditure")
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     chart(dailyBalances)
                     EnergySeriesLegend()
                 }
@@ -325,12 +349,12 @@ struct WeeklyEnergyCard: View {
     private var balanceStatement: String {
         if let authored = section.balanceHeadline, !authored.isEmpty { return authored }
         let balance = section.averageBalanceKcal
-        if abs(balance) <= 100 { return "About even day to day" }
-        return balance > 0 ? "A controlled daily surplus" : "A consistent daily deficit"
+        if abs(balance) < 25 { return "About even day to day" }
+        return "\(abs(balance).formatted()) kcal/day \(balance < 0 ? "below" : "above")"
     }
 
     private var balanceColor: Color {
-        abs(section.averageBalanceKcal) <= 100 ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.energyIntake
+        PhysiqueOSTheme.chartSuccess
     }
 
     private func chart(_ points: [BriefingDailyEnergyPoint]) -> some View {
@@ -353,7 +377,18 @@ struct WeeklyEnergyCard: View {
                 }
             }
         }
-        .chartXAxis(.hidden)
+        .chartXAxis {
+            AxisMarks(values: points.map(\.date)) { value in
+                AxisValueLabel {
+                    if let date = value.as(String.self),
+                       let point = points.first(where: { $0.date == date }) {
+                        Text(point.label ?? String(date.suffix(2)))
+                            .physiqueOSFont(.init(size: 10, weight: .semibold))
+                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    }
+                }
+            }
+        }
         .chartYAxis(.hidden)
         .frame(height: 180)
         .chartScrub { location, proxy, geometry in
@@ -373,9 +408,6 @@ struct WeeklyEnergyCard: View {
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

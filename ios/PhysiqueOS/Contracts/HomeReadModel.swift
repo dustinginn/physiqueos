@@ -33,13 +33,11 @@ struct HomeHeader: Codable, Equatable {
     var name: String
 }
 
-/// Mirrors `HomeHeroCard.jsx`'s `mode` prop. Only `active` and `terminal`
-/// are modeled in this slice — `calibration` and `phase_trajectory` are
-/// real web hero modes but are not yet exercised by a representative
-/// fixture; see the Native V1 doc update for this slice.
+/// Mirrors the web Home hero's current production modes.
 enum HomeHeroMode: String, Codable {
     case active
     case terminal
+    case phaseTrajectory = "phase_trajectory"
 }
 
 struct HomeHero: Codable, Equatable {
@@ -55,6 +53,10 @@ struct HomeHero: Codable, Equatable {
     /// shows an empty "—" ring in that case).
     var confidence: Int?
     var confidenceDetail: ConfidenceDetail?
+
+    /// Server-composed goal/phase timeline copy (for example "7 weeks to
+    /// goal target"), presented prominently in phase-trajectory mode.
+    var primaryTimeline: String? = nil
 
     var projectedFinish: String?
     var daysRemaining: String?

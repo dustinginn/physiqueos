@@ -73,6 +73,22 @@ final class HomeViewModel {
         state = .loaded(home)
     }
 
+    /// Once `priority.complete.v1` has durably committed, the successful
+    /// write is authoritative. Remove that occurrence immediately, then
+    /// reconcile Home in the background without turning a later read
+    /// outage into a false "completion failed" state.
+    func reconcileAfterConfirmedPriorityCompletion(occurrenceID: String) async {
+        guard case .loaded(var current) = state else { return }
+        current.todaysFocus.removeAll { $0.id == occurrenceID }
+        state = .loaded(current)
+        do {
+            state = .loaded(try await api.fetchHome())
+        } catch {
+            // Preserve the acknowledged canonical success. Pull-to-refresh
+            // remains available for later reconciliation.
+        }
+    }
+
     /// Replaces the identity (`id`/`title`/`destination`) of whichever
     /// Home goal row is presented as `.primary` with the Goals engine's
     /// current active goal — everything else about that row (icon, color,

@@ -1,16 +1,20 @@
 import SwiftUI
 
-/// Mirrors `HomeHeroCard.jsx`'s `active` and `terminal` modes: a goal label
+/// Mirrors `HomeHeroCard.jsx`'s active, phase-trajectory, and terminal modes: a goal label
 /// badge, headline, support line, the Confidence ring (active) or a primary
 /// action button (terminal), and — in active mode — Projected Finish/Days
-/// Remaining metrics. `calibration` and `phase_trajectory` hero modes exist
-/// on the web but are not modeled in this slice.
+/// Remaining metrics.
 struct HomeHeroCardView: View {
     let hero: HomeHero
     var onOpenConfidenceDetail: () -> Void
 
     var body: some View {
-        CardContainer(padding: .sm) {
+        CardContainer(
+            padding: .sm,
+            background: hero.mode == .phaseTrajectory
+                ? PhysiqueOSTheme.trajectorySurface
+                : PhysiqueOSTheme.surfaceElevated
+        ) {
             VStack(alignment: .leading, spacing: 0) {
                 SectionHeading("Trajectory")
 
@@ -26,9 +30,16 @@ struct HomeHeroCardView: View {
                         Text(hero.headline)
                             .physiqueOSFont(PhysiqueOSTypography.heroHeadline)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        if hero.mode == .phaseTrajectory, let timeline = hero.primaryTimeline {
+                            Text(timeline)
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                        }
                         Text(hero.supportLine)
                             .physiqueOSFont(PhysiqueOSTypography.heroSupportLine)
+                            .lineSpacing(2)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
                     confidenceSlot
