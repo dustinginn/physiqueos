@@ -73,8 +73,19 @@ export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, o
                 payload->'goalContext' AS goal_context,
                 payload->'confidencePublication' AS confidence_publication,
                 payload->'lifecycle' AS lifecycle
-           FROM physiqueos.canonical_briefing_records AS artifact
+          FROM physiqueos.canonical_briefing_records AS artifact
           WHERE owner_user_id=$1 AND collection_name='dailyBriefings'
+            AND (
+              payload->>'cadence' IN ('weekly','midweek','monthly')
+              OR (
+                payload->>'cadence'='event'
+                AND (
+                  payload#>>'{trigger,evidenceType}' IN ('dexa','dexa_scan','body_composition','photo','photo_session','progress_photo')
+                  OR (payload#>'{briefing,dexaEventNarrative}') IS NOT NULL
+                  OR (payload#>'{briefing,photoEventNarrative}') IS NOT NULL
+                )
+              )
+            )
             AND ($2::text IS NULL OR (COALESCE(observed_at,'epoch'::timestamptz),record_id) < (
               SELECT COALESCE(observed_at,'epoch'::timestamptz),record_id FROM physiqueos.canonical_briefing_records
                WHERE owner_user_id=$1 AND collection_name='dailyBriefings' AND record_id=$2

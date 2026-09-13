@@ -25,6 +25,7 @@ describe("PostgresBriefingNavigationReadStore", () => {
     });
     expect(query).toHaveBeenCalledTimes(1);
     expect(query.mock.calls[0][0]).not.toMatch(/SELECT\s+payload[,\s]/i);
+    expect(query.mock.calls[0][0]).toContain("payload->>'cadence' IN ('weekly','midweek','monthly')");
     expect(query.mock.calls[0][1]).toEqual(["owner", null, 21]);
   });
 

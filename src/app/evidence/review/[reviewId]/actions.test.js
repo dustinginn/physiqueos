@@ -385,6 +385,7 @@ vi.mock("../../../../application/composition/productionApplicationComposition", 
 }));
 
 const {
+  beginNativeEvidenceReviewConfirmation,
   confirmEvidenceReview,
   continueEvidenceReviewInBackground,
   reprocessEvidenceReview,
@@ -780,6 +781,32 @@ describe("confirmEvidenceReview", () => {
     revalidatePath.mockClear();
     redirect.mockClear();
     mockState.value = createIsolatedReviewState(runtimeStore);
+  });
+
+  it("returns Native at the durable claim boundary before canonical work", async () => {
+    const review = mockState.value.evidenceReviews[0];
+    review.status = "pending";
+    review.commitProgress = {};
+    review.commitClaim = null;
+
+    const result = await beginNativeEvidenceReviewConfirmation({
+      reviewId: review.id,
+      confirmedBy: mockState.value.user.id,
+      operationId: "native-confirm:command-one",
+    });
+
+    expect(result).toMatchObject({
+      state: "processing",
+      accepted: true,
+      reviewId: review.id,
+      continuationKey: expect.stringContaining(":canonical_commit:not_started:0"),
+    });
+    expect(mockState.value.canonicalCommitCalls).toBe(0);
+    expect(mockState.value.evidenceReviews[0]).toMatchObject({
+      status: "committing",
+      commitClaim: { status: "available", operationId: "native-confirm:command-one" },
+      commitProgress: {},
+    });
   });
 
   it("resumes the failed review through the real action boundary without a ReferenceError", async () => {

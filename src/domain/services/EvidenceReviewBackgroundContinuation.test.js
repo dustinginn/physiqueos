@@ -39,10 +39,23 @@ describe("Evidence Review background continuation contract", () => {
     expect(second).not.toBe(first);
   });
 
-  it("does not enqueue before canonical durability or after final confirmation", () => {
-    expect(createEvidenceReviewContinuationMessage(reviewWithCompletedSteps(0), {
+  it("enqueues a released durable Native claim before canonical work and not an active claim", () => {
+    const released = reviewWithCompletedSteps(0);
+    released.interpretedEvidence = { package_id: "package-one" };
+    released.commitClaim = { status: "available" };
+    expect(createEvidenceReviewContinuationMessage(released, {
       createId: () => "message-one",
+    })).toMatchObject({
+      dedupeKey: expect.stringContaining(":canonical_commit:not_started:0"),
+      payload: { reviewId: "review-one" },
+    });
+    released.commitClaim.status = "in_progress";
+    expect(createEvidenceReviewContinuationMessage(released, {
+      createId: () => "message-active",
     })).toBeNull();
+  });
+
+  it("does not enqueue after final confirmation", () => {
     const confirmed = reviewWithCompletedSteps(POST_CONFIRMATION_STEP_ORDER.length);
     confirmed.status = "confirmed";
     confirmed.confirmation = { confirmedAt: "2026-08-30T01:00:00.000Z" };

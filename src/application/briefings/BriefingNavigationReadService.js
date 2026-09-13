@@ -20,6 +20,7 @@ export function createBriefingNavigationReadService({ store } = {}) {
       if (store.listNativeHistory) return store.listNativeHistory({ limit, cursor });
       const history = await store.listHistory();
       const artifacts = [...(history.artifacts ?? [])]
+        .filter(isNativeHistoryArtifact)
         .sort((left, right) => String(right.generatedAt ?? right.createdAt ?? "").localeCompare(String(left.generatedAt ?? left.createdAt ?? "")));
       const start = cursor ? Math.max(artifacts.findIndex((item) => item.id === cursor) + 1, 0) : 0;
       const selected = artifacts.slice(start, start + limit);
@@ -78,7 +79,23 @@ export function createBriefingNavigationReadService({ store } = {}) {
           presentation: finished,
         });
       }
-      return context;
+      // Monthly and event artifacts already persist their finished canonical
+      // presentation/narrative. Native needs only that frozen artifact and
+      // the bounded goal titles used for historical attribution; returning
+      // current DEXA scans, decisions, reconciliation work, and other live
+      // context made one real DEXA detail response ~140 KB and coupled a
+      // historical read to unrelated mutable collections.
+      if (isNativeHistoryArtifact(artifact)) {
+        return Object.freeze({
+          artifact,
+          goals: Object.freeze((context.goals ?? []).map((goal) => Object.freeze({
+            id: goal.id,
+            title: goal.title ?? goal.name ?? null,
+            name: goal.name ?? goal.title ?? null,
+          }))),
+        });
+      }
+      return null;
     },
     getDexaArtifact({ scanId } = {}) {
       return store.getDexaArtifact({ scanId });
@@ -161,6 +178,12 @@ function repositoryNativeSummary(artifact) {
     detail: Object.freeze({ resource: "briefing", artifactId: artifact.id }),
     version: Number(artifact.version ?? 1),
   });
+}
+
+function isNativeHistoryArtifact(artifact) {
+  if (["weekly", "midweek", "monthly"].includes(artifact?.cadence)) return true;
+  if (artifact?.cadence !== "event") return false;
+  return ["dexa_event", "photo_event"].includes(nativeArtifactType(artifact));
 }
 
 function nativeArtifactType(artifact) {

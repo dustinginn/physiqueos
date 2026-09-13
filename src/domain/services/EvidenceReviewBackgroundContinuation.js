@@ -15,7 +15,17 @@ export function nextEvidenceReviewContinuationStep(review) {
 }
 
 export function createEvidenceReviewContinuationKey(review) {
-  if (!isEvidenceReviewCanonicalSaveComplete(review)) return null;
+  // A Native confirmation is durably accepted when the review package and
+  // commit claim have been persisted, not only after the (potentially slow)
+  // canonical checkpoint finishes. Once that claim is released as
+  // `available`, the worker may safely prove zero side effects and start at
+  // canonical_commit. Active claims remain ineligible, so two executors can
+  // never race the first checkpoint.
+  const preCanonicalReady =
+    review?.status === "committing" &&
+    review?.commitClaim?.status === "available" &&
+    Boolean(review?.interpretedEvidence?.package_id ?? review?.interpretedEvidence?.id);
+  if (!isEvidenceReviewCanonicalSaveComplete(review) && !preCanonicalReady) return null;
   const nextStep = nextEvidenceReviewContinuationStep(review);
   if (!nextStep) return null;
   const progress = review.commitProgress ?? {};

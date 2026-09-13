@@ -224,7 +224,7 @@ describe("artifact-backed Home briefing routing", () => {
       ...photoEvent,
       generatedAt: "2026-07-22T18:00:00Z",
       trigger: { evidenceType: "dexa", evidenceId: "scan" },
-      briefing: { dexaEventNarrative: { scanDate: "2026-07-01" } },
+      briefing: { dexaEventNarrative: { snapshot: { scanDate: "2026-07-22" } } },
     };
     expect(isEventActiveForHome({
       artifact: dexaEvent,
@@ -234,6 +234,11 @@ describe("artifact-backed Home briefing routing", () => {
     expect(isEventActiveForHome({
       artifact: dexaEvent,
       localDate: "2026-07-23",
+      timeZone: "America/Los_Angeles",
+    })).toBe(true);
+    expect(isEventActiveForHome({
+      artifact: dexaEvent,
+      localDate: "2026-07-24",
       timeZone: "America/Los_Angeles",
     })).toBe(false);
     expect(dexaEvent).toMatchObject({

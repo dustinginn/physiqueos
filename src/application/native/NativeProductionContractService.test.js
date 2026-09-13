@@ -329,6 +329,34 @@ describe("Native production contract boundary", () => {
     expect(result.confirmation).toEqual({ state: "processing", reviewId: "review-1" });
   });
 
+  it("rejects a production-shaped Nutrition conflict before accepting a command receipt", async () => {
+    const current = fixture();
+    current.readers.evidenceReview.getReview.mockResolvedValue({ review: {
+      id: "review-1", evidenceTypes: ["nutrition"],
+      interpretedEvidence: { evidence_objects: [{
+        id: "nutrition_2026-09-12", evidence_type: "nutrition",
+        metadata: { daily_totals_reconciliation: {
+          status: "needs_review",
+          conflicting_fields: ["calories", "protein_g"],
+        } },
+      }] },
+    } });
+
+    await expect(current.service.command({
+      request: request(), commandType: "evidence-review.commit.v1",
+      metadata: { idempotencyKey: "nutrition-conflict", expectedVersion: "9" },
+      payload: { reviewId: "review-1" },
+    })).rejects.toMatchObject({
+      status: 400,
+      code: "NUTRITION_DAILY_TOTALS_CONFLICT",
+      fieldErrors: expect.arrayContaining([
+        expect.objectContaining({ field: "dailyTotals.calories" }),
+      ]),
+    });
+    expect(current.executeCommand).not.toHaveBeenCalled();
+    expect(current.confirmEvidenceReview).not.toHaveBeenCalled();
+  });
+
   it("allows versioned Native dismissal only for approved Evidence Review families", async () => {
     const current = fixture();
     await current.service.command({

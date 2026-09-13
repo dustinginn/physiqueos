@@ -119,7 +119,7 @@ describe("Home briefing availability", () => {
       eventArtifact: photoEvent({
         generatedAt: "2026-07-26T17:30:00Z",
         trigger: { evidenceType: "dexa", evidenceId: "scan" },
-        briefing: { dexaEventNarrative: { hero: { body: "DEXA ready" } } },
+        briefing: { dexaEventNarrative: { snapshot: { scanDate: "2026-07-26" }, hero: { body: "DEXA ready" } } },
       }),
       weeklyArtifact: weeklyArtifact(),
       now: new Date("2026-07-26T18:00:00Z"),

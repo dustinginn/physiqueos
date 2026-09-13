@@ -9,6 +9,8 @@ import {
   projectNativeWeightRead,
 } from "./NativeReadProjectionService.js";
 import { Phase3Command } from "../commands/Phase3CommandService.js";
+import { assertEvidenceCanonicalCommitReady } from
+  "../../domain/services/EvidenceCanonicalCommitReadinessService.js";
 
 const RESOURCES = new Set(Object.values(NativeProductionResource));
 const CONTEXTS = new Set(["all", "build-lean-mass", "visible-abs"]);
@@ -162,6 +164,23 @@ export function createNativeProductionContractService({
             code: "NATIVE_EVIDENCE_REVIEW_UNAVAILABLE",
             title: "This Evidence Review is not available to the Native production workflow.",
           });
+        }
+        if (commandType === Phase3Command.COMMIT_EVIDENCE_REVIEW) {
+          try {
+            assertEvidenceCanonicalCommitReady(review.interpretedEvidence);
+          } catch (error) {
+            throw new ApplicationProblem({
+              status: 400,
+              code: error?.code ?? "EVIDENCE_REVIEW_NOT_COMMITTABLE",
+              title: "This Nutrition review needs a correction before it can be confirmed.",
+              detail: error?.message,
+              fieldErrors: (error?.fields ?? []).map((field) => ({
+                field: `dailyTotals.${field}`,
+                code: "conflicts_with_meal_totals",
+                detail: "The summary value conflicts with the complete meal total.",
+              })),
+            });
+          }
         }
       }
       const result = await executeCommand({ commandType, principal, metadata, payload });

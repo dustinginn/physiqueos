@@ -90,6 +90,8 @@ import {
 } from "../../../../domain/services/CanonicalPhotoSessionIdentityService";
 import { resolveCanonicalEvidenceLocalDate } from
   "../../../../domain/services/CanonicalEvidenceDateService";
+import { assertEvidenceCanonicalCommitReady } from
+  "../../../../domain/services/EvidenceCanonicalCommitReadinessService";
 
 function uniqueStrings(values = []) {
   return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
@@ -262,6 +264,7 @@ async function executeEvidenceReviewConfirmation(formData, {
     assertNoUnresolvedProvisionalExercises(evidencePackage);
     assertIncludedPhotoSessionsReady(evidencePackage);
     validateDexaObjectsBeforeCommit(evidencePackage);
+    assertEvidenceCanonicalCommitReady(evidencePackage);
   }
 
   const claimedReview = await service.beginCommit(reviewId, {
@@ -272,6 +275,19 @@ async function executeEvidenceReviewConfirmation(formData, {
   });
   const supportsDurableCommitClaims = typeof FounderRepositories.evidenceReviews
     .claimEvidenceReviewCommit === "function";
+  if (nativeStart && supportsDurableCommitClaims) {
+    // `beginCommit` persisted the exact reviewed package and an owned claim.
+    // Release it transactionally so the repository enqueues the first durable
+    // continuation. Native is no longer held open while canonical_commit
+    // loads and writes the provider runtime.
+    const released = await service.pauseCommit(reviewId, { operationId });
+    return Object.freeze({
+      state: "processing",
+      accepted: true,
+      reviewId,
+      continuationKey: createEvidenceReviewContinuationKey(released),
+    });
+  }
   let orchestrationResult;
   let continuationPath = null;
   try {

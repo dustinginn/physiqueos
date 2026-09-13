@@ -37,7 +37,7 @@ export function resolveHomeBriefingSelection({
           : `/briefings/review/${eventArtifact.id}`,
       label: "Event Briefing",
       localDate,
-      reason: "active_same_day_event",
+      reason: "active_event_day_or_following_day",
     };
   }
   const validMonthly = isCadenceArtifactReady(monthlyArtifact, "monthly") &&

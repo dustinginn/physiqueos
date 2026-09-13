@@ -15,6 +15,19 @@ describe("Native Briefing detail composition", () => {
     expect(result.items.map((item) => item.artifactType)).toEqual(["dexa_event", "photo_event"]);
   });
 
+  it("isolates unsupported legacy rows instead of poisoning Native history", async () => {
+    const historyStore = {
+      listHistory: vi.fn(async () => ({ artifacts: [
+        { id: "legacy-daily", cadence: null, artifactType: null, generatedAt: "2026-09-13T13:00:00.000Z" },
+        weeklyArtifact(),
+      ] })),
+      getArtifact: vi.fn(), getAnalysis: vi.fn(),
+    };
+    const result = await createBriefingNavigationReadService({ store: historyStore }).listNativeHistory({ limit: 50 });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({ artifactId: "weekly-2026-09-06", cadence: "weekly" });
+  });
+
   it("returns the artifact-bound finished Weekly screen presentation instead of the raw artifact", async () => {
     const artifact = weeklyArtifact();
     const service = createBriefingNavigationReadService({ store: store(artifact) });
@@ -57,6 +70,25 @@ describe("Native Briefing detail composition", () => {
     });
     expect(result.presentation.hero.verdict).not.toBe("Raw verdict");
     expect(result).not.toHaveProperty("briefing");
+  });
+
+  it("returns a bounded frozen DEXA artifact without unrelated live context", async () => {
+    const artifact = {
+      id: "opaque-dexa", artifactType: "event", cadence: "event", generatedAt: "2026-09-13T06:28:58.012Z",
+      trigger: { evidenceType: "dexa", evidenceId: "scan-1", occurredAt: "2026-09-12" },
+      goalContext: { goalId: "goal-build", phaseId: "phase-2" },
+      briefing: { dexaEventNarrative: { scanId: "scan-1", snapshot: { scanDate: "2026-09-12", leanMass: 145.37 } } },
+    };
+    const service = createBriefingNavigationReadService({ store: store(artifact) });
+    const result = await service.getNativeArtifact({ artifactId: artifact.id });
+    expect(result).toEqual({
+      artifact,
+      goals: [],
+    });
+    expect(result).not.toHaveProperty("dexaScans");
+    expect(result).not.toHaveProperty("phaseReviewDecisions");
+    expect(result).not.toHaveProperty("workItems");
+    expect(result).not.toHaveProperty("revision");
   });
 });
 

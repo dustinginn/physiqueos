@@ -510,7 +510,7 @@ describe("Founder Confirm on a dead-lettered partially_committed review", () => 
     };
   });
 
-  it("advances the commit instead of reporting 'processing' forever", async () => {
+  it("durably re-enqueues the failed checkpoint without blocking Native", async () => {
     // The continuation for this checkpoint has already dead-lettered, so
     // nothing will ever redeliver it. Before the fix this returned
     // `{ state: "processing" }` without doing any work, which is what made the
@@ -519,11 +519,11 @@ describe("Founder Confirm on a dead-lettered partially_committed review", () => 
       reviewId: REVIEW_ID, confirmedBy: OWNER, operationId: "native-confirm-retry",
     });
 
-    expect(outcome).toMatchObject({ state: "processing", completedStep: "compatibility_writes" });
+    expect(outcome).toMatchObject({ state: "processing", accepted: true, reviewId: REVIEW_ID });
     expect(mockState.value.claimCalls).toBe(1);
     expect(mockState.value.releaseCalls).toBe(1);
-    expect(mockState.value.review.commitProgress.compatibility_writes.status).toBe("completed");
-    expect(mockState.value.dexaUpserts).toHaveLength(1);
+    expect(mockState.value.review.commitProgress.compatibility_writes.status).toBe("failed");
+    expect(mockState.value.dexaUpserts).toHaveLength(0);
     expect(mockState.value.canonicalCommitCalls).toBe(0);
   });
 

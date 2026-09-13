@@ -23,17 +23,22 @@ export function isEventBriefingRelevantForHome({
 
 function isPhotoEventRelevant({ artifact, localDate, timeZone }) {
   const eventDate = artifact.briefing?.photoEventNarrative?.eventDate ??
-    artifact.trigger?.occurredAt ?? artifact.generatedAt;
-  const eventLocalDate = getLocalDateKey(eventDate, timeZone);
-  if (eventLocalDate === localDate) return true;
-  const publicationLocalDate = getLocalDateKey(artifact.generatedAt, timeZone);
-  return eventLocalDate === shiftDate(localDate, -1) &&
-    publicationLocalDate === localDate;
+    artifact.trigger?.occurredAt ?? null;
+  return isEventDayOrFollowingDay({ eventDate, localDate, timeZone });
 }
 
 function isDexaEventRelevant({ artifact, localDate, timeZone }) {
-  if (!artifact.generatedAt) return false;
-  return getLocalDateKey(artifact.generatedAt, timeZone) === localDate;
+  const eventDate = artifact.briefing?.dexaEventNarrative?.snapshot?.scanDate ??
+    artifact.briefing?.dexaEventNarrative?.scanDate ??
+    artifact.briefing?.dexaEventNarrative?.eventDate ??
+    artifact.trigger?.occurredAt ?? null;
+  return isEventDayOrFollowingDay({ eventDate, localDate, timeZone });
+}
+
+function isEventDayOrFollowingDay({ eventDate, localDate, timeZone }) {
+  if (!eventDate || !localDate) return false;
+  const eventLocalDate = getLocalDateKey(eventDate, timeZone);
+  return localDate === eventLocalDate || localDate === shiftDate(eventLocalDate, 1);
 }
 
 function shiftDate(value, amount) {
