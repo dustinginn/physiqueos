@@ -417,9 +417,15 @@ describe("Native production contract boundary", () => {
     expect(nativeProductionContractManifest.writes.map((item) => item.commandType)).toEqual([
       "weight.submit.v1", "check-in.submit.v1", "priority.complete.v1",
       "training-session.commit.v1", "nutrition-day.upsert.v1", "activity-day.upsert.v1",
+      "healthkit.observations.ingest.v1",
       "dexa-review.measurements.v1", "evidence-review.commit.v1", "evidence-review.dispose.v1",
     ]);
-    expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/HealthKit|activity-day\.sync/);
+    expect(nativeProductionContractManifest.healthKitIngestion).toMatchObject({
+      contractVersion: "healthkit-ingestion-v1",
+      queryCursor: expect.stringMatching(/device-owned/),
+      evidenceEligibility: "not assessed by ingestion",
+    });
+    expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/activity-day\.sync/);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/storage_key|Spaces|databaseName|provider-authoritative/);
   });
 });

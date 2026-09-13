@@ -22,6 +22,31 @@ export function createPhase4CanonicalRecordStore({ query }) {
       );
       return result.rows.map(mapRecord);
     },
+    async putIfAbsent({ ownerUserId, collection, recordId, payload, sourceIdentity = null }) {
+      const table = assertKnownPhase4Collection(collection);
+      const version = normalizeVersion(payload.version);
+      const enriched = { ...structuredClone(payload), version };
+      const inserted = await query(
+        `INSERT INTO physiqueos.${table}
+          (owner_user_id,collection_name,record_id,source_ordinal,legacy_id,version,status,occurrence_date,observed_at,source_identity,provenance,payload)
+         VALUES ($1,$2,$3,
+           (SELECT COALESCE(MAX(source_ordinal)+1,0) FROM physiqueos.${table} WHERE owner_user_id=$1 AND collection_name=$2),
+           $3,$4,$5,$6::date,$7::timestamptz,$8,$9::jsonb,$10::jsonb)
+         ON CONFLICT (owner_user_id,collection_name,record_id) DO NOTHING
+         RETURNING payload,version`,
+        [ownerUserId, collection, recordId, version, nullable(enriched.status ?? enriched.state),
+          calendarDate(enriched.occurrenceDate ?? enriched.localDate ?? enriched.date),
+          dateTime(enriched.observedAt ?? enriched.occurredAt ?? enriched.createdAt), nullable(sourceIdentity),
+          JSON.stringify(enriched.provenance ?? { source: "phase4-command" }), JSON.stringify(enriched)]
+      );
+      if (inserted.rows[0]) return Object.freeze({ created: true, record: mapRecord(inserted.rows[0]) });
+      const existing = await query(
+        `SELECT payload,version FROM physiqueos.${table}
+         WHERE owner_user_id=$1 AND collection_name=$2 AND record_id=$3`,
+        [ownerUserId, collection, recordId]
+      );
+      return Object.freeze({ created: false, record: mapRecord(existing.rows[0]) });
+    },
     async put({ ownerUserId, collection, recordId, payload, expectedVersion = null, sourceIdentity = null }) {
       const table = assertKnownPhase4Collection(collection);
       const version = expectedVersion == null ? normalizeVersion(payload.version) : Number(expectedVersion) + 1;
@@ -78,6 +103,15 @@ export function createInMemoryCanonicalRecordStore(collections) {
   return Object.freeze({
     async get({ collection, recordId }) { return clone(maps.get(collection)?.get(recordId)); },
     async list({ collection }) { return [...(maps.get(collection)?.values() ?? [])].map(clone); },
+    async putIfAbsent({ collection, recordId, payload }) {
+      const collectionMap = maps.get(collection) ?? new Map();
+      maps.set(collection, collectionMap);
+      const existing = collectionMap.get(recordId);
+      if (existing) return Object.freeze({ created: false, record: clone(existing) });
+      const record = Object.freeze({ ...structuredClone(payload), version: normalizeVersion(payload.version) });
+      collectionMap.set(recordId, record);
+      return Object.freeze({ created: true, record: clone(record) });
+    },
     async put({ collection, recordId, payload, expectedVersion = null }) {
       const collectionMap = maps.get(collection) ?? new Map();
       maps.set(collection, collectionMap);

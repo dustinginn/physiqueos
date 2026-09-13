@@ -26,6 +26,7 @@ const payloads = {
   [Phase3Command.SYNC_ACTIVITY_DAY]: { localDate: "2026-08-11", dailyActivity: { move_calories: 700 }, sourceIdentity: "healthkit-day-2026-08-11" },
   [Phase3Command.COMMIT_TRAINING_SESSION]: { sessionId: "session-native", localDate: "2026-08-11", exercises: [{ canonicalExerciseId: "barbell-bench-press", sets: [{ reps: 8, load: 185, unit: "lb" }] }] },
   [Phase3Command.UPSERT_ACTIVITY_DAY]: { localDate: "2026-08-11", dailyActivity: { move_calories: 700 }, sourceIdentity: "screenshot-day-2026-08-11", source: { modality: "screenshot", application: "Apple Fitness" } },
+  [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: { batchId: "healthkit-batch-2026-08-11", observations: [{ observationType: "workout" }] },
   [Phase3Command.EDIT_DEXA_REVIEW]: { reviewId: "review-dexa", evidenceObjectId: "dexa-one", measurements: { measuredAt: "2026-08-11", totalMass: 180 } },
   [Phase3Command.COMMIT_EVIDENCE_REVIEW]: { reviewId: "review-dexa" },
 };
@@ -112,6 +113,7 @@ function commandPort(commandType) {
     [Phase3Command.CONFIRM_PHOTO]: "confirmPhotoEvidence", [Phase3Command.CONFIRM_DEXA]: "confirmDexaEvidence",
     [Phase3Command.UPSERT_NUTRITION_DAY]: "upsertNutritionDay", [Phase3Command.SYNC_ACTIVITY_DAY]: "syncActivityDay",
     [Phase3Command.COMMIT_TRAINING_SESSION]: "commitTrainingSession", [Phase3Command.UPSERT_ACTIVITY_DAY]: "upsertActivityDay",
+    [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: "ingestHealthKitObservations",
     [Phase3Command.EDIT_DEXA_REVIEW]: "editDexaReview", [Phase3Command.COMMIT_EVIDENCE_REVIEW]: "requestEvidenceReviewConfirmation",
   })[commandType];
 }

@@ -1,15 +1,22 @@
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
-import { PHASE4_DOMAIN_TABLES } from "./phase4DomainCollections.js";
+import {
+  PHASE4_APPLICATION_RECORD_TABLES,
+  PHASE4_CANONICAL_DOMAIN_TABLES,
+  PHASE4_DOMAIN_TABLES,
+} from "./phase4DomainCollections.js";
 
 const require = createRequire(import.meta.url);
 const migration = require("../../../db/migrations/000003_phase4_canonical_domains.cjs");
 
 describe("Phase 4 canonical domain schema", () => {
   it("maps every canonical source collection to a bounded domain table", () => {
-    expect(Object.keys(PHASE4_DOMAIN_TABLES).sort()).toEqual([...FOUNDATION_SOURCE_COLLECTIONS].sort());
+    expect(Object.keys(PHASE4_CANONICAL_DOMAIN_TABLES).sort()).toEqual([...FOUNDATION_SOURCE_COLLECTIONS].sort());
     expect(new Set(Object.values(PHASE4_DOMAIN_TABLES)).size).toBe(10);
+    expect(PHASE4_APPLICATION_RECORD_TABLES).toEqual({
+      healthKitObservations: "canonical_training_records",
+    });
   });
 
   it("defines owner, identity, version, occurrence, provenance, media and reversible import state", () => {

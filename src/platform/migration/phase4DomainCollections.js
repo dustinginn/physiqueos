@@ -1,6 +1,6 @@
 import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
 
-export const PHASE4_DOMAIN_TABLES = Object.freeze({
+export const PHASE4_CANONICAL_DOMAIN_TABLES = Object.freeze({
   user: "canonical_user_records",
   nutritionContext: "canonical_user_records",
   goals: "canonical_goal_records",
@@ -42,8 +42,20 @@ export const PHASE4_DOMAIN_TABLES = Object.freeze({
   goalConfidenceContinuitySeeds: "canonical_confidence_records",
 });
 
-const missing = FOUNDATION_SOURCE_COLLECTIONS.filter((name) => !PHASE4_DOMAIN_TABLES[name]);
-const extra = Object.keys(PHASE4_DOMAIN_TABLES).filter((name) => !FOUNDATION_SOURCE_COLLECTIONS.includes(name));
+// Application-owned source records live outside the imported/exported canonical
+// Founder runtime. They reuse existing JSON record tables, so adding one here
+// does not require database DDL or a production-data migration.
+export const PHASE4_APPLICATION_RECORD_TABLES = Object.freeze({
+  healthKitObservations: "canonical_training_records",
+});
+
+export const PHASE4_DOMAIN_TABLES = Object.freeze({
+  ...PHASE4_CANONICAL_DOMAIN_TABLES,
+  ...PHASE4_APPLICATION_RECORD_TABLES,
+});
+
+const missing = FOUNDATION_SOURCE_COLLECTIONS.filter((name) => !PHASE4_CANONICAL_DOMAIN_TABLES[name]);
+const extra = Object.keys(PHASE4_CANONICAL_DOMAIN_TABLES).filter((name) => !FOUNDATION_SOURCE_COLLECTIONS.includes(name));
 if (missing.length || extra.length) {
   throw new Error(`Phase 4 collection map is incomplete (missing=${missing.join(",")}; extra=${extra.join(",")}).`);
 }
