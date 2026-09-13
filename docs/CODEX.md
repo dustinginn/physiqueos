@@ -62,6 +62,62 @@ Avoid changing unrelated code.
 
 Leave the codebase cleaner than you found it.
 
+## Development Storage Hygiene (Dustin's Environment)
+
+This policy applies to PhysiqueOS work performed in Dustin's macOS account. It does not authorize inspecting or cleaning another user's data, using `sudo`, or performing broad system cleanup.
+
+### Workflow ownership
+
+A workflow owns every disposable artifact it creates. Record the exact path, operate only on that path, and remove it when the workflow finishes unless it is intentionally retained for a stated reason.
+
+* Name temporary roots `physiqueos-<task>-<unique-id>` under an appropriate temporary directory.
+* Use `defer`, `finally`, `trap`, or the runtime's equivalent to attempt exact-path cleanup after success and controlled failure.
+* Never use wildcards, age alone, or an unverified prefix as authority to delete.
+* Never remove another process's temporary directory or any artifact whose provenance is uncertain.
+* Do not add cron jobs, scheduled tasks, background cleaners, or autonomous deletion services.
+* A future cleanup helper, if approved, must accept only explicitly registered PhysiqueOS-owned paths and default to dry-run.
+
+### Storage checkpoints
+
+Require at least **10 GiB of free disk space** before starting any of these operations:
+
+* full Swift and UI validation;
+* a fresh generic Release build after deleting DerivedData;
+* a large migration or capture;
+* a temporary repository clone;
+* a large dependency install; or
+* an Xcode release archive.
+
+If free space is below 10 GiB, stop before starting the operation. Report the current free space, identify only already-owned disposable artifacts, remove only paths that have been verified safe and exact, then check again. Do not consume the final few GiB and wait for `ENOSPC`.
+
+### Build, test, and agent output
+
+* Reuse DerivedData during active development. Treat it as disposable, but clear it only after a release candidate is validated and uploaded when disk pressure warrants it, or for an explicitly required clean validation.
+* Remove isolated test DerivedData and `.xcresult` bundles after results are summarized and required failure evidence or screenshots are retained. Do not keep a separate temporary build tree for every build number.
+* Preserve a minimal regression fixture in source when needed; do not retain an entire temporary build tree as a fixture.
+* Prefer concise test reporters and bounded, workflow-owned temporary logs. Keep useful errors available while a task is active, retain only the necessary failure excerpt or summary, and remove successful-run logs. Do not suppress errors to reduce output or repeatedly capture identical Xcode output.
+* At the end of a substantial Codex or Claude task, ensure no workflow-owned multi-gigabyte task output remains. PhysiqueOS repository policy cannot modify Claude or Codex product internals.
+
+### Local lifecycle guidance
+
+* Keep `node_modules` for active worktrees when useful. When a worktree is approved for retirement, include its `node_modules`, `.next`, coverage, `dist`, build, and other regenerable output in the exact worktree's removal plan. Avoid duplicate dependency trees in temporary clones.
+* Never automatically remove a Git worktree. First verify that its changes are committed and durably reachable, it contains no unique untracked files, and no active process uses it. Report eligible redundant worktrees as cleanup candidates; never remove the active Native or server worktree, an uncommitted worktree, or its branch merely because the worktree is removed.
+* Maintain one primary current iPhone Simulator. Create additional devices only for an explicit compatibility test, report retired devices as cleanup candidates, and never automatically delete a booted or active simulator. Do not create iPad Simulators unless explicitly required.
+* Treat older Xcode archives as reviewable cleanup candidates only after TestFlight accepts the build and a newer known-good build exists. Keep a small intentional retention set; never automatically delete archives that may be needed for symbolication or historical debugging.
+* Keep active worktrees, dependencies, DerivedData, `.next`, Simulator data, and active build/test directories on local storage. Use iCloud only for worthwhile static historical material; verify upload completion before considering removal of a local download.
+
+### End-of-task storage report
+
+For substantial work, the final report must state:
+
+* temporary directories created and removed;
+* large logs or test artifacts retained and why;
+* current free disk space;
+* whether DerivedData was intentionally retained; and
+* whether a redundant worktree was created and, if so, why it remains necessary.
+
+The desired closeout state is preserved source changes, clean or explicitly documented Git state, removed workflow-owned disposable artifacts, no abandoned multi-gigabyte logs or unnecessary temporary clones, and healthy disk headroom.
+
 ---
 
 # Development Philosophy

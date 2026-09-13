@@ -838,6 +838,11 @@ enum TrainingDateFormatting {
         ISO8601DateFormatter().date(from: value) ?? dateKeyFormatter.date(from: value)
     }
 
+    /// Formats a calendar DATE KEY. Passing an ISO-8601 instant here is a
+    /// defect, not a convenience: the first ten characters of an instant are
+    /// its UTC date, so an evening timestamp in a western time zone renders as
+    /// tomorrow. That is exactly how the Evidence Review header came to show
+    /// "Sep 13" for a Sep 12 DEXA scan.
     static func short(_ value: String) -> String {
         // Web `formatDate` treats the first ten characters as a calendar
         // date, not an instant. Preserve that date key so a UTC midnight

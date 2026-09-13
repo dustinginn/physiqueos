@@ -126,10 +126,11 @@ struct EvidenceReviewDetailView: View {
                 .physiqueOSFont(PhysiqueOSTypography.screenTitle)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
             HStack(spacing: 8) {
-                if let createdAt = review.createdAt {
-                    Text(TrainingDateFormatting.short(createdAt))
+                if let occurrence = Self.occurrenceDateLabel(for: review) {
+                    Text(occurrence)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .accessibilityIdentifier("evidenceReviewDetail.occurrenceDate")
                 }
                 if let version = review.version {
                     Text("Version \(version)")
@@ -139,6 +140,37 @@ struct EvidenceReviewDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The date the evidence actually occurred, read from the review's own
+    /// items — deliberately never `review.createdAt`.
+    ///
+    /// The header used to hand `createdAt` to `TrainingDateFormatting.short`,
+    /// which is a *date-key* formatter: it keeps the first ten characters and
+    /// renders them in UTC. `createdAt` is an instant, so a review the Founder
+    /// created at 7:11 PM on Sep 12 is `2026-09-13T02:11Z`, and the header read
+    /// "Sep 13" for a DEXA scan that the Captured Evidence card on the same
+    /// screen correctly listed as Sep 12, 2026. A review's creation instant is
+    /// not the evidence's date under any time zone, so it is not shown at all.
+    static func occurrenceDateLabel(for review: EvidenceReviewDetailReadModel) -> String? {
+        let included = review.items.filter(\.included)
+        let sourceItems = included.isEmpty ? review.items : included
+        var unique: [String] = []
+        for label in sourceItems.compactMap(\.date).map(evidenceDateLabel) where !unique.contains(label) {
+            unique.append(label)
+        }
+        switch unique.count {
+        case 0: return nil
+        case 1: return unique[0]
+        default: return "\(unique.count) dates"
+        }
+    }
+
+    /// Item dates arrive either as a `"YYYY-MM-DD"` key or already formatted by
+    /// the server. Both are calendar dates, never instants — which is what
+    /// makes the UTC date-key formatter the right one here.
+    static func evidenceDateLabel(_ value: String) -> String {
+        value.contains(",") ? value : TrainingDateFormatting.short(value)
     }
 
     private func itemsCard(_ review: EvidenceReviewDetailReadModel) -> some View {
@@ -180,7 +212,7 @@ struct EvidenceReviewDetailView: View {
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                         .foregroundStyle(item.included ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textMuted)
                                     if let date = item.date {
-                                        Text(date.contains(",") ? date : TrainingDateFormatting.short(date))
+                                        Text(Self.evidenceDateLabel(date))
                                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                                             .foregroundStyle(PhysiqueOSTheme.textMuted)
                                     }

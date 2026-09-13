@@ -274,7 +274,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         assertButtonLabel(containing: "Face Pull")
         attachScreenshot("24-logger-shoulders-canonical-catalog")
 
-        tapButton(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        selectExercise(identifier: "trainingLogger.exercise.shoulder_press_machine")
         tapButton(identifier: "trainingLogger.startLogging")
         tapButton(identifier: "trainingLogger.cancelWorkout")
         let alert = app.alerts["Cancel this workout?"]
@@ -301,7 +301,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         tapButton(identifier: "trainingLogger.start")
         tapButton(identifier: "trainingLogger.area.shoulders")
         tapText("Choose exercises")
-        tapButton(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        selectExercise(identifier: "trainingLogger.exercise.shoulder_press_machine")
         tapButton(identifier: "trainingLogger.startLogging")
 
         let markComplete = app.buttons["Mark set complete"].firstMatch
@@ -348,7 +348,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         tapButton(identifier: "trainingLogger.start")
         tapButton(identifier: "trainingLogger.area.shoulders")
         tapText("Choose exercises")
-        tapButton(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        selectExercise(identifier: "trainingLogger.exercise.shoulder_press_machine")
         tapButton(identifier: "trainingLogger.startLogging")
         fillFirstSet(reps: "10", load: "45")
         app.buttons["Mark set complete"].firstMatch.tap()
@@ -515,6 +515,26 @@ final class TrainingAcceptanceUITests: XCTestCase {
         }
         XCTAssertTrue(button.exists && button.isHittable, "Could not scroll to button: \(identifier)")
         button.tap()
+    }
+
+    private func selectExercise(identifier: String) {
+        var button = app.buttons.matching(identifier: identifier).firstMatch
+        let persistentAction = app.buttons["trainingLogger.startLogging"]
+        for _ in 0..<12 where
+            !button.exists
+            || !button.isHittable
+            || (persistentAction.exists && button.frame.maxY >= persistentAction.frame.minY)
+        {
+            app.swipeUp()
+            button = app.buttons.matching(identifier: identifier).firstMatch
+        }
+        XCTAssertTrue(button.exists && button.isHittable, "Could not scroll to exercise: \(identifier)")
+        XCTAssertTrue(
+            !persistentAction.exists || button.frame.maxY < persistentAction.frame.minY,
+            "Exercise remained obscured by the persistent action: \(identifier)"
+        )
+        button.tap()
+        XCTAssertTrue(button.isSelected, "Exercise selection did not persist: \(identifier)")
     }
 
     private func navigateBack() {

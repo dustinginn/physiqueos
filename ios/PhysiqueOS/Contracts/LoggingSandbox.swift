@@ -396,65 +396,163 @@ enum EvidenceSandboxRouter {
         return sources
     }
 
-    private static func detectedCategories(inSingleSource text: String) -> [EvidenceCategory] {
-        var result: [EvidenceCategory] = []
-        func add(_ category: EvidenceCategory, when condition: Bool) {
-            if condition, !result.contains(category) { result.append(category) }
+    /// How much weight one matched term carries for its own category.
+    ///
+    /// `defining` terms name the evidence type itself or a measurement that
+    /// essentially only that type reports ("bodyspec", "regional lean",
+    /// "activity rings", "shoulder press"). `supporting` terms are real
+    /// signal but plausibly incidental in another domain's document — a
+    /// BodySpec report discusses "nutrition" and "training" in its
+    /// recommendations, and reports a "body fat" percentage, without being
+    /// any of those things.
+    enum SignalSpecificity {
+        case defining
+        case supporting
+
+        var diagnosticLabel: String {
+            switch self {
+            case .defining: "defining"
+            case .supporting: "supporting"
+            }
         }
-        // DEXA's own vocabulary is highly specific to a body-composition scan
-        // report and essentially never appears incidentally in another
-        // evidence type — unlike, say, "sleep" or "steps," which can turn up
-        // anywhere in a multi-section report's lifestyle notes. A strong DEXA
-        // match therefore takes precedence over Recovery/Activity/Progress
-        // Photos/Weight's more generic single-word or common-phrase signals
-        // from the SAME source (mirrors the pre-existing Weight-vs-DEXA
-        // suppression below) rather than treating the pairing as ambiguous.
-        // It deliberately does NOT suppress Labs/Nutrition/Training, whose
-        // own keyword sets are similarly specific — a real co-occurrence of
-        // two such strong, distinct signals is genuine ambiguity worth
-        // surfacing, not something to silently resolve.
-        add(.dexa, when: containsAny(text, dexaTerms))
-        add(.labs, when: containsAny(text, labsTerms))
-        add(.recovery, when: containsAny(text, recoveryTerms) && !result.contains(.dexa))
-        add(.progressPhotos, when: containsAny(text, progressPhotoTerms) && !result.contains(.dexa))
-        // A calorie value appears on both Apple workout summaries and Nutrition
-        // screens. It is therefore deliberately not a Nutrition signal on its
-        // own. Nutrition requires domain-specific context such as macros, food,
-        // meals, or a daily diary/summary.
-        let nutritionSignal = containsAny(text, nutritionTerms)
-        add(.nutrition, when: nutritionSignal)
-        let trainingSignal = containsAny(text, trainingTerms) || text.range(of: trainingSetPattern, options: .regularExpression) != nil
-        add(.training, when: trainingSignal)
-        add(.activity, when: containsAny(text, activityTerms) && !trainingSignal && !result.contains(.dexa))
-        let weightSignal = containsAny(text, weightTerms) || text.range(of: weightReadingPattern, options: .regularExpression) != nil
-        add(.weight, when: weightSignal && !trainingSignal && !result.contains(.dexa))
-        return result
     }
 
-    // The keyword sets below are shared verbatim by the classification
-    // decision above and by `detectedSignals(for:)` below, so the diagnostic
-    // can never drift from the logic it explains.
-    static let dexaTerms = [
-        "dexa", "bodyspec", "body composition", "lean tissue", "fat tissue",
-        "fat mass", "body fat", "regional lean", "regional fat", "bone mineral content", "vat volume",
+    /// Deterministic evidence-strength classification for ONE source.
+    ///
+    /// Flat substring-OR treated a single incidental word as equal to a
+    /// cluster of document-identity terms. The real Founder BodySpec PDF
+    /// matched ten DEXA terms alongside exactly one "nutrition" and one
+    /// "training", came out as three categories, and was routed to the
+    /// ambiguous branch. The rule below is the smallest correction that
+    /// removes the equivalence without hardcoding "DEXA beats Nutrition":
+    ///
+    ///   1. A category with at least one `defining` term is established.
+    ///   2. When any category is established that way, categories resting on
+    ///      `supporting` terms alone are outweighed and dropped.
+    ///   3. With no defining match anywhere, supporting matches are all we
+    ///      have, so they classify — two or more first, a lone one otherwise.
+    ///
+    /// Genuine cross-family ambiguity survives: two categories each holding a
+    /// defining term both stay, and the caller still routes to `.mixed`.
+    /// Rule 2 also subsumes the hand-written Weight-vs-DEXA and
+    /// Activity-vs-Training suppressions this replaces — a DEXA report's bare
+    /// "174.7 lb" line and a workout summary's "steps" are supporting-only
+    /// matches that now lose to the defining category in their own source.
+    private static func detectedCategories(inSingleSource text: String) -> [EvidenceCategory] {
+        var defining: [EvidenceCategory] = []
+        var supportingOnly: [EvidenceCategory] = []
+        var loneSupporting: [EvidenceCategory] = []
+
+        for (category, terms) in categorySignals {
+            var definingMatches = 0
+            var supportingMatches = 0
+            for (term, specificity) in terms where text.contains(term) {
+                switch specificity {
+                case .defining: definingMatches += 1
+                case .supporting: supportingMatches += 1
+                }
+            }
+            if let (pattern, specificity) = categoryPatterns[category],
+               text.range(of: pattern, options: .regularExpression) != nil {
+                switch specificity {
+                case .defining: definingMatches += 1
+                case .supporting: supportingMatches += 1
+                }
+            }
+            if definingMatches > 0 {
+                defining.append(category)
+            } else if supportingMatches >= 2 {
+                supportingOnly.append(category)
+            } else if supportingMatches == 1 {
+                loneSupporting.append(category)
+            }
+        }
+
+        if !defining.isEmpty { return defining }
+        if !supportingOnly.isEmpty { return supportingOnly }
+        return loneSupporting
+    }
+
+    /// The keyword tables, each term tagged with the weight it carries. These
+    /// are shared verbatim by the classification decision above and by
+    /// `detectedSignals(for:)` below, so the diagnostic can never drift from
+    /// the logic it explains. Declaration order fixes the order of the
+    /// returned categories, which the caller relies on being stable.
+    static let categorySignals: [(category: EvidenceCategory, terms: [(term: String, specificity: SignalSpecificity)])] = [
+        (.dexa, [
+            ("dexa", .defining), ("bodyspec", .defining), ("body composition", .defining),
+            ("lean tissue", .defining), ("fat tissue", .defining), ("regional lean", .defining),
+            ("regional fat", .defining), ("bone mineral content", .defining), ("vat volume", .defining),
+            // Reported by scales and lab panels too.
+            ("fat mass", .supporting), ("body fat", .supporting),
+        ]),
+        (.labs, [
+            ("lab panel", .defining), ("bloodwork", .defining), ("blood test", .defining),
+            ("hemoglobin", .defining), ("cholesterol", .defining),
+            // Appears in protocol and goal notes.
+            ("testosterone", .supporting),
+        ]),
+        (.recovery, [
+            ("hrv", .defining), ("readiness", .defining), ("recovery score", .defining),
+            ("time asleep", .defining),
+            // Turns up in any report's lifestyle section.
+            ("sleep", .supporting),
+        ]),
+        // Progress-photo evidence is images, not text. Text that names a pose
+        // is usually narrative — a DEXA report suggesting "front relaxed pose
+        // photos taken the same morning" is still a DEXA report. So no pose
+        // name is treated as defining; a photo session identifies itself
+        // through the all-images package rule in `detectedCategories(for:)`,
+        // and two or more pose phrases with nothing else present still
+        // classify on their own.
+        (.progressPhotos, [
+            ("progress photo", .supporting), ("front relaxed", .supporting), ("rear relaxed", .supporting),
+            ("side relaxed", .supporting), ("pose photo", .supporting),
+        ]),
+        // A calorie value appears on both Apple workout summaries and Nutrition
+        // screens. It is therefore deliberately not a Nutrition term at all.
+        (.nutrition, [
+            ("macros", .defining), ("food diary", .defining), ("daily nutrition", .defining),
+            ("myfitnesspal", .defining), ("cronometer", .defining), ("serving size", .defining),
+            ("breakfast", .defining), ("lunch", .defining), ("dinner", .defining),
+            ("snacks", .defining), ("meal", .defining), ("carbohydrate", .defining), ("carbs", .defining),
+            // The bare word and single macro names are what a DEXA report's
+            // recommendations use. This is the real Founder collision.
+            ("nutrition", .supporting), ("protein", .supporting),
+            ("fiber", .supporting), ("sodium", .supporting),
+        ]),
+        (.training, [
+            ("workout", .defining), ("traditional strength", .defining), ("functional strength", .defining),
+            ("sets", .defining), ("reps", .defining), ("active calories", .defining),
+            ("workout time", .defining), ("average heart rate", .defining),
+            ("shoulder press", .defining), ("bench press", .defining), ("lateral raise", .defining),
+            ("squat", .defining), ("deadlift", .defining), ("curl", .defining),
+            ("treadmill", .defining), ("stair stepper", .defining), ("outdoor walk", .defining),
+            ("indoor walk", .defining), ("outdoor run", .defining), ("indoor run", .defining),
+            ("cycling", .defining), ("elliptical", .defining), ("rowing", .defining), ("hiking", .defining),
+            // The other half of the real Founder collision, plus a word that
+            // labels a field on almost every report.
+            ("training", .supporting), ("duration", .supporting),
+        ]),
+        (.activity, [
+            ("activity rings", .defining), ("move goal", .defining),
+            ("stand hours", .defining), ("exercise minutes", .defining),
+            ("steps", .supporting),
+        ]),
+        (.weight, [
+            ("morning weight", .defining), ("body weight", .defining),
+            ("weighed in", .defining), ("scale weight", .defining),
+        ]),
     ]
-    static let labsTerms = ["lab panel", "bloodwork", "blood test", "hemoglobin", "cholesterol", "testosterone"]
-    static let recoveryTerms = ["sleep", "hrv", "readiness", "recovery score", "time asleep"]
-    static let progressPhotoTerms = ["progress photo", "front relaxed", "rear relaxed", "side relaxed", "pose photo"]
-    static let nutritionTerms = [
-        "nutrition", "protein", "carbohydrate", "carbs", "macros", "meal",
-        "breakfast", "lunch", "dinner", "snacks", "food diary", "daily nutrition",
-        "fiber", "sodium", "serving size", "myfitnesspal", "cronometer",
+
+    /// Regular-expression signals, one per category, carrying the same tiers.
+    /// A set line ("185 lb 8r x 3") is unmistakably Training. A lone mass
+    /// reading is not unmistakably a weigh-in — a DEXA report prints one.
+    static let categoryPatterns: [EvidenceCategory: (pattern: String, specificity: SignalSpecificity)] = [
+        .training: (trainingSetPattern, .defining),
+        .weight: (weightReadingPattern, .supporting),
     ]
-    static let trainingTerms = [
-        "workout", "training", "traditional strength", "functional strength",
-        "sets", "reps", "active calories", "workout time", "duration", "average heart rate",
-        "shoulder press", "bench press", "lateral raise", "squat", "deadlift", "curl",
-        "treadmill", "stair stepper", "outdoor walk", "indoor walk", "outdoor run",
-        "indoor run", "cycling", "elliptical", "rowing", "hiking",
-    ]
-    static let activityTerms = ["activity rings", "move goal", "stand hours", "exercise minutes", "steps"]
-    static let weightTerms = ["morning weight", "body weight", "weighed in", "scale weight"]
+
     static let trainingSetPattern = #"(?im)^\s*\d+(?:\.\d+)?\s*(?:p|lb|lbs|pounds?)\s+\d+(?:\.\d+)?\s*(?:r|reps?)\s*[x×]\s*\d+\s*$"#
     static let weightReadingPattern = #"(?m)^\s*\d{2,3}(?:\.\d+)?\s*(?:lb|lbs|kg)\s*$"#
 
@@ -468,35 +566,28 @@ enum EvidenceSandboxRouter {
     /// guessed at again.
     static func detectedSignals(for draft: EvidenceIntakeDraft) -> [String] {
         var signals: [String] = []
-        func record(_ category: EvidenceCategory, _ terms: [String], in text: String) {
-            for term in terms where text.contains(term) {
-                let identifier = "\(category.rawValue).keyword.\(term.replacingOccurrences(of: " ", with: "_"))"
-                if !signals.contains(identifier) { signals.append(identifier) }
-            }
+        func append(_ identifier: String) {
+            if !signals.contains(identifier) { signals.append(identifier) }
         }
         for source in classificationSources(for: draft) {
             let text = source.classificationText
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-            record(.dexa, dexaTerms, in: text)
-            record(.labs, labsTerms, in: text)
-            record(.recovery, recoveryTerms, in: text)
-            record(.progressPhotos, progressPhotoTerms, in: text)
-            record(.nutrition, nutritionTerms, in: text)
-            record(.training, trainingTerms, in: text)
-            record(.activity, activityTerms, in: text)
-            record(.weight, weightTerms, in: text)
-            if text.range(of: trainingSetPattern, options: .regularExpression) != nil, !signals.contains("training.pattern.set_line") {
-                signals.append("training.pattern.set_line")
+            for (category, terms) in categorySignals {
+                for (term, specificity) in terms where text.contains(term) {
+                    // The tier is part of the identifier so a reported
+                    // collision shows at a glance which side rested on
+                    // document identity and which on an incidental word.
+                    append("\(category.rawValue).\(specificity.diagnosticLabel).\(term.replacingOccurrences(of: " ", with: "_"))")
+                }
             }
-            if text.range(of: weightReadingPattern, options: .regularExpression) != nil, !signals.contains("weight.pattern.reading_line") {
-                signals.append("weight.pattern.reading_line")
+            if text.range(of: trainingSetPattern, options: .regularExpression) != nil {
+                append("training.defining.pattern_set_line")
+            }
+            if text.range(of: weightReadingPattern, options: .regularExpression) != nil {
+                append("weight.supporting.pattern_reading_line")
             }
         }
         return signals
-    }
-
-    private static func containsAny(_ text: String, _ terms: [String]) -> Bool {
-        terms.contains(where: text.contains)
     }
 }
 

@@ -336,6 +336,92 @@ final class LoggingSandboxTests: XCTestCase {
         }
     }
 
+    // MARK: - The real Build 27 Founder collision
+    //
+    // Build 25 and Build 26 each "corrected" Automatic precedence against an
+    // INFERRED collision. The Founder's real BodySpec PDF then reported its
+    // own signals, and the actual collision was ten DEXA document-identity
+    // terms against exactly one "nutrition" and one "training" — words that
+    // appear in that report's recommendations section. Flat OR treated the
+    // three as equals, so Automatic said "more than one kind of evidence."
+
+    /// Text chosen to reproduce the exact production signal set:
+    /// dexa, bodyspec, body_composition, lean_tissue, fat_tissue, fat_mass,
+    /// body_fat, regional_lean, regional_fat, bone_mineral_content,
+    /// plus nutrition and training.
+    private var founderBuild27DexaReportText: String {
+        """
+        BodySpec DEXA Body Composition Report
+        Lean Tissue 153.3 lb
+        Fat Tissue 14.2 lb
+        Fat Mass 14.2 lb
+        Body Fat 8.1%
+        Bone Mineral Content 7.2 lb
+        Regional Lean and Regional Fat distribution follow.
+        Recommendations: review your nutrition and keep resistance training consistent.
+        """
+    }
+
+    func testRealFounderDexaReportClassifiesAsDexaNotAmbiguous() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 9, 12))
+        draft.details = founderBuild27DexaReportText
+
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: draft), [.dexa])
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: draft), .dexa)
+    }
+
+    func testRealFounderCollisionIsTenDefiningDexaTermsAgainstTwoIncidentalWords() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 9, 12))
+        draft.details = founderBuild27DexaReportText
+
+        let signals = EvidenceSandboxRouter.detectedSignals(for: draft)
+
+        // The ten DEXA signals the Founder's device actually reported.
+        for term in ["dexa", "bodyspec", "body_composition", "lean_tissue", "fat_tissue",
+                     "regional_lean", "regional_fat", "bone_mineral_content"] {
+            XCTAssertTrue(signals.contains("dexa.defining.\(term)"), "missing dexa.defining.\(term) in \(signals)")
+        }
+        for term in ["fat_mass", "body_fat"] {
+            XCTAssertTrue(signals.contains("dexa.supporting.\(term)"), "missing dexa.supporting.\(term) in \(signals)")
+        }
+        // The two words that used to outweigh all of the above.
+        XCTAssertTrue(signals.contains("nutrition.supporting.nutrition"), "signals: \(signals)")
+        XCTAssertTrue(signals.contains("training.supporting.training"), "signals: \(signals)")
+        XCTAssertFalse(signals.contains { $0.hasPrefix("nutrition.defining.") }, "signals: \(signals)")
+        XCTAssertFalse(signals.contains { $0.hasPrefix("training.defining.") }, "signals: \(signals)")
+    }
+
+    /// The correction must not be "DEXA wins". Each incidental word loses to
+    /// ANY defining match, in either direction.
+    func testIncidentalWordsLoseToDefiningMatchesInEitherDirection() {
+        var nutritionDocument = EvidenceIntakeDraft.fresh(now: date(2026, 9, 12))
+        nutritionDocument.details = "MyFitnessPal daily nutrition summary. Macros logged. Body fat goal noted. Keep training consistent."
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: nutritionDocument), [.nutrition])
+
+        var trainingDocument = EvidenceIntakeDraft.fresh(now: date(2026, 9, 12))
+        trainingDocument.details = "Traditional Strength Training workout. Bench Press 3 sets. Remember your nutrition afterwards."
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: trainingDocument), [.training])
+    }
+
+    /// Two defining terms from two families is the case that must stay
+    /// ambiguous — the Founder is asked rather than guessed at.
+    func testTwoDefiningFamiliesStillProduceAmbiguity() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 9, 12))
+        draft.details = "BodySpec DEXA Body Composition Report. Also attached: MyFitnessPal macros for the same day."
+
+        XCTAssertEqual(Set(EvidenceSandboxRouter.detectedCategories(for: draft)), Set([.dexa, .nutrition]))
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: draft), .mixed)
+    }
+
+    /// With no defining term anywhere, supporting terms are all the evidence
+    /// there is and must still classify rather than yielding nothing.
+    func testSupportingTermsAloneStillClassify() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 9, 12))
+        draft.details = "Sleep 7h 40m last night."
+
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: draft), [.recovery])
+    }
+
     func testGenuinelyDistinctStrongSignalsFromTwoFamiliesRemainAmbiguous() {
         // Labs' own keyword set is just as specific/branded as DEXA's — a
         // real co-occurrence of both is genuine ambiguity, not something the
@@ -361,17 +447,21 @@ final class LoggingSandboxTests: XCTestCase {
 
         let signals = EvidenceSandboxRouter.detectedSignals(for: draft)
 
-        XCTAssertTrue(signals.contains("dexa.keyword.dexa"), "signals: \(signals)")
-        XCTAssertTrue(signals.contains("dexa.keyword.bodyspec"), "signals: \(signals)")
-        XCTAssertTrue(signals.contains("nutrition.keyword.protein"), "signals: \(signals)")
-        XCTAssertTrue(signals.contains("training.keyword.training"), "signals: \(signals)")
+        // The identifier carries the tier, so a reported collision shows which
+        // side rested on document identity and which on an incidental word.
+        XCTAssertTrue(signals.contains("dexa.defining.dexa"), "signals: \(signals)")
+        XCTAssertTrue(signals.contains("dexa.defining.bodyspec"), "signals: \(signals)")
+        XCTAssertTrue(signals.contains("nutrition.supporting.protein"), "signals: \(signals)")
+        XCTAssertTrue(signals.contains("training.supporting.training"), "signals: \(signals)")
     }
 
     /// The diagnostic must expose which families collided, so an ambiguous
     /// real document explains itself instead of requiring another guess.
     func testDetectedSignalsExplainsAnAmbiguousClassification() {
         var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
-        draft.details = "BodySpec DEXA Body Composition. Aim for more protein each day."
+        // Two defining terms from two families — real ambiguity, not the
+        // incidental-word kind the specificity model now resolves.
+        draft.details = "BodySpec DEXA Body Composition. Macros logged in MyFitnessPal."
 
         let categories = EvidenceSandboxRouter.detectedCategories(for: draft)
         let signals = EvidenceSandboxRouter.detectedSignals(for: draft)

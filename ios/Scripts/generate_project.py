@@ -293,6 +293,7 @@ test_files = [
     ("PhysiqueOSTests", "LogReadModelTests.swift"),
     ("PhysiqueOSTests", "SharedUITests.swift"),
     ("PhysiqueOSTests", "EvidenceReadModelTests.swift"),
+    ("PhysiqueOSTests", "EvidenceReviewHeaderDateTests.swift"),
     ("PhysiqueOSTests", "EvidenceHubUsageTests.swift"),
     ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
     ("PhysiqueOSTests", "TrainingLibraryCatalogTests.swift"),
@@ -324,7 +325,7 @@ DEPLOYMENT_TARGET = "18.0"
 # One authoritative TestFlight build number. Increment this value, run this
 # generator, then build/archive. Never edit CURRENT_PROJECT_VERSION in the
 # generated project by hand.
-APP_BUILD_NUMBER = 27
+APP_BUILD_NUMBER = 28
 
 # The Founder's existing, paid Apple Developer Program team ("DUSTIN JOSEPH
 # GINN" in Xcode's Signing & Capabilities UI). Recovered from a real Xcode

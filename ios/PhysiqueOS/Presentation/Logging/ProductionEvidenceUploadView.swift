@@ -136,9 +136,10 @@ struct ProductionEvidenceUploadView: View {
     /// attachment UI and submission, never `domainChoice` directly.
     @State private var resolvedScenario: Scenario?
     @State private var classificationNote: String?
-    /// Fixed signal identifiers (e.g. "nutrition.keyword.protein") explaining
-    /// an ambiguous Automatic classification. Never document content.
-    @State private var classificationSignals: [String] = []
+    /// True once Automatic ran and could not decide. Keeps Automatic selected
+    /// (no domain is implied to have been detected) while requiring the
+    /// Founder to choose one before submitting.
+    @State private var automaticClassificationUnresolved = false
     @State private var captureMode: CaptureMode = .screenshot
     @State private var effectiveDate = Date()
     @State private var attachments: [SandboxAttachment] = []
@@ -196,6 +197,11 @@ struct ProductionEvidenceUploadView: View {
                 isLoadingAttachments = false
             }
         }
+        .onChange(of: attachments.count) {
+            // A different attachment set is a different classification
+            // question, so let Automatic try again.
+            automaticClassificationUnresolved = false
+        }
         .fileImporter(
             isPresented: $isFilePickerPresented,
             allowedContentTypes: domainChoice == .automatic ? [.pdf, .image] : [.pdf],
@@ -249,7 +255,7 @@ struct ProductionEvidenceUploadView: View {
                     domainChoice = choice
                     resolvedScenario = choice.scenario
                     classificationNote = nil
-                    classificationSignals = []
+                    automaticClassificationUnresolved = false
                 } label: {
                     HStack {
                         Text(choice.label).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -282,15 +288,10 @@ struct ProductionEvidenceUploadView: View {
             } }
         }
         if let note = classificationNote {
-            CardContainer { VStack(alignment: .leading, spacing: 6) {
+            CardContainer {
                 Text(note).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.chartEffort)
-                if !classificationSignals.isEmpty {
-                    Text("Signals: \(classificationSignals.joined(separator: ", "))")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        .accessibilityIdentifier("productionEvidenceUpload.classificationSignals")
-                }
-            }.frame(maxWidth: .infinity, alignment: .leading) }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         if resolvedScenario == .dexa || domainChoice == .automatic || captureMode == .screenshot {
             attachmentCard
@@ -338,7 +339,10 @@ struct ProductionEvidenceUploadView: View {
 
     private var canSubmit: Bool {
         guard !isLoadingAttachments else { return false }
-        if domainChoice == .automatic { return !attachments.isEmpty }
+        // Automatic already ran on these attachments and could not decide, so
+        // re-submitting would only reclassify the same bytes to the same
+        // answer. The Founder has to pick a domain to move forward.
+        if domainChoice == .automatic { return !attachments.isEmpty && !automaticClassificationUnresolved }
         if resolvedScenario == .dexa || captureMode == .screenshot { return !attachments.isEmpty }
         switch resolvedScenario {
         case .nutrition: return [caloriesText, proteinText, carbsText, fatText, fiberText].contains { !$0.isEmpty }
@@ -461,22 +465,16 @@ struct ProductionEvidenceUploadView: View {
         let note: String?
         switch categories.first {
         case _ where categories.count > 1:
-            // Bounded diagnostic. Build 25 and Build 26 each "corrected"
-            // Automatic precedence against an INFERRED keyword collision,
-            // and the real document still came back ambiguous both times —
-            // so the collision must be reported, not guessed at again.
-            //
-            // Both the matched category names and the matched signal
-            // identifiers come from our own fixed keyword tables (e.g.
-            // "nutrition.keyword.protein"); the document's extracted text,
-            // filename, and contents are never logged or displayed. This is
-            // surfaced in the UI as well as the console so the next real
-            // ambiguous document identifies itself without the phone being
-            // attached to Xcode.
+            // Now that the classifier weighs document-identity terms above
+            // incidental ones, reaching here means two categories each matched
+            // a defining term — real ambiguity worth asking about rather than
+            // resolving silently. The on-screen signal list that diagnosed the
+            // original collision is gone; the console line stays, since the
+            // matched category names and signal identifiers come from our own
+            // fixed keyword tables and never from the document's text,
+            // filename, or contents.
             let matched = categories.map(\.rawValue).sorted()
-            let signals = EvidenceSandboxRouter.detectedSignals(for: draft)
-            print("EvidenceClassification: ambiguous categories=\(matched) signals=\(signals)")
-            classificationSignals = signals
+            print("EvidenceClassification: ambiguous categories=\(matched) signals=\(EvidenceSandboxRouter.detectedSignals(for: draft))")
             scenario = nil
             note = "This looks like more than one kind of evidence (matched: \(matched.joined(separator: ", "))). Choose the right one below."
         case .nutrition: scenario = .nutrition; note = "Detected: Nutrition."
@@ -494,11 +492,19 @@ struct ProductionEvidenceUploadView: View {
         }
         guard let scenario else {
             classificationNote = note
-            domainChoice = .nutrition // surfaces the explicit Nutrition/Activity/DEXA choices without losing attachments
+            // Automatic stays selected — that IS what the Founder chose, and
+            // the classifier did not pick anything. Previously this flipped
+            // the selection to Nutrition purely so the Upload button would
+            // stop re-running classification, which put a checkmark next to
+            // Nutrition and read as "the classifier decided Nutrition."
+            // Marking the attempt unresolved instead disables Upload until an
+            // explicit domain is chosen, and keeps the attachments.
+            automaticClassificationUnresolved = true
             resolvedScenario = nil
             phase = .picking
             return
         }
+        automaticClassificationUnresolved = false
         resolvedScenario = scenario
         classificationNote = note
         guard (try? NativeProductWriteGuard.authorize(scenario.writeGuardDomain, in: .founderProduction)) != nil else {
@@ -522,7 +528,7 @@ struct ProductionEvidenceUploadView: View {
         }
         let startedAt = Date()
         do {
-            let status = try await environment.evidenceIntakePipeline.submitIntake(
+            _ = try await environment.evidenceIntakePipeline.submitIntake(
                 scope: "\(scenario.rawValue)-intake.\(localDate)",
                 effectiveDate: localDate,
                 expectedEvidenceType: scenario.expectedEvidenceType,
