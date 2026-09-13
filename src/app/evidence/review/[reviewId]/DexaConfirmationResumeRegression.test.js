@@ -184,8 +184,8 @@ vi.mock("../../../../application/read-models/EvidenceConfirmationReadService", (
   }),
 }));
 
-vi.mock("../../../../domain/services/DEXAEventNarrativeService", () => ({
-  createFounderDEXAEventNarrativeService: () => ({
+vi.mock("../../../../application/composition/productionDEXAEventNarrativeComposition", () => ({
+  createProductionDEXAEventNarrativeService: async () => ({
     async generate({ scanId }) {
       mockState.value.briefingCalls.push(scanId);
       return { artifactId: `event_briefing_dexa_${scanId}` };
@@ -406,6 +406,57 @@ describe("resuming an interrupted DEXA confirmation", () => {
     }
     expect(mockState.value.briefingCalls).toEqual([OBJECT_ID]);
     expect(mockState.value.analyses.filter((item) => item.id.startsWith("analysis_dexa_"))).toHaveLength(1);
+  });
+
+  it("resumes the production checkpoint-8 shape through briefing and makes home_refresh reachable", async () => {
+    const completed = [
+      "canonical_commit",
+      "compatibility_writes",
+      "scheduled_completion",
+      "analysis",
+      "training_performance_events",
+      "goal_evaluation",
+      "event_eligibility",
+    ];
+    mockState.value = createResumeState({
+      commitProgress: Object.fromEntries([
+        ...completed.map((step) => [step, {
+          status: "completed",
+          attempts: 1,
+          result: step === "canonical_commit"
+            ? { status: "completed", canonicalEvidenceIds: [CANONICAL_ID] }
+            : step === "analysis"
+              ? { status: "completed", analysisIds: [] }
+              : step === "event_eligibility"
+                ? { status: "completed", eligible: ["dexa"] }
+                : { status: "completed" },
+        }]),
+        ["briefing", {
+          status: "failed",
+          attempts: 3,
+          error: "Provider full runtime forbids legacy Founder JSON path resolution.",
+        }],
+      ]),
+    });
+
+    await drainContinuations();
+
+    expect(mockState.value.review.status).toBe("confirmed");
+    expect(mockState.value.review.commitProgress.briefing).toMatchObject({
+      status: "completed",
+      attempts: 4,
+      result: {
+        status: "completed",
+        artifactIds: [`event_briefing_dexa_${OBJECT_ID}`],
+      },
+    });
+    expect(mockState.value.review.commitProgress.home_refresh).toMatchObject({
+      status: "completed",
+      attempts: 1,
+    });
+    expect(mockState.value.briefingCalls).toEqual([OBJECT_ID]);
+    expect(mockState.value.canonicalCommitCalls).toBe(0);
+    expect(mockState.value.review.commitProgress.canonical_commit.attempts).toBe(1);
   });
 
   it("is idempotent: re-delivering a continuation after confirmation changes nothing", async () => {

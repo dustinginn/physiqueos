@@ -22,7 +22,9 @@ import { interpretPhotoSetWithVision } from "../../../../domain/interpreters/Pho
 import { normalizePhotoInterpretationToStructuredObservations } from "../../../../domain/interpreters/PhotoObservationModel";
 import { createDEXAInterpretation } from "../../../../domain/services/DEXAInterpretationService";
 import { GoalEvaluationService } from "../../../../domain/services/GoalEvaluationService";
-import { createFounderDEXAEventNarrativeService } from "../../../../domain/services/DEXAEventNarrativeService";
+import {
+  createProductionDEXAEventNarrativeService,
+} from "../../../../application/composition/productionDEXAEventNarrativeComposition";
 import {
   createPhotoEventNarrativeService,
 } from "../../../../domain/services/PhotoEventNarrativeService";
@@ -1033,7 +1035,14 @@ function createHandlers({ evidencePackage, reviewId, user,
           photoSessionIds.push(result.sessionId);
           continue;
         }
-        const artifact = await createFounderDEXAEventNarrativeService({ repositories: FounderRepositories }).generate({ userId: user.id, scanId: canonicalId });
+        const dexaEventService =
+          await createProductionDEXAEventNarrativeService({
+            repositories: FounderRepositories,
+          });
+        const artifact = await dexaEventService.generate({
+          userId: user.id,
+          scanId: canonicalId,
+        });
         if (!artifact?.artifactId && !artifact?.id) throw new Error("dexa_event_briefing_failed: DEXA Event briefing was not created.");
         artifacts.push(artifact.artifactId ?? artifact.id);
       }
