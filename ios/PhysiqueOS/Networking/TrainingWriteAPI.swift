@@ -119,14 +119,10 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         guard outcome.outcome != .pending, let result = outcome.receipt.result else {
             throw TrainingWriteError.confirmationTimedOut
         }
-        if outcome.confirmation?.state != "confirmed" {
-            let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: idempotencyStore)
-            do {
-                try await pipeline.awaitConfirmation(reviewAPI: reviewAPI, reviewId: result.reviewId)
-            } catch {
-                throw TrainingWriteError.confirmationTimedOut
-            }
-        }
+        // The command receipt is the durable authoritative boundary. The
+        // shared outbox owns canonical commit and every later continuation;
+        // waiting for the review to become fully confirmed here previously
+        // turned a successful workout into a false timeout/network error.
         bindingStore.remove(draftId: draft.id)
         return result
     }

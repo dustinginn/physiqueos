@@ -30,15 +30,16 @@ struct ProductionEvidenceUploadView: View {
         var label: String { self == .screenshot ? "Screenshot" : "Manual" }
     }
 
-    /// The three types Founder Production's evidence-intake endpoint
+    /// The four screenshot/PDF families Founder Production's evidence-intake endpoint
     /// actually accepts (`NativeEvidenceIntakeRequest.js`'s `TYPES` set).
     enum Scenario: String, CaseIterable, Identifiable {
-        case nutrition, activity, dexa
+        case nutrition, activity, training, dexa
         var id: String { rawValue }
         var label: String {
             switch self {
             case .nutrition: "Nutrition"
             case .activity: "Activity"
+            case .training: "Training"
             case .dexa: "DEXA"
             }
         }
@@ -46,6 +47,7 @@ struct ProductionEvidenceUploadView: View {
             switch self {
             case .nutrition: "nutrition"
             case .activity: "activity_day"
+            case .training: "training"
             case .dexa: "dexa_scan"
             }
         }
@@ -53,6 +55,7 @@ struct ProductionEvidenceUploadView: View {
             switch self {
             case .nutrition: .nutrition
             case .activity: .activityEvidence
+            case .training: .workoutLogger
             case .dexa: .dexa
             }
         }
@@ -140,6 +143,11 @@ struct ProductionEvidenceUploadView: View {
     /// (no domain is implied to have been detected) while requiring the
     /// Founder to choose one before submitting.
     @State private var automaticClassificationUnresolved = false
+    /// Automatic is resolved per attachment. Mixed families are grouped into
+    /// separate canonical intakes behind one Founder Upload action; only an
+    /// actually ambiguous attachment needs a local explicit hint.
+    @State private var attachmentScenarios: [String: Scenario] = [:]
+    @State private var unresolvedAttachmentIDs = Set<String>()
     @State private var captureMode: CaptureMode = .screenshot
     @State private var effectiveDate = Date()
     @State private var attachments: [SandboxAttachment] = []
@@ -150,6 +158,8 @@ struct ProductionEvidenceUploadView: View {
     @State private var phase: Phase = .picking
     @State private var uploadStartedAt: Date?
     @State private var acceptanceSeconds: Double?
+    @State private var transferProgress: Double = 0
+    @State private var groupedTransferProgress: [Scenario: Double] = [:]
 
     @State private var caloriesText = ""
     @State private var proteinText = ""
@@ -201,6 +211,8 @@ struct ProductionEvidenceUploadView: View {
             // A different attachment set is a different classification
             // question, so let Automatic try again.
             automaticClassificationUnresolved = false
+            attachmentScenarios = [:]
+            unresolvedAttachmentIDs = []
         }
         .fileImporter(
             isPresented: $isFilePickerPresented,
@@ -316,11 +328,34 @@ struct ProductionEvidenceUploadView: View {
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
             } else {
                 ForEach(attachments) { attachment in
-                    HStack {
-                        Text(attachment.displayName).physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        Spacer()
-                        Button { attachments.removeAll { $0.id == attachment.id } } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.textMuted)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(attachment.displayName).physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            Spacer()
+                            if let scenario = attachmentScenarios[attachment.id] {
+                                Text(scenario.label).physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                    .foregroundStyle(PhysiqueOSTheme.accent)
+                            }
+                            Button { attachments.removeAll { $0.id == attachment.id } } label: {
+                                Image(systemName: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.textMuted)
+                            }
+                        }
+                        if domainChoice == .automatic, unresolvedAttachmentIDs.contains(attachment.id) {
+                            Picker("Choose type for \(attachment.displayName)", selection: Binding(
+                                get: { attachmentScenarios[attachment.id] },
+                                set: { selected in
+                                    if let selected {
+                                        attachmentScenarios[attachment.id] = selected
+                                        unresolvedAttachmentIDs.remove(attachment.id)
+                                        automaticClassificationUnresolved = !unresolvedAttachmentIDs.isEmpty
+                                    }
+                                }
+                            )) {
+                                Text("Choose type").tag(Scenario?.none)
+                                ForEach(Self.automaticScenarios) { scenario in
+                                    Text(scenario.label).tag(Optional(scenario))
+                                }
+                            }
                         }
                     }
                 }
@@ -347,7 +382,7 @@ struct ProductionEvidenceUploadView: View {
         switch resolvedScenario {
         case .nutrition: return [caloriesText, proteinText, carbsText, fatText, fiberText].contains { !$0.isEmpty }
         case .activity: return [activeCaloriesText, totalCaloriesText, exerciseMinutesText, standHoursText, moveGoalText].contains { !$0.isEmpty }
-        case .dexa, .none: return false
+        case .training, .dexa, .none: return false
         }
     }
 
@@ -400,8 +435,10 @@ struct ProductionEvidenceUploadView: View {
 
     private var uploadingContent: some View {
         CardContainer { VStack(alignment: .leading, spacing: 10) {
-            ProgressView().tint(PhysiqueOSTheme.accent)
-            Text("Uploading…").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            ProgressView(value: transferProgress, total: 1).tint(PhysiqueOSTheme.accent)
+            Text(transferProgress < 1 ? "Transferring… \(Int(transferProgress * 100))%" : "Transfer complete. Waiting for durable acceptance…")
+                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
         }.frame(maxWidth: .infinity, alignment: .leading) }
     }
 
@@ -455,63 +492,86 @@ struct ProductionEvidenceUploadView: View {
     /// which of the three server-supported intake types to submit as; the
     /// server still authoritatively interprets the file itself.
     private func classifyThenUpload() async {
+        if attachmentScenarios.count == attachments.count, unresolvedAttachmentIDs.isEmpty {
+            await submitAutomaticGroups()
+            return
+        }
         phase = .classifying
         var draft = EvidenceIntakeDraft.fresh(now: effectiveDate)
         draft.attachments = attachments
         draft = await EvidenceLocalInterpretation.prepare(draft)
         attachments = draft.attachments
-        let categories = EvidenceSandboxRouter.detectedCategories(for: draft)
-        let scenario: Scenario?
-        let note: String?
-        switch categories.first {
-        case _ where categories.count > 1:
-            // Now that the classifier weighs document-identity terms above
-            // incidental ones, reaching here means two categories each matched
-            // a defining term — real ambiguity worth asking about rather than
-            // resolving silently. The on-screen signal list that diagnosed the
-            // original collision is gone; the console line stays, since the
-            // matched category names and signal identifiers come from our own
-            // fixed keyword tables and never from the document's text,
-            // filename, or contents.
-            let matched = categories.map(\.rawValue).sorted()
-            print("EvidenceClassification: ambiguous categories=\(matched) signals=\(EvidenceSandboxRouter.detectedSignals(for: draft))")
-            scenario = nil
-            note = "This looks like more than one kind of evidence (matched: \(matched.joined(separator: ", "))). Choose the right one below."
-        case .nutrition: scenario = .nutrition; note = "Detected: Nutrition."
-        case .activity: scenario = .activity; note = "Detected: Activity."
-        case .dexa: scenario = .dexa; note = "Detected: DEXA."
-        case .training:
-            scenario = nil
-            note = "This looks like a workout — use Workout Logger instead of Add Evidence."
-        case .weight:
-            scenario = nil
-            note = "This looks like a weigh-in — use Log Weight instead of Add Evidence."
-        case .progressPhotos, .labs, .recovery, .generic, .none:
-            scenario = nil
-            note = "Couldn't automatically tell what this is. Choose the right kind below."
+        var resolved: [String: Scenario] = [:]
+        var unresolved = Set<String>()
+        for attachment in draft.attachments {
+            let matches = EvidenceSandboxRouter.detectedCategories(for: attachment)
+                .compactMap(Self.scenario(for:))
+            if matches.count == 1, let match = matches.first {
+                resolved[attachment.id] = match
+            } else {
+                unresolved.insert(attachment.id)
+                if matches.count > 1 {
+                    print("EvidenceClassification: ambiguous attachment=\(attachment.id) categories=\(matches.map(\.rawValue).sorted())")
+                }
+            }
         }
-        guard let scenario else {
-            classificationNote = note
-            // Automatic stays selected — that IS what the Founder chose, and
-            // the classifier did not pick anything. Previously this flipped
-            // the selection to Nutrition purely so the Upload button would
-            // stop re-running classification, which put a checkmark next to
-            // Nutrition and read as "the classifier decided Nutrition."
-            // Marking the attempt unresolved instead disables Upload until an
-            // explicit domain is chosen, and keeps the attachments.
+        attachmentScenarios = resolved
+        unresolvedAttachmentIDs = unresolved
+        automaticClassificationUnresolved = !unresolved.isEmpty
+        let counts = Dictionary(grouping: resolved.values, by: { $0 }).mapValues(\.count)
+        classificationNote = unresolved.isEmpty
+            ? "Grouped: \(Self.groupSummary(counts))."
+            : "Choose a type only for the \(unresolved.count) attachment\(unresolved.count == 1 ? "" : "s") that could not be classified unambiguously. Other attachments keep their detected types."
+        guard unresolved.isEmpty else {
+            phase = .picking
+            return
+        }
+        await submitAutomaticGroups()
+    }
+
+    private func submitAutomaticGroups() async {
+        let grouped = Dictionary(grouping: attachments) { attachmentScenarios[$0.id] }
+        guard !grouped.keys.contains(nil), grouped.count > 0 else {
             automaticClassificationUnresolved = true
-            resolvedScenario = nil
+            unresolvedAttachmentIDs.formUnion(attachments.filter { attachmentScenarios[$0.id] == nil }.map(\.id))
             phase = .picking
             return
         }
-        automaticClassificationUnresolved = false
-        resolvedScenario = scenario
-        classificationNote = note
-        guard (try? NativeProductWriteGuard.authorize(scenario.writeGuardDomain, in: .founderProduction)) != nil else {
-            phase = .picking
-            return
+        phase = .uploading
+        transferProgress = 0
+        groupedTransferProgress = [:]
+        let localDate = Self.localDateKey.string(from: effectiveDate)
+        let startedAt = Date()
+        let pipeline = environment.evidenceIntakePipeline
+        let groupCount = grouped.count
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for (scenarioOptional, groupAttachments) in grouped {
+                    guard let scenario = scenarioOptional else { continue }
+                    let files = Self.files(from: groupAttachments, scenario: scenario)
+                    group.addTask {
+                        _ = try await pipeline.submitIntake(
+                            scope: "automatic-\(scenario.rawValue)-intake.\(localDate)",
+                            effectiveDate: localDate,
+                            expectedEvidenceType: scenario.expectedEvidenceType,
+                            files: files,
+                            onUploadProgress: { progress in
+                                Task { @MainActor in
+                                    groupedTransferProgress[scenario] = progress
+                                    transferProgress = groupedTransferProgress.values.reduce(0, +) / Double(groupCount)
+                                }
+                            }
+                        )
+                    }
+                }
+                try await group.waitForAll()
+            }
+            acceptanceSeconds = Date().timeIntervalSince(startedAt)
+            let counts = Dictionary(grouping: attachmentScenarios.values, by: { $0 }).mapValues(\.count)
+            phase = .accepted("Your grouped evidence was accepted for \(Self.mediumDate.string(from: effectiveDate)): \(Self.groupSummary(counts)).")
+        } catch {
+            phase = .failed(Self.errorMessage(for: error))
         }
-        await submitIntake(scenario: scenario)
     }
 
     /// The whole point of this rewrite: submit and return control to the
@@ -521,18 +581,19 @@ struct ProductionEvidenceUploadView: View {
     /// `EvidenceReviewDetailView`'s Confirm/Correct actions.
     private func submitIntake(scenario: Scenario) async {
         phase = .uploading
+        transferProgress = 0
         let localDate = Self.localDateKey.string(from: effectiveDate)
-        let files = attachments.compactMap { attachment -> (filename: String, contentType: String, data: Data)? in
-            guard let data = attachment.data else { return nil }
-            return (attachment.displayName, attachment.contentType ?? (scenario == .dexa ? "application/pdf" : "image/jpeg"), data)
-        }
+        let files = Self.files(from: attachments, scenario: scenario)
         let startedAt = Date()
         do {
             _ = try await environment.evidenceIntakePipeline.submitIntake(
                 scope: "\(scenario.rawValue)-intake.\(localDate)",
                 effectiveDate: localDate,
                 expectedEvidenceType: scenario.expectedEvidenceType,
-                files: files
+                files: files,
+                onUploadProgress: { progress in
+                    Task { @MainActor in transferProgress = progress }
+                }
             )
             acceptanceSeconds = Date().timeIntervalSince(startedAt)
             let noun = scenario == .dexa ? "scan" : "screenshots"
@@ -573,7 +634,7 @@ struct ProductionEvidenceUploadView: View {
                 )
                 let refreshed = try await environment.activityAPI.fetchActivityLanding(scope: .all)
                 guard refreshed.activityHistory.contains(where: { $0.date == localDate }) else { throw ProductionNativeError.invalidResponse }
-            case .dexa:
+            case .training, .dexa:
                 throw ProductionNativeError.invalidResponse
             }
             phase = .confirmed
@@ -591,6 +652,31 @@ struct ProductionEvidenceUploadView: View {
     }()
 
     private static let mediumDate: DateFormatter = { let f = DateFormatter(); f.dateStyle = .medium; return f }()
+
+    private static let automaticScenarios: [Scenario] = [.nutrition, .activity, .training, .dexa]
+
+    private static func scenario(for category: EvidenceCategory) -> Scenario? {
+        switch category {
+        case .nutrition: .nutrition
+        case .activity: .activity
+        case .training: .training
+        case .dexa: .dexa
+        default: nil
+        }
+    }
+
+    private static func files(from attachments: [SandboxAttachment], scenario: Scenario) -> [(filename: String, contentType: String, data: Data)] {
+        attachments.compactMap { attachment in
+            guard let data = attachment.data else { return nil }
+            return (attachment.displayName, attachment.contentType ?? (scenario == .dexa ? "application/pdf" : "image/jpeg"), data)
+        }
+    }
+
+    private static func groupSummary(_ counts: [Scenario: Int]) -> String {
+        automaticScenarios.compactMap { scenario in
+            counts[scenario].map { "\(scenario.label) \($0)" }
+        }.joined(separator: " · ")
+    }
 
     private static func errorMessage(for error: Error) -> String {
         if let productionError = error as? ProductionNativeError { return productionError.errorDescription ?? "This evidence could not be uploaded." }

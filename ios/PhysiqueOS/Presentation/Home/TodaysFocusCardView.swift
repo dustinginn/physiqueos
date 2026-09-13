@@ -15,17 +15,22 @@ struct TodaysFocusCardView: View {
         items.count == 1 || items.contains { $0.actionLabel != nil }
     }
 
+    private var density: FocusTileView.Density {
+        if useSingleColumn { return .expanded }
+        return items.count == 2 ? .balanced : .compact
+    }
+
     var body: some View {
         CardContainer(padding: .sm) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeading("Today's Priorities")
                 if useSingleColumn {
                     VStack(spacing: 8) {
-                        ForEach(items) { FocusTileView(item: $0, onTap: onTap, onComplete: onComplete, isCompleting: completingIDs.contains($0.id)) }
+                        ForEach(items) { FocusTileView(item: $0, density: density, onTap: onTap, onComplete: onComplete, isCompleting: completingIDs.contains($0.id)) }
                     }
                 } else {
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
-                        ForEach(items) { FocusTileView(item: $0, onTap: onTap, onComplete: onComplete, isCompleting: completingIDs.contains($0.id)) }
+                        ForEach(items) { FocusTileView(item: $0, density: density, onTap: onTap, onComplete: onComplete, isCompleting: completingIDs.contains($0.id)) }
                     }
                 }
             }

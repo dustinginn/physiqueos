@@ -20,13 +20,16 @@ private let iconMap: [HomeFocusIcon: String] = [
 /// non-completable item, matching `FocusTile.jsx`'s own
 /// `actionLabel`-present branch.
 struct FocusTileView: View {
+    enum Density { case compact, balanced, expanded }
+
     let item: PriorityOccurrence
+    var density: Density = .balanced
     var onTap: (AppDestination) -> Void
     var onComplete: (PriorityOccurrence) -> Void
     var isCompleting: Bool = false
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
             Button { onTap(item.destination) } label: { rowBody }
                 .buttonStyle(.plain)
             if item.completable, !item.completed, !isCompleting {
@@ -41,7 +44,8 @@ struct FocusTileView: View {
                     .accessibilityLabel("Completed")
             }
         }
-        .padding(10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .frame(minHeight: 68)
         .background(PhysiqueOSTheme.surfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -55,16 +59,30 @@ struct FocusTileView: View {
     }
 
     private var rowBody: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             IconBadge(systemImage: iconMap[item.icon] ?? "target", color: item.color, size: .xs, isCircular: true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .physiqueOSFont(PhysiqueOSTypography.focusLabel)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if let subtitle = item.subtitle {
+                if density != .compact, let subtitle = item.subtitle {
                     Text(subtitle)
                         .physiqueOSFont(PhysiqueOSTypography.focusSubtitle)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
+                if (density == .expanded || item.changeLabel != nil), let metadata = item.metadata {
+                    Text(metadata)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                }
+                if let changeLabel = item.changeLabel {
+                    Text(changeLabel)
+                        .physiqueOSFont(PhysiqueOSTypography.focusBadge)
+                        .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(PhysiqueOSTheme.chartEffort.opacity(0.14))
+                        .clipShape(Capsule())
                 }
             }
             Spacer(minLength: 4)
@@ -80,7 +98,8 @@ struct FocusTileView: View {
 
     private var accessibilityLabel: String {
         var parts = [item.title]
-        if let subtitle = item.subtitle { parts.append(subtitle) }
+        if density != .compact, let subtitle = item.subtitle { parts.append(subtitle) }
+        if let metadata = item.metadata { parts.append(metadata) }
         parts.append(item.actionLabel ?? (item.completed ? "Completed" : "Not completed"))
         return parts.joined(separator: ", ")
     }

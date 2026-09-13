@@ -69,7 +69,7 @@ struct AppDestinationRouterView: View {
         case .localEvidenceReview(let reviewId):
             LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog, onNavigate: onNavigate)
         case .evidenceReview(let reviewId):
-            EvidenceReviewDetailView(reviewId: reviewId)
+            EvidenceReviewDetailView(reviewId: reviewId, onReturnToLog: onReturnToLog)
         case .evidenceRecoveryUpload(let type, let occurrenceDateKey):
             if environment.nativeAuthority == .founderProduction {
                 DestinationPlaceholderView(destination: destination)

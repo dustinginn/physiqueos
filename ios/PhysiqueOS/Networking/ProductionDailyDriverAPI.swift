@@ -94,11 +94,20 @@ struct ProductionHomeAPI: HomeAPI {
         if let invalid = priorities.first(where: { $0.date.isEmpty }) {
             throw ProductionDailyDriverError.missingPriorityOccurrenceDate(invalid.id)
         }
+        let briefingCards = envelope.data.briefingCards.map { card in
+            var canonical = card
+            // The web DEXA route is scan-addressed, but the shared Native
+            // Briefing detail resource is artifact-addressed. Home already
+            // carries that canonical artifact id; normalize only at this
+            // production adapter boundary so web routing remains unchanged.
+            canonical.destination = .briefingDetail(briefingId: card.id)
+            return canonical
+        }
         return HomeReadModel(
             header: envelope.data.header,
             hero: envelope.data.hero.readModel,
             nextBestAction: envelope.data.nextBestAction,
-            briefingCards: envelope.data.briefingCards,
+            briefingCards: briefingCards,
             goals: try envelope.data.goals.map { try $0.readModel() },
             todaysFocus: priorities
         )
@@ -182,7 +191,10 @@ struct ProductionHomeAPI: HomeAPI {
                         progressType: phase.progress?.progressType,
                         clampedProgressPercentage: phase.progress?.clampedProgressPercentage,
                         presentationLabel: phase.progress?.presentationLabel,
-                        progressStatus: phase.progress?.status
+                        progressStatus: phase.progress?.status,
+                        startDate: phase.startDate,
+                        calculatedPlannedReviewDate: phase.calculatedPlannedReviewDate,
+                        timelineProgressState: phase.timelineProgressState
                     )
                 }
                 return HomeGoal(
@@ -240,6 +252,9 @@ struct ProductionHomeAPI: HomeAPI {
         var phaseName: String?
         var status: String?
         var presentationTone: String?
+        var startDate: String?
+        var calculatedPlannedReviewDate: String?
+        var timelineProgressState: String?
     }
     private struct ServerProgress: Decodable {
         var baselineValue: Double?

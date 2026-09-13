@@ -43,7 +43,8 @@ struct ProductionEvidenceIntakePipeline {
         scope: String,
         effectiveDate: String,
         expectedEvidenceType: String,
-        files: [(filename: String, contentType: String, data: Data)]
+        files: [(filename: String, contentType: String, data: Data)],
+        onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> ProductionEvidenceIntakeStatus {
         let domain: NativeProductWriteDomain
         switch expectedEvidenceType {
@@ -67,7 +68,8 @@ struct ProductionEvidenceIntakePipeline {
             submissionIdentity: submissionIdentity,
             effectiveDate: effectiveDate,
             expectedEvidenceType: expectedEvidenceType,
-            files: files
+            files: files,
+            onUploadProgress: onUploadProgress
         )
     }
 

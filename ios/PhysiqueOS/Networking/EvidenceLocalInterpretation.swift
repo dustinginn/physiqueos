@@ -369,12 +369,16 @@ enum EvidenceLocalInterpretation {
     static func supportingWorkout(id: String, sourceEvidenceIds: [String], from text: String) -> TrainingLoggerSupportingWorkout? {
         let activityName: String
         let category: String
-        if isCardioText(text) {
-            activityName = cardioTitle(text)
-            category = "Cardio"
-        } else if isStrengthText(text) {
+        // The workout's explicit Apple Health family owns the screenshot.
+        // Check strength first so an incidental exercise name such as
+        // "rowing" cannot turn a Traditional Strength Training summary into
+        // cardio supporting evidence.
+        if isStrengthText(text) {
             activityName = strengthTitle(text)
             category = "Strength"
+        } else if isCardioText(text) {
+            activityName = cardioTitle(text)
+            category = "Cardio"
         } else {
             return nil
         }
@@ -391,7 +395,7 @@ enum EvidenceLocalInterpretation {
             distance: distanceValue,
             distanceUnit: distanceValue != nil ? distanceUnit(text) : nil,
             sourceEvidenceIds: sourceEvidenceIds,
-            recordOwner: .activity
+            recordOwner: category == "Strength" ? .trainingSession : .activity
         )
     }
 

@@ -357,6 +357,19 @@ enum EvidenceSandboxRouter {
         return result
     }
 
+    /// Per-attachment classification for production Automatic grouping.
+    /// This deliberately uses the same single-source specificity model as
+    /// package classification, but never lets a sibling attachment's signal
+    /// turn this attachment into an ambiguous/global choice.
+    static func detectedCategories(for attachment: SandboxAttachment) -> [EvidenceCategory] {
+        let text = [attachment.extractedText, attachment.displayName]
+            .compactMap { $0 }
+            .joined(separator: "\n")
+            .lowercased()
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
+        return detectedCategories(inSingleSource: text)
+    }
+
     /// The concatenated, original-case text of just the sources whose own
     /// per-source classification actually included `category` — used by
     /// per-category field extraction (e.g. `activityItem`) so a field

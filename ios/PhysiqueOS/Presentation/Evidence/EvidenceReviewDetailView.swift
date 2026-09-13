@@ -12,6 +12,7 @@ struct EvidenceReviewDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     let reviewId: String
+    var onReturnToLog: () -> Void = {}
     @State private var state: LoadState = .loading
     @State private var actionState: ActionState = .idle
     @State private var editedMeasurements: DEXAScanMeasurements?
@@ -31,6 +32,7 @@ struct EvidenceReviewDetailView: View {
         case confirming(String)
         case dismissing
         case dismissed
+        case accepted
         case confirmed
         case stillProcessing
         case refreshRequired(String)
@@ -313,7 +315,9 @@ struct EvidenceReviewDetailView: View {
     private func actionSection(for review: EvidenceReviewDetailReadModel) -> some View {
         switch actionState {
         case .idle:
-            if Self.isActionable(review.status) {
+            if review.status == "confirmed" {
+                completionActions(label: "Confirmed")
+            } else if Self.isActionable(review.status) {
                 VStack(spacing: 10) {
                     if review.items.contains(where: { $0.dexaMeasurements != nil }) {
                         Button("Correct Measurements") { beginEditingMeasurements(review: review) }
@@ -329,9 +333,6 @@ struct EvidenceReviewDetailView: View {
                             .accessibilityIdentifier("evidenceReview.dismiss")
                     }
                 }
-            } else if review.status == "confirmed" {
-                Label("Already confirmed", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
             }
         case .editingMeasurements:
             EmptyView() // the measurement card itself carries its own Save action
@@ -355,8 +356,10 @@ struct EvidenceReviewDetailView: View {
             }.frame(maxWidth: .infinity, alignment: .leading) }
         case .dismissed:
             Label("Dismissed", systemImage: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.textSecondary)
+        case .accepted:
+            completionActions(label: "Confirmation accepted")
         case .confirmed:
-            Label("Confirmed", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess)
+            completionActions(label: "Confirmed")
         case .stillProcessing:
             CardContainer { VStack(alignment: .leading, spacing: 6) {
                 Text("Still confirming").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
@@ -377,6 +380,21 @@ struct EvidenceReviewDetailView: View {
                 Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(PhysiqueOSTheme.destructive)
                 PrimaryActionButton(title: "Try Again", tone: .accent) { actionState = .idle }
             }
+        }
+    }
+
+    private func completionActions(label: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(label, systemImage: "checkmark.circle.fill")
+                .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+            Text("PhysiqueOS owns this confirmation. Remaining analysis and briefing updates continue in the background.")
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            PrimaryActionButton(title: "Back to Log", tone: .accent) {
+                onReturnToLog()
+                dismiss()
+            }
+            .accessibilityIdentifier("evidenceReview.backToLog")
         }
     }
 
@@ -484,6 +502,13 @@ struct EvidenceReviewDetailView: View {
                 actionState = .confirmed
                 return
             }
+            // A successful command response now represents the durable,
+            // version-protected acceptance boundary. The outbox owns the
+            // remaining canonical/post-confirm checkpoints; keeping this
+            // screen blocked would only turn their latency into a false
+            // Confirm failure.
+            actionState = .accepted
+            return
         } catch {
             if !ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) {
                 actionState = .failed(Self.errorMessage(for: error))
@@ -493,18 +518,21 @@ struct EvidenceReviewDetailView: View {
             // review before allowing any retry; the stable idempotency key
             // remains the sole identity for this attempt.
         }
-        // The commit call succeeded and is now processing durably on the
-        // server (a background worker drives it forward regardless of
-        // this screen). A failure from HERE on is never reported as "this
-        // failed" — only as "still processing," since the confirm attempt
-        // itself already landed.
+        // The response was lost after dispatch. Perform one read-only status
+        // resolution, never a second mutation. Check Now remains available
+        // only when that single recovery read is also inconclusive.
         do {
-            try await environment.evidenceIntakePipeline.awaitConfirmation(reviewAPI: environment.evidenceReviewAPI, reviewId: reviewId) { status in
-                Task { @MainActor in actionState = .confirming("Confirming (\(Self.statusLabel(status)))…") }
+            guard let refreshed = try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId) else {
+                actionState = .stillProcessing
+                return
             }
-            actionState = .confirmed
-        } catch ProductionEvidenceIntakePipeline.Error.commitFailed {
-            actionState = .failed("This review needs another look — the canonical commit failed. Reopen it to try again.")
+            state = .loaded(refreshed)
+            switch refreshed.status {
+            case "confirmed": actionState = .confirmed
+            case "committing", "partially_committed": actionState = .accepted
+            case "commit_failed": actionState = .failed("This review needs another look — the canonical commit failed. Reopen it to try again.")
+            default: actionState = .stillProcessing
+            }
         } catch {
             actionState = .stillProcessing
         }

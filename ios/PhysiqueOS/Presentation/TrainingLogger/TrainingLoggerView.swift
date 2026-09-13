@@ -899,8 +899,13 @@ struct TrainingLoggerView: View {
                     if let draft = viewModel.draft {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(draft.exercises.count) exercises · \(draft.completedSetCount) completed sets")
-                            if !draft.supportingWorkoutObservations.isEmpty {
-                                Text("\(draft.supportingWorkoutObservations.count) supporting cardio workout\(draft.supportingWorkoutObservations.count == 1 ? "" : "s")")
+                            let strengthCount = draft.supportingWorkoutObservations.filter { $0.category == "Strength" }.count
+                            let cardioCount = draft.supportingWorkoutObservations.filter { $0.category == "Cardio" }.count
+                            if strengthCount > 0 {
+                                Text("\(strengthCount) supporting strength workout\(strengthCount == 1 ? "" : "s")")
+                            }
+                            if cardioCount > 0 {
+                                Text("\(cardioCount) supporting cardio workout\(cardioCount == 1 ? "" : "s")")
                             }
                             Text(draft.supportingEvidenceAssets.isEmpty ? "No supporting screenshots attached" : "\(draft.supportingEvidenceAssets.count) supporting screenshot\(draft.supportingEvidenceAssets.count == 1 ? "" : "s") attached")
                         }

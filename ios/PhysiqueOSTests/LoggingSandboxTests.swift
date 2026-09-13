@@ -211,6 +211,48 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertFalse(items.contains { $0.category == .nutrition })
     }
 
+    func testAutomaticClassifiesMixedFamiliesPerAttachmentWithoutSiblingSuppression() {
+        let nutrition = SandboxAttachment(id: "nutrition", displayName: "food.png", source: .photos, contentType: "image/png", extractedText: "MyFitnessPal Nutrition Calories 2450 Macros Protein 180g")
+        let activity = SandboxAttachment(id: "activity", displayName: "rings.png", source: .photos, contentType: "image/png", extractedText: "Activity Rings Move 700 CAL Exercise 45 MIN Stand 12 HRS")
+        let training = SandboxAttachment(id: "training", displayName: "workout.png", source: .photos, contentType: "image/png", extractedText: "Traditional Strength Training Bench Press 4 sets")
+
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: nutrition), [.nutrition])
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: activity), [.activity])
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: training), [.training])
+    }
+
+    func testAutomaticSupportsEveryRequestedMixedFamilyPair() {
+        let attachments: [EvidenceCategory: SandboxAttachment] = [
+            .nutrition: SandboxAttachment(id: "nutrition", displayName: "food.png", source: .photos, contentType: "image/png", extractedText: "MyFitnessPal Nutrition Calories 2450 Macros Protein 180g"),
+            .activity: SandboxAttachment(id: "activity", displayName: "rings.png", source: .photos, contentType: "image/png", extractedText: "Activity Rings Move 700 CAL Exercise 45 MIN Stand 12 HRS"),
+            .training: SandboxAttachment(id: "training", displayName: "workout.png", source: .photos, contentType: "image/png", extractedText: "Traditional Strength Training Bench Press 4 sets"),
+        ]
+        for pair in [[EvidenceCategory.nutrition, .activity], [.nutrition, .training], [.activity, .training]] {
+            XCTAssertEqual(
+                pair.map { EvidenceSandboxRouter.detectedCategories(for: attachments[$0]!) },
+                pair.map { [$0] }
+            )
+        }
+    }
+
+    func testAutomaticKeepsMultipleFilesInTheSameFamily() {
+        let first = SandboxAttachment(id: "meal-1", displayName: "meal-1.png", source: .photos, contentType: "image/png", extractedText: "MyFitnessPal Nutrition Calories 900")
+        let second = SandboxAttachment(id: "meal-2", displayName: "meal-2.png", source: .photos, contentType: "image/png", extractedText: "Macros Protein 80g Carbs 120g")
+
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: first), [.nutrition])
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: second), [.nutrition])
+    }
+
+    func testAutomaticAmbiguityIsScopedToOnlyTheAmbiguousAttachment() {
+        let nutrition = SandboxAttachment(id: "nutrition", displayName: "nutrition.png", source: .photos, contentType: "image/png", extractedText: "MyFitnessPal Nutrition Calories 2450")
+        let ambiguous = SandboxAttachment(id: "ambiguous", displayName: "combined.png", source: .photos, contentType: "image/png", extractedText: "MyFitnessPal macros and Traditional Strength Training workout")
+        let activity = SandboxAttachment(id: "activity", displayName: "activity.png", source: .photos, contentType: "image/png", extractedText: "Activity Rings Move 650 CAL Exercise 40 MIN")
+
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: nutrition), [.nutrition])
+        XCTAssertEqual(Set(EvidenceSandboxRouter.detectedCategories(for: ambiguous)), Set([.nutrition, .training]))
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: activity), [.activity])
+    }
+
     func testRealFounderWorkoutSignalsPreserveRepsFirstStrengthAndTwoWalks() async throws {
         let store = LoggingSandboxStore(now: date(2026, 8, 31))
         store.evidenceDraft.details = "Bicep curls\n12r 50p x4\n\nSpider curls\n12r 40p x4"

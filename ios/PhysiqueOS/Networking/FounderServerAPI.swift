@@ -2,6 +2,25 @@ import Foundation
 
 protocol FounderHTTPTransport: Sendable {
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse)
+    func upload(
+        for request: URLRequest,
+        from body: Data,
+        onProgress: @escaping @Sendable (Double) -> Void
+    ) async throws -> (Data, HTTPURLResponse)
+}
+
+extension FounderHTTPTransport {
+    func upload(
+        for request: URLRequest,
+        from body: Data,
+        onProgress: @escaping @Sendable (Double) -> Void
+    ) async throws -> (Data, HTTPURLResponse) {
+        var request = request
+        request.httpBody = body
+        let result = try await data(for: request)
+        onProgress(1)
+        return result
+    }
 }
 
 struct URLSessionFounderHTTPTransport: FounderHTTPTransport {
@@ -15,6 +34,37 @@ struct URLSessionFounderHTTPTransport: FounderHTTPTransport {
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else { throw FounderServerError.invalidResponse }
         return (data, httpResponse)
+    }
+
+    func upload(
+        for request: URLRequest,
+        from body: Data,
+        onProgress: @escaping @Sendable (Double) -> Void
+    ) async throws -> (Data, HTTPURLResponse) {
+        let delegate = FounderUploadProgressDelegate(onProgress: onProgress)
+        let (data, response) = try await session.upload(for: request, from: body, delegate: delegate)
+        guard let httpResponse = response as? HTTPURLResponse else { throw FounderServerError.invalidResponse }
+        onProgress(1)
+        return (data, httpResponse)
+    }
+}
+
+private final class FounderUploadProgressDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let onProgress: @Sendable (Double) -> Void
+
+    init(onProgress: @escaping @Sendable (Double) -> Void) {
+        self.onProgress = onProgress
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
+        guard totalBytesExpectedToSend > 0 else { return }
+        onProgress(min(max(Double(totalBytesSent) / Double(totalBytesExpectedToSend), 0), 1))
     }
 }
 
@@ -463,7 +513,8 @@ actor ProductionNativeAPI {
         submissionIdentity: String,
         effectiveDate: String,
         expectedEvidenceType: String,
-        files: [(filename: String, contentType: String, data: Data)]
+        files: [(filename: String, contentType: String, data: Data)],
+        onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> ProductionEvidenceIntakeStatus {
         let boundary = "PhysiqueOSNativeIntake\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
         var body = Data()
@@ -481,14 +532,38 @@ actor ProductionNativeAPI {
         ]
         let path = "\(configuration.routeFamily)/evidence/intakes"
         let token = try await validAccessToken()
-        var result = try await perform(path: path, method: "POST", body: body, bearer: token, accept: "application/json", headers: headers)
+        var result = try await performUpload(path: path, method: "POST", body: body, bearer: token, accept: "application/json", headers: headers, onProgress: onUploadProgress)
         if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
             let refreshedToken = try await refreshAccessToken()
-            result = try await perform(path: path, method: "POST", body: body, bearer: refreshedToken, accept: "application/json", headers: headers)
+            result = try await performUpload(path: path, method: "POST", body: body, bearer: refreshedToken, accept: "application/json", headers: headers, onProgress: onUploadProgress)
         }
         try validateHTTP(result.1, data: result.0)
         do { return try decoder.decode(ProductionEvidenceIntakeStatus.self, from: result.0) }
         catch { throw ProductionNativeError.invalidResponse }
+    }
+
+    private func performUpload(
+        path: String,
+        method: String,
+        body: Data,
+        bearer: String,
+        accept: String,
+        headers: [String: String],
+        onProgress: @escaping @Sendable (Double) -> Void
+    ) async throws -> (Data, HTTPURLResponse) {
+        let endpoint = baseURL.appending(path: path)
+        guard let url = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)?.url else {
+            throw ProductionNativeError.invalidResponse
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 120
+        request.setValue(accept, forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
+        do { return try await transport.upload(for: request, from: body, onProgress: onProgress) }
+        catch { throw ProductionNativeError.networkFailure }
     }
 
     func fetchEvidenceIntakeStatus(intakeId: String) async throws -> ProductionEvidenceIntakeStatus {

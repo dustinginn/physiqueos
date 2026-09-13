@@ -21,7 +21,7 @@ struct FixtureBriefingAPI: BriefingAPI {
 
     func fetchHistory() async throws -> [BriefingHistoryRowReadModel] {
         store.history.map { briefing in
-            BriefingHistoryRowReadModel(
+            return BriefingHistoryRowReadModel(
                 artifactId: briefing.id,
                 artifactType: briefing.cadence == .event ? (briefing.dexa != nil ? "dexa_event" : "photo_event") : nil,
                 cadence: briefing.cadence,
@@ -60,7 +60,7 @@ struct ProductionBriefingAPI: BriefingAPI {
             var query = ["limit": "50"]
             if let cursor { query["cursor"] = cursor }
             let envelope = try await api.readResource("briefing-history", query: query, as: HistoryPayload.self)
-            rows.append(contentsOf: envelope.data.items.map(\.readModel))
+            rows.append(contentsOf: envelope.data.items.compactMap(\.readModel))
             guard envelope.data.page?.hasMore == true,
                   let next = envelope.data.page?.nextCursor,
                   !next.isEmpty,
@@ -114,16 +114,25 @@ struct ProductionBriefingAPI: BriefingAPI {
     private struct Row: Decodable {
         var artifactId: String
         var artifactType: String?
-        var cadence: String
+        var cadence: String?
         var label: String
         var publicationDate: String?
         var version: Int
 
-        var readModel: BriefingHistoryRowReadModel {
-            BriefingHistoryRowReadModel(
+        var readModel: BriefingHistoryRowReadModel? {
+            let resolvedCadence: BriefingCadence?
+            switch artifactType {
+            case "dexa_event", "photo_event": resolvedCadence = .event
+            default:
+                resolvedCadence = cadence.flatMap(BriefingCadence.init(rawValue:))
+            }
+            guard let resolvedCadence,
+                  [.weekly, .midweek, .monthly, .event].contains(resolvedCadence)
+            else { return nil }
+            return BriefingHistoryRowReadModel(
                 artifactId: artifactId,
                 artifactType: artifactType,
-                cadence: BriefingCadence(rawValue: cadence) ?? .daily,
+                cadence: resolvedCadence,
                 label: label,
                 publicationDate: publicationDate,
                 version: version

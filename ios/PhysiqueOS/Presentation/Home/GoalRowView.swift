@@ -127,25 +127,29 @@ struct PhaseTrajectoryGoalView: View {
     var onTap: (AppDestination) -> Void
 
     var body: some View {
-        let content = VStack(alignment: .leading, spacing: 10) {
+        let content = VStack(alignment: .leading, spacing: 0) {
             Text("Primary Goal")
                 .physiqueOSFont(PhysiqueOSTypography.primaryGoalEyebrow)
                 .foregroundStyle(PhysiqueOSTheme.accent)
             Text(title)
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .padding(.top, 2)
             if let targetDescription = trajectory.targetDescription {
                 Text(targetDescription + (trajectory.overallTargetDate.map { " by \(TrainingDateFormatting.short($0))" } ?? ""))
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .padding(.top, 8)
             }
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 ForEach(trajectory.phases) { phase in
                     PhaseTrajectoryPhaseCard(phase: phase)
                 }
             }
+            .padding(.top, 12)
             if let guardrail = trajectory.guardrail {
                 GuardrailCalloutCard(text: guardrail)
+                    .padding(.top, 12)
             }
         }
 
@@ -172,49 +176,70 @@ private struct PhaseTrajectoryPhaseCard: View {
     private var accent: Color { colorToken.foreground }
 
     private var statusLabel: String {
-        phase.status.prefix(1).uppercased() + phase.status.dropFirst()
+        if phase.timelineProgressState == "review_due" { return "Review due" }
+        return phase.status.prefix(1).uppercased() + phase.status.dropFirst()
     }
 
     private var isOutcome: Bool { phase.progressType == "outcome" }
     private var isUnavailable: Bool { phase.progressType == "unavailable" }
 
+    private var timingLabel: String? {
+        guard phase.status == "active",
+              let startDate = phase.startDate,
+              let reviewDate = phase.calculatedPlannedReviewDate else { return nil }
+        return "Started \(compactDate(startDate)) · Planned review \(compactDate(reviewDate))"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 10) {
-                IconBadge(systemImage: isOutcome ? "figure.strengthtraining.traditional" : "safari", color: colorToken, size: .md, isCircular: false)
+                Image(systemName: isOutcome ? "figure.strengthtraining.traditional" : "safari")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 36, height: 36)
+                    .background(colorToken.background)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Phase \(phase.order + 1)")
-                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(accent)
                     Text(phase.phaseName)
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        .font(.system(size: 13, weight: .heavy))
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .lineSpacing(3)
                 }
                 Spacer(minLength: 8)
                 Text(statusLabel)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .font(.system(size: 9, weight: .heavy))
                     .foregroundStyle(accent)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(PhysiqueOSTheme.surfaceMuted)
                     .clipShape(Capsule())
             }
+            if let timingLabel {
+                Text(timingLabel)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .padding(.leading, 46)
+            }
             if isUnavailable, let label = phase.presentationLabel {
                 Text(label)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             } else if let percentage = phase.clampedProgressPercentage {
                 AnimatedProgressBar(value: percentage, color: accent, accessibilityLabel: "\(phase.phaseName) progress")
                 if let label = phase.presentationLabel {
                     Text(label)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 if isOutcome {
                     Text(phase.progressStatus == "awaiting_follow_up" ? "Awaiting next DEXA" : "DEXA measurements anchor progress")
-                        .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
@@ -227,25 +252,41 @@ private struct PhaseTrajectoryPhaseCard: View {
     }
 }
 
+private func compactDate(_ value: String) -> String {
+    let input = DateFormatter()
+    input.locale = Locale(identifier: "en_US_POSIX")
+    input.calendar = Calendar(identifier: .gregorian)
+    input.timeZone = TimeZone(secondsFromGMT: 0)
+    input.dateFormat = "yyyy-MM-dd"
+    guard let date = input.date(from: value) else { return value }
+    let output = DateFormatter()
+    output.locale = Locale(identifier: "en_US_POSIX")
+    output.calendar = Calendar(identifier: .gregorian)
+    output.timeZone = TimeZone(secondsFromGMT: 0)
+    output.dateFormat = "MMM d"
+    return output.string(from: date)
+}
+
 private struct GuardrailCalloutCard: View {
     let text: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             IconBadge(systemImage: "checkmark.shield.fill", color: .primary, size: .md, isCircular: false)
-            VStack(alignment: .leading, spacing: 3) {
+                .frame(width: 40, height: 40)
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Guardrail")
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.accent)
                 Text(text)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text("This remains in effect throughout every phase.")
-                    .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
-        .padding(12)
+        .padding(16)
         .background(PhysiqueOSTheme.accent.opacity(0.07))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(PhysiqueOSTheme.accent.opacity(0.22)))
@@ -258,7 +299,7 @@ struct GoalsCardView: View {
 
     var body: some View {
         CardContainer(padding: .sm) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Your Goals")
                 VStack(spacing: 0) {
                     ForEach(goals) { goal in

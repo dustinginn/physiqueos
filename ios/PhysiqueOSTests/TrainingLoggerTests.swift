@@ -324,6 +324,22 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(resolved?.sourceEvidenceIds, ["a"])
     }
 
+    func testAppleHealthStrengthScreenshotDoesNotBecomeCardioFromIncidentalExerciseText() {
+        let text = """
+        Traditional Strength Training
+        Workout Time 1:11:51
+        Active Calories 380
+        Exercises included seated rowing
+        """
+
+        let workout = EvidenceLocalInterpretation.supportingWorkout(id: "strength", sourceEvidenceIds: ["strength-image"], from: text)
+
+        XCTAssertEqual(workout?.activityName, "Traditional Strength Training")
+        XCTAssertEqual(workout?.category, "Strength")
+        XCTAssertEqual(workout?.recordOwner, .trainingSession)
+        XCTAssertEqual(workout?.durationMinutes ?? 0, 71.85, accuracy: 0.001)
+    }
+
     func testTwoDifferentRealScreenshotsInterpretIntoTwoDistinctWorkouts() {
         let stairsText = "Stair Stepper\nWorkout Time 42:18\nActive Calories 386"
         let runText = "Outdoor Run\nWorkout Time 31:00\nActive Calories 402\nDistance 3.2 mi"
@@ -761,11 +777,11 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildTwentyEightInSourceControlledConfiguration() throws {
+    func testAppDeclaresExemptEncryptionAndBuildTwentyNineInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "28")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "29")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }

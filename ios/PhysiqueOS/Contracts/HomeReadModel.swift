@@ -194,6 +194,12 @@ struct HomeGoalPhase: Codable, Equatable, Identifiable {
     /// choose the outcome sub-caption ("Awaiting next DEXA" vs. "DEXA
     /// measurements anchor progress"), matching `PhaseRow`'s own check.
     var progressStatus: String?
+    /// Canonical phase timing supplied by `HomeGoalTrajectoryService`.
+    /// These remain date-only server values; the Home presentation never
+    /// derives them from the device clock.
+    var startDate: String? = nil
+    var calculatedPlannedReviewDate: String? = nil
+    var timelineProgressState: String? = nil
 }
 
 struct HomeGoal: Codable, Equatable, Identifiable {
