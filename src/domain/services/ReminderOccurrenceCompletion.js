@@ -56,6 +56,11 @@ export function resolvePriorityExecutionContract({ reminder, occurrenceDate } = 
     priorityId: reminder.id,
     occurrenceDate,
     occurrenceKey: createPriorityOccurrenceKey(reminder.id, occurrenceDate),
+    expectedVersion: reminder.version !== null
+      && reminder.version !== undefined
+      && Number.isSafeInteger(Number(reminder.version))
+      ? Number(reminder.version)
+      : null,
   };
   if (reminder.id === "reminder_morning_weight" || reminder.linkedEvidenceType === "weight") {
     return Object.freeze({ ...identity, workflow: "morning_check_in", destination: "/check-in/morning" });

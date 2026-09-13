@@ -10,6 +10,7 @@ describe("canonical Priority relationship", () => {
     const contract = resolvePriorityExecutionContract({
       reminder: {
         id: "reminder_morning_weight",
+        version: 7,
         linkedEvidenceType: "weight",
       },
       occurrenceDate: "2026-09-01",
@@ -18,6 +19,7 @@ describe("canonical Priority relationship", () => {
       priorityId: "reminder_morning_weight",
       occurrenceDate: "2026-09-01",
       occurrenceKey: createPriorityOccurrenceKey("reminder_morning_weight", "2026-09-01"),
+      expectedVersion: 7,
       workflow: "morning_check_in",
       destination: "/check-in/morning",
     });
@@ -28,6 +30,14 @@ describe("canonical Priority relationship", () => {
       reminder: { id: "generic", title: "Morning Weigh-In", type: "other" },
       occurrenceDate: "2026-09-01",
     }).workflow).toBe("priority_detail");
+  });
+
+  it("does not invent a reminder version when the read source omits it", () => {
+    const contract = resolvePriorityExecutionContract({
+      reminder: { id: "reminder_foam_rolling" },
+      occurrenceDate: "2026-09-01",
+    });
+    expect(contract.expectedVersion).toBeNull();
   });
 
   it("keeps a dated completion-history occurrence out of Home", () => {

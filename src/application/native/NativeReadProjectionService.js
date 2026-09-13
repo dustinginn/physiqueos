@@ -75,6 +75,8 @@ function projectPhotoSession(session) {
       intendedCaptureDate: view.captureDate ?? session.captureDate,
       comparisonStatus: view.comparisonStatus ?? "no_prior_matching_pose",
       mediaReference: view.imageHref ?? view.imageUrl ?? null,
+      galleryInterpretation: projectGalleryInterpretation(view.galleryInterpretation),
+      sourceHistory: typeof view.sourceHistory === "string" ? view.sourceHistory : null,
       prior: view.comparison ? Object.freeze({
         sessionId: view.comparison.previousSessionId ?? null,
         photoId: view.comparison.previousCanonicalViewId ?? null,
@@ -83,6 +85,17 @@ function projectPhotoSession(session) {
         mediaReference: view.comparison.previousImageHref ?? view.comparison.previousImageUrl ?? null,
       }) : null,
     }))),
+  });
+}
+
+function projectGalleryInterpretation(value) {
+  if (!value || typeof value !== "object") return null;
+  return Object.freeze({
+    summary: typeof value.summary === "string" ? value.summary : null,
+    comparisonBullets: Object.freeze(Array.isArray(value.comparisonBullets)
+      ? value.comparisonBullets.filter((item) => typeof item === "string").slice(0, 20)
+      : []),
+    conditionSummary: typeof value.conditionSummary === "string" ? value.conditionSummary : null,
   });
 }
 

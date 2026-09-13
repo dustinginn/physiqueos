@@ -22,6 +22,26 @@ describe("WeeklyBriefingScreenPresentationService", () => {
     expect(result.hero.confidence.presentationExplanation).toBe(confidence.primaryReason);
   });
 
+  it("keeps the canonical training-day count and every structured highlight field", () => {
+    const result = createWeeklyBriefingScreenPresentation({
+      cards: { progress: { training: { presentation: {
+        trainingDayCount: 6,
+        comparableCategoryCount: 9,
+        counts: { improving: 7, stable: 0, plateauing: 1, regressing: 1, insufficient: 0 },
+        categorySummaries: [{ id: "triceps" }],
+        highlights: [{ exercise: "Hyperextension Machine", label: "New session-volume mark", value: 4800, delta: 675, percentChange: 16.4, unit: "lb volume" }],
+      } } } },
+      narrativePresentationSelection: {
+        training: { conclusion: "Training progressed.", priorityCategories: [] },
+      },
+    });
+    expect(result.training).toMatchObject({
+      trainingDayCount: 6,
+      comparableCategoryCount: 9,
+      highlights: [{ exercise: "Hyperextension Machine", label: "New session-volume mark", value: 4800, delta: 675, percentChange: 16.4, unit: "lb volume" }],
+    });
+  });
+
   it.each([
     undefined,
     {},

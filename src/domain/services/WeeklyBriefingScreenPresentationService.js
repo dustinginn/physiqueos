@@ -55,6 +55,7 @@ export function createWeeklyBriefingScreenPresentation(narrative) {
       conclusion: string(trainingSelection.conclusion),
       status: object(trainingFacts.counts),
       comparableCategoryCount: finite(trainingFacts.comparableCategoryCount),
+      trainingDayCount: finite(trainingFacts.trainingDayCount ?? trainingFacts.completedSessionCount),
       insufficientCount: finite(trainingFacts.counts?.insufficient),
       categories: array(trainingFacts.categorySummaries).filter(isObject),
       priorityCategories: array(trainingSelection.priorityCategories).filter(isObject),

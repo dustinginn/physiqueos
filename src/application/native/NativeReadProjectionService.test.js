@@ -47,6 +47,13 @@ describe("Native finished read projections", () => {
           canonicalPhotoId: "photo-current", poseId: "front-relaxed",
           pose: { id: "front-relaxed", label: "Front Relaxed", view: "front", pose: "relaxed" },
           captureDate: "2026-07-11", comparisonStatus: "comparable",
+          galleryInterpretation: {
+            summary: "Canonical interpretation.",
+            comparisonBullets: ["Waist looks tighter."],
+            conditionSummary: "Comparable light and distance.",
+            internalPrompt: "must-not-escape",
+          },
+          sourceHistory: "Compared Jul 3 and Jul 11.",
           imageHref: `/api/private-evidence/media/${mediaId}`,
           imageReference: "private/storage/key.jpg",
           comparison: {
@@ -61,10 +68,16 @@ describe("Native finished read projections", () => {
       sessionId: "session-current", revision: 4, intendedCaptureDate: "2026-07-11",
       photos: [{
         photoId: "photo-current", poseId: "front-relaxed", comparisonStatus: "comparable",
+        galleryInterpretation: {
+          summary: "Canonical interpretation.",
+          comparisonBullets: ["Waist looks tighter."],
+          conditionSummary: "Comparable light and distance.",
+        },
+        sourceHistory: "Compared Jul 3 and Jul 11.",
         prior: { sessionId: "session-prior", photoId: "photo-prior", intendedCaptureDate: "2026-07-03" },
       }],
     });
-    expect(JSON.stringify(result)).not.toMatch(/sessionFingerprint|hiddenProvenance|storage|path|provider/i);
+    expect(JSON.stringify(result)).not.toMatch(/sessionFingerprint|hiddenProvenance|internalPrompt|storage|path|provider/i);
   });
 
   it("does not expose raw Training report primitives to Native", () => {

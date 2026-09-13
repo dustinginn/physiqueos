@@ -23,4 +23,24 @@ describe("Native opaque media projection", () => {
     expect(projectNativeMediaReferences({ href: "/goals/build-lean-mass", imageHref: "/api/private-evidence/founder/photo.jpg" }))
       .toEqual({ href: "/goals/build-lean-mass" });
   });
+
+  it("projects Photo Event current and previous pose media at every nested presentation location", () => {
+    const prior = "media-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbb";
+    const current = "media-cccccccccccccccccccccccccccccccc-dddddddddddd";
+    const result = projectNativeMediaReferences({
+      briefing: { photoEventNarrative: {
+        activeViews: [{ poseId: "front-relaxed", imageHref: `media://${current}` }],
+        cardContent: { progress: { comparisons: [{
+          poseId: "front-relaxed",
+          previousImageHref: `/api/private-evidence/media/${prior}`,
+          imageHref: `/api/private-evidence/media/${current}`,
+        }] } },
+      } },
+    });
+    const narrative = result.briefing.photoEventNarrative;
+    expect(narrative.activeViews[0].media.mediaId).toBe(current);
+    expect(narrative.cardContent.progress.comparisons[0].previousMedia.mediaId).toBe(prior);
+    expect(narrative.cardContent.progress.comparisons[0].media.mediaId).toBe(current);
+    expect(JSON.stringify(result)).not.toMatch(/private-evidence|media:\/\//);
+  });
 });

@@ -39,6 +39,31 @@ describe("Phase 4 canonical command persistence ports", () => {
     await expect(ports.editGoal(commandContext({ goalId: "goal-one", patch: { title: "first" } }, "9", "stale"))).rejects.toMatchObject({ code: "EXPECTED_VERSION_CONFLICT" });
   });
 
+  it("preserves dose-aware completion semantics and exact occurrence idempotency", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const first = await ports.completePriority(commandContext({
+      priorityId: "priority-one", occurrenceDate: "2026-08-11",
+      dose: "0.5 mg", protocolId: "protocol-one",
+    }, "1", "dose-aware"));
+    expect(first.result.status).toBe("completed");
+    expect(records.snapshot().reminders[0].completionHistory).toEqual([
+      expect.objectContaining({
+        id: "priority-one:2026-08-11",
+        evidenceDate: "2026-08-11",
+        effectiveDose: "0.5 mg",
+        protocolId: "protocol-one",
+        satisfactionType: "scheduled_protocol_execution",
+      }),
+    ]);
+    const repeated = await ports.completePriority(commandContext({
+      priorityId: "priority-one", occurrenceDate: "2026-08-11",
+      dose: "0.5 mg", protocolId: "protocol-one",
+    }, "1", "dose-aware-retry"));
+    expect(repeated.result.status).toBe("already_completed");
+    expect(records.snapshot().reminders[0].completionHistory).toHaveLength(1);
+  });
+
   it("keeps independent aggregate writes independent", async () => {
     const records = fixture();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });

@@ -137,4 +137,26 @@ describe("WeeklyBriefingPresentationService", () => {
     ]);
     expect(repositories.canonicalEvidence.listCanonicalEvidenceObjects).not.toHaveBeenCalled();
   });
+
+  it("preserves the canonical training-day count into the finished Native/web presentation", async () => {
+    const artifact = {
+      id: "weekly-training-days",
+      evidenceWindow: window,
+      briefing: { weeklyNarrative: {
+        weekStart: window.startDate,
+        weekEnd: window.endDate,
+        cards: { progress: { training: { completedDays: 6, presentation: {
+          trainingDayCount: 6,
+          completedSessionCount: 6,
+          comparableCategoryCount: 9,
+          counts: { improving: 7, stable: 0, plateauing: 1, regressing: 1, insufficient: 0 },
+          categorySummaries: [{ id: "triceps", status: "plateauing" }],
+          highlights: [],
+        } } } },
+        context: { pi: { observations: [] } },
+      } },
+    };
+    const result = await adaptWeeklyArtifactForPresentation({ artifact });
+    expect(result.briefing.weeklyNarrative.cards.progress.training.presentation.trainingDayCount).toBe(6);
+  });
 });
