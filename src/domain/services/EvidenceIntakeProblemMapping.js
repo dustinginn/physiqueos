@@ -20,6 +20,7 @@ const VALIDATION_PROBLEMS = new Map([
   ["MULTIPART_BOUNDARY_MISSING", { status: 400, title: "The upload request is missing its multipart boundary." }],
   ["MULTIPART_REQUEST_TOO_LARGE", { status: 413, title: "The upload is larger than PhysiqueOS accepts." }],
   ["PROVIDER_UPLOAD_CONTENT_TYPE_INVALID", { status: 400, title: "The uploaded file's declared type is invalid." }],
+  ["EVIDENCE_UPLOAD_CONTENT_TYPE_INVALID", { status: 400, title: "An uploaded file declared a platform type identifier instead of a media type." }],
 ]);
 
 // A parser/storage failure whose cause IS understood (unlike a true unknown

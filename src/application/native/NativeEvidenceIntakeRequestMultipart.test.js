@@ -100,20 +100,21 @@ describe("Native production Evidence intake — realistic network-level multipar
     expect(result.files[0].size).toBe(65_536);
   });
 
-  it("accepts the real Native content-type defect shape (filename + com.adobe.pdf) at THIS layer — it fails later, not here", async () => {
-    // This is the exact multipart shape Build 24/25 sent before the Native
-    // fix: EvidenceAttachmentLoader.files() declared the UTI identifier
-    // "com.adobe.pdf" as the multipart Content-Type instead of a MIME type.
-    // parseNativeEvidenceIntakeRequest's DEXA validation accepts it via the
-    // ".pdf" filename fallback (see DexaPdfIntakeService.validateDexaPdfUpload) —
-    // proving the real production 500 did NOT originate in multipart parsing
-    // or in this function at all.
+  it("rejects the real Native content-type defect shape (filename + a UTType identifier) at the intake boundary", async () => {
+    // Build 24/25 sent "com.adobe.pdf" as the multipart Content-Type, and
+    // Build 26 still sent a platform identifier whenever the file's UTType
+    // had no MIME mapping. Multipart parsing has never been the problem —
+    // it parses this shape perfectly well. The defect is that a platform
+    // type identifier is not a media type, and the intake boundary (which
+    // owns the contract, and whose value becomes the stored object's HTTP
+    // Content-Type) now says so immediately instead of letting it travel
+    // four more layers into provider upload.
     const request = multipartRequest({
       fields: dexaFields(),
       file: { filename: "BodySpec.pdf", contentType: "com.adobe.pdf", data: pdfBytes(2_048) },
     });
-    const result = await parseNativeEvidenceIntakeRequest(request);
-    expect(result.files[0].type).toBe("com.adobe.pdf");
+    await expect(parseNativeEvidenceIntakeRequest(request))
+      .rejects.toMatchObject({ code: "EVIDENCE_UPLOAD_CONTENT_TYPE_INVALID", status: 400 });
   });
 
   it("rejects a request with no multipart boundary declared", async () => {

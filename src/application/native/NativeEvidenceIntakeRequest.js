@@ -63,7 +63,36 @@ export async function parseNativeEvidenceIntakeRequest(request) {
   });
 }
 
+// Every uploaded part's declared type is propagated verbatim into the
+// stored object's HTTP Content-Type (ProviderCanonicalUploadService →
+// Spaces), so it must be a real MIME type. A client that declares a
+// platform type identifier instead (an Apple UTType such as
+// "com.adobe.pdf", "public.data", or a dynamic "dyn.…") is violating the
+// wire contract. That previously travelled five layers before dying deep
+// inside provider upload with an error that named neither the offending
+// value nor the file; the intake boundary owns this contract and rejects
+// it here instead. An ABSENT type stays legal — downstream defaults it to
+// application/octet-stream — so this only rejects a present-but-invalid
+// declaration. The server deliberately does NOT rewrite the value: the
+// platform-to-MIME translation belongs on the client, where the platform
+// type actually exists.
+const MIME_TYPE_SHAPE = /^[-\w.+]+\/[-\w.+]+$/;
+
+function assertDeclaredTypesAreMIME(files) {
+  for (const file of files) {
+    const declared = String(file?.type ?? "").trim();
+    if (declared && !MIME_TYPE_SHAPE.test(declared)) {
+      throw problem(
+        400,
+        "EVIDENCE_UPLOAD_CONTENT_TYPE_INVALID",
+        "An uploaded file declared a platform type identifier instead of a media type."
+      );
+    }
+  }
+}
+
 async function validateFiles({ expectedEvidenceType, files }) {
+  assertDeclaredTypesAreMIME(files);
   if (expectedEvidenceType === "dexa_scan") {
     if (files.length !== 1) throw problem(400, "DEXA_PDF_REQUIRED", "DEXA intake requires exactly one BodySpec PDF.");
     validateDexaPdfUpload({
