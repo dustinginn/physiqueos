@@ -97,6 +97,8 @@
 		0000000000000000000010B0 /* EvidenceReviewReadyNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AF /* EvidenceReviewReadyNotifier.swift */; };
 		00000000000000000000125B /* NotificationDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000125C /* NotificationDiagnostics.swift */; };
 		00000000000000000000125D /* NotificationDiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000125E /* NotificationDiagnosticsView.swift */; };
+		000000000000000000001263 /* RecurringSupportAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001264 /* RecurringSupportAPI.swift */; };
+		000000000000000000001265 /* OperatingPlanNotificationLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001266 /* OperatingPlanNotificationLinkTests.swift */; };
 		0000000000000000000010B2 /* PhysiqueOSTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B1 /* PhysiqueOSTheme.swift */; };
 		0000000000000000000010B4 /* HomeGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B3 /* HomeGreeting.swift */; };
 		0000000000000000000010B6 /* IconBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B5 /* IconBadge.swift */; };
@@ -393,6 +395,8 @@
 		0000000000000000000010AF /* EvidenceReviewReadyNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReviewReadyNotifier.swift"; sourceTree = "<group>"; };
 		00000000000000000000125C /* NotificationDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NotificationDiagnostics.swift"; sourceTree = "<group>"; };
 		00000000000000000000125E /* NotificationDiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NotificationDiagnosticsView.swift"; sourceTree = "<group>"; };
+		000000000000000000001264 /* RecurringSupportAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecurringSupportAPI.swift"; sourceTree = "<group>"; };
+		000000000000000000001266 /* OperatingPlanNotificationLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanNotificationLinkTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000010B1 /* PhysiqueOSTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSTheme.swift"; sourceTree = "<group>"; };
 		0000000000000000000010B3 /* HomeGreeting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeGreeting.swift"; sourceTree = "<group>"; };
 		0000000000000000000010B5 /* IconBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IconBadge.swift"; sourceTree = "<group>"; };
@@ -730,6 +734,7 @@
 				0000000000000000000010AD /* PriorityNotificationDelegate.swift */,
 				0000000000000000000010AF /* EvidenceReviewReadyNotifier.swift */,
 				00000000000000000000125C /* NotificationDiagnostics.swift */,
+				000000000000000000001264 /* RecurringSupportAPI.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -1056,6 +1061,7 @@
 				00000000000000000000121C /* PriorityNotificationSchedulerTests.swift */,
 				000000000000000000001260 /* PriorityOccurrenceCalculatorTests.swift */,
 				000000000000000000001262 /* NotificationDiagnosticsTests.swift */,
+				000000000000000000001266 /* OperatingPlanNotificationLinkTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1325,6 +1331,7 @@
 				0000000000000000000010B0 /* EvidenceReviewReadyNotifier.swift in Sources */,
 				00000000000000000000125B /* NotificationDiagnostics.swift in Sources */,
 				00000000000000000000125D /* NotificationDiagnosticsView.swift in Sources */,
+				000000000000000000001263 /* RecurringSupportAPI.swift in Sources */,
 				0000000000000000000010B2 /* PhysiqueOSTheme.swift in Sources */,
 				0000000000000000000010B4 /* HomeGreeting.swift in Sources */,
 				0000000000000000000010B6 /* IconBadge.swift in Sources */,
@@ -1498,6 +1505,7 @@
 				00000000000000000000121D /* PriorityNotificationSchedulerTests.swift in Sources */,
 				00000000000000000000125F /* PriorityOccurrenceCalculatorTests.swift in Sources */,
 				000000000000000000001261 /* NotificationDiagnosticsTests.swift in Sources */,
+				000000000000000000001265 /* OperatingPlanNotificationLinkTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

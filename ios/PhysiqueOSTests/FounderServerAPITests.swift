@@ -373,7 +373,7 @@ final class FounderServerAPITests: XCTestCase {
     func testFounderProductionWriteGuardEnablesOnlyTheAcceptedDailyDriverDomainsAndSandboxRemainsIsolated() throws {
         XCTAssertEqual(
             NativeProductWriteDomain.enabledUnderFounderProduction,
-            [.morningCheckInAndWeight, .workoutLogger, .nutrition, .activityEvidence, .dexa, .priorityCompletion]
+            [.morningCheckInAndWeight, .workoutLogger, .nutrition, .activityEvidence, .dexa, .priorityCompletion, .operatingPlan]
         )
         for domain in NativeProductWriteDomain.allCases {
             if NativeProductWriteDomain.enabledUnderFounderProduction.contains(domain) {
@@ -677,7 +677,11 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(URLComponents(url: requests[2].url!, resolvingAgainstBaseURL: false)?.queryItems,
                        [URLQueryItem(name: "occurrenceDate", value: "2026-09-10"), URLQueryItem(name: "priorityId", value: "priority-canonical")])
         XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
-        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.operatingPlan, in: .founderProduction))
+        // Build 33: .operatingPlan is enabled for the recurring-support
+        // shape (Recovery/Tracking) — see NativeProductWriteDomain
+        // .enabledUnderFounderProduction's own doc comment for scope.
+        XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.operatingPlan, in: .founderProduction))
+        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.goalAndPhaseTransitions, in: .founderProduction))
     }
 
     /// Build 21 item 11 (Priority Detail timing parity): confirmed against

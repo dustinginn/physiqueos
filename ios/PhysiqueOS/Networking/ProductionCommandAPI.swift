@@ -19,6 +19,7 @@ enum ProductionCommandType {
     static let editDexaReviewMeasurements = "dexa-review.measurements.v1"
     static let commitEvidenceReview = "evidence-review.commit.v1"
     static let disposeEvidenceReview = "evidence-review.dispose.v1"
+    static let saveRecurringSupport = "operating-plan.recurring-support.save.v1"
 }
 
 struct ProductionCommandRequestMetadata: Encodable {

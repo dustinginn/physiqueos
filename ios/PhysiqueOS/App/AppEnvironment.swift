@@ -77,14 +77,14 @@ enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
     /// The bounded set of domains accepted for the Daily Driver Write
     /// Build. Every other domain (HealthKit sync has no case yet; Evidence
     /// Review's generic accept/reject queue; Goal/Phase transitions;
-    /// Operating Plan edits; Progress Photo writes) remains denied under
-    /// Founder Production regardless of authority — this is a scope
-    /// decision from the task spec, not a placeholder for "not implemented
-    /// yet." Nutrition/Activity/DEXA's own screenshot-evidence confirm
-    /// commands are gated by their own domain case (`.nutrition`,
-    /// `.activityEvidence`, `.dexa`), not by `.evidenceReview` — that case
-    /// stays reserved for a future general Evidence Review accept/reject
-    /// UI, which this build does not add.
+    /// Progress Photo writes) remains denied under Founder Production
+    /// regardless of authority — this is a scope decision from the task
+    /// spec, not a placeholder for "not implemented yet." Nutrition/
+    /// Activity/DEXA's own screenshot-evidence confirm commands are gated
+    /// by their own domain case (`.nutrition`, `.activityEvidence`,
+    /// `.dexa`), not by `.evidenceReview` — that case stays reserved for a
+    /// future general Evidence Review accept/reject UI, which this build
+    /// does not add.
     ///
     /// A prior pass (server authority `67267032`'s predecessor) found
     /// EVERY domain blocked by a genuine server-side gap and shipped none
@@ -95,12 +95,26 @@ enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
     /// pipeline. `.priorityCompletion` is enabled only because the
     /// canonical Home/Priority projections now expose the Reminder version
     /// required by `priority.complete.v1`'s If-Match contract.
+    ///
+    /// `.operatingPlan` was enabled in Build 33 for the "recurring support"
+    /// shape specifically (Recovery's Foam Rolling, Tracking's Morning
+    /// Weigh-In — both route through the same server-owned
+    /// `operating-plan.recurring-support.save.v1` command Web's own
+    /// `saveFoamRollingSupport`/`saveMorningWeighInSupport` actions already
+    /// call). The other six Operating Plan domains (Energy Strategy,
+    /// Nutrition strategy, Training strategy, Peptides, Supplements,
+    /// Coaching Updates) each need their own server command and remain
+    /// sandbox-only until that work lands — enabling this flag does not by
+    /// itself make every Operating Plan screen production-safe; each
+    /// screen's own read/write API decides whether it actually calls
+    /// production or stays on `OperatingPlanSandboxStore`.
     static let enabledUnderFounderProduction: Set<NativeProductWriteDomain> = [
         .morningCheckInAndWeight,
         .priorityCompletion,
         .workoutLogger,
         .nutrition,
         .activityEvidence,
+        .operatingPlan,
         .dexa,
     ]
 }
@@ -242,6 +256,19 @@ final class AppEnvironment {
         switch nativeAuthority {
         case .sandbox: NotAvailableWeightWriteAPI()
         case .founderProduction: ProductionWeightWriteAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
+        }
+    }
+
+    /// `.operatingPlan` is enabled for the recurring-support shape only —
+    /// see `NativeProductWriteDomain.enabledUnderFounderProduction`.
+    /// Sandbox never calls this seam (Recovery/Tracking screens read/write
+    /// `operatingPlanStore` directly under Sandbox) —
+    /// `NotAvailableRecurringSupportAPI` exists only so the property is
+    /// total.
+    var recurringSupportAPI: RecurringSupportAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableRecurringSupportAPI()
+        case .founderProduction: ProductionRecurringSupportAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
         }
     }
 
