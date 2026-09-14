@@ -22,6 +22,27 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(reads.count, 2)
     }
 
+    /// Regression for a real Build 33 defect: a training/workout command
+    /// invalidated the cache key "log", but Log is actually cached under
+    /// "evidence-review-queue" (`ProductionDailyDriverAPI.fetchLog()` calls
+    /// `readResource("evidence-review-queue", ...)`) — the mismatch meant
+    /// completing a workout never invalidated Log's cache at all, so a
+    /// stale "Nothing logged yet" response could keep serving for up to
+    /// the full cache TTL after a real, durably-committed workout.
+    func testTrainingCommandsInvalidateTheActualLogCacheKey() async {
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: [:]))
+        let affected = await api.resourcesAffected(by: "training-session.commit.v1")
+        XCTAssertTrue(affected.contains("evidence-review-queue"), "Training commands must invalidate Log's real cache key, not a stale/unused one")
+        XCTAssertFalse(affected.contains("log"), "\"log\" is not a real resource name — invalidating it is dead code")
+    }
+
+    func testEvidenceCommandsInvalidateTheActualLogCacheKey() async {
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: [:]))
+        let affected = await api.resourcesAffected(by: "evidence-review.commit.v1")
+        XCTAssertTrue(affected.contains("evidence-review-queue"))
+        XCTAssertFalse(affected.contains("log"))
+    }
+
     func testProductionReadCacheDeduplicatesConcurrentCanonicalReads() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),

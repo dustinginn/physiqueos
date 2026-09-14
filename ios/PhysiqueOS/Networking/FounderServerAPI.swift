@@ -863,16 +863,22 @@ actor ProductionNativeAPI {
         catch { throw ProductionNativeError.invalidResponse }
     }
 
-    private func resourcesAffected(by commandType: String) -> Set<String> {
+    // Internal (not private) so the mapping from a command type to the
+    // cache keys it invalidates is directly unit-testable — a mismatch
+    // here (e.g. invalidating "log" when Log is actually cached under
+    // "evidence-review-queue") silently leaves a stale read cached with
+    // no error anywhere, exactly the Build 32/33 workout-visibility defect
+    // this was found fixing.
+    func resourcesAffected(by commandType: String) -> Set<String> {
         if commandType.contains("priority") { return ["home", "priority"] }
         if commandType.contains("training") || commandType.contains("workout") {
             return [
                 "home", "training-landing", "training-reporting", "training-library",
-                "training-logger", "training-day", "training-session", "log",
+                "training-logger", "training-day", "training-session", "evidence-review-queue",
             ]
         }
         if commandType.contains("evidence") || commandType.contains("review") {
-            return ["home", "log", "reporting", "weight", "nutrition", "activity", "energy", "dexa", "photos", "timeline"]
+            return ["home", "evidence-review-queue", "reporting", "weight", "nutrition", "activity", "energy", "dexa", "photos", "timeline"]
         }
         return ["home"]
     }
