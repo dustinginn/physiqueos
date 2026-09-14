@@ -9,6 +9,11 @@ import SwiftUI
 struct LogView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: LogViewModel?
+    /// See `HomeView`'s matching field: `.task(id:)` re-fires on ordinary
+    /// tab-switch reappearance even without an authority change, so this
+    /// guards against rebuilding (and blanking) an already-loaded view
+    /// model just because the tab was revisited.
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     var onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -21,7 +26,10 @@ struct LogView: View {
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = LogViewModel(api: environment.logAPI)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = LogViewModel(api: environment.logAPI)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }

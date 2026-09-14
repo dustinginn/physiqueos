@@ -11,6 +11,15 @@ struct HomeView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: HomeViewModel?
+    /// The authority `viewModel` was actually built for. `.task(id:)`
+    /// re-fires on ordinary tab-switch reappearance even when the id
+    /// hasn't changed (a standard SwiftUI/TabView quirk, not just on a
+    /// genuine authority change) — rebuilding `viewModel` unconditionally
+    /// every time threw away its in-memory state and forced the spinner
+    /// branch back on every visit. Comparing against this lets a mere
+    /// reappearance reuse the existing instance (and its already-loaded
+    /// state) while a real authority change still rebuilds correctly.
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var confidenceDetailPresentation: (confidence: Int, detail: ConfidenceDetail)?
     @State private var completingPriorityIDs: Set<String> = []
     @State private var completionError: String?
@@ -26,13 +35,16 @@ struct HomeView: View {
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = HomeViewModel(
-                api: environment.homeAPI,
-                priorityStore: environment.loggingSandboxStore,
-                goalsSandboxStore: environment.goalsSandboxStore,
-                briefingStore: environment.briefingSandboxStore,
-                appliesSandboxProjections: environment.nativeAuthority == .sandbox
-            )
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = HomeViewModel(
+                    api: environment.homeAPI,
+                    priorityStore: environment.loggingSandboxStore,
+                    goalsSandboxStore: environment.goalsSandboxStore,
+                    briefingStore: environment.briefingSandboxStore,
+                    appliesSandboxProjections: environment.nativeAuthority == .sandbox
+                )
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
             await prefetchLikelyDestinations()
         }

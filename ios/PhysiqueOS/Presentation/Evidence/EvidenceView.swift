@@ -13,6 +13,11 @@ import SwiftUI
 struct EvidenceView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: EvidenceViewModel?
+    /// See `HomeView`'s matching field: `.task(id:)` re-fires on ordinary
+    /// tab-switch reappearance even without an authority change, so this
+    /// guards against rebuilding (and blanking) an already-loaded view
+    /// model just because the tab was revisited.
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     var onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -25,7 +30,10 @@ struct EvidenceView: View {
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = EvidenceViewModel(api: environment.evidenceAPI)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = EvidenceViewModel(api: environment.evidenceAPI)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }
