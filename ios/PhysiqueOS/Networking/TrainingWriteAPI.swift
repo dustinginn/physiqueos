@@ -1,19 +1,34 @@
 import Foundation
 
 protocol TrainingWriteAPI: Sendable {
+    /// Commits the structured TrainingSession only — exercises, sets, reps,
+    /// load. This must become durable immediately and never waits on
+    /// supporting-evidence screenshots, regardless of whether any are
+    /// attached or how far along their interpretation is.
     func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult
     /// Starts (or resumes) interpreting any attached supporting-evidence
-    /// screenshots as soon as they are attached, well before `commit` is
-    /// called. `commit` still awaits the same binding, but since intake
-    /// interpretation typically runs to completion during the rest of the
-    /// workout, the wait it actually hits at Finish is usually already
-    /// satisfied. Best-effort: failures here surface again, normally, inside
-    /// `commit`, so this never needs to throw.
+    /// screenshots as soon as they are attached. Purely a head start for
+    /// `reconcileSupportingEvidenceAfterCommit`; `commit` never consumes or
+    /// waits on this.
     func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async
+    /// Reconciles any attached supporting-evidence screenshots onto the
+    /// already-durable session named by `commit`'s result, entirely in the
+    /// background. Confirms the screenshots' own evidence review through the
+    /// same `evidence-review.commit.v1` path every other evidence type uses
+    /// — its existing duplicate-detection already merges same-day training
+    /// evidence rather than creating a second copy, so this needs no
+    /// training-specific merge logic of its own. Best-effort: a failure here
+    /// (a screenshot that never finishes interpreting, a review that stays
+    /// ambiguous) leaves the screenshot's evidence review exactly where the
+    /// normal standalone Evidence Review flow would — reachable and
+    /// confirmable later — never lost, and never reverses the session's
+    /// already-durable commit.
+    func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async
 }
 
 extension TrainingWriteAPI {
     func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async {}
+    func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async {}
 }
 
 struct TrainingCommitResult: Decodable, Equatable, Sendable {
@@ -106,15 +121,19 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         let supersets = draft.relationships.map {
             Superset(id: $0.id, memberExerciseIds: $0.memberExerciseIds)
         }
-        let supportingBinding = try await prepareSupportingEvidence(for: draft)
+        // The structured TrainingSession must become durable immediately —
+        // interpreting any attached supporting screenshots (which can take up
+        // to a minute) is never a prerequisite for that. Any supporting
+        // evidence is reconciled onto the session separately, in the
+        // background, once it's ready (see `reconcileSupportingEvidenceAfterCommit`).
         let payload = Payload(
             sessionId: draft.id,
             localDate: draft.workoutDate,
             mode: draft.mode == .live ? "live" : "retrospective",
             exercises: exercises,
             supersets: supersets,
-            supportingEvidenceReviewId: supportingBinding?.reviewId,
-            supportingEvidenceReviewVersion: supportingBinding?.reviewVersion
+            supportingEvidenceReviewId: nil,
+            supportingEvidenceReviewVersion: nil
         )
         let signature = ProductionIdempotentSubmission.signature([
             ProductionCommandType.commitTrainingSession,
@@ -128,8 +147,6 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                 return "\(identity)|\(exercise.occurrenceId)|\(exercise.executionVariant?.key ?? "ordinary")|\(sets)"
             }.joined(separator: ";"),
             supersets.map { "\($0.id):\($0.memberExerciseIds.joined(separator: ","))" }.joined(separator: ";"),
-            supportingBinding?.reviewId ?? "no-supporting-evidence",
-            supportingBinding.map { String($0.reviewVersion) } ?? "",
         ])
         let key = idempotencyStore.resolvedKey(scope: "training-session.\(draft.id)", signature: signature)
         let outcome: ProductionCommandOutcome<TrainingCommitResult> = try await api.submitCommand(
@@ -144,7 +161,9 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         // shared outbox owns canonical commit and every later continuation;
         // waiting for the review to become fully confirmed here previously
         // turned a successful workout into a false timeout/network error.
-        bindingStore.remove(draftId: draft.id)
+        // Any supporting-evidence binding is intentionally left in place here
+        // (not cleared) — reconciling it onto this now-durable session is a
+        // separate, later step; see `reconcileSupportingEvidenceAfterCommit`.
         return result
     }
 
@@ -155,6 +174,22 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         // earlier attachment that didn't yet include everything on `draft`.
         bindingStore.remove(draftId: draft.id)
         _ = try? await prepareSupportingEvidence(for: draft)
+    }
+
+    func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async {
+        // Whatever `prepareSupportingEvidence` needs the attachment files
+        // for happens inside this call — safe to clean them up unconditionally
+        // once it returns, succeeding or not.
+        defer { attachmentStore.removeAll(draftId: draft.id) }
+        guard let binding = try? await prepareSupportingEvidence(for: draft) else { return }
+        guard let review = try? await reviewAPI.fetchReview(reviewId: binding.reviewId),
+              let version = review.version
+        else { return }
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: idempotencyStore)
+        _ = try? await pipeline.commitReview(
+            domain: .workoutLogger, reviewId: binding.reviewId, expectedVersion: String(version)
+        )
+        bindingStore.remove(draftId: draft.id)
     }
 
     private func prepareSupportingEvidence(for draft: TrainingLoggerDraft) async throws -> TrainingEvidenceBinding? {

@@ -2133,15 +2133,16 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(bodyweightSets[1]["load"] as? Double, 25)
     }
 
-    func testProductionTrainingCommitUploadsPrivateScreenshotAndBindsVersionedReview() async throws {
+    /// Build 32: the structured TrainingSession must become durable
+    /// immediately, never waiting on (or requiring) a supporting-evidence
+    /// screenshot's interpretation — even when one is attached. `commit`
+    /// must not touch the evidence-intake pipeline at all.
+    func testProductionTrainingCommitNeverWaitsOnAttachedSupportingEvidence() async throws {
         let result = #"{"status":"confirmation_requested","reviewId":"review-training","reviewRevision":2,"sessionId":"native-session-media","intendedDate":"2026-09-11","exerciseIds":["barbell_bench_press"]}"#
         let response = #"{"outcome":"committed","receipt":{"status":"committed","result":"# + result + #", "operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"},"confirmation":{"state":"confirmed","reviewId":"review-training","continuationKey":null,"completedStep":"complete","publication":null}}"#
-        let review = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-training","status":"pending","createdAt":"2026-09-11T12:00:00.000Z","version":1,"interpretedEvidence":{"evidence_objects":[{"id":"training-object","evidence_type":"training","observed_at":"2026-09-11"}]}}}"#)
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
-            .json(202, #"{"intakeId":"intake-training","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/api/v1/native/evidence/intakes/intake-training"}"#),
-            .json(200, #"{"intakeId":"intake-training","status":"ready","reviewId":"review-training","reviewUrl":"/review","processingUrl":"/status"}"#),
-            .json(200, review), .json(200, response),
+            .json(200, response),
         ])
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
@@ -2169,19 +2170,69 @@ final class FounderServerAPITests: XCTestCase {
             supportingWorkouts: nil, supportingWorkoutFailureAssetIds: nil
         )
 
-        _ = try await writeAPI.commit(draft)
+        let committed = try await writeAPI.commit(draft)
+
+        XCTAssertEqual(committed.exerciseIds, ["barbell_bench_press"])
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map { $0.url?.path }, ["/api/v1/native/auth/pair", "/api/v1/native/commands"],
+            "commit must never touch the evidence-intake pipeline, with or without an attachment.")
+        let command = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests.last?.httpBody)) as? [String: Any])
+        let payload = try XCTUnwrap(command["payload"] as? [String: Any])
+        XCTAssertNil(payload["supportingEvidenceReviewId"])
+        XCTAssertNil(payload["supportingEvidenceReviewVersion"])
+        // The screenshot bytes are deliberately still on disk after commit —
+        // `reconcileSupportingEvidenceAfterCommit` (a separate, later step)
+        // owns reading and then deleting them.
+        XCTAssertEqual(try attachments.load(reference: reference), Data([1, 2, 3]))
+    }
+
+    /// The later, best-effort step that reconciles an attached screenshot
+    /// onto the already-durable session: interprets it, then confirms its
+    /// evidence review through the exact same `evidence-review.commit.v1`
+    /// path every other evidence type uses (no training-specific merge
+    /// command needed — that path's own duplicate-detection already merges
+    /// same-day training evidence). Cleans up the attachment file when done.
+    func testReconcileSupportingEvidenceAfterCommitConfirmsScreenshotReview() async throws {
+        let review = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-training","status":"pending","createdAt":"2026-09-11T12:00:00.000Z","version":1,"interpretedEvidence":{"evidence_objects":[{"id":"training-object","evidence_type":"training","observed_at":"2026-09-11"}]}}}"#)
+        let confirmResponse = #"{"outcome":"committed","receipt":{"status":"committed","result":null,"operationId":null,"commandId":"01911111-1111-7111-8111-111111111112"},"confirmation":{"state":"confirmed","reviewId":"review-training","continuationKey":null,"completedStep":"complete","publication":null}}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(202, #"{"intakeId":"intake-training","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/api/v1/native/evidence/intakes/intake-training"}"#),
+            .json(200, #"{"intakeId":"intake-training","status":"ready","reviewId":"review-training","reviewUrl":"/review","processingUrl":"/status"}"#),
+            .json(200, review), .json(200, confirmResponse),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let attachments = MemoryTrainingLoggerAttachmentStore()
+        let reference = try attachments.save(data: Data([1, 2, 3]), draftId: "native-session-media", assetId: "asset-1", displayName: "Workout.png")
+        let defaults = Self.freshDefaults()
+        let writeAPI = ProductionTrainingWriteAPI(
+            api: native,
+            reviewAPI: ProductionEvidenceReviewAPI(api: native),
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults),
+            attachmentStore: attachments,
+            bindingStore: TrainingEvidenceBindingStore(defaults: defaults)
+        )
+        let draft = TrainingLoggerDraft(
+            id: "native-session-media", mode: .live, workoutDate: "2026-09-11", selectedAreaIds: ["chest"],
+            exercises: [], relationships: [], step: .complete, exercisePickerReturnStep: nil,
+            exercisePickerExistingExerciseIds: nil,
+            supportingEvidence: [TrainingLoggerSupportingEvidence(id: "asset-1", displayName: "Workout.png", source: .photos, storageReference: reference, contentType: "image/png")],
+            supportingWorkouts: nil, supportingWorkoutFailureAssetIds: nil
+        )
+
+        await writeAPI.reconcileSupportingEvidenceAfterCommit(for: draft)
 
         let requests = await transport.requests
         XCTAssertEqual(requests.map { $0.url?.path }, [
             "/api/v1/native/auth/pair", "/api/v1/native/evidence/intakes",
             "/api/v1/native/evidence/intakes/intake-training", "/api/v1/native/read/evidence-review",
             "/api/v1/native/commands",
-        ])
+        ], "the two back-to-back reads of the same review coalesce via in-flight read dedup.")
         let command = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests.last?.httpBody)) as? [String: Any])
-        let payload = try XCTUnwrap(command["payload"] as? [String: Any])
-        XCTAssertEqual(payload["supportingEvidenceReviewId"] as? String, "review-training")
-        XCTAssertEqual(payload["supportingEvidenceReviewVersion"] as? Int, 1)
-        XCTAssertFalse(String(data: try XCTUnwrap(requests.last?.httpBody), encoding: .utf8)?.contains(reference) == true)
+        XCTAssertEqual(command["commandType"] as? String, ProductionCommandType.commitEvidenceReview)
+        XCTAssertEqual(command["payload"] as? [String: String], ["reviewId": "review-training"])
+        XCTAssertThrowsError(try attachments.load(reference: reference), "the screenshot file is cleaned up once reconciliation finishes.")
     }
 
     func testProductionTrainingCommitCreatesFounderNamedExerciseWithSelectedArea() async throws {

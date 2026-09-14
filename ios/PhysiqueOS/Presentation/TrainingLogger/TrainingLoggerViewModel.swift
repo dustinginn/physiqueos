@@ -150,7 +150,14 @@ final class TrainingLoggerViewModel {
         guard var draft else { return }
         draft.step = .complete
         self.draft = draft
-        attachmentStore.removeAll(draftId: draft.id)
+        // When supporting evidence is attached, its files stay on disk until
+        // `reconcileSupportingEvidenceAfterCommit` (running in the
+        // background, after this returns) has read them — it owns deleting
+        // them once done. With nothing attached, clean up immediately as
+        // before.
+        if draft.supportingEvidenceAssets.isEmpty {
+            attachmentStore.removeAll(draftId: draft.id)
+        }
         draftStore.discard()
         savedDraft = nil
     }
@@ -165,10 +172,6 @@ final class TrainingLoggerViewModel {
         validationMessage = nil
         refreshWarning = nil
         defer { isSubmitting = false }
-        // If evidence is still being interpreted from an attachment made
-        // moments ago, wait for that same work rather than letting `commit`
-        // start a redundant, duplicate interpretation of its own.
-        await evidencePrewarmTask?.value
         do {
             _ = try await writeAPI.commit(draft)
         } catch {
@@ -183,6 +186,17 @@ final class TrainingLoggerViewModel {
         // as failed or resurrect the local draft — nothing after this point
         // is authoritative over that.
         completeLocalCapture()
+        // Reconciling any attached supporting evidence happens entirely in
+        // the background, after the durable commit above and after
+        // navigation to the completion screen — never blocking either one.
+        // If an attach-time prewarm is already interpreting the same
+        // screenshots, wait for that instead of starting a redundant,
+        // duplicate interpretation.
+        let pendingPrewarm = evidencePrewarmTask
+        Task { [writeAPI] in
+            _ = await pendingPrewarm?.value
+            await writeAPI.reconcileSupportingEvidenceAfterCommit(for: draft)
+        }
         do {
             configuration = try await api.fetchConfiguration()
         } catch {
