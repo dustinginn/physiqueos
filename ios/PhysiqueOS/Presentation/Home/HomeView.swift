@@ -10,6 +10,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var viewModel: HomeViewModel?
     /// The authority `viewModel` was actually built for. `.task(id:)`
     /// re-fires on ordinary tab-switch reappearance even when the id
@@ -133,14 +134,14 @@ struct HomeView: View {
                         guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: environment.nativeAuthority)) != nil else { return }
                         completingPriorityIDs.insert(occurrence.id)
                         Task { @MainActor in
-                            defer { completingPriorityIDs.remove(occurrence.id) }
                             if environment.nativeAuthority == .sandbox {
                                 environment.loggingSandboxStore.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
-                                viewModel?.refreshTodaysFocus()
+                                await settlePriorityCompletion(occurrence.id) { viewModel?.refreshTodaysFocus() }
                                 return
                             }
                             guard let version = occurrence.expectedVersion else {
                                 completionError = "Refresh Home to obtain the current priority version."
+                                completingPriorityIDs.remove(occurrence.id)
                                 return
                             }
                             do {
@@ -150,15 +151,39 @@ struct HomeView: View {
                                     context: occurrence.completionContext,
                                     expectedVersion: version
                                 )
-                                await viewModel?.reconcileAfterConfirmedPriorityCompletion(occurrenceID: occurrence.id)
+                                await settlePriorityCompletion(occurrence.id) {
+                                    await viewModel?.reconcileAfterConfirmedPriorityCompletion(occurrenceID: occurrence.id)
+                                }
                             } catch {
                                 completionError = "The priority was not marked complete. Refresh before retrying."
+                                completingPriorityIDs.remove(occurrence.id)
                             }
                         }
                     }
+                    .transition(.opacity)
                 }
             }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: home.todaysFocus.count)
         }
+    }
+
+    /// Lets a just-completed priority's checkmark (already shown via
+    /// `isCompleting`) hold for a beat before the tile collapses and the
+    /// remaining cards reflow — rather than the tile vanishing the instant
+    /// the write settles. The completion itself is never delayed by this;
+    /// only the animated removal is. `mutate` is what actually drops the
+    /// occurrence from `home.todaysFocus` (sandbox's synchronous
+    /// `refreshTodaysFocus` or production's async
+    /// `reconcileAfterConfirmedPriorityCompletion`) — the `.animation(value:)`
+    /// on the surrounding VStack picks up that change whenever it lands and
+    /// animates the collapse/reflow (and, if this was the last priority, the
+    /// whole card's fade-out) automatically.
+    private func settlePriorityCompletion(_ occurrenceID: String, mutate: () async -> Void) async {
+        if !reduceMotion {
+            try? await Task.sleep(for: .milliseconds(450))
+        }
+        await mutate()
+        completingPriorityIDs.remove(occurrenceID)
     }
 }
 

@@ -26,14 +26,19 @@ struct TodaysFocusCardView: View {
                         ForEach(items) { item in
                             if let sessionItems = item.sessionItems {
                                 SessionPriorityCardView(item: item, sessionItems: sessionItems, onTap: onTap)
+                                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
                             } else {
                                 FocusTileView(item: item, density: density, onTap: onTap, onComplete: onComplete, isCompleting: completingIDs.contains(item.id))
+                                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
                             }
                         }
                     }
                 } else {
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
-                        ForEach(items) { FocusTileView(item: $0, density: density, onTap: onTap, onComplete: onComplete, isCompleting: completingIDs.contains($0.id)) }
+                        ForEach(items) {
+                            FocusTileView(item: $0, density: density, onTap: onTap, onComplete: onComplete, isCompleting: completingIDs.contains($0.id))
+                                .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                        }
                     }
                 }
             }
