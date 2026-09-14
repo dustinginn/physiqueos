@@ -28,6 +28,14 @@ final class TrainingLoggerViewModel {
     /// failed. Never implies the workout itself needs to be resubmitted.
     var refreshWarning: String?
 
+    /// Interprets attached supporting-evidence screenshots as soon as they
+    /// are attached, so the wait `submit()` would otherwise hit at Finish is
+    /// normally already satisfied. Each new attachment chains after the
+    /// previous prewarm rather than racing it, so the cached binding always
+    /// ends up reflecting the most recently attached asset set, never an
+    /// earlier, incomplete one that happened to finish last.
+    private var evidencePrewarmTask: Task<Void, Never>?
+
     init(
         api: TrainingLoggerAPI,
         writeAPI: TrainingWriteAPI = NotAvailableTrainingWriteAPI(),
@@ -157,6 +165,10 @@ final class TrainingLoggerViewModel {
         validationMessage = nil
         refreshWarning = nil
         defer { isSubmitting = false }
+        // If evidence is still being interpreted from an attachment made
+        // moments ago, wait for that same work rather than letting `commit`
+        // start a redundant, duplicate interpretation of its own.
+        await evidencePrewarmTask?.value
         do {
             _ = try await writeAPI.commit(draft)
         } catch {
@@ -195,6 +207,7 @@ final class TrainingLoggerViewModel {
             data: data, draftId: draft.id, assetId: assetId, displayName: asset.displayName
         )
         update { $0.retainSupportingEvidenceFile(assetId: assetId, reference: reference, contentType: contentType) }
+        prewarmSupportingEvidenceIfNeeded()
     }
 
     func removeSupportingEvidence(assetId: String) {
@@ -204,6 +217,22 @@ final class TrainingLoggerViewModel {
         }
         attachmentStore.remove(reference: reference)
         update { $0.removeSupportingEvidence(id: assetId) }
+    }
+
+    /// Fires the write API's best-effort evidence-intake prewarm for the
+    /// current draft's full attached asset set, chained after any prewarm
+    /// already in flight. Chaining (rather than cancelling) matters because
+    /// Swift task cancellation is cooperative and this call still completes
+    /// its network work in the background either way — without an explicit
+    /// order, a second attachment's prewarm could finish before the first
+    /// one and leave an earlier, incomplete binding cached.
+    private func prewarmSupportingEvidenceIfNeeded() {
+        guard authority == .founderProduction, let draft, !draft.supportingEvidenceAssets.isEmpty else { return }
+        let previous = evidencePrewarmTask
+        evidencePrewarmTask = Task { [writeAPI] in
+            _ = await previous?.value
+            await writeAPI.prewarmSupportingEvidence(for: draft)
+        }
     }
 
     func pickerExercises() -> [TrainingLoggerCatalogExercise] {

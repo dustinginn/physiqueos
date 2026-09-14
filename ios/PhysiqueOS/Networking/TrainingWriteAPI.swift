@@ -2,6 +2,18 @@ import Foundation
 
 protocol TrainingWriteAPI: Sendable {
     func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult
+    /// Starts (or resumes) interpreting any attached supporting-evidence
+    /// screenshots as soon as they are attached, well before `commit` is
+    /// called. `commit` still awaits the same binding, but since intake
+    /// interpretation typically runs to completion during the rest of the
+    /// workout, the wait it actually hits at Finish is usually already
+    /// satisfied. Best-effort: failures here surface again, normally, inside
+    /// `commit`, so this never needs to throw.
+    func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async
+}
+
+extension TrainingWriteAPI {
+    func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async {}
 }
 
 struct TrainingCommitResult: Decodable, Equatable, Sendable {
@@ -134,6 +146,15 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         // turned a successful workout into a false timeout/network error.
         bindingStore.remove(draftId: draft.id)
         return result
+    }
+
+    func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async {
+        // Always recompute against the asset list as of THIS call: a caller
+        // (the view model) is expected to serialize successive prewarms, so
+        // an existing cached binding here would only ever be stale — from an
+        // earlier attachment that didn't yet include everything on `draft`.
+        bindingStore.remove(draftId: draft.id)
+        _ = try? await prepareSupportingEvidence(for: draft)
     }
 
     private func prepareSupportingEvidence(for draft: TrainingLoggerDraft) async throws -> TrainingEvidenceBinding? {
