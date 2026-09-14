@@ -103,6 +103,14 @@ struct OperatingPlanDexaAppointmentView: View {
             let display = DateFormatter()
             display.locale = Locale(identifier: "en_US")
             display.dateFormat = "MMMM d"
+            // `plannedDate` is a canonical date-only value parsed above as
+            // UTC midnight (matching `TrainingDateFormatting.short`'s own
+            // pattern) — displaying it in the device's LOCAL time zone
+            // (the default when unset) rolled it back a day for any
+            // negative-UTC-offset zone, every US zone included. Pinning
+            // this formatter to UTC too keeps the parse and the display in
+            // the same reference frame, so the calendar day never moves.
+            display.timeZone = TimeZone(identifier: "UTC")
             return display.string(from: date)
         } ?? item.plannedDate
         let timeText = item.localTime.isEmpty ? "" : OperatingPlanSandboxStore.formattedLocalTime(item.localTime)

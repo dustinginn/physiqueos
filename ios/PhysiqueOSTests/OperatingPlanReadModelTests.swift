@@ -599,6 +599,26 @@ final class OperatingPlanReadModelTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(AppDestination.self, from: data), .operatingPlanDexaAppointment)
     }
 
+    /// `plannedDate` is a canonical date-only value; `summary(_:)` parses and
+    /// displays it with the SAME (UTC) reference frame on both ends. Both
+    /// formatters are hardcoded to UTC internally, independent of the
+    /// device's own time zone, so this doesn't need to fake the device
+    /// clock to prove the day never shifts — it just locks in that both
+    /// ends still agree. Regression guard for the date rendering one
+    /// calendar day early for every negative-UTC-offset zone.
+    func testDexaAppointmentSummaryPreservesTheCanonicalCalendarDay() throws {
+        let item = CoachingDexaReadModel(plannedDate: "2026-11-15", localTime: "", reminderPreferences: [], uploadReminder: false, preparationNote: "")
+        XCTAssertEqual(OperatingPlanDexaAppointmentView.summary(item), "November 15")
+    }
+
+    /// Month-boundary case: a naive local-timezone parse/display mismatch
+    /// would roll this back into the prior month entirely, not just the
+    /// prior day of the same month.
+    func testDexaAppointmentSummaryPreservesTheCanonicalCalendarDayAcrossAMonthBoundary() throws {
+        let item = CoachingDexaReadModel(plannedDate: "2026-03-01", localTime: "", reminderPreferences: [], uploadReminder: false, preparationNote: "")
+        XCTAssertEqual(OperatingPlanDexaAppointmentView.summary(item), "March 1")
+    }
+
     // MARK: - Training Protocol Builder (`/profile/operating-plan/training/new`)
 
     /// The fixture's Training strategy is already active — matching the

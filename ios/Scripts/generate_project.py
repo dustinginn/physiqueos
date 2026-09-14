@@ -110,6 +110,10 @@ app_files = [
     ("Networking", "FounderPhotoMediaStore.swift"),
     ("Performance", "NativePerformanceDiagnostics.swift"),
     ("Networking", "FounderProductionPhotoMediaStore.swift"),
+    ("Networking", "PriorityNotificationCategories.swift"),
+    ("Networking", "PriorityNotificationScheduler.swift"),
+    ("Networking", "PriorityNotificationDelegate.swift"),
+    ("Networking", "EvidenceReviewReadyNotifier.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "HomeGreeting.swift"),
     ("SharedUI", "IconBadge.swift"),
@@ -312,6 +316,7 @@ test_files = [
     ("PhysiqueOSTests", "MorningCheckInModelTests.swift"),
     ("PhysiqueOSTests", "FounderServerAPITests.swift"),
     ("PhysiqueOSTests", "EvidenceAttachmentContentTypeProbeTests.swift"),
+    ("PhysiqueOSTests", "PriorityNotificationSchedulerTests.swift"),
 ]
 
 ui_test_files = [

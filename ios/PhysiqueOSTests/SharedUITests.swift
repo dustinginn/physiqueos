@@ -163,6 +163,26 @@ final class SharedUITests: XCTestCase {
         XCTAssertNil(EvidenceDateParsing.date(fromLocalDateString: "not-a-date"))
     }
 
+    /// Regression for a real bug: the parsed `Date` is handed to
+    /// `Calendar.current`-based UI (`DateField`'s `DatePicker` and its
+    /// default-timezone label formatter), which reads back a `Date`'s
+    /// calendar day using the DEVICE's own time zone, not UTC. A
+    /// UTC-midnight anchor read back that way on any negative-UTC-offset
+    /// device (every US time zone, exercised here via a fixed UTC-8
+    /// calendar rather than the device's actual zone, so this doesn't
+    /// depend on where the test happens to run) rolled the visible
+    /// "Evidence date" back to the PREVIOUS calendar day — noon-UTC
+    /// anchoring (this file's actual convention) keeps it correct.
+    func testEvidenceDateParsingSurvivesReinterpretationInATimezoneBehindUTC() {
+        let date = try! XCTUnwrap(EvidenceDateParsing.date(fromLocalDateString: "2026-08-28"))
+        var behindUTC = Calendar(identifier: .gregorian)
+        behindUTC.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let components = behindUTC.dateComponents([.year, .month, .day], from: date)
+        XCTAssertEqual(components.year, 2026)
+        XCTAssertEqual(components.month, 8)
+        XCTAssertEqual(components.day, 28)
+    }
+
     func testNutritionCaloriesUsesADistinctGreenIdentityFromCarbohydrates() {
         let calories = UIColor(PhysiqueOSTheme.nutritionCalories)
         let carbohydrates = UIColor(PhysiqueOSTheme.macroCarbohydrates)
