@@ -119,6 +119,10 @@ struct ProductionEvidenceUploadView: View {
         case picking
         case classifying
         case uploading
+        /// Transfer is durably accepted; briefly checking whether
+        /// interpretation already finished before falling back to
+        /// `.accepted`'s "check Log later" messaging.
+        case processing
         case accepted(String)
         case confirmed
         case failed(String)
@@ -182,6 +186,7 @@ struct ProductionEvidenceUploadView: View {
                 case .picking: pickingContent
                 case .classifying: classifyingContent
                 case .uploading: uploadingContent
+                case .processing: processingContent
                 case .accepted(let message): acceptedContent(message)
                 case .confirmed: confirmedContent
                 case .failed(let message): failedContent(message)
@@ -442,6 +447,13 @@ struct ProductionEvidenceUploadView: View {
         }.frame(maxWidth: .infinity, alignment: .leading) }
     }
 
+    private var processingContent: some View {
+        CardContainer { VStack(alignment: .leading, spacing: 10) {
+            ProgressView().tint(PhysiqueOSTheme.accent)
+            Text("Reading what you uploaded…").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }.frame(maxWidth: .infinity, alignment: .leading) }
+    }
+
     private func acceptedContent(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             CardContainer { VStack(alignment: .leading, spacing: 8) {
@@ -574,11 +586,16 @@ struct ProductionEvidenceUploadView: View {
         }
     }
 
-    /// The whole point of this rewrite: submit and return control to the
-    /// Founder immediately. No polling, no waiting for interpretation or
-    /// canonical commit — those continue entirely server-side, and the
-    /// Founder finds the result later via Log's pending-review list and
-    /// `EvidenceReviewDetailView`'s Confirm/Correct actions.
+    /// Submit and return control to the Founder immediately once durable
+    /// acceptance is known — no long wait for interpretation or canonical
+    /// commit, which continue entirely server-side either way. On top of
+    /// that: a brief, tightly-bounded look to see whether interpretation
+    /// already finished (it normally does, within a couple of seconds).
+    /// When it has, skip the "check Log later" detour and go straight to
+    /// the exact Evidence Review — that's the whole point of uploading
+    /// through this flow rather than depositing a file somewhere. When it
+    /// hasn't, this falls back to exactly the prior behavior; nothing here
+    /// waits longer than `fastFollowUpMaxWait` for that answer.
     private func submitIntake(scenario: Scenario) async {
         phase = .uploading
         transferProgress = 0
@@ -586,7 +603,7 @@ struct ProductionEvidenceUploadView: View {
         let files = Self.files(from: attachments, scenario: scenario)
         let startedAt = Date()
         do {
-            _ = try await environment.evidenceIntakePipeline.submitIntake(
+            let intake = try await environment.evidenceIntakePipeline.submitIntake(
                 scope: "\(scenario.rawValue)-intake.\(localDate)",
                 effectiveDate: localDate,
                 expectedEvidenceType: scenario.expectedEvidenceType,
@@ -597,11 +614,26 @@ struct ProductionEvidenceUploadView: View {
             )
             acceptanceSeconds = Date().timeIntervalSince(startedAt)
             let noun = scenario == .dexa ? "scan" : "screenshots"
-            phase = .accepted("Your \(noun) \(files.count == 1 && scenario != .dexa ? "was" : "were") accepted for \(Self.mediumDate.string(from: effectiveDate)).")
+            let acceptedMessage = "Your \(noun) \(files.count == 1 && scenario != .dexa ? "was" : "were") accepted for \(Self.mediumDate.string(from: effectiveDate))."
+            phase = .processing
+            if let reviewId = try? await environment.evidenceIntakePipeline.awaitReadyIntake(
+                intakeId: intake.intakeId, pollInterval: Self.fastFollowUpPollInterval, maxPolls: Self.fastFollowUpMaxPolls
+            ) {
+                onNavigate(.evidenceReview(reviewId: reviewId))
+                return
+            }
+            phase = .accepted(acceptedMessage)
         } catch {
             phase = .failed(Self.errorMessage(for: error))
         }
     }
+
+    /// A couple of seconds, matching the Founder's expectation that a
+    /// screenshot upload "normally" resolves in about that time. Anything
+    /// slower falls back to the async "check Log later" path rather than
+    /// holding this screen open indefinitely.
+    private static let fastFollowUpPollInterval: Duration = .seconds(1)
+    private static let fastFollowUpMaxPolls = 3
 
     private func submitManualEntry(scenario: Scenario) async {
         phase = .uploading
