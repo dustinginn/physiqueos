@@ -35,7 +35,42 @@ enum PriorityNotificationScheduler {
 
         let pending = await center.pendingNotificationRequests()
         let existingScheduledIds = Set(pending.map(\.identifier).filter { $0.hasPrefix(scheduledPrefix) })
+        let plan = reconciliationPlan(items: items, existingScheduledIdentifiers: existingScheduledIds, now: now, calendar: calendar)
 
+        if !plan.toRemove.isEmpty { center.removePendingNotificationRequests(withIdentifiers: plan.toRemove) }
+        // `add` replaces any existing request with the same identifier in
+        // place (e.g. the canonical schedule's time changed) — no separate
+        // "already scheduled, skip" branch is needed for correctness.
+        for request in plan.toAdd {
+            try? await center.add(request)
+        }
+    }
+
+    /// The actual reconciliation decision, factored out as a pure function
+    /// (no `UNUserNotificationCenter` access) so the schedule-change
+    /// invariant — a canonical schedule edit replaces the pending
+    /// notification rather than ever leaving both an old and a new one
+    /// pending — is deterministically testable. Authorization can't be
+    /// granted programmatically in a test, so `sync` (which needs a live,
+    /// authorized center) can't be exercised end-to-end there; this can.
+    ///
+    /// Every identifier this returns in `toAdd` is stable per
+    /// priority+occurrence (`identifier(priorityId:occurrenceDate:)`) and
+    /// carries whatever fire time the CURRENT `items` says — so if the
+    /// canonical schedule changed since the last sync, the same identifier
+    /// simply gets a new trigger; `UNUserNotificationCenter.add` replacing
+    /// same-identifier requests (Apple's documented behavior) is what turns
+    /// that into "old cancelled, new scheduled" with no window where both
+    /// exist. `toRemove` only ever needs to cover identifiers that are no
+    /// longer desired at all (completed, or dropped from `items`) — never a
+    /// same-identifier schedule-time change, which needs no explicit
+    /// removal.
+    static func reconciliationPlan(
+        items: [PriorityOccurrence],
+        existingScheduledIdentifiers: Set<String>,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> (toAdd: [UNNotificationRequest], toRemove: [String]) {
         var desired: [UNNotificationRequest] = []
         var completedIdentifiersToCancel: [String] = []
 
@@ -62,15 +97,8 @@ enum PriorityNotificationScheduler {
         }
 
         let desiredIds = Set(desired.map(\.identifier))
-        let staleIds = existingScheduledIds.subtracting(desiredIds)
-        let toRemove = Array(staleIds) + completedIdentifiersToCancel
-        if !toRemove.isEmpty { center.removePendingNotificationRequests(withIdentifiers: toRemove) }
-        // `add` replaces any existing request with the same identifier in
-        // place (e.g. the canonical schedule's time changed) — no separate
-        // "already scheduled, skip" branch is needed for correctness.
-        for request in desired {
-            try? await center.add(request)
-        }
+        let staleIds = existingScheduledIdentifiers.subtracting(desiredIds)
+        return (toAdd: desired, toRemove: Array(staleIds) + completedIdentifiersToCancel)
     }
 
     /// Device-only: reschedules the same notification content one hour
