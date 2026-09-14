@@ -164,9 +164,6 @@ function WeeklyTraining({ training }) {
     {training.conclusion && <p className="text-sm font-semibold leading-6 text-[var(--text-secondary)]">
       {training.conclusion}
     </p>}
-    <p className="mt-3 text-[10px] font-bold text-[var(--text-muted)]">
-      {training.trainingDayCount} training days · {training.comparableCategoryCount} reviewed categories · {training.status.improving} improving · {training.status.plateauing} plateauing · {training.insufficientCount} insufficient
-    </p>
     <TrainingPerformanceHighlights items={training.highlights.slice(0, 3)}/>
     {training.priorityCategories.length > 0 && <div className="mt-5">
       <p className="text-[10px] font-black uppercase tracking-[.08em] text-[var(--text-muted)]">

@@ -71,11 +71,11 @@ describe("Weekly Briefing History visible route", () => {
     );
     expect(sectionText(html, "weekly-confidence"))
       .not.toContain("Confidence improved this week");
-    expect(sectionText(html, "weekly-training-response")).toContain(
-      "6 training days"
+    expect(sectionText(html, "weekly-training-response")).not.toContain(
+      "reviewed categories"
     );
-    expect(sectionText(html, "weekly-training-response")).toContain(
-      "9 reviewed categories"
+    expect(sectionText(html, "weekly-training-response")).not.toContain(
+      "training days"
     );
     expect(sectionText(html, "weekly-training-response")).toContain("Back");
     const training = sectionText(html, "weekly-training-response");
