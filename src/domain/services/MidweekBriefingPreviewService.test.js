@@ -62,7 +62,9 @@ describe("Wednesday Midweek Briefing preview", () => {
     expect(result.training).toMatchObject({ sessionsCompleted: 2, performanceTrend: "improving" });
     expect(result.training.highlights.map((item)=>item.exercise).join(" ")).toMatch(/Pull-Up|Row/);
     expect(result.training.highlights[0]).toMatchObject({ kind: "Record", label: "New volume-load record", value: 2200, previous: 2000, delta: 200, percentChange: 10 });
-    expect(result.training.prioritySignals.find((signal) => signal.key === "lower_body").status).toBe("The trend is still forming.");
+    expect(result.training.priorityCategories).toContainEqual(
+      expect.objectContaining({ id: "back", label: "Back", status: "improving", statusTone: "success", comparableExerciseCount: 2 })
+    );
     expect(result.charts.training).toBeNull();
   });
 
@@ -70,6 +72,7 @@ describe("Wednesday Midweek Briefing preview", () => {
     const result = compose(midweekPreviewFixtures.trainingWatch);
     expect(result.training.watch.map((item)=>item.status)).toEqual(expect.arrayContaining(["plateauing","regressing"]));
     expect(result.training.watch.map((item)=>item.message).join(" ")).toMatch(/increase difficulty|recovery and execution/i);
+    expect(result.training.priorityCategories.map((item)=>item.status)).toEqual(expect.arrayContaining(["plateauing","regressing"]));
   });
 
   it("keeps weight concise and never emits a weight chart", () => {

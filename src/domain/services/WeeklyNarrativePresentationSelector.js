@@ -98,7 +98,7 @@ export function selectWeeklyNarrativePresentation({
   });
 }
 
-function selectTrainingPriorities(conclusion, trainingFacts) {
+export function selectTrainingPriorities(conclusion, trainingFacts) {
   const categories = Array.isArray(trainingFacts?.categories)
     ? trainingFacts.categories
     : [];

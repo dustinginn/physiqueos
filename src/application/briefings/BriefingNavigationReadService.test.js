@@ -231,7 +231,7 @@ function midweekArtifact() {
         comparison: { averageBalance: -272 },
         chartPoints: [],
       },
-      training: { highlights: [], watch: [], interpretation: "Raw interpretation", prioritySignals: [] },
+      training: { highlights: [], watch: [], interpretation: "Raw interpretation", priorityCategories: [] },
       goalConfidence: { assessmentId: "confidence-1", score: 60, band: "moderate" },
       activeGoal: { id: "goal-build", name: "Build Lean Mass" },
       activePhase: { id: "phase-1", name: "Establish Maintenance" },
