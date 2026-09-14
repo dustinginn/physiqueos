@@ -46,8 +46,32 @@ enum NotificationDiagnostics {
         let reason: String
     }
 
+    /// The finer-grained settings `UNUserNotificationCenter` exposes
+    /// alongside `authorizationStatus` — distinct from it, and from
+    /// whether a request exists at all. `authorizationStatus == .authorized`
+    /// only means the Founder said yes once; a Focus Mode, the iOS 15+
+    /// Scheduled Summary, or a per-alert-type toggle can each independently
+    /// silence delivery without ever showing up as "denied" or as a
+    /// missing pending request. Surfacing these separately is what makes
+    /// "the request exists but iOS chose not to show it" distinguishable
+    /// from "no request was ever created."
+    struct DeliverySettings {
+        let alertSetting: UNNotificationSetting
+        let soundSetting: UNNotificationSetting
+        let badgeSetting: UNNotificationSetting
+        let lockScreenSetting: UNNotificationSetting
+        let notificationCenterSetting: UNNotificationSetting
+        /// iOS 15+ "Scheduled Summary" — when `.enabled`, an otherwise
+        /// eligible notification can be held and delivered later as part
+        /// of a digest instead of immediately, which reads exactly like
+        /// "it never fired" from the Founder's side.
+        let scheduledDeliverySetting: UNNotificationSetting
+        let timeSensitiveSetting: UNNotificationSetting
+    }
+
     struct Report {
         let authorizationStatus: UNAuthorizationStatus
+        let deliverySettings: DeliverySettings
         let pendingRequests: [PendingRequestSnapshot]
         let itemOutcomes: [ItemOutcome]
         let lastSyncFailures: [(identifier: String, error: Error)]
@@ -85,6 +109,15 @@ enum NotificationDiagnostics {
 
         return Report(
             authorizationStatus: settings.authorizationStatus,
+            deliverySettings: DeliverySettings(
+                alertSetting: settings.alertSetting,
+                soundSetting: settings.soundSetting,
+                badgeSetting: settings.badgeSetting,
+                lockScreenSetting: settings.lockScreenSetting,
+                notificationCenterSetting: settings.notificationCenterSetting,
+                scheduledDeliverySetting: settings.scheduledDeliverySetting,
+                timeSensitiveSetting: settings.timeSensitiveSetting
+            ),
             pendingRequests: snapshots,
             itemOutcomes: outcomes,
             lastSyncFailures: PriorityNotificationScheduler.lastSyncFailures

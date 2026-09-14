@@ -1,13 +1,15 @@
 import SwiftUI
 import UserNotifications
 
-/// DEBUG-only screen answering "does a pending local notification actually
-/// exist for this occurrence, and if not, exactly why not" — built from
+/// Hidden diagnostic screen (long-press on Home — no visible affordance,
+/// but deliberately compiled into every configuration, TestFlight/Release
+/// included, since it exists to answer "does a pending local notification
+/// actually exist" on exactly the physical device that reported a delivery
+/// problem) answering that question and, if a request DOES exist, why iOS
+/// might still not have shown it — built from
 /// `NotificationDiagnostics.makeReport`, which reuses the live scheduler's
 /// own reconciliation logic rather than a second copy of it. Read-only: it
 /// never schedules, cancels, or otherwise mutates the notification center.
-/// Not wired into any production navigation path — see `HomeView`'s
-/// `#if DEBUG` entry point.
 struct NotificationDiagnosticsView: View {
     let items: [PriorityOccurrence]
     @State private var report: NotificationDiagnostics.Report?
@@ -22,6 +24,22 @@ struct NotificationDiagnosticsView: View {
                             Text(String(describing: report.authorizationStatus))
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        }
+
+                        // Distinct from authorization: a Focus Mode, the
+                        // iOS 15+ Scheduled Summary, or a per-alert-type
+                        // toggle can each silence delivery of an otherwise
+                        // correctly-scheduled, authorized request — this
+                        // is how "a request exists but iOS didn't show it"
+                        // is told apart from "no request was ever created".
+                        section("Delivery Settings") {
+                            deliverySettingRow("Alert", report.deliverySettings.alertSetting)
+                            deliverySettingRow("Sound", report.deliverySettings.soundSetting)
+                            deliverySettingRow("Badge", report.deliverySettings.badgeSetting)
+                            deliverySettingRow("Lock Screen", report.deliverySettings.lockScreenSetting)
+                            deliverySettingRow("Notification Center", report.deliverySettings.notificationCenterSetting)
+                            deliverySettingRow("Scheduled Summary", report.deliverySettings.scheduledDeliverySetting)
+                            deliverySettingRow("Time Sensitive", report.deliverySettings.timeSensitiveSetting)
                         }
 
                         section("Pending Requests (\(report.pendingRequests.count))") {
@@ -65,6 +83,18 @@ struct NotificationDiagnosticsView: View {
                 }
             }
             .task { report = await NotificationDiagnostics.makeReport(items: items) }
+        }
+    }
+
+    private func deliverySettingRow(_ label: String, _ setting: UNNotificationSetting) -> some View {
+        HStack {
+            Text(label)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            Spacer()
+            Text(String(describing: setting))
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(setting == .disabled ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.textPrimary)
         }
     }
 

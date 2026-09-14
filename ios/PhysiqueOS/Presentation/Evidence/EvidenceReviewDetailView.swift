@@ -284,7 +284,6 @@ struct EvidenceReviewDetailView: View {
                                     detailText(typedEvidence)
                                 }
                             }
-                            if !item.sourceFiles.isEmpty { detailText("Sources: \(item.sourceFiles.joined(separator: ", "))") }
                             if let measurements = item.dexaMeasurements, actionState != .editingMeasurements {
                                 dexaMeasurementSummary(measurements)
                             }

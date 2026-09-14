@@ -25,9 +25,7 @@ struct HomeView: View {
     @State private var confidenceDetailPresentation: (confidence: Int, detail: ConfidenceDetail)?
     @State private var completingPriorityIDs: Set<String> = []
     @State private var completionError: String?
-#if DEBUG
     @State private var showingNotificationDiagnostics = false
-#endif
     var onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -39,11 +37,13 @@ struct HomeView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
-#if DEBUG
-        // Debug-only entry point to `NotificationDiagnosticsView` — not a
-        // production affordance, so a long-press rather than a visible
-        // button. Long-press anywhere on Home rather than a specific
-        // element so it works regardless of what's currently loaded.
+        // Deliberately NOT `#if DEBUG`: TestFlight ships the Release
+        // configuration, which strips DEBUG code entirely — a debug-only
+        // gate here would make this diagnostic permanently unreachable on
+        // exactly the build (and exact physical device) it exists to
+        // diagnose. No visible affordance either way — a long-press
+        // anywhere on Home, not a menu item — so this stays invisible to
+        // an ordinary user without needing a build-configuration gate.
         .onLongPressGesture(minimumDuration: 1.5) { showingNotificationDiagnostics = true }
         .sheet(isPresented: $showingNotificationDiagnostics) {
             if case .loaded(let home) = viewModel?.state {
@@ -52,7 +52,6 @@ struct HomeView: View {
                 NotificationDiagnosticsView(items: [])
             }
         }
-#endif
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = HomeViewModel(
