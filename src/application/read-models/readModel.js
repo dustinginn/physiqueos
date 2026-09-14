@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { destinationFromWebHref } from "../../contracts/v1/destination.js";
+import { createDestination, DestinationId, destinationFromWebHref } from "../../contracts/v1/destination.js";
 import { canonicalJson } from "../../contracts/v1/canonicalJson.js";
 
 const FORBIDDEN_KEYS = new Set([
@@ -33,20 +33,25 @@ export function createApplicationReadModel({
   return deepFreeze(result);
 }
 
-export function projectClientSafeValue(value) {
-  if (Array.isArray(value)) return value.map(projectClientSafeValue);
+export function projectClientSafeValue(value, { canonicalGoalDestinations = false } = {}) {
+  const options = { canonicalGoalDestinations };
+  if (Array.isArray(value)) return value.map((item) => projectClientSafeValue(item, options));
   if (!value || typeof value !== "object") return value;
   const output = {};
   for (const [key, child] of Object.entries(value)) {
     if (child === undefined) continue;
     if (FORBIDDEN_KEYS.has(key)) continue;
     if (key === "href" && typeof child === "string") {
-      const destination = destinationFromWebHref(child);
+      let destination = destinationFromWebHref(child);
       if (!destination) throw new Error(`Application read model contains an unmapped web destination: ${child}`);
+      if (canonicalGoalDestinations && destination.id === DestinationId.GOAL_DETAIL &&
+          typeof value.id === "string" && value.id.trim()) {
+        destination = createDestination(DestinationId.GOAL_DETAIL, { goalId: value.id });
+      }
       output.destination = destination;
       continue;
     }
-    output[key] = projectClientSafeValue(child);
+    output[key] = projectClientSafeValue(child, options);
   }
   return output;
 }

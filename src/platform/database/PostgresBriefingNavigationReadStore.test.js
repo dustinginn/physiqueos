@@ -26,7 +26,36 @@ describe("PostgresBriefingNavigationReadStore", () => {
     expect(query).toHaveBeenCalledTimes(1);
     expect(query.mock.calls[0][0]).not.toMatch(/SELECT\s+payload[,\s]/i);
     expect(query.mock.calls[0][0]).toContain("payload->>'cadence' IN ('weekly','midweek','monthly')");
+    expect(query.mock.calls[0][0]).toContain("NULLIF(payload->>'generatedAt','')::timestamptz");
+    expect(query.mock.calls[0][0]).toMatch(/ORDER BY COALESCE\([\s\S]*generatedAt[\s\S]*\) DESC,record_id DESC/);
     expect(query.mock.calls[0][1]).toEqual(["owner", null, 21]);
+  });
+
+  it("loads a production-shaped Photo Event detail with its provider media identities", async () => {
+    const priorMediaId = "media-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbb";
+    const currentMediaId = "media-cccccccccccccccccccccccccccccccc-dddddddddddd";
+    const query = vi.fn(async (sql) => {
+      if (sql.includes("canonical_briefing_records")) return { rows: [{
+        payload: { id: "photo-event", cadence: "event", briefing: { photoEventNarrative: {
+          cardContent: { progress: { comparisons: [{
+            poseId: "front-relaxed",
+            previousImageHref: "/api/private-evidence/founder/photos/previous.jpg",
+            imageHref: `/api/private-evidence/media/${currentMediaId}`,
+          }] } },
+        } } }, version: 2,
+      }] };
+      if (sql.includes("canonical_media_objects")) return { rows: [
+        { id: priorMediaId, original_filename: "previous.jpg", provenance: { sourceRelativePath: "founder/photos/previous.jpg" }, state: "verified" },
+        { id: currentMediaId, original_filename: "current.jpg", provenance: {}, state: "verified" },
+      ] };
+      return { rows: [] };
+    });
+    const result = await createPostgresBriefingNavigationReadStore({
+      pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 }, ownerUserId: "owner",
+    }).getNativeArtifactContext({ artifactId: "photo-event" });
+    expect(result.mediaObjects.map((item) => item.id)).toEqual([priorMediaId, currentMediaId]);
+    const mediaCall = query.mock.calls.find(([sql]) => sql.includes("canonical_media_objects"));
+    expect(mediaCall[1][2]).toContain("founder/photos/previous.jpg");
   });
 
   it("loads history with two bounded collection reads", async () => {

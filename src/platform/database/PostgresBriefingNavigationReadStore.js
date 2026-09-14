@@ -1,4 +1,5 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
+import { collectMediaLookup } from "./PostgresPhotoEventBriefingReadStore.js";
 
 export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, onComplete = null } = {}) {
   if (!pool?.query || !ownerUserId) throw new Error("Briefing navigation storage requires a PostgreSQL pool and owner.");
@@ -86,11 +87,26 @@ export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, o
                 )
               )
             )
-            AND ($2::text IS NULL OR (COALESCE(observed_at,'epoch'::timestamptz),record_id) < (
-              SELECT COALESCE(observed_at,'epoch'::timestamptz),record_id FROM physiqueos.canonical_briefing_records
+            AND ($2::text IS NULL OR (COALESCE(
+              NULLIF(payload->>'deliveryDate','')::timestamptz,
+              NULLIF(payload->>'generatedAt','')::timestamptz,
+              NULLIF(payload->>'createdAt','')::timestamptz,
+              observed_at,'epoch'::timestamptz
+            ),record_id) < (
+              SELECT COALESCE(
+                NULLIF(payload->>'deliveryDate','')::timestamptz,
+                NULLIF(payload->>'generatedAt','')::timestamptz,
+                NULLIF(payload->>'createdAt','')::timestamptz,
+                observed_at,'epoch'::timestamptz
+              ),record_id FROM physiqueos.canonical_briefing_records
                WHERE owner_user_id=$1 AND collection_name='dailyBriefings' AND record_id=$2
             ))
-          ORDER BY observed_at DESC NULLS LAST,record_id DESC
+          ORDER BY COALESCE(
+            NULLIF(payload->>'deliveryDate','')::timestamptz,
+            NULLIF(payload->>'generatedAt','')::timestamptz,
+            NULLIF(payload->>'createdAt','')::timestamptz,
+            observed_at,'epoch'::timestamptz
+          ) DESC,record_id DESC
           LIMIT $3`,
         [ownerUserId, input.cursor ?? null, limit + 1],
       );
@@ -116,6 +132,39 @@ export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, o
       const records = createPhase4CanonicalRecordStore({ query });
       const artifact = await records.get({ ownerUserId, collection: "dailyBriefings", recordId: input.artifactId });
       return context({ artifact, query });
+    }),
+    getNativeArtifactContext: tracked("briefing.native-artifact", async ({ input, query }) => {
+      const records = createPhase4CanonicalRecordStore({ query });
+      const artifact = await records.get({ ownerUserId, collection: "dailyBriefings", recordId: input.artifactId });
+      if (!artifact) return Object.freeze({ artifact: null, user: null, goals: [], confidenceAssessment: null, mediaObjects: [] });
+      const assessmentId = confidenceAssessmentId(artifact);
+      const mediaLookup = artifact.briefing?.photoEventNarrative
+        ? collectMediaLookup(artifact.briefing.photoEventNarrative)
+        : null;
+      const list = (collection) => records.list({ ownerUserId, collection });
+      const [users, goals, confidenceHistory, mediaResult] = await Promise.all([
+        list("user"),
+        list("goals"),
+        assessmentId ? records.get({ ownerUserId, collection: "goalConfidenceHistory",
+          recordId: `goal_confidence_history_v2|${assessmentId}` }) : null,
+        mediaLookup ? query(
+          `SELECT id,evidence_record_id,original_filename,sha256,provenance,state
+             FROM physiqueos.canonical_media_objects
+            WHERE owner_user_id=$1 AND state='verified'
+              AND (id=ANY($2::text[])
+                OR lower(replace(coalesce(provenance->>'sourceRelativePath',''),'\\','/'))=ANY($3::text[])
+                OR lower(coalesce(original_filename,''))=ANY($4::text[]))
+            ORDER BY id`,
+          [ownerUserId, mediaLookup.objectIds, mediaLookup.sourcePaths, mediaLookup.basenames],
+        ) : null,
+      ]);
+      return Object.freeze({
+        artifact,
+        user: users.find((item) => item.id === ownerUserId) ?? users[0] ?? null,
+        goals,
+        confidenceAssessment: confidenceHistory?.assessment ?? null,
+        mediaObjects: Object.freeze(mediaResult?.rows ?? []),
+      });
     }),
     getDexaArtifact: tracked("briefing.dexa-artifact", async ({ input, query }) => {
       const result = await query(
@@ -173,6 +222,11 @@ export function createRepositoryBriefingNavigationReadStore({ repositories, load
       return Object.freeze({ artifacts, workItems });
     },
     async getArtifact({ artifactId }) {
+      const user = await repositories.users.getCurrentUser();
+      const artifacts = await repositories.dailyBriefings.listDailyBriefings(user?.id);
+      return buildContext(artifacts.find((item) => item.id === artifactId) ?? null);
+    },
+    async getNativeArtifactContext({ artifactId }) {
       const user = await repositories.users.getCurrentUser();
       const artifacts = await repositories.dailyBriefings.listDailyBriefings(user?.id);
       return buildContext(artifacts.find((item) => item.id === artifactId) ?? null);

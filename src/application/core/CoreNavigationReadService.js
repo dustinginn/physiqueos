@@ -14,6 +14,10 @@ import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupp
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
 import { resolveCanonicalGoalPhaseChronology } from "../../domain/services/CanonicalGoalPhaseChronologyService.js";
+import {
+  createTrainingLoggerProgressionRecommendation,
+  TRAINING_LOGGER_PROGRESSION_STATUS,
+} from "../../domain/services/TrainingLoggerProgressionService.js";
 
 export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   home: Object.freeze([
@@ -102,14 +106,24 @@ export function createCoreNavigationReadService({
           .map(projectTrainingHistorySession)
           .sort((left, right) => String(right.observed_at).localeCompare(String(left.observed_at)))
           .slice(0, 120);
+        const goalContext = projectGoalContext(selectCanonicalActiveGoal(runtime.goals ?? [], {
+          ownerUserId: runtime.user?.id,
+        }), initialDate);
+        const initialProgressionRecommendations = canonicalExercises
+          .map((exercise) => projectTrainingLoggerRecommendation({
+            exercise,
+            goalContext,
+            initialDate,
+            sessions: confirmedTrainingRecords,
+          }))
+          .filter(Boolean);
         return Object.freeze({
-          goalContext: projectGoalContext(selectCanonicalActiveGoal(runtime.goals ?? [], {
-            ownerUserId: runtime.user?.id,
-          }), initialDate),
+          goalContext,
           initialCanonicalExercises: canonicalExercises,
           initialDate,
           initialHistorySessions: historySessions,
           initialPerformedExerciseIds: performedExerciseIds,
+          initialProgressionRecommendations,
         });
       });
     },
@@ -285,13 +299,59 @@ function projectTrainingHistorySession(record) {
       equipment: exercise.equipment,
       ...(exercise.executionVariant ? { executionVariant: exercise.executionVariant } : {}),
       sets: (exercise.sets ?? []).map((set) => ({
+        duration_seconds: set.duration_seconds ?? set.durationSeconds ?? null,
+        load_type: set.load_type ?? set.loadType ?? null,
+        measurement_type: set.measurement_type ?? set.measurementType ?? null,
         reps: set.reps,
         weight: set.weight ?? set.load,
-        weight_unit: set.weight_unit ?? set.unit ?? "lb",
+        weight_unit: set.weight_unit ?? set.unit ??
+          (set.load_type === "bodyweight" || set.loadType === "bodyweight" ? "bodyweight" : "lb"),
       })),
     })),
     exerciseRelationshipGroups: session.exerciseRelationshipGroups ?? [],
   };
+}
+
+function projectTrainingLoggerRecommendation({ exercise, goalContext, initialDate, sessions }) {
+  const result = createTrainingLoggerProgressionRecommendation({
+    canonicalExerciseId: exercise.id,
+    goalContext,
+    nowDate: initialDate,
+    sessions,
+  });
+  if (result.status === TRAINING_LOGGER_PROGRESSION_STATUS.INSUFFICIENT) return null;
+  const state = result.status === TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY
+    ? "opportunity"
+    : result.status === TRAINING_LOGGER_PROGRESSION_STATUS.RECOVER
+      ? "recover"
+      : "maintain";
+  const eyebrow = state === "opportunity"
+    ? "Progression opportunity"
+    : state === "recover"
+      ? "Recovery opportunity"
+      : "Maintain current performance";
+  const hasTarget = result.recommendedReps != null;
+  const bodyweight = result.recommendedLoadType === "bodyweight";
+  const loadLabel = bodyweight
+    ? "BW"
+    : result.recommendedLoad != null
+      ? `${result.recommendedLoad} ${result.recommendedUnit ?? "lb"}`
+      : null;
+  return Object.freeze({
+    canonicalExerciseId: exercise.id,
+    state,
+    eyebrow,
+    message: result.reason,
+    prescription: hasTarget
+      ? `${loadLabel ?? "No added load"} x ${result.recommendedReps}`
+      : result.recommendedAction === "consider_progression"
+        ? "Progress manually if today’s performance supports it"
+        : "Repeat the latest comparable performance",
+    suggestedLoad: bodyweight ? null : result.recommendedLoad,
+    suggestedLoadType: result.recommendedLoadType,
+    suggestedReps: result.recommendedReps,
+    suggestedUnit: bodyweight ? null : result.recommendedUnit,
+  });
 }
 
 function projectGoalContext(goal, date) {

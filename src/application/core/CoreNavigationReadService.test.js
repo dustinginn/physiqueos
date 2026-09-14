@@ -87,12 +87,49 @@ describe("provider-native core navigation reads", () => {
       initialCanonicalExercises: expect.any(Array),
       initialHistorySessions: expect.any(Array),
       initialPerformedExerciseIds: expect.any(Array),
+      initialProgressionRecommendations: expect.any(Array),
     });
     expect(morning).toMatchObject({
       today: "2026-08-29",
       reconciliationItems: expect.any(Array),
       briefingReconciliation: expect.any(Object),
     });
+  });
+
+  it("projects canonical progression recommendations and bodyweight loading semantics for Native", async () => {
+    const { narrow, runtime } = services();
+    for (const [index, date] of ["2026-08-01", "2026-08-08", "2026-08-15"].entries()) {
+      runtime.canonicalEvidenceObjects.push({
+        canonicalId: `training-pull-up-${index}`,
+        quality: { status: "complete" },
+        payload: {
+          id: `session-pull-up-${index}`,
+          evidence_type: "training",
+          observed_at: date,
+          exercises: [{
+            id: `pull-up-${index}`,
+            canonicalExerciseId: "pull_up",
+            name: "Pull-Ups",
+            sets: [{ reps: 6, weight: 25, weight_unit: "lb", load_type: "external_load" }],
+          }],
+        },
+      });
+    }
+
+    const logger = await narrow.getTrainingLogger();
+    expect(logger.initialProgressionRecommendations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        canonicalExerciseId: "pull_up",
+        eyebrow: "Progression opportunity",
+        prescription: "25 lb x 7",
+        suggestedLoad: 25,
+        suggestedLoadType: "external_load",
+        suggestedReps: 7,
+      }),
+    ]));
+    const set = logger.initialHistorySessions
+      .find((session) => session.id === "session-pull-up-2").exercises[0].sets[0];
+    expect(set).toMatchObject({ weight: 25, weight_unit: "lb", load_type: "external_load" });
   });
 
   it("hydrates the canonical registry before the first cold-start Workout Logger read", async () => {

@@ -277,9 +277,15 @@ function createDetailedTrainingSession({
       sets: exercise.sets.map((set, index) => ({
         id: set.id,
         set_number: index + 1,
-        reps: Number(set.reps),
-        weight: Number(set.load),
-        weight_unit: set.unit ?? "lb",
+        reps: set.reps == null ? null : Number(set.reps),
+        duration_seconds: set.durationSeconds == null ? null : Number(set.durationSeconds),
+        weight: set.loadType === "bodyweight" ? null : Number(set.load ?? 0),
+        weight_unit: set.loadType === "bodyweight" ? "bodyweight" : set.unit ?? "lb",
+        load_type: set.loadType ?? (set.unit === "bodyweight" ? "bodyweight" : "external_load"),
+        measurement_type: set.durationSeconds != null ? "duration"
+          : set.loadType === "bodyweight" ? "bodyweight_reps" : "weighted_reps",
+        set_type: set.durationSeconds != null ? "duration"
+          : set.loadType === "bodyweight" ? "bodyweight_reps" : "weighted_reps",
         provenance_ref: draftArtifactId,
       })),
       provenance_ref: draftArtifactId,
@@ -440,10 +446,10 @@ function assertProductionDraft(draft) {
     !Array.isArray(exercise.sets) ||
     exercise.sets.length === 0 ||
     exercise.sets.some((set) =>
-      !Number.isFinite(Number(set.reps)) ||
-      Number(set.reps) <= 0 ||
-      !Number.isFinite(Number(set.load)) ||
-      Number(set.load) < 0
+      ((!Number.isFinite(Number(set.reps)) || Number(set.reps) <= 0) &&
+        (!Number.isFinite(Number(set.durationSeconds)) || Number(set.durationSeconds) <= 0)) ||
+      (set.loadType !== "bodyweight" &&
+        (!Number.isFinite(Number(set.load ?? 0)) || Number(set.load ?? 0) < 0))
     )
   )) {
     throw new Error("Every exercise needs at least one performed set with valid reps and load.");

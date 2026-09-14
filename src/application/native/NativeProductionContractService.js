@@ -235,7 +235,9 @@ export function createNativeProductionContractService({
       resource,
       authority: "founder-production",
       generatedAt: now().toISOString(),
-      data: projectClientSafeValue(projectNativeMediaReferences(data)),
+      data: projectClientSafeValue(projectNativeMediaReferences(data), {
+        canonicalGoalDestinations: true,
+      }),
     });
   }
 }

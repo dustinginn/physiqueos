@@ -4,11 +4,21 @@ import { prepareMidweekBriefingReviewPresentation } from "../../domain/services/
 import { createWeeklyBriefingScreenPresentation } from "../../domain/services/WeeklyBriefingScreenPresentationService.js";
 import { resolveWeeklyBriefingPhaseBoundary } from "../../domain/services/WeeklyBriefingPhaseBoundaryReadService.js";
 import { projectConfidenceExplanationForSurface } from "../../domain/presentation/confidenceExplanationPresentation.js";
+import { projectPersistedMonthlyPresentationForRendering } from "../../domain/services/MonthlyPersistedArtifactCompatibilityService.js";
+import { createProviderMediaReferenceResolver } from "../media/ProviderMediaReferenceResolver.js";
+import { resolveNarrativeMedia } from "./PhotoEventBriefingReadService.js";
 
 export function createBriefingNavigationReadService({ store } = {}) {
   if (!store?.getAnalysis || !store?.getArtifact || !store?.listHistory) throw new Error("Briefing navigation requires a read store.");
   async function loadArtifact({ artifactId, version = null } = {}) {
     const context = await store.getArtifact({ artifactId });
+    const artifact = resolveBriefingReviewArtifact(context.artifact ? [context.artifact] : [], { artifactId, version });
+    return Object.freeze({ ...context, artifact });
+  }
+  async function loadNativeArtifact({ artifactId, version = null } = {}) {
+    const context = store.getNativeArtifactContext
+      ? await store.getNativeArtifactContext({ artifactId })
+      : await store.getArtifact({ artifactId });
     const artifact = resolveBriefingReviewArtifact(context.artifact ? [context.artifact] : [], { artifactId, version });
     return Object.freeze({ ...context, artifact });
   }
@@ -35,7 +45,7 @@ export function createBriefingNavigationReadService({ store } = {}) {
     },
     getArtifact: loadArtifact,
     async getNativeArtifact(input = {}) {
-      const context = await loadArtifact(input);
+      const context = await loadNativeArtifact(input);
       const artifact = context.artifact;
       if (!artifact) return null;
       if (artifact.briefing?.weeklyNarrative) {
@@ -79,20 +89,51 @@ export function createBriefingNavigationReadService({ store } = {}) {
           presentation: finished,
         });
       }
-      // Monthly and event artifacts already persist their finished canonical
-      // presentation/narrative. Native needs only that frozen artifact and
-      // the bounded goal titles used for historical attribution; returning
-      // current DEXA scans, decisions, reconciliation work, and other live
-      // context made one real DEXA detail response ~140 KB and coupled a
-      // historical read to unrelated mutable collections.
-      if (isNativeHistoryArtifact(artifact)) {
-        return Object.freeze({
-          artifact,
-          goals: Object.freeze((context.goals ?? []).map((goal) => Object.freeze({
-            id: goal.id,
-            title: goal.title ?? goal.name ?? null,
-            name: goal.name ?? goal.title ?? null,
-          }))),
+      if (artifact.cadence === "monthly" && artifact.briefing?.monthlyPresentation) {
+        const presentation = projectPersistedMonthlyPresentationForRendering(
+          artifact.briefing.monthlyPresentation
+        );
+        return persistedNativeDetail(context, {
+          ...artifact,
+          briefing: { ...artifact.briefing, monthlyPresentation: {
+            ...presentation,
+            hero: { ...presentation.hero, confidence: projectConfidenceExplanationForSurface(
+              presentation.hero?.confidence,
+              { assessment: context.confidenceAssessment, surface: "monthly" }
+            ) },
+          } },
+        });
+      }
+      if (artifact.briefing?.dexaEventNarrative) {
+        const narrative = artifact.briefing.dexaEventNarrative;
+        return persistedNativeDetail(context, {
+          ...artifact,
+          briefing: { ...artifact.briefing, dexaEventNarrative: {
+            ...narrative,
+            goalConfidence: projectConfidenceExplanationForSurface(
+              narrative.goalConfidence,
+              { assessment: context.confidenceAssessment, surface: "dexa_event",
+                historicalContext: { eventDate: narrative.snapshot?.scanDate ?? artifact.evidenceCutoff } }
+            ),
+          } },
+        });
+      }
+      if (artifact.briefing?.photoEventNarrative) {
+        const resolver = createProviderMediaReferenceResolver(context.mediaObjects ?? []);
+        const narrative = resolveNarrativeMedia(artifact.briefing.photoEventNarrative, resolver);
+        return persistedNativeDetail(context, {
+          ...artifact,
+          briefing: { ...artifact.briefing, photoEventNarrative: {
+            ...narrative,
+            goalConfidence: projectConfidenceExplanationForSurface(
+              narrative.goalConfidence,
+              { assessment: context.confidenceAssessment, surface: "photo_event",
+                historicalContext: {
+                  matchedOnly: artifact.confidencePublication?.confidenceMode === "matched-only",
+                  eventDate: narrative.eventDate ?? artifact.evidenceCutoff,
+                } }
+            ),
+          } },
         });
       }
       return null;
@@ -106,6 +147,17 @@ export function createBriefingNavigationReadService({ store } = {}) {
     getConfidenceAssessment({ assessmentId } = {}) {
       return store.getConfidenceAssessment?.({ assessmentId }) ?? null;
     },
+  });
+}
+
+function persistedNativeDetail(context, artifact) {
+  return Object.freeze({
+    artifact: Object.freeze(artifact),
+    goals: Object.freeze((context.goals ?? []).map((goal) => Object.freeze({
+      id: goal.id,
+      title: goal.title ?? goal.name ?? null,
+      name: goal.name ?? goal.title ?? null,
+    }))),
   });
 }
 

@@ -109,6 +109,20 @@ describe("Native production contract boundary", () => {
     expect(JSON.stringify(result)).not.toMatch(/postgres|provider|objectKey|storage_key/i);
   });
 
+  it("projects arbitrary Home Goal routes with the canonical Goal identity", async () => {
+    const current = fixture();
+    current.readers.core.getHome.mockResolvedValue({ goals: [{
+      id: "goal-canonical-arbitrary-42",
+      title: "An Arbitrary Current Goal",
+      href: "/goals/build-lean-mass",
+    }] });
+    const result = await current.service.read({ request: request(), resource: "home" });
+    expect(result.data.goals[0].destination).toEqual({
+      id: "goal.detail",
+      parameters: { goalId: "goal-canonical-arbitrary-42" },
+    });
+  });
+
   it("keeps Founder and Sandbox owner authorities fail-closed", async () => {
     const authenticate = vi.fn(async () => ({ ...principal, userId: "user_native_sandbox_alpha" }));
     await expect(fixture({ authenticate }).service.read({ request: request(), resource: "home" }))

@@ -46,6 +46,33 @@ describe("Native Briefing detail composition", () => {
     expect(JSON.stringify(result)).not.toContain("raw-internal-marker");
   });
 
+  it("projects Weekly Confidence from the same canonical assessment source as Web", async () => {
+    const artifact = weeklyArtifact();
+    artifact.briefing.weeklyNarrative.goalConfidence = {
+      assessmentId: "confidence-weekly", score: 62, band: "moderate",
+      movementDirection: "held", primaryReason: "Raw reason.",
+    };
+    const confidenceAssessment = {
+      schemaVersion: "canonical_confidence_assessment_v2", id: "confidence-weekly",
+      currentPercentage: 62, priorPercentage: 62, confidenceBand: "moderate",
+      movement: "no_meaningful_change", movementMagnitude: "none",
+      sourceCutoff: "2026-09-06T06:59:59.999Z", publisherType: "weekly",
+      sourceLineage: {}, evidenceDurability: { contradictionState: "none" },
+      narrativeExplanation: { text: "Canonical weekly publication explanation." },
+    };
+    const service = createBriefingNavigationReadService({
+      store: store(artifact, { confidenceAssessment }),
+    });
+    const result = await service.getNativeArtifact({ artifactId: artifact.id });
+    expect(result.presentation.hero.confidence).toMatchObject({
+      presentationExplanation: expect.any(String),
+      explanationModel: {
+        sourceAssessmentId: "confidence-weekly",
+        movementLabel: "No meaningful change",
+      },
+    });
+  });
+
   it("returns the finished Midweek editorial presentation with historical Confidence binding", async () => {
     const artifact = midweekArtifact();
     const confidenceAssessment = {
@@ -64,12 +91,75 @@ describe("Native Briefing detail composition", () => {
       historical: { frozen: true, artifactBound: true },
       presentation: {
         hero: { verdict: "Calories are moving closer to supporting stronger training." },
+        energyBalance: {
+          headline: "Intake is below estimated expenditure",
+          balanceHeadline: "200 kcal/day below",
+          interpretation: "Food or activity is missing for each day so far. Keep the plan steady and fill in what you can before Sunday.",
+          comparisonNarrative: expect.stringMatching(/72 kcal\/day/i),
+        },
         coachTake: { recommendation: expect.stringMatching(/full week/i) },
         goalConfidence: { explanationModel: { sourceAssessmentId: "confidence-1" } },
       },
     });
     expect(result.presentation.hero.verdict).not.toBe("Raw verdict");
     expect(result).not.toHaveProperty("briefing");
+  });
+
+  it("resolves both Photo Event comparison identities before Native media projection", async () => {
+    const prior = "media-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbb";
+    const current = "media-cccccccccccccccccccccccccccccccc-dddddddddddd";
+    const artifact = {
+      id: "photo-event", cadence: "event", version: 3, generatedAt: "2026-08-23T07:00:00Z",
+      confidencePublication: { confidenceMode: "matched-only" },
+      briefing: { photoEventNarrative: {
+        eventDate: "2026-08-22",
+        cardContent: { progress: { comparisons: [{ poseId: "front-relaxed",
+          previousImageHref: "/api/private-evidence/founder/photos/previous.jpg",
+          imageHref: `/api/private-evidence/media/${current}` }] } },
+      } },
+    };
+    const service = createBriefingNavigationReadService({ store: {
+      ...store(artifact),
+      getNativeArtifactContext: vi.fn(async () => ({ artifact, goals: [], confidenceAssessment: null,
+        mediaObjects: [
+          { id: prior, original_filename: "previous.jpg", provenance: { sourceRelativePath: "founder/photos/previous.jpg" }, state: "verified" },
+          { id: current, original_filename: "current.jpg", provenance: {}, state: "verified" },
+        ] })),
+    } });
+    const result = await service.getNativeArtifact({ artifactId: artifact.id });
+    const comparison = result.artifact.briefing.photoEventNarrative.cardContent.progress.comparisons[0];
+    expect(comparison.previousImageHref).toBe(`/api/private-evidence/media/${prior}`);
+    expect(comparison.imageHref).toBe(`/api/private-evidence/media/${current}`);
+  });
+
+  it.each([
+    ["monthly", { cadence: "monthly", briefing: { monthlyPresentation: { hero: { confidence: null } } } }],
+    ["dexa_event", { cadence: "event", briefing: { dexaEventNarrative: { snapshot: { scanDate: "2026-09-12" }, goalConfidence: null } } }],
+    ["photo_event", { cadence: "event", briefing: { photoEventNarrative: { eventDate: "2026-08-22", goalConfidence: null } } }],
+  ])("keeps %s on the same server Confidence projection path as Web", async (_family, shape) => {
+    const confidence = { score: 62, band: "moderate", priorScore: 62, delta: 0,
+      movementDirection: "held", assessmentId: "confidence-1", primaryReason: "Raw reason." };
+    const artifact = { id: `${_family}-artifact`, version: 1, generatedAt: "2026-09-13T07:00:00Z", ...shape };
+    if (_family === "monthly") artifact.briefing.monthlyPresentation.hero.confidence = confidence;
+    else if (_family === "dexa_event") artifact.briefing.dexaEventNarrative.goalConfidence = confidence;
+    else artifact.briefing.photoEventNarrative.goalConfidence = confidence;
+    const confidenceAssessment = {
+      schemaVersion: "canonical_confidence_assessment_v2", id: "confidence-1",
+      currentPercentage: 62, priorPercentage: 62, confidenceBand: "moderate",
+      movement: "no_meaningful_change", movementMagnitude: "none",
+      sourceCutoff: "2026-09-13T06:59:59.999Z", publisherType: _family,
+      sourceLineage: {}, evidenceDurability: { contradictionState: "none" },
+      narrativeExplanation: { text: "Canonical publication explanation." },
+    };
+    const service = createBriefingNavigationReadService({ store: store(artifact, { confidenceAssessment }) });
+    const result = await service.getNativeArtifact({ artifactId: artifact.id });
+    const projected = _family === "monthly"
+      ? result.artifact.briefing.monthlyPresentation.hero.confidence
+      : result.artifact.briefing[_family === "dexa_event" ? "dexaEventNarrative" : "photoEventNarrative"].goalConfidence;
+    expect(projected).toMatchObject({
+      presentationExplanation: expect.any(String),
+      explanationModel: { sourceAssessmentId: "confidence-1", movementLabel: "No meaningful change" },
+    });
   });
 
   it("returns a bounded frozen DEXA artifact without unrelated live context", async () => {
@@ -135,7 +225,12 @@ function midweekArtifact() {
     confidencePublication: { assessmentId: "confidence-1", publisherType: "midweek" },
     briefing: {
       hero: { verdict: "Raw verdict", summary: "Raw summary" },
-      energyBalance: { estimatedDailyBalanceMidpoint: -200, chartPoints: [] },
+      energyBalance: {
+        balanceDirection: "probably_below",
+        estimatedDailyBalanceMidpoint: -200,
+        comparison: { averageBalance: -272 },
+        chartPoints: [],
+      },
       training: { highlights: [], watch: [], interpretation: "Raw interpretation", prioritySignals: [] },
       goalConfidence: { assessmentId: "confidence-1", score: 60, band: "moderate" },
       activeGoal: { id: "goal-build", name: "Build Lean Mass" },

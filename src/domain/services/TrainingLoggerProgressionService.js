@@ -48,7 +48,9 @@ export function createTrainingLoggerProgressionRecommendation({
       reason: "More comparable confirmed sessions are needed before recommending progression.",
       recommendedAction: "manual_or_previous",
       recommendedLoad: null,
+      recommendedLoadType: null,
       recommendedReps: null,
+      recommendedUnit: null,
       comparisonContext: createComparisonContext({ canonicalExerciseId, relationshipContext, variant }),
       historyReferences: comparable.map(toHistoryReference),
       calibration: { phase, movementCadenceDays: null, userCadenceDays: null },
@@ -88,7 +90,9 @@ export function createTrainingLoggerProgressionRecommendation({
       reason: "The latest comparable session was below the prior performance.",
       recommendedAction: "keep_previous",
       recommendedLoad: previous.load,
+      recommendedLoadType: previous.loadType,
       recommendedReps: previous.reps,
+      recommendedUnit: previous.unit,
     };
   }
 
@@ -99,7 +103,9 @@ export function createTrainingLoggerProgressionRecommendation({
       reason: `Recent comparable performance progressed and remains on pace for the ${phaseExpectation.label}.`,
       recommendedAction: "maintain",
       recommendedLoad: latest.load,
+      recommendedLoadType: latest.loadType,
       recommendedReps: latest.reps,
+      recommendedUnit: latest.unit,
     };
   }
 
@@ -111,7 +117,9 @@ export function createTrainingLoggerProgressionRecommendation({
       reason: `Comparable performance has held long enough to consider progression for the ${phaseExpectation.label}.`,
       recommendedAction: target ? "use_suggestion" : "consider_progression",
       recommendedLoad: target?.load ?? null,
+      recommendedLoadType: target ? latest.loadType : null,
       recommendedReps: target?.reps ?? null,
+      recommendedUnit: target ? latest.unit : null,
     };
   }
 
@@ -123,7 +131,9 @@ export function createTrainingLoggerProgressionRecommendation({
       : "The available history supports repeating the latest comparable performance.",
     recommendedAction: "maintain",
     recommendedLoad: latest.load,
+    recommendedLoadType: latest.loadType,
     recommendedReps: latest.reps,
+    recommendedUnit: latest.unit,
   };
 }
 
@@ -171,6 +181,7 @@ function listAllPerformances(sessions = []) {
           getCanonicalTrainingExerciseSlug(exercise.name),
         date: String(session.observed_at ?? session.date ?? "").slice(0, 10),
         load: best.load,
+        loadType: best.loadType,
         reps: best.reps,
         relationshipKey: getTrainingExerciseRelationshipComparisonKey(
           deriveTrainingExerciseRelationshipContext({ exercise, session })
@@ -185,11 +196,18 @@ function listAllPerformances(sessions = []) {
 
 function getBestComparableSet(sets = []) {
   return (sets ?? [])
-    .map((set) => ({
-      load: finite(set.weight ?? set.load),
-      reps: finite(set.reps),
-      unit: set.weight_unit ?? set.unit ?? "lb",
-    }))
+    .map((set) => {
+      const loadType = set.load_type ?? set.loadType ??
+        (set.weight_unit === "bodyweight" || set.unit === "bodyweight"
+          ? "bodyweight"
+          : "external_load");
+      return {
+        load: loadType === "bodyweight" ? 0 : finite(set.weight ?? set.load),
+        loadType,
+        reps: finite(set.reps),
+        unit: loadType === "bodyweight" ? "bodyweight" : set.weight_unit ?? set.unit ?? "lb",
+      };
+    })
     .filter((set) => set.load !== null && set.reps !== null)
     .sort((left, right) => comparePerformance(right, left))[0] ?? null;
 }

@@ -82,7 +82,7 @@ export function createPostgresPhotoEventBriefingReadStore({ pool, ownerUserId, o
   });
 }
 
-function collectMediaLookup(value) {
+export function collectMediaLookup(value) {
   const references = [];
   visit(value, references);
   const objectIds = new Set();

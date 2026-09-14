@@ -5,7 +5,6 @@ import {
 } from "../models/trainingPerformanceEvent";
 import { normalizeTrainingExecutionVariant } from "../models/trainingExecutionVariant";
 
-export const TRAINING_LIBRARY_RECORD_LIMIT = 5;
 const TYPE_ORDER = {
   [TRAINING_PERFORMANCE_EVENT_TYPES.SESSION_VOLUME_PR]: 0,
   [TRAINING_PERFORMANCE_EVENT_TYPES.REPS_AT_LOAD_PR]: 1,
@@ -14,36 +13,57 @@ const TYPE_ORDER = {
 export function createTrainingLibraryExerciseRecordsReadModel({
   canonicalExerciseId,
   events = [],
-  visibleLimit = TRAINING_LIBRARY_RECORD_LIMIT,
 } = {}) {
   const selectedId = cleanString(canonicalExerciseId);
-  if (!selectedId || !Number.isSafeInteger(visibleLimit) || visibleLimit < 1) {
-    return null;
-  }
+  if (!selectedId) return null;
 
   const byId = new Map();
   for (const event of events) {
     if (byId.has(event?.id)) continue;
     const item = toItem(event, selectedId);
-    if (item) byId.set(event.id, item);
+    if (item) byId.set(event.id, { event, item });
   }
-  const records = [...byId.values()].sort(compareRecords);
+  const activeByFamily = new Map();
+  for (const entry of byId.values()) {
+    const key = activeRecordFamilyKey(entry.event);
+    const current = activeByFamily.get(key);
+    if (!current || isStrongerRecord(entry.item, current)) {
+      activeByFamily.set(key, entry.item);
+    }
+  }
+  const records = [...activeByFamily.values()].sort(compareRecords);
   if (records.length === 0) return null;
 
-  const visibleRecords = records.slice(0, visibleLimit);
   return {
     id: `training_library_records_${selectedId}`,
     heading: "Performance Records",
     canonicalExerciseId: selectedId,
-    canonicalExerciseName: visibleRecords[0].canonicalExerciseName,
-    records: visibleRecords,
-    visibleCount: visibleRecords.length,
+    canonicalExerciseName: records[0].canonicalExerciseName,
+    records,
+    visibleCount: records.length,
     totalCount: records.length,
-    hiddenCount: records.length - visibleRecords.length,
-    countLabel: records.length > visibleRecords.length
-      ? `Showing ${visibleRecords.length} of ${records.length} records`
-      : null,
+    hiddenCount: 0,
+    countLabel: null,
   };
+}
+
+function activeRecordFamilyKey(event) {
+  const variant = event.executionVariant?.key ?? "ordinary";
+  const relationship = event.relationshipContext
+    ? `${event.relationshipContext.relationshipType ?? "relationship"}:${(event.relationshipContext.orderedPartners ?? [])
+      .map((partner) => partner.canonicalExerciseId ?? partner.name ?? "")
+      .sort()
+      .join(",")}`
+    : "standalone";
+  if (event.eventType === TRAINING_PERFORMANCE_EVENT_TYPES.REPS_AT_LOAD_PR) {
+    return [event.eventType, event.load, event.loadUnit, variant, relationship].join("|");
+  }
+  return [event.eventType, event.unit, variant, relationship].join("|");
+}
+
+function isStrongerRecord(candidate, current) {
+  return candidate.achievedValue > current.achievedValue ||
+    (candidate.achievedValue === current.achievedValue && compareRecords(candidate, current) < 0);
 }
 
 function toItem(event, selectedId) {

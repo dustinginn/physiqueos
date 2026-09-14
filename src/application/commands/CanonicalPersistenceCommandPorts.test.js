@@ -113,6 +113,39 @@ describe("Phase 4 canonical command persistence ports", () => {
     expect(snapshot.piEnergyConfidenceWorkItems.length).toBeGreaterThan(0);
   });
 
+  it("preserves bodyweight and added-load semantics through the Native workout staging boundary", async () => {
+    const records = fixture();
+    const result = await createCanonicalPersistenceCommandPorts({ records, now }).commitTrainingSession(commandContext({
+      sessionId: "native-bodyweight-loading", localDate: "2026-08-11",
+      exercises: [{
+        canonicalExerciseId: "pull_up",
+        sets: [
+          { setId: "bw", reps: 8, load: null, loadType: "bodyweight", unit: "bodyweight" },
+          { setId: "weighted", reps: 6, load: 25, loadType: "external_load", unit: "lb" },
+        ],
+      }, {
+        canonicalExerciseId: "plank",
+        sets: [
+          { setId: "duration", durationSeconds: 60, load: null, loadType: "bodyweight", unit: "bodyweight" },
+        ],
+      }],
+    }, null, "training-bodyweight-loading"));
+    const review = records.snapshot().evidenceReviews.find((item) => item.id === result.result.reviewId);
+    const sets = review.interpretedEvidence.evidence_objects
+      .find((item) => item.evidence_type === "training").exercises[0].sets;
+    expect(sets[0]).toMatchObject({ reps: 8, weight: null, weight_unit: "bodyweight", load_type: "bodyweight" });
+    expect(sets[1]).toMatchObject({ reps: 6, weight: 25, weight_unit: "lb", load_type: "external_load" });
+    const durationSet = review.interpretedEvidence.evidence_objects
+      .find((item) => item.evidence_type === "training").exercises[1].sets[0];
+    expect(durationSet).toMatchObject({
+      reps: null,
+      duration_seconds: 60,
+      weight: null,
+      weight_unit: "bodyweight",
+      load_type: "bodyweight",
+    });
+  });
+
   it("stages a Founder-created Native exercise with its canonical definition and resolves duplicate names", async () => {
     const records = fixture();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });

@@ -557,19 +557,27 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       }
       const occurrenceId = String(exercise.occurrenceId ?? `native_${context.payload.sessionId}_exercise_${index + 1}`);
       const sets = (exercise.sets ?? []).map((set, setIndex) => {
-        const reps = Number(set.reps);
-        const load = Number(set.load ?? 0);
-        if (!Number.isFinite(reps) || reps <= 0 || !Number.isFinite(load) || load < 0) {
-          throw problem(400, "TRAINING_SET_INVALID", `Exercise ${index + 1}, set ${setIndex + 1} has invalid reps or load.`);
+        const reps = set.reps == null ? null : Number(set.reps);
+        const durationSeconds = set.durationSeconds == null ? null : Number(set.durationSeconds);
+        const loadType = String(set.loadType ?? (set.unit === "bodyweight" ? "bodyweight" : "external_load"));
+        const load = loadType === "bodyweight" ? 0 : Number(set.load ?? 0);
+        if ((!Number.isFinite(reps) || reps <= 0) &&
+            (!Number.isFinite(durationSeconds) || durationSeconds <= 0)) {
+          throw problem(400, "TRAINING_SET_INVALID", `Exercise ${index + 1}, set ${setIndex + 1} needs valid reps or duration.`);
         }
-        const unit = String(set.unit ?? (definition.defaultLoadType === "bodyweight" ? "bodyweight" : "lb"));
+        if (!Number.isFinite(load) || load < 0 || !["bodyweight", "external_load"].includes(loadType)) {
+          throw problem(400, "TRAINING_SET_INVALID", `Exercise ${index + 1}, set ${setIndex + 1} has invalid loading semantics.`);
+        }
+        const unit = String(loadType === "bodyweight" ? "bodyweight" : set.unit ?? "lb");
         if (!["lb", "kg", "bodyweight"].includes(unit)) {
           throw problem(400, "TRAINING_SET_UNIT_INVALID", "Training set unit must be lb, kg, or bodyweight.");
         }
         return {
           id: String(set.setId ?? `${occurrenceId}_set_${setIndex + 1}`),
           reps,
-          load: unit === "bodyweight" ? 0 : load,
+          durationSeconds,
+          load,
+          loadType,
           unit,
           confirmed: true,
         };

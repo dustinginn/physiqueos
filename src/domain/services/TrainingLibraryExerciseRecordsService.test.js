@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { createTrainingPerformanceEvent } from "../models/trainingPerformanceEvent";
 import {
   createTrainingLibraryExerciseRecordsReadModel,
-  TRAINING_LIBRARY_RECORD_LIMIT,
 } from "./TrainingLibraryExerciseRecordsService";
 
 describe("Training Library exercise records read model", () => {
@@ -82,7 +81,7 @@ describe("Training Library exercise records read model", () => {
     expect(model.records[0].canonicalExerciseId).toBe("exercise_a");
   });
 
-  it("orders by workout date, type, achieved value, and event ID independent of insertion", () => {
+  it("selects the strongest active record per semantic family independent of insertion", () => {
     const events = [
       reps({ workoutDate: "2026-07-24", reps: 18, load: 65 }),
       reps({ workoutDate: "2026-07-25", reps: 14, load: 70 }),
@@ -94,7 +93,6 @@ describe("Training Library exercise records read model", () => {
     expect(forward).toEqual(reverse);
     expect(forward.records.map((item) => [item.workoutDate, item.achievementType, item.achievedValue])).toEqual([
       ["2026-07-25", "session_volume_pr", 3700],
-      ["2026-07-25", "reps_at_load_pr", 15],
       ["2026-07-25", "reps_at_load_pr", 14],
       ["2026-07-24", "reps_at_load_pr", 18],
     ]);
@@ -149,7 +147,7 @@ describe("Training Library exercise records read model", () => {
     expect(compose("spider_curl", [])).toBeNull();
   });
 
-  it("limits the history to five and retains total and hidden counts", () => {
+  it("collapses superseded session-volume history without arbitrary latest-N truncation", () => {
     const events = Array.from({ length: 8 }, (_, index) =>
       volume({
         workoutDate: `2026-07-${String(25 - index).padStart(2, "0")}`,
@@ -158,13 +156,26 @@ describe("Training Library exercise records read model", () => {
       })
     );
     const model = compose("cable_pushdown", events);
-    expect(model.records).toHaveLength(TRAINING_LIBRARY_RECORD_LIMIT);
+    expect(model.records).toHaveLength(1);
+    expect(model.records[0]).toMatchObject({ achievedValue: 7000, workoutDate: "2026-07-25" });
     expect(model).toMatchObject({
-      visibleCount: 5,
-      totalCount: 8,
-      hiddenCount: 3,
-      countLabel: "Showing 5 of 8 records",
+      visibleCount: 1,
+      totalCount: 1,
+      hiddenCount: 0,
+      countLabel: null,
     });
+  });
+
+  it("keeps distinct reps-at-load identities while superseding an older PR at the same load", () => {
+    const model = compose("ez_bar_curl", [
+      reps({ workoutDate: "2026-07-01", reps: 12, baseline: 10, load: 65 }),
+      reps({ workoutDate: "2026-07-15", reps: 15, load: 65 }),
+      reps({ workoutDate: "2026-07-20", reps: 10, baseline: 8, load: 75 }),
+    ]);
+    expect(model.records.map((item) => [item.achievedValue, item.value])).toEqual([
+      [10, "10 reps at 75 lb"],
+      [15, "15 reps at 65 lb"],
+    ]);
   });
 
   it("renders the exact July 25 event distribution by exercise", () => {
