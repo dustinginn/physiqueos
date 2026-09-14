@@ -752,6 +752,21 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertEqual(TrainingExerciseHistoryCalculator.sessionBadge(for: "2026-08-17T06:05:00-07:00", referenceDate: reference), "Aug 17")
     }
 
+    /// The proven Sep 13 production defect: the server's `observed_at` is
+    /// sometimes a bare "YYYY-MM-DD" date key with no time component at
+    /// all. Parsing that as an instant (the prior implementation did, via
+    /// `TrainingDateFormatting.date(from:)`'s UTC-pinned fallback) anchors
+    /// it to UTC midnight, which a locally-timezoned same-day comparison
+    /// then rolls back a full day for any device timezone behind UTC — a
+    /// same-day workout printed "Yesterday". Comparing the literal date-key
+    /// string instead (matching the web's own `getSessionBadgeLabel`) never
+    /// constructs that ambiguous instant in the first place.
+    func testSessionBadgeTreatsABareDateKeyAsTodayRegardlessOfDeviceTimezone() throws {
+        let reference = try XCTUnwrap(TrainingDateFormatting.date(from: "2026-09-13T20:00:00Z"))
+        XCTAssertEqual(TrainingExerciseHistoryCalculator.sessionBadge(for: "2026-09-13", referenceDate: reference), "Today")
+        XCTAssertEqual(TrainingExerciseHistoryCalculator.sessionBadge(for: "2026-09-12", referenceDate: reference), "Yesterday")
+    }
+
     // MARK: - Performance Records (completeness sweep, Known Gap 1)
 
     /// Lat Pulldown's session-volume PR ties directly to its own already-

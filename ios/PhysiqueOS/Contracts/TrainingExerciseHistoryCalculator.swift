@@ -145,16 +145,36 @@ enum TrainingExerciseHistoryCalculator {
     /// "Mon D" fallback (`TrainingDateFormatting.short`). `referenceDate`
     /// is injectable so this is deterministically testable rather than
     /// depending on the device clock.
+    ///
+    /// `getSessionBadgeLabel` (`DeepPagePrimitives.jsx`) deliberately never
+    /// converts `isoDate` into a `Date`/instant — it compares the first 10
+    /// characters as a plain string against locally-computed "today"/
+    /// "yesterday" date keys. That matters here: `isoDate` is the server's
+    /// overloaded `observed_at` (sometimes a bare "YYYY-MM-DD" key,
+    /// sometimes a full instant), and a prior version of this function DID
+    /// parse it into a `Date` — a bare date key parses as UTC midnight,
+    /// which `Calendar`'s locally-timezoned same-day comparison then rolled
+    /// back a full day for any timezone behind UTC (the proven Sep 13
+    /// "Yesterday" defect). Matching the web's own string-prefix semantics
+    /// exactly avoids that instant-conversion ambiguity entirely rather
+    /// than trying to out-guess it.
     static func sessionBadge(for isoDate: String, referenceDate: Date = Date()) -> String {
-        guard let date = TrainingDateFormatting.date(from: isoDate) else {
-            return TrainingDateFormatting.short(isoDate)
-        }
-        let calendar = Calendar(identifier: .gregorian)
-        if calendar.isDate(date, inSameDayAs: referenceDate) { return "Today" }
+        let dateKey = String(isoDate.prefix(10))
+        let calendar = Calendar.current
+        if dateKey == localDateKey(for: referenceDate, calendar: calendar) { return "Today" }
         if let yesterday = calendar.date(byAdding: .day, value: -1, to: referenceDate),
-           calendar.isDate(date, inSameDayAs: yesterday) {
+           dateKey == localDateKey(for: yesterday, calendar: calendar) {
             return "Yesterday"
         }
         return TrainingDateFormatting.short(isoDate)
+    }
+
+    /// Mirrors the web's `toDateKey` — the device's LOCAL calendar day
+    /// (`getFullYear`/`getMonth`/`getDate` are local-timezone accessors in
+    /// JS), never UTC.
+    private static func localDateKey(for date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        guard let year = components.year, let month = components.month, let day = components.day else { return "" }
+        return String(format: "%04d-%02d-%02d", year, month, day)
     }
 }
