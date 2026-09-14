@@ -26,7 +26,10 @@ import {
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
 import {
   isReminderOccurrenceCompleted,
+  openOnlyNotificationAction,
+  resolveNotificationAction,
   resolvePriorityExecutionContract,
+  specializedNotificationAction,
 } from "./ReminderOccurrenceCompletion.js";
 import {
   resolveCanonicalGoalRelationships,
@@ -90,7 +93,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           userId: resolvedUserId,
         });
         return support
-          ? withExecutionContract(createMorningWeighInPriorityDetail({
+          ? withExecutionContractAndNotificationAction(createMorningWeighInPriorityDetail({
               goals,
               operatingPlan,
               support,
@@ -98,7 +101,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
               timeZone,
               weightEntry: canonicalWeightEntries(weightEntries)
                 .find((entry) => String(entry.measuredAt).slice(0, 10) === occurrenceDate) ?? null,
-            }), reminder, occurrenceDate)
+            }), reminder, occurrenceDate, false, support.executionItem?.preferredSchedule?.timeOfDay)
           : null;
       }
 
@@ -147,40 +150,50 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                   projection,
                   protocol,
                 });
-          return withExecutionContract(detail, reminder, projection.localDate);
+          return withDosingNotificationAction(
+            withExecutionContract(detail, reminder, projection.localDate),
+            {
+              priorityId: projection.priorityId,
+              occurrenceDate: projection.localDate,
+              timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
+            }
+          );
         }
 
-        return withExecutionContract(createLegacyReminderOnlyProtocolPriorityDetail({
-          reminder,
-          protocol,
-          goals,
-          operatingPlan,
-          operatingRhythm,
-          occurrenceDate,
-          timeZone,
-        }), reminder, occurrenceDate);
+        return withDosingNotificationAction(
+          withExecutionContract(createLegacyReminderOnlyProtocolPriorityDetail({
+            reminder,
+            protocol,
+            goals,
+            operatingPlan,
+            operatingRhythm,
+            occurrenceDate,
+            timeZone,
+          }), reminder, occurrenceDate),
+          { priorityId: reminder.id, occurrenceDate, timeOfDay: reminder.schedule?.timeOfDay }
+        );
       }
 
       if (reminder?.linkedEvidenceType === "progress_photo") {
-        return withExecutionContract(createProgressPhotoPriorityDetail({
+        return withExecutionContractAndNotificationAction(createProgressPhotoPriorityDetail({
           executionItem: executionItems.find((item) => item.id === "execution_progress_photos"),
           reminder,
           goals,
           operatingPlan,
-        }), reminder, occurrenceDate);
+        }), reminder, occurrenceDate, false);
       }
 
       if (reminder) {
-        return withExecutionContract(createReminderPriorityDetail({
+        return withExecutionContractAndNotificationAction(createReminderPriorityDetail({
           reminder,
           goals,
           operatingPlan,
           occurrenceDate,
           timeZone,
-        }), reminder, occurrenceDate);
+        }), reminder, occurrenceDate, !isReminderOccurrenceCompleted(reminder, { occurrenceDate, timeZone }));
       }
 
-      return createFallbackPriorityDetail(priorityId, goals);
+      return createFallbackPriorityDetail(priorityId, goals, occurrenceDate);
     },
   }});
 }
@@ -189,6 +202,34 @@ function withExecutionContract(detail, reminder, occurrenceDate) {
   return detail ? {
     ...detail,
     executionContract: resolvePriorityExecutionContract({ reminder, occurrenceDate }),
+  } : null;
+}
+
+// Attaches both `executionContract` and its derived `notificationAction` in
+// one pass, for the ordinary (non-dosing) reminder-backed cases — Morning
+// Weigh-in, Progress Photos, and a plain completable reminder. The
+// execution contract's own `workflow` (set by `resolvePriorityExecutionContract`)
+// is what actually routes Morning Weigh-in/Progress Photos to
+// `specialized_workflow_required` here, not a second classification.
+function withExecutionContractAndNotificationAction(detail, reminder, occurrenceDate, completable = false, timeOfDay = null) {
+  if (!detail) return null;
+  const executionContract = resolvePriorityExecutionContract({ reminder, occurrenceDate });
+  return {
+    ...detail,
+    executionContract,
+    notificationAction: resolveNotificationAction({ executionContract, completable, timeOfDay: timeOfDay ?? reminder?.schedule?.timeOfDay }),
+  };
+}
+
+// Dosing semantics mean peptide/recovery/supplement execution items must
+// never expose blind direct completion from a notification — always
+// specialized, regardless of `actionable`/`completable` state, and
+// regardless of whether a canonical Execution projection was actually
+// found (the legacy reminder-only path below has no `projection` at all).
+function withDosingNotificationAction(detail, { priorityId, occurrenceDate, timeOfDay = null }) {
+  return detail ? {
+    ...detail,
+    notificationAction: specializedNotificationAction({ workflow: "peptide_protocol", priorityId, occurrenceDate, timeOfDay }),
   } : null;
 }
 
@@ -779,6 +820,12 @@ function createDexaAppointmentPriorityDetail({ appointment, goals, operatingPlan
     subtitle: getDexaPrioritySubtitle(stage, time),
     status: upload ? "Action needed" : "Upcoming",
     completable: false,
+    notificationAction: specializedNotificationAction({
+      workflow: upload ? "dexa_evidence" : "dexa_appointment",
+      priorityId: createDexaPriorityId(appointment.preferredSchedule.date, stage),
+      occurrenceDate: appointment.preferredSchedule.date,
+      timeOfDay: appointment.preferredSchedule.timeOfDay,
+    }),
     action: {
       label: upload ? "Upload DEXA Results" : "View DEXA Appointment",
       href: upload ? "/evidence/dexa" : "/profile/operating-plan/execution/dexa",
@@ -921,7 +968,7 @@ function createReminderPriorityDetail({ reminder, goals, operatingPlan, occurren
   };
 }
 
-function createFallbackPriorityDetail(priorityId, goals) {
+function createFallbackPriorityDetail(priorityId, goals, occurrenceDate) {
   const primaryGoal = selectCanonicalActiveGoal(goals);
 
   return {
@@ -934,6 +981,9 @@ function createFallbackPriorityDetail(priorityId, goals) {
       label: "Continue",
       href: "/",
     },
+    // No canonical reminder identity could be resolved for this priority —
+    // always fail safe to open_only rather than guess at completability.
+    notificationAction: openOnlyNotificationAction({ priorityId, occurrenceDate }),
     sections: [
       {
         title: "Why it matters",

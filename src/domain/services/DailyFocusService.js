@@ -27,7 +27,10 @@ import {
 import {
   createPriorityOccurrenceKey as createCanonicalPriorityOccurrenceKey,
   isReminderOccurrenceCompleted,
+  openOnlyNotificationAction,
+  resolveNotificationAction,
   resolvePriorityExecutionContract,
+  specializedNotificationAction,
 } from "./ReminderOccurrenceCompletion.js";
 
 const DAY_NAMES = [
@@ -449,18 +452,20 @@ function getPersistentReminderItems({
 
       if (completed) return null;
 
+      const executionContract = resolvePriorityExecutionContract({ reminder, occurrenceDate: today });
       return {
         id: reminder.id,
         label: reminder.title,
         subtitle: state.label,
         metadata: formatReminderMetadata(reminder),
-        href: resolvePriorityExecutionContract({ reminder, occurrenceDate: today }).destination,
+        href: executionContract.destination,
         icon: getReminderIcon(reminder),
         color: getReminderColor(reminder),
         completed,
         completable: true,
         completionId: reminder.id,
-        executionContract: resolvePriorityExecutionContract({ reminder, occurrenceDate: today }),
+        executionContract,
+        notificationAction: resolveNotificationAction({ executionContract, completable: true, timeOfDay: reminder.schedule?.timeOfDay }),
         state: state.name,
         priority: state.priorityOffset + 18,
       };
@@ -487,6 +492,7 @@ function getMorningWeightItem({ checkIns, executionItems, latestWeight, now, pro
   });
   const timing = support.executionItem.preferredSchedule?.timeOfDay;
   const state = getPriorityState(timing, now, timeZone);
+  const executionContract = resolvePriorityExecutionContract({ reminder: support.reminder, occurrenceDate: today });
   return {
     id: support.reminder.id,
     label: "Morning Weigh-In",
@@ -501,7 +507,8 @@ function getMorningWeightItem({ checkIns, executionItems, latestWeight, now, pro
     session: getSessionTimeBlock(timing),
     state: state.name,
     priority: state.priorityOffset + 10,
-    executionContract: resolvePriorityExecutionContract({ reminder: support.reminder, occurrenceDate: today }),
+    executionContract,
+    notificationAction: resolveNotificationAction({ executionContract, completable: false, timeOfDay: timing }),
   };
 }
 
@@ -512,6 +519,7 @@ function getLegacyMorningWeightItem({ latestWeight, todaysCheckIn, today, now, t
     id: "verified-weight", label: "Morning Weight", subtitle: state.label, metadata: "Fasted",
     href: "/check-in/morning", icon: "scale", color: "evidence", completed,
     session: "morning", state: state.name, priority: state.priorityOffset + 10,
+    notificationAction: specializedNotificationAction({ workflow: "morning_check_in", priorityId: "verified-weight", occurrenceDate: today, timeOfDay: "morning" }),
   };
 }
 
@@ -542,6 +550,12 @@ function getDexaAppointmentItems({ executionItems, now, timeZone }) {
     changeLabel: upload ? "Results needed" : null,
     alwaysShowMetadata: true,
     dexaProjection: projection,
+    notificationAction: specializedNotificationAction({
+      workflow: upload ? "dexa_evidence" : "dexa_appointment",
+      priorityId: projection.priorityId,
+      occurrenceDate: projection.scheduledDate,
+      timeOfDay: appointment.preferredSchedule?.timeOfDay,
+    }),
   }];
 }
 
@@ -586,6 +600,7 @@ function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now 
         completedCategoryIds.has(expectedView)
       );
     const state = getPriorityState(reminder.schedule?.timeOfDay, now);
+    const executionContract = resolvePriorityExecutionContract({ reminder, occurrenceDate: today });
 
     return {
       id: reminder.id,
@@ -603,7 +618,8 @@ function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now 
       session: timeBlock,
       state: state.name,
       priority: state.priorityOffset + 12,
-      executionContract: resolvePriorityExecutionContract({ reminder, occurrenceDate: today }),
+      executionContract,
+      notificationAction: resolveNotificationAction({ executionContract, completable: false, timeOfDay: reminder.schedule?.timeOfDay }),
     };
   });
 }
@@ -671,6 +687,7 @@ function mapSessionToPriority(session, occurrenceDate) {
       satisfiedByEvidence: item.satisfiedByEvidence,
     })),
     priority: session.priority,
+    notificationAction: specializedNotificationAction({ workflow: "grouped_session", priorityId: session.id, occurrenceDate, timeOfDay: session.timeBlock }),
   };
 }
 
@@ -817,6 +834,25 @@ function getExecutionBackedProtocolItems({
         executionContract: reminder
           ? resolvePriorityExecutionContract({ reminder, occurrenceDate: today })
           : null,
+        // Dosing semantics mean a peptide/recovery/supplement item must
+        // never expose blind direct completion from a notification, even
+        // when it happens to be built on top of an ordinary reminder for
+        // scheduling (`forceSpecialized`) — and when there's no reminder at
+        // all (`executionContract` null), it's still specialized rather
+        // than falling back to `open_only`.
+        notificationAction: reminder
+          ? resolveNotificationAction({
+              executionContract: resolvePriorityExecutionContract({ reminder, occurrenceDate: today }),
+              completable: projection.completable,
+              forceSpecialized: true,
+              timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
+            })
+          : specializedNotificationAction({
+              workflow: "peptide_protocol",
+              priorityId: projection.historyAnchorId,
+              occurrenceDate: today,
+              timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay,
+            }),
         state: state.name,
         priority: state.priorityOffset + (recoverySupport ? 18 : 22) + index,
         changeLabel: setupRequired
@@ -912,6 +948,12 @@ function getLegacyReminderOnlyDoseChangeItem({
     protocolId: doseChange.protocol.id,
     occurrenceDate: today,
     taperStepId: doseChange.entry.label ?? null,
+    notificationAction: specializedNotificationAction({
+      workflow: "dose_change",
+      priorityId: `dose-change-${doseChange.protocol.id}-${today}`,
+      occurrenceDate: today,
+      timeOfDay: "night",
+    }),
   };
 }
 
@@ -929,6 +971,7 @@ function getProteinItem({ todaysCheckIn, today }) {
     completed,
     occurrenceDate: today,
     priority: completed ? 80 : 65,
+    notificationAction: openOnlyNotificationAction({ priorityId: "protein-goal", occurrenceDate: today }),
   };
 }
 
@@ -946,6 +989,7 @@ function getActivityItem({ todaysCheckIn, today }) {
     completed,
     occurrenceDate: today,
     priority: completed ? 85 : 70,
+    notificationAction: openOnlyNotificationAction({ priorityId: "activity-ring", occurrenceDate: today }),
   };
 }
 
@@ -963,6 +1007,7 @@ function getSleepItem({ todaysCheckIn, today }) {
     completed,
     occurrenceDate: today,
     priority: completed ? 90 : 75,
+    notificationAction: openOnlyNotificationAction({ priorityId: "sleep-hours", occurrenceDate: today }),
   };
 }
 

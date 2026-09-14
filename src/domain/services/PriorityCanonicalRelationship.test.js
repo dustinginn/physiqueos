@@ -3,6 +3,7 @@ import { createDailyFocusService } from "./DailyFocusService.js";
 import {
   createPriorityOccurrenceKey,
   resolvePriorityExecutionContract,
+  resolveScheduledTime,
 } from "./ReminderOccurrenceCompletion.js";
 
 describe("canonical Priority relationship", () => {
@@ -55,5 +56,48 @@ describe("canonical Priority relationship", () => {
       }],
     });
     expect(items.some((item) => item.id === "reminder_foam_roll")).toBe(false);
+  });
+
+  it("resolves an already-exact schedule time as-is and a named bucket to its canonical hour", () => {
+    expect(resolveScheduledTime("16:30")).toBe("16:30");
+    expect(resolveScheduledTime("morning")).toBe("07:00");
+    expect(resolveScheduledTime("night")).toBe("21:00");
+    expect(resolveScheduledTime(null)).toBeNull();
+    expect(resolveScheduledTime("not-a-real-bucket")).toBeNull();
+  });
+
+  it("Foam Rolling is direct-completion-allowed, and its notification schedule follows the canonical reminder schedule with no separate Native configuration", () => {
+    const dailyFocus = (timeOfDay) => createDailyFocusService().getDailyFocus({
+      now: new Date("2026-09-01T12:00:00.000Z"),
+      timeZone: "UTC",
+      reminders: [{
+        id: "reminder_foam_roll",
+        title: "Foam Rolling",
+        type: "other",
+        version: 3,
+        active: true,
+        persistenceMode: "always_visible",
+        schedule: { type: "daily", timeOfDay },
+      }],
+    });
+
+    const morning = dailyFocus("morning").find((item) => item.id === "reminder_foam_roll");
+    expect(morning.notificationAction).toMatchObject({
+      classification: "direct_completion_allowed",
+      scheduledTime: "07:00",
+      completionCommand: {
+        commandType: "priority.complete.v1",
+        expectedVersion: 3,
+        payload: { priorityId: "reminder_foam_roll" },
+      },
+    });
+
+    // The ONLY thing that changed is the canonical reminder's own schedule —
+    // no Native-side scheduling configuration exists to update. This is the
+    // whole point: Native must derive notification timing from this field,
+    // never maintain a second, independently-adjustable schedule.
+    const evening = dailyFocus("18:45").find((item) => item.id === "reminder_foam_roll");
+    expect(evening.notificationAction.scheduledTime).toBe("18:45");
+    expect(evening.notificationAction.classification).toBe("direct_completion_allowed");
   });
 });

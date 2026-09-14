@@ -14,6 +14,11 @@ describe("DEXA Priority Detail", () => {
         label: "View DEXA Appointment",
         href: "/profile/operating-plan/execution/dexa",
       },
+      notificationAction: {
+        classification: "specialized_workflow_required",
+        workflow: "dexa_appointment",
+        completionCommand: null,
+      },
     });
     expect(section(detail, "Preparation").items[0].detail).toBe("Use the saved clinic instructions.");
     expect(section(detail, "When").items[0].label).toContain("7:30 AM");
@@ -32,6 +37,11 @@ describe("DEXA Priority Detail", () => {
       title: "Upload DEXA results",
       status: "Action needed",
       action: { label: "Upload DEXA Results", href: "/evidence/dexa" },
+      notificationAction: {
+        classification: "specialized_workflow_required",
+        workflow: "dexa_evidence",
+        completionCommand: null,
+      },
     });
     expect(section(detail, "What").items[0].detail).toContain("scheduled scan time has passed");
     expect(section(detail, "Preparation")).toBeUndefined();

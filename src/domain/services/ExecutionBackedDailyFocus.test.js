@@ -52,6 +52,14 @@ describe("Execution-backed Daily Focus composition", () => {
     });
     expect(item.metadata).not.toContain("2 mg");
     expect(item.executionProjection.provenance.currentDose).toBe("execution");
+    // Dosing semantics: even though this item is completable and its
+    // reminder-derived executionContract.workflow is "priority_detail" (the
+    // same shape an ordinary direct-completable reminder has), a peptide
+    // item must never expose blind direct completion from a notification.
+    expect(item.notificationAction).toMatchObject({
+      classification: "specialized_workflow_required",
+      completionCommand: null,
+    });
   });
 
   it("reconciles the saved Support record across due, not-due, and disabled reminder states", () => {
