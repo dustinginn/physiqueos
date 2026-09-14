@@ -29,45 +29,45 @@ struct RootTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack(path: $homePath) {
-                HomeView(onNavigate: { homePath.append($0) })
+                HomeView(onNavigate: { noteNavigation($0); homePath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { homePath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { noteNavigation($0); homePath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.home.title, systemImage: AppTab.home.systemImageName) }
             .tag(AppTab.home)
 
             NavigationStack(path: $goalsPath) {
-                GoalsView(onNavigate: { goalsPath.append($0) })
+                GoalsView(onNavigate: { noteNavigation($0); goalsPath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { goalsPath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { noteNavigation($0); goalsPath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.goals.title, systemImage: AppTab.goals.systemImageName) }
             .tag(AppTab.goals)
 
             NavigationStack(path: $logPath) {
-                LogView(onNavigate: { logPath.append($0) })
+                LogView(onNavigate: { noteNavigation($0); logPath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { logPath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { noteNavigation($0); logPath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.log.title, systemImage: AppTab.log.systemImageName) }
             .tag(AppTab.log)
 
             NavigationStack(path: $evidencePath) {
-                EvidenceView(onNavigate: { evidencePath.append($0) })
+                EvidenceView(onNavigate: { noteNavigation($0); evidencePath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { evidencePath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { noteNavigation($0); evidencePath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.evidence.title, systemImage: AppTab.evidence.systemImageName) }
             .tag(AppTab.evidence)
 
             NavigationStack(path: $youPath) {
-                YouPlaceholderView(onNavigate: { youPath.append($0) })
+                YouPlaceholderView(onNavigate: { noteNavigation($0); youPath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { youPath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { noteNavigation($0); youPath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.you.title, systemImage: AppTab.you.systemImageName) }
@@ -85,6 +85,12 @@ struct RootTabView: View {
             await Task.yield()
             logPath = NavigationPath()
         }
+    }
+
+    private func noteNavigation(_ destination: AppDestination) {
+#if DEBUG
+        NativePerformanceDiagnostics.recordNavigationInitiated(surface: destination.serverDestinationId)
+#endif
     }
 
     /// Briefing Detail's top-of-screen "Home" navigation (the Founder's

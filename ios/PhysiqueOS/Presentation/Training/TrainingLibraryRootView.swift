@@ -32,7 +32,12 @@ struct TrainingLibraryRootView: View {
             viewModel = TrainingLibraryRootViewModel(api: environment.trainingAPI)
             await viewModel?.load()
         }
-        .refreshable { await viewModel?.load() }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["training-library"])
+            }
+            await viewModel?.load()
+        }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
     }
 

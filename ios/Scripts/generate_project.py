@@ -108,6 +108,7 @@ app_files = [
     ("Networking", "UUIDv7.swift"),
     ("Networking", "ProductionDailyDriverAPI.swift"),
     ("Networking", "FounderPhotoMediaStore.swift"),
+    ("Performance", "NativePerformanceDiagnostics.swift"),
     ("Networking", "FounderProductionPhotoMediaStore.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "HomeGreeting.swift"),
@@ -325,7 +326,7 @@ DEPLOYMENT_TARGET = "18.0"
 # One authoritative TestFlight build number. Increment this value, run this
 # generator, then build/archive. Never edit CURRENT_PROJECT_VERSION in the
 # generated project by hand.
-APP_BUILD_NUMBER = 30
+APP_BUILD_NUMBER = 31
 
 # The Founder's existing, paid Apple Developer Program team ("DUSTIN JOSEPH
 # GINN" in Xcode's Signing & Capabilities UI). Recovered from a real Xcode
@@ -516,7 +517,7 @@ def group_children_for(path):
 
 group_lines = []
 
-top_children = ["App", "Contracts", "Networking", "SharedUI", "Presentation", "Resources", "Supporting"]
+top_children = ["App", "Contracts", "Networking", "Performance", "SharedUI", "Presentation", "Resources", "Supporting"]
 refs = "\n".join(f"\t\t\t\t{I(f'group:{c}')} /* {c} */," for c in top_children)
 group_lines.append(f"""\t\t{I('group:PhysiqueOS')} /* PhysiqueOS */ = {{
 \t\t\tisa = PBXGroup;

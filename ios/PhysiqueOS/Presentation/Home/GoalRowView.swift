@@ -8,6 +8,18 @@ private let iconMap: [HomeGoalIcon: String] = [
     .target: "target",
 ]
 
+/// Stable Native adaptations of the live Web Home card relationships.
+/// Values remain centralized so geometry parity is regression-testable.
+enum HomeGoalWebParityTokens {
+    static let cardHorizontalPadding: CGFloat = 16
+    static let cardVerticalPadding: CGFloat = 15
+    static let phaseIconSize: CGFloat = 42
+    static let guardrailIconSize: CGFloat = 42
+    static let cardCornerRadius: CGFloat = 16
+    static let phaseToPhaseSpacing: CGFloat = 12
+    static let guardrailTopSpacing: CGFloat = 14
+}
+
 /// Mirrors `GoalRow.jsx`'s `primary_goal` (progress bar + percentage) and
 /// default "supporting" (status + detail pair) presentations. `terminal`,
 /// `calibration`, and `phase_trajectory` goal rows exist on the web but are
@@ -141,21 +153,24 @@ struct PhaseTrajectoryGoalView: View {
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     .padding(.top, 8)
             }
-            VStack(spacing: 10) {
+            VStack(spacing: HomeGoalWebParityTokens.phaseToPhaseSpacing) {
                 ForEach(trajectory.phases) { phase in
                     PhaseTrajectoryPhaseCard(phase: phase)
                 }
             }
-            .padding(.top, 12)
+            .padding(.top, 14)
             if let guardrail = trajectory.guardrail {
                 GuardrailCalloutCard(text: guardrail)
-                    .padding(.top, 12)
+                    .padding(.top, HomeGoalWebParityTokens.guardrailTopSpacing)
             }
         }
 
         return Group {
             if let destination {
-                Button { onTap(destination) } label: { content }.buttonStyle(.plain)
+                Button { onTap(destination) } label: {
+                    content.frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
             } else {
                 content
             }
@@ -194,24 +209,24 @@ private struct PhaseTrajectoryPhaseCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: isOutcome ? "figure.strengthtraining.traditional" : "safari")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(accent)
-                    .frame(width: 36, height: 36)
+                    .frame(width: HomeGoalWebParityTokens.phaseIconSize, height: HomeGoalWebParityTokens.phaseIconSize)
                     .background(colorToken.background)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Phase \(phase.order + 1)")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(accent)
                     Text(phase.phaseName)
-                        .font(.system(size: 13, weight: .heavy))
+                        .font(.system(size: 16, weight: .heavy))
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         .lineSpacing(3)
                 }
                 Spacer(minLength: 8)
                 Text(statusLabel)
-                    .font(.system(size: 9, weight: .heavy))
+                    .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(accent)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -222,7 +237,7 @@ private struct PhaseTrajectoryPhaseCard: View {
                 Text(timingLabel)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    .padding(.leading, 46)
+                    .padding(.leading, HomeGoalWebParityTokens.phaseIconSize + 10)
             }
             if isUnavailable, let label = phase.presentationLabel {
                 Text(label)
@@ -233,22 +248,24 @@ private struct PhaseTrajectoryPhaseCard: View {
                 AnimatedProgressBar(value: percentage, color: accent, accessibilityLabel: "\(phase.phaseName) progress")
                 if let label = phase.presentationLabel {
                     Text(label)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 if isOutcome {
                     Text(phase.progressStatus == "awaiting_follow_up" ? "Awaiting next DEXA" : "DEXA measurements anchor progress")
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
         }
-        .padding(12)
+        .padding(.horizontal, HomeGoalWebParityTokens.cardHorizontalPadding)
+        .padding(.vertical, HomeGoalWebParityTokens.cardVerticalPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(accent.opacity(0.2)))
+        .clipShape(RoundedRectangle(cornerRadius: HomeGoalWebParityTokens.cardCornerRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: HomeGoalWebParityTokens.cardCornerRadius, style: .continuous).strokeBorder(accent.opacity(0.2)))
     }
 }
 
@@ -273,23 +290,25 @@ private struct GuardrailCalloutCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             IconBadge(systemImage: "checkmark.shield.fill", color: .primary, size: .md, isCircular: false)
-                .frame(width: 40, height: 40)
+                .frame(width: HomeGoalWebParityTokens.guardrailIconSize, height: HomeGoalWebParityTokens.guardrailIconSize)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Guardrail")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(PhysiqueOSTheme.accent)
                 Text(text)
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .font(.system(size: 16, weight: .heavy))
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text("This remains in effect throughout every phase.")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
-        .padding(16)
+        .padding(.horizontal, HomeGoalWebParityTokens.cardHorizontalPadding)
+        .padding(.vertical, HomeGoalWebParityTokens.cardVerticalPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.accent.opacity(0.07))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(PhysiqueOSTheme.accent.opacity(0.22)))
+        .clipShape(RoundedRectangle(cornerRadius: HomeGoalWebParityTokens.cardCornerRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: HomeGoalWebParityTokens.cardCornerRadius, style: .continuous).strokeBorder(PhysiqueOSTheme.accent.opacity(0.22)))
     }
 }
 

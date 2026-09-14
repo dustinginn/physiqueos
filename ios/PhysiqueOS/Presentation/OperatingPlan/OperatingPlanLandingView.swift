@@ -40,7 +40,12 @@ struct OperatingPlanLandingView: View {
         .navigationTitle("Operating Plan")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
-        .refreshable { await load() }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["operating-plan"])
+            }
+            await load()
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await load() }

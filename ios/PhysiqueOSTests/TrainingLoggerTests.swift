@@ -184,6 +184,85 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertNil(draft.exercises.first?.progressionChoice)
     }
 
+    func testBodyweightDefaultExercisesAlwaysAllowOptionalPerSetExternalLoad() {
+        let pullUps = TrainingLoggerCatalogExercise(
+            canonicalExerciseId: "pull_up", name: "Pull-Ups", areaId: "back", equipment: "bodyweight",
+            measurement: .bodyweightReps, defaultLoadType: "bodyweight", previouslyPerformed: true,
+            history: [.init(
+                sessionId: "pull-prior", workoutDate: "2026-08-30", executionVariant: nil, relationship: nil,
+                sets: [.init(setNumber: 1, reps: 6, weight: 25, weightUnit: "lb", durationSeconds: nil, loadType: "external_load", setType: "weighted_reps")]
+            )],
+            progressionRecommendation: .init(
+                state: .opportunity, eyebrow: "Progression opportunity", message: "Canonical recommendation.",
+                prescription: "25 lb x 7", suggestedLoad: 25, suggestedLoadType: "external_load",
+                suggestedReps: 7, suggestedUnit: "lb"
+            )
+        )
+        let hangingRaises = TrainingLoggerCatalogExercise(
+            canonicalExerciseId: "hanging_leg_raise", name: "Hanging Leg Raises", areaId: "core", equipment: "bodyweight",
+            measurement: .bodyweightReps, defaultLoadType: "bodyweight", previouslyPerformed: true,
+            history: [.init(
+                sessionId: "raise-prior", workoutDate: "2026-08-30", executionVariant: nil, relationship: nil,
+                sets: [.init(setNumber: 1, reps: 18, weight: nil, weightUnit: "bodyweight", durationSeconds: nil, loadType: "bodyweight", setType: "bodyweight_reps")]
+            )], progressionRecommendation: nil
+        )
+        var workout = draft(date: "2026-09-13", areas: ["back", "core"])
+        workout.addExercise(pullUps)
+        workout.addExercise(hangingRaises)
+
+        XCTAssertEqual(workout.exercises[0].previousPerformance?.compactLine, "Previous 6 x 25 lb · 2026-08-30 · Ordinary · Standalone")
+        XCTAssertEqual(workout.exercises[0].sets.first?.load, 25)
+        XCTAssertEqual(workout.exercises[1].previousPerformance?.compactLine, "Previous 18 x BW · 2026-08-30 · Ordinary · Standalone")
+        XCTAssertNil(workout.exercises[1].sets.first?.load)
+        let targets = TrainingLoggerNumericFocusOrder.targets(for: workout)
+        XCTAssertEqual(targets.filter { $0.exerciseId == workout.exercises[0].id }.map(\.kind), [.reps, .load])
+        XCTAssertEqual(targets.filter { $0.exerciseId == workout.exercises[1].id }.map(\.kind), [.reps, .load])
+
+        workout.exercises[0].sets[0].load = nil
+        XCTAssertNil(workout.exercises[0].sets[0].load, "Removing added load returns the set to bodyweight-only.")
+        workout.exercises[1].sets[0].load = 10
+        workout.addSet(to: workout.exercises[1].id)
+        workout.exercises[1].sets[1].load = 15
+        XCTAssertEqual(workout.exercises[1].sets.map(\.load), [10, 15])
+    }
+
+    func testCanonicalRecommendationActionsRemainEditableAndNoRecommendationWithholds() {
+        let recommendation = TrainingLoggerProgressionRecommendation(
+            state: .maintain, eyebrow: "Maintain current performance", message: "Canonical recommendation.",
+            prescription: "110 lb x 14", suggestedLoad: 110, suggestedLoadType: "external_load",
+            suggestedReps: 14, suggestedUnit: "lb"
+        )
+        let history = TrainingLoggerHistoryRecord(
+            sessionId: "previous", workoutDate: "2026-08-30", executionVariant: nil, relationship: nil,
+            sets: [.init(setNumber: 1, reps: 14, weight: 110, weightUnit: "lb", durationSeconds: nil, loadType: "external_load", setType: "weighted_reps")]
+        )
+        let row = TrainingLoggerCatalogExercise(
+            canonicalExerciseId: "seated_cable_row", name: "Seated Cable Rows", areaId: "back", equipment: "cable",
+            measurement: .repsLoad, defaultLoadType: nil, previouslyPerformed: true,
+            history: [history], progressionRecommendation: recommendation
+        )
+        let without = TrainingLoggerCatalogExercise(
+            canonicalExerciseId: "new_row", name: "New Row", areaId: "back", equipment: "cable",
+            measurement: .repsLoad, defaultLoadType: nil, previouslyPerformed: true,
+            history: [history], progressionRecommendation: nil
+        )
+        var workout = draft(date: "2026-09-13", areas: ["back"])
+        workout.addExercise(row)
+        workout.addExercise(without)
+        let id = workout.exercises[0].id
+        workout.applyProgressionSuggestion(to: id)
+        XCTAssertEqual(workout.exercises[0].sets[0].reps, 14)
+        XCTAssertEqual(workout.exercises[0].sets[0].load, 110)
+        workout.exercises[0].sets[0].reps = 15
+        XCTAssertEqual(workout.exercises[0].sets[0].reps, 15, "Suggestion remains editable.")
+        workout.keepPreviousPerformance(for: id)
+        XCTAssertEqual(workout.exercises[0].sets[0].reps, 14)
+        XCTAssertEqual(workout.exercises[0].sets[0].load, 110)
+        workout.exercises[0].sets[0].load = 115
+        XCTAssertEqual(workout.exercises[0].sets[0].load, 115, "Previous choice remains editable.")
+        XCTAssertNil(workout.exercises[1].progressionRecommendation)
+    }
+
     func testSupersetComparisonIsolationUsesCanonicalPartnerIdentity() async throws {
         let config = try await configuration()
         let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
@@ -252,8 +331,14 @@ final class TrainingLoggerTests: XCTestCase {
         draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "plank" }))
         let targets = TrainingLoggerNumericFocusOrder.targets(for: draft)
         XCTAssertEqual(targets.filter { $0.exerciseId == draft.exercises[0].id }.map(\.kind), [.reps, .load, .reps, .load, .reps, .load])
-        XCTAssertEqual(targets.filter { $0.exerciseId == draft.exercises[1].id }.map(\.kind), Array(repeating: .reps, count: draft.exercises[1].sets.count))
-        XCTAssertEqual(targets.filter { $0.exerciseId == draft.exercises[2].id }.map(\.kind), [.duration, .duration, .duration])
+        XCTAssertEqual(
+            targets.filter { $0.exerciseId == draft.exercises[1].id }.map(\.kind),
+            Array(repeating: [.reps, .load], count: draft.exercises[1].sets.count).flatMap { $0 }
+        )
+        XCTAssertEqual(
+            targets.filter { $0.exerciseId == draft.exercises[2].id }.map(\.kind),
+            Array(repeating: [.duration, .load], count: draft.exercises[2].sets.count).flatMap { $0 }
+        )
         XCTAssertEqual(TrainingLoggerNumericFocusOrder.next(after: targets[0].id, in: draft), targets[1].id)
         XCTAssertNil(TrainingLoggerNumericFocusOrder.next(after: targets.last!.id, in: draft))
     }
@@ -777,11 +862,11 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildTwentyNineInSourceControlledConfiguration() throws {
+    func testAppDeclaresExemptEncryptionAndBuildThirtyOneInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "30")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "31")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }

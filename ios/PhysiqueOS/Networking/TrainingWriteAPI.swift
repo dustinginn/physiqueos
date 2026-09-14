@@ -70,16 +70,23 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             } else {
                 provisional = nil
             }
-            guard exercise.measurement != .duration else {
-                throw TrainingWriteError.unsupportedDurationExercise(exercise.name)
-            }
-            let unit = exercise.measurement == .bodyweightReps ? "bodyweight" : "lb"
             return Exercise(
                 canonicalExerciseId: canonicalID,
                 provisionalExercise: provisional,
                 occurrenceId: exercise.id,
                 executionVariant: exercise.executionVariant,
-                sets: completed.map { SetPayload(setId: $0.id, reps: $0.reps ?? 0, load: unit == "bodyweight" ? 0 : ($0.load ?? 0), unit: unit) }
+                sets: completed.map { set in
+                    let defaultsToBodyweight = exercise.defaultLoadType == "bodyweight"
+                    let bodyweightOnly = defaultsToBodyweight && set.load == nil
+                    return SetPayload(
+                        setId: set.id,
+                        reps: set.reps,
+                        durationSeconds: set.durationSeconds,
+                        load: bodyweightOnly ? nil : set.load,
+                        loadType: bodyweightOnly ? "bodyweight" : "external_load",
+                        unit: bodyweightOnly ? "bodyweight" : "lb"
+                    )
+                }
             )
         }
         guard !exercises.isEmpty else { throw TrainingWriteError.noCompletedSets }
@@ -102,7 +109,9 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             draft.id,
             draft.workoutDate,
             exercises.map { exercise in
-                let sets = exercise.sets.map { "\($0.setId):\($0.reps):\($0.load):\($0.unit)" }.joined(separator: ",")
+                let sets = exercise.sets.map { set in
+                    "\(set.setId):\(set.reps.map { String($0) } ?? "-"):\(set.durationSeconds.map { String($0) } ?? "-"):\(set.load.map { String($0) } ?? "-"):\(set.loadType):\(set.unit)"
+                }.joined(separator: ",")
                 let identity = exercise.canonicalExerciseId ?? "new:\(exercise.provisionalExercise?.name ?? ""):\(exercise.provisionalExercise?.primaryMuscleGroupId ?? "")"
                 return "\(identity)|\(exercise.occurrenceId)|\(exercise.executionVariant?.key ?? "ordinary")|\(sets)"
             }.joined(separator: ";"),
@@ -181,8 +190,10 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
 
     private struct SetPayload: Encodable {
         var setId: String
-        var reps: Double
-        var load: Double
+        var reps: Double?
+        var durationSeconds: Double?
+        var load: Double?
+        var loadType: String
         var unit: String
     }
 

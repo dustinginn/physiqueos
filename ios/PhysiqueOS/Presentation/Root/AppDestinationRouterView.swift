@@ -15,6 +15,16 @@ struct AppDestinationRouterView: View {
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     var body: some View {
+        Group { routedContent }
+            .onAppear {
+#if DEBUG
+                NativePerformanceDiagnostics.recordShell(surface: destination.serverDestinationId)
+#endif
+            }
+    }
+
+    @ViewBuilder
+    private var routedContent: some View {
         switch destination {
         case .goalDetail(let goalId):
             GoalDetailView(goalId: goalId, onNavigate: onNavigate)

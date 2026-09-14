@@ -137,12 +137,13 @@ enum TrainingPerformanceEventValidator {
 /// (`TrainingLibraryExerciseRecordsService.js`) field-for-field: select a
 /// canonical exercise, deduplicate by durable event id, reject unsupported
 /// schema/category/type or malformed values, preserve variant/relationship
-/// context, sort deterministically, cap at five, and return `nil` when no
-/// qualifying record remains. PR detection itself stays server-owned.
+/// context, select the current strongest event for each canonical record
+/// family, sort deterministically, and return `nil` when no qualifying
+/// record remains. Historical events stay canonical; this is summary
+/// selection only. PR detection itself stays server-owned.
 enum TrainingPerformanceRecordsCalculator {
     static let schemaVersion = "training_performance_event_v1"
     static let category = "training_performance"
-    static let recordLimit = 5
 
     static func recordsReadModel(
         canonicalExerciseId: String,
@@ -151,29 +152,55 @@ enum TrainingPerformanceRecordsCalculator {
         guard let selectedId = clean(canonicalExerciseId) else { return nil }
 
         var seenEventIds: Set<String> = []
-        var records: [TrainingPerformanceRecord] = []
+        var activeByFamily: [String: TrainingPerformanceRecord] = [:]
         for event in events {
             guard seenEventIds.insert(event.id).inserted else { continue }
             guard let record = toRecord(event, selectedId: selectedId) else { continue }
-            records.append(record)
+            let family = activeRecordFamilyKey(event)
+            if let current = activeByFamily[family] {
+                if record.achievedValue > current.achievedValue ||
+                    (record.achievedValue == current.achievedValue && isOrderedBefore(record, current)) {
+                    activeByFamily[family] = record
+                }
+            } else {
+                activeByFamily[family] = record
+            }
         }
 
+        var records = Array(activeByFamily.values)
         records.sort(by: isOrderedBefore)
         guard let first = records.first else { return nil }
 
-        let visible = Array(records.prefix(recordLimit))
-        let hiddenCount = records.count - visible.count
         return TrainingPerformanceRecordsReadModel(
             id: "training_library_records_\(selectedId)",
             heading: "Performance Records",
             canonicalExerciseId: selectedId,
             canonicalExerciseName: first.canonicalExerciseName,
-            records: visible,
-            visibleCount: visible.count,
+            records: records,
+            visibleCount: records.count,
             totalCount: records.count,
-            hiddenCount: hiddenCount,
-            countLabel: hiddenCount > 0 ? "Showing \(visible.count) of \(records.count) records" : nil
+            hiddenCount: 0,
+            countLabel: nil
         )
+    }
+
+    private static func activeRecordFamilyKey(_ event: TrainingPerformanceEvent) -> String {
+        let variant = event.executionVariant?.key ?? "ordinary"
+        let relationship: String
+        if let context = event.relationshipContext {
+            relationship = "\(context.relationshipType):" + context.orderedPartners
+                .map { $0.canonicalExerciseId }
+                .sorted()
+                .joined(separator: ",")
+        } else {
+            relationship = "standalone"
+        }
+        if event.eventType == TrainingPerformanceEventType.repsAtLoadPR.rawValue {
+            let load = event.load.map { String($0) } ?? ""
+            return [event.eventType, load, event.loadUnit ?? "", variant, relationship]
+                .joined(separator: "|")
+        }
+        return [event.eventType, event.unit ?? "", variant, relationship].joined(separator: "|")
     }
 
     /// `toItem`: intentionally validates the same boundary the web read

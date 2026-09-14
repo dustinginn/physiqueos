@@ -374,7 +374,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         XCTAssertTrue(repsField.waitForExistence(timeout: 3), "Set 1 reps field was not reachable.")
         repsField.tap()
         repsField.typeText(reps)
-        let loadField = app.textFields["Set 1 load"]
+        let loadField = app.textFields["Set 1 optional external load"]
         XCTAssertTrue(loadField.waitForExistence(timeout: 3), "Set 1 load field was not reachable.")
         loadField.tap()
         loadField.typeText(load)

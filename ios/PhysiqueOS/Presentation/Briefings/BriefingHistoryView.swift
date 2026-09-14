@@ -4,7 +4,7 @@ import SwiftUI
 /// Reads through the authority-switching `BriefingAPI` (`briefing-history`
 /// under Founder Production, `BriefingSandboxStore.history` under
 /// Sandbox) — never a second History-only fixture. Server-sorted
-/// newest-first already (`ORDER BY observed_at DESC ..., record_id DESC`)
+/// newest-first already (canonical publication timestamp, then record id)
 /// — Native does not re-sort.
 ///
 /// Verified real behavior: History does NOT show Confidence or Goal/Phase
@@ -33,7 +33,12 @@ struct BriefingHistoryView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .refreshable { await load(showLoading: false) }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["briefing-history"])
+            }
+            await load(showLoading: false)
+        }
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)

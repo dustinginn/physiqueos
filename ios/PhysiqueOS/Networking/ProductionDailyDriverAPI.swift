@@ -1246,6 +1246,11 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         let projected = payload.initialCanonicalExercises.map(ProductionCanonicalExercise.init)
         let catalog = try CanonicalTrainingCatalog(exercises: projected)
         let history = payload.initialHistorySessions
+        let recommendations = Dictionary(
+            uniqueKeysWithValues: (payload.initialProgressionRecommendations ?? []).map {
+                ($0.canonicalExerciseId, $0.recommendation)
+            }
+        )
         return TrainingLoggerConfiguration(
             areas: catalog.areas.map { TrainingLoggerArea(id: $0.id, label: $0.label) },
             variants: [],
@@ -1257,9 +1262,10 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                         areaId: area.id,
                         equipment: exercise.equipment,
                         measurement: exercise.measurement,
+                        defaultLoadType: exercise.defaultLoadType,
                         previouslyPerformed: payload.initialPerformedExerciseIds.contains(exercise.canonicalExerciseId),
                         history: Self.history(for: exercise.canonicalExerciseId, in: history),
-                        progressionRecommendation: nil
+                        progressionRecommendation: recommendations[exercise.canonicalExerciseId]
                     )
                 }
             }
@@ -1283,9 +1289,9 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                             reps: set.reps,
                             weight: set.weight,
                             weightUnit: set.weightUnit,
-                            durationSeconds: nil,
-                            loadType: nil,
-                            setType: nil
+                            durationSeconds: set.durationSeconds,
+                            loadType: set.loadType,
+                            setType: set.measurementType
                         )
                     }
                 )
@@ -1297,6 +1303,7 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         var initialCanonicalExercises: [RawExercise]
         var initialHistorySessions: [HistorySession]
         var initialPerformedExerciseIds: [String]
+        var initialProgressionRecommendations: [RawRecommendation]?
     }
 
     /// `coreNavigation.getTrainingLogger`'s `initialHistorySessions` are a
@@ -1329,6 +1336,33 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         var reps: Double?
         var weight: Double?
         var weightUnit: String?
+        var durationSeconds: Double?
+        var loadType: String?
+        var measurementType: String?
+    }
+    private struct RawRecommendation: Decodable {
+        var canonicalExerciseId: String
+        var state: TrainingLoggerProgressionState
+        var eyebrow: String
+        var message: String
+        var prescription: String
+        var suggestedLoad: Double?
+        var suggestedLoadType: String?
+        var suggestedReps: Double?
+        var suggestedUnit: String?
+
+        var recommendation: TrainingLoggerProgressionRecommendation {
+            .init(
+                state: state,
+                eyebrow: eyebrow,
+                message: message,
+                prescription: prescription,
+                suggestedLoad: suggestedLoad,
+                suggestedLoadType: suggestedLoadType,
+                suggestedReps: suggestedReps,
+                suggestedUnit: suggestedUnit
+            )
+        }
     }
     fileprivate struct RawExercise: Decodable {
         var id: String; var name: String; var equipment: String?
@@ -1360,7 +1394,13 @@ private struct ProductionCanonicalExercise: Decodable {
 }
 
 private struct CanonicalTrainingCatalog {
-    struct Exercise { var canonicalExerciseId: String; var label: String; var equipment: String?; var measurement: TrainingLoggerMeasurement }
+    struct Exercise {
+        var canonicalExerciseId: String
+        var label: String
+        var equipment: String?
+        var measurement: TrainingLoggerMeasurement
+        var defaultLoadType: String?
+    }
     struct Area { var id: String; var label: String; var exercises: [Exercise] }
     let areas: [Area]
 
@@ -1384,7 +1424,8 @@ private struct CanonicalTrainingCatalog {
                 label: exercise.label,
                 equipment: exercise.equipment,
                 measurement: exercise.defaultMeasurement == "duration" ? .duration
-                    : exercise.defaultLoadType == "bodyweight" ? .bodyweightReps : .repsLoad
+                    : exercise.defaultLoadType == "bodyweight" ? .bodyweightReps : .repsLoad,
+                defaultLoadType: exercise.defaultLoadType
             ))
         }
         areas = definitions.map { id, label in
@@ -1771,16 +1812,19 @@ struct ProductionEvidenceAPI: EvidenceAPI {
     let api: ProductionNativeAPI
 
     func fetchEvidenceHub() async throws -> EvidenceHubReadModel {
-        // Sequential, not concurrent: `ProductionNativeAPI` serializes reads
-        // through one bearer-refresh path anyway, and a predictable request
-        // order keeps this composition straightforward to test.
-        let weight = try await ProductionWeightEvidenceAPI(api: api).fetchWeightReport(scope: .all)
-        let training = try await ProductionTrainingAPI(api: api).fetchTrainingLanding(scope: .all)
-        let nutrition = try await ProductionNutritionAPI(api: api).fetchNutritionLanding(scope: .all)
-        let activity = try await ProductionActivityAPI(api: api).fetchActivityLanding(scope: .all)
-        let energy = try await ProductionEnergyAPI(api: api).fetchEnergyReport(scope: .all)
-        let dexa = try await ProductionDEXAAPI(api: api).fetchDEXAReport(scope: .all)
-        let photos = try await ProductionPhotosAPI(api: api).fetchPhotosLanding(scope: .all)
+        // These are independent canonical reads. Actor reentrancy keeps the
+        // one refresh-token boundary safe while allowing healthy requests to
+        // overlap instead of forcing Evidence Hub through seven serial waits.
+        async let weightRead = ProductionWeightEvidenceAPI(api: api).fetchWeightReport(scope: .all)
+        async let trainingRead = ProductionTrainingAPI(api: api).fetchTrainingLanding(scope: .all)
+        async let nutritionRead = ProductionNutritionAPI(api: api).fetchNutritionLanding(scope: .all)
+        async let activityRead = ProductionActivityAPI(api: api).fetchActivityLanding(scope: .all)
+        async let energyRead = ProductionEnergyAPI(api: api).fetchEnergyReport(scope: .all)
+        async let dexaRead = ProductionDEXAAPI(api: api).fetchDEXAReport(scope: .all)
+        async let photosRead = ProductionPhotosAPI(api: api).fetchPhotosLanding(scope: .all)
+        let (weight, training, nutrition, activity, energy, dexa, photos) = try await (
+            weightRead, trainingRead, nutritionRead, activityRead, energyRead, dexaRead, photosRead
+        )
 
         let streams: [EvidenceStreamSummary] = [
             trainingStream(training),

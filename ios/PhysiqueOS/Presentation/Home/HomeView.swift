@@ -34,8 +34,15 @@ struct HomeView: View {
                 appliesSandboxProjections: environment.nativeAuthority == .sandbox
             )
             await viewModel?.load()
+            await prefetchLikelyDestinations()
         }
-        .refreshable { await viewModel?.load() }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["home"])
+            }
+            await viewModel?.load()
+            await prefetchLikelyDestinations()
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await viewModel?.load() }
@@ -54,6 +61,25 @@ struct HomeView: View {
         )) { presentation in
             ConfidenceDetailSheet(confidence: presentation.confidence, detail: presentation.detail)
         }
+    }
+
+    private func prefetchLikelyDestinations() async {
+        guard environment.nativeAuthority == .founderProduction,
+              case .loaded(let home) = viewModel?.state else { return }
+        async let goals: Void = prefetchGoal(home.goals.first)
+        async let briefing: Void = prefetchBriefing(home.briefingCards.first)
+        _ = await (goals, briefing)
+    }
+
+    private func prefetchGoal(_ goal: HomeGoal?) async {
+        guard let goal else { return }
+        _ = try? await environment.goalsAPI.fetchGoalsHub()
+        _ = try? await environment.goalsAPI.fetchGoalDetail(goalId: goal.id)
+    }
+
+    private func prefetchBriefing(_ card: HomeBriefingCard?) async {
+        guard let card else { return }
+        _ = try? await environment.briefingAPI.fetchBriefing(artifactId: card.id)
     }
 
     @ViewBuilder

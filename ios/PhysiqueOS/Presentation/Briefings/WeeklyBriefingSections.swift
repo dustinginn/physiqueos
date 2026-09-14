@@ -190,7 +190,7 @@ struct BriefingTrainingResponseCard: View {
                                     Text(group.label)
                                         .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    Text("\(group.statusLabel) across \(group.comparableExerciseCount) exercises.")
+                                    Text(groupSummary(group))
                                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                                 }
@@ -288,6 +288,11 @@ struct BriefingTrainingResponseCard: View {
         default: PhysiqueOSTheme.accent
         }
     }
+
+    private func groupSummary(_ group: BriefingTrainingPriorityGroup) -> String {
+        guard let count = group.comparableExerciseCount else { return group.statusLabel }
+        return "\(group.statusLabel) across \(count) \(count == 1 ? "exercise" : "exercises")."
+    }
 }
 
 /// The real screen's one genuinely interactive Briefing chart — a per-day
@@ -299,6 +304,7 @@ struct BriefingTrainingResponseCard: View {
 /// screen's own `chart.summaryOnly` fallback).
 struct WeeklyEnergyCard: View {
     let section: WeeklyEnergySection
+    var showsDailySemanticRows = false
     @State private var selectedDate: String?
 
     var body: some View {
@@ -328,6 +334,15 @@ struct WeeklyEnergyCard: View {
                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
+                if showsDailySemanticRows,
+                   let dailyBalances = section.dailyBalances,
+                   !dailyBalances.isEmpty {
+                    VStack(spacing: 8) {
+                        ForEach(dailyBalances) { point in
+                            dailySemanticRow(point)
+                        }
+                    }
+                }
                 Divider().overlay(PhysiqueOSTheme.divider)
                 HStack(alignment: .top, spacing: 8) {
                     energyMetric("Avg Intake", "\(section.averageIntakeKcal) kcal", color: PhysiqueOSTheme.energyIntake)
@@ -336,7 +351,7 @@ struct WeeklyEnergyCard: View {
                 }
                 Divider().overlay(PhysiqueOSTheme.divider)
                 if let dailyBalances = section.dailyBalances, !dailyBalances.isEmpty {
-                    Text("Daily intake vs estimated expenditure")
+                    Text(section.chartTitle ?? "Daily intake vs estimated expenditure")
                         .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     chart(dailyBalances)
@@ -355,6 +370,44 @@ struct WeeklyEnergyCard: View {
 
     private var balanceColor: Color {
         PhysiqueOSTheme.chartSuccess
+    }
+
+    private func dailySemanticRow(_ point: BriefingDailyEnergyPoint) -> some View {
+        HStack(spacing: 12) {
+            Text(fullWeekday(point.date, fallback: point.label))
+                .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Spacer()
+            if point.hasPairedData, let balance = point.balanceKcal {
+                Text("\(balance >= 0 ? "+" : "−")\(abs(balance)) kcal")
+                    .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                    .foregroundStyle(balance == 0 ? PhysiqueOSTheme.textSecondary : PhysiqueOSTheme.chartSuccess)
+            } else {
+                Text("No data")
+                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func fullWeekday(_ value: String, fallback: String?) -> String {
+        let input = DateFormatter()
+        input.locale = Locale(identifier: "en_US_POSIX")
+        input.calendar = Calendar(identifier: .gregorian)
+        input.timeZone = TimeZone(secondsFromGMT: 0)
+        input.dateFormat = "yyyy-MM-dd"
+        guard let date = input.date(from: value) else { return fallback ?? value }
+        let output = DateFormatter()
+        output.locale = Locale(identifier: "en_US_POSIX")
+        output.calendar = Calendar(identifier: .gregorian)
+        output.timeZone = TimeZone(secondsFromGMT: 0)
+        output.dateFormat = "EEEE"
+        return output.string(from: date)
     }
 
     private func chart(_ points: [BriefingDailyEnergyPoint]) -> some View {

@@ -74,7 +74,7 @@ enum ProductionBriefingMapper {
             generatedAt: narrative["generatedAt"]?.string ?? narrative["eventDate"]?.string ?? "",
             window: eventWindow(date: narrative["eventDate"]?.string),
             attribution: attribution(from: narrative["goalContext"], fallbackTitle: "Goal at publication"),
-            confidence: confidence(from: narrative["goalConfidence"]),
+            confidence: try confidence(from: narrative["goalConfidence"]),
             photo: photo(from: narrative, completion: root["completion"])
         )
     }
@@ -96,7 +96,7 @@ enum ProductionBriefingMapper {
                 generatedAt: artifact["publicationDate"]?.string ?? "",
                 window: window,
                 attribution: attribution(from: attributionValue, fallbackTitle: hero?["goalLabel"]?.string ?? "Goal at publication"),
-                confidence: confidence(from: hero?["confidence"]),
+                confidence: try confidence(from: hero?["confidence"]),
                 weekly: weekly(from: presentation)
             )
         }
@@ -107,7 +107,7 @@ enum ProductionBriefingMapper {
             generatedAt: artifact["publicationDate"]?.string ?? "",
             window: window,
             attribution: attribution(from: attributionValue, fallbackTitle: activeGoal?["title"]?.string ?? activeGoal?["name"]?.string ?? "Goal at publication", phaseName: presentation["activePhase"]?["name"]?.string),
-            confidence: confidence(from: presentation["goalConfidence"]),
+            confidence: try confidence(from: presentation["goalConfidence"]),
             midweek: midweek(from: presentation, window: window)
         )
     }
@@ -126,7 +126,7 @@ enum ProductionBriefingMapper {
             return try makeBase(
                 id: id, cadence: .monthly, generatedAt: generatedAt, window: window,
                 attribution: attribution(from: rawAttribution, fallbackTitle: presentation["hero"]?["goal"]?.string ?? goalTitle),
-                confidence: confidence(from: presentation["hero"]?["confidence"]),
+                confidence: try confidence(from: presentation["hero"]?["confidence"]),
                 monthly: monthly(from: presentation)
             )
         case .event:
@@ -134,7 +134,7 @@ enum ProductionBriefingMapper {
                 return try makeBase(
                     id: id, cadence: .event, generatedAt: generatedAt, window: window,
                     attribution: attribution(from: rawAttribution, fallbackTitle: goalTitle),
-                    confidence: confidence(from: narrative["goalConfidence"] ?? narrative["hero"]?["confidence"]),
+                    confidence: try confidence(from: narrative["goalConfidence"] ?? narrative["hero"]?["confidence"]),
                     dexa: dexa(from: narrative)
                 )
             }
@@ -142,7 +142,7 @@ enum ProductionBriefingMapper {
                 return try makeBase(
                     id: id, cadence: .event, generatedAt: generatedAt, window: window,
                     attribution: attribution(from: rawAttribution, fallbackTitle: goalTitle),
-                    confidence: confidence(from: narrative["goalConfidence"]),
+                    confidence: try confidence(from: narrative["goalConfidence"]),
                     photo: photo(from: narrative, completion: nil)
                 )
             }
@@ -216,7 +216,7 @@ enum ProductionBriefingMapper {
         return context["goals"]?.array.first(where: { $0["id"]?.string == id })?["title"]?.string
     }
 
-    private static func confidence(from value: BriefingJSONValue?) -> BriefingConfidenceReadModel? {
+    private static func confidence(from value: BriefingJSONValue?) throws -> BriefingConfidenceReadModel? {
         guard let value, let score = value["score"]?.int, let band = value["band"]?.string else { return nil }
         let rawMovement = value["movementDirection"]?.string ?? value["movement"]?.string ?? "initial"
         let movement: BriefingConfidenceReadModel.MovementDirection
@@ -228,25 +228,36 @@ enum ProductionBriefingMapper {
         }
         let presentationExplanation = value["presentationExplanation"]?.string
             ?? value["explanationModel"]?["summary"]?.string
-        let primaryReason = presentationExplanation ?? value["primaryReason"]?.string ?? ""
         let presentationMovementLabel = value["movementLabel"]?.string
             ?? value["explanationModel"]?["movementLabel"]?.string
+        guard let presentationExplanation, !presentationExplanation.isEmpty,
+              let presentationMovementLabel, !presentationMovementLabel.isEmpty else {
+            throw ProductionNativeError.invalidResponse
+        }
+        let supporting = factorTexts(value["explanationModel"]?["supportingFactors"])
+        let limiting = factorTexts(value["explanationModel"]?["limitingFactors"])
+        let uncertainty = factorTexts(value["unresolvedUncertainty"])
+        let decisive = factorTexts(value["explanationModel"]?["nextDecisiveEvidence"])
+        let historical = value["explanationModel"]?["historicalContext"]?["summary"]?.string
+            ?? value["explanationModel"]?["historicalContext"]?["text"]?.string
         return .init(
             score: score,
             band: band,
             priorScore: value["priorScore"]?.int,
             delta: value["delta"]?.int,
             movementDirection: movement,
-            primaryReason: primaryReason,
-            supportingReasons: strings(value["supportingReasons"]),
-            limitingReasons: strings(value["limitingReasons"]),
-            unresolvedUncertainty: strings(value["unresolvedUncertainty"]),
+            primaryReason: presentationExplanation,
+            supportingReasons: supporting.isEmpty ? strings(value["supportingReasons"]) : supporting,
+            limitingReasons: limiting.isEmpty ? strings(value["limitingReasons"]) : limiting,
+            unresolvedUncertainty: uncertainty,
             goalId: value["goalId"]?.string ?? value["assessmentContext"]?["goalId"]?.string ?? "historical-goal",
             phaseId: value["phaseId"]?.string ?? value["assessmentContext"]?["phaseId"]?.string,
             capturedAt: value["assessmentDate"]?.string ?? value["assessmentTimestamp"]?.string ?? value["capturedAt"]?.string ?? "",
             source: value["source"]?.string ?? "canonical_pi_snapshot",
             presentationExplanation: presentationExplanation,
-            presentationMovementLabel: presentationMovementLabel
+            presentationMovementLabel: presentationMovementLabel,
+            nextDecisiveEvidence: decisive,
+            historicalContext: historical
         )
     }
 
@@ -348,12 +359,13 @@ enum ProductionBriefingMapper {
             averageIntakeKcal: intake!,
             averageExpenditureKcal: expenditure!,
             averageBalanceKcal: balance!,
-            narrative: energy?["interpretation"]?.string ?? energy?["summary"]?.string ?? "",
+            narrative: energy?["interpretation"]?.string ?? "",
             dailyBalances: dailyEnergyPoints(energy?["chartPoints"]),
             headline: energy?["headline"]?.string,
-            balanceHeadline: energy?["balanceDirection"]?.string,
-            comparisonNarrative: energy?["comparison"]?["narrative"]?.string,
-            methodology: energy?["rmrProvenance"]?["strategy"]?.string
+            balanceHeadline: energy?["balanceHeadline"]?.string,
+            comparisonNarrative: energy?["comparisonNarrative"]?.string,
+            methodology: energy?["rmrProvenance"]?["strategy"]?.string,
+            chartTitle: energy?["chartTitle"]?.string
         )
         let weight = value["weightContext"]
         let body = value["bodyComposition"]
@@ -444,11 +456,20 @@ enum ProductionBriefingMapper {
 
     private static func trainingPriority(_ value: BriefingJSONValue) -> BriefingTrainingPriorityGroup? {
         guard let id = value["areaId"]?.string ?? value["categoryId"]?.string ?? value["id"]?.string ?? value["key"]?.string else { return nil }
+        let evidenceStatus = value["conclusionStatus"]?.string ?? value["evidenceStatus"]?.string
+        if let evidenceStatus,
+           ["insufficient", "absent", "no_evidence", "withheld"].contains(evidenceStatus) {
+            return nil
+        }
+        let comparableExerciseCount = value["comparableExerciseCount"]?.int ?? value["exerciseCount"]?.int
+        if let comparableExerciseCount, comparableExerciseCount <= 0 {
+            return nil
+        }
         return .init(
             areaId: id,
             label: value["label"]?.string ?? "Training area",
             statusLabel: value["statusLabel"]?.string ?? value["status"]?.string ?? "",
-            comparableExerciseCount: value["comparableExerciseCount"]?.int ?? value["exerciseCount"]?.int ?? 0,
+            comparableExerciseCount: comparableExerciseCount,
             tone: value["tone"]?.string ?? value["statusTone"]?.string ?? "evidence"
         )
     }
@@ -836,6 +857,16 @@ enum ProductionBriefingMapper {
 
     private static func strings(_ value: BriefingJSONValue?) -> [String] {
         value?.array.compactMap(\.string) ?? []
+    }
+
+    private static func factorTexts(_ value: BriefingJSONValue?) -> [String] {
+        value?.array.compactMap { factor in
+            factor.string
+                ?? factor["text"]?.string
+                ?? factor["summary"]?.string
+                ?? factor["label"]?.string
+                ?? factor["title"]?.string
+        } ?? []
     }
 
     private static func dateRange(_ start: String, _ end: String) -> String {

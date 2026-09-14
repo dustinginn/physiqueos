@@ -42,6 +42,7 @@ struct TrainingLoggerCatalogExercise: Codable, Equatable, Identifiable {
     var areaId: String
     var equipment: String?
     var measurement: TrainingLoggerMeasurement
+    var defaultLoadType: String? = nil
     var previouslyPerformed: Bool
     var history: [TrainingLoggerHistoryRecord]
     var progressionRecommendation: TrainingLoggerProgressionRecommendation?
@@ -232,6 +233,7 @@ struct TrainingLoggerDraftExercise: Codable, Equatable, Identifiable {
     var name: String
     var areaId: String
     var measurement: TrainingLoggerMeasurement
+    var defaultLoadType: String? = nil
     var executionVariant: TrainingExecutionVariant?
     var sets: [TrainingLoggerDraftSet]
     var previousPerformance: TrainingLoggerPreviousPerformance?
@@ -246,6 +248,10 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
     var setNumber: Int
     var reps: Double?
     var load: Double?
+    /// Canonical loading semantics. `nil` is retained for older saved
+    /// drafts and resolved from the exercise default plus entered load at
+    /// the submission boundary.
+    var loadType: String?
     var durationSeconds: Double?
     var isCompleted: Bool
 
@@ -254,6 +260,7 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
         setNumber: Int,
         reps: Double?,
         load: Double?,
+        loadType: String? = nil,
         durationSeconds: Double?,
         isCompleted: Bool
     ) {
@@ -261,12 +268,13 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
         self.setNumber = setNumber
         self.reps = reps
         self.load = load
+        self.loadType = loadType
         self.durationSeconds = durationSeconds
         self.isCompleted = isCompleted
     }
 
     static func empty(number: Int) -> Self {
-        .init(id: UUID().uuidString, setNumber: number, reps: nil, load: nil, durationSeconds: nil, isCompleted: false)
+        .init(id: UUID().uuidString, setNumber: number, reps: nil, load: nil, loadType: nil, durationSeconds: nil, isCompleted: false)
     }
 
     init(source: TrainingSet, number: Int) {
@@ -274,6 +282,7 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
         setNumber = number
         reps = source.reps
         load = source.weight
+        loadType = source.loadType
         durationSeconds = source.durationSeconds
         isCompleted = false
     }
@@ -323,10 +332,12 @@ struct TrainingLoggerProgressionRecommendation: Codable, Equatable {
     var message: String
     var prescription: String
     var suggestedLoad: Double?
+    var suggestedLoadType: String? = nil
     var suggestedReps: Double?
+    var suggestedUnit: String? = nil
 
     var hasExplicitTarget: Bool {
-        suggestedLoad != nil && suggestedReps != nil
+        suggestedReps != nil && (suggestedLoad != nil || suggestedLoadType == "bodyweight")
     }
 }
 
@@ -380,6 +391,7 @@ extension TrainingLoggerDraft {
             name: catalogExercise.name,
             areaId: catalogExercise.areaId,
             measurement: catalogExercise.measurement,
+            defaultLoadType: catalogExercise.defaultLoadType,
             executionVariant: nil,
             sets: sets,
             previousPerformance: previous,
@@ -473,6 +485,7 @@ extension TrainingLoggerDraft {
             name: cleanName,
             areaId: areaId,
             measurement: .repsLoad,
+            defaultLoadType: nil,
             executionVariant: nil,
             sets: (1...3).map(TrainingLoggerDraftSet.empty),
             previousPerformance: nil,
@@ -521,12 +534,14 @@ extension TrainingLoggerDraft {
         guard let index = exercises.firstIndex(where: { $0.id == exerciseId }),
               let recommendation = exercises[index].progressionRecommendation,
               recommendation.hasExplicitTarget,
-              let suggestedReps = recommendation.suggestedReps,
-              let suggestedLoad = recommendation.suggestedLoad else { return }
+              let suggestedReps = recommendation.suggestedReps else { return }
         exercises[index].progressionChoice = .suggestion
         for setIndex in exercises[index].sets.indices {
             exercises[index].sets[setIndex].reps = suggestedReps
-            exercises[index].sets[setIndex].load = suggestedLoad
+            exercises[index].sets[setIndex].load = recommendation.suggestedLoadType == "bodyweight"
+                ? nil
+                : recommendation.suggestedLoad
+            exercises[index].sets[setIndex].loadType = recommendation.suggestedLoadType
             exercises[index].sets[setIndex].isCompleted = false
         }
     }
@@ -540,6 +555,7 @@ extension TrainingLoggerDraft {
             let source = previous.sets[min(setIndex, previous.sets.count - 1)]
             exercises[index].sets[setIndex].reps = source.reps
             exercises[index].sets[setIndex].load = source.weight
+            exercises[index].sets[setIndex].loadType = source.loadType
             exercises[index].sets[setIndex].durationSeconds = source.durationSeconds
             exercises[index].sets[setIndex].isCompleted = false
         }
@@ -571,6 +587,7 @@ extension TrainingLoggerDraft {
         exercises[index].name = replacement.name
         exercises[index].areaId = replacement.areaId
         exercises[index].measurement = replacement.measurement
+        exercises[index].defaultLoadType = replacement.defaultLoadType
         exercises[index].executionVariant = nil
         exercises[index].previousPerformance = previous
         exercises[index].progressionRecommendation = previous == nil ? nil : replacement.progressionRecommendation
@@ -654,15 +671,16 @@ enum TrainingLoggerNumericFocusOrder {
         draft.exercises.flatMap { exercise in
             exercise.sets.flatMap { set -> [TrainingLoggerNumericFieldTarget] in
                 switch exercise.measurement {
-                case .repsLoad:
+                case .repsLoad, .bodyweightReps, .duration:
+                    let primary: TrainingLoggerNumericFieldTarget = .init(
+                        exerciseId: exercise.id,
+                        setId: set.id,
+                        kind: exercise.measurement == .duration ? .duration : .reps
+                    )
                     return [
-                        .init(exerciseId: exercise.id, setId: set.id, kind: .reps),
+                        primary,
                         .init(exerciseId: exercise.id, setId: set.id, kind: .load),
                     ]
-                case .bodyweightReps:
-                    return [.init(exerciseId: exercise.id, setId: set.id, kind: .reps)]
-                case .duration:
-                    return [.init(exerciseId: exercise.id, setId: set.id, kind: .duration)]
                 }
             }
         }

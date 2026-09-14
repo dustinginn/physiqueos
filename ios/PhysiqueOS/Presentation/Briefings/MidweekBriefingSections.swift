@@ -17,7 +17,7 @@ struct MidweekBriefingSections: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             hero
-            if let energy = content.energy { WeeklyEnergyCard(section: energy) }
+            if let energy = content.energy { WeeklyEnergyCard(section: energy, showsDailySemanticRows: true) }
             if let weight = content.weight {
                 weeklyWeightCard(weight)
             } else if let weightContextNarrative = content.weightContextNarrative {

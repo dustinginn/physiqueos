@@ -694,7 +694,7 @@ struct TrainingLoggerView: View {
         HStack(spacing: 8) {
             Text("Set").frame(width: 30)
             Text(measurement == .duration ? "Seconds" : "Reps").frame(maxWidth: .infinity)
-            if measurement == .repsLoad { Text("Load (lb)").frame(maxWidth: .infinity) }
+            Text("Load (lb)").frame(maxWidth: .infinity)
             Text("Done").frame(width: 42)
             Color.clear.frame(width: 24)
         }
@@ -722,19 +722,17 @@ struct TrainingLoggerView: View {
                 onEditingChanged: numericEditingChanged
             )
                 .frame(height: 34)
-            if exercise.measurement == .repsLoad {
-                let loadID = TrainingLoggerNumericFieldTarget(exerciseId: exercise.id, setId: set.id, kind: .load).id
-                NumericEditField(
-                    text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: "load", keyPath: \.load),
-                    accessibilityLabel: "Set \(set.setNumber) load",
-                    fieldID: loadID,
-                    focusedFieldID: $focusedNumericFieldID,
-                    previousFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.previous(before: loadID, in: $0) },
-                    nextFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.next(after: loadID, in: $0) },
-                    onEditingChanged: numericEditingChanged
-                )
-                    .frame(height: 34)
-            }
+            let loadID = TrainingLoggerNumericFieldTarget(exerciseId: exercise.id, setId: set.id, kind: .load).id
+            NumericEditField(
+                text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: "load", keyPath: \.load),
+                accessibilityLabel: "Set \(set.setNumber) optional external load",
+                fieldID: loadID,
+                focusedFieldID: $focusedNumericFieldID,
+                previousFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.previous(before: loadID, in: $0) },
+                nextFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.next(after: loadID, in: $0) },
+                onEditingChanged: numericEditingChanged
+            )
+                .frame(height: 34)
             Button {
                 viewModel.update { draft in
                     guard let exerciseIndex = draft.exercises.firstIndex(where: { $0.id == exercise.id }),

@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import UIKit
 
 /// Founder Production's own authenticated opaque photo media loader —
@@ -19,11 +20,23 @@ final class FounderProductionPhotoMediaStore {
     nonisolated init(api: ProductionNativeAPI) { self.api = api }
 
     func loadImage(mediaId: String) async {
-        if case .loaded = imageStates[mediaId] { return }
+        switch imageStates[mediaId] {
+        case .loaded, .loading: return
+        default: break
+        }
         imageStates[mediaId] = .loading
         do {
             let media = try await api.readMedia(mediaId: mediaId)
-            guard let image = UIImage(data: media.data) else { throw ProductionNativeError.invalidResponse }
+            let image = try await Task.detached(priority: .userInitiated) {
+                guard let source = CGImageSourceCreateWithData(media.data as CFData, nil),
+                      let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                        kCGImageSourceCreateThumbnailFromImageAlways: true,
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                        kCGImageSourceThumbnailMaxPixelSize: 1_600,
+                      ] as CFDictionary)
+                else { throw ProductionNativeError.invalidResponse }
+                return UIImage(cgImage: image)
+            }.value
             imageStates[mediaId] = .loaded(image)
         } catch {
             imageStates[mediaId] = .failed

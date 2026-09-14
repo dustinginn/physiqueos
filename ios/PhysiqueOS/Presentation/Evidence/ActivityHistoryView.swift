@@ -81,7 +81,12 @@ struct ActivityHistoryView: View {
             viewModel = ActivityHistoryViewModel(api: environment.activityAPI)
             await viewModel?.load()
         }
-        .refreshable { await viewModel?.load() }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["activity"])
+            }
+            await viewModel?.load()
+        }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
     }
 

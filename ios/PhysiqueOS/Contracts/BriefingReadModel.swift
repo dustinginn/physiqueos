@@ -180,6 +180,10 @@ struct BriefingConfidenceReadModel: Codable, Equatable {
     /// persisted fixtures omit these and retain the compatibility fallbacks.
     var presentationExplanation: String? = nil
     var presentationMovementLabel: String? = nil
+    /// Canonical server-authored decisive evidence and historical framing.
+    /// Native retains these as artifact content and never derives them.
+    var nextDecisiveEvidence: [String]? = nil
+    var historicalContext: String? = nil
 
     var bandLabel: String {
         switch band {
@@ -246,6 +250,7 @@ struct WeeklyEnergySection: Codable, Equatable {
     var balanceHeadline: String? = nil
     var comparisonNarrative: String? = nil
     var methodology: String? = nil
+    var chartTitle: String? = nil
 }
 
 struct BriefingDailyEnergyPoint: Codable, Equatable, Identifiable {
@@ -319,7 +324,9 @@ struct BriefingTrainingPriorityGroup: Codable, Equatable, Identifiable {
     var areaId: String
     var label: String
     var statusLabel: String
-    var comparableExerciseCount: Int
+    /// Nil means a supported qualitative conclusion with no published
+    /// count. An explicit zero is never rendered as a conclusion.
+    var comparableExerciseCount: Int?
     var tone: String
 }
 

@@ -62,6 +62,9 @@ struct WeightHistoryView: View {
             await viewModel?.load()
         }
         .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["weight"])
+            }
             await viewModel?.load()
         }
         .onChange(of: scenePhase) { _, phase in

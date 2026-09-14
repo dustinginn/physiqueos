@@ -385,6 +385,20 @@ actor ProductionNativeAPI {
     private let encoder = JSONEncoder()
     private var accessToken: String?
     private var refreshTask: Task<String, Error>?
+    private struct CachedRead {
+        let data: Data
+        let storedAt: Date
+    }
+    private var readCache: [String: CachedRead] = [:]
+    private var readCacheOrder: [String] = []
+    private var inFlightReads: [String: Task<Data, Error>] = [:]
+    private var readCacheGeneration = 0
+    private let maximumCachedReads = 32
+
+    enum ReadPolicy: Sendable, Equatable {
+        case cacheFirst
+        case reload
+    }
 
     init(
         configuration: NativeAPIEnvironment = .founderProduction,
@@ -468,18 +482,103 @@ actor ProductionNativeAPI {
     func readResource<Payload: Decodable & Sendable>(
         _ resource: String,
         query: [String: String] = [:],
+        policy: ReadPolicy = .cacheFirst,
         as type: Payload.Type
     ) async throws -> ProductionResponseEnvelope<Payload> {
         guard resource.range(of: #"^[a-z][a-z0-9-]*$"#, options: .regularExpression) != nil else {
             throw ProductionNativeError.invalidResponse
         }
-        let envelope: ProductionResponseEnvelope<Payload> = try await authenticatedJSON(
+        let key = readCacheKey(resource: resource, query: query)
+        let startedAt = ContinuousClock.now
+        var cacheHit = false
+        var generationForStore: Int?
+        let data: Data
+        if policy == .cacheFirst,
+           let cached = readCache[key],
+           Date().timeIntervalSince(cached.storedAt) <= cacheLifetime(for: resource) {
+            data = cached.data
+            cacheHit = true
+        } else if let active = inFlightReads[key] {
+            data = try await active.value
+        } else {
+            let generation = readCacheGeneration
+            generationForStore = generation
+            let task = Task { try await self.loadReadData(resource: resource, query: query) }
+            inFlightReads[key] = task
+            do {
+                data = try await task.value
+                inFlightReads[key] = nil
+            } catch {
+                inFlightReads[key] = nil
+                throw error
+            }
+        }
+        let decodeStartedAt = ContinuousClock.now
+        let envelope: ProductionResponseEnvelope<Payload>
+        do { envelope = try decoder.decode(ProductionResponseEnvelope<Payload>.self, from: data) }
+        catch { throw ProductionNativeError.invalidResponse }
+        let decodeMilliseconds = Self.elapsedMilliseconds(since: decodeStartedAt)
+        try validate(envelope, expectedResource: resource)
+        if let generationForStore, generationForStore == readCacheGeneration {
+            storeRead(data, for: key)
+        }
+#if DEBUG
+        NativePerformanceDiagnostics.recordRead(
+            resource: resource,
+            milliseconds: Self.elapsedMilliseconds(since: startedAt),
+            decodeMilliseconds: decodeMilliseconds,
+            bytes: data.count,
+            cacheHit: cacheHit
+        )
+#endif
+        return envelope
+    }
+
+    func invalidateReadResources(_ resources: Set<String>) {
+        readCacheGeneration += 1
+        readCache = readCache.filter { key, _ in
+            !resources.contains(where: { key == $0 || key.hasPrefix("\($0)?") })
+        }
+        readCacheOrder.removeAll { key in
+            resources.contains(where: { key == $0 || key.hasPrefix("\($0)?") })
+        }
+    }
+
+    private func loadReadData(resource: String, query: [String: String]) async throws -> Data {
+        let (data, _) = try await authenticatedResponse(
             path: "\(configuration.routeFamily)/read/\(resource)",
             method: "GET",
-            query: query
+            query: query,
+            accept: "application/json"
         )
-        try validate(envelope, expectedResource: resource)
-        return envelope
+        return data
+    }
+
+    private func readCacheKey(resource: String, query: [String: String]) -> String {
+        guard !query.isEmpty else { return resource }
+        return resource + "?" + query.keys.sorted().map { "\($0)=\(query[$0] ?? "")" }.joined(separator: "&")
+    }
+
+    private func cacheLifetime(for resource: String) -> TimeInterval {
+        switch resource {
+        case "home": 30
+        case "briefing-history", "training-landing", "training-reporting", "training-library": 60
+        default: 90
+        }
+    }
+
+    private func storeRead(_ data: Data, for key: String) {
+        readCache[key] = CachedRead(data: data, storedAt: Date())
+        readCacheOrder.removeAll { $0 == key }
+        readCacheOrder.append(key)
+        while readCacheOrder.count > maximumCachedReads {
+            readCache.removeValue(forKey: readCacheOrder.removeFirst())
+        }
+    }
+
+    private static func elapsedMilliseconds(since instant: ContinuousClock.Instant) -> Int {
+        let components = instant.duration(to: .now).components
+        return max(0, Int(components.seconds * 1_000 + components.attoseconds / 1_000_000_000_000_000))
     }
 
     func readMedia(mediaId: String) async throws -> ProductionMediaPayload {
@@ -756,8 +855,26 @@ actor ProductionNativeAPI {
             )
         }
         try validateHTTP(result.1, data: result.0)
-        do { return try decoder.decode(ProductionCommandOutcome<Result>.self, from: result.0) }
+        do {
+            let outcome = try decoder.decode(ProductionCommandOutcome<Result>.self, from: result.0)
+            invalidateReadResources(resourcesAffected(by: commandType))
+            return outcome
+        }
         catch { throw ProductionNativeError.invalidResponse }
+    }
+
+    private func resourcesAffected(by commandType: String) -> Set<String> {
+        if commandType.contains("priority") { return ["home", "priority"] }
+        if commandType.contains("training") || commandType.contains("workout") {
+            return [
+                "home", "training-landing", "training-reporting", "training-library",
+                "training-logger", "training-day", "training-session", "log",
+            ]
+        }
+        if commandType.contains("evidence") || commandType.contains("review") {
+            return ["home", "log", "reporting", "weight", "nutrition", "activity", "energy", "dexa", "photos", "timeline"]
+        }
+        return ["home"]
     }
 
     private func validateHTTP(_ response: HTTPURLResponse, data: Data) throws {

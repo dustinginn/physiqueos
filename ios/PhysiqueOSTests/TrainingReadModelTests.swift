@@ -812,18 +812,19 @@ final class TrainingReadModelTests: XCTestCase {
     /// (the read model is always scoped to one canonical exercise id), so
     /// this constructs same-exercise events to exercise the comparator
     /// itself.
-    func testPerformanceRecordsOrderByDateThenTypeThenValueThenId() throws {
+    func testPerformanceRecordsSelectCurrentSemanticFamiliesThenOrderDeterministically() throws {
         let events = [
             performanceEvent(id: "b", eventType: .repsAtLoadPR, workoutDate: "2026-08-20", load: 100, loadUnit: "lb", reps: 10),
             performanceEvent(id: "a", eventType: .sessionVolumePR, workoutDate: "2026-08-20", unit: "lb", sessionVolume: 2000),
             performanceEvent(id: "c", eventType: .sessionVolumePR, workoutDate: "2026-08-22", unit: "lb", sessionVolume: 1500),
         ]
         let model = try XCTUnwrap(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: events))
-        XCTAssertEqual(model.records.map(\.workoutDate), ["2026-08-22", "2026-08-20", "2026-08-20"])
-        XCTAssertEqual(model.records.map(\.achievementType), [.sessionVolumePR, .sessionVolumePR, .repsAtLoadPR])
+        XCTAssertEqual(model.records.map(\.workoutDate), ["2026-08-20", "2026-08-20"])
+        XCTAssertEqual(model.records.map(\.achievementType), [.sessionVolumePR, .repsAtLoadPR])
+        XCTAssertEqual(model.records.first?.achievedValue, 2000)
     }
 
-    func testPerformanceRecordsTruncateAtFiveWithACountLabel() {
+    func testPerformanceRecordsPreserveDistinctLoadFamiliesWithoutLatestNTruncation() {
         let events = (1...7).map { index in
             performanceEvent(
                 id: "event-\(index)", eventType: .repsAtLoadPR,
@@ -832,11 +833,24 @@ final class TrainingReadModelTests: XCTestCase {
             )
         }
         let model = TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: events)
-        XCTAssertEqual(model?.records.count, 5)
-        XCTAssertEqual(model?.visibleCount, 5)
+        XCTAssertEqual(model?.records.count, 7)
+        XCTAssertEqual(model?.visibleCount, 7)
         XCTAssertEqual(model?.totalCount, 7)
-        XCTAssertEqual(model?.hiddenCount, 2)
-        XCTAssertEqual(model?.countLabel, "Showing 5 of 7 records")
+        XCTAssertEqual(model?.hiddenCount, 0)
+        XCTAssertNil(model?.countLabel)
+    }
+
+    func testPerformanceRecordsCollapseSupersededVolumeAndMatchedLoadRecords() throws {
+        let events = [
+            performanceEvent(id: "volume-old", eventType: .sessionVolumePR, workoutDate: "2026-08-01", unit: "lb", sessionVolume: 9000),
+            performanceEvent(id: "volume-best", eventType: .sessionVolumePR, workoutDate: "2026-08-16", unit: "lb", sessionVolume: 10800),
+            performanceEvent(id: "load-old", eventType: .repsAtLoadPR, workoutDate: "2026-08-01", load: 180, loadUnit: "lb", reps: 12),
+            performanceEvent(id: "load-best", eventType: .repsAtLoadPR, workoutDate: "2026-08-16", load: 180, loadUnit: "lb", reps: 15),
+            performanceEvent(id: "load-distinct", eventType: .repsAtLoadPR, workoutDate: "2026-08-02", load: 140, loadUnit: "lb", reps: 18),
+        ]
+        let model = try XCTUnwrap(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: events))
+        XCTAssertEqual(Set(model.records.map(\.value)), ["10,800 lb", "15 reps at 180 lb", "18 reps at 140 lb"])
+        XCTAssertEqual(model.hiddenCount, 0)
     }
 
     func testPerformanceRecordsCalculatorReturnsNilForEmptyOrMismatchedEvents() {

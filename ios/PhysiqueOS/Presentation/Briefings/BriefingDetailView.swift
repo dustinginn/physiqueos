@@ -42,7 +42,12 @@ struct BriefingDetailView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
         }
-        .refreshable { await load(showLoading: false) }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["briefing"])
+            }
+            await load(showLoading: false)
+        }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)

@@ -58,7 +58,12 @@ struct PriorityDetailView: View {
             )
             await viewModel?.load()
         }
-        .refreshable { await viewModel?.load() }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["priority"])
+            }
+            await viewModel?.load()
+        }
     }
 
     @ViewBuilder

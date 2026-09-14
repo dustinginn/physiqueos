@@ -62,7 +62,12 @@ struct EnergyHistoryView: View {
             viewModel = EnergyHistoryViewModel(api: environment.energyAPI)
             await viewModel?.load()
         }
-        .refreshable { await viewModel?.load() }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["energy"])
+            }
+            await viewModel?.load()
+        }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
     }
 

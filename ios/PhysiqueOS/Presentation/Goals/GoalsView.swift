@@ -26,7 +26,12 @@ struct GoalsView: View {
             )
             await viewModel?.load()
         }
-        .refreshable { await viewModel?.load() }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["goals"])
+            }
+            await viewModel?.load()
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await viewModel?.load() }

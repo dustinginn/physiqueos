@@ -3,6 +3,41 @@ import XCTest
 @testable import PhysiqueOS
 
 final class FounderServerAPITests: XCTestCase {
+    func testProductionReadCacheReusesCanonicalEnvelopeAndInvalidatesNarrowly() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["weight": productionWeightJSON(value: 170.4)]
+        )
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Cache test")
+
+        _ = try await api.readWeight()
+        _ = try await api.readWeight()
+        var reads = await transport.requests.filter { $0.url?.path.hasSuffix("/read/weight") == true }
+        XCTAssertEqual(reads.count, 1)
+
+        await api.invalidateReadResources(["weight"])
+        _ = try await api.readWeight()
+        reads = await transport.requests.filter { $0.url?.path.hasSuffix("/read/weight") == true }
+        XCTAssertEqual(reads.count, 2)
+    }
+
+    func testProductionReadCacheDeduplicatesConcurrentCanonicalReads() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["weight": productionWeightJSON(value: 170.4)]
+        )
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Dedup test")
+
+        async let first = api.readWeight()
+        async let second = api.readWeight()
+        _ = try await (first, second)
+
+        let reads = await transport.requests.filter { $0.url?.path.hasSuffix("/read/weight") == true }
+        XCTAssertEqual(reads.count, 1)
+    }
+
     func testNativeEnvironmentConfigurationPinsProductionAndPreservesSandbox() {
         XCTAssertEqual(NativeAPIEnvironment.founderProduction.baseURL.absoluteString, "https://physiqueos.dustinginn.com")
         XCTAssertEqual(NativeAPIEnvironment.founderProduction.routeFamily, "/api/v1/native")
@@ -335,7 +370,7 @@ final class FounderServerAPITests: XCTestCase {
     }
 
     @MainActor
-    func testProductionHomeUsesServerProjectionWithoutSandboxOverwriteAndRefetches() async throws {
+    func testProductionHomeUsesServerProjectionCachesWarmReadsAndExplicitlyRefetches() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(200, productionHomeJSON(priorityID: "priority-server-old", goalID: "goal-server", confidence: 71)),
@@ -358,6 +393,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(first.hero.primaryTimeline, "4 weeks remaining")
         XCTAssertNil(first.hero.daysRemaining)
         XCTAssertEqual(first.goals.first?.id, "goal-server")
+        XCTAssertEqual(first.goals.first?.destination, .goalDetail(goalId: "goal-server"))
         XCTAssertEqual(first.goals.first?.current, "148.3")
         XCTAssertEqual(first.goals.first?.target, "10")
         // Home Phase Parity (Build 21 regression): Founder Production's
@@ -387,6 +423,10 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(first.todaysFocus[0].completionContext, .init(occurrenceDate: "2026-09-10", dose: nil, protocolId: nil))
         XCTAssertEqual(first.todaysFocus[0].destination, .priorityOccurrence(priorityId: "completion-canonical", occurrenceDate: "2026-09-10"))
 
+        await viewModel.load()
+        guard case .loaded(let cached) = viewModel.state else { return XCTFail("Expected cached production Home") }
+        XCTAssertEqual(cached.hero.confidence, 71)
+        await native.invalidateReadResources(["home"])
         await viewModel.load()
         guard case .loaded(let refreshed) = viewModel.state else { return XCTFail("Expected refreshed production Home") }
         XCTAssertEqual(refreshed.hero.confidence, 74)
@@ -465,9 +505,6 @@ final class FounderServerAPITests: XCTestCase {
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(200, productionEnvelope(resource: "goals", data: #"{"activeGoals":[],"completedGoals":[],"transitionEntry":null,"relationshipContext":{}}"#)),
             .json(200, productionGoalsJSON),
-            .json(200, productionGoalsJSON),
-            .json(200, productionActiveGoalJSON),
-            .json(200, productionGoalsJSON),
             .json(200, productionActiveGoalJSON),
         ])
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
@@ -478,6 +515,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertNil(empty.activeGoal)
         XCTAssertTrue(empty.completedGoals.isEmpty)
 
+        await native.invalidateReadResources(["goals"])
         let hub = try await api.fetchGoalsHub()
         let active = try XCTUnwrap(hub.activeGoal)
         let fetchedDetail = try await api.fetchGoalDetail(goalId: active.id)
@@ -878,7 +916,10 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(history.sets.map(\.reps), [10, 8])
         XCTAssertEqual(history.sets.map(\.weight), [135, 145])
         XCTAssertEqual(history.sets.map(\.setNumber), [1, 2])
+        XCTAssertEqual(logger.exercises.first?.progressionRecommendation?.eyebrow, "Maintain current performance")
+        XCTAssertEqual(logger.exercises.first?.progressionRecommendation?.suggestedLoad, 145)
 
+        await native.invalidateReadResources(["training-library"])
         await XCTAssertThrowsErrorAsync(try await ProductionTrainingAPI(api: native).fetchTrainingArea(areaId: "chest", scope: .all)) { error in
             XCTAssertEqual(error as? ProductionDailyDriverError,
                            .unknownCanonicalExerciseArea(exerciseID: "canonical-unknown", muscleGroupID: "Unmapped Muscle"))
@@ -1486,6 +1527,42 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(Set(rows.map(\.displayCadenceLabel)), Set(["Weekly Briefing", "Midweek Briefing", "Monthly Briefing", "DEXA Event Briefing", "Photo Event Briefing"]))
     }
 
+    func testProductionShapedHistoryKeepsAllFivePhotoEventsVisibleAcrossCompleteCatalog() async throws {
+        let families: [(prefix: String, type: String, cadence: String, count: Int)] = [
+            ("weekly", "scheduled", "weekly", 10),
+            ("midweek", "scheduled", "midweek", 7),
+            ("monthly", "scheduled", "monthly", 2),
+            ("dexa", "dexa_event", "event", 4),
+            ("photo", "photo_event", "event", 5),
+        ]
+        var ordinal = 0
+        let items = families.flatMap { family in
+            (1...family.count).map { index -> String in
+                ordinal += 1
+                return #"{"artifactId":"\#(family.prefix)-\#(index)","artifactType":"\#(family.type)","cadence":"\#(family.cadence)","label":"\#(family.prefix)","publicationDate":"2026-08-\#(String(format: "%02d", 29 - ordinal))T12:00:00Z","version":1}"#
+            }
+        }
+        let catalog = productionEnvelope(
+            resource: "briefing-history",
+            data: "{\"items\":[\(items.joined(separator: ","))],\"page\":{\"limit\":50,\"hasMore\":false,\"nextCursor\":null}}"
+        )
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["briefing-history": catalog]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let rows = try await ProductionBriefingAPI(api: native).fetchHistory()
+
+        XCTAssertEqual(rows.count, 28)
+        XCTAssertEqual(rows.filter { $0.cadence == .weekly }.count, 10)
+        XCTAssertEqual(rows.filter { $0.cadence == .midweek }.count, 7)
+        XCTAssertEqual(rows.filter { $0.cadence == .monthly }.count, 2)
+        XCTAssertEqual(rows.filter(\.isDEXAEvent).count, 4)
+        XCTAssertEqual(rows.filter(\.isPhotoEvent).map(\.artifactId), ["photo-1", "photo-2", "photo-3", "photo-4", "photo-5"])
+    }
+
     func testProductionWeeklyBriefingUsesFinishedServerPresentation() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),
@@ -1502,13 +1579,19 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.weekly?.energy?.averageBalanceKcal, -125)
         XCTAssertEqual(result.weekly?.training?.highlights?.first?.canonicalExerciseId, "bench-press")
         XCTAssertEqual(result.confidence?.score, 71)
+        XCTAssertEqual(result.confidence?.presentationExplanation, "Canonical weekly Confidence explanation.")
+        XCTAssertEqual(result.confidence?.movementLabel, "Confidence increased")
         let request = await transport.requests.last
         XCTAssertEqual(URLComponents(url: try XCTUnwrap(request?.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "artifactId" })?.value, "weekly-1")
     }
 
     func testProductionWeeklyBriefingPreservesExactLiveEnergyAndTrainingShape() async throws {
         let live = productionEnvelope(resource: "briefing", data: #"{"schemaVersion":"1","artifact":{"artifactId":"weekly-live","artifactType":"scheduled","cadence":"weekly","version":1,"evidenceWindow":{"id":"weekly:2026-09-06:2026-09-12:America/Los_Angeles","startDate":"2026-09-06","endDate":"2026-09-12","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-13T07:02:58.048Z"},"goalPhaseAttribution":{"goalId":"goal","phaseId":"phase"},"historical":{"frozen":true,"artifactBound":true},"presentation":{"hero":{"periodLabel":"Completed week\nSep 6–Sep 12","goalLabel":"Build Lean Mass","headline":"Training moved forward, but calories still look low.","body":"Canonical weekly narrative.","confidence":{"score":62,"band":"moderate","priorScore":62,"delta":0,"movementDirection":"held","presentationExplanation":"Canonical explanation.","primaryReason":"Raw reason.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"goalId":"goal","phaseId":"phase","assessmentDate":"2026-09-13T07:02:58.048Z","source":"canonical_confidence_v2_snapshot"},"strategy":{"name":"Lean Mass Build","weekLabel":"Week 5","reviewLabel":""}},"energy":{"chart":{"title":"Daily intake vs estimated expenditure","points":[{"date":"2026-09-06","label":"Su","intake":3920,"expenditure":2188,"balance":1732,"complete":true},{"date":"2026-09-12","label":"Sa","intake":null,"expenditure":2838,"balance":null,"complete":false}]},"title":"Calories need more context.","averageIntake":2685.8,"averageExpenditure":2561.4,"averageBalance":170.5,"pairedDayCount":6,"eligibleDayCount":7,"narrative":"Canonical energy narrative."},"weight":null,"photos":null,"training":{"title":"Training progressed across most areas.","conclusion":"Canonical training narrative.","trainingDayCount":6,"status":{"stable":0,"improving":7,"plateauing":1,"regressing":1,"insufficient":0},"comparableCategoryCount":9,"insufficientCount":0,"highlights":[{"icon":"🏆","kind":"Record","unit":"lb volume","delta":675,"label":"New session-volume mark","value":4800,"exercise":"Hyperextension Machine","previous":4125,"percentChange":16.4}],"priorityCategories":[{"id":"triceps","label":"Triceps","status":"plateauing","statusLabel":"Plateauing","statusTone":"warning","comparableExerciseCount":3}],"available":true},"bodyComposition":null,"coachInsight":{"biggestWin":"Win.","keepBuilding":"Build.","watchNextWeek":"Watch.","actionItems":[]}}}"#)
-        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["briefing": live])
+        let canonicalLive = live.replacingOccurrences(
+            of: #""presentationExplanation":"Canonical explanation.","primaryReason""#,
+            with: #""presentationExplanation":"Canonical explanation.","movementLabel":"No meaningful change","primaryReason""#
+        )
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["briefing": canonicalLive])
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
 
@@ -1533,7 +1616,7 @@ final class FounderServerAPITests: XCTestCase {
     func testProductionMidweekBriefingPreservesDistinctFinishedPresentation() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),
-            byResource: ["briefing": productionMidweekBriefingJSON]
+            byResource: ["briefing": build31MidweekBriefingJSON]
         )
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
@@ -1545,8 +1628,18 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertNil(result.weekly)
         XCTAssertEqual(result.midweek?.heroVerdict, "Server-owned midweek verdict")
         XCTAssertEqual(result.midweek?.prioritiesThroughSunday, ["Keep the plan steady."])
-        XCTAssertEqual(result.midweek?.energy?.averageIntakeKcal, 2475)
-        XCTAssertEqual(result.midweek?.energy?.averageExpenditureKcal, 2510)
+        XCTAssertEqual(result.midweek?.energy?.headline, "Intake and expenditure are close")
+        XCTAssertEqual(result.midweek?.energy?.balanceHeadline, "99 kcal/day above")
+        XCTAssertEqual(result.midweek?.energy?.averageIntakeKcal, 2954)
+        XCTAssertEqual(result.midweek?.energy?.averageExpenditureKcal, 2856)
+        XCTAssertEqual(result.midweek?.energy?.averageBalanceKcal, 99)
+        XCTAssertEqual(result.midweek?.energy?.dailyBalances?.map(\.hasPairedData), [false, true, true])
+        XCTAssertEqual(result.midweek?.energy?.dailyBalances?.map(\.balanceKcal), [nil, 598, -401])
+        XCTAssertFalse(result.midweek?.energy?.headline?.contains("probably_") == true)
+        XCTAssertEqual(result.midweek?.training?.priorityGroups?.map(\.areaId), ["core"])
+        XCTAssertNil(result.midweek?.training?.priorityGroups?.first?.comparableExerciseCount)
+        XCTAssertEqual(result.confidence?.presentationExplanation, "Canonical midweek Confidence explanation.")
+        XCTAssertEqual(result.confidence?.movementLabel, "No meaningful change")
         XCTAssertEqual(result.midweek?.weight?.averageWeightLb, 170.4)
         XCTAssertEqual(result.midweek?.bodyComposition?.leanMassLb, "150.25 lb")
         XCTAssertEqual(result.midweek?.training?.headline, "Two lifts moved forward")
@@ -1555,10 +1648,29 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.attribution.phaseName, "Foundation")
     }
 
-    func testProductionMonthlyBriefingMapsPersistedDistinctPresentationWithoutNarrativeDerivation() async throws {
+    func testProductionBriefingRejectsLocalConfidenceFallbackWhenCanonicalPresentationIsMissing() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),
-            byResource: ["briefing": productionMonthlyBriefingJSON]
+            byResource: ["briefing": productionMidweekBriefingJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        await XCTAssertThrowsErrorAsync(
+            try await ProductionBriefingAPI(api: native).fetchBriefing(artifactId: "midweek-1")
+        ) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .invalidResponse)
+        }
+    }
+
+    func testProductionMonthlyBriefingMapsPersistedDistinctPresentationWithoutNarrativeDerivation() async throws {
+        let canonicalMonthly = productionMonthlyBriefingJSON.replacingOccurrences(
+            of: #""movementDirection":"increased","primaryReason""#,
+            with: #""movementDirection":"increased","presentationExplanation":"Canonical monthly Confidence explanation.","movementLabel":"Confidence increased","primaryReason""#
+        )
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["briefing": canonicalMonthly]
         )
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
@@ -1572,6 +1684,8 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.monthly?.whatChangedSections?.first?.headline, "Consistency improved")
         XCTAssertEqual(result.monthly?.heroHighlights?.first?.value, "Three lifts advanced")
         XCTAssertEqual(result.monthly?.trainingProgress?.stats.first?.detail, "Across the completed month")
+        XCTAssertEqual(result.confidence?.presentationExplanation, "Canonical monthly Confidence explanation.")
+        XCTAssertEqual(result.confidence?.movementLabel, "Confidence increased")
         XCTAssertNil(result.weekly)
         XCTAssertNil(result.midweek)
     }
@@ -1640,6 +1754,33 @@ final class FounderServerAPITests: XCTestCase {
         let request = await transport.requests.last
         XCTAssertEqual(request?.url?.path, "/api/v1/native/read/photo-event")
         XCTAssertEqual(URLComponents(url: try XCTUnwrap(request?.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "sessionId" })?.value, "session-canonical")
+    }
+
+    func testHistoryPhotoEventDetailPreservesAuthorizedPreviousAndCurrentMediaIdentities() async throws {
+        let historyPayload = productionEnvelope(resource: "briefing", data: #"""
+        {"artifact":{"id":"event_briefing_progress_photo_session-canonical","cadence":"event","version":1,"generatedAt":"2026-09-01T12:00:00Z","goalContext":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"briefing":{"photoEventNarrative":{"photoSessionId":"session-canonical","eventDate":"2026-09-01","activeViews":[],"cardContent":{"hero":{"title":"Canonical photo event","body":"Published narrative."},"snapshot":{"poses":["Front Relaxed"],"conditions":"Consistent"},"progress":{"comparisons":[{"id":"comparison-1","poseId":"front-relaxed","photoSessionId":"session-canonical","previousSessionId":"session-prior","previousDate":"2026-08-15","headline":"Canonical comparison.","previousMedia":{"mediaId":"media-prior","deliveryPath":"/api/v1/native/media/media-prior"},"media":{"mediaId":"media-current","deliveryPath":"/api/v1/native/media/media-current"}}]},"interpretation":{"paragraphs":[]},"coachInsight":{"body":""}}}}},"goals":[{"id":"goal-canonical","title":"Build Lean Mass"}]}
+        """#)
+        let canonicalHistoryPayload = historyPayload.replacingOccurrences(
+            of: #""activeViews""#,
+            with: #""goalConfidence":{"score":64,"band":"moderate","movementDirection":"held","presentationExplanation":"Canonical photo Confidence explanation.","movementLabel":"No meaningful change","primaryReason":"Canonical photo rationale.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"goalId":"goal-canonical","phaseId":"phase-canonical","assessmentDate":"2026-09-01T12:00:00Z","source":"canonical_pi_snapshot"},"activeViews""#
+        )
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["briefing": canonicalHistoryPayload]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionBriefingAPI(api: native).fetchBriefing(artifactId: "event_briefing_progress_photo_session-canonical")
+        let result = try XCTUnwrap(fetched)
+        let comparison = try XCTUnwrap(result.photo?.ordinaryComparisons.first)
+
+        XCTAssertEqual(comparison.poseId, .frontRelaxed)
+        XCTAssertEqual(comparison.priorSetId, "session-prior")
+        XCTAssertEqual(comparison.priorMediaId, "media-prior")
+        XCTAssertEqual(comparison.currentMediaId, "media-current")
+        XCTAssertEqual(result.confidence?.presentationExplanation, "Canonical photo Confidence explanation.")
+        XCTAssertEqual(result.confidence?.movementLabel, "No meaningful change")
     }
 
     func testProductionPhotoEventResolvesCanonicalCurrentAndPriorMediaForEveryPose() async throws {
@@ -1755,6 +1896,7 @@ final class FounderServerAPITests: XCTestCase {
         let viewModel = WeightHistoryViewModel(api: ProductionWeightEvidenceAPI(api: api))
 
         await viewModel.load()
+        await api.invalidateReadResources(["weight"])
         await viewModel.load()
 
         guard case .loaded(let report) = viewModel.state else { return XCTFail("Expected loaded Weight") }
@@ -1940,7 +2082,7 @@ final class FounderServerAPITests: XCTestCase {
     }
 
     func testProductionTrainingCommitReturnsAtDurableProcessingAcceptanceWithoutPolling() async throws {
-        let result = #"{"status":"confirmation_requested","reviewId":"review-1","reviewRevision":1,"sessionId":"native-session-1","intendedDate":"2026-09-11","exerciseIds":["barbell_bench_press"]}"#
+        let result = #"{"status":"confirmation_requested","reviewId":"review-1","reviewRevision":1,"sessionId":"native-session-1","intendedDate":"2026-09-11","exerciseIds":["barbell_bench_press","pull_up"]}"#
         let response = #"{"outcome":"committed","receipt":{"status":"committed","result":"# + result + #", "operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"},"confirmation":{"state":"processing","accepted":true,"reviewId":"review-1","continuationKey":"continuation","completedStep":null,"publication":null}}"#
         let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, response)])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
@@ -1958,6 +2100,15 @@ final class FounderServerAPITests: XCTestCase {
                 sets: [TrainingLoggerDraftSet(id: "set-1", setNumber: 1, reps: 8, load: 185, durationSeconds: nil, isCompleted: true)],
                 previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
                 isProvisional: false, provenance: nil
+            ), TrainingLoggerDraftExercise(
+                id: "occurrence-2", canonicalExerciseId: "pull_up", name: "Pull-Ups",
+                areaId: "back", measurement: .bodyweightReps, defaultLoadType: "bodyweight", executionVariant: nil,
+                sets: [
+                    TrainingLoggerDraftSet(id: "set-bw", setNumber: 1, reps: 8, load: nil, loadType: "bodyweight", durationSeconds: nil, isCompleted: true),
+                    TrainingLoggerDraftSet(id: "set-added", setNumber: 2, reps: 6, load: 25, loadType: "external_load", durationSeconds: nil, isCompleted: true),
+                ],
+                previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
+                isProvisional: false, provenance: nil
             )],
             relationships: [], step: .review, exercisePickerReturnStep: nil,
             exercisePickerExistingExerciseIds: nil, supportingEvidence: nil, supportingWorkouts: nil,
@@ -1966,7 +2117,7 @@ final class FounderServerAPITests: XCTestCase {
 
         let committed = try await writeAPI.commit(draft)
 
-        XCTAssertEqual(committed.exerciseIds, ["barbell_bench_press"])
+        XCTAssertEqual(committed.exerciseIds, ["barbell_bench_press", "pull_up"])
         let requests = await transport.requests
         XCTAssertEqual(requests.count, 2)
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
@@ -1975,6 +2126,11 @@ final class FounderServerAPITests: XCTestCase {
         let exercises = try XCTUnwrap(payload["exercises"] as? [[String: Any]])
         XCTAssertEqual(exercises.first?["canonicalExerciseId"] as? String, "barbell_bench_press")
         XCTAssertEqual((exercises.first?["sets"] as? [[String: Any]])?.first?["unit"] as? String, "lb")
+        let bodyweightSets = try XCTUnwrap(exercises.last?["sets"] as? [[String: Any]])
+        XCTAssertEqual(bodyweightSets[0]["loadType"] as? String, "bodyweight")
+        XCTAssertNil(bodyweightSets[0]["load"])
+        XCTAssertEqual(bodyweightSets[1]["loadType"] as? String, "external_load")
+        XCTAssertEqual(bodyweightSets[1]["load"] as? Double, 25)
     }
 
     func testProductionTrainingCommitUploadsPrivateScreenshotAndBindsVersionedReview() async throws {
@@ -2975,7 +3131,7 @@ private func productionTrainingLibraryJSON(exerciseID: String, muscleGroup: Stri
 /// `TrainingSessionDetailReadModel` here.
 private func productionTrainingLoggerJSON(exerciseID: String, muscleGroup: String) -> String {
     productionEnvelope(resource: "training-logger", data: """
-    {"initialDate":"2026-09-10","initialCanonicalExercises":[{"id":"\(exerciseID)","name":"Incline Press","equipment":"Dumbbells","bodyRegion":"Upper Body","primaryMuscleGroups":["\(muscleGroup)"],"defaultMeasurement":"reps_load","defaultLoadType":"external"}],"initialHistorySessions":[{"id":"session-canonical","evidence_type":"training","observed_at":"2026-09-09","exercises":[{"id":"exercise-occurrence-canonical","canonicalExerciseId":"\(exerciseID)","name":"Incline Press","body_region":"Upper Body","equipment":"Dumbbells","sets":[{"reps":10,"weight":135,"weight_unit":"lb"},{"reps":8,"weight":145,"weight_unit":"lb"}]}]}],"initialPerformedExerciseIds":["\(exerciseID)"]}
+    {"initialDate":"2026-09-10","initialCanonicalExercises":[{"id":"\(exerciseID)","name":"Incline Press","equipment":"Dumbbells","bodyRegion":"Upper Body","primaryMuscleGroups":["\(muscleGroup)"],"defaultMeasurement":"reps_load","defaultLoadType":"external"}],"initialHistorySessions":[{"id":"session-canonical","evidence_type":"training","observed_at":"2026-09-09","exercises":[{"id":"exercise-occurrence-canonical","canonicalExerciseId":"\(exerciseID)","name":"Incline Press","body_region":"Upper Body","equipment":"Dumbbells","sets":[{"reps":10,"weight":135,"weight_unit":"lb","load_type":"external_load"},{"reps":8,"weight":145,"weight_unit":"lb","load_type":"external_load"}]}]}],"initialPerformedExerciseIds":["\(exerciseID)"],"initialProgressionRecommendations":[{"canonicalExerciseId":"\(exerciseID)","state":"maintain","eyebrow":"Maintain current performance","message":"Canonical recommendation.","prescription":"145 lb x 8","suggestedLoad":145,"suggestedLoadType":"external_load","suggestedReps":8,"suggestedUnit":"lb"}]}
     """)
 }
 
@@ -3016,9 +3172,28 @@ private let productionBriefingHistoryJSON = productionEnvelope(resource: "briefi
 }
 """)
 
-private let productionWeeklyBriefingJSON = productionEnvelope(resource: "briefing", data: #"{"schemaVersion":"1","artifact":{"artifactId":"weekly-1","artifactType":"scheduled","cadence":"weekly","version":3,"evidenceWindow":{"id":"week-1","startDate":"2026-09-01","endDate":"2026-09-07","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-08T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"historical":{"frozen":true,"artifactBound":true},"presentation":{"hero":{"periodLabel":"Completed week\nSep 1–7","goalLabel":"Build Lean Mass","headline":"Server-owned weekly conclusion","body":"Published narrative.","confidence":{"score":71,"band":"moderate","priorScore":68,"delta":3,"movementDirection":"increased","primaryReason":"Evidence strengthened.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"goalId":"goal-canonical","phaseId":"phase-canonical","assessmentDate":"2026-09-08T14:00:00.000Z","source":"canonical_pi_snapshot"},"strategy":{"name":"Foundation","weekLabel":"Week 2","reviewLabel":"Next review"}},"energy":{"averageIntake":2500,"averageExpenditure":2625,"averageBalance":-125,"pairedDayCount":7,"eligibleDayCount":7,"narrative":"Server energy read."},"weight":{"weeklyAverage":170.2,"change":0.4,"narrative":"Server weight read."},"photos":null,"training":{"title":"Training response","conclusion":"Server training conclusion.","status":{"improving":1,"stable":2},"comparableCategoryCount":3,"insufficientCount":0,"highlights":[{"canonicalExerciseId":"bench-press","label":"Bench Press","recordType":"Volume PR","headline":"New benchmark","detail":"Server detail","delta":"+100 lb","tone":"success"}],"priorityCategories":[],"available":true},"bodyComposition":null,"coachInsight":{"biggestWin":"Strong execution.","keepBuilding":"Keep building.","watchNextWeek":"Watch recovery.","actionItems":["Repeat the plan."]}}}"#)
+private let productionWeeklyBriefingJSON = productionEnvelope(resource: "briefing", data: #"{"schemaVersion":"1","artifact":{"artifactId":"weekly-1","artifactType":"scheduled","cadence":"weekly","version":3,"evidenceWindow":{"id":"week-1","startDate":"2026-09-01","endDate":"2026-09-07","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-08T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"historical":{"frozen":true,"artifactBound":true},"presentation":{"hero":{"periodLabel":"Completed week\nSep 1–7","goalLabel":"Build Lean Mass","headline":"Server-owned weekly conclusion","body":"Published narrative.","confidence":{"score":71,"band":"moderate","priorScore":68,"delta":3,"movementDirection":"increased","presentationExplanation":"Canonical weekly Confidence explanation.","movementLabel":"Confidence increased","primaryReason":"Evidence strengthened.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"goalId":"goal-canonical","phaseId":"phase-canonical","assessmentDate":"2026-09-08T14:00:00.000Z","source":"canonical_pi_snapshot"},"strategy":{"name":"Foundation","weekLabel":"Week 2","reviewLabel":"Next review"}},"energy":{"averageIntake":2500,"averageExpenditure":2625,"averageBalance":-125,"pairedDayCount":7,"eligibleDayCount":7,"narrative":"Server energy read."},"weight":{"weeklyAverage":170.2,"change":0.4,"narrative":"Server weight read."},"photos":null,"training":{"title":"Training response","conclusion":"Server training conclusion.","status":{"improving":1,"stable":2},"comparableCategoryCount":3,"insufficientCount":0,"highlights":[{"canonicalExerciseId":"bench-press","label":"Bench Press","recordType":"Volume PR","headline":"New benchmark","detail":"Server detail","delta":"+100 lb","tone":"success"}],"priorityCategories":[],"available":true},"bodyComposition":null,"coachInsight":{"biggestWin":"Strong execution.","keepBuilding":"Keep building.","watchNextWeek":"Watch recovery.","actionItems":["Repeat the plan."]}}}"#)
 
 private let productionMidweekBriefingJSON = productionEnvelope(resource: "briefing", data: #"{"schemaVersion":"1","artifact":{"artifactId":"midweek-1","artifactType":"scheduled","cadence":"midweek","version":2,"evidenceWindow":{"id":"midweek-1","startDate":"2026-09-06","endDate":"2026-09-08","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-09T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"historical":{"frozen":true,"artifactBound":true},"presentation":{"hero":{"verdict":"Server-owned midweek verdict","summary":"Published midweek summary."},"energyBalance":{"headline":"Near maintenance so far","averageIntake":2475,"estimatedAverageExpenditure":2510,"estimatedDailyBalanceMidpoint":-35,"comparableDays":3,"interpretation":"Three paired days are available.","chartPoints":[{"date":"2026-09-06","intake":2450,"expenditure":2500,"balance":-50,"complete":true,"label":"Sun"},{"date":"2026-09-07","intake":2500,"expenditure":2520,"balance":-20,"complete":true,"label":"Mon"},{"date":"2026-09-08","intake":2475,"expenditure":2510,"balance":-35,"complete":true,"label":"Tue"}]},"training":{"performanceHeadline":"Two lifts moved forward","sessionsCompleted":2,"interpretation":"Training remained productive.","status":{"improving":2,"stable":1},"highlights":[{"canonicalExerciseId":"bench-press","exerciseName":"Bench Press","recordType":"Reps at load","performanceValue":"8 @ 185 lb","headline":"Bench advanced","detail":"A published strength signal.","delta":"+1 rep","tone":"success"}],"watch":{"exercise":"Back Squat","status":"watch","message":"Keep the next exposure technically clean."},"prioritySignals":[{"areaId":"chest","label":"Chest","status":"improving","comparableExerciseCount":2,"tone":"success"}]},"coachTake":{"biggestTakeaway":"Hold steady.","recommendation":"Use the full week."},"goalConfidence":{"score":69,"band":"moderate","movementDirection":"held","primaryReason":"Evidence held.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"assessmentContext":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"assessmentTimestamp":"2026-09-09T14:00:00.000Z","source":"canonical_pi_snapshot"},"activeGoal":{"id":"goal-canonical","name":"Build Lean Mass"},"activePhase":{"id":"phase-canonical","name":"Foundation"},"prioritiesThroughSunday":["Keep the plan steady."],"weightContext":{"averageWeight":170.4,"changeFromPriorComparable":0.2,"interpretation":"Weight is stable."},"bodyComposition":{"objective":"Use the scan as the baseline.","interpretation":"Lean mass remains the anchor.","newScan":{"date":"2026-09-01","bodyFatPercentage":8.55,"leanMass":150.25,"fatMass":14.1}}}}"#)
+
+private let build31MidweekBriefingJSON = productionEnvelope(resource: "briefing", data: #"""
+{
+  "schemaVersion":"1",
+  "artifact":{"artifactId":"midweek-1","artifactType":"scheduled","cadence":"midweek","version":2,"evidenceWindow":{"id":"midweek-1","startDate":"2026-09-06","endDate":"2026-09-08","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-09T14:00:00.000Z"},
+  "goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},
+  "historical":{"frozen":true,"artifactBound":true},
+  "presentation":{
+    "hero":{"verdict":"Server-owned midweek verdict","summary":"Published midweek summary."},
+    "energyBalance":{"headline":"Intake and expenditure are close","balanceHeadline":"99 kcal/day above","averageIntake":2954,"estimatedAverageExpenditure":2856,"estimatedDailyBalanceMidpoint":99,"comparableDays":2,"interpretation":"Monday and Tuesday were close to maintenance; Sunday is missing data.","comparisonNarrative":"The prior comparable period averaged 272 kcal/day below.","chartTitle":"Energy Balance, Sunday–Tuesday","balanceDirection":"probably_above","chartPoints":[{"date":"2026-09-06","intake":null,"expenditure":null,"balance":null,"complete":false,"label":"Sun"},{"date":"2026-09-07","intake":3200,"expenditure":2602,"balance":598,"complete":true,"label":"Mon"},{"date":"2026-09-08","intake":2708,"expenditure":3109,"balance":-401,"complete":true,"label":"Tue"}]},
+    "training":{"performanceHeadline":"Two lifts moved forward","sessionsCompleted":2,"interpretation":"Training remained productive.","status":{"improving":1,"stable":0},"highlights":[],"watch":{"exercise":"Back Squat","status":"watch","message":"Keep the next exposure technically clean."},"prioritySignals":[{"areaId":"lower-body","label":"Lower Body","statusLabel":"Stable","comparableExerciseCount":0,"tone":"muted"},{"areaId":"core","label":"Core","statusLabel":"Progressing across recent sessions.","tone":"success"},{"areaId":"arms","label":"Arms","statusLabel":"Leading this week's progress.","evidenceStatus":"absent","tone":"success"}]},
+    "coachTake":{"biggestTakeaway":"Hold steady.","recommendation":"Use the full week."},
+    "goalConfidence":{"score":69,"band":"moderate","movementDirection":"held","presentationExplanation":"Canonical midweek Confidence explanation.","movementLabel":"No meaningful change","primaryReason":"Evidence held.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"assessmentContext":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"assessmentTimestamp":"2026-09-09T14:00:00.000Z","source":"canonical_pi_snapshot"},
+    "activeGoal":{"id":"goal-canonical","name":"Build Lean Mass"},"activePhase":{"id":"phase-canonical","name":"Foundation"},"prioritiesThroughSunday":["Keep the plan steady."],
+    "weightContext":{"averageWeight":170.4,"changeFromPriorComparable":0.2,"interpretation":"Weight is stable."},
+    "bodyComposition":{"objective":"Use the scan as the baseline.","interpretation":"Lean mass remains the anchor.","newScan":{"date":"2026-09-01","bodyFatPercentage":8.55,"leanMass":150.25,"fatMass":14.1}}
+  }
+}
+"""#)
 
 private let productionMonthlyBriefingJSON = productionEnvelope(resource: "briefing", data: #"{"artifact":{"id":"monthly-1","artifactType":"scheduled","cadence":"monthly","version":1,"generatedAt":"2026-10-01T14:00:00.000Z","evidenceWindow":{"id":"monthly:2026-09","startDate":"2026-09-01","endDate":"2026-09-30","briefingMonth":"2026-09","deliveryDate":"2026-10-01","timeZone":"America/Los_Angeles"},"goalContext":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"briefing":{"monthlyPresentation":{"hero":{"period":"September 1–30 · Delivered October 1","goal":"Foundation","title":"Server-owned monthly thesis","thesis":"Published monthly narrative.","highlights":[{"label":"Training","value":"Three lifts advanced","detail":"Across the completed month","icon":"training","tone":"success"}],"confidence":{"score":73,"band":"moderate","movementDirection":"increased","primaryReason":"The month strengthened the read.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"goalId":"goal-canonical","phaseId":"phase-canonical","assessmentDate":"2026-10-01T14:00:00.000Z","source":"canonical_pi_snapshot"}},"milestone":null,"training":{"title":"Training advanced","summary":"Server training month.","stats":[{"label":"Signal","value":"Improving","detail":"Across the completed month"}],"interpretation":"Repeatable strength.","next":"Continue."},"energy":{"title":"Energy Evolution","summary":"Server energy month.","whyItMatters":"Repeatability improved.","phaseLabel":"Foundation","phaseDates":"Sep 1–30","summaryMetrics":[{"label":"Avg intake","value":2500},{"label":"Avg expenditure","value":2450},{"label":"Avg balance","value":50}],"weekly":[{"id":"week-1","label":"Sep 1–7","intake":2500,"expenditure":2450,"balance":50,"missing":false}]},"newBaseline":{"title":"Baseline held","summary":"Frozen baseline.","callout":"Use the next DEXA.","facts":[{"label":"Body fat","value":"8.5%"},{"label":"Lean mass","value":"150 lb"},{"label":"Fat mass","value":"14 lb"},{"label":"Reference date","value":"September 1, 2026"}]},"changes":{"themes":[{"label":"Training","title":"Consistency improved","body":"Sessions repeated.","tone":"training"}]},"moments":{"moments":[{"date":"2026-09-15","label":"Midmonth benchmark","body":"A canonical moment."}]},"monthAhead":{"title":"October","thesis":"Keep building.","guidance":[{"label":"Training","value":"Progress","detail":"Repeat the program.","tone":"training"}]}}}},"goals":[{"id":"goal-canonical","title":"Build Lean Mass"}]}"#)
 

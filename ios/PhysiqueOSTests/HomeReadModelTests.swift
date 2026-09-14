@@ -6,6 +6,15 @@ import XCTest
 /// native must decode and display server-owned values, never derive them.
 final class HomeReadModelTests: XCTestCase {
 
+    func testWebParityTokensKeepPhaseAndGuardrailGeometrySymmetrical() {
+        XCTAssertEqual(HomeGoalWebParityTokens.cardHorizontalPadding, 16)
+        XCTAssertEqual(HomeGoalWebParityTokens.cardVerticalPadding, 15)
+        XCTAssertEqual(HomeGoalWebParityTokens.phaseIconSize, HomeGoalWebParityTokens.guardrailIconSize)
+        XCTAssertEqual(HomeGoalWebParityTokens.cardCornerRadius, 16)
+        XCTAssertGreaterThanOrEqual(HomeGoalWebParityTokens.phaseToPhaseSpacing, 12)
+        XCTAssertGreaterThanOrEqual(HomeGoalWebParityTokens.guardrailTopSpacing, HomeGoalWebParityTokens.phaseToPhaseSpacing)
+    }
+
     // MARK: - Fixture decoding integrity
 
     func testBundledFixtureDecodesWithoutError() throws {
