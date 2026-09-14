@@ -226,7 +226,7 @@ struct EvidenceReviewDetailView: View {
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text(metric.label.uppercased())
                                                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                                .foregroundStyle(PhysiqueOSTheme.accent)
+                                                .foregroundStyle(item.type == "nutrition" ? Self.nutritionMetricColor(metric.label) : PhysiqueOSTheme.accent)
                                             Text(metric.value)
                                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -502,11 +502,29 @@ struct EvidenceReviewDetailView: View {
                 actionState = .confirmed
                 return
             }
-            // A successful command response now represents the durable,
-            // version-protected acceptance boundary. The outbox owns the
-            // remaining canonical/post-confirm checkpoints; keeping this
-            // screen blocked would only turn their latency into a false
-            // Confirm failure.
+            // A successful command response represents the durable,
+            // version-protected acceptance boundary — the outbox owns the
+            // remaining canonical/post-confirm checkpoints regardless of
+            // what happens next on this screen. But that finishes in a
+            // couple of seconds in the ordinary case, so take one brief,
+            // tightly-bounded look before settling for "accepted, continues
+            // in the background": if it's already done, show that instead
+            // of making the Founder wonder or come back later.
+            do {
+                try await environment.evidenceIntakePipeline.awaitConfirmation(
+                    reviewAPI: environment.evidenceReviewAPI, reviewId: reviewId,
+                    pollInterval: Self.fastFollowUpPollInterval, maxPolls: Self.fastFollowUpMaxPolls
+                )
+                actionState = .confirmed
+                return
+            } catch ProductionEvidenceIntakePipeline.Error.commitFailed {
+                actionState = .failed("This review needs another look — the canonical commit failed. Reopen it to try again.")
+                return
+            } catch {
+                // Not resolved within the fast window — keeping this screen
+                // blocked any longer would only turn ordinary latency into a
+                // false Confirm failure. The outbox still owns finishing it.
+            }
             actionState = .accepted
             return
         } catch {
@@ -567,6 +585,28 @@ struct EvidenceReviewDetailView: View {
 
     private static func isActionable(_ status: String) -> Bool {
         ["pending", "commit_failed", "partially_committed"].contains(status)
+    }
+
+    /// A couple of seconds, matching the Founder's expectation that
+    /// confirmation "normally" finishes about that fast. Anything slower
+    /// falls back to the existing "accepted, continues in the background"
+    /// messaging rather than holding this screen open indefinitely.
+    private static let fastFollowUpPollInterval: Duration = .seconds(1)
+    private static let fastFollowUpMaxPolls = 3
+
+    /// Reuses the exact same Calories/Protein/Carbs/Fat tokens the
+    /// established Nutrition presentation (`PhysiqueOSTheme.nutritionCalories`/
+    /// `macroProtein`/`macroCarbohydrates`/`macroFat`) already uses, rather
+    /// than inventing a second palette — matches the server's own
+    /// `EvidenceReviewPresentationService` metric labels exactly.
+    private static func nutritionMetricColor(_ label: String) -> Color {
+        switch label {
+        case "Calories": PhysiqueOSTheme.nutritionCalories
+        case "Protein": PhysiqueOSTheme.macroProtein
+        case "Carbs": PhysiqueOSTheme.macroCarbohydrates
+        case "Fat": PhysiqueOSTheme.macroFat
+        default: PhysiqueOSTheme.accent
+        }
     }
 
     private static func domain(for review: EvidenceReviewDetailReadModel) -> NativeProductWriteDomain {
