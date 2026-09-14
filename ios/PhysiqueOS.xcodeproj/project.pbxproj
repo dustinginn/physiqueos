@@ -71,6 +71,7 @@
 		000000000000000000001252 /* PriorityNotificationCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001251 /* PriorityNotificationCategories.swift */; };
 		000000000000000000001254 /* PriorityNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001253 /* PriorityNotificationScheduler.swift */; };
 		000000000000000000001256 /* PriorityNotificationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001255 /* PriorityNotificationDelegate.swift */; };
+		00000000000000000000125A /* EvidenceReviewReadyNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001259 /* EvidenceReviewReadyNotifier.swift */; };
 		00000000000000000000107C /* DailyEvidenceWriteAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000107B /* DailyEvidenceWriteAPI.swift */; };
 		00000000000000000000107E /* DEXAAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000107D /* DEXAAPI.swift */; };
 		000000000000000000001080 /* PhotosAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000107F /* PhotosAPI.swift */; };
@@ -362,6 +363,7 @@
 		000000000000000000001251 /* PriorityNotificationCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationCategories.swift"; sourceTree = "<group>"; };
 		000000000000000000001253 /* PriorityNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationScheduler.swift"; sourceTree = "<group>"; };
 		000000000000000000001255 /* PriorityNotificationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationDelegate.swift"; sourceTree = "<group>"; };
+		000000000000000000001259 /* EvidenceReviewReadyNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReviewReadyNotifier.swift"; sourceTree = "<group>"; };
 		00000000000000000000107B /* DailyEvidenceWriteAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyEvidenceWriteAPI.swift"; sourceTree = "<group>"; };
 		00000000000000000000107D /* DEXAAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAAPI.swift"; sourceTree = "<group>"; };
 		00000000000000000000107F /* PhotosAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotosAPI.swift"; sourceTree = "<group>"; };
@@ -696,6 +698,7 @@
 				000000000000000000001251 /* PriorityNotificationCategories.swift */,
 				000000000000000000001253 /* PriorityNotificationScheduler.swift */,
 				000000000000000000001255 /* PriorityNotificationDelegate.swift */,
+				000000000000000000001259 /* EvidenceReviewReadyNotifier.swift */,
 				00000000000000000000107B /* DailyEvidenceWriteAPI.swift */,
 				00000000000000000000107D /* DEXAAPI.swift */,
 				00000000000000000000107F /* PhotosAPI.swift */,
@@ -1284,6 +1287,7 @@
 				000000000000000000001252 /* PriorityNotificationCategories.swift in Sources */,
 				000000000000000000001254 /* PriorityNotificationScheduler.swift in Sources */,
 				000000000000000000001256 /* PriorityNotificationDelegate.swift in Sources */,
+				00000000000000000000125A /* EvidenceReviewReadyNotifier.swift in Sources */,
 				00000000000000000000107C /* DailyEvidenceWriteAPI.swift in Sources */,
 				00000000000000000000107E /* DEXAAPI.swift in Sources */,
 				000000000000000000001080 /* PhotosAPI.swift in Sources */,

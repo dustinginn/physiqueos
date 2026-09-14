@@ -623,6 +623,20 @@ struct ProductionEvidenceUploadView: View {
                 return
             }
             phase = .accepted(acceptedMessage)
+            // Interpretation is taking longer than the fast in-flow look —
+            // this is the fallback path (Finding 7): keep watching in the
+            // background and notify the instant it's actually ready, rather
+            // than leaving the Founder to remember to check Log later.
+            Task {
+                await EvidenceReviewReadyNotifier.pollAndNotify(
+                    pipeline: environment.evidenceIntakePipeline,
+                    reviewAPI: environment.evidenceReviewAPI,
+                    intakeId: intake.intakeId,
+                    domainLabel: scenario.label,
+                    effectiveDate: localDate,
+                    environment: environment
+                )
+            }
         } catch {
             phase = .failed(Self.errorMessage(for: error))
         }

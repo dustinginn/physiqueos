@@ -65,6 +65,10 @@ struct EvidenceReviewDetailView: View {
             }
         }
         .task(id: environment.nativeAuthority) { await load() }
+        .onAppear { environment.currentlyViewingReviewId = reviewId }
+        .onDisappear {
+            if environment.currentlyViewingReviewId == reviewId { environment.currentlyViewingReviewId = nil }
+        }
         .confirmationDialog(
             "Dismiss this Evidence Review?",
             isPresented: $showingDismissConfirmation,

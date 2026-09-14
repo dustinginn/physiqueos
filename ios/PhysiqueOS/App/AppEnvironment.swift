@@ -160,6 +160,12 @@ final class AppEnvironment {
     /// since a notification response can arrive before any view exists to
     /// receive it directly (cold launch).
     var pendingNotificationDestination: AppDestination?
+    /// The Evidence Review id currently on screen, if any — set/cleared by
+    /// `EvidenceReviewDetailView` itself. `EvidenceReviewReadyNotifier`
+    /// checks this before posting a fallback "ready to review" notification
+    /// so a review that becomes ready while the Founder is already looking
+    /// at it never produces a redundant notification.
+    var currentlyViewingReviewId: String?
     private let authoritySelectionStore: NativeAuthoritySelectionStore
     private let sandboxHomeAPI: HomeAPI
     private let sandboxGoalsAPI: GoalsAPI
