@@ -932,28 +932,59 @@ struct TrainingLoggerView: View {
     }
 
     private func complete(_ viewModel: TrainingLoggerViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             loggerHeader(eyebrow: "Workout Complete", title: "Workout logged", subtitle: "Your workout review is complete.")
             if let warning = viewModel.refreshWarning {
                 Text(warning)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
+            WorkoutCompleteConfirmation()
             if let achievements = viewModel.draft?.performanceAchievementLines, !achievements.isEmpty {
                 CardContainer(background: PhysiqueOSTheme.chartSuccess.opacity(0.12)) {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .center, spacing: 10) {
                         Label("Better performance", systemImage: "trophy.fill")
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16).foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                        ForEach(achievements, id: \.self) { Text($0).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.textPrimary) }
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading20).foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                        ForEach(achievements, id: \.self) {
+                            Text($0)
+                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .multilineTextAlignment(.center)
+                        }
                     }
+                    .frame(maxWidth: .infinity)
                 }
             }
-            CardContainer {
-                Label("Ready to return to Log", systemImage: "checkmark.circle.fill")
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-            }
             PrimaryActionButton(title: "Return to Log") { dismiss() }
+        }
+    }
+
+    private struct WorkoutCompleteConfirmation: View {
+        @State private var scale: CGFloat = 0.6
+        @State private var opacity: Double = 0
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            VStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 56, weight: .bold))
+                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                    .scaleEffect(scale)
+                Text("Workout confirmed")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            }
+            .opacity(opacity)
+            .frame(maxWidth: .infinity)
+            .onAppear {
+                guard !reduceMotion else {
+                    scale = 1
+                    opacity = 1
+                    return
+                }
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) { scale = 1 }
+                withAnimation(.easeOut(duration: 0.3)) { opacity = 1 }
+            }
         }
     }
 
