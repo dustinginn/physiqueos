@@ -2,8 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  loadProductionBoundedFounderReadContext,
+} from "../../../../../application/composition/productionApplicationComposition";
+import { finishDurableOperatingPlanSave } from "../../../../../application/plan/OperatingPlanSaveCompletion";
 import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { loadApplicationRuntimeBindings } from "../../../../../application/runtime/ApplicationCanonicalRuntime";
+import {
+  loadApplicationCanonicalCommitBindings,
+  loadApplicationRuntimeBindings,
+} from "../../../../../application/runtime/ApplicationCanonicalRuntime";
 import { validateExecutionItem } from "../../../../../domain/models/executionItem";
 import {
   createProgressPhotosExecutionScheduleService,
@@ -16,46 +23,33 @@ import {
 const PROGRESS_PHOTOS_ID = "execution_progress_photos";
 
 export async function saveFoamRollingSupport(context, _previousState, formData) {
-  const user = await FounderRepositories.users.getCurrentUser();
-  const [execution, protocol, reminders] = await Promise.all([
-    FounderRepositories.executionItems.getExecutionItemById(context.executionId),
-    FounderRepositories.protocols.getProtocolById(context.protocolId),
-    FounderRepositories.reminders.listReminders(user.id),
-  ]);
-  const reminder = reminders.find((item) => item.id === context.reminderId);
+  const { repositories } = await loadProductionBoundedFounderReadContext({
+    collections: ["user", "protocols"],
+  });
+  const user = await repositories.users.getCurrentUser();
+  const protocol = await repositories.protocols.getProtocolById(context.protocolId);
   const draft = buildRecurringSupportDraftFromFormData(formData);
 
   if (
-    !execution ||
-    execution.userId !== user.id ||
-    execution.id !== "execution_foam_roll" ||
+    context.executionId !== "execution_foam_roll" ||
     !protocol ||
     protocol.userId !== user.id ||
     protocol.category !== "recovery" ||
     protocol.status !== "active" ||
-    !reminder ||
-    reminder.linkedEntityId !== protocol.id
+    !context.reminderId
   ) {
     return { message: "Foam Rolling Support is no longer available." };
   }
-  if (
-    Number(context.expectedRevision) !==
-    Number(execution.executionRevision ?? 1)
-  ) {
-    return {
-      message: "This Support schedule changed while you were editing it. Review the latest version and try again.",
-    };
-  }
 
   const result = await createRecurringSupportManagementService({
-    ...(await loadApplicationRuntimeBindings()),
+    ...(await loadApplicationCanonicalCommitBindings()),
   }).save({
     protocolId: protocol.id,
     protocolCategory: "recovery",
-    executionId: execution.id,
-    reminderId: reminder.id,
+    executionId: context.executionId,
+    reminderId: context.reminderId,
     userId: user.id,
-    expectedRevision: execution.executionRevision ?? 1,
+    expectedRevision: context.expectedRevision,
     draft,
   });
 
@@ -69,11 +63,22 @@ export async function saveFoamRollingSupport(context, _previousState, formData) 
   }
 
   const strategyPath = `/profile/protocols/${encodeURIComponent(protocol.id)}?from=operating-plan`;
-  revalidatePath("/profile/operating-plan", "page");
-  revalidatePath(`/profile/operating-plan/execution/${encodeURIComponent(execution.id)}`, "page");
-  revalidatePath(`/priorities/${encodeURIComponent(reminder.id)}`, "page");
-  revalidatePath(strategyPath, "page");
-  revalidatePath("/", "page");
+  const refresh = finishDurableOperatingPlanSave({
+    paths: [
+      "/profile/operating-plan",
+      `/profile/operating-plan/execution/${encodeURIComponent(context.executionId)}`,
+      `/priorities/${encodeURIComponent(context.reminderId)}`,
+      strategyPath,
+      "/",
+    ],
+    revalidate: revalidatePath,
+  });
+  if (!refresh.refreshed) {
+    return {
+      saved: true,
+      message: "Saved. This page could not refresh automatically.",
+    };
+  }
   redirect(strategyPath);
 }
 

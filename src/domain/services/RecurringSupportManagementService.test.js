@@ -92,6 +92,82 @@ describe("recurring Support management", () => {
     expect(fixture.live.reminders[0].notes).toBe(reminderNotes);
   });
 
+  it("uses one bounded canonical transaction and projects the saved reminder time to Native", async () => {
+    const fixture = setup();
+    const canonical = structuredClone(fixture.live);
+    let request;
+    const service = createRecurringSupportManagementService({
+      now: () => new Date("2026-08-08T12:00:00.000Z"),
+      mutateCanonicalRuntime: async (input) => {
+        request = input;
+        const result = await input.mutate(canonical);
+        return {
+          committed: true,
+          commitId: "commit_support_1",
+          revision: 42,
+          result,
+          memoryProfile: {
+            runtimeLoadCount: 1,
+            runtimeCloneCount: 0,
+            fullRuntimeSerializationCount: 0,
+            runtimeCollectionLoadCount: input.readCollections.length,
+          },
+        };
+      },
+    });
+
+    const result = await service.save(command({
+      draft: draft({ specificTime: "18:45" }),
+    }));
+
+    expect(result).toMatchObject({
+      outcome: "success",
+      committed: true,
+      commitId: "commit_support_1",
+      revision: 42,
+      memoryProfile: {
+        runtimeLoadCount: 1,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+        runtimeCollectionLoadCount: 3,
+      },
+    });
+    expect(request).toMatchObject({
+      operation: "operating-plan-recurring-support-save",
+      allowedCollections: ["executionItems", "reminders"],
+      readCollections: ["protocols", "executionItems", "reminders"],
+      readApplicationContext: false,
+      readImportMetadata: false,
+      allowApplicationContextMutation: false,
+    });
+    expect(canonical.executionItems[0].preferredSchedule.timeOfDay).toBe("18:45");
+    expect(canonical.reminders[0].schedule.timeOfDay).toBe("18:45");
+    expect(
+      foamPriority(canonical, "2026-08-08T19:00:00.000Z")
+        .notificationAction.scheduledTime
+    ).toBe("18:45");
+  });
+
+  it("keeps optimistic concurrency and malformed-input failures inside the bounded transaction", async () => {
+    const fixture = setup();
+    const canonical = structuredClone(fixture.live);
+    const service = createRecurringSupportManagementService({
+      mutateCanonicalRuntime: async (input) => ({
+        committed: true,
+        revision: 2,
+        result: await input.mutate(canonical),
+      }),
+    });
+
+    const stale = await service.save(command({ expectedRevision: 99 }));
+    expect(stale).toMatchObject({ outcome: "version_conflict", committed: false });
+    expect(canonical.executionItems[0].preferredSchedule.timeOfDay).toBe("17:00");
+
+    const invalid = await service.save(command({ draft: { malformed: true } }));
+    expect(invalid).toMatchObject({ outcome: "invalid", committed: false });
+    expect(canonical.reminders[0].schedule.timeOfDay).toBe("17:00");
+  });
+
   it("disables stale reminder projection without deleting completion history", async () => {
     const fixture = setup();
     const history = structuredClone(fixture.live.reminders[0].completionHistory);

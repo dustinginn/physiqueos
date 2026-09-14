@@ -30,7 +30,7 @@ export default function RecurringSupportEditorScreen({
           className="mb-6 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--text-secondary)]"
           href={backHref ?? `/profile/protocols/${encodeURIComponent(protocol.id)}?from=operating-plan`}
         >
-          â† {protocol.name}
+          ← {protocol.name}
         </Link>
         <header className="mb-6">
           <p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-[var(--primary)]">
@@ -88,7 +88,7 @@ export default function RecurringSupportEditorScreen({
             </SupportEditorSection>
           )}
           {state?.message && (
-            <p className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+            <p className={`rounded-2xl p-3 text-sm font-semibold ${state.saved ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>
               {state.message}
             </p>
           )}
@@ -97,7 +97,7 @@ export default function RecurringSupportEditorScreen({
             disabled={pending || !scheduleReady || !reminder}
             type="submit"
           >
-            {pending ? "Savingâ€¦" : "Save Support"}
+            {pending ? "Saving…" : "Save Support"}
           </button>
         </form>
       </div>

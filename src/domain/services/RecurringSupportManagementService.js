@@ -94,16 +94,20 @@ export function validateRecurringSupportDraft(value = {}) {
 export function createRecurringSupportManagementService({
   runtimeStorePath,
   liveStore,
+  mutateCanonicalRuntime = null,
   now = () => new Date(),
   createUnitOfWork = (options) => createFounderStoreUnitOfWork(options),
   faults = {},
 } = {}) {
-  if (!runtimeStorePath || !liveStore) {
+  if (typeof mutateCanonicalRuntime !== "function" && (!runtimeStorePath || !liveStore)) {
     throw new Error("Recurring Support management requires a bound Founder store.");
   }
 
   return {
     async save(command = {}) {
+      if (typeof mutateCanonicalRuntime === "function") {
+        return saveBounded({ command, faults, mutateCanonicalRuntime, now });
+      }
       const transaction = createUnitOfWork({
         filePath: runtimeStorePath,
         liveStore,
@@ -115,111 +119,11 @@ export function createRecurringSupportManagementService({
         let expectedReminder;
         let preservedReminderHistory;
         const staged = await transaction.mutate((store) => {
-          const protocol = store.protocols?.find(
-            (item) =>
-              item.id === command.protocolId &&
-              item.userId === command.userId &&
-              item.status === "active" &&
-              item.category === command.protocolCategory
-          );
-          const execution = store.executionItems?.find(
-            (item) =>
-              item.id === command.executionId &&
-              item.userId === command.userId &&
-              [item.protocolRootId, item.linkedProtocolId].includes(command.protocolId)
-          );
-          if (!protocol || !execution) {
-            throw typed(
-              RecurringSupportOutcome.NOT_FOUND,
-              "This Support item is no longer available."
-            );
-          }
-          if (
-            Number(command.expectedRevision) !==
-            Number(execution.executionRevision ?? 1)
-          ) {
-            throw typed(
-              RecurringSupportOutcome.VERSION_CONFLICT,
-              "This Support schedule changed while you were editing it."
-            );
-          }
-
-          const draft = normalizeRecurringSupportDraft(command.draft);
-          const errors = validateRecurringSupportDraft(draft);
-          if (errors.length) {
-            throw typed(RecurringSupportOutcome.INVALID, errors[0]);
-          }
-
-          const timestamp = now().toISOString();
-          const executionCandidate = {
-            ...execution,
-            cadence: draft.cadence,
-            preferredSchedule: draft.preferredSchedule,
-            reminderPreference: draft.reminderPreference,
-            notes: draft.notes,
-            executionRevision: (execution.executionRevision ?? 0) + 1,
-            updatedAt: timestamp,
-          };
-          const executionChanged =
-            executionSemantic(execution) !== executionSemantic(executionCandidate);
-          expectedExecution = executionSemantic(executionCandidate);
-          if (executionChanged) {
-            const executionIndex = store.executionItems.findIndex(
-              (item) => item.id === execution.id
-            );
-            store.executionItems[executionIndex] = executionCandidate;
-          }
-
-          store.reminders ??= [];
-          const reminderMatches = store.reminders.filter(
-            (item) =>
-              item.userId === command.userId &&
-              (item.id === command.reminderId ||
-                (item.linkedEntityId === protocol.id &&
-                  ["protocol_reminder", "recovery_reminder"].includes(item.type)))
-          );
-          if (reminderMatches.length !== 1) {
-            throw typed(
-              RecurringSupportOutcome.INVALID,
-              "This Support reminder is not available to edit right now."
-            );
-          }
-          const reminder = reminderMatches[0];
-          preservedReminderHistory = reminderHistory(reminder);
-          const reminderSchedule = supportScheduleToReminder(
-            draft.supportSchedule,
-            execution.timingContext ?? protocol.schedule?.timingContext ?? protocol.category
-          );
-          const reminderCandidate = {
-            ...reminder,
-            schedule: {
-              ...reminderSchedule,
-              timezone: reminder.schedule?.timezone ?? null,
-            },
-            active: draft.reminderPreference === "remind",
-            updatedAt: timestamp,
-          };
-          const reminderChanged =
-            reminderSemantic(reminder) !== reminderSemantic(reminderCandidate);
-          expectedReminder = reminderSemantic(reminderCandidate);
-          if (reminderChanged) {
-            const reminderIndex = store.reminders.findIndex(
-              (item) => item.id === reminder.id
-            );
-            store.reminders[reminderIndex] = reminderCandidate;
-          }
-
-          if (!executionChanged && !reminderChanged) {
-            throw typed(RecurringSupportOutcome.UNCHANGED, "No changes to save.");
-          }
-          faults.afterWrite?.(store, executionCandidate);
-          return {
-            executionId: execution.id,
-            executionRevision: executionChanged
-              ? executionCandidate.executionRevision
-              : execution.executionRevision ?? 1,
-            reminderId: reminder.id,
-          };
+          const applied = applyRecurringSupportMutation({ command, faults, now, store });
+          expectedExecution = applied.expectedExecution;
+          expectedReminder = applied.expectedReminder;
+          preservedReminderHistory = applied.preservedReminderHistory;
+          return applied.result;
         });
 
         const committed = await transaction.commit({
@@ -266,6 +170,189 @@ export function createRecurringSupportManagementService({
         };
       }
     },
+  };
+}
+
+async function saveBounded({ command, faults, mutateCanonicalRuntime, now }) {
+  try {
+    const committed = await mutateCanonicalRuntime({
+      operation: "operating-plan-recurring-support-save",
+      allowedCollections: ["executionItems", "reminders"],
+      readCollections: ["protocols", "executionItems", "reminders"],
+      readApplicationContext: false,
+      readImportMetadata: false,
+      allowApplicationContextMutation: false,
+      mutate(store) {
+        const applied = applyRecurringSupportMutation({ command, faults, now, store });
+        faults.beforeVerification?.(store);
+        if (!verifyRecurringSupportMutation(store, command, applied)) {
+          throw typed(
+            RecurringSupportOutcome.PERSISTENCE_FAILURE,
+            "We could not verify this Support schedule. Nothing was changed."
+          );
+        }
+        return applied.result;
+      },
+    });
+    return {
+      outcome: RecurringSupportOutcome.SUCCESS,
+      committed: true,
+      revision: committed.revision,
+      commitId: committed.commitId,
+      memoryProfile: committed.memoryProfile,
+      ...committed.result,
+    };
+  } catch (error) {
+    return recurringSupportFailure(error);
+  }
+}
+
+function applyRecurringSupportMutation({ command, faults, now, store }) {
+  const protocol = store.protocols?.find(
+    (item) =>
+      item.id === command.protocolId &&
+      item.userId === command.userId &&
+      item.status === "active" &&
+      item.category === command.protocolCategory
+  );
+  const execution = store.executionItems?.find(
+    (item) =>
+      item.id === command.executionId &&
+      item.userId === command.userId &&
+      [item.protocolRootId, item.linkedProtocolId].includes(command.protocolId)
+  );
+  if (!protocol || !execution) {
+    throw typed(
+      RecurringSupportOutcome.NOT_FOUND,
+      "This Support item is no longer available."
+    );
+  }
+  if (
+    Number(command.expectedRevision) !==
+    Number(execution.executionRevision ?? 1)
+  ) {
+    throw typed(
+      RecurringSupportOutcome.VERSION_CONFLICT,
+      "This Support schedule changed while you were editing it."
+    );
+  }
+
+  const draft = normalizeRecurringSupportDraft(command.draft);
+  const errors = validateRecurringSupportDraft(draft);
+  if (errors.length) {
+    throw typed(RecurringSupportOutcome.INVALID, errors[0]);
+  }
+
+  const timestamp = now().toISOString();
+  const executionCandidate = {
+    ...execution,
+    cadence: draft.cadence,
+    preferredSchedule: draft.preferredSchedule,
+    reminderPreference: draft.reminderPreference,
+    notes: draft.notes,
+    executionRevision: (execution.executionRevision ?? 0) + 1,
+    updatedAt: timestamp,
+  };
+  const executionChanged =
+    executionSemantic(execution) !== executionSemantic(executionCandidate);
+  const expectedExecution = executionSemantic(executionCandidate);
+  if (executionChanged) {
+    const executionIndex = store.executionItems.findIndex(
+      (item) => item.id === execution.id
+    );
+    store.executionItems[executionIndex] = executionCandidate;
+  }
+
+  store.reminders ??= [];
+  const reminderMatches = store.reminders.filter(
+    (item) =>
+      item.userId === command.userId &&
+      (item.id === command.reminderId ||
+        (item.linkedEntityId === protocol.id &&
+          ["protocol_reminder", "recovery_reminder"].includes(item.type)))
+  );
+  if (reminderMatches.length !== 1) {
+    throw typed(
+      RecurringSupportOutcome.INVALID,
+      "This Support reminder is not available to edit right now."
+    );
+  }
+  const reminder = reminderMatches[0];
+  const preservedReminderHistory = reminderHistory(reminder);
+  const reminderSchedule = supportScheduleToReminder(
+    draft.supportSchedule,
+    execution.timingContext ?? protocol.schedule?.timingContext ?? protocol.category
+  );
+  const reminderCandidate = {
+    ...reminder,
+    schedule: {
+      ...reminderSchedule,
+      timezone: reminder.schedule?.timezone ?? null,
+    },
+    active: draft.reminderPreference === "remind",
+    updatedAt: timestamp,
+  };
+  const reminderChanged =
+    reminderSemantic(reminder) !== reminderSemantic(reminderCandidate);
+  const expectedReminder = reminderSemantic(reminderCandidate);
+  if (reminderChanged) {
+    const reminderIndex = store.reminders.findIndex(
+      (item) => item.id === reminder.id
+    );
+    store.reminders[reminderIndex] = reminderCandidate;
+  }
+
+  if (!executionChanged && !reminderChanged) {
+    throw typed(RecurringSupportOutcome.UNCHANGED, "No changes to save.");
+  }
+  faults.afterWrite?.(store, executionCandidate);
+  return {
+    expectedExecution,
+    expectedReminder,
+    preservedReminderHistory,
+    result: {
+      executionId: execution.id,
+      executionRevision: executionChanged
+        ? executionCandidate.executionRevision
+        : execution.executionRevision ?? 1,
+      reminderId: reminder.id,
+    },
+  };
+}
+
+function verifyRecurringSupportMutation(store, command, expected) {
+  const execution = store.executionItems?.find(
+    (item) => item.id === command.executionId
+  );
+  const reminder = store.reminders?.find(
+    (item) => item.id === command.reminderId
+  );
+  return Boolean(
+    execution &&
+      reminder &&
+      executionSemantic(execution) === expected.expectedExecution &&
+      reminderSemantic(reminder) === expected.expectedReminder &&
+      reminderHistory(reminder) === expected.preservedReminderHistory
+  );
+}
+
+function recurringSupportFailure(error) {
+  const own = findTyped(error);
+  if (own) return { outcome: own.outcome, committed: false, reason: own.message };
+  if (error?.committed) {
+    return {
+      outcome: RecurringSupportOutcome.PUBLICATION_FAILURE,
+      committed: true,
+      reason: "The Support schedule saved but could not refresh.",
+    };
+  }
+  return {
+    outcome:
+      error?.code === FounderStoreUnitOfWorkErrorCode.REVISION_CONFLICT
+        ? RecurringSupportOutcome.VERSION_CONFLICT
+        : RecurringSupportOutcome.PERSISTENCE_FAILURE,
+    committed: false,
+    reason: "We could not update this Support schedule. Nothing was changed.",
   };
 }
 
