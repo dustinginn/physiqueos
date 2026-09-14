@@ -225,6 +225,35 @@ describe("Phase 4 canonical command persistence ports", () => {
     }, "1", "dexa-stale"))).rejects.toMatchObject({ code: "STALE_VERSION" });
   });
 
+  it("saves recurring support (Foam Rolling) atomically across the execution item and its reminder, and rejects a stale edit", async () => {
+    const records = recurringSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const draft = {
+      supportSchedule: {
+        frequency: "daily", daysOfWeek: [], intervalDays: 1, timing: "specific",
+        specificTime: "08:40", startDate: "2026-07-23", endDate: null,
+      },
+      reminderPreference: "remind", notes: "",
+    };
+    const saved = await ports.saveRecurringSupport(commandContext({
+      protocolId: "recovery", protocolCategory: "recovery",
+      executionId: "execution_foam_roll", reminderId: "reminder_foam_roll_daily", draft,
+    }, "1", "recurring-support-save"));
+    expect(saved.result).toMatchObject({ status: "updated", executionId: "execution_foam_roll", executionRevision: 2 });
+    const snapshot = records.snapshot();
+    const execution = snapshot.executionItems.find((item) => item.id === "execution_foam_roll");
+    expect(execution.preferredSchedule.timeOfDay).toBe("08:40");
+    expect(execution.executionRevision).toBe(2);
+    const reminder = snapshot.reminders.find((item) => item.id === "reminder_foam_roll_daily");
+    expect(reminder.schedule.timeOfDay).toBe("08:40");
+
+    await expect(ports.saveRecurringSupport(commandContext({
+      protocolId: "recovery", protocolCategory: "recovery",
+      executionId: "execution_foam_roll", reminderId: "reminder_foam_roll_daily",
+      draft: { ...draft, supportSchedule: { ...draft.supportSchedule, specificTime: "09:00" } },
+    }, "1", "recurring-support-stale"))).rejects.toMatchObject({ code: "STALE_VERSION" });
+  });
+
   it("dismisses only the owned current review without creating or changing canonical history", async () => {
     const records = fixture();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });
@@ -410,4 +439,34 @@ function fixture() {
 }
 function commandContext(payload, expectedVersion, commandId) {
   return { ownerUserId, principal, metadata: { commandId, expectedVersion }, payload };
+}
+
+/// Isolated from the shared `fixture()` above (which uses generic
+/// "priority-one" stub executionItems/reminders shared by every other test
+/// in this file) — the real Foam Rolling shape, matching
+/// `RecurringSupportManagementService.test.js`'s own fixture.
+function recurringSupportFixture() {
+  return createInMemoryCanonicalRecordStore({
+    user: [{ id: ownerUserId, timeZone: "America/Los_Angeles", version: 1 }],
+    protocols: [{
+      id: "recovery", userId: ownerUserId, category: "recovery", name: "Foam Rolling",
+      status: "active", activatedAt: "2026-07-23T16:54:00.550Z", version: 1,
+    }],
+    executionItems: [{
+      id: "execution_foam_roll", userId: ownerUserId, type: "recovery", title: "Foam Rolling",
+      active: true, linkedProtocolId: "recovery", cadence: { type: "daily" },
+      preferredSchedule: { daysOfWeek: [], timeOfDay: "17:00", startDate: "2026-07-23" },
+      executionRevision: 1, notes: "", version: 1,
+    }],
+    reminders: [{
+      id: "reminder_foam_roll_daily", userId: ownerUserId, title: "Foam Roll", type: "recovery_reminder",
+      linkedEntityType: "protocol", linkedEntityId: "recovery", active: true,
+      schedule: { type: "daily", timeOfDay: "17:00" }, version: 1,
+    }],
+    goals: [], evidenceReviews: [], trainingPerformanceEvents: [],
+    weightEntries: [], dailyCheckIns: [], evidencePackages: [], canonicalEvidenceObjects: [],
+    dexaScans: [], protocolVersions: [], progressPhotos: [], dailyBriefings: [], analyses: [],
+    briefingReconciliationWorkItems: [],
+    canonicalExerciseLibrary: [], piEnergyConfidenceWorkItems: [], piTrainingConfidenceWorkItems: [],
+  });
 }

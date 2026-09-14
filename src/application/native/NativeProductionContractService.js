@@ -27,6 +27,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.EDIT_DEXA_REVIEW,
   Phase3Command.COMMIT_EVIDENCE_REVIEW,
   Phase3Command.DISPOSE_EVIDENCE_REVIEW,
+  Phase3Command.SAVE_RECURRING_SUPPORT,
 ]);
 
 export function createNativeProductionContractService({
@@ -134,6 +135,9 @@ export function createNativeProductionContractService({
         case "evidence-review": data = await readers.evidenceReview.getReview(required(input.reviewId, "reviewId")); break;
         case "evidence-review-queue": data = await readers.core.getLog(); break;
         case "timeline": data = await readers.timeline.getPage({ limit: boundedLimit(input.limit) }); break;
+        case "operating-plan-recurring-support": data = await readers.core.getRecurringSupport({
+          executionId: required(input.executionId, "executionId"),
+        }); break;
         default: throw unavailableResource();
       }
       if (data == null) throw unavailableResource();

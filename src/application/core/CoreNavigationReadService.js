@@ -11,6 +11,8 @@ import { createBriefingReconciliationPresentation } from "../../domain/services/
 import { MORNING_EVIDENCE_RECOVERY_STATUSES } from "../../domain/services/MorningEvidenceRecoveryService.js";
 import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";
 import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
+import { createRecurringSupportHydrationModel } from "../../domain/services/RecurringSupportManagementService.js";
+import { formatSupportScheduleSummary } from "../../domain/models/SupportScheduleModel.js";
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
 import { resolveCanonicalGoalPhaseChronology } from "../../domain/services/CanonicalGoalPhaseChronologyService.js";
@@ -170,6 +172,43 @@ export function createCoreNavigationReadService({
           userId: ownerUserId,
         }),
       }));
+    },
+    /// The one canonical Operating Plan "recurring support" detail read —
+    /// covers both Recovery (e.g. Foam Rolling) and Tracking (Morning
+    /// Weigh-In), since both are the exact same execution-item+reminder
+    /// shape `RecurringSupportManagementService` already owns end to end.
+    /// Mirrors `execution/[executionId]/page.js`'s own lookup (protocol via
+    /// the execution item's own linked/root protocol id, reminder via
+    /// `linkedEntityId === protocol.id`) generically rather than
+    /// hardcoding each known execution id, so a future recurring-support
+    /// item needs no new Native read plumbing.
+    getRecurringSupport({ executionId }) {
+      return withContext("core.navigation.recurring-support", "tracking", ({ ownerUserId, runtime }) => {
+        const executionItem = (runtime.executionItems ?? []).find(
+          (item) => item.id === executionId && item.userId === ownerUserId && item.active !== false
+        );
+        if (!executionItem) return null;
+        const protocolId = executionItem.protocolRootId ?? executionItem.linkedProtocolId;
+        const protocol = (runtime.protocols ?? []).find((item) =>
+          item.id === protocolId && item.userId === ownerUserId && item.status === "active"
+        );
+        if (!protocol) return null;
+        const reminder = (runtime.reminders ?? []).find((item) =>
+          item.userId === ownerUserId && item.linkedEntityId === protocol.id &&
+          ["protocol_reminder", "recovery_reminder"].includes(item.type)
+        ) ?? null;
+        const hydration = createRecurringSupportHydrationModel({ executionItem, protocol, reminder });
+        return Object.freeze({
+          protocolId: protocol.id,
+          protocolCategory: protocol.category,
+          executionId: executionItem.id,
+          reminderId: reminder?.id ?? null,
+          title: executionItem.title ?? protocol.name ?? "",
+          purpose: executionItem.description ?? "",
+          supportSummary: formatSupportScheduleSummary(hydration.supportSchedule),
+          hydration,
+        });
+      });
     },
   });
 

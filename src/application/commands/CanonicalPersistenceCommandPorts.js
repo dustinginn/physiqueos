@@ -25,6 +25,10 @@ import {
   isReminderOccurrenceCompleted,
   resolvePriorityExecutionContract,
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
+import {
+  createRecurringSupportManagementService,
+  RecurringSupportOutcome,
+} from "../../domain/services/RecurringSupportManagementService.js";
 
 export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "submitWeight", "submitCheckIn", "createEvidenceIntake", "editEvidenceReview",
@@ -32,8 +36,11 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "editProtocol", "editGoal", "transitionGoal", "createTrainingSession", "correctTrainingSession",
   "completeTrainingLogger", "confirmNutritionEvidence", "confirmPhotoEvidence", "confirmDexaEvidence",
   "upsertNutritionDay", "syncActivityDay", "commitTrainingSession", "upsertActivityDay",
-  "editDexaReview", "requestEvidenceReviewConfirmation",
+  "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport",
 ]);
+
+const RECURRING_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "executionItems", "reminders"]);
+const RECURRING_SUPPORT_READ_COLLECTIONS = Object.freeze(["user", ...RECURRING_SUPPORT_BOUNDED_COLLECTIONS]);
 
 export function createCanonicalPersistenceCommandPorts({ records, now = () => new Date() } = {}) {
   if (!records?.get || !records?.put) throw new Error("Canonical command ports require a record store.");
@@ -143,7 +150,64 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     commitTrainingSession,
     editDexaReview,
     requestEvidenceReviewConfirmation,
+    saveRecurringSupport,
   });
+
+  /// The one canonical write for every "recurring support" execution item
+  /// (Foam Rolling under Recovery, Morning Weigh-In under Tracking, and any
+  /// future domain that reuses this exact shape) — a thin wrapper over the
+  /// SAME `RecurringSupportManagementService` Web's own
+  /// `saveFoamRollingSupport`/`saveMorningWeighInSupport` actions already
+  /// call, using the established `loadCandidate`/`mutateCanonicalRuntime`
+  /// bounded-mutation pattern `commitMorningCheckIn` above demonstrates —
+  /// no second implementation of the schedule/reminder write semantics.
+  async function saveRecurringSupport(context) {
+    const { candidate, before } = await loadCandidate(RECURRING_SUPPORT_READ_COLLECTIONS, context.ownerUserId);
+    const result = await createRecurringSupportManagementService({
+      runtimeStorePath: "/tmp/physiqueos-native-recurring-support.json",
+      liveStore: candidate,
+      now,
+      mutateCanonicalRuntime: (input) => mutateCandidateRuntime(candidate, context.metadata.commandId, input),
+    }).save({
+      protocolId: context.payload.protocolId,
+      protocolCategory: context.payload.protocolCategory,
+      executionId: context.payload.executionId,
+      reminderId: context.payload.reminderId,
+      userId: context.ownerUserId,
+      expectedRevision: context.metadata.expectedVersion,
+      draft: context.payload.draft,
+    });
+    if (result.outcome === RecurringSupportOutcome.NOT_FOUND) {
+      throw problem(404, "RECURRING_SUPPORT_UNAVAILABLE", result.reason ?? "This Support item is no longer available.");
+    }
+    if (result.outcome === RecurringSupportOutcome.VERSION_CONFLICT) {
+      const execution = (candidate.executionItems ?? []).find((item) => item.id === context.payload.executionId);
+      throw staleVersionProblem({
+        expectedVersion: context.metadata.expectedVersion,
+        actualVersion: execution?.executionRevision ?? null,
+        resource: `execution-item:${context.payload.executionId}`,
+      });
+    }
+    if (result.outcome === RecurringSupportOutcome.INVALID) {
+      throw problem(400, "RECURRING_SUPPORT_INVALID", result.reason ?? "The Support schedule is invalid.");
+    }
+    if (result.outcome !== RecurringSupportOutcome.SUCCESS) {
+      throw problem(500, "RECURRING_SUPPORT_PERSISTENCE_FAILED", result.reason ?? "We could not update this Support schedule. Nothing was changed.");
+    }
+    await persistCandidateCollections({
+      before, candidate, collections: RECURRING_SUPPORT_BOUNDED_COLLECTIONS, ownerUserId: context.ownerUserId,
+    });
+    const execution = candidate.executionItems?.find((item) => item.id === context.payload.executionId) ?? null;
+    return {
+      status: "committed",
+      result: {
+        status: "updated",
+        executionId: context.payload.executionId,
+        executionRevision: execution?.executionRevision ?? result.revision ?? null,
+      },
+      outbox: [],
+    };
+  }
 
   async function commitMorningCheckIn(context, { reconcilePreviousDayPriorities }) {
     const date = context.payload.localDate;

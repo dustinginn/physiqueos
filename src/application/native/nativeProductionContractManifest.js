@@ -30,6 +30,7 @@ export const NativeProductionResource = Object.freeze({
   EVIDENCE_REVIEW: "evidence-review",
   EVIDENCE_REVIEW_QUEUE: "evidence-review-queue",
   TIMELINE: "timeline",
+  OPERATING_PLAN_RECURRING_SUPPORT: "operating-plan-recurring-support",
 });
 
 const reads = Object.freeze([
@@ -62,6 +63,7 @@ const reads = Object.freeze([
   read("evidence-review", "/api/v1/native/read/evidence-review", "evidenceReview.getReview"),
   read("evidence-review-queue", "/api/v1/native/read/evidence-review-queue", "coreNavigation.getLog"),
   read("timeline", "/api/v1/native/read/timeline", "evidenceTimeline.getPage", { pagination: "limit:1-200" }),
+  read("operating-plan-recurring-support", "/api/v1/native/read/operating-plan-recurring-support", "coreNavigation.getRecurringSupport"),
 ]);
 
 const writes = Object.freeze([
@@ -74,6 +76,7 @@ const writes = Object.freeze([
   write(Phase3Command.EDIT_DEXA_REVIEW, ["reviewId", "evidenceObjectId", "measurements"], "If-Match required for every edit"),
   write(Phase3Command.COMMIT_EVIDENCE_REVIEW, ["reviewId"], "If-Match required to start the canonical Evidence Review lifecycle"),
   write(Phase3Command.DISPOSE_EVIDENCE_REVIEW, ["reviewId", "disposition"], "If-Match required; disposition must be discarded"),
+  write(Phase3Command.SAVE_RECURRING_SUPPORT, ["protocolId", "protocolCategory", "executionId", "reminderId", "draft"], "If-Match required; expectedVersion compares against the execution item's own executionRevision"),
 ]);
 
 export const nativeProductionContractManifest = Object.freeze({

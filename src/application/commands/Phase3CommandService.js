@@ -27,6 +27,7 @@ export const Phase3Command = Object.freeze({
   UPSERT_ACTIVITY_DAY: "activity-day.upsert.v1",
   EDIT_DEXA_REVIEW: "dexa-review.measurements.v1",
   COMMIT_EVIDENCE_REVIEW: "evidence-review.commit.v1",
+  SAVE_RECURRING_SUPPORT: "operating-plan.recurring-support.save.v1",
 });
 
 const DEFINITIONS = Object.freeze({
@@ -53,6 +54,9 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.UPSERT_ACTIVITY_DAY]: define("upsertActivityDay", ["localDate", "dailyActivity", "sourceIdentity", "source"], false),
   [Phase3Command.EDIT_DEXA_REVIEW]: define("editDexaReview", ["reviewId", "evidenceObjectId", "measurements"], true),
   [Phase3Command.COMMIT_EVIDENCE_REVIEW]: define("requestEvidenceReviewConfirmation", ["reviewId"], true),
+  [Phase3Command.SAVE_RECURRING_SUPPORT]: define(
+    "saveRecurringSupport", ["protocolId", "protocolCategory", "executionId", "reminderId", "draft"], true
+  ),
 });
 
 export function createPhase3CommandService({ transactionRunner, ports, writeFence = null } = {}) {
@@ -129,7 +133,10 @@ function validatePayload(commandType, payload) {
     throw validation("supportingEvidenceReviewVersion", "supportingEvidenceReviewVersion must be a positive integer.");
   }
   if (payload.observedAt != null && Number.isNaN(Date.parse(payload.observedAt))) throw validation("observedAt", "observedAt must be an ISO date-time.");
-  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId"]) {
+  if (payload.draft != null && (!payload.draft || typeof payload.draft !== "object" || Array.isArray(payload.draft))) {
+    throw validation("draft", "draft must be an object.");
+  }
+  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId"]) {
     if (payload[field] != null && !String(payload[field]).trim()) throw validation(field, `${field} must be a non-empty identity.`);
   }
 }

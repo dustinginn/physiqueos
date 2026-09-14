@@ -78,6 +78,25 @@ describe("provider-native core navigation reads", () => {
     });
   });
 
+  it("resolves Recovery's recurring support (Foam Rolling) generically, without hardcoding the execution id", async () => {
+    const { narrow } = recurringSupportServices();
+    const result = await narrow.getRecurringSupport({ executionId: "execution_foam_roll" });
+    expect(result.protocolId).toBe("recovery");
+    expect(result.protocolCategory).toBe("recovery");
+    expect(result.executionId).toBe("execution_foam_roll");
+    expect(result.reminderId).toBe("reminder_foam_roll_daily");
+    expect(result.title).toBe("Foam Rolling");
+    expect(result.hydration.supportSchedule).toEqual({
+      frequency: "daily", daysOfWeek: [], intervalDays: 1, timing: "specific",
+      specificTime: "17:00", startDate: "2026-07-23", endDate: null,
+    });
+  });
+
+  it("returns null for an execution id that does not exist or is not owned by this Founder", async () => {
+    const { narrow } = recurringSupportServices();
+    expect(await narrow.getRecurringSupport({ executionId: "execution_does_not_exist" })).toBeNull();
+  });
+
   it("provides bounded Workout Logger and Morning Check-In models", async () => {
     const { narrow } = services();
     const logger = await narrow.getTrainingLogger();
@@ -214,6 +233,40 @@ describe("provider-native core navigation reads", () => {
     }
   });
 });
+
+/// A small, hand-built runtime carrying the real Foam Rolling shape
+/// (matching `RecurringSupportManagementService.test.js`'s own fixture) —
+/// the shared `services()` phase5-synthetic runtime above intentionally
+/// carries only minimal stub records with no realistic recovery/tracking
+/// data, so it can't exercise `getRecurringSupport`'s actual field mapping.
+function recurringSupportServices() {
+  const runtime = {
+    user: { id: "user" },
+    protocols: [{
+      id: "recovery", userId: "user", category: "recovery", name: "Foam Rolling",
+      status: "active", activatedAt: "2026-07-23T16:54:00.550Z",
+    }],
+    executionItems: [{
+      id: "execution_foam_roll", userId: "user", type: "recovery", title: "Foam Rolling",
+      description: "Support recovery and keep training quality available.", active: true,
+      linkedProtocolId: "recovery", cadence: { type: "daily" },
+      preferredSchedule: { daysOfWeek: [], timeOfDay: "17:00", startDate: "2026-07-23" },
+      reminderPreference: "in_app", notes: "",
+    }],
+    reminders: [{
+      id: "reminder_foam_roll_daily", userId: "user", title: "Foam Roll", type: "recovery_reminder",
+      linkedEntityType: "protocol", linkedEntityId: "recovery", active: true,
+      schedule: { type: "daily", timeOfDay: "17:00" },
+    }],
+  };
+  return {
+    runtime,
+    narrow: createCoreNavigationReadService({
+      store: createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime }),
+      now: () => NOW,
+    }),
+  };
+}
 
 function services({ readCanonicalExerciseRegistry = null } = {}) {
   const runtime = createPhase5SyntheticRuntime();
