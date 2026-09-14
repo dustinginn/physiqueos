@@ -25,6 +25,9 @@ struct HomeView: View {
     @State private var confidenceDetailPresentation: (confidence: Int, detail: ConfidenceDetail)?
     @State private var completingPriorityIDs: Set<String> = []
     @State private var completionError: String?
+#if DEBUG
+    @State private var showingNotificationDiagnostics = false
+#endif
     var onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -36,6 +39,20 @@ struct HomeView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
+#if DEBUG
+        // Debug-only entry point to `NotificationDiagnosticsView` — not a
+        // production affordance, so a long-press rather than a visible
+        // button. Long-press anywhere on Home rather than a specific
+        // element so it works regardless of what's currently loaded.
+        .onLongPressGesture(minimumDuration: 1.5) { showingNotificationDiagnostics = true }
+        .sheet(isPresented: $showingNotificationDiagnostics) {
+            if case .loaded(let home) = viewModel?.state {
+                NotificationDiagnosticsView(items: home.todaysFocus)
+            } else {
+                NotificationDiagnosticsView(items: [])
+            }
+        }
+#endif
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = HomeViewModel(
@@ -94,8 +111,31 @@ struct HomeView: View {
               case .loaded(let home) = viewModel?.state
         else { return }
         let center = UNUserNotificationCenter.current()
+        // A no-op after the Founder's first decision (iOS never re-prompts
+        // once authorized/denied) — this remains the natural first point
+        // scheduling becomes possible, rather than a separate settings
+        // screen. The resulting status is what actually gates `sync`
+        // below, and is published to `environment` so Home can show a
+        // visible notice on denial instead of silently scheduling nothing.
         _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-        await PriorityNotificationScheduler.sync(items: home.todaysFocus, center: center)
+        environment.notificationAuthorizationStatus = await PriorityNotificationScheduler.sync(items: home.todaysFocus, center: center)
+    }
+
+    /// Whether at least one of today's focus items would actually have
+    /// gotten a local notification if authorization were granted — the
+    /// same eligibility `PriorityNotificationScheduler.reconciliationPlan`
+    /// applies, so the denial notice only appears when denial is actually
+    /// costing the Founder a reminder, never as unconditional noise.
+    private func hasScheduleableFocusItem(_ items: [PriorityOccurrence]) -> Bool {
+        let now = Date()
+        return items.contains { item in
+            guard !item.completed,
+                  let action = item.notificationAction,
+                  let scheduledTime = action.scheduledTime,
+                  let fireDate = PriorityNotificationScheduler.fireDate(scheduledTime, occurrenceDate: item.date, calendar: .current)
+            else { return false }
+            return fireDate > now
+        }
     }
 
     private func prefetchLikelyDestinations() async {
@@ -152,6 +192,9 @@ struct HomeView: View {
                 GoalsCardView(goals: home.goals, onTap: onNavigate)
 
                 if home.hasTodaysFocus {
+                    if environment.notificationAuthorizationStatus == .denied, hasScheduleableFocusItem(home.todaysFocus) {
+                        NotificationsDisabledNotice()
+                    }
                     TodaysFocusCardView(items: home.todaysFocus, completingIDs: completingPriorityIDs, onTap: onNavigate) { occurrence in
                         guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: environment.nativeAuthority)) != nil else { return }
                         completingPriorityIDs.insert(occurrence.id)
@@ -213,4 +256,25 @@ private struct ConfidenceDetailPresentation: Identifiable {
     let confidence: Int
     let detail: ConfidenceDetail
     var id: String { detail.qualitativeLevel + String(confidence) }
+}
+
+/// Shown on Home instead of silently scheduling nothing when the Founder
+/// has denied notification permission and at least one of today's
+/// priorities would otherwise have gotten a reminder — the visible/
+/// diagnostic failure state this feature must show rather than letting
+/// priorities display as if reminders were active while none are pending.
+private struct NotificationsDisabledNotice: View {
+    var body: some View {
+        CardContainer(padding: .sm) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "bell.slash.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Text("Notifications are off, so scheduled priority reminders won't fire. Enable them in Settings to get reminded.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+        }
+        .accessibilityIdentifier("home.notificationsDisabledNotice")
+    }
 }

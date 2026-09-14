@@ -95,6 +95,8 @@
 		0000000000000000000010AC /* PriorityNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AB /* PriorityNotificationScheduler.swift */; };
 		0000000000000000000010AE /* PriorityNotificationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AD /* PriorityNotificationDelegate.swift */; };
 		0000000000000000000010B0 /* EvidenceReviewReadyNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AF /* EvidenceReviewReadyNotifier.swift */; };
+		00000000000000000000125B /* NotificationDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000125C /* NotificationDiagnostics.swift */; };
+		00000000000000000000125D /* NotificationDiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000125E /* NotificationDiagnosticsView.swift */; };
 		0000000000000000000010B2 /* PhysiqueOSTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B1 /* PhysiqueOSTheme.swift */; };
 		0000000000000000000010B4 /* HomeGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B3 /* HomeGreeting.swift */; };
 		0000000000000000000010B6 /* IconBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B5 /* IconBadge.swift */; };
@@ -278,6 +280,8 @@
 		000000000000000000001219 /* FounderServerAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001218 /* FounderServerAPITests.swift */; };
 		00000000000000000000121B /* EvidenceAttachmentContentTypeProbeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000121A /* EvidenceAttachmentContentTypeProbeTests.swift */; };
 		00000000000000000000121D /* PriorityNotificationSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000121C /* PriorityNotificationSchedulerTests.swift */; };
+		00000000000000000000125F /* PriorityOccurrenceCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001260 /* PriorityOccurrenceCalculatorTests.swift */; };
+		000000000000000000001261 /* NotificationDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001262 /* NotificationDiagnosticsTests.swift */; };
 		00000000000000000000124D /* TrainingAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000124C /* TrainingAcceptanceUITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -387,6 +391,8 @@
 		0000000000000000000010AB /* PriorityNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationScheduler.swift"; sourceTree = "<group>"; };
 		0000000000000000000010AD /* PriorityNotificationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationDelegate.swift"; sourceTree = "<group>"; };
 		0000000000000000000010AF /* EvidenceReviewReadyNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReviewReadyNotifier.swift"; sourceTree = "<group>"; };
+		00000000000000000000125C /* NotificationDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NotificationDiagnostics.swift"; sourceTree = "<group>"; };
+		00000000000000000000125E /* NotificationDiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NotificationDiagnosticsView.swift"; sourceTree = "<group>"; };
 		0000000000000000000010B1 /* PhysiqueOSTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSTheme.swift"; sourceTree = "<group>"; };
 		0000000000000000000010B3 /* HomeGreeting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeGreeting.swift"; sourceTree = "<group>"; };
 		0000000000000000000010B5 /* IconBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IconBadge.swift"; sourceTree = "<group>"; };
@@ -571,6 +577,8 @@
 		000000000000000000001218 /* FounderServerAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderServerAPITests.swift"; sourceTree = "<group>"; };
 		00000000000000000000121A /* EvidenceAttachmentContentTypeProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceAttachmentContentTypeProbeTests.swift"; sourceTree = "<group>"; };
 		00000000000000000000121C /* PriorityNotificationSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationSchedulerTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001260 /* PriorityOccurrenceCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityOccurrenceCalculatorTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001262 /* NotificationDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NotificationDiagnosticsTests.swift"; sourceTree = "<group>"; };
 		00000000000000000000124C /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		000000000000000000001236 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000001237 /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -721,6 +729,7 @@
 				0000000000000000000010AB /* PriorityNotificationScheduler.swift */,
 				0000000000000000000010AD /* PriorityNotificationDelegate.swift */,
 				0000000000000000000010AF /* EvidenceReviewReadyNotifier.swift */,
+				00000000000000000000125C /* NotificationDiagnostics.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -901,6 +910,7 @@
 				0000000000000000000010F9 /* TodaysFocusCardView.swift */,
 				0000000000000000000010FB /* PriorityDetailView.swift */,
 				0000000000000000000010FD /* PriorityDetailViewModel.swift */,
+				00000000000000000000125E /* NotificationDiagnosticsView.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -1044,6 +1054,8 @@
 				000000000000000000001218 /* FounderServerAPITests.swift */,
 				00000000000000000000121A /* EvidenceAttachmentContentTypeProbeTests.swift */,
 				00000000000000000000121C /* PriorityNotificationSchedulerTests.swift */,
+				000000000000000000001260 /* PriorityOccurrenceCalculatorTests.swift */,
+				000000000000000000001262 /* NotificationDiagnosticsTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1311,6 +1323,8 @@
 				0000000000000000000010AC /* PriorityNotificationScheduler.swift in Sources */,
 				0000000000000000000010AE /* PriorityNotificationDelegate.swift in Sources */,
 				0000000000000000000010B0 /* EvidenceReviewReadyNotifier.swift in Sources */,
+				00000000000000000000125B /* NotificationDiagnostics.swift in Sources */,
+				00000000000000000000125D /* NotificationDiagnosticsView.swift in Sources */,
 				0000000000000000000010B2 /* PhysiqueOSTheme.swift in Sources */,
 				0000000000000000000010B4 /* HomeGreeting.swift in Sources */,
 				0000000000000000000010B6 /* IconBadge.swift in Sources */,
@@ -1482,6 +1496,8 @@
 				000000000000000000001219 /* FounderServerAPITests.swift in Sources */,
 				00000000000000000000121B /* EvidenceAttachmentContentTypeProbeTests.swift in Sources */,
 				00000000000000000000121D /* PriorityNotificationSchedulerTests.swift in Sources */,
+				00000000000000000000125F /* PriorityOccurrenceCalculatorTests.swift in Sources */,
+				000000000000000000001261 /* NotificationDiagnosticsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

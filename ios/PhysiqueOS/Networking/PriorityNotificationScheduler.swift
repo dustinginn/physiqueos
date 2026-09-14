@@ -12,8 +12,11 @@ import UserNotifications
 /// time Home is read, without this type needing to know how completion
 /// happened.
 enum PriorityNotificationScheduler {
-    private static let scheduledPrefix = "priority.scheduled."
-    private static let snoozedPrefix = "priority.snoozed."
+    // Internal (not private) so `NotificationDiagnostics` can classify live
+    // pending requests by the same prefixes `sync` itself uses, without a
+    // second hardcoded copy of these strings.
+    static let scheduledPrefix = "priority.scheduled."
+    static let snoozedPrefix = "priority.snoozed."
     static let snoozeInterval: TimeInterval = 3600
 
     static func identifier(priorityId: String, occurrenceDate: String) -> String {
@@ -24,14 +27,30 @@ enum PriorityNotificationScheduler {
         "\(snoozedPrefix)\(priorityId).\(occurrenceDate)"
     }
 
+    /// Pure authorization gate, extracted so "authorization denied means no
+    /// silent scheduling" is directly testable without a live
+    /// `UNUserNotificationCenter` (authorization can't be granted
+    /// programmatically in a test).
+    static func canSchedule(authorizationStatus: UNAuthorizationStatus) -> Bool {
+        authorizationStatus == .authorized || authorizationStatus == .provisional
+    }
+
+    /// Any identifiers whose `center.add()` call failed on the most recent
+    /// `sync()` — `sync` stays best-effort (one failed add must not block
+    /// the others), so this exists purely so `NotificationDiagnostics` (and
+    /// a debugger) can see what would otherwise be silently swallowed.
+    @MainActor static private(set) var lastSyncFailures: [(identifier: String, error: Error)] = []
+
+    @MainActor
+    @discardableResult
     static func sync(
         items: [PriorityOccurrence],
         now: Date = Date(),
         calendar: Calendar = .current,
         center: UNUserNotificationCenter = .current()
-    ) async {
+    ) async -> UNAuthorizationStatus {
         let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+        guard canSchedule(authorizationStatus: settings.authorizationStatus) else { return settings.authorizationStatus }
 
         let pending = await center.pendingNotificationRequests()
         let existingScheduledIds = Set(pending.map(\.identifier).filter { $0.hasPrefix(scheduledPrefix) })
@@ -41,9 +60,16 @@ enum PriorityNotificationScheduler {
         // `add` replaces any existing request with the same identifier in
         // place (e.g. the canonical schedule's time changed) — no separate
         // "already scheduled, skip" branch is needed for correctness.
+        var failures: [(identifier: String, error: Error)] = []
         for request in plan.toAdd {
-            try? await center.add(request)
+            do {
+                try await center.add(request)
+            } catch {
+                failures.append((request.identifier, error))
+            }
         }
+        lastSyncFailures = failures
+        return settings.authorizationStatus
     }
 
     /// The actual reconciliation decision, factored out as a pure function
@@ -139,7 +165,19 @@ enum PriorityNotificationScheduler {
         content.sound = .default
         content.categoryIdentifier = PriorityNotificationCategory.category(for: action.classification)
         content.userInfo = userInfo(for: item, action: action)
-        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        var components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        // `Calendar.dateComponents(_:from:)` only populates the component
+        // fields actually requested — it does NOT carry `timeZone` along
+        // unless `.timeZone` is itself requested. Left unset,
+        // `UNCalendarNotificationTrigger` falls back to interpreting these
+        // bare hour/minute numbers in `Calendar.current` AT THE MOMENT IT
+        // EVALUATES the trigger — which only happens to match what this
+        // function intended when `calendar` passed in is ALSO `.current`
+        // and the device's time zone hasn't changed between scheduling and
+        // firing. Setting it explicitly makes the trigger self-contained
+        // and correct regardless of either of those, rather than correct
+        // only by the coincidence of both.
+        components.timeZone = calendar.timeZone
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         return UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
     }
@@ -156,6 +194,9 @@ enum PriorityNotificationScheduler {
             "priorityId": item.routePriorityId ?? item.id,
             "occurrenceDate": item.date,
         ]
+        if let scheduledTime = action.scheduledTime {
+            info["canonicalScheduledTime"] = scheduledTime
+        }
         if let destinationData = try? JSONEncoder().encode(item.destination) {
             info["destination"] = destinationData
         }

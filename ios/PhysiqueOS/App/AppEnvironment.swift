@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 
 enum NativeAPIEnvironment: String, CaseIterable, Identifiable, Sendable, Hashable {
     case sandbox
@@ -166,6 +167,12 @@ final class AppEnvironment {
     /// so a review that becomes ready while the Founder is already looking
     /// at it never produces a redundant notification.
     var currentlyViewingReviewId: String?
+    /// Set after every `PriorityNotificationScheduler.sync` call — lets
+    /// Home show a visible notice when the Founder denied notification
+    /// permission, rather than silently scheduling nothing while priorities
+    /// still display as if reminders were active. `.notDetermined` means
+    /// sync hasn't run yet this launch (nothing to report either way).
+    var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
     private let authoritySelectionStore: NativeAuthoritySelectionStore
     private let sandboxHomeAPI: HomeAPI
     private let sandboxGoalsAPI: GoalsAPI

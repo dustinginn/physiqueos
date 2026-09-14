@@ -147,11 +147,108 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertEqual(plan.toRemove, [staleIdentifier])
     }
 
+    /// The Build 32 physical-device investigation's leading finding: the
+    /// server's `resolveScheduledTime` can resolve to `null` for a
+    /// `timeOfDay` value that still displays correctly elsewhere (an
+    /// asymmetry proven separately against the server's own source). This
+    /// proves the Native-side CONSEQUENCE of that in isolation: when
+    /// `notificationAction.scheduledTime` is nil, no request is created —
+    /// silently, with no error — reproducing "Home shows the correct time
+    /// but no notification ever fires" exactly.
+    func testNilCanonicalScheduledTimeSilentlySkipsSchedulingRatherThanGuessing() {
+        let item = Self.foamRolling(scheduledTime: nil)
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [item], existingScheduledIdentifiers: [], now: Self.referenceNow, calendar: utc
+        )
+        XCTAssertTrue(plan.toAdd.isEmpty)
+        XCTAssertTrue(plan.toRemove.isEmpty)
+    }
+
+    func testSameDayFutureScheduledTimeCreatesARequest() {
+        // referenceNow is 2026-09-13T05:00:00Z; 07:00 the same day is future.
+        let item = Self.foamRolling(scheduledTime: "07:00")
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [item], existingScheduledIdentifiers: [], now: Self.referenceNow, calendar: utc
+        )
+        XCTAssertEqual(plan.toAdd.count, 1)
+    }
+
+    func testSameDayPastScheduledTimeIsSkippedRatherThanFiringImmediately() {
+        // referenceNow is 2026-09-13T05:00:00Z; 02:00 the same day already
+        // passed — must not schedule a notification that would fire the
+        // instant it's added (or not fire at all, depending on iOS's own
+        // handling of a past trigger), and must not be silently treated as
+        // "tomorrow" either.
+        let item = Self.foamRolling(scheduledTime: "02:00")
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [item], existingScheduledIdentifiers: [], now: Self.referenceNow, calendar: utc
+        )
+        XCTAssertTrue(plan.toAdd.isEmpty)
+    }
+
+    func testAuthorizationDeniedOrNotDeterminedPreventsScheduling() {
+        XCTAssertFalse(PriorityNotificationScheduler.canSchedule(authorizationStatus: .denied))
+        XCTAssertFalse(PriorityNotificationScheduler.canSchedule(authorizationStatus: .notDetermined))
+    }
+
+    func testAuthorizationGrantedOrProvisionalAllowsScheduling() {
+        XCTAssertTrue(PriorityNotificationScheduler.canSchedule(authorizationStatus: .authorized))
+        XCTAssertTrue(PriorityNotificationScheduler.canSchedule(authorizationStatus: .provisional))
+    }
+
+    /// Snooze and canonical requests must never be confused by cleanup: a
+    /// snoozed identifier for an occurrence that's no longer in `items` at
+    /// all (the common "past occurrence" case, since only TODAY's
+    /// occurrences ever appear in `items`) is untouched by reconciliation —
+    /// `toRemove` only ever targets the `scheduledPrefix` set it was given.
+    func testReconciliationNeverTargetsASnoozeIdentifierItWasNotToldAbout() {
+        let snoozeIdentifier = PriorityNotificationScheduler.snoozeIdentifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-12")
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [], existingScheduledIdentifiers: [], now: Self.referenceNow, calendar: utc
+        )
+        XCTAssertFalse(plan.toRemove.contains(snoozeIdentifier))
+    }
+
+    /// A valid, freshly-created request must never be removed by the very
+    /// same reconciliation pass that just created it — re-running
+    /// reconciliation with the identical item and the identifier it
+    /// produced last time (simulating the app now knowing it's pending)
+    /// must leave it alone.
+    func testReconciliationDoesNotDeleteTheValidRequestItJustCreated() throws {
+        let item = Self.foamRolling(scheduledTime: "07:00")
+        let firstPlan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [item], existingScheduledIdentifiers: [], now: Self.referenceNow, calendar: utc
+        )
+        let identifier = try XCTUnwrap(firstPlan.toAdd.first?.identifier)
+
+        let secondPlan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [item], existingScheduledIdentifiers: [identifier], now: Self.referenceNow, calendar: utc
+        )
+        XCTAssertFalse(secondPlan.toRemove.contains(identifier))
+    }
+
+    /// `fireDate` must resolve the Founder's own local wall-clock hour in
+    /// whatever real time zone `calendar` carries — not a hardcoded offset.
+    /// Proven here against a genuine named zone distinct from UTC, so this
+    /// only passes if the calendar argument is actually honored.
+    func testFireDateResolvesTheHourInTheGivenTimeZoneNotUTC() throws {
+        var pacific = Calendar(identifier: .gregorian)
+        pacific.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let date = try XCTUnwrap(PriorityNotificationScheduler.fireDate("08:40", occurrenceDate: "2026-09-14", calendar: pacific))
+        let components = pacific.dateComponents([.hour, .minute], from: date)
+        XCTAssertEqual(components.hour, 8)
+        XCTAssertEqual(components.minute, 40)
+        // The same instant read back in UTC is a different wall-clock hour
+        // (Pacific is behind UTC) — proving the fire instant is genuinely
+        // anchored to the Pacific interpretation, not incidentally correct.
+        XCTAssertNotEqual(utc.component(.hour, from: date), 8)
+    }
+
     // MARK: - Fixtures
 
     private static let referenceNow = ISO8601DateFormatter().date(from: "2026-09-13T05:00:00Z")!
 
-    private static func foamRolling(scheduledTime: String, completed: Bool = false) -> PriorityOccurrence {
+    private static func foamRolling(scheduledTime: String?, completed: Bool = false) -> PriorityOccurrence {
         PriorityOccurrence(
             id: "reminder_foam_roll",
             executionItemId: "reminder_foam_roll",

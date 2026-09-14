@@ -114,6 +114,7 @@ app_files = [
     ("Networking", "PriorityNotificationScheduler.swift"),
     ("Networking", "PriorityNotificationDelegate.swift"),
     ("Networking", "EvidenceReviewReadyNotifier.swift"),
+    ("Networking", "NotificationDiagnostics.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "HomeGreeting.swift"),
     ("SharedUI", "IconBadge.swift"),
@@ -153,6 +154,7 @@ app_files = [
     ("Presentation/Home", "TodaysFocusCardView.swift"),
     ("Presentation/Home", "PriorityDetailView.swift"),
     ("Presentation/Home", "PriorityDetailViewModel.swift"),
+    ("Presentation/Home", "NotificationDiagnosticsView.swift"),
     ("Presentation/Briefings", "BriefingHistoryView.swift"),
     ("Presentation/Briefings", "BriefingDetailView.swift"),
     ("Presentation/Briefings", "WeeklyBriefingSections.swift"),
@@ -317,6 +319,8 @@ test_files = [
     ("PhysiqueOSTests", "FounderServerAPITests.swift"),
     ("PhysiqueOSTests", "EvidenceAttachmentContentTypeProbeTests.swift"),
     ("PhysiqueOSTests", "PriorityNotificationSchedulerTests.swift"),
+    ("PhysiqueOSTests", "PriorityOccurrenceCalculatorTests.swift"),
+    ("PhysiqueOSTests", "NotificationDiagnosticsTests.swift"),
 ]
 
 ui_test_files = [
