@@ -275,7 +275,16 @@ async function executeEvidenceReviewConfirmation(formData, {
   });
   const supportsDurableCommitClaims = typeof FounderRepositories.evidenceReviews
     .claimEvidenceReviewCommit === "function";
-  if (nativeStart && supportsDurableCommitClaims) {
+  // A Training confirmation is the one case where Native's own UI tells the
+  // Founder "Workout logged" the instant this request returns — that claim
+  // must not outrun the canonical TrainingSession actually existing. Every
+  // other native evidence type (Nutrition/Activity/DEXA/Photos) keeps the
+  // original zero-synchronous-steps behavior below: Native isn't held open
+  // for canonical_commit, and nothing here asked for those to change.
+  const isTrainingConfirmation = committedPackage.evidence_objects.some(
+    (item) => item.evidence_type === "training"
+  );
+  if (nativeStart && supportsDurableCommitClaims && !isTrainingConfirmation) {
     // `beginCommit` persisted the exact reviewed package and an owned claim.
     // Release it transactionally so the repository enqueues the first durable
     // continuation. Native is no longer held open while canonical_commit

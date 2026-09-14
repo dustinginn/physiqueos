@@ -783,11 +783,21 @@ describe("confirmEvidenceReview", () => {
     mockState.value = createIsolatedReviewState(runtimeStore);
   });
 
-  it("returns Native at the durable claim boundary before canonical work", async () => {
+  it("returns Native at the durable claim boundary before canonical work, for a NON-Training review", async () => {
+    // This fixture (evidence_review_20260727161133407, see
+    // createIsolatedReviewState) is a Training review — reassign it to a
+    // non-Training evidence type so this test exercises the still-fully-
+    // async path every other native evidence type keeps.
     const review = mockState.value.evidenceReviews[0];
     review.status = "pending";
     review.commitProgress = {};
     review.commitClaim = null;
+    review.interpretedEvidence = {
+      ...review.interpretedEvidence,
+      evidence_objects: (review.interpretedEvidence.evidence_objects ?? [])
+        .filter((item) => item.evidence_type !== "training")
+        .concat([{ id: "nutrition-fixture-one", evidence_type: "nutrition" }]),
+    };
 
     const result = await beginNativeEvidenceReviewConfirmation({
       reviewId: review.id,
@@ -806,6 +816,44 @@ describe("confirmEvidenceReview", () => {
       status: "committing",
       commitClaim: { status: "available", operationId: "native-confirm:command-one" },
       commitProgress: {},
+    });
+  });
+
+  // Build 33: a Training confirmation is the one native evidence type where
+  // Native's own "Workout logged" UI must not outrun the canonical
+  // TrainingSession actually existing. `canonical_commit` — the SAME first
+  // orchestration step the non-native background path already runs
+  // synchronously (maxSteps: 1) — now also runs before this call returns,
+  // instead of deferring even that first step to the async worker. Every
+  // other native evidence type (see the test above) is unaffected.
+  //
+  // NOTE: I could not execute this test locally — this suite's fixture
+  // (`private/founder/runtime-store.json`) is a private, environment-local
+  // file not present in this checkout (the same pre-existing gap noted
+  // throughout this session). The assertions below are derived by precise
+  // reading of PostConfirmationOrchestrator.run and the native confirmation
+  // branch in actions.js, not confirmed by running this suite — flagged
+  // honestly rather than claimed as verified.
+  it("Build 33: runs canonical_commit synchronously for a Training review before returning to Native", async () => {
+    const review = mockState.value.evidenceReviews[0];
+    review.status = "pending";
+    review.commitProgress = {};
+    review.commitClaim = null;
+
+    const result = await beginNativeEvidenceReviewConfirmation({
+      reviewId: review.id,
+      confirmedBy: mockState.value.user.id,
+      operationId: "native-confirm:command-training",
+    });
+
+    expect(result).toMatchObject({
+      state: "processing",
+      reviewId: review.id,
+      completedStep: "canonical_commit",
+    });
+    expect(mockState.value.canonicalCommitCalls).toBe(1);
+    expect(mockState.value.evidenceReviews[0].commitProgress?.canonical_commit).toMatchObject({
+      status: "completed",
     });
   });
 
