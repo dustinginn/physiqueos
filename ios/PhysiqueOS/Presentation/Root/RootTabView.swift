@@ -74,6 +74,31 @@ struct RootTabView: View {
             .tag(AppTab.you)
         }
         .tint(PhysiqueOSTheme.accent)
+        .onChange(of: environment.pendingNotificationDestination) { _, destination in
+            guard let destination else { return }
+            openFromNotification(destination)
+        }
+        .task {
+            if let destination = environment.pendingNotificationDestination {
+                openFromNotification(destination)
+            }
+        }
+    }
+
+    /// A priority notification always opens on Home's stack — priorities
+    /// are Home's own surface, and Home is where the underlying data (and
+    /// its own completion animation, deep-link or not) already lives.
+    /// Same tab-switch-then-clear-stack pattern as `returnToLog`/
+    /// `returnToHome`, so a stale push from whatever the Founder was doing
+    /// before the notification arrived is never left behind.
+    private func openFromNotification(_ destination: AppDestination) {
+        selectedTab = .home
+        environment.pendingNotificationDestination = nil
+        Task { @MainActor in
+            await Task.yield()
+            homePath = NavigationPath()
+            homePath.append(destination)
+        }
     }
 
     private func returnToLog() {

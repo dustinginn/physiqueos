@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// The real Stage 1 Home screen: the daily cockpit answering "Am I on
 /// track?" and "What matters most today?" (docs/INFORMATION_ARCHITECTURE.md).
@@ -48,6 +49,7 @@ struct HomeView: View {
             }
             await viewModel?.load()
             await prefetchLikelyDestinations()
+            await syncPriorityNotifications()
         }
         .refreshable {
             if environment.nativeAuthority == .founderProduction {
@@ -55,10 +57,14 @@ struct HomeView: View {
             }
             await viewModel?.load()
             await prefetchLikelyDestinations()
+            await syncPriorityNotifications()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            Task { await viewModel?.load() }
+            Task {
+                await viewModel?.load()
+                await syncPriorityNotifications()
+            }
         }
         .alert("Priority could not be completed", isPresented: Binding(
             get: { completionError != nil },
@@ -74,6 +80,22 @@ struct HomeView: View {
         )) { presentation in
             ConfidenceDetailSheet(confidence: presentation.confidence, detail: presentation.detail)
         }
+    }
+
+    /// Reconciles locally-scheduled priority notifications against the
+    /// just-loaded canonical Home read. Authorization is requested here
+    /// (a no-op after the Founder's first decision) rather than gating
+    /// behind a separate settings screen — this is the natural point
+    /// notification scheduling first becomes possible. A denied/not-yet-
+    /// decided authorization simply means `sync` schedules nothing; there
+    /// is no separate error state to show for that.
+    private func syncPriorityNotifications() async {
+        guard environment.nativeAuthority == .founderProduction,
+              case .loaded(let home) = viewModel?.state
+        else { return }
+        let center = UNUserNotificationCenter.current()
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+        await PriorityNotificationScheduler.sync(items: home.todaysFocus, center: center)
     }
 
     private func prefetchLikelyDestinations() async {

@@ -153,6 +153,13 @@ final class UserDefaultsNativeAuthoritySelectionStore: NativeAuthoritySelectionS
 @Observable
 final class AppEnvironment {
     private(set) var nativeAuthority: NativeAPIEnvironment
+    /// Set by `PriorityNotificationDelegate` when the Founder taps a
+    /// priority notification (or its default action). `RootTabView`
+    /// observes this and clears it once consumed — the one deliberate
+    /// exception to "views own their own navigation state" in this app,
+    /// since a notification response can arrive before any view exists to
+    /// receive it directly (cold launch).
+    var pendingNotificationDestination: AppDestination?
     private let authoritySelectionStore: NativeAuthoritySelectionStore
     private let sandboxHomeAPI: HomeAPI
     private let sandboxGoalsAPI: GoalsAPI

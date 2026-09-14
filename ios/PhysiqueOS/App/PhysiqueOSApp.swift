@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// Application entry point and composition root.
 ///
@@ -9,6 +10,7 @@ import SwiftUI
 @main
 struct PhysiqueOSApp: App {
     @State private var environment = AppEnvironment()
+    @State private var notificationDelegate = PriorityNotificationDelegate()
 
     var body: some Scene {
         WindowGroup {
@@ -23,6 +25,16 @@ struct PhysiqueOSApp: App {
                 // own light/dark setting instead, mismatching every
                 // custom-drawn view.
                 .preferredColorScheme(.dark)
+                .task {
+                    // The delegate is injected once, here, rather than
+                    // captured at scheduling time — a notification response
+                    // can arrive well after whatever scheduled it. Category
+                    // registration is idempotent and cheap enough to redo on
+                    // every launch rather than tracking whether it's needed.
+                    notificationDelegate.environment = environment
+                    UNUserNotificationCenter.current().delegate = notificationDelegate
+                    PriorityNotificationCategoryRegistrar.registerCategories()
+                }
         }
     }
 }

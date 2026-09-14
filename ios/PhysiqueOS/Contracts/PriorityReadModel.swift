@@ -226,6 +226,14 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     /// this Morning Check-In occurrence. It is intentionally occurrence-
     /// bound and never populated from a generic latest/today read.
     var relatedWeight: PriorityRelatedWeight? = nil
+    /// Server-owned notification classification/timing
+    /// (`resolveNotificationAction`/`specializedNotificationAction`/
+    /// `openOnlyNotificationAction` in `ReminderOccurrenceCompletion.js`).
+    /// Native must never re-derive whether an occurrence is safe to
+    /// complete directly from a notification, nor invent its own
+    /// notification schedule — both come from here. `nil` under Sandbox,
+    /// which has no wire equivalent.
+    var notificationAction: PriorityNotificationAction? = nil
 
     var destination: AppDestination {
         if sessionItems != nil, id == "morning-check-in" {
@@ -257,6 +265,39 @@ struct PriorityRelatedWeight: Codable, Equatable {
     var value: Double
     var unit: String
     var version: Int?
+}
+
+/// Mirrors the server's `notificationAction` shape exactly
+/// (`ReminderOccurrenceCompletion.js`). `classification` decides which
+/// iOS notification actions (if any) are safe to offer; `completionCommand`
+/// is only ever present when `classification == "direct_completion_allowed"`
+/// and is submitted verbatim, unchanged, by the exact same
+/// `priority.complete.v1` path Native's in-app completion already uses.
+struct PriorityNotificationAction: Codable, Equatable {
+    enum Classification: String, Codable {
+        case openOnly = "open_only"
+        case directCompletionAllowed = "direct_completion_allowed"
+        case specializedWorkflowRequired = "specialized_workflow_required"
+    }
+
+    var classification: Classification
+    /// Canonical "HH:mm" (24-hour, already resolved server-side from
+    /// whatever raw schedule value — exact time or a named daypart bucket
+    /// — the underlying reminder/execution item carries). `nil` means
+    /// nothing schedulable is known; Native must not invent a time.
+    var scheduledTime: String?
+    var completionCommand: PriorityNotificationCompletionCommand?
+}
+
+struct PriorityNotificationCompletionCommand: Codable, Equatable {
+    var commandType: String
+    var expectedVersion: Int
+    var payload: PriorityNotificationCompletionPayload
+}
+
+struct PriorityNotificationCompletionPayload: Codable, Equatable {
+    var priorityId: String
+    var occurrenceDate: String
 }
 
 /// One `priority` resource `sections[]` entry (`PriorityDetailService.js`).

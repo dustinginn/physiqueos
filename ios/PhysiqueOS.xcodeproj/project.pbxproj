@@ -68,6 +68,9 @@
 		000000000000000000001076 /* ProductionEvidenceIntakePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001075 /* ProductionEvidenceIntakePipeline.swift */; };
 		000000000000000000001078 /* DEXAWriteAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001077 /* DEXAWriteAPI.swift */; };
 		00000000000000000000107A /* TrainingWriteAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001079 /* TrainingWriteAPI.swift */; };
+		000000000000000000001252 /* PriorityNotificationCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001251 /* PriorityNotificationCategories.swift */; };
+		000000000000000000001254 /* PriorityNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001253 /* PriorityNotificationScheduler.swift */; };
+		000000000000000000001256 /* PriorityNotificationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001255 /* PriorityNotificationDelegate.swift */; };
 		00000000000000000000107C /* DailyEvidenceWriteAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000107B /* DailyEvidenceWriteAPI.swift */; };
 		00000000000000000000107E /* DEXAAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000107D /* DEXAAPI.swift */; };
 		000000000000000000001080 /* PhotosAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000107F /* PhotosAPI.swift */; };
@@ -258,6 +261,7 @@
 		0000000000000000000011F1 /* EvidenceReviewHeaderDateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011F0 /* EvidenceReviewHeaderDateTests.swift */; };
 		0000000000000000000011F3 /* EvidenceHubUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011F2 /* EvidenceHubUsageTests.swift */; };
 		0000000000000000000011F5 /* TrainingReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011F4 /* TrainingReadModelTests.swift */; };
+		000000000000000000001258 /* PriorityNotificationSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001257 /* PriorityNotificationSchedulerTests.swift */; };
 		0000000000000000000011F7 /* TrainingLibraryCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011F6 /* TrainingLibraryCatalogTests.swift */; };
 		0000000000000000000011F9 /* ActivityReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011F8 /* ActivityReadModelTests.swift */; };
 		0000000000000000000011FB /* NutritionReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011FA /* NutritionReadModelTests.swift */; };
@@ -355,6 +359,9 @@
 		000000000000000000001075 /* ProductionEvidenceIntakePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProductionEvidenceIntakePipeline.swift"; sourceTree = "<group>"; };
 		000000000000000000001077 /* DEXAWriteAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAWriteAPI.swift"; sourceTree = "<group>"; };
 		000000000000000000001079 /* TrainingWriteAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingWriteAPI.swift"; sourceTree = "<group>"; };
+		000000000000000000001251 /* PriorityNotificationCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationCategories.swift"; sourceTree = "<group>"; };
+		000000000000000000001253 /* PriorityNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationScheduler.swift"; sourceTree = "<group>"; };
+		000000000000000000001255 /* PriorityNotificationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationDelegate.swift"; sourceTree = "<group>"; };
 		00000000000000000000107B /* DailyEvidenceWriteAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyEvidenceWriteAPI.swift"; sourceTree = "<group>"; };
 		00000000000000000000107D /* DEXAAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAAPI.swift"; sourceTree = "<group>"; };
 		00000000000000000000107F /* PhotosAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotosAPI.swift"; sourceTree = "<group>"; };
@@ -546,6 +553,7 @@
 		0000000000000000000011F0 /* EvidenceReviewHeaderDateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReviewHeaderDateTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000011F2 /* EvidenceHubUsageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceHubUsageTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000011F4 /* TrainingReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingReadModelTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001257 /* PriorityNotificationSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityNotificationSchedulerTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000011F6 /* TrainingLibraryCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryCatalogTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000011F8 /* ActivityReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityReadModelTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000011FA /* NutritionReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReadModelTests.swift"; sourceTree = "<group>"; };
@@ -685,6 +693,9 @@
 				000000000000000000001075 /* ProductionEvidenceIntakePipeline.swift */,
 				000000000000000000001077 /* DEXAWriteAPI.swift */,
 				000000000000000000001079 /* TrainingWriteAPI.swift */,
+				000000000000000000001251 /* PriorityNotificationCategories.swift */,
+				000000000000000000001253 /* PriorityNotificationScheduler.swift */,
+				000000000000000000001255 /* PriorityNotificationDelegate.swift */,
 				00000000000000000000107B /* DailyEvidenceWriteAPI.swift */,
 				00000000000000000000107D /* DEXAAPI.swift */,
 				00000000000000000000107F /* PhotosAPI.swift */,
@@ -1014,6 +1025,7 @@
 				0000000000000000000011F0 /* EvidenceReviewHeaderDateTests.swift */,
 				0000000000000000000011F2 /* EvidenceHubUsageTests.swift */,
 				0000000000000000000011F4 /* TrainingReadModelTests.swift */,
+				000000000000000000001257 /* PriorityNotificationSchedulerTests.swift */,
 				0000000000000000000011F6 /* TrainingLibraryCatalogTests.swift */,
 				0000000000000000000011F8 /* ActivityReadModelTests.swift */,
 				0000000000000000000011FA /* NutritionReadModelTests.swift */,
@@ -1269,6 +1281,9 @@
 				000000000000000000001076 /* ProductionEvidenceIntakePipeline.swift in Sources */,
 				000000000000000000001078 /* DEXAWriteAPI.swift in Sources */,
 				00000000000000000000107A /* TrainingWriteAPI.swift in Sources */,
+				000000000000000000001252 /* PriorityNotificationCategories.swift in Sources */,
+				000000000000000000001254 /* PriorityNotificationScheduler.swift in Sources */,
+				000000000000000000001256 /* PriorityNotificationDelegate.swift in Sources */,
 				00000000000000000000107C /* DailyEvidenceWriteAPI.swift in Sources */,
 				00000000000000000000107E /* DEXAAPI.swift in Sources */,
 				000000000000000000001080 /* PhotosAPI.swift in Sources */,
@@ -1447,6 +1462,7 @@
 				0000000000000000000011F1 /* EvidenceReviewHeaderDateTests.swift in Sources */,
 				0000000000000000000011F3 /* EvidenceHubUsageTests.swift in Sources */,
 				0000000000000000000011F5 /* TrainingReadModelTests.swift in Sources */,
+				000000000000000000001258 /* PriorityNotificationSchedulerTests.swift in Sources */,
 				0000000000000000000011F7 /* TrainingLibraryCatalogTests.swift in Sources */,
 				0000000000000000000011F9 /* ActivityReadModelTests.swift in Sources */,
 				0000000000000000000011FB /* NutritionReadModelTests.swift in Sources */,
