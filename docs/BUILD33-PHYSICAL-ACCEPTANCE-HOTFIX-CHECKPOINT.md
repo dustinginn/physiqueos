@@ -274,3 +274,127 @@ Sep 14/historical candidates remain blocked on the bounded authenticated reads.
 Do not claim physical acceptance or deploy/upload yet. Physical priority
 notification delivery remains unproven. Running-app Review-ready fallback is
 accepted V1; terminated-app delivery remains deferred and is not a blocker.
+
+## Read-only audit-context follow-up
+
+The follow-up starts from Native `aca0c8b756b4bb29876aa63a37fbad2d0b25d90d`
+and server `20239744fc690278fc76cca86526fc8b753f4836`, with clean worktrees
+except the preserved server forensic script. The three proven hotfixes remain
+unchanged. Only documentation changed in this follow-up; no production records
+were copied into fixtures or diagnostic files.
+
+Every DigitalOcean network read used the explicit `physiqueos-audit` context.
+No default/global context was switched and the dead deploy context was not used.
+
+### Fresh authority proof
+
+App list and deployment metadata reads succeeded. Production is ACTIVE at
+deployment `d31fa175-9739-4613-ba26-ad81ddb4fdf1`, 9/9 successful steps, exact
+web and worker `source_commit_hash`:
+`6728505dd3452f212bee585c5a550f3cb4c7867b`. This supersedes the earlier inability
+to refresh deployment metadata; the embedded health identity is still ignored.
+
+### Safe production log findings
+
+A bounded 200-line web run-log read provides actual server evidence:
+
+- `core.navigation.operating-plan-protocol-domain` is followed by HTTP 500,
+  `INTERNAL_ERROR`, error class `RangeError`, at 2026-09-15T14:10:41.471Z and
+  2026-09-15T14:29:53.959Z.
+- Logger reads fail with HTTP 500 and error class `Error`, including
+  2026-09-15T14:29:20.514Z, consistent with the proven collection-routing defect.
+- Access-token expiry 401 entries also exist, but subsequent reads enter the
+  domain service and fail with 500. This is not evidence that the demonstrated
+  protocol-domain failure is simply missing authentication.
+
+The structured logger intentionally redacts exception messages. It does not
+include the protocolId in these failure records, so the available logs cannot
+independently assign a precise input/error to Recovery versus Peptides versus
+Supplements. No headers, tokens, cookies, or raw evidence contents were emitted.
+
+The demonstrated roll-up failure is server-side before successful HTTP
+serialization, not Native decoding. `getOperatingPlanProtocolDomain` passes
+the owner's raw timezone into `getLocalDateKey`; an invalid timezone can cause
+the observed `RangeError`. The existing `resolveLocalTimeZone` would normalize
+invalid input, but the production owner timezone has NOT been read. This is a
+specific hypothesis to test, not a proven input defect or a reason to guess a
+new patch. Neither legacy data nor canonical validation was changed.
+
+### Database inspection versus SQL authentication
+
+Database list identifies the existing PostgreSQL cluster
+`f544596d-594e-4aa4-a0a8-533bda0992c6` as online. Connection and existing-role
+metadata reads are allowed. However:
+
+- Connection response fields are protocol, URI, database, host, port, and SSL.
+- It supplies neither a username nor a password; its URI also has neither.
+- Existing roles are visible but have no supplied password.
+
+No connection URI, password, or token value was printed. No configuration,
+role, firewall, permission, console, or authentication mutation was attempted.
+Inspection permission therefore does not provide a usable authenticated SQL
+reader in this process. No broader DigitalOcean permission is requested.
+
+### Exact reads still blocked
+
+An existing approved SQL reader or a trusted operator's sanitized read-only
+results are required. These are the missing business reads, not additional
+DigitalOcean configuration operations:
+
+1. Founder canonical user timezone plus owner-scoped current recovery/peptide/
+   supplement protocol and current-version rows, linked execution rows,
+   relevant reminders, and lifecycle/revision fields. Execute the canonical
+   roll-up against that bounded snapshot with writes prohibited by PostgreSQL.
+2. Founder canonical Training records (including quality/supersession and
+   provenance) and linked observations for Sep 14 and the active historical
+   candidate scan. No cardio mutation; only read cardio context when needed
+   to demonstrate separation.
+3. Founder Logger-related intake/review/command receipts around the failed
+   attempts, to distinguish an earlier pending object from a failed bootstrap.
+
+Until those reads are available, exact root causes for each Operating Plan
+domain, Sep 14 identities/chronology, full historical candidate counts, and
+failed-attempt server objects remain unresolved. Candidate count is UNKNOWN,
+not zero. A screenshot plus metadata cannot replace canonical record inspection.
+
+### Proposed one-time reconciliation design — not implemented or executed
+
+After an actual candidate preview exists:
+
+1. READ ONLY / REPEATABLE READ preview runs the pure owner-scoped audit helper
+   and emits every eligible pair, every ambiguous exclusion, record versions,
+   payload digests, field-preservation summary, and before/after active counts.
+2. Founder explicitly authorizes that exact candidate list. A mutation must not
+   accept new candidates discovered after authorization.
+3. An owner-fenced PostgreSQL transaction locks the candidate records, re-reads
+   current active Training context, and revalidates unchanged versions/digests,
+   both-direction uniqueness, provenance, temporal/context compatibility, and
+   non-supersession. Any mismatch rolls back rather than guessing.
+4. Reuse the canonical forward merge transition; if it is not separately
+   callable for existing records, extract that transition with characterization
+   tests instead of fabricating a confirmation event or duplicating merge code.
+   Preview determines exact survivor/retired identities before authorization.
+5. Preserve structured exercises/sets/loads/variants/relationships and Apple
+   telemetry, all evidence provenance, existing performance linkage, and
+   supersession history. Recompute only affected canonical derived projections
+   through established idempotent mechanisms, proving no duplicated Activity
+   calories or Training volume/performance events.
+6. A stable owner + authorized-pair + digest identity makes replay return the
+   existing reconciliation result. Before/after record IDs and counts are
+   recorded atomically. Already reconciled pairs are safe no-ops; ambiguous
+   pairs never mutate. Any failure rolls back the complete transaction.
+
+This is a design requiring actual preview data and focused implementation tests,
+not a claim that a write-ready production repair has been built.
+
+### Follow-up validation and decision
+
+No behavioral source changed, so the prior 982 Native unit / 5 UI / 299 focused
+server / 151 Training / 109 persistence / 80 foundation and build results remain
+the validation of the exact preserved hotfix source. Documentation diff checks
+and authority/worktree checks are repeated at closeout. No expensive suite is
+presented as freshly rerun in this documentation-only follow-up.
+
+One coherent Build 34 release candidate is NOT yet ready: protected canonical
+reads are still necessary to finish diagnosis. Native remains 1.0 (33), no
+deployment/upload occurred, and production data remains untouched.
