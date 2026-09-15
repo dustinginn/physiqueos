@@ -56,7 +56,7 @@ Implementation classification does not substitute for Founder device acceptance.
 | 4 | Workout Complete polish | COMPLETE | Existing unified completion/performance presentation retained |
 | 5 | Upload auto-opens Review when quickly ready | COMPLETE | ProductionEvidenceUploadView bounded three-second follow-up routes to real review |
 | 6 | Fast evidence confirmation completes in-flow | COMPLETE | EvidenceReviewDetailView bounded authoritative confirmation follow-up |
-| 7 | Review-ready fallback notification | PARTIAL | Local running-app task suppresses viewed/confirmed reviews; terminated-app delivery is not implemented or proven; Founder scope clarification requested |
+| 7 | Review-ready fallback notification | ACCEPTED WITH DOCUMENTED V1 LIMITATION | Founder accepts delivery while the app/task remains alive; terminated-app delivery is deferred to future background-execution architecture; canonical durability is unaffected |
 | 8 | Nutrition macro colors in Review | COMPLETE | Existing semantic Calories/Protein/Carbs/Fat tokens |
 | 9 | Cached Home/Log/Evidence avoid blocking reloads | COMPLETE | Retained view models + cache-first canonical reads; no load-state reset on ordinary re-entry |
 | 10 | Date/time audit and fixes | COMPLETE | Calendar date vs instant boundaries, chronology/editor/notification regression suites; extreme-offset and fractional-date corrections |
@@ -83,7 +83,7 @@ Implementation classification does not substitute for Founder device acceptance.
 | 31 | No Confidence V3 / Narrative V3 integration | COMPLETE | Separate worktrees and architecture remain untouched |
 | 32 | No production mutation during development | COMPLETE | Isolated tests/builds only; no deploy/upload/production commands |
 
-The old unconditional structured-workout “Session Details” UI expectation is SUPERSEDED by the approved unified presentation. No known scope item is silently marked complete because unrelated tests pass. The Review-ready running-app limitation remains explicit pending Founder clarification.
+The old unconditional structured-workout “Session Details” UI expectation is SUPERSEDED by the approved unified presentation. No known scope item is silently marked complete because unrelated tests pass. Founder accepts the explicit Review-ready running-app limitation for Build 33; it is not a blocker.
 
 ## Landing and bounded protocol roll-up
 
@@ -231,4 +231,4 @@ BUILD 33 UPLOADED TO TESTFLIGHT: NO
 INCREMENTAL RECURRING COST: $0
 ```
 
-Overall completion remains **PARTIAL pending Founder scope clarification** for requirement 7: the existing local Review-ready fallback runs while the app's task is alive; it does not guarantee delivery if the app is terminated before Review becomes ready. Supporting terminated-app delivery would require a separate background/server delivery design, not a polling or paid-service claim. No terminated-app solution was invented during this reconciliation.
+Requirement 7 is **ACCEPTED WITH DOCUMENTED V1 LIMITATION**: the existing local Review-ready fallback runs while the app's task is alive. Founder explicitly does not require delivery after full app termination for Build 33; that behavior is deferred to future background-execution architecture. Evidence durability and canonical correctness are unaffected. No source behavior or background execution was added. Physical Actionable Priority Notification delivery remains a separate, unproven Founder acceptance item.
