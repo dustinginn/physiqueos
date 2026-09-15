@@ -2,6 +2,15 @@
 
 2026-09-15. Physical acceptance FAILED. This checkpoint is not a release authorization.
 
+## Current decision — production investigation completed
+
+The **PC production findings and final candidate** section below supersedes the
+earlier unresolved-access, unknown-candidate, and not-yet-implemented statements.
+The Founder supplied authoritative sanitized PC SQL/log findings; no additional
+Mac production access, credentials, permissions, or production writes were used.
+The generic candidate is ready for review, not deployed or physically accepted.
+Native remains 1.0 (33); Build 34 has not been created.
+
 ## Authorities and boundaries
 
 Native preflight: `222e402f3880050dabd6088a21b151d92e30eadc`, branch
@@ -398,3 +407,254 @@ presented as freshly rerun in this documentation-only follow-up.
 One coherent Build 34 release candidate is NOT yet ready: protected canonical
 reads are still necessary to finish diagnosis. Native remains 1.0 (33), no
 deployment/upload occurred, and production data remains untouched.
+
+## PC production findings and final candidate
+
+### Authority and evidence provenance
+
+This continuation verified clean Native
+`bcdae2c4a2ea0d58c2449109e65a168d77c345f7` and server
+`20239744fc690278fc76cca86526fc8b753f4836` on the existing Build 33 branches,
+except the untouched pre-existing server forensic script. Final server candidate:
+`2d0d8818db9e6b6f911348c3d0c93df400c0c63c`. Native behavioral source is unchanged
+in this continuation; its documentation-only candidate SHA is reported at handoff.
+Production remains the Founder/PC-verified Build 33 server
+`6728505dd3452f212bee585c5a550f3cb4c7867b`, deployment
+`d31fa175-9739-4613-ba26-ad81ddb4fdf1`. No Mac production commands were needed.
+
+The approved PC read-only application-console path is documented for future
+reference, NOT reproduced on Mac: repository
+`C:\Users\dusti\Documents\GitHub\physiqueos`, runner
+`.tmp/digitalocean/run-app-console-context-gzip-source-on-open.mjs`, explicit
+context `physiqueos-final-cutover-config`, historically app
+`bf57cf56-48cc-4cd6-90e4-a23ee5381741`, component `web`. Future use must reverify
+authority, run `BEGIN READ ONLY`, verify `transaction_read_only = on`, and stop
+on 401/403 or unavailable binding. This reference grants no deployment, write,
+replay, benchmarking, or PI/OpenAI authorization; credentials must never be exposed.
+
+### Recovery, Peptides, Supplements — one proven shared root cause
+
+The production owner has no `timeZone` key and has `timezone: null`. The deployed
+roll-up passes `user?.timeZone ?? user?.timezone` directly into `getLocalDateKey`.
+That evaluates to **null**, not undefined. The helper's default parameter does
+not apply to null, reproducing `RangeError: Invalid time zone specified: null`.
+Production logs show the database read succeeds before date composition throws
+and HTTP serialization returns 500. This is a shared server initial-roll-up
+defect, not three Native decoder or editor defects.
+
+The candidate uses the EXISTING `resolveLocalTimeZone` before date formatting
+in the protocol-domain reader, peptide support detail, supplement create-editor
+default date, and Logger initial date. The reader does not hardcode a zone or
+invent fallback semantics. Existing resolver behavior preserves valid IANA zones
+and resolves absent/null/invalid values through the canonical fallback (which
+resolves this owner to America/Los_Angeles). No user/reminder records are rewritten.
+
+| Domain | Authoritative production shape | Correction and protection |
+| --- | --- | --- |
+| Recovery | Active Foam Rolling execution revision 3; daily, start Sep 14, 08:40, no end; reminder 08:40, timezone null; older root 17:00 | Shared timezone resolution; current execution/reminder stay authoritative; older root untouched |
+| Peptides | Linked active Retatrutide/Tesamorelin roots and executions, revision 4; Thursday / Sunday–Thursday at 21:45; reminder zones null | Shared resolution also used by peptide detail; dosing/timeline/concurrency/specialized completion unchanged |
+| Supplements | Four active roots: Tongkat Ali, Fadogia Agrestis, Multivitamin, Electrolytes; executions revision 1; morning/daypart and empty daily start dates; Fadogia every other day starting July 25 | Legacy canonical schedule representations accepted, not normalized; support/strategy/lifecycle writes unchanged |
+
+Deterministic synthetic regression tests cover six owner shapes across ALL EIGHT
+domain reads: valid IANA, missing keys, explicit undefined, exact absent `timeZone`
+plus null `timezone`, both null, and invalid-zone canonical fallback. Reminder
+timezone null is included. Separate tests characterize Recovery's old-root/current
+execution difference, both peptide schedules, and four legacy supplement daypart
+shapes. Serialized runtime state is unchanged by each read. Energy stays read-only;
+all editable domains retain their existing concurrency and atomic write boundary.
+No sandbox fallback or raw error presentation was added.
+
+### Shared Web/Native Logger, My Library, category
+
+PC logs confirm `Unsupported core navigation collection: myLibraryMemberships`
+fails BEFORE SQL for both Web and Native Logger. The existing candidate's optional
+registration in the canonical Training table fixes their shared
+`getTrainingLogger()` path. No schema, backfill, Web workaround, or alternate
+catalog semantics. Real-provider collection-list and Web integration tests pass.
+Durable synchronous Training canonical_commit, asynchronous downstream work,
+non-Training confirmation semantics, and actual Log cache invalidation remain intact.
+
+The previous My Library/category fixes are preserved unchanged: active performed
+history UNION explicit memberships, required projection, My Library default,
+explicit All Exercises, separate cache keys, stale-response generation guards,
+Training/evidence invalidation, and no full-catalog error fallback. Tests cover
+initial load, cache/scope isolation, errors, late responses, scope switches,
+membership addition, and returning from Training confirmation. Canonical full-
+catalog duplicate prevention remains intact.
+
+Hyperextension Machine uses the server's existing **Glutes navigation category**,
+not Lower Back anatomical derivation. Identity, exercise history, and performance
+history are unchanged. Library/Logger focused navigation assertions pass.
+
+### Failed September 15 attempt — no production cleanup
+
+Within the Founder-local Sep 15 PC audit window: no new canonical TrainingSession,
+Training command receipt, Training package/review, or evidence intake receipt.
+Only unrelated Morning Check-In and Nutrition/Activity evidence was present.
+The bootstrap failure therefore did not reach a server-side Training confirmation.
+No delete, force-confirm, replay, or cleanup is required. Local-only Native draft
+state at the failed attempt remains unknowable from these server findings.
+
+### Exact historical one-pair preview — not executed
+
+Technical identities below are engineering-only, never normal Founder UI:
+
+- Surviving structured record:
+  `training|authoritative|training_logger_draft_A5936FA6-FEE7-4BAA-9D84-9E0034BDC8A6`.
+  Sep 14, Manual / Training Logger; four exercises, 16 performed sets; no workout
+  window/calories/HR or Apple UUID. Identities: `leg_press_feet_middle`,
+  `pendulum_squat_machine`, `leg_extension`, `sissy_squat`.
+- Record proposed for supersession:
+  `training|authoritative|evidence_submission_9B9B0363B6E34A599A1DF27070FA23D4_images_file_2`.
+  Sep 14, Screenshot / Apple Fitness; zero exercises; 07:45–08:44,
+  **3518 seconds**, **438 active calories**, **121 average HR**; no Apple UUID.
+
+Both are active, unsuperseded, same owner/local date/frozen Goal/Phase, exactly
+one eligible counterpart in EACH direction. Structured exercises without a window
+and positive Apple empty-strength telemetry provide the complementary shape;
+matching is not same-day + strength alone. The two Outdoor Walks remain separate.
+Publication predates the Build 33 matcher: **historical omission**, NOT a forward
+matcher defect. No Sep-14/date/ID/exercise-specific domain branch was added.
+
+Complete PC audit: 217 Training records, 211 active, 6 superseded, 69 active dates
+from July 4–Sep 14. **Exactly ONE deterministic pair, above; no other pair qualifies.**
+
+| Excluded set | Reason |
+| --- | --- |
+| 37 dates: July 4–19, July 21–31, August 1–10 | Structured records have no eligible open Apple strength telemetry counterpart |
+| 31 dates: August 11–September 4, September 8–13 | Structured records already have workout windows; not the open complementary shape |
+| July 9, included in the earlier date set | Two structured sessions, no eligible telemetry; no inferred match |
+| 140 active cardio/other observations | Outside narrow strength reconciliation |
+| 6 superseded rows | Excluded; never resurrected |
+
+There is no additional eligible empty strength observation and no eligible
+ambiguous pair to mutate. Generic competing-strength and attribution-mismatch
+tests explicitly exclude ambiguous candidates.
+
+Expected preview, using the authoritative findings (NOT a newly run SQL preview):
+
+| Assertion | Before → after |
+| --- | --- |
+| Deterministic candidate count | 1 |
+| Total canonical Training records | 217 → 217 |
+| Active / superseded Training | 211 / 6 → 210 / 7 |
+| Sep 14 Training rows | 4 → 3; two walks and one unified strength session |
+| Exercises / performed sets | 4 / 16 → 4 / 16, exact canonical IDs, loads/reps/relationships preserved |
+| Goal/Phase, Logger identity and performance anchors | Unchanged |
+| Apple workout window / duration / calories / average HR | 07:45–08:44 / 3518 / 438 / 121 preserved, no recalculated duration |
+| Sep 14 workout calories | 438 + 84 + 105 = 627 → 627 |
+| Daily Activity move calories / non-workout calculation | Unchanged; no extra 438 added |
+| Evidence provenance | Both Logger and Apple screenshot retained |
+| Replay | No-op, no new Training/performance events or owner revision bump |
+| Review state | Untouched |
+
+The actual canonical DB versions/digests were not included in the sanitized
+handoff (review version 19 is NOT a canonical record version). A fresh approved
+PC READ ONLY preview must seal the current full owner Training/Activity snapshot
+before execution. No fake production hashes/versions or private fixtures are used.
+
+### Generic historical mechanism and atomicity
+
+`src/application/training/HistoricalTrainingReconciliationService.js` exports a
+pure manifest preview and an engineering-only PostgreSQL reconciler accepting an
+EXISTING injected pool and EXPLICIT owner. No HTTP endpoint, scheduler, credential
+discovery, automatic execution, or implicit production connection.
+
+Preview starts REPEATABLE READ / READ ONLY, verifies `transaction_read_only = on`,
+reads owner-scoped canonical Training/Activity records, reports explicit pair IDs,
+preservation/calorie/count assertions, and seals DB versions plus payload digests.
+Execution requires an intact approved preview and separate explicit authorization.
+It starts SERIALIZABLE, uses the established owner advisory fence, locks/re-reads
+the owner context, revalidates the exact snapshot/digest and both-direction unique
+compatibility, and updates only changed canonical records with version predicates.
+Owner runtime revision advances atomically; any failure rolls everything back.
+An atomic marker on the retired record makes exact approved replay a no-op.
+
+`reconcileHistoricalWorkoutLoggerApplePair` reuses EXISTING canonical payload,
+provenance, supersession, and Activity reconciliation functions. Structured
+canonical/payload identity and exact exercises/relationships/frozen attribution
+are retained, protecting performance/progression anchors. Apple telemetry is
+merged into that survivor; Apple observation becomes superseded. Activity totals
+use active canonical sessions and replace the retired strength reference, not
+add calories. Cardio and superseded history are unchanged. No review, command,
+performance, or progression records are rewritten or replayed.
+
+The module successfully bundles as engineering Node CJS and runs a disconnected
+synthetic preview smoke. For future authorized PC use, bundle source from the
+exact reviewed candidate and inject the existing component binding; this does
+not replicate access on Mac or independently authorize executing the write path.
+
+### Sep 14 review anomaly — keep separate and untouched
+
+Authoritative PC finding: structured review remains `committing`, DB version 19,
+without completed confirmation, despite durable canonical Training. Existing
+`EvidenceCanonicalCommitRecoveryService` can prove canonical durability only
+after validating claim/progress/lease/identity and complete canonical coverage.
+`EvidenceReviewService.finalizeCommit` requires the entire post-confirmation step
+order, not simply an existing TrainingSession. Status/version alone cannot prove
+all downstream work finished or justify synthetic completion.
+
+Recommendation: LEAVE the historical review unchanged in this merge. Canonical
+Training reconciliation does not require a lifecycle repair. No original
+confirmation replay or new TrainingSession. If Founder later requests lifecycle
+repair, first obtain a SEPARATE bounded read-only claim/progress/outbox/step-receipt
+preview and use the existing proven recovery/continuation semantics; do not mark
+complete or replay canonicalization from these incomplete facts. No speculative
+review mutation is bundled into this candidate.
+
+### Final fresh validation
+
+| Gate | Result |
+| --- | --- |
+| Full Native units | 982/982 PASS |
+| Affected Native UI journeys | 5/5 PASS, no skipped tests; Simulator, not physical proof |
+| Debug build | PASS through unit/UI builds |
+| Generic unsigned arm64 Release | PASS |
+| Focused fixture-independent server hotfix suite | 356/356 PASS, 23 files |
+| Operating Plan all-eight reads, six timezone shapes / legacy schedule tests | PASS inside focused suite |
+| Historical preview/transaction/rollback/digest/owner/ambiguity tests | 9/9 PASS, synthetic database boundary |
+| Broader Training regression | 151/151 PASS, 16 files |
+| Canonical persistence regression | 109/109 PASS, 14 files |
+| Foundation and transport regression | 36/36 + 80/80 PASS |
+| Changed-file lint / credential scan / diff checks | PASS |
+| Deterministic generation twice / release configuration | PASS, no generated-file change, 1.0 (33), original bundle/team |
+| Provider-mode production server build | PASS at exact server candidate 2d0d8818; 48 static build pages, isolated validation output |
+
+Expanded Workout Detail navigation run: 17 tests passed; one unchanged test fails
+ENOENT because `private/founder/runtime-store.json` is absent. The test file is
+unchanged from production authority and this is the established missing-private-
+fixture baseline, not hidden or replaced with imported production data. Approved
+unified Workout Detail is also covered by passing Native units and affected UI.
+An initial UI invocation used an incorrect class selector and was interrupted;
+the corrected `TrainingAcceptanceUITests` run actually executed all five journeys
+and passed. Existing LLDB-version and Next middleware warnings are non-failing.
+
+### Documentation implications and proposed authorized sequence
+
+After Build 34 Founder acceptance, update canonical server `docs/ARCHITECTURE.md`
+and `docs/DECISIONS.md` for canonical timezone resolution at read-composition
+boundaries and explicit owner-fenced, version/digest-sealed historical canonical
+repair. Document the reconciler's source location there; no existing
+`docs/CODEBASE_MAP.md` exists in either worktree, so no fictional map is referenced.
+This checkpoint flags those durable decisions; the broader architecture
+documentation project is intentionally deferred.
+
+1. Founder reviews final Native/server candidate and this exact one-pair preview.
+2. Only after explicit deployment authorization: reverify production/current
+   branch authorities and deploy the exact server candidate using the established
+   mechanism, without spec/infrastructure changes. Verify exact web/worker hashes
+   and live/ready. Read-only acceptance must cover BOTH Web and Native Logger,
+   all eight Operating Plan reads, canonical My Library and navigation category.
+3. Only after explicit ONE-PAIR mutation authorization: approved PC operator
+   obtains fresh READ ONLY sealed preview. If candidate scope/context differs,
+   STOP for review. Execute only that intact manifest transactionally; verify
+   211→210 active Training, exact survivor/retired IDs, structure/provenance,
+   unchanged 627 workout calories and both walks, and safe replay. Review stays
+   untouched. Authorization for deployment does not imply authorization to merge.
+4. Only after separate shipping authorization: deterministic build 33→34 bump,
+   shipping-only commit, archive preserving Builds 29–33, Xcode/TestFlight upload,
+   then Founder physical acceptance. No build bump/upload was performed here.
+
+Physical Actionable Priority Notification delivery remains UNPROVEN. Running-app
+Review-ready fallback remains accepted V1; terminated-app delivery is deferred,
+not a Build 34 hotfix blocker. Nothing deployed, reconciled, repaired, or mutated.
