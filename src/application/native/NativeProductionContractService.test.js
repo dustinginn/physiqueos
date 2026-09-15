@@ -20,6 +20,7 @@ function fixture(overrides = {}) {
       getOperatingPlan: call({ goalId: "goal-build", phaseId: "phase-2" }),
       getMorningCheckIn: call({ today: "2026-09-09" }),
       getTrainingLogger: call({ initialDate: "2026-09-09" }),
+      getTrainingMyLibrary: call([]),
       getLog: call({ reviews: [] }),
       getRecurringSupport: call({ protocolId: "protocol-recovery-1", protocolCategory: "recovery", executionId: "execution_foam_roll", reminderId: "reminder_foam_roll_daily", hydration: { executionRevision: 1 } }),
       getNutritionStrategyDetail: call({ protocolId: "nutrition-protocol", title: "Macro Strategy", editor: { expectedCurrentVersionId: "nutrition-protocol_v1" } }),
@@ -42,7 +43,7 @@ function fixture(overrides = {}) {
         report: { resistancePerformance: { raw: true } },
         presentation: { schemaVersion: "1", resistance: { title: "Resistance Training" } },
       }),
-      getLibrary: call({ report: {} }),
+      getLibrary: call({ report: { canonicalExercises: [] } }),
       getDay: call({ date: "2026-09-09" }), getSession: call({ id: "session-1" }), getExercise: call({ id: "curl" }),
     },
     progress: {
@@ -93,6 +94,30 @@ function fixture(overrides = {}) {
   return { confirmEvidenceReview, evidenceIntake, executeCommand, openMedia, readers, service };
 }
 describe("Native production contract boundary", () => {
+  it("defaults Library to history/explicit membership and keeps All Exercises separate", async () => {
+    const current = fixture();
+    current.readers.core.getTrainingMyLibrary.mockResolvedValue(["performed", "added"]);
+    current.readers.training.getLibrary.mockResolvedValue({ report: { canonicalExercises: [
+      { canonicalExerciseId: "performed" }, { canonicalExerciseId: "added" }, { canonicalExerciseId: "background" },
+    ] } });
+    const read = (input = {}) => current.service.read({ request: request(), resource: "training-library", input });
+    const mine = await read();
+    expect(mine.data.myLibraryExerciseIds).toEqual(["performed", "added"]);
+    expect(mine.data.report.canonicalExercises.map((exercise) => exercise.canonicalExerciseId)).toEqual(["performed", "added"]);
+    expect((await read({ libraryScope: "all" })).data.report.canonicalExercises).toHaveLength(3);
+    expect((await read()).data.report.canonicalExercises).toHaveLength(2);
+    await expect(read({ libraryScope: "invalid" })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("fails honestly when the membership authority fails rather than returning the full catalog", async () => {
+    const current = fixture();
+    current.readers.core.getTrainingMyLibrary.mockRejectedValue(new Error("Synthetic membership read unavailable"));
+    await expect(current.service.read({ request: request(), resource: "training-library", input: {} }))
+      .rejects.toThrow("Synthetic membership read unavailable");
+    current.readers.core.getTrainingMyLibrary.mockResolvedValue(null);
+    await expect(current.service.read({ request: request(), resource: "training-library", input: {} }))
+      .rejects.toMatchObject({ status: 404 });
+  });
   it("returns an accepted command receipt when confirmation continuation throws", async () => {
     const current = fixture();
     current.confirmEvidenceReview.mockRejectedValueOnce(Object.assign(new Error("worker unavailable"), { code: "WORKER_PENDING" }));

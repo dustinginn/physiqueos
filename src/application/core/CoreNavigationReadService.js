@@ -6,6 +6,7 @@ import { createLogReadService } from "../log/LogReadService.js";
 import { createOperatingPlanReadService } from "../plan/OperatingPlanReadService.js";
 import { createYouProfileService } from "../../domain/services/YouProfileService.js";
 import { listCanonicalTrainingExerciseIdentities } from "../../domain/models/trainingExerciseIdentity.js";
+import { getPrimaryTrainingNavigationGroup } from "../../navigation/trainingNavigationMapping.js";
 import { createMorningPriorityReconciliationService } from "../../domain/services/MorningPriorityReconciliationService.js";
 import { createBriefingReconciliationPresentation } from "../../domain/services/BriefingReconciliationPresentationService.js";
 import { MORNING_EVIDENCE_RECOVERY_STATUSES } from "../../domain/services/MorningEvidenceRecoveryService.js";
@@ -179,10 +180,7 @@ export function createCoreNavigationReadService({
         /// (`myLibraryMemberships`) are the only state that can't be
         /// inferred from history; a performed exercise needs no membership
         /// record of its own.
-        const explicitLibraryMemberIds = (runtime.myLibraryMemberships ?? [])
-          .map((membership) => membership.canonicalExerciseId)
-          .filter(Boolean);
-        const myLibraryExerciseIds = [...new Set([...performedExerciseIds, ...explicitLibraryMemberIds])];
+        const myLibraryExerciseIds = projectTrainingMyLibrary(runtime);
         const historySessions = confirmedTrainingRecords
           .map(projectTrainingHistorySession)
           .sort((left, right) => String(right.observed_at).localeCompare(String(left.observed_at)))
@@ -200,7 +198,15 @@ export function createCoreNavigationReadService({
           .filter(Boolean);
         return Object.freeze({
           goalContext,
-          initialCanonicalExercises: canonicalExercises,
+          initialCanonicalExercises: canonicalExercises.map((exercise) => ({
+            ...exercise,
+            primaryNavigationCategory: getPrimaryTrainingNavigationGroup({
+              canonicalExerciseId: exercise.id,
+              label: exercise.name,
+              primaryMuscleGroups: exercise.primary_muscle_groups,
+              regionLabel: exercise.body_region,
+            }),
+          })),
           initialDate,
           initialHistorySessions: historySessions,
           initialPerformedExerciseIds: performedExerciseIds,
@@ -208,6 +214,10 @@ export function createCoreNavigationReadService({
           initialProgressionRecommendations,
         });
       });
+    },
+    getTrainingMyLibrary() {
+      return withContext("core.navigation.training-my-library", "trainingLogger", ({ runtime }) =>
+        projectTrainingMyLibrary(runtime));
     },
     getMorningCheckIn() {
       return withContext("core.navigation.morning-check-in", "morningCheckIn", async ({ ownerUserId, repositories, runtime }) => {
@@ -713,6 +723,17 @@ function compactObject(value) {
 
 function evidenceType(record) {
   return (record?.payload ?? record)?.evidence_type ?? null;
+}
+
+function projectTrainingMyLibrary(runtime) {
+  const historyIds = (runtime.canonicalEvidenceObjects ?? [])
+    .filter((record) => evidenceType(record) === "training" &&
+      record.quality?.status !== "superseded" && !record.quality?.supersededBy)
+    .flatMap((record) => (record.payload ?? record).exercises ?? [])
+    .map((exercise) => exercise.canonicalExerciseId);
+  const explicitIds = (runtime.myLibraryMemberships ?? [])
+    .map((membership) => membership.canonicalExerciseId);
+  return Object.freeze([...new Set([...historyIds, ...explicitIds].filter(Boolean))].sort());
 }
 
 function projectTrainingHistorySession(record) {

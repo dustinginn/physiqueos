@@ -1,7 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPostgresCoreNavigationReadStore } from "./PostgresCoreNavigationReadStore.js";
+import { CORE_NAVIGATION_COLLECTIONS } from "../../application/core/CoreNavigationReadService.js";
 
 describe("PostgreSQL core navigation read store", () => {
+  it("accepts the actual Logger collection set including persisted My Library membership", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    const store = createPostgresCoreNavigationReadStore({ pool: { query }, ownerUserId: "owner-one" });
+    const result = await store.run("core.navigation.training-logger", ({ readCollections }) =>
+      readCollections(CORE_NAVIGATION_COLLECTIONS.trainingLogger));
+    expect(result.myLibraryMemberships).toEqual([]);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0][0]).toContain("physiqueos.canonical_training_records");
+    expect(query.mock.calls[0][1].flat()).toContain("myLibraryMemberships");
+  });
   it("loads a screen's collections in one bounded query with zero compatibility loads", async () => {
     const query = vi.fn(async () => ({
       rows: [

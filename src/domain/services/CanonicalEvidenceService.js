@@ -909,8 +909,13 @@ function hasWorkoutTemporalWindow(payload) {
 }
 
 function isOpenAppleStrengthTelemetry(payload = {}) {
+  const source = payload.source ?? {};
+  const appleSource = /apple[ _-]*(watch|health|fitness)/i.test([
+    source.application, source.integration, source.provider,
+  ].filter(Boolean).join(" "));
   return (
     isTrainingSession(payload) &&
+    appleSource &&
     (payload.exercises ?? []).length === 0 &&
     hasWorkoutTemporalWindow(payload) &&
     STRENGTH_ACTIVITY_TYPE_PATTERN.test(String(payload.metadata?.activity_type ?? ""))
@@ -920,6 +925,7 @@ function isOpenAppleStrengthTelemetry(payload = {}) {
 function isOpenStructuredTrainingSession(payload = {}) {
   return (
     isTrainingSession(payload) &&
+    STRENGTH_ACTIVITY_TYPE_PATTERN.test(String(payload.metadata?.activity_type ?? "")) &&
     (payload.exercises ?? []).length > 0 &&
     !hasWorkoutTemporalWindow(payload)
   );
@@ -953,6 +959,40 @@ function findOpenWorkoutLoggerAppleHealthMatch(canonicalById, evidenceObject) {
   );
 
   return candidates.length === 1 ? candidates : [];
+}
+
+/// Pure engineering audit: no repositories, persistence, scheduler, or automatic
+/// historical sweep. Requires a caller-supplied, owner-scoped canonical read.
+/// Both directions must be unique; a one-to-many day is never a repair candidate.
+export function auditHistoricalWorkoutLoggerApplePairs({ canonicalObjects = [], userId } = {}) {
+  if (!userId) throw new Error("Historical workout audit requires an explicit owner.");
+  const active = canonicalObjects.filter((record) => record.userId === userId &&
+    !isSupersededCanonicalObject(record) && record.payload?.evidence_type === "training");
+  const canonicalById = new Map(active.map((record) => [record.canonicalId, record]));
+  const candidates = [];
+  const excludedAmbiguous = [];
+  for (const structured of active.filter((record) => isOpenStructuredTrainingSession(record.payload))) {
+    const date = getDateKey(structured.payload.observed_at);
+    const telemetry = active.filter((record) => getDateKey(record.payload.observed_at) === date &&
+      isOpenAppleStrengthTelemetry(record.payload));
+    if (telemetry.length === 0) continue;
+    const match = findOpenWorkoutLoggerAppleHealthMatch(canonicalById, structured.payload);
+    const mutualMatch = match.length === 1 &&
+      findOpenWorkoutLoggerAppleHealthMatch(canonicalById, match[0].payload).length === 1;
+    const row = {
+      date,
+      structuredCanonicalId: structured.canonicalId,
+      telemetryCanonicalIds: telemetry.map((record) => record.canonicalId).sort(),
+      sameDayStrengthCandidateCount: active.filter((record) => getDateKey(record.payload.observed_at) === date &&
+        STRENGTH_ACTIVITY_TYPE_PATTERN.test(String(record.payload.metadata?.activity_type ?? ""))).length,
+      exerciseCount: structured.payload.exercises.length,
+      setCount: structured.payload.exercises.reduce((sum, exercise) => sum + (exercise.sets ?? []).length, 0),
+    };
+    if (mutualMatch) candidates.push({ ...row, deterministic: true });
+    else excludedAmbiguous.push({ ...row, deterministic: false });
+  }
+  const order = (left, right) => `${left.date}|${left.structuredCanonicalId}`.localeCompare(`${right.date}|${right.structuredCanonicalId}`);
+  return { candidates: candidates.sort(order), excludedAmbiguous: excludedAmbiguous.sort(order) };
 }
 
 function isCompatibleTrainingPayload(left = {}, right = {}) {

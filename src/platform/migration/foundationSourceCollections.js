@@ -42,7 +42,10 @@ export const FOUNDATION_REQUIRED_SOURCE_COLLECTIONS = Object.freeze([
   "phaseLifecycleReadModels",
 ]);
 
-export const FOUNDATION_OPTIONAL_SOURCE_COLLECTIONS = Object.freeze([]);
+// An explicit addition before first workout needs persistence; performed
+// membership remains derived from Training history. Older canonical imports
+// may legitimately omit this collection, so no backfill is required.
+export const FOUNDATION_OPTIONAL_SOURCE_COLLECTIONS = Object.freeze(["myLibraryMemberships"]);
 
 export const FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS = Object.freeze([
   Object.freeze({
@@ -64,7 +67,10 @@ export const FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS = Object.freeze([
 
 // Backwards-compatible name used by import/schema code. In contract v2 this is
 // deliberately the persisted canonical set, not the hydrated runtime shape.
-export const FOUNDATION_SOURCE_COLLECTIONS = FOUNDATION_REQUIRED_SOURCE_COLLECTIONS;
+export const FOUNDATION_SOURCE_COLLECTIONS = Object.freeze([
+  ...FOUNDATION_REQUIRED_SOURCE_COLLECTIONS,
+  ...FOUNDATION_OPTIONAL_SOURCE_COLLECTIONS,
+]);
 
 export const FOUNDATION_RUNTIME_METADATA_KEYS = Object.freeze([
   "version", "revision", "lastCommitId", "updatedAt", "importedAt",

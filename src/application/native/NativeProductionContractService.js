@@ -107,7 +107,26 @@ export function createNativeProductionContractService({
           data = projectNativeTrainingReportingRead(reporting);
           break;
         }
-        case "training-library": data = await readers.training.getLibrary({ context, currentDate, path: pathParts(input.path) }); break;
+        case "training-library": {
+          const libraryScope = input.libraryScope ?? "my-library";
+          if (!["my-library", "all"].includes(libraryScope)) throw validation("libraryScope", "Choose My Library or All Exercises.");
+          const [library, myLibraryExerciseIds] = await Promise.all([
+            readers.training.getLibrary({ context, currentDate, path: pathParts(input.path) }),
+            readers.core.getTrainingMyLibrary(),
+          ]);
+          if (!library || !Array.isArray(myLibraryExerciseIds)) throw unavailableResource();
+          const membership = new Set(myLibraryExerciseIds);
+          data = {
+            ...library,
+            myLibraryExerciseIds,
+            report: {
+              ...library.report,
+              canonicalExercises: library.report.canonicalExercises.filter((exercise) =>
+                libraryScope === "all" || membership.has(exercise.canonicalExerciseId)),
+            },
+          };
+          break;
+        }
         case "training-day": data = await readers.training.getDay({ date: dateKey(input.date, "date"), timeZone: input.timeZone || null }); break;
         case "training-session": data = await readers.training.getSession({ sessionId: required(input.sessionId, "sessionId") }); break;
         case "training-exercise": data = await readers.training.getExercise({ context, currentDate, exerciseSlug: required(input.exerciseId, "exerciseId") }); break;

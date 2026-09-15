@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reconcileConfirmedEvidencePackage } from "./CanonicalEvidenceService";
+import { auditHistoricalWorkoutLoggerApplePairs, reconcileConfirmedEvidencePackage } from "./CanonicalEvidenceService";
 
 // Build 33: proves the fix for the Founder-observed defect where a
 // structured Workout Logger strength session and an independently
@@ -83,6 +83,55 @@ function activeTrainingObjects(objects) {
 }
 
 describe("Workout Logger + Apple Health same-day strength reconciliation", () => {
+  it("does not treat a non-Apple telemetry observation as Apple evidence", () => {
+    const existing = [canonicalOf(structuredSession())];
+    const telemetry = appleTelemetry({ source: { application: "Another workout provider" } });
+    const result = reconcileConfirmedEvidencePackage({ evidencePackage: { package_id: "non-apple", userId, evidence_objects: [telemetry] }, existingCanonicalObjects: existing, userId });
+    expect(result.report.supersededCanonicalIds).toHaveLength(0);
+  });
+
+  it("does not merge an exercise-bearing cardio session into Apple strength", () => {
+    const cardio = structuredSession({ metadata: { activity_type: "Outdoor Walk" } });
+    const result = reconcileConfirmedEvidencePackage({ evidencePackage: { package_id: "apple", userId, evidence_objects: [appleTelemetry()] }, existingCanonicalObjects: [canonicalOf(cardio)], userId });
+    expect(result.report.supersededCanonicalIds).toHaveLength(0);
+  });
+
+  it("audits historical mutual uniqueness without modifying any record and excludes ambiguity/cardio/other owners", () => {
+    const records = [
+      canonicalOf(structuredSession()), canonicalOf(appleTelemetry()),
+      canonicalOf(structuredSession({ id: "ambiguous-a", observed_at: "2026-09-13" })),
+      canonicalOf(structuredSession({ id: "ambiguous-b", observed_at: "2026-09-13" })),
+      canonicalOf(appleTelemetry({ id: "ambiguous-apple", observed_at: "2026-09-13" })),
+      canonicalOf(appleTelemetry({ id: "walk", metadata: { activity_type: "Outdoor Walk", start_time: "2026-09-14T10:00:00Z" } })),
+      canonicalOf(structuredSession({ id: "other-owner" }), { userId: "someone-else" }),
+    ];
+    const before = JSON.stringify(records);
+    const audit = auditHistoricalWorkoutLoggerApplePairs({ canonicalObjects: records, userId });
+    expect(audit.candidates).toHaveLength(1);
+    expect(audit.candidates[0]).toMatchObject({ date: "2026-09-14", deterministic: true, sameDayStrengthCandidateCount: 2, exerciseCount: 1, setCount: 1 });
+    expect(audit.excludedAmbiguous).toHaveLength(2);
+    expect(JSON.stringify(records)).toBe(before);
+  });
+
+  it.each([false, true])("reconciles a NEW future workout in either confirmation order with relationships and telemetry preserved (Apple first=%s)", (appleFirst) => {
+    const logger = structuredSession({ observed_at: "2026-10-01", exerciseRelationshipGroups: [{ id: "superset", relationshipType: "superset", memberExerciseIds: ["ex1", "ex2"] }], exercises: [
+      structuredSession().exercises[0],
+      { ...structuredSession().exercises[0], id: "ex2", canonicalExerciseId: "leg_extension", name: "Leg Extension" },
+    ] });
+    const apple = appleTelemetry({ observed_at: "2026-10-01", metadata: { ...appleTelemetry().metadata, start_time: "2026-10-01T07:45:00Z", end_time: "2026-10-01T08:44:00Z" } });
+    const existing = [canonicalOf(appleFirst ? apple : logger)];
+    const evidencePackage = { package_id: "new-future-workout", userId, evidence_objects: [appleFirst ? logger : apple] };
+    const result = reconcileConfirmedEvidencePackage({ evidencePackage, existingCanonicalObjects: existing, userId });
+    const changedIds = new Set(result.changedObjects.map((record) => record.canonicalId));
+    const after = [...existing.filter((record) => !changedIds.has(record.canonicalId)), ...result.changedObjects];
+    const active = activeTrainingObjects(after);
+    expect(active).toHaveLength(1);
+    expect(active[0].payload.exercises).toHaveLength(2);
+    expect(active[0].payload.exercises.flatMap((exercise) => exercise.sets)).toHaveLength(2);
+    expect(active[0].payload.exerciseRelationshipGroups).toHaveLength(1);
+    expect(active[0].payload.metadata).toMatchObject({ active_calories: 438, average_heart_rate: 121, duration_seconds: 3540 });
+    expect(reconcileConfirmedEvidencePackage({ evidencePackage, existingCanonicalObjects: after, userId }).changedObjects).toHaveLength(0);
+  });
   it("merges a later Apple strength telemetry confirmation into the existing structured session as ONE canonical TrainingSession", () => {
     const existing = [canonicalOf(structuredSession())];
     const evidencePackage = { package_id: "apple-package-1", userId, evidence_objects: [appleTelemetry()] };

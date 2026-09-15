@@ -6,6 +6,7 @@ import { createMigrationManifest, validateMigrationSourceKeys } from "./migratio
 import {
   FOUNDATION_COLLECTION_CONTRACT_VERSION,
   FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS,
+  FOUNDATION_REQUIRED_SOURCE_COLLECTIONS,
   FOUNDATION_SOURCE_COLLECTIONS,
   inspectFoundationSourceInventory,
 } from "./foundationSourceCollections.js";
@@ -143,13 +144,13 @@ export async function readAndValidateCanonicalPackage(packageRoot, { observePhas
   const expectedExcluded = FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS.map(({ sourceCollection, classification, canonicalOwner }) => ({ sourceCollection, classification, canonicalOwner }));
   const actualExcluded = (manifest.collectionInventory.excluded ?? []).map(({ sourceCollection, classification, canonicalOwner }) => ({ sourceCollection, classification, canonicalOwner }));
   if (canonicalJson(actualExcluded) !== canonicalJson(expectedExcluded)) throw new Error("Canonical package excluded collection classifications do not match the active contract.");
-  if (manifest.collectionInventory.required?.expectedCount !== FOUNDATION_SOURCE_COLLECTIONS.length || manifest.collectionInventory.required?.missing?.length) {
+  if (manifest.collectionInventory.required?.expectedCount !== FOUNDATION_REQUIRED_SOURCE_COLLECTIONS.length || manifest.collectionInventory.required?.missing?.length) {
     throw new Error("Canonical package required collection inventory is incomplete.");
   }
   if (manifest.collectionInventory.unknown?.length) throw new Error("Canonical package inventory contains unknown source collections.");
   const expected = new Set(FOUNDATION_SOURCE_COLLECTIONS);
   const actual = new Set(Object.keys(collections));
-  const missing = [...expected].filter((name) => !actual.has(name));
+  const missing = FOUNDATION_REQUIRED_SOURCE_COLLECTIONS.filter((name) => !actual.has(name));
   if (missing.length) throw new Error(`Canonical package is missing required collections: ${missing.join(", ")}`);
   const extra = [...actual].filter((name) => !expected.has(name));
   if (extra.length) throw new Error(`Canonical package contains noncanonical collections: ${extra.join(", ")}`);

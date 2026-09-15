@@ -290,6 +290,11 @@ describe("provider-native core navigation reads", () => {
       "dumbbell_reverse_lunge", "leg_press_feet_high",
     ]));
     expect(new Set(logger.initialMyLibraryExerciseIds).size).toBe(logger.initialMyLibraryExerciseIds.length);
+    expect(await narrow.getTrainingMyLibrary()).toEqual(logger.initialMyLibraryExerciseIds);
+    expect(logger.initialCanonicalExercises.find((exercise) => exercise.id === "hyperextension_machine"))
+      .toMatchObject({ primaryNavigationCategory: "glutes" });
+    runtime.canonicalEvidenceObjects[0].quality.status = "superseded";
+    expect(await narrow.getTrainingMyLibrary()).toEqual(["leg_press_feet_high"]);
   });
 
   it("hydrates the canonical registry before the first cold-start Workout Logger read", async () => {

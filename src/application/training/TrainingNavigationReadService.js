@@ -11,6 +11,7 @@ import {
 } from "../../domain/services/TrainingEvidenceContextService.js";
 import { createTrainingLibraryExerciseRecordsReadModel } from "../../domain/services/TrainingLibraryExerciseRecordsService.js";
 import { resolveTrainingExerciseIdentity } from "../../domain/models/trainingExerciseIdentity.js";
+import { getPrimaryTrainingNavigationGroup } from "../../navigation/trainingNavigationMapping.js";
 import {
   readCurrentCanonicalTrainingExerciseRegistry,
 } from "./CanonicalExerciseRegistryReadService.js";
@@ -250,6 +251,12 @@ function withSupportingMedia(session, record) {
 function projectCanonicalExerciseRegistry(exercises = []) {
   return Object.freeze(exercises.map((exercise) => Object.freeze({
     canonicalExerciseId: exercise.id,
+    primaryNavigationCategory: getPrimaryTrainingNavigationGroup({
+      canonicalExerciseId: exercise.id,
+      label: exercise.name,
+      primaryMuscleGroups: exercise.primary_muscle_groups,
+      regionLabel: exercise.body_region,
+    }),
     familyLabel: exercise.movement_pattern ?? null,
     label: exercise.name,
     primaryMuscleGroupId: exercise.primary_muscle_group_id ?? null,

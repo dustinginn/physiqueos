@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
+import { FOUNDATION_REQUIRED_SOURCE_COLLECTIONS, FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
 import { exportCanonicalPackage, PHASE4_PACKAGE_VERSION } from "./phase4CanonicalExport.js";
 import {
   createFixedBuildIdentityProvider,
@@ -85,6 +85,7 @@ export function createPhase5SyntheticRuntime({ recordsPerCollection = 3 } = {}) 
       record("canonicalEvidenceObjects", 4, { canonicalId: "phase5-dexa-evidence-001", payload: { evidence_type: "dexa", observed_at: "2026-08-10", file: "synthetic-dexa.pdf" } }),
     ],
     trainingPerformanceEvents: many("trainingPerformanceEvents", { exerciseId: "phase5_exercise_curl", sessionId: "phase5-training-session-001", eventType: "volume", value: 300 }),
+    myLibraryMemberships: [],
     trainingPerformanceEventBatches: many("trainingPerformanceEventBatches", { sessionId: "phase5-training-session-001", eventIds: ["phase5-trainingPerformanceEvents-001"], state: "processed" }),
     canonicalExerciseLibrary: many("canonicalExerciseLibrary", { canonicalExerciseId: "phase5_exercise_curl", name: "Synthetic Curl", bodyRegion: "Arms", movementPattern: "Elbow Flexion", category: "Arms", aliases: ["Fixture Curl"] }),
     piEnergyConfidenceWorkItems: many("piEnergyConfidenceWorkItems", { goalId: "phase5-goals-001", state: "completed" }),
@@ -138,7 +139,7 @@ export async function writePhase5SyntheticPackage({ outputRoot, repositoryRevisi
 }
 
 function assertComplete(runtime) {
-  const missing = FOUNDATION_SOURCE_COLLECTIONS.filter((name) => runtime[name] == null || (Array.isArray(runtime[name]) && runtime[name].length === 0));
+  const missing = FOUNDATION_REQUIRED_SOURCE_COLLECTIONS.filter((name) => runtime[name] == null || (Array.isArray(runtime[name]) && runtime[name].length === 0));
   const extra = Object.keys(runtime).filter((name) => !FOUNDATION_SOURCE_COLLECTIONS.includes(name) && !["version", "revision", "lastCommitId", "updatedAt", "importedAt"].includes(name));
   if (missing.length || extra.length) throw new Error(`Phase 5 synthetic runtime is incomplete (missing=${missing.join(",")}; extra=${extra.join(",")}).`);
 }
