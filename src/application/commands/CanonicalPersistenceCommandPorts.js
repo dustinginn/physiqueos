@@ -29,6 +29,14 @@ import {
   createRecurringSupportManagementService,
   RecurringSupportOutcome,
 } from "../../domain/services/RecurringSupportManagementService.js";
+import {
+  ActiveProtocolSuccessorOutcome,
+  applyPreparedActiveProtocolSuccessor,
+  prepareActiveProtocolSuccessorTransition,
+  verifyActiveProtocolSuccessorState,
+} from "../../domain/services/ActiveProtocolSuccessorService.js";
+import { buildStrategySuccessorPayload } from "../../domain/services/StrategyEditorService.js";
+import { getLocalDateKey } from "../../domain/utils/localDate.js";
 
 export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "submitWeight", "submitCheckIn", "createEvidenceIntake", "editEvidenceReview",
@@ -36,11 +44,14 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "editProtocol", "editGoal", "transitionGoal", "createTrainingSession", "correctTrainingSession",
   "completeTrainingLogger", "confirmNutritionEvidence", "confirmPhotoEvidence", "confirmDexaEvidence",
   "upsertNutritionDay", "syncActivityDay", "commitTrainingSession", "upsertActivityDay",
-  "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport",
+  "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport", "saveNutritionStrategy",
 ]);
 
 const RECURRING_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "executionItems", "reminders"]);
 const RECURRING_SUPPORT_READ_COLLECTIONS = Object.freeze(["user", ...RECURRING_SUPPORT_BOUNDED_COLLECTIONS]);
+
+const NUTRITION_STRATEGY_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "protocolVersions"]);
+const NUTRITION_STRATEGY_READ_COLLECTIONS = Object.freeze(["user", ...NUTRITION_STRATEGY_BOUNDED_COLLECTIONS]);
 
 export function createCanonicalPersistenceCommandPorts({ records, now = () => new Date() } = {}) {
   if (!records?.get || !records?.put) throw new Error("Canonical command ports require a record store.");
@@ -151,6 +162,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     editDexaReview,
     requestEvidenceReviewConfirmation,
     saveRecurringSupport,
+    saveNutritionStrategy,
   });
 
   /// The one canonical write for every "recurring support" execution item
@@ -205,6 +217,111 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         executionId: context.payload.executionId,
         executionRevision: execution?.executionRevision ?? result.revision ?? null,
       },
+      outbox: [],
+    };
+  }
+
+  /// Nutrition strategy save — the smallest safe Native production write
+  /// for the Nutrition Operating Plan domain. Reuses `buildNutrition`'s
+  /// EXACT validation logic (via `buildStrategySuccessorPayload`, given a
+  /// plain-object FormData adapter — that function only calls `.get(key)`)
+  /// and `ActiveProtocolSuccessorService`'s separately-exported PURE
+  /// transition functions, orchestrated by hand through
+  /// `loadCandidate`/`persistCandidateCollections` rather than through the
+  /// shared service itself (which requires a file-based
+  /// `runtimeStorePath`/`liveStore` binding Web owns and this port must not
+  /// touch or duplicate). Concurrency is Nutrition's OWN actual model —
+  /// `expectedCurrentVersionId` against the protocol's `currentVersionId`
+  /// — not the Recovery/Tracking `expectedRevision` counter.
+  async function saveNutritionStrategy(context) {
+    const { candidate, before } = await loadCandidate(NUTRITION_STRATEGY_READ_COLLECTIONS, context.ownerUserId);
+    const protocol = (candidate.protocols ?? []).find((item) =>
+      item.id === context.payload.protocolId &&
+      item.userId === context.ownerUserId &&
+      item.status === "active" &&
+      (item.protocolType ?? item.category) === "nutrition"
+    );
+    if (!protocol) {
+      throw problem(404, "NUTRITION_STRATEGY_UNAVAILABLE", "This strategy is no longer available.");
+    }
+    const version = protocol.currentVersionId
+      ? (candidate.protocolVersions ?? []).find((item) => item.id === protocol.currentVersionId)
+      : null;
+    if (!version) {
+      throw problem(404, "NUTRITION_STRATEGY_UNAVAILABLE", "This strategy is not ready to edit.");
+    }
+    const draft = context.payload.draft ?? {};
+    const form = {
+      get: (key) => ({
+        proteinBasis: draft.proteinBasis,
+        proteinRatio: draft.proteinRatio,
+        fixedProtein: draft.fixedProteinGrams,
+        carbohydrateStrategy: draft.carbohydrateStrategy,
+        fatStrategy: draft.fatStrategy,
+      }[key] ?? null),
+    };
+    const built = buildStrategySuccessorPayload({ form, protocol, strategyType: "nutrition", version });
+    if (!built.valid) {
+      if (built.outcome === "unchanged_successor") {
+        return unchangedNutritionOutcome(protocol);
+      }
+      throw problem(400, "NUTRITION_STRATEGY_INVALID", built.error ?? "This strategy could not be saved.");
+    }
+    const goalId = protocol.currentGoalIds?.[0] ?? protocol.relatedGoalIds?.[0] ?? null;
+    const command = {
+      protocolId: protocol.id,
+      expectedCurrentVersionId: context.payload.expectedCurrentVersionId,
+      successorVersion: built.successorVersion,
+      effectiveDate: getLocalDateKey(),
+      goalAssociation: { goalId, relationship: "supports" },
+      provenance: {
+        author: {
+          type: "user",
+          id: context.ownerUserId,
+          displayName: candidate.user?.displayName ?? candidate.user?.name ?? "Founder",
+        },
+        reason: "Update active nutrition strategy.",
+        confirmation: { confirmedByUser: true, authority: "founder_direct_strategy_edit" },
+        details: { source: "native_direct_strategy_edit" },
+      },
+    };
+    const prepared = prepareActiveProtocolSuccessorTransition(candidate, command, now());
+    if (!prepared.ok) {
+      if (prepared.outcome === ActiveProtocolSuccessorOutcome.EXPECTED_VERSION_CONFLICT) {
+        throw staleVersionProblem({
+          expectedVersion: context.payload.expectedCurrentVersionId,
+          actualVersion: protocol.currentVersionId,
+          resource: `protocol:${protocol.id}`,
+        });
+      }
+      if (prepared.outcome === ActiveProtocolSuccessorOutcome.UNCHANGED_SUCCESSOR) {
+        return unchangedNutritionOutcome(protocol);
+      }
+      const status = prepared.outcome === ActiveProtocolSuccessorOutcome.DUPLICATE_SUCCESSOR ? 409 : 400;
+      throw problem(status, "NUTRITION_STRATEGY_INVALID", prepared.reason ?? "This strategy could not be saved.");
+    }
+    applyPreparedActiveProtocolSuccessor(candidate, prepared);
+    if (!verifyActiveProtocolSuccessorState(candidate, protocol.id, prepared.successor.id)) {
+      throw problem(500, "NUTRITION_STRATEGY_PERSISTENCE_FAILED", "We could not confirm this strategy update. Nothing was changed.");
+    }
+    await persistCandidateCollections({
+      before, candidate, collections: NUTRITION_STRATEGY_BOUNDED_COLLECTIONS, ownerUserId: context.ownerUserId,
+    });
+    return {
+      status: "committed",
+      result: {
+        status: "updated",
+        protocolId: protocol.id,
+        currentVersionId: prepared.successor.id,
+      },
+      outbox: [],
+    };
+  }
+
+  function unchangedNutritionOutcome(protocol) {
+    return {
+      status: "committed",
+      result: { status: "unchanged", protocolId: protocol.id, currentVersionId: protocol.currentVersionId },
       outbox: [],
     };
   }

@@ -28,6 +28,7 @@ export const Phase3Command = Object.freeze({
   EDIT_DEXA_REVIEW: "dexa-review.measurements.v1",
   COMMIT_EVIDENCE_REVIEW: "evidence-review.commit.v1",
   SAVE_RECURRING_SUPPORT: "operating-plan.recurring-support.save.v1",
+  SAVE_NUTRITION_STRATEGY: "operating-plan.nutrition-strategy.save.v1",
 });
 
 const DEFINITIONS = Object.freeze({
@@ -56,6 +57,9 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.COMMIT_EVIDENCE_REVIEW]: define("requestEvidenceReviewConfirmation", ["reviewId"], true),
   [Phase3Command.SAVE_RECURRING_SUPPORT]: define(
     "saveRecurringSupport", ["protocolId", "protocolCategory", "executionId", "reminderId", "draft"], true
+  ),
+  [Phase3Command.SAVE_NUTRITION_STRATEGY]: define(
+    "saveNutritionStrategy", ["protocolId", "expectedCurrentVersionId", "draft"], false
   ),
 });
 
@@ -136,7 +140,7 @@ function validatePayload(commandType, payload) {
   if (payload.draft != null && (!payload.draft || typeof payload.draft !== "object" || Array.isArray(payload.draft))) {
     throw validation("draft", "draft must be an object.");
   }
-  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId"]) {
+  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId", "expectedCurrentVersionId"]) {
     if (payload[field] != null && !String(payload[field]).trim()) throw validation(field, `${field} must be a non-empty identity.`);
   }
 }

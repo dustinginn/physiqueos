@@ -22,6 +22,7 @@ function fixture(overrides = {}) {
       getTrainingLogger: call({ initialDate: "2026-09-09" }),
       getLog: call({ reviews: [] }),
       getRecurringSupport: call({ protocolId: "protocol-recovery-1", protocolCategory: "recovery", executionId: "execution_foam_roll", reminderId: "reminder_foam_roll_daily", hydration: { executionRevision: 1 } }),
+      getNutritionStrategyDetail: call({ protocolId: "nutrition-protocol", title: "Macro Strategy", editor: { expectedCurrentVersionId: "nutrition-protocol_v1" } }),
     },
     activeGoal: { getPreview: call({ goalId: "goal-build", phaseId: "phase-2", confidence: { score: 62, band: "Moderate", movement: "held" } }) },
     completedGoal: { getVisibleAbs: call({ goalId: "goal-visible-abs", status: "completed" }) },
@@ -253,6 +254,7 @@ describe("Native production contract boundary", () => {
       "photo-event": { sessionId: "photo-session-1" },
       "evidence-review": { reviewId: "review-1" },
       "operating-plan-recurring-support": { executionId: "execution_foam_roll" },
+      "operating-plan-nutrition-strategy": { strategyId: "nutrition-protocol" },
     };
     const results = new Map();
     for (const declaration of nativeProductionContractManifest.reads) {
@@ -434,7 +436,7 @@ describe("Native production contract boundary", () => {
       "weight.submit.v1", "check-in.submit.v1", "priority.complete.v1",
       "training-session.commit.v1", "nutrition-day.upsert.v1", "activity-day.upsert.v1",
       "dexa-review.measurements.v1", "evidence-review.commit.v1", "evidence-review.dispose.v1",
-      "operating-plan.recurring-support.save.v1",
+      "operating-plan.recurring-support.save.v1", "operating-plan.nutrition-strategy.save.v1",
     ]);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/HealthKit|activity-day\.sync/);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/storage_key|Spaces|databaseName|provider-authoritative/);

@@ -28,6 +28,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.COMMIT_EVIDENCE_REVIEW,
   Phase3Command.DISPOSE_EVIDENCE_REVIEW,
   Phase3Command.SAVE_RECURRING_SUPPORT,
+  Phase3Command.SAVE_NUTRITION_STRATEGY,
 ]);
 
 export function createNativeProductionContractService({
@@ -137,6 +138,9 @@ export function createNativeProductionContractService({
         case "timeline": data = await readers.timeline.getPage({ limit: boundedLimit(input.limit) }); break;
         case "operating-plan-recurring-support": data = await readers.core.getRecurringSupport({
           executionId: required(input.executionId, "executionId"),
+        }); break;
+        case "operating-plan-nutrition-strategy": data = await readers.core.getNutritionStrategyDetail({
+          strategyId: required(input.strategyId, "strategyId"),
         }); break;
         default: throw unavailableResource();
       }

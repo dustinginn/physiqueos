@@ -13,6 +13,8 @@ import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localD
 import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
 import { createRecurringSupportHydrationModel } from "../../domain/services/RecurringSupportManagementService.js";
 import { formatSupportScheduleSummary } from "../../domain/models/SupportScheduleModel.js";
+import { composeOperatingPlanStrategyDetail } from "../../domain/services/OperatingPlanStrategyDetailService.js";
+import { createStrategyEditorModel } from "../../domain/services/StrategyEditorService.js";
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
 import { resolveCanonicalGoalPhaseChronology } from "../../domain/services/CanonicalGoalPhaseChronologyService.js";
@@ -207,6 +209,55 @@ export function createCoreNavigationReadService({
           purpose: executionItem.description ?? "",
           supportSummary: formatSupportScheduleSummary(hydration.supportSchedule),
           hydration,
+        });
+      });
+    },
+    /// The Nutrition Operating Plan strategy detail + editor read, combined
+    /// into one payload so Native can render the detail screen and prime
+    /// the editor from a single fetch. Reuses the exact same display
+    /// composition (`composeOperatingPlanStrategyDetail`) and editor-field
+    /// derivation (`createStrategyEditorModel`) Web's own strategy detail
+    /// and edit pages already call — no parallel Nutrition read logic.
+    /// `expectedCurrentVersionId` is Nutrition's actual concurrency token
+    /// (the protocol's `currentVersionId`), matching
+    /// `ActiveProtocolSuccessorService`'s own model rather than Recovery's
+    /// `expectedRevision` counter.
+    getNutritionStrategyDetail({ strategyId }) {
+      return withContext("core.navigation.nutrition-strategy-detail", "operatingPlan", async ({ ownerUserId, repositories }) => {
+        const protocol = await repositories.protocols.getProtocolById(strategyId);
+        if (!protocol || protocol.userId !== ownerUserId || protocol.status !== "active" ||
+            (protocol.protocolType ?? protocol.category) !== "nutrition") {
+          return null;
+        }
+        const version = protocol.currentVersionId
+          ? await repositories.protocolVersions.getVersionById(protocol.currentVersionId)
+          : null;
+        if (!version) return null;
+        const [goals, nutritionContext] = await Promise.all([
+          repositories.goals.listGoals(ownerUserId),
+          repositories.nutritionContext.getNutritionContext(ownerUserId),
+        ]);
+        const detail = composeOperatingPlanStrategyDetail({
+          goals, nutritionContext, protocol, strategyType: "nutrition", version,
+        });
+        const editorModel = createStrategyEditorModel({ protocol, strategyType: "nutrition", version });
+        if (!detail || !editorModel) return null;
+        return Object.freeze({
+          protocolId: protocol.id,
+          title: detail.title,
+          purpose: detail.purpose,
+          goal: detail.goal,
+          startedDate: detail.startedDate,
+          status: detail.status,
+          fields: detail.sections,
+          editor: Object.freeze({
+            expectedCurrentVersionId: protocol.currentVersionId,
+            proteinBasis: editorModel.proteinBasis,
+            proteinRatio: editorModel.proteinRatio,
+            fixedProteinGrams: editorModel.fixedProtein ?? 150,
+            carbohydrateStrategy: editorModel.carbohydrateStrategy,
+            fatStrategy: editorModel.fatStrategy,
+          }),
         });
       });
     },

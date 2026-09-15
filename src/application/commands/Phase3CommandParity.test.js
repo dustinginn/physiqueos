@@ -32,6 +32,10 @@ const payloads = {
     protocolId: "recovery", protocolCategory: "recovery", executionId: "execution_foam_roll", reminderId: "reminder_foam_roll_daily",
     draft: { supportSchedule: { frequency: "daily", daysOfWeek: [], intervalDays: 1, timing: "specific", specificTime: "08:40", startDate: "2026-07-23", endDate: null }, reminderPreference: "remind", notes: "" },
   },
+  [Phase3Command.SAVE_NUTRITION_STRATEGY]: {
+    protocolId: "nutrition-protocol", expectedCurrentVersionId: "nutrition-protocol_v1",
+    draft: { proteinBasis: "fixed_grams", proteinRatio: 1, fixedProteinGrams: 200, carbohydrateStrategy: "balanced", fatStrategy: "higher_fat" },
+  },
 };
 
 describe("Phase 3 task command parity boundary", () => {
@@ -118,6 +122,7 @@ function commandPort(commandType) {
     [Phase3Command.COMMIT_TRAINING_SESSION]: "commitTrainingSession", [Phase3Command.UPSERT_ACTIVITY_DAY]: "upsertActivityDay",
     [Phase3Command.EDIT_DEXA_REVIEW]: "editDexaReview", [Phase3Command.COMMIT_EVIDENCE_REVIEW]: "requestEvidenceReviewConfirmation",
     [Phase3Command.SAVE_RECURRING_SUPPORT]: "saveRecurringSupport",
+    [Phase3Command.SAVE_NUTRITION_STRATEGY]: "saveNutritionStrategy",
   })[commandType];
 }
 

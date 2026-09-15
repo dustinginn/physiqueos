@@ -97,6 +97,29 @@ describe("provider-native core navigation reads", () => {
     expect(await narrow.getRecurringSupport({ executionId: "execution_does_not_exist" })).toBeNull();
   });
 
+  it("composes the Nutrition strategy detail and editor from the active protocol version", async () => {
+    const { narrow } = nutritionStrategyServices();
+    const result = await narrow.getNutritionStrategyDetail({ strategyId: "nutrition-protocol" });
+    expect(result.protocolId).toBe("nutrition-protocol");
+    expect(result.title).toBe("Macro Strategy");
+    expect(result.fields).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Carbohydrate Approach", value: "Performance" }),
+    ]));
+    expect(result.editor).toEqual({
+      expectedCurrentVersionId: "nutrition-protocol_v1",
+      proteinBasis: "body_weight",
+      proteinRatio: 1,
+      fixedProteinGrams: 150,
+      carbohydrateStrategy: "performance",
+      fatStrategy: "sustainable_minimum",
+    });
+  });
+
+  it("returns null for a Nutrition strategy id that is not an active, owned Nutrition protocol", async () => {
+    const { narrow } = nutritionStrategyServices();
+    expect(await narrow.getNutritionStrategyDetail({ strategyId: "does-not-exist" })).toBeNull();
+  });
+
   it("provides bounded Workout Logger and Morning Check-In models", async () => {
     const { narrow } = services();
     const logger = await narrow.getTrainingLogger();
@@ -257,6 +280,39 @@ function recurringSupportServices() {
       id: "reminder_foam_roll_daily", userId: "user", title: "Foam Roll", type: "recovery_reminder",
       linkedEntityType: "protocol", linkedEntityId: "recovery", active: true,
       schedule: { type: "daily", timeOfDay: "17:00" },
+    }],
+  };
+  return {
+    runtime,
+    narrow: createCoreNavigationReadService({
+      store: createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime }),
+      now: () => NOW,
+    }),
+  };
+}
+
+/// A small, hand-built runtime carrying a realistic active Nutrition
+/// protocol/version pair — isolated from the shared phase5-synthetic
+/// `services()` runtime for the same reason `recurringSupportServices()`
+/// is: the shared runtime carries no realistic strategy content to exercise
+/// `getNutritionStrategyDetail`'s actual detail/editor composition.
+function nutritionStrategyServices() {
+  const runtime = {
+    user: { id: "user", displayName: "Founder" },
+    goals: [{ id: "goal-one", userId: "user", title: "Lean Mass Goal", primary: true, status: "active" }],
+    protocols: [{
+      id: "nutrition-protocol", userId: "user", category: "nutrition", protocolType: "nutrition",
+      name: "Nutrition Strategy", status: "active", currentVersionId: "nutrition-protocol_v1",
+      currentGoalIds: ["goal-one"], activatedAt: "2026-07-01T00:00:00.000Z",
+    }],
+    protocolVersions: [{
+      id: "nutrition-protocol_v1", protocolId: "nutrition-protocol", versionNumber: 1,
+      status: "active", effectiveAt: "2026-07-01", endedAt: null,
+      effectiveStrategy: {
+        proteinBasis: "body_weight", proteinRatio: 1, fixedProtein: null, proteinTarget: null,
+        carbohydrateStrategy: "performance", fatStrategy: "sustainable_minimum",
+      },
+      goalLinks: [{ goalId: "goal-one", relationship: "supports" }],
     }],
   };
   return {

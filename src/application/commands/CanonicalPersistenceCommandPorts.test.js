@@ -225,6 +225,78 @@ describe("Phase 4 canonical command persistence ports", () => {
     }, "1", "dexa-stale"))).rejects.toMatchObject({ code: "STALE_VERSION" });
   });
 
+  it("saves a Nutrition strategy successor, superseding the current version and advancing currentVersionId", async () => {
+    const records = nutritionStrategyFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const saved = await ports.saveNutritionStrategy(commandContext({
+      protocolId: "nutrition-protocol",
+      expectedCurrentVersionId: "nutrition-protocol_v1",
+      draft: {
+        proteinBasis: "fixed_grams", proteinRatio: 1, fixedProteinGrams: 200,
+        carbohydrateStrategy: "balanced", fatStrategy: "higher_fat",
+      },
+    }, null, "nutrition-strategy-save"));
+    expect(saved.result.status).toBe("updated");
+    expect(saved.result.protocolId).toBe("nutrition-protocol");
+    const successorId = saved.result.currentVersionId;
+    expect(successorId).not.toBe("nutrition-protocol_v1");
+    const snapshot = records.snapshot();
+    const protocol = snapshot.protocols.find((item) => item.id === "nutrition-protocol");
+    expect(protocol.currentVersionId).toBe(successorId);
+    const previous = snapshot.protocolVersions.find((item) => item.id === "nutrition-protocol_v1");
+    expect(previous.status).toBe("superseded");
+    const successor = snapshot.protocolVersions.find((item) => item.id === successorId);
+    expect(successor.effectiveStrategy).toMatchObject({
+      proteinBasis: "fixed_grams", fixedProtein: 200, proteinTarget: 200,
+      carbohydrateStrategy: "balanced", fatStrategy: "higher_fat",
+    });
+  });
+
+  it("rejects a Nutrition strategy save against a stale expectedCurrentVersionId without mutating state", async () => {
+    const records = nutritionStrategyFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.saveNutritionStrategy(commandContext({
+      protocolId: "nutrition-protocol",
+      expectedCurrentVersionId: "nutrition-protocol_v0-stale",
+      draft: {
+        proteinBasis: "fixed_grams", proteinRatio: 1, fixedProteinGrams: 200,
+        carbohydrateStrategy: "balanced", fatStrategy: "higher_fat",
+      },
+    }, null, "nutrition-strategy-stale"))).rejects.toMatchObject({ code: "STALE_VERSION" });
+    const snapshot = records.snapshot();
+    expect(snapshot.protocols.find((item) => item.id === "nutrition-protocol").currentVersionId).toBe("nutrition-protocol_v1");
+    expect(snapshot.protocolVersions).toHaveLength(1);
+  });
+
+  it("treats an unchanged Nutrition strategy save as a no-op rather than an error", async () => {
+    const records = nutritionStrategyFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const saved = await ports.saveNutritionStrategy(commandContext({
+      protocolId: "nutrition-protocol",
+      expectedCurrentVersionId: "nutrition-protocol_v1",
+      draft: {
+        proteinBasis: "body_weight", proteinRatio: 1, fixedProteinGrams: 150,
+        carbohydrateStrategy: "performance", fatStrategy: "sustainable_minimum",
+      },
+    }, null, "nutrition-strategy-unchanged"));
+    expect(saved.result).toMatchObject({ status: "unchanged", currentVersionId: "nutrition-protocol_v1" });
+    expect(records.snapshot().protocolVersions).toHaveLength(1);
+  });
+
+  it("rejects an invalid Nutrition strategy draft without mutating state", async () => {
+    const records = nutritionStrategyFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.saveNutritionStrategy(commandContext({
+      protocolId: "nutrition-protocol",
+      expectedCurrentVersionId: "nutrition-protocol_v1",
+      draft: {
+        proteinBasis: "body_weight", proteinRatio: 9, fixedProteinGrams: 150,
+        carbohydrateStrategy: "performance", fatStrategy: "sustainable_minimum",
+      },
+    }, null, "nutrition-strategy-invalid"))).rejects.toMatchObject({ code: "NUTRITION_STRATEGY_INVALID" });
+    expect(records.snapshot().protocolVersions).toHaveLength(1);
+  });
+
   it("saves recurring support (Foam Rolling) atomically across the execution item and its reminder, and rejects a stale edit", async () => {
     const records = recurringSupportFixture();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });
@@ -439,6 +511,42 @@ function fixture() {
 }
 function commandContext(payload, expectedVersion, commandId) {
   return { ownerUserId, principal, metadata: { commandId, expectedVersion }, payload };
+}
+
+/// Isolated from the shared `fixture()` above — a realistic active Nutrition
+/// protocol/version pair (Web's own `saveStrategy` shape:
+/// `protocolType`/`category` "nutrition", `currentVersionId` pointing at an
+/// active, unended version with a real `effectiveStrategy`), rather than the
+/// shared fixture's generic version-less "protocol-one" stub.
+function nutritionStrategyFixture() {
+  return createInMemoryCanonicalRecordStore({
+    user: [{ id: ownerUserId, timeZone: "America/Los_Angeles", displayName: "Founder", version: 1 }],
+    protocols: [{
+      id: "nutrition-protocol", userId: ownerUserId, category: "nutrition", protocolType: "nutrition",
+      name: "Nutrition Strategy", status: "active", currentVersionId: "nutrition-protocol_v1",
+      currentGoalIds: ["goal-one"], relatedGoalIds: [], activatedAt: "2026-07-01T00:00:00.000Z", version: 1,
+    }],
+    protocolVersions: [{
+      id: "nutrition-protocol_v1", protocolId: "nutrition-protocol", versionNumber: 1,
+      status: "active", effectiveAt: "2026-07-01", endedAt: null,
+      effectiveStrategy: {
+        proteinBasis: "body_weight", proteinRatio: 1, fixedProtein: null, proteinTarget: null,
+        carbohydrateStrategy: "performance", fatStrategy: "sustainable_minimum",
+      },
+      goalLinks: [{ goalId: "goal-one", relationship: "supports" }],
+      author: { type: "user", id: ownerUserId, displayName: "Founder" },
+      intent: { summary: "Support the active Goal with the current Nutrition strategy." },
+      change: { reason: "Initial strategy.", changedFields: [], previousVersionId: null },
+      confirmation: { confirmedByUser: true }, createdAt: "2026-07-01T00:00:00.000Z", version: 1,
+    }],
+    goals: [{ id: "goal-one", userId: ownerUserId, title: "Goal", primary: true, status: "active", version: 1,
+      operatingState: { value: "build_lean_mass" }, phases: [] }],
+    executionItems: [], reminders: [], evidenceReviews: [], trainingPerformanceEvents: [],
+    weightEntries: [], dailyCheckIns: [], evidencePackages: [], canonicalEvidenceObjects: [],
+    dexaScans: [], progressPhotos: [], dailyBriefings: [], analyses: [],
+    briefingReconciliationWorkItems: [],
+    canonicalExerciseLibrary: [], piEnergyConfidenceWorkItems: [], piTrainingConfidenceWorkItems: [],
+  });
 }
 
 /// Isolated from the shared `fixture()` above (which uses generic
