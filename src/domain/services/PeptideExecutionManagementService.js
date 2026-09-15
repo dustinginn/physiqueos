@@ -43,105 +43,17 @@ export function createPeptideExecutionManagementService({ runtimeStorePath, live
   return { async save(command = {}) {
     const transaction = createUnitOfWork({ filePath: runtimeStorePath, liveStore, now, stageFrom: liveStore }).begin();
     try {
-      let recordId;
-      let expectedCanonical;
-      let expectedReminder;
-      let preservedReminderHistory;
+      let prepared;
       const staged = await transaction.mutate((store) => {
-        const protocol = store.protocols?.find((item) => item.id === command.protocolId && item.userId === command.userId && item.category === "peptide");
-        if (!protocol || protocol.status !== "active") throw typed(PeptideExecutionOutcome.NOT_FOUND, "The active peptide is unavailable.");
-        const draft = normalizePeptideExecutionDraft(command.draft);
-        const errors = validatePeptideExecutionDraft(draft);
-        if (errors.length) throw typed(PeptideExecutionOutcome.INVALID, errors[0]);
-        store.executionItems ??= [];
-        const classification=classifyPeptideExecutionState({protocol,executionItems:store.executionItems});
-        if(classification.state===PeptideExecutionState.INVALID)throw typed(PeptideExecutionOutcome.INVALID,"This peptide schedule is not available to edit right now.");
-        const existing=classification.record;
-        if (existing && Number(command.expectedRevision) !== Number(existing.executionRevision ?? 1)) throw typed(PeptideExecutionOutcome.VERSION_CONFLICT, "This schedule changed while you were editing it. Review the latest version and try again.");
-        if (!existing && command.expectedRevision != null && command.expectedRevision !== "") throw typed(PeptideExecutionOutcome.VERSION_CONFLICT, "This schedule changed while you were editing it. Review the latest version and try again.");
-        const goalIds = [...new Set([...(protocol.currentGoalIds ?? []), ...(protocol.relatedGoalIds ?? [])])];
-        const timestamp = now().toISOString();
-        recordId = existing?.id ?? `execution_peptide_${protocol.id}`;
-        const nextTimeline = draft.timelineOperation === "preserve"
-          ? normalizeTimeline(existing?.timeline ?? [])
-          : draft.timeline;
-        const timelineChanged = JSON.stringify(normalizeTimeline(existing?.timeline ?? [])) !== JSON.stringify(nextTimeline);
-        const timelineHistory = command.preserveTimelineHistory && existing && timelineChanged
-          ? [
-              ...(existing.timelineHistory ?? []),
-              {
-                archivedAt: timestamp,
-                executionRevision: existing.executionRevision ?? 1,
-                timeline: normalizeTimeline(existing.timeline ?? []),
-              },
-            ]
-          : existing?.timelineHistory;
-        const candidate = {
-          ...(existing ?? {}), id: recordId, userId: command.userId, type: "peptide", title: protocol.name,
-          description: "Peptide Execution", active: true, protocolRootId: protocol.id,
-          linkedStrategyIds: [protocol.id], linkedGoalIds: goalIds, linkedEvidenceTypes: [],
-          cadence: draft.cadence, preferredSchedule: draft.preferredSchedule, timingContext: draft.timingContext,
-          reminderPreference: draft.reminderPreference,
-          priority: command.preservePriority ? (existing?.priority ?? draft.priority) : draft.priority,
-          notes: draft.notes,
-          timeline: nextTimeline,
-          ...(timelineHistory ? { timelineHistory } : {}),
-          dosingStrategy: draft.dosingStrategyOperation === "clear"
-            ? null
-            : draft.dosingStrategy ?? existing?.dosingStrategy ?? null,
-          executionRevision: (existing?.executionRevision ?? 0) + 1,
-          author: command.author, createdAt: existing?.createdAt ?? timestamp, updatedAt: timestamp,
-        };
-        const executionUnchanged = classification.state===PeptideExecutionState.CANONICAL && semantic(normalizeCanonicalRecord(existing)) === semantic(candidate);
-        expectedCanonical = semantic(candidate);
-        const index = existing ? store.executionItems.findIndex((item) => item.id === existing.id) : -1;
-        if (!executionUnchanged) {
-          if (index >= 0) store.executionItems[index] = candidate; else store.executionItems.push(candidate);
-        }
-        let reminderChanged = false;
-        if (command.synchronizeReminder) {
-          store.reminders ??= [];
-          const matches = store.reminders.filter((item) => item.userId === command.userId && item.type === "protocol_reminder" && item.linkedEntityId === protocol.id);
-          if (matches.length > 1) throw typed(PeptideExecutionOutcome.INVALID, "This reminder is not available to edit right now.");
-          const reminder = matches[0] ?? null;
-          preservedReminderHistory = reminder ? reminderHistory(reminder) : null;
-          const reminderSchedule = supportScheduleToReminder(draft.supportSchedule, draft.timingContext);
-          const reminderCandidate = {
-            ...(reminder ?? {}),
-            id: reminder?.id ?? `reminder_${protocol.id}`,
-            userId: command.userId,
-            title: protocol.name,
-            type: "protocol_reminder",
-            linkedEntityType: "protocol",
-            linkedEntityId: protocol.id,
-            relatedGoalIds: goalIds,
-            schedule: {
-              ...reminderSchedule,
-              timezone: reminder?.schedule?.timezone ?? null,
-            },
-            active: draft.reminderPreference === "remind",
-            createdAt: reminder?.createdAt ?? timestamp,
-            updatedAt: timestamp,
-          };
-          expectedReminder = reminderSemantic(reminderCandidate);
-          reminderChanged = !reminder || reminderSemantic(reminder) !== expectedReminder;
-          if (reminderChanged) {
-            const reminderIndex = reminder ? store.reminders.findIndex((item) => item.id === reminder.id) : -1;
-            if (reminderIndex >= 0) store.reminders[reminderIndex] = reminderCandidate;
-            else store.reminders.push(reminderCandidate);
-          }
-        }
-        if (executionUnchanged && !reminderChanged) throw typed(PeptideExecutionOutcome.UNCHANGED, "No changes to save.");
-        faults.afterWrite?.(store, candidate);
-        return { created: !existing, executionId: recordId, executionRevision: candidate.executionRevision };
+        prepared = preparePeptideExecutionTransition(store, command, now());
+        if (!prepared.ok) throw typed(prepared.outcome, prepared.reason);
+        const result = applyPreparedPeptideExecutionTransition(store, prepared);
+        faults.afterWrite?.(store, prepared.executionCandidate);
+        return result;
       });
       const committed = await transaction.commit({ validateFinalized(store) {
         faults.beforeVerification?.(store);
-        const matches = store.executionItems.filter((item) => item.type === "peptide" && item.protocolRootId === command.protocolId);
-        if (!(matches.length === 1 && matches[0].id === recordId && semantic(matches[0]) === expectedCanonical)) return false;
-        if (!command.synchronizeReminder) return true;
-        const reminders = store.reminders.filter((item) => item.userId === command.userId && item.type === "protocol_reminder" && item.linkedEntityId === command.protocolId);
-        return reminders.length === 1 && reminderSemantic(reminders[0]) === expectedReminder && (!preservedReminderHistory || reminderHistory(reminders[0]) === preservedReminderHistory);
+        return verifyPreparedPeptideExecutionTransition(store, prepared);
       } });
       return { outcome: PeptideExecutionOutcome.SUCCESS, committed: true, revision: committed.revision, ...staged };
     } catch (error) {
@@ -151,6 +63,156 @@ export function createPeptideExecutionManagementService({ runtimeStorePath, live
       return { outcome: error?.code === FounderStoreUnitOfWorkErrorCode.REVISION_CONFLICT ? PeptideExecutionOutcome.VERSION_CONFLICT : PeptideExecutionOutcome.PERSISTENCE_FAILURE, committed: false, reason: "We could not update this schedule. Nothing was changed." };
     }
   } };
+}
+
+/// The single transport-independent peptide mutation. Web's file/runtime
+/// transaction and Native's bounded canonical command both prepare, apply,
+/// and verify this exact transition; neither transport owns dosing,
+/// timeline-history, executionRevision, or reminder synchronization rules.
+export function preparePeptideExecutionTransition(store, command = {}, at = new Date()) {
+  const protocol = store?.protocols?.find((item) =>
+    item.id === command.protocolId && item.userId === command.userId && item.category === "peptide"
+  );
+  if (!protocol || protocol.status !== "active") {
+    return rejectedTransition(PeptideExecutionOutcome.NOT_FOUND, "The active peptide is unavailable.");
+  }
+  const draft = normalizePeptideExecutionDraft(command.draft);
+  const errors = validatePeptideExecutionDraft(draft);
+  if (errors.length) return rejectedTransition(PeptideExecutionOutcome.INVALID, errors[0]);
+  const classification = classifyPeptideExecutionState({ protocol, executionItems: store.executionItems ?? [] });
+  if (classification.state === PeptideExecutionState.INVALID) {
+    return rejectedTransition(PeptideExecutionOutcome.INVALID, "This peptide schedule is not available to edit right now.");
+  }
+  const existing = classification.record;
+  if (existing && Number(command.expectedRevision) !== Number(existing.executionRevision ?? 1)) {
+    return rejectedTransition(PeptideExecutionOutcome.VERSION_CONFLICT, "This schedule changed while you were editing it. Review the latest version and try again.");
+  }
+  if (!existing && command.expectedRevision != null && command.expectedRevision !== "") {
+    return rejectedTransition(PeptideExecutionOutcome.VERSION_CONFLICT, "This schedule changed while you were editing it. Review the latest version and try again.");
+  }
+  const goalIds = [...new Set([...(protocol.currentGoalIds ?? []), ...(protocol.relatedGoalIds ?? [])])];
+  const timestamp = new Date(at).toISOString();
+  const recordId = existing?.id ?? `execution_peptide_${protocol.id}`;
+  const nextTimeline = draft.timelineOperation === "preserve"
+    ? normalizeTimeline(existing?.timeline ?? [])
+    : draft.timeline;
+  const timelineChanged = JSON.stringify(normalizeTimeline(existing?.timeline ?? [])) !== JSON.stringify(nextTimeline);
+  const timelineHistory = command.preserveTimelineHistory && existing && timelineChanged
+    ? [
+        ...(existing.timelineHistory ?? []),
+        {
+          archivedAt: timestamp,
+          executionRevision: existing.executionRevision ?? 1,
+          timeline: normalizeTimeline(existing.timeline ?? []),
+        },
+      ]
+    : existing?.timelineHistory;
+  const executionCandidate = {
+    ...(existing ?? {}), id: recordId, userId: command.userId, type: "peptide", title: protocol.name,
+    description: "Peptide Execution", active: true, protocolRootId: protocol.id,
+    linkedStrategyIds: [protocol.id], linkedGoalIds: goalIds, linkedEvidenceTypes: [],
+    cadence: draft.cadence, preferredSchedule: draft.preferredSchedule, timingContext: draft.timingContext,
+    reminderPreference: draft.reminderPreference,
+    priority: command.preservePriority ? (existing?.priority ?? draft.priority) : draft.priority,
+    notes: draft.notes,
+    timeline: nextTimeline,
+    ...(timelineHistory ? { timelineHistory } : {}),
+    dosingStrategy: draft.dosingStrategyOperation === "clear"
+      ? null
+      : draft.dosingStrategy ?? existing?.dosingStrategy ?? null,
+    executionRevision: (existing?.executionRevision ?? 0) + 1,
+    author: command.author, createdAt: existing?.createdAt ?? timestamp, updatedAt: timestamp,
+  };
+  const executionChanged = classification.state !== PeptideExecutionState.CANONICAL ||
+    semantic(normalizeCanonicalRecord(existing)) !== semantic(executionCandidate);
+  let reminder = null;
+  let reminderCandidate = null;
+  let reminderChanged = false;
+  let preservedReminderHistory = null;
+  if (command.synchronizeReminder) {
+    const matches = (store.reminders ?? []).filter((item) =>
+      item.userId === command.userId && item.type === "protocol_reminder" && item.linkedEntityId === protocol.id
+    );
+    if (matches.length > 1) {
+      return rejectedTransition(PeptideExecutionOutcome.INVALID, "This reminder is not available to edit right now.");
+    }
+    reminder = matches[0] ?? null;
+    preservedReminderHistory = reminder ? reminderHistory(reminder) : null;
+    const reminderSchedule = supportScheduleToReminder(draft.supportSchedule, draft.timingContext);
+    reminderCandidate = {
+      ...(reminder ?? {}),
+      id: reminder?.id ?? `reminder_${protocol.id}`,
+      userId: command.userId,
+      title: protocol.name,
+      type: "protocol_reminder",
+      linkedEntityType: "protocol",
+      linkedEntityId: protocol.id,
+      relatedGoalIds: goalIds,
+      schedule: { ...reminderSchedule, timezone: reminder?.schedule?.timezone ?? null },
+      active: draft.reminderPreference === "remind",
+      createdAt: reminder?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    };
+    reminderChanged = !reminder || reminderSemantic(reminder) !== reminderSemantic(reminderCandidate);
+  }
+  if (!executionChanged && !reminderChanged) {
+    return rejectedTransition(PeptideExecutionOutcome.UNCHANGED, "No changes to save.");
+  }
+  return Object.freeze({
+    ok: true,
+    protocolId: protocol.id,
+    userId: command.userId,
+    created: !existing,
+    existingExecutionId: existing?.id ?? null,
+    executionCandidate,
+    executionChanged,
+    existingReminderId: reminder?.id ?? null,
+    reminderCandidate,
+    reminderChanged,
+    synchronizeReminder: command.synchronizeReminder === true,
+    preservedReminderHistory,
+  });
+}
+
+export function applyPreparedPeptideExecutionTransition(store, prepared) {
+  if (!prepared?.ok) throw new Error("A prepared peptide transition is required.");
+  store.executionItems ??= [];
+  if (prepared.executionChanged) {
+    const index = prepared.existingExecutionId
+      ? store.executionItems.findIndex((item) => item.id === prepared.existingExecutionId)
+      : -1;
+    if (index >= 0) store.executionItems[index] = structuredClone(prepared.executionCandidate);
+    else store.executionItems.push(structuredClone(prepared.executionCandidate));
+  }
+  if (prepared.synchronizeReminder && prepared.reminderChanged) {
+    store.reminders ??= [];
+    const index = prepared.existingReminderId
+      ? store.reminders.findIndex((item) => item.id === prepared.existingReminderId)
+      : -1;
+    if (index >= 0) store.reminders[index] = structuredClone(prepared.reminderCandidate);
+    else store.reminders.push(structuredClone(prepared.reminderCandidate));
+  }
+  return {
+    created: prepared.created,
+    executionId: prepared.executionCandidate.id,
+    executionRevision: prepared.executionCandidate.executionRevision,
+  };
+}
+
+export function verifyPreparedPeptideExecutionTransition(store, prepared) {
+  if (!prepared?.ok) return false;
+  const matches = (store.executionItems ?? []).filter((item) =>
+    item.type === "peptide" && item.protocolRootId === prepared.protocolId
+  );
+  if (!(matches.length === 1 && matches[0].id === prepared.executionCandidate.id &&
+      semantic(matches[0]) === semantic(prepared.executionCandidate))) return false;
+  if (!prepared.synchronizeReminder) return true;
+  const reminders = (store.reminders ?? []).filter((item) =>
+    item.userId === prepared.userId && item.type === "protocol_reminder" && item.linkedEntityId === prepared.protocolId
+  );
+  return reminders.length === 1 &&
+    reminderSemantic(reminders[0]) === reminderSemantic(prepared.reminderCandidate) &&
+    (!prepared.preservedReminderHistory || reminderHistory(reminders[0]) === prepared.preservedReminderHistory);
 }
 
 export function buildPeptideExecutionDraftFromFormData(formData) {
@@ -186,24 +248,41 @@ export function buildPeptideSupportDraftFromFormData(formData) {
   } catch {
     return normalizePeptideExecutionDraft({ malformedSupport: true });
   }
+  return buildPeptideSupportDraft({
+    supportSchedule: schedule,
+    dosingStrategy: strategy,
+    legacyTimeline,
+    timingContext: get("timingContext"),
+    reminderPreference: get("reminderPreference"),
+    priority: get("legacyPriority"),
+    notes: get("notes"),
+  });
+}
+
+/// Shared Web/Native adapter from the Support editor's structured values to
+/// the canonical execution draft. In particular, custom dosing clears the
+/// generated strategy while preserving the existing manually-authored
+/// timeline; every other pattern regenerates its dated phases server-side.
+export function buildPeptideSupportDraft(value = {}) {
+  const schedule = normalizeSupportSchedule(value.supportSchedule);
+  const strategy = normalizePeptideDosingStrategy(value.dosingStrategy);
   let generated;
   try {
     generated = strategy.pattern === "custom" ? null : generatePeptideDosingTimeline(strategy);
   } catch {
     return normalizePeptideExecutionDraft({ malformedSupport: true });
   }
-  const executionSchedule = supportScheduleToExecution(schedule);
   return normalizePeptideExecutionDraft({
-    ...executionSchedule,
+    ...supportScheduleToExecution(schedule),
     supportSchedule: schedule,
     dosingStrategy: strategy.pattern === "custom" ? null : strategy,
     dosingStrategyOperation: strategy.pattern === "custom" ? "clear" : "replace",
-    timingContext: get("timingContext"),
-    reminderPreference: get("reminderPreference"),
-    priority: get("legacyPriority"),
-    notes: get("notes"),
+    timingContext: value.timingContext,
+    reminderPreference: value.reminderPreference,
+    priority: value.priority,
+    notes: value.notes,
     timelineOperation: strategy.pattern === "custom" ? "preserve" : "replace",
-    timeline: strategy.pattern === "custom" ? legacyTimeline : generated,
+    timeline: strategy.pattern === "custom" ? value.legacyTimeline : generated,
   });
 }
 
@@ -314,5 +393,6 @@ function normalizeCadence(value) { const cadence=String(value??"").trim().toLowe
 function normalizeTime(value) { const raw = String(value ?? ""); return raw === "night" ? "before_bed" : raw; }
 function reminderSemantic(item) { return JSON.stringify({ active: item.active, schedule: item.schedule }); }
 function reminderHistory(item) { return JSON.stringify({ completedAt: item.completedAt ?? null, completionHistory: item.completionHistory ?? null }); }
+function rejectedTransition(outcome, reason) { return Object.freeze({ ok: false, outcome, reason }); }
 function typed(outcome, message) { const error = new Error(message); error.peptideExecutionOutcome = outcome; return error; }
 function findTyped(error) { let current=error; while(current){if(current.peptideExecutionOutcome)return{outcome:current.peptideExecutionOutcome,message:current.message};current=current.cause;} return null; }

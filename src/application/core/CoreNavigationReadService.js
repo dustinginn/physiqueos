@@ -12,6 +12,11 @@ import { MORNING_EVIDENCE_RECOVERY_STATUSES } from "../../domain/services/Mornin
 import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";
 import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
 import { createRecurringSupportHydrationModel } from "../../domain/services/RecurringSupportManagementService.js";
+import {
+  classifyPeptideExecutionState,
+  createPeptideSupportHydrationModel,
+  PeptideExecutionState,
+} from "../../domain/services/PeptideExecutionManagementService.js";
 import { formatSupportScheduleSummary } from "../../domain/models/SupportScheduleModel.js";
 import { composeOperatingPlanStrategyDetail } from "../../domain/services/OperatingPlanStrategyDetailService.js";
 import { createStrategyEditorModel, TRAINING_AREAS } from "../../domain/services/StrategyEditorService.js";
@@ -220,6 +225,42 @@ export function createCoreNavigationReadService({
           purpose: executionItem.description ?? "",
           supportSummary: formatSupportScheduleSummary(hydration.supportSchedule),
           hydration,
+        });
+      });
+    },
+    /// Typed peptide Support read for Native. It reuses the same
+    /// classification and hydration functions as Web's detail/editor route,
+    /// while projecting only editable fields and presentation-ready phases
+    /// rather than exposing execution/reminder runtime records.
+    getPeptideSupport({ protocolId }) {
+      return withContext("core.navigation.peptide-support", "operatingPlan", ({ ownerUserId, runtime }) => {
+        const protocol = (runtime.protocols ?? []).find((item) =>
+          item.id === protocolId && item.userId === ownerUserId && item.category === "peptide" && item.status === "active"
+        );
+        if (!protocol) return null;
+        const classification = classifyPeptideExecutionState({ protocol, executionItems: runtime.executionItems ?? [] });
+        if (classification.state === PeptideExecutionState.INVALID) return null;
+        const executionItem = classification.record;
+        const reminders = (runtime.reminders ?? []).filter((item) =>
+          item.userId === ownerUserId && item.type === "protocol_reminder" && item.linkedEntityId === protocol.id
+        );
+        if (reminders.length > 1) return null;
+        const reminder = reminders[0] ?? null;
+        const hydration = createPeptideSupportHydrationModel({ executionItem, protocol, reminder });
+        const localDate = getLocalDateKey(now(), runtime.user?.timeZone ?? runtime.user?.timezone);
+        return Object.freeze({
+          protocolId: protocol.id,
+          executionId: executionItem?.id ?? null,
+          executionRevision: hydration.executionRevision,
+          name: protocol.name ?? executionItem?.title ?? "Peptide Support",
+          purpose: protocol.purpose ?? protocol.description ?? executionItem?.description ?? "",
+          state: classification.state.toUpperCase(),
+          supportSchedule: hydration.supportSchedule,
+          dosing: projectPeptideDosingStrategy(hydration.dosingStrategy),
+          timeline: projectPeptideTimeline(hydration.legacyTimeline, localDate, executionItem?.id ?? protocol.id),
+          reminderPreference: hydration.reminderPreference,
+          timingContext: hydration.timingContext,
+          notes: hydration.notes,
         });
       });
     },
@@ -519,6 +560,52 @@ function projectGoalContext(goal, date) {
       name: phase.name ?? null,
     } : null,
   };
+}
+
+function projectPeptideDosingStrategy(strategy = {}) {
+  const number = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+  return Object.freeze({
+    pattern: strategy.pattern,
+    startingDoseAmount: number(strategy.startingDose?.amount),
+    startingDoseUnit: strategy.startingDose?.unit ?? "",
+    startDate: strategy.startDate ?? "",
+    stepAmount: number(strategy.stepAmount),
+    stepInterval: number(strategy.stepInterval),
+    stepUnit: strategy.stepUnit,
+    targetDoseAmount: number(strategy.targetDose),
+    holdDuration: number(strategy.holdDuration),
+    holdUnit: strategy.holdUnit,
+    decreaseAmount: number(strategy.decreaseAmount),
+    decreaseInterval: number(strategy.decreaseInterval),
+    decreaseUnit: strategy.decreaseUnit,
+    landingDoseAmount: number(strategy.landingDose),
+    endDate: strategy.endDate ?? null,
+  });
+}
+
+function projectPeptideTimeline(timeline = [], localDate, identity) {
+  return Object.freeze(timeline.map((phase, index) => {
+    const status = phase.startDate > localDate
+      ? "upcoming"
+      : phase.endDate && phase.endDate < localDate
+        ? "completed"
+        : "active";
+    return Object.freeze({
+      id: `${identity}:phase:${index + 1}:${phase.startDate}`,
+      label: phase.notes || `Phase ${index + 1}`,
+      window: `${formatPeptideDate(phase.startDate)} – ${phase.endDate ? formatPeptideDate(phase.endDate) : "Until changed"}`,
+      doseAmount: Number.isFinite(Number(phase.dose?.amount)) ? Number(phase.dose.amount) : 0,
+      doseUnit: phase.dose?.unit ?? "",
+      status,
+    });
+  }));
+}
+
+function formatPeptideDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return String(value ?? "");
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+  });
 }
 
 function createReadPrincipal(userId) {

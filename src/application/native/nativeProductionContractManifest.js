@@ -33,6 +33,7 @@ export const NativeProductionResource = Object.freeze({
   OPERATING_PLAN_RECURRING_SUPPORT: "operating-plan-recurring-support",
   OPERATING_PLAN_NUTRITION_STRATEGY: "operating-plan-nutrition-strategy",
   OPERATING_PLAN_TRAINING_STRATEGY: "operating-plan-training-strategy",
+  OPERATING_PLAN_PEPTIDE_SUPPORT: "operating-plan-peptide-support",
 });
 
 const reads = Object.freeze([
@@ -68,6 +69,7 @@ const reads = Object.freeze([
   read("operating-plan-recurring-support", "/api/v1/native/read/operating-plan-recurring-support", "coreNavigation.getRecurringSupport"),
   read("operating-plan-nutrition-strategy", "/api/v1/native/read/operating-plan-nutrition-strategy", "coreNavigation.getNutritionStrategyDetail"),
   read("operating-plan-training-strategy", "/api/v1/native/read/operating-plan-training-strategy", "coreNavigation.getTrainingStrategyDetail"),
+  read("operating-plan-peptide-support", "/api/v1/native/read/operating-plan-peptide-support", "coreNavigation.getPeptideSupport"),
 ]);
 
 const writes = Object.freeze([
@@ -85,6 +87,7 @@ const writes = Object.freeze([
   write(Phase3Command.ADD_TO_MY_LIBRARY, ["canonicalExerciseId"], "If-Match not used; idempotent add of an existing canonical exercise to My Library"),
   write(Phase3Command.CREATE_CANONICAL_EXERCISE, ["canonicalName", "primaryMuscleGroupId"], "If-Match not used; server rejects with 409 CANONICAL_EXERCISE_DUPLICATE when the full catalog already has a matching identity"),
   write(Phase3Command.SAVE_TRAINING_STRATEGY, ["protocolId", "expectedCurrentVersionId", "draft"], "If-Match not used; concurrency is enforced via expectedCurrentVersionId matching the protocol's own currentVersionId"),
+  write(Phase3Command.SAVE_PEPTIDE_SUPPORT, ["protocolId", "draft"], "If-Match carries executionRevision when configured; omission is valid only while no execution exists"),
 ]);
 
 export const nativeProductionContractManifest = Object.freeze({

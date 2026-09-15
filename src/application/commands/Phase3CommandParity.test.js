@@ -45,6 +45,14 @@ const payloads = {
       priorities: ["chest", "back"], progression: "aggressive",
     },
   },
+  [Phase3Command.SAVE_PEPTIDE_SUPPORT]: {
+    protocolId: "peptide-protocol",
+    draft: {
+      supportSchedule: { frequency: "weekly", daysOfWeek: ["thursday"], intervalDays: 1, timing: "specific", specificTime: "21:45", startDate: "2026-05-21", endDate: null },
+      dosingStrategy: { pattern: "stay", startingDose: { amount: "0.5", unit: "mg" }, startDate: "2026-05-21", endDate: null },
+      timingContext: "fasted_before_bed", reminderPreference: "remind", notes: "",
+    },
+  },
 };
 
 describe("Phase 3 task command parity boundary", () => {
@@ -135,6 +143,7 @@ function commandPort(commandType) {
     [Phase3Command.ADD_TO_MY_LIBRARY]: "addToMyLibrary",
     [Phase3Command.CREATE_CANONICAL_EXERCISE]: "createCanonicalExercise",
     [Phase3Command.SAVE_TRAINING_STRATEGY]: "saveTrainingStrategy",
+    [Phase3Command.SAVE_PEPTIDE_SUPPORT]: "savePeptideSupport",
   })[commandType];
 }
 

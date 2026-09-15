@@ -32,6 +32,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.ADD_TO_MY_LIBRARY,
   Phase3Command.CREATE_CANONICAL_EXERCISE,
   Phase3Command.SAVE_TRAINING_STRATEGY,
+  Phase3Command.SAVE_PEPTIDE_SUPPORT,
 ]);
 
 export function createNativeProductionContractService({
@@ -147,6 +148,9 @@ export function createNativeProductionContractService({
         }); break;
         case "operating-plan-training-strategy": data = await readers.core.getTrainingStrategyDetail({
           strategyId: required(input.strategyId, "strategyId"),
+        }); break;
+        case "operating-plan-peptide-support": data = await readers.core.getPeptideSupport({
+          protocolId: required(input.protocolId, "protocolId"),
         }); break;
         default: throw unavailableResource();
       }

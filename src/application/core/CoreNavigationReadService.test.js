@@ -146,6 +146,40 @@ describe("provider-native core navigation reads", () => {
     expect(await narrow.getTrainingStrategyDetail({ strategyId: "does-not-exist" })).toBeNull();
   });
 
+  it("projects the production peptide Support editor without exposing runtime records", async () => {
+    const { narrow } = peptideSupportServices();
+    const result = await narrow.getPeptideSupport({ protocolId: "peptide-protocol" });
+    expect(result).toMatchObject({
+      protocolId: "peptide-protocol",
+      executionId: "execution-peptide",
+      executionRevision: 3,
+      name: "Retatrutide",
+      state: "CANONICAL",
+      supportSchedule: {
+        frequency: "weekly", daysOfWeek: ["thursday"], timing: "specific",
+        specificTime: "21:45", startDate: "2026-05-21", endDate: null,
+      },
+      dosing: { pattern: "stay", startingDoseAmount: 0.5, startingDoseUnit: "mg", endDate: null },
+      reminderPreference: "remind",
+      timingContext: "fasted_before_bed",
+    });
+    expect(result.timeline).toEqual([
+      expect.objectContaining({ doseAmount: 0.5, doseUnit: "mg", status: "active" }),
+    ]);
+    expect(result).not.toHaveProperty("reminder");
+    expect(result).not.toHaveProperty("timelineHistory");
+  });
+
+  it("fails closed for an unavailable or ambiguous peptide Support plan", async () => {
+    const { narrow, runtime } = peptideSupportServices();
+    expect(await narrow.getPeptideSupport({ protocolId: "missing" })).toBeNull();
+    runtime.executionItems.push({ ...runtime.executionItems[0], id: "duplicate-peptide" });
+    expect(await narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).toBeNull();
+    runtime.executionItems.pop();
+    runtime.reminders.push({ ...runtime.reminders[0], id: "duplicate-reminder" });
+    expect(await narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).toBeNull();
+  });
+
   it("provides bounded Workout Logger and Morning Check-In models", async () => {
     const { narrow } = services();
     const logger = await narrow.getTrainingLogger();
@@ -408,6 +442,37 @@ function trainingStrategyServices() {
         progression: { pace: "moderate" },
       },
       goalLinks: [{ goalId: "goal-one", relationship: "supports" }],
+    }],
+  };
+  return {
+    runtime,
+    narrow: createCoreNavigationReadService({
+      store: createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime }),
+      now: () => NOW,
+    }),
+  };
+}
+
+function peptideSupportServices() {
+  const runtime = {
+    user: { id: "user", displayName: "Founder", timeZone: "America/Los_Angeles" },
+    protocols: [{
+      id: "peptide-protocol", userId: "user", category: "peptide", name: "Retatrutide",
+      purpose: "Support the active body-composition strategy.", status: "active", currentGoalIds: ["goal-one"],
+    }],
+    executionItems: [{
+      id: "execution-peptide", userId: "user", type: "peptide", title: "Retatrutide", active: true,
+      protocolRootId: "peptide-protocol", linkedStrategyIds: ["peptide-protocol"], linkedGoalIds: ["goal-one"],
+      cadence: { type: "weekly" },
+      preferredSchedule: { daysOfWeek: ["thursday"], timeOfDay: "21:45", startDate: "2026-05-21", endDate: null },
+      timingContext: "fasted_before_bed", reminderPreference: "remind", priority: "high", notes: "Current plan",
+      dosingStrategy: { pattern: "stay", startingDose: { amount: "0.5", unit: "mg" }, startDate: "2026-05-21", endDate: null },
+      timeline: [{ startDate: "2026-05-21", endDate: null, dose: { amount: "0.5", unit: "mg" }, notes: "" }],
+      executionRevision: 3,
+    }],
+    reminders: [{
+      id: "reminder-peptide", userId: "user", type: "protocol_reminder", linkedEntityId: "peptide-protocol",
+      active: true, schedule: { type: "weekly", daysOfWeek: ["thursday"], timeOfDay: "21:45" },
     }],
   };
   return {

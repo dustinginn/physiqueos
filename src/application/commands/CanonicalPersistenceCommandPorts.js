@@ -35,6 +35,14 @@ import {
   prepareActiveProtocolSuccessorTransition,
   verifyActiveProtocolSuccessorState,
 } from "../../domain/services/ActiveProtocolSuccessorService.js";
+import {
+  applyPreparedPeptideExecutionTransition,
+  buildPeptideSupportDraft,
+  classifyPeptideExecutionState,
+  PeptideExecutionOutcome,
+  preparePeptideExecutionTransition,
+  verifyPreparedPeptideExecutionTransition,
+} from "../../domain/services/PeptideExecutionManagementService.js";
 import { buildStrategySuccessorPayload } from "../../domain/services/StrategyEditorService.js";
 import { getLocalDateKey } from "../../domain/utils/localDate.js";
 
@@ -45,7 +53,7 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "completeTrainingLogger", "confirmNutritionEvidence", "confirmPhotoEvidence", "confirmDexaEvidence",
   "upsertNutritionDay", "syncActivityDay", "commitTrainingSession", "upsertActivityDay",
   "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport", "saveNutritionStrategy",
-  "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy",
+  "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
 ]);
 
 const RECURRING_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "executionItems", "reminders"]);
@@ -55,6 +63,8 @@ const NUTRITION_STRATEGY_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "prot
 const NUTRITION_STRATEGY_READ_COLLECTIONS = Object.freeze(["user", ...NUTRITION_STRATEGY_BOUNDED_COLLECTIONS]);
 const TRAINING_STRATEGY_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "protocolVersions"]);
 const TRAINING_STRATEGY_READ_COLLECTIONS = Object.freeze(["user", ...TRAINING_STRATEGY_BOUNDED_COLLECTIONS]);
+const PEPTIDE_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["executionItems", "reminders"]);
+const PEPTIDE_SUPPORT_READ_COLLECTIONS = Object.freeze(["user", "protocols", ...PEPTIDE_SUPPORT_BOUNDED_COLLECTIONS]);
 
 export function createCanonicalPersistenceCommandPorts({ records, now = () => new Date() } = {}) {
   if (!records?.get || !records?.put) throw new Error("Canonical command ports require a record store.");
@@ -169,6 +179,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     addToMyLibrary,
     createCanonicalExercise,
     saveTrainingStrategy,
+    savePeptideSupport,
   });
 
   /// The one canonical write for every "recurring support" execution item
@@ -328,6 +339,90 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     return {
       status: "committed",
       result: { status: "unchanged", protocolId: protocol.id, currentVersionId: protocol.currentVersionId },
+      outbox: [],
+    };
+  }
+
+  /// Native peptide Support save — a bounded canonical transaction around
+  /// the exact pure transition Web's PeptideExecutionManagementService also
+  /// invokes. executionRevision remains the concurrency authority; dosing
+  /// timeline replacement/history and reminder synchronization are applied
+  /// and persisted together inside the enclosing command transaction.
+  async function savePeptideSupport(context) {
+    const { candidate, before } = await loadCandidate(PEPTIDE_SUPPORT_READ_COLLECTIONS, context.ownerUserId);
+    const requested = context.payload.draft ?? {};
+    const draft = buildPeptideSupportDraft({
+      supportSchedule: requested.supportSchedule,
+      dosingStrategy: requested.dosingStrategy,
+      timingContext: requested.timingContext,
+      reminderPreference: requested.reminderPreference,
+      notes: requested.notes,
+    });
+    const prepared = preparePeptideExecutionTransition(candidate, {
+      protocolId: context.payload.protocolId,
+      userId: context.ownerUserId,
+      expectedRevision: context.metadata.expectedVersion,
+      draft,
+      author: {
+        type: "user",
+        id: context.ownerUserId,
+        displayName: candidate.user?.displayName ?? candidate.user?.name ?? "Founder",
+      },
+      synchronizeReminder: true,
+      preservePriority: true,
+      preserveTimelineHistory: true,
+    }, now());
+    if (!prepared.ok) {
+      if (prepared.outcome === PeptideExecutionOutcome.NOT_FOUND) {
+        throw problem(404, "PEPTIDE_SUPPORT_UNAVAILABLE", prepared.reason);
+      }
+      if (prepared.outcome === PeptideExecutionOutcome.VERSION_CONFLICT) {
+        const protocol = (candidate.protocols ?? []).find((item) => item.id === context.payload.protocolId);
+        const current = protocol
+          ? classifyPeptideExecutionState({ protocol, executionItems: candidate.executionItems ?? [] }).record
+          : null;
+        throw staleVersionProblem({
+          expectedVersion: context.metadata.expectedVersion,
+          actualVersion: current?.executionRevision ?? (current ? 1 : null),
+          resource: `peptide-execution:${context.payload.protocolId}`,
+        });
+      }
+      if (prepared.outcome === PeptideExecutionOutcome.UNCHANGED) {
+        const protocol = (candidate.protocols ?? []).find((item) => item.id === context.payload.protocolId);
+        const current = protocol
+          ? classifyPeptideExecutionState({ protocol, executionItems: candidate.executionItems ?? [] }).record
+          : null;
+        return {
+          status: "committed",
+          result: {
+            status: "unchanged",
+            protocolId: context.payload.protocolId,
+            executionId: current?.id ?? null,
+            executionRevision: current?.executionRevision ?? (current ? 1 : null),
+          },
+          outbox: [],
+        };
+      }
+      throw problem(400, "PEPTIDE_SUPPORT_INVALID", prepared.reason ?? "This peptide Support plan is invalid.");
+    }
+    const result = applyPreparedPeptideExecutionTransition(candidate, prepared);
+    if (!verifyPreparedPeptideExecutionTransition(candidate, prepared)) {
+      throw problem(500, "PEPTIDE_SUPPORT_PERSISTENCE_FAILED", "We could not confirm this peptide Support update. Nothing was changed.");
+    }
+    await persistCandidateCollections({
+      before,
+      candidate,
+      collections: PEPTIDE_SUPPORT_BOUNDED_COLLECTIONS,
+      ownerUserId: context.ownerUserId,
+    });
+    return {
+      status: "committed",
+      result: {
+        status: "updated",
+        protocolId: context.payload.protocolId,
+        executionId: result.executionId,
+        executionRevision: result.executionRevision,
+      },
       outbox: [],
     };
   }

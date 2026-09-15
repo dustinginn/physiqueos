@@ -471,6 +471,114 @@ describe("Phase 4 canonical command persistence ports", () => {
     }, "1", "recurring-support-stale"))).rejects.toMatchObject({ code: "STALE_VERSION" });
   });
 
+  it("applies a Native peptide dose edit without changing its canonical schedule", async () => {
+    const records = peptideSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol", draft: peptideSupportDraft({ notes: "Original Support" }),
+    }, "1", "peptide-support-normalize-dose"));
+    const before = records.snapshot();
+
+    await ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol",
+      draft: peptideSupportDraft({ startingDose: "0.75", notes: "Original Support" }),
+    }, "2", "peptide-support-dose-only"));
+    const after = records.snapshot();
+    expect(after.executionItems[0].dosingStrategy.startingDose).toEqual({ amount: "0.75", unit: "mg" });
+    expect(after.executionItems[0].timeline[0].dose).toEqual({ amount: "0.75", unit: "mg" });
+    expect(after.executionItems[0].preferredSchedule).toEqual(before.executionItems[0].preferredSchedule);
+    expect(after.reminders[0].schedule).toEqual(before.reminders[0].schedule);
+  });
+
+  it("applies a Native peptide schedule edit without changing its dosing phases", async () => {
+    const records = peptideSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol", draft: peptideSupportDraft({ notes: "Original Support" }),
+    }, "1", "peptide-support-normalize-schedule"));
+    const before = records.snapshot();
+
+    await ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol",
+      draft: peptideSupportDraft({ specificTime: "20:30", notes: "Original Support" }),
+    }, "2", "peptide-support-schedule-only"));
+    const after = records.snapshot();
+    expect(after.executionItems[0].preferredSchedule.timeOfDay).toBe("20:30");
+    expect(after.reminders[0].schedule.timeOfDay).toBe("20:30");
+    expect(after.executionItems[0].dosingStrategy).toEqual(before.executionItems[0].dosingStrategy);
+    expect(after.executionItems[0].timeline).toEqual(before.executionItems[0].timeline);
+    expect(after.executionItems[0].timelineHistory).toEqual(before.executionItems[0].timelineHistory);
+  });
+
+  it("round-trips combined Native peptide dose and schedule edits through one canonical transition", async () => {
+    const records = peptideSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const completionHistory = structuredClone(records.snapshot().reminders[0].completionHistory);
+    const saved = await ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol",
+      draft: peptideSupportDraft({ specificTime: "20:30", pattern: "titrate_up", endDate: null }),
+    }, "1", "peptide-support-combined"));
+    expect(saved.result).toMatchObject({
+      status: "updated", protocolId: "peptide-protocol",
+      executionId: "execution-peptide", executionRevision: 2,
+    });
+    const snapshot = records.snapshot();
+    const execution = snapshot.executionItems[0];
+    expect(execution).toMatchObject({
+      id: "execution-peptide", protocolRootId: "peptide-protocol", executionRevision: 2,
+      priority: "high", preferredSchedule: { timeOfDay: "20:30", endDate: null },
+      dosingStrategy: { pattern: "titrate_up", startingDose: { amount: "0.5", unit: "mg" }, targetDose: "1.5" },
+    });
+    expect(execution.timeline.map((phase) => phase.dose.amount)).toEqual(["0.5", "1", "1.5"]);
+    expect(execution.timeline.at(-1).endDate).toBeNull();
+    expect(execution.timelineHistory).toEqual([{
+      archivedAt: "2026-08-11T12:00:00.000Z",
+      executionRevision: 1,
+      timeline: [{ startDate: "2026-05-21", endDate: null, dose: { amount: "0.5", unit: "mg" }, notes: "Original" }],
+    }]);
+    expect(snapshot.reminders[0]).toMatchObject({
+      id: "reminder-peptide", active: true,
+      schedule: { daysOfWeek: ["thursday"], timeOfDay: "20:30", endDate: null },
+    });
+    expect(snapshot.reminders[0].completionHistory).toEqual(completionHistory);
+  });
+
+  it("preserves peptide end-date semantics and rejects a stale executionRevision without mutation", async () => {
+    const records = peptideSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol", draft: peptideSupportDraft({ endDate: "2026-12-31" }),
+    }, "1", "peptide-support-ended"));
+    const ended = records.snapshot();
+    expect(ended.executionItems[0].preferredSchedule.endDate).toBe("2026-12-31");
+    expect(ended.executionItems[0].timeline.at(-1).endDate).toBe("2026-12-31");
+    expect(ended.reminders[0].schedule.endDate).toBe("2026-12-31");
+
+    const beforeStale = structuredClone(ended);
+    await expect(ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol", draft: peptideSupportDraft({ specificTime: "19:00" }),
+    }, "1", "peptide-support-stale"))).rejects.toMatchObject({ code: "STALE_VERSION" });
+    expect(records.snapshot()).toEqual(beforeStale);
+  });
+
+  it("idempotently replays the same Native peptide command without a second phase archival", async () => {
+    const records = peptideSupportFixture();
+    const service = createPhase3CommandService({
+      transactionRunner: createInMemoryFoundationTransactionStore(),
+      ports: createCanonicalPersistenceCommandPorts({ records, now }),
+    });
+    const input = {
+      commandType: Phase3Command.SAVE_PEPTIDE_SUPPORT,
+      principal,
+      metadata: { idempotencyKey: "peptide-support-idempotent", expectedVersion: "1" },
+      payload: { protocolId: "peptide-protocol", draft: peptideSupportDraft({ specificTime: "20:30" }) },
+    };
+    expect((await service.execute(input)).outcome).toBe("committed");
+    expect((await service.execute(input)).outcome).toBe("replayed");
+    expect(records.snapshot().executionItems[0]).toMatchObject({ executionRevision: 2 });
+    expect(records.snapshot().executionItems[0].timelineHistory).toHaveLength(1);
+  });
+
   it("dismisses only the owned current review without creating or changing canonical history", async () => {
     const records = fixture();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });
@@ -756,6 +864,53 @@ function recurringSupportFixture() {
     weightEntries: [], dailyCheckIns: [], evidencePackages: [], canonicalEvidenceObjects: [],
     dexaScans: [], protocolVersions: [], progressPhotos: [], dailyBriefings: [], analyses: [],
     briefingReconciliationWorkItems: [],
+    canonicalExerciseLibrary: [], piEnergyConfidenceWorkItems: [], piTrainingConfidenceWorkItems: [],
+  });
+}
+
+function peptideSupportDraft({ specificTime = "21:45", pattern = "stay", startingDose = "0.5", endDate = null, notes = "Updated Support" } = {}) {
+  return {
+    supportSchedule: {
+      frequency: "weekly", daysOfWeek: ["thursday"], intervalDays: 1,
+      timing: "specific", specificTime, startDate: "2026-05-21", endDate,
+    },
+    dosingStrategy: {
+      pattern, startingDose: { amount: startingDose, unit: "mg" }, startDate: "2026-05-21",
+      stepAmount: "0.5", stepInterval: 1, stepUnit: "weeks", targetDose: "1.5",
+      holdDuration: 1, holdUnit: "weeks", decreaseAmount: "0.5", decreaseInterval: 1,
+      decreaseUnit: "weeks", landingDose: "0.5", endDate,
+    },
+    timingContext: "fasted_before_bed", reminderPreference: "remind", notes,
+  };
+}
+
+function peptideSupportFixture() {
+  return createInMemoryCanonicalRecordStore({
+    user: [{ id: ownerUserId, timeZone: "America/Los_Angeles", displayName: "Founder", version: 1 }],
+    protocols: [{
+      id: "peptide-protocol", userId: ownerUserId, category: "peptide", name: "Retatrutide",
+      status: "active", currentGoalIds: ["goal-one"], relatedGoalIds: [], version: 1,
+    }],
+    executionItems: [{
+      id: "execution-peptide", userId: ownerUserId, type: "peptide", title: "Retatrutide", active: true,
+      protocolRootId: "peptide-protocol", linkedStrategyIds: ["peptide-protocol"], linkedGoalIds: ["goal-one"], linkedEvidenceTypes: [],
+      cadence: { type: "weekly" }, preferredSchedule: { daysOfWeek: ["thursday"], timeOfDay: "21:45", startDate: "2026-05-21", endDate: null },
+      timingContext: "fasted_before_bed", reminderPreference: "remind", priority: "high", notes: "Original Support",
+      dosingStrategy: { pattern: "stay", startingDose: { amount: "0.5", unit: "mg" }, startDate: "2026-05-21", endDate: null },
+      timeline: [{ startDate: "2026-05-21", endDate: null, dose: { amount: "0.5", unit: "mg" }, notes: "Original" }],
+      executionRevision: 1, author: { type: "user", id: ownerUserId },
+      createdAt: "2026-05-21T12:00:00.000Z", updatedAt: "2026-05-21T12:00:00.000Z", version: 1,
+    }],
+    reminders: [{
+      id: "reminder-peptide", userId: ownerUserId, title: "Retatrutide", type: "protocol_reminder",
+      linkedEntityType: "protocol", linkedEntityId: "peptide-protocol", relatedGoalIds: ["goal-one"], active: true,
+      schedule: { type: "weekly", cadence: "weekly", interval: 1, unit: "week", daysOfWeek: ["thursday"], dayOfWeek: "thursday", timeOfDay: "21:45", startDate: "2026-05-21", endDate: null, timingContext: "fasted_before_bed", timezone: "America/Los_Angeles" },
+      completedAt: "2026-08-07T12:00:00.000Z", completionHistory: [{ id: "prior-dose", evidenceDate: "2026-08-07" }],
+      createdAt: "2026-05-21T12:00:00.000Z", updatedAt: "2026-05-21T12:00:00.000Z", version: 1,
+    }],
+    goals: [], protocolVersions: [], evidenceReviews: [], trainingPerformanceEvents: [],
+    weightEntries: [], dailyCheckIns: [], evidencePackages: [], canonicalEvidenceObjects: [],
+    dexaScans: [], progressPhotos: [], dailyBriefings: [], analyses: [], briefingReconciliationWorkItems: [],
     canonicalExerciseLibrary: [], piEnergyConfidenceWorkItems: [], piTrainingConfidenceWorkItems: [],
   });
 }

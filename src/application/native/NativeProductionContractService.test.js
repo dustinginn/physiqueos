@@ -24,6 +24,7 @@ function fixture(overrides = {}) {
       getRecurringSupport: call({ protocolId: "protocol-recovery-1", protocolCategory: "recovery", executionId: "execution_foam_roll", reminderId: "reminder_foam_roll_daily", hydration: { executionRevision: 1 } }),
       getNutritionStrategyDetail: call({ protocolId: "nutrition-protocol", title: "Macro Strategy", editor: { expectedCurrentVersionId: "nutrition-protocol_v1" } }),
       getTrainingStrategyDetail: call({ protocolId: "training-protocol", title: "Current Training Strategy", editor: { expectedCurrentVersionId: "training-protocol_v1" } }),
+      getPeptideSupport: call({ protocolId: "peptide-protocol", executionId: "execution-peptide", executionRevision: 2, name: "Retatrutide" }),
     },
     activeGoal: { getPreview: call({ goalId: "goal-build", phaseId: "phase-2", confidence: { score: 62, band: "Moderate", movement: "held" } }) },
     completedGoal: { getVisibleAbs: call({ goalId: "goal-visible-abs", status: "completed" }) },
@@ -257,6 +258,7 @@ describe("Native production contract boundary", () => {
       "operating-plan-recurring-support": { executionId: "execution_foam_roll" },
       "operating-plan-nutrition-strategy": { strategyId: "nutrition-protocol" },
       "operating-plan-training-strategy": { strategyId: "training-protocol" },
+      "operating-plan-peptide-support": { protocolId: "peptide-protocol" },
     };
     const results = new Map();
     for (const declaration of nativeProductionContractManifest.reads) {
@@ -441,6 +443,7 @@ describe("Native production contract boundary", () => {
       "operating-plan.recurring-support.save.v1", "operating-plan.nutrition-strategy.save.v1",
       "training-catalog.my-library.add.v1", "training-catalog.exercise.create.v1",
       "operating-plan.training-strategy.save.v1",
+      "operating-plan.peptide-support.save.v1",
     ]);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/HealthKit|activity-day\.sync/);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/storage_key|Spaces|databaseName|provider-authoritative/);
