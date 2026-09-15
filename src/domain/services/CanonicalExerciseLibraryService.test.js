@@ -4,6 +4,7 @@ import {
   canonicalDefinitionsPendingCreation,
   createCanonicalExerciseDefinition,
   findCanonicalExerciseConflict,
+  findCanonicalExerciseConflicts,
   listExercisesWithoutCanonicalIdentity,
   prepareCanonicalExerciseIdentitiesForConfirmation,
   searchCanonicalExerciseOptions,
@@ -19,6 +20,16 @@ import { canonicalJson } from "../../contracts/v1/canonicalJson";
 afterEach(() => registerRuntimeTrainingExercises([]));
 
 describe("canonical exercise review resolution", () => {
+  it("retains every shared-alias conflict without duplicate catalog identities", () => {
+    const existing = [
+      { id: "test_row_one", name: "Test Row One", aliases: ["test shared row"] },
+      { id: "test_row_two", name: "Test Row Two", aliases: ["test shared row"] },
+      { id: "test_row_two", name: "Test Row Two", aliases: ["test shared row"] },
+    ];
+    expect(findCanonicalExerciseConflicts({ name: "test shared row" }, existing).map((item) => item.id))
+      .toEqual(["test_row_one", "test_row_two"]);
+    expect(findCanonicalExerciseConflict({ name: "test shared row" }, existing)?.id).toBe("test_row_one");
+  });
   it("blocks unresolved confirmation without changing the package", () => {
     const evidencePackage = fixture();
     expect(() => assertNoUnresolvedProvisionalExercises(evidencePackage))

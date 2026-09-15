@@ -52,15 +52,22 @@ export function createCanonicalExerciseDefinition(input = {}) {
 }
 
 export function findCanonicalExerciseConflict(definition, existing = []) {
+  return findCanonicalExerciseConflicts(definition, existing)[0] ?? null;
+}
+
+// The same exact-name/alias policy, retaining every distinct identity so a
+// transport can ask the user rather than guess when an alias is shared.
+export function findCanonicalExerciseConflicts(definition, existing = []) {
   const candidates = [...listCanonicalTrainingExerciseIdentities(), ...existing];
   const incoming = new Set(
     [definition.name, ...(definition.aliases ?? [])].map(normalizeExercisePhrase)
   );
-  return candidates.find((candidate) =>
+  const matches = candidates.filter((candidate) =>
     [candidate.name, ...(candidate.aliases ?? [])]
       .map(normalizeExercisePhrase)
       .some((value) => incoming.has(value))
-  ) ?? null;
+  );
+  return [...new Map(matches.map((candidate) => [candidate.id, candidate])).values()];
 }
 
 export function searchCanonicalExerciseOptions(candidates = [], query = "") {

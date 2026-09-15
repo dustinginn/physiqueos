@@ -9,6 +9,19 @@ const principal = { userId: ownerUserId, deviceId: "device-one", sessionId: "ses
 const now = () => new Date("2026-08-11T12:00:00.000Z");
 
 describe("Phase 4 canonical command persistence ports", () => {
+  it("returns all ambiguous catalog candidates without creating an identity or membership", async () => {
+    const records = createInMemoryCanonicalRecordStore({ canonicalExerciseLibrary: [
+      { id: "test_row_one", name: "Test Row One", aliases: ["test shared row"] },
+      { id: "test_row_two", name: "Test Row Two", aliases: ["test shared row"] },
+    ] });
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.createCanonicalExercise(commandContext({ canonicalName: "Test Shared Row", primaryMuscleGroupId: "back" }, null, "ambiguous-create")))
+      .rejects.toMatchObject({ code: "CANONICAL_EXERCISE_DUPLICATE", recovery: { candidates: [
+        { id: "test_row_one", name: "Test Row One" }, { id: "test_row_two", name: "Test Row Two" },
+      ] } });
+    expect(records.snapshot().canonicalExerciseLibrary).toHaveLength(2);
+    expect(records.snapshot().myLibraryMemberships ?? []).toEqual([]);
+  });
   it("preserves command outcomes across independent legacy-copy adapters", async () => {
     const left = fixture(); const right = fixture();
     const commands = [

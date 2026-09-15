@@ -16,6 +16,7 @@ import { createTrainingExerciseRelationshipGroup } from "../../domain/models/tra
 import {
   createCanonicalExerciseDefinition,
   findCanonicalExerciseConflict,
+  findCanonicalExerciseConflicts,
 } from "../../domain/services/CanonicalExerciseLibraryService.js";
 import { applyDexaReviewMeasurements } from "../../domain/services/DexaPdfIntakeService.js";
 import { assertValidDexaScan } from "../../domain/services/DEXAContract.js";
@@ -922,14 +923,18 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     } catch (error) {
       throw canonicalValidationProblem(error);
     }
-    const conflict = findCanonicalExerciseConflict(definition, existingLibrary);
+    const conflicts = findCanonicalExerciseConflicts(definition, existingLibrary);
+    const conflict = conflicts[0];
     if (conflict) {
       throw new ApplicationProblem({
         status: 409,
         code: "CANONICAL_EXERCISE_DUPLICATE",
         title: "An existing canonical exercise already matches this name.",
         detail: `"${context.payload.canonicalName}" matches the existing canonical exercise "${conflict.name}".`,
-        recovery: { existingCanonicalExerciseId: conflict.id, existingCanonicalExerciseName: conflict.name },
+        recovery: {
+          ...(conflicts.length === 1 ? { existingCanonicalExerciseId: conflict.id, existingCanonicalExerciseName: conflict.name } : {}),
+          candidates: conflicts.map((item) => ({ id: item.id, name: item.name })),
+        },
       });
     }
     await records.put({
