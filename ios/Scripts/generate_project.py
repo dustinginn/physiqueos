@@ -116,6 +116,7 @@ app_files = [
     ("Networking", "EvidenceReviewReadyNotifier.swift"),
     ("Networking", "NotificationDiagnostics.swift"),
     ("Networking", "RecurringSupportAPI.swift"),
+    ("Networking", "NutritionStrategyAPI.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "HomeGreeting.swift"),
     ("SharedUI", "IconBadge.swift"),
@@ -323,6 +324,7 @@ test_files = [
     ("PhysiqueOSTests", "PriorityOccurrenceCalculatorTests.swift"),
     ("PhysiqueOSTests", "NotificationDiagnosticsTests.swift"),
     ("PhysiqueOSTests", "OperatingPlanNotificationLinkTests.swift"),
+    ("PhysiqueOSTests", "NutritionStrategyAPITests.swift"),
 ]
 
 ui_test_files = [

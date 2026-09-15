@@ -259,8 +259,9 @@ final class AppEnvironment {
         }
     }
 
-    /// `.operatingPlan` is enabled for the recurring-support shape only —
-    /// see `NativeProductWriteDomain.enabledUnderFounderProduction`.
+    /// `.operatingPlan` is enabled for the recurring-support shape and the
+    /// Nutrition strategy — see
+    /// `NativeProductWriteDomain.enabledUnderFounderProduction`.
     /// Sandbox never calls this seam (Recovery/Tracking screens read/write
     /// `operatingPlanStore` directly under Sandbox) —
     /// `NotAvailableRecurringSupportAPI` exists only so the property is
@@ -269,6 +270,19 @@ final class AppEnvironment {
         switch nativeAuthority {
         case .sandbox: NotAvailableRecurringSupportAPI()
         case .founderProduction: ProductionRecurringSupportAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
+        }
+    }
+
+    /// `.operatingPlan` is enabled for Nutrition — see
+    /// `NativeProductWriteDomain.enabledUnderFounderProduction`. Sandbox
+    /// never calls this seam (the Nutrition strategy detail/editor reads
+    /// and writes `operatingPlanStore` directly under Sandbox) —
+    /// `NotAvailableNutritionStrategyAPI` exists only so the property is
+    /// total.
+    var nutritionStrategyAPI: NutritionStrategyAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableNutritionStrategyAPI()
+        case .founderProduction: ProductionNutritionStrategyAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
         }
     }
 
