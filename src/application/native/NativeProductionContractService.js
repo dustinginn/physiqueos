@@ -214,7 +214,12 @@ export function createNativeProductionContractService({
           ...(review.evidenceTypes ?? []),
           ...(review.interpretedEvidence?.evidence_objects ?? []).map((item) => item?.evidence_type),
         ].filter(Boolean));
-        if (evidenceTypes.size === 0 || [...evidenceTypes].some((type) => !NATIVE_EVIDENCE_REVIEW_TYPES.has(type))) {
+        // Discarding a pending photo review cannot create canonical photo
+        // history. Keep confirmation's narrower family allowlist intact.
+        const allowedTypes = commandType === Phase3Command.DISPOSE_EVIDENCE_REVIEW
+          ? new Set([...NATIVE_EVIDENCE_REVIEW_TYPES, "photo_session", "progress_photo"])
+          : NATIVE_EVIDENCE_REVIEW_TYPES;
+        if (evidenceTypes.size === 0 || [...evidenceTypes].some((type) => !allowedTypes.has(type))) {
           throw new ApplicationProblem({
             status: 400,
             code: "NATIVE_EVIDENCE_REVIEW_UNAVAILABLE",

@@ -306,7 +306,7 @@ async function createEvidencePackageFromStoredArtifacts({
 }) {
   const imageArtifacts = storedArtifacts.filter((artifact) => isImageArtifact(artifact));
   const pdfArtifacts = storedArtifacts.filter((artifact) => isPdfArtifact(artifact));
-  const classifiedImages = classifyImageArtifacts(imageArtifacts);
+  const classifiedImages = classifyImageArtifacts(imageArtifacts, { expectedEvidenceType });
   const packages = [];
 
   if (classifiedImages.screenshots.length > 0) {
@@ -386,6 +386,13 @@ async function createEvidencePackageFromStoredArtifacts({
           userId,
         });
 
+  if (expectedEvidenceType === "training" && (evidencePackage.evidence_objects ?? []).some((object) =>
+    ["photo_session", "progress_photo", "photo", "photos"].includes(object?.evidence_type)
+  )) {
+    const error = new Error("Workout screenshot interpretation did not retain the requested workout context.");
+    error.code = "WORKOUT_SCREENSHOT_CONTEXT_CONFLICT";
+    throw error;
+  }
   return evidencePackage;
 }
 
@@ -1428,7 +1435,13 @@ function getSourceModality(artifacts = []) {
   return "manual";
 }
 
-function classifyImageArtifacts(artifacts = []) {
+export function classifyImageArtifacts(artifacts = [], { expectedEvidenceType = "auto" } = {}) {
+  // Explicit Workout Logger context is stronger than filename, encoding,
+  // or byte-size heuristics. A workout screenshot can be a large JPEG or
+  // HEIC; those properties must never reroute it into body-photo review.
+  if (expectedEvidenceType === "training") {
+    return { progressPhotos: [], screenshots: [...artifacts] };
+  }
   return artifacts.reduce(
     (groups, artifact) => {
       if (isLikelyProgressPhotoArtifact(artifact)) {

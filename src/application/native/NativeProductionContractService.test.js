@@ -414,7 +414,7 @@ describe("Native production contract boundary", () => {
     expect(current.confirmEvidenceReview).not.toHaveBeenCalled();
   });
 
-  it("allows versioned Native dismissal only for approved Evidence Review families", async () => {
+  it("allows versioned photo dismissal without enabling photo confirmation", async () => {
     const current = fixture();
     await current.service.command({
       request: request(), commandType: "evidence-review.dispose.v1",
@@ -430,10 +430,15 @@ describe("Native production contract boundary", () => {
     current.readers.evidenceReview.getReview.mockResolvedValue({
       review: { id: "review-photo", evidenceTypes: ["progress_photo"] },
     });
-    await expect(current.service.command({
+    await current.service.command({
       request: request(), commandType: "evidence-review.dispose.v1",
       metadata: { idempotencyKey: "dismiss-photo", expectedVersion: "1" },
       payload: { reviewId: "review-photo", disposition: "discarded" },
+    });
+    await expect(current.service.command({
+      request: request(), commandType: "evidence-review.commit.v1",
+      metadata: { idempotencyKey: "confirm-photo", expectedVersion: "1" },
+      payload: { reviewId: "review-photo" },
     })).rejects.toMatchObject({ status: 400, code: "NATIVE_EVIDENCE_REVIEW_UNAVAILABLE" });
   });
 

@@ -11,7 +11,7 @@ vi.mock("../interpreters/ScreenshotInterpreterService", () => ({
     mocks.reconcileIndependentlyInterpretedScreenshotPackages,
 }));
 
-const { reinterpretEvidenceIntakeSubmissionFromStoredArtifacts } =
+const { reinterpretEvidenceIntakeSubmissionFromStoredArtifacts, interpretEvidenceIntakeStoredArtifacts } =
   await import("./EvidenceIntakeService.js");
 
 describe("stored Apple Health evidence reinterpretation", () => {
@@ -44,6 +44,40 @@ describe("stored Apple Health evidence reinterpretation", () => {
         diagnostics: { stages: [], warnings: [] },
       })
     );
+  });
+
+  it("routes explicit workout-context large JPEG and HEIC artifacts through the screenshot interpreter", async () => {
+    const artifacts = [1, 2, 3].map((ordinal) => ({
+      id: `image-${ordinal}`, ordinal,
+      fileName: `Apple Health Screenshot ${ordinal}.jpg`,
+      mimeType: ordinal === 2 ? "image/heic" : "image/jpeg",
+      buffer: Buffer.alloc(1_100_000),
+      uploadedAt: "2026-09-15T19:00:00.000Z",
+      observedDate: "2026-09-15", dataUrl: "data:image/jpeg;base64,c3ludGhldGlj",
+    }));
+    const result = await interpretEvidenceIntakeStoredArtifacts({
+      capturedAt: "2026-09-15T19:00:00.000Z", evidenceDate: "2026-09-15",
+      expectedEvidenceType: "training", submissionId: "synthetic-workout", userId: "founder",
+      sourceArtifacts: artifacts, loadArtifact: async ({ artifact }) => artifact,
+    });
+    expect(mocks.interpretScreenshotsWithVision).toHaveBeenCalledTimes(3);
+    expect(mocks.interpretScreenshotsWithVision.mock.calls.every(([input]) => input.expectedEvidenceType === "training")).toBe(true);
+    expect(result.evidencePackage.evidence_objects).toHaveLength(3);
+    expect(result.evidencePackage.evidence_objects.every((item) => item.evidence_type === "training")).toBe(true);
+  });
+
+  it("does not let an interpreter photo classification override explicit Training context", async () => {
+    mocks.interpretScreenshotsWithVision.mockResolvedValue({
+      provider: "internal", evidencePackage: {
+        package_id: "synthetic", evidence_objects: [{ id: "candidate", evidence_type: "photo_session" }],
+        provenance: { source_artifacts: [] }, interpreter: { provider: "internal" },
+      },
+    });
+    const artifact = { id: "image", ordinal: 1, fileName: "workout.jpg", mimeType: "image/jpeg", buffer: Buffer.alloc(1_100_000), observedDate: "2026-09-15", uploadedAt: "2026-09-15T19:00:00.000Z" };
+    await expect(interpretEvidenceIntakeStoredArtifacts({
+      capturedAt: "2026-09-15T19:00:00.000Z", evidenceDate: "2026-09-15", expectedEvidenceType: "training",
+      submissionId: "synthetic", userId: "founder", sourceArtifacts: [artifact], loadArtifact: async ({ artifact: value }) => value,
+    })).rejects.toMatchObject({ code: "WORKOUT_SCREENSHOT_CONTEXT_CONFLICT" });
   });
 
   it("reuses all three stored artifacts, their historical date, and the package identity", async () => {

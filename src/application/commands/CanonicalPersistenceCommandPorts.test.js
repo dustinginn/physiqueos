@@ -616,6 +616,18 @@ describe("Phase 4 canonical command persistence ports", () => {
     })).rejects.toMatchObject({ code: "RESOURCE_NOT_FOUND" });
   });
 
+  it.each(["committing", "confirmed", "partially_committed"])("refuses current %s review dismissal without any record mutation", async (status) => {
+    const records = fixture();
+    const current = records.snapshot().evidenceReviews.find((item) => item.id === "review-one");
+    await records.put({ collection: "evidenceReviews", recordId: "review-one", expectedVersion: 1, payload: { ...current, status } });
+    const before = records.snapshot();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.disposeEvidenceReview(commandContext({
+      reviewId: "review-one", disposition: "discarded",
+    }, "2", "dismiss-unsupported"))).rejects.toMatchObject({ status: 409, code: "EVIDENCE_REVIEW_NOT_DISMISSIBLE" });
+    expect(records.snapshot()).toEqual(before);
+  });
+
   it("replays an identical Evidence Review dismissal without a second transition", async () => {
     const records = fixture();
     const service = createPhase3CommandService({
