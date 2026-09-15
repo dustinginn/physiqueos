@@ -48,9 +48,9 @@ describe("production Training Logger integration", () => {
     expect(coreNavigationSource).toContain("initialHistorySessions: historySessions");
   });
 
-  it("uses a concrete timezone fallback when profile timezone fields are null", () => {
+  it("uses the shared canonical timezone resolver when profile timezone fields are null", () => {
     expect(coreNavigationSource).toContain(
-      'user?.timeZone ?? user?.timezone ?? "America/Los_Angeles"'
+      'resolveLocalTimeZone(user?.timeZone ?? user?.timezone)'
     );
     expect(coreNavigationSource).toContain("getLocalDateKey");
   });

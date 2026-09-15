@@ -57,8 +57,15 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     expect(Object.keys(detail)).not.toContain("protocolVersions");
   });
 
-  it("follows all eight production-shaped landing destinations through their bounded canonical reads", async () => {
-    const fixture = setup();
+  it.each([
+    ["valid IANA", { timeZone: "Pacific/Auckland" }],
+    ["missing", {}],
+    ["undefined", { timeZone: undefined, timezone: undefined }],
+    ["production absent timeZone/null timezone", { timezone: null }],
+    ["both null", { timeZone: null, timezone: null }],
+    ["existing invalid-zone fallback", { timezone: "not-an-IANA-zone" }],
+  ])("follows all eight production-shaped landing destinations with %s owner timezone", async (_label, timezoneFields) => {
+    const fixture = setup({ timezoneFields });
     const reads = fixture.reads();
     const runtime = fixture.snapshot();
     const sections = buildOperatingPlan({
@@ -92,6 +99,35 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
       }
     }
     expect(sections).toHaveLength(8);
+  });
+
+  it("reads four active Supplement daypart/legacy schedules with null owner timezone without normalizing persisted state", async () => {
+    const runtime = source(); delete runtime.user.timeZone; runtime.user.timezone = null;
+    const baseRoot = runtime.protocols.find(item => item.id === "supplement");
+    const baseVersion = runtime.protocolVersions.find(item => item.protocolId === "supplement");
+    const baseExecution = runtime.executionItems.find(item => item.id === "execution-supplement");
+    const baseReminder = runtime.reminders.find(item => item.id === "reminder-supplement");
+    runtime.protocols = runtime.protocols.filter(item => item.category !== "supplement");
+    runtime.protocolVersions = runtime.protocolVersions.filter(item => item.protocolId !== "supplement");
+    runtime.executionItems = runtime.executionItems.filter(item => item.type !== "supplement");
+    runtime.reminders = runtime.reminders.filter(item => item.type !== "supplement_reminder");
+    for (const [index, name] of ["Tongkat Ali", "Fadogia Agrestis", "Multivitamin", "Electrolytes"].entries()) {
+      const id = `supplement-${index}`, startDate = index === 1 ? "2026-07-25" : "";
+      runtime.protocols.push({ ...baseRoot, id, name, currentVersionId: `${id}-v1`, startDate: "" });
+      runtime.protocolVersions.push({ ...baseVersion, id: `${id}-v1`, protocolId: id });
+      runtime.executionItems.push({ ...structuredClone(baseExecution), id: `execution-${id}`, protocolRootId: id, supplementVersionId: `${id}-v1`,
+        cadence: { type: index === 1 ? "every_other_day" : "daily" }, preferredSchedule: { timeOfDay: "morning", daysOfWeek: [], startDate, endDate: null } });
+      runtime.reminders.push({ ...structuredClone(baseReminder), id: `reminder-${id}`, linkedEntityId: id, linkedExecutionId: `execution-${id}`,
+        schedule: { type: "daily", timeOfDay: "morning", startDate, timezone: null } });
+    }
+    const before = JSON.stringify(runtime);
+    const reads = createCoreNavigationReadService({ now: () => NOW,
+      store: createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime }) });
+    expect((await reads.getOperatingPlanProtocolDomain({ protocolId: "supplement-0" })).methods).toHaveLength(4);
+    for (let i = 0; i < 4; i++) expect(await reads.getSupplementSupport({ protocolId: `supplement-${i}` })).toMatchObject({
+      executionRevision: 1, supportSchedule: { timing: "morning", endDate: null } });
+    expect(await reads.getSupplementStrategyEditor()).toMatchObject({ mode: "create", startDate: "2026-09-15" });
+    expect(JSON.stringify(runtime)).toBe(before);
   });
 
   it("round-trips Supplement dose/schedule/reminder edits with dual concurrency and preserved history", async () => {
@@ -302,8 +338,13 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
   });
 });
 
-function setup() {
+function setup({ timezoneFields } = {}) {
   const runtime = source();
+  if (timezoneFields) {
+    delete runtime.user.timeZone;
+    Object.assign(runtime.user, timezoneFields);
+    for (const reminder of runtime.reminders) reminder.schedule.timezone = null;
+  }
   let clock = NOW;
   let revision = runtime.revision;
   const { revision: _revision, ...collections } = runtime;

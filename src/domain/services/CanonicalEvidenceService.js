@@ -995,6 +995,45 @@ export function auditHistoricalWorkoutLoggerApplePairs({ canonicalObjects = [], 
   return { candidates: candidates.sort(order), excludedAmbiguous: excludedAmbiguous.sort(order) };
 }
 
+// Historical repair reuses the forward canonical payload/provenance mergers.
+// Keeping the structured identity preserves existing performance linkage; its
+// already-canonical exercises and frozen attribution are not reinterpreted.
+export function reconcileHistoricalWorkoutLoggerApplePair({ canonicalObjects, userId, structuredCanonicalId, telemetryCanonicalId }) {
+  const audit = auditHistoricalWorkoutLoggerApplePairs({ canonicalObjects, userId });
+  const eligible = audit.candidates.find((pair) => pair.structuredCanonicalId === structuredCanonicalId &&
+    pair.telemetryCanonicalIds.length === 1 && pair.telemetryCanonicalIds[0] === telemetryCanonicalId);
+  if (!eligible) throw new Error("Historical Training pair is not uniquely compatible.");
+  const structured = canonicalObjects.find((record) => record.canonicalId === structuredCanonicalId);
+  const telemetry = canonicalObjects.find((record) => record.canonicalId === telemetryCanonicalId);
+  for (const field of ["goalId", "phaseId"]) {
+    if ((structured[field] ?? structured.goalPhaseAttribution?.[field] ?? null) !==
+        (telemetry[field] ?? telemetry.goalPhaseAttribution?.[field] ?? null)) {
+      throw new Error("Historical Training attribution does not agree.");
+    }
+  }
+  const survivor = {
+    ...structured,
+    payload: {
+      ...mergeTrainingPayload(structured.payload, telemetry.payload),
+      id: structured.payload.id,
+      exercises: structured.payload.exercises,
+      ...(structured.payload.exerciseRelationshipGroups !== undefined
+        ? { exerciseRelationshipGroups: structured.payload.exerciseRelationshipGroups } : {}),
+    },
+    provenance: mergeCanonicalProvenanceObjects(structured.provenance, telemetry.provenance),
+  };
+  const retired = createSupersededCanonicalObject({ object: telemetry,
+    reason: "Uniquely compatible structured Training and Apple telemetry reconciled.", supersededBy: survivor.canonicalId });
+  const date = getDateKey(structured.payload.observed_at);
+  const scoped = canonicalObjects.filter((record) => record.userId === userId &&
+    !isSupersededCanonicalObject(record) && getDateKey(record.payload?.observed_at) === date &&
+    ["training", "activity_day"].includes(record.payload?.evidence_type) && record.canonicalId !== retired.canonicalId);
+  const byId = new Map(scoped.map((record) => [record.canonicalId, record.canonicalId === survivor.canonicalId ? survivor : record]));
+  reconcileActivityDaysWithTrainingSessions(byId);
+  return [byId.get(survivor.canonicalId), retired,
+    ...[...byId.values()].filter((record) => record.payload.evidence_type === "activity_day")];
+}
+
 function isCompatibleTrainingPayload(left = {}, right = {}) {
   if (!isTrainingSession(left) || !isTrainingSession(right)) return false;
   return assessWorkoutDuplicatePair(left, right).outcome === "duplicate";

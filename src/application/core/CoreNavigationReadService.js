@@ -135,7 +135,7 @@ export function createCoreNavigationReadService({
           category: representative.category,
           executionItems: runtime.executionItems ?? [],
           goals: runtime.goals ?? [],
-          localDate: getLocalDateKey(now(), runtime.user?.timeZone ?? runtime.user?.timezone),
+          localDate: getLocalDateKey(now(), resolveLocalTimeZone(runtime.user?.timeZone ?? runtime.user?.timezone)),
           protocols,
           versions: (runtime.protocolVersions ?? []).filter((item) => currentVersionIds.has(item.id)),
           includePaused: representative.category === "supplement",
@@ -164,7 +164,7 @@ export function createCoreNavigationReadService({
       const canonicalExercises = await ensureCanonicalExerciseRegistry();
       return withContext("core.navigation.training-logger", "trainingLogger", ({ runtime }) => {
         const user = runtime.user;
-        const initialDate = getLocalDateKey(now(), user?.timeZone ?? user?.timezone ?? "America/Los_Angeles");
+        const initialDate = getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone));
         const confirmedTrainingRecords = (runtime.canonicalEvidenceObjects ?? []).filter((record) =>
           evidenceType(record) === "training" &&
           record.quality?.status !== "superseded" &&
@@ -319,7 +319,7 @@ export function createCoreNavigationReadService({
         if (reminders.length > 1) return null;
         const reminder = reminders[0] ?? null;
         const hydration = createPeptideSupportHydrationModel({ executionItem, protocol, reminder });
-        const localDate = getLocalDateKey(now(), runtime.user?.timeZone ?? runtime.user?.timezone);
+        const localDate = getLocalDateKey(now(), resolveLocalTimeZone(runtime.user?.timeZone ?? runtime.user?.timezone));
         return Object.freeze({
           protocolId: protocol.id,
           executionId: executionItem?.id ?? null,
@@ -395,7 +395,7 @@ export function createCoreNavigationReadService({
             name: "",
             purpose: "",
             role: "",
-            startDate: getLocalDateKey(now(), runtime.user?.timeZone ?? runtime.user?.timezone),
+            startDate: getLocalDateKey(now(), resolveLocalTimeZone(runtime.user?.timeZone ?? runtime.user?.timezone)),
             initialStatus: "active",
           });
         }

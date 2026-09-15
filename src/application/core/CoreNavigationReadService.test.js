@@ -170,6 +170,39 @@ describe("provider-native core navigation reads", () => {
     expect(result).not.toHaveProperty("timelineHistory");
   });
 
+  it("reads Recovery with the exact null-owner timezone and current schedule without rewriting the older root", async () => {
+    const { narrow, runtime } = recurringSupportServices();
+    runtime.user.timezone = null;
+    runtime.protocols[0].schedule = { timeOfDay: "17:00" };
+    runtime.executionItems[0].executionRevision = 3;
+    runtime.executionItems[0].preferredSchedule = { daysOfWeek: [], timeOfDay: "08:40", startDate: "2026-09-14", endDate: null };
+    runtime.reminders[0].schedule = { type: "daily", timeOfDay: "08:40", startDate: "2026-09-14", endDate: null, timezone: null };
+    const before = JSON.stringify(runtime);
+    expect(await narrow.getOperatingPlanProtocolDomain({ protocolId: "recovery" })).toMatchObject({ category: "recovery", methods: [{ name: "Foam Rolling" }] });
+    expect(await narrow.getRecurringSupport({ executionId: "execution_foam_roll" })).toMatchObject({ hydration: {
+      executionRevision: 3, supportSchedule: { frequency: "daily", specificTime: "08:40", startDate: "2026-09-14", endDate: null } } });
+    expect(JSON.stringify(runtime)).toBe(before);
+  });
+
+  it("reads two linked Peptide executions with null owner/reminder timezone while preserving dosing history", async () => {
+    const { narrow, runtime } = peptideSupportServices();
+    delete runtime.user.timeZone; runtime.user.timezone = null;
+    runtime.executionItems[0].executionRevision = 4;
+    runtime.reminders[0].schedule.timezone = null;
+    runtime.protocols.push({ ...runtime.protocols[0], id: "second-peptide", name: "Tesamorelin" });
+    const second = structuredClone(runtime.executionItems[0]);
+    Object.assign(second, { id: "second-execution", title: "Tesamorelin", protocolRootId: "second-peptide", linkedStrategyIds: ["second-peptide"] });
+    second.preferredSchedule.daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday"];
+    runtime.executionItems.push(second);
+    runtime.reminders.push({ ...structuredClone(runtime.reminders[0]), id: "second-reminder", linkedEntityId: "second-peptide" });
+    const before = JSON.stringify(runtime);
+    const domain = await narrow.getOperatingPlanProtocolDomain({ protocolId: "peptide-protocol" });
+    expect(domain.methods).toHaveLength(2);
+    for (const id of ["peptide-protocol", "second-peptide"]) expect(await narrow.getPeptideSupport({ protocolId: id })).toMatchObject({
+      executionRevision: 4, supportSchedule: { specificTime: "21:45", endDate: null } });
+    expect(JSON.stringify(runtime)).toBe(before);
+  });
+
   it("projects a bounded protocol-domain roll-up with typed Native support destinations", async () => {
     const { narrow } = peptideSupportServices();
     const result = await narrow.getOperatingPlanProtocolDomain({ protocolId: "peptide-protocol" });
