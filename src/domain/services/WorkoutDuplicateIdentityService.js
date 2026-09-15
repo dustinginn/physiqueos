@@ -109,7 +109,7 @@ export function getWorkoutDuplicateIdentityKey(evidenceObject = {}) {
   return ["training", "evidence", String(evidenceObject.id ?? evidenceObject.canonicalId ?? "")].join("|");
 }
 
-function getWorkoutIdentityFacts(evidenceObject = {}) {
+export function getWorkoutIdentityFacts(evidenceObject = {}) {
   const metadata = evidenceObject.metadata ?? {};
   const provenance = evidenceObject.provenance ?? {};
   const source = evidenceObject.source ?? {};

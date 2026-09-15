@@ -29,6 +29,7 @@ export default defineConfig({
       "src/domain/services/CanonicalActivityDayService.test.js",
       "src/domain/services/EnergyEvidenceService.test.js",
       "src/domain/services/CanonicalEvidenceScopedReconciliation.test.js",
+      "src/domain/services/WorkoutLoggerAppleHealthReconciliation.test.js",
     ],
     fileParallelism: false,
     maxWorkers: 1,

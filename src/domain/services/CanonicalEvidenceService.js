@@ -8,6 +8,7 @@ import {
 import {
   assessWorkoutDuplicatePair,
   getWorkoutDuplicateIdentityKey,
+  getWorkoutIdentityFacts,
 } from "./WorkoutDuplicateIdentityService";
 import {
   createCanonicalNutritionDayRecord,
@@ -646,7 +647,10 @@ function backfillKnownTrainingExerciseDetails(evidenceObject = {}) {
 function chooseRicherCanonicalPayload(existingPayload, candidate, options = {}) {
   if (!existingPayload) return candidate;
 
-  if (isCompatibleTrainingPayload(existingPayload, candidate)) {
+  if (
+    isCompatibleTrainingPayload(existingPayload, candidate) ||
+    isOpenWorkoutLoggerAppleHealthPair(existingPayload, candidate)
+  ) {
     return mergeTrainingPayload(existingPayload, candidate, options);
   }
 
@@ -781,13 +785,20 @@ function findCompatibleCanonicalObjects(canonicalById, evidenceObject) {
     return [];
   }
 
+  const openReconciliationMatchIds = isTrainingSession(evidenceObject)
+    ? new Set(findOpenWorkoutLoggerAppleHealthMatch(canonicalById, evidenceObject).map(
+        (object) => object.canonicalId
+      ))
+    : null;
+
   return [...canonicalById.values()].filter((canonicalObject) =>
     isNutritionDay(evidenceObject)
       ? isNutritionDay(canonicalObject.payload) &&
         getNutritionDayLogicalKey(canonicalObject) ===
           getNutritionDayLogicalKey(evidenceObject)
       : isTrainingSession(evidenceObject)
-      ? isCompatibleTrainingPayload(canonicalObject.payload, evidenceObject)
+      ? isCompatibleTrainingPayload(canonicalObject.payload, evidenceObject) ||
+        openReconciliationMatchIds.has(canonicalObject.canonicalId)
       : isDexaEvidence(evidenceObject)
       ? isDexaEvidence(canonicalObject.payload) &&
         getDexaLogicalScanKey(canonicalObject) ===
@@ -871,6 +882,77 @@ function comparableActivityMetric(left, right) {
   }
 
   return Number(left) === Number(right);
+}
+
+// Build 33: the Founder's structured Workout Logger entry (real exercises,
+// no workout-level timing) and an independently-submitted Apple Watch
+// strength-workout screenshot (real start/end/duration/calories, no
+// exercises) score ZERO confidence under `assessWorkoutDuplicatePair` —
+// that scorer needs overlapping temporal/metric/exercise signal on BOTH
+// sides, and the structured side carries none of that today. Left alone,
+// each becomes its OWN canonical TrainingSession, doubling the Founder's
+// visible strength-session count for one physical workout. This is a
+// narrow, explicit pairing rule for exactly that shape, layered on top of
+// (never replacing) the generic scorer: same calendar day, one side is
+// Apple strength telemetry with no exercises, the other is a structured
+// session with exercises and no telemetry yet. It only fires when exactly
+// one candidate exists on the other side that day — the Founder may
+// legitimately run multiple strength sessions in one day, and guessing
+// among several open candidates would risk merging two genuinely distinct
+// workouts. Ambiguous or absent matches fall back to today's unmerged
+// behavior unchanged.
+const STRENGTH_ACTIVITY_TYPE_PATTERN = /strength|resistance|weight training|lifting|weights?/i;
+
+function hasWorkoutTemporalWindow(payload) {
+  const facts = getWorkoutIdentityFacts(payload);
+  return facts.start !== null || facts.end !== null;
+}
+
+function isOpenAppleStrengthTelemetry(payload = {}) {
+  return (
+    isTrainingSession(payload) &&
+    (payload.exercises ?? []).length === 0 &&
+    hasWorkoutTemporalWindow(payload) &&
+    STRENGTH_ACTIVITY_TYPE_PATTERN.test(String(payload.metadata?.activity_type ?? ""))
+  );
+}
+
+function isOpenStructuredTrainingSession(payload = {}) {
+  return (
+    isTrainingSession(payload) &&
+    (payload.exercises ?? []).length > 0 &&
+    !hasWorkoutTemporalWindow(payload)
+  );
+}
+
+// Pairwise only — deliberately does NOT re-check sibling uniqueness. By the
+// time `chooseRicherCanonicalPayload`/`mergeTrainingPayload` see a pair,
+// `findOpenWorkoutLoggerAppleHealthMatch` has already enforced the
+// "exactly one open candidate that day" safety gate upstream; re-deriving
+// it here would need the full canonical set this function doesn't have.
+function isOpenWorkoutLoggerAppleHealthPair(left = {}, right = {}) {
+  if (getDateKey(left.observed_at) !== getDateKey(right.observed_at)) return false;
+  return (
+    (isOpenAppleStrengthTelemetry(left) && isOpenStructuredTrainingSession(right)) ||
+    (isOpenStructuredTrainingSession(left) && isOpenAppleStrengthTelemetry(right))
+  );
+}
+
+function findOpenWorkoutLoggerAppleHealthMatch(canonicalById, evidenceObject) {
+  const isIncomingAppleTelemetry = isOpenAppleStrengthTelemetry(evidenceObject);
+  const isIncomingStructuredSession = isOpenStructuredTrainingSession(evidenceObject);
+  if (!isIncomingAppleTelemetry && !isIncomingStructuredSession) return [];
+
+  const dateKey = getDateKey(evidenceObject.observed_at);
+  const candidates = [...canonicalById.values()].filter((object) =>
+    object.quality?.status !== "superseded" &&
+    getDateKey(object.payload?.observed_at) === dateKey &&
+    (isIncomingAppleTelemetry
+      ? isOpenStructuredTrainingSession(object.payload)
+      : isOpenAppleStrengthTelemetry(object.payload))
+  );
+
+  return candidates.length === 1 ? candidates : [];
 }
 
 function isCompatibleTrainingPayload(left = {}, right = {}) {
