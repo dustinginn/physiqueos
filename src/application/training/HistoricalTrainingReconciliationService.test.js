@@ -1,13 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { createPostgresHistoricalTrainingReconciler, HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION, previewHistoricalTrainingReconciliation } from "./HistoricalTrainingReconciliationService.js";
+import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
 
 const OWNER = "synthetic-owner";
 const DATE = "2026-10-01";
 const attribution = { goalId: "goal", phaseId: "phase", frozen: true };
 function record(id, payload, extra = {}) {
-  return { recordId: id, version: 2, payload: { canonicalId: id, userId: OWNER, goalId: "goal", phaseId: "phase",
+  return { recordId: id, ownerUserId: OWNER, collectionName: "canonicalEvidenceObjects", databaseStatus: null,
+    sourceIdentity: null, version: 2, payload: { canonicalId: id, version: 2, userId: OWNER, goalId: "goal", phaseId: "phase",
     goalPhaseAttribution: attribution, quality: { status: "active" }, provenance: { evidence_package_ids: [id], source_artifact_refs: [id] },
     payload: { id, observed_at: DATE, ...payload }, ...extra } };
+}
+function legacyFixture({ staleActivity = false } = {}) {
+  const records = fixture().map((row, index) => ({ ...row, recordId: `@index:${101 + index}` }));
+  if (staleActivity) {
+    records[1].payload.payload.metadata.start_time = "07:45";
+    records[1].payload.payload.metadata.end_time = "08:44";
+    records[4].payload.payload.daily_activity.move_calories = 948;
+    records[4].payload.payload.derived_metrics = { workout_active_calories: 0, non_workout_active_calories: 948, training_sessions_referenced: 0 };
+    records[4].payload.payload.references = { training_session_ids: [] };
+    records[4].payload.activityRevision = { revision: 1, semanticFingerprint: "synthetic-frozen-observation" };
+  }
+  return records;
 }
 function fixture() {
   const exercises = ["exercise-a", "exercise-b", "exercise-c", "exercise-d"].map((id) => ({ id, canonicalExerciseId: id, name: id,
@@ -37,13 +51,15 @@ function database(initial = fixture(), { failWrite = -1, readOnly = "on" } = {})
       statements.push(sql);
       if (sql.startsWith("BEGIN")) { staged = structuredClone(durable); stagedRevision = revision; }
       if (sql.startsWith("SHOW")) return { rows: [{ transaction_read_only: readOnly }] };
-      if (sql.startsWith("SELECT record_id")) return { rows: staged.map(row => ({ record_id: row.recordId, version: row.version, payload: structuredClone(row.payload) })) };
+      if (sql.startsWith("SELECT record_id")) return { rows: staged.map(row => ({ record_id: row.recordId, version: row.version,
+        owner_user_id: row.ownerUserId, collection_name: row.collectionName, status: row.databaseStatus,
+        source_identity: row.sourceIdentity, payload: structuredClone(row.payload) })) };
       if (sql.startsWith("UPDATE physiqueos.canonical_evidence_records")) {
         writes += 1;
         if (writes === failWrite) throw new Error("Injected second-write failure");
-        const row = staged.find(row => row.recordId === values[1] && row.version === values[2]);
+        const row = staged.find(row => row.ownerUserId === values[0] && row.recordId === values[1] && row.version === values[2] && row.payload.canonicalId === values[5]);
         if (!row) return { rows: [] };
-        row.payload = JSON.parse(values[3]); row.version += 1;
+        row.payload = JSON.parse(values[3]); row.version += 1; row.databaseStatus = values[4];
         return { rows: [{ record_id: row.recordId }] };
       }
       if (sql.startsWith("UPDATE physiqueos.canonical_runtime_metadata")) return { rows: [{ revision: ++stagedRevision }] };
@@ -53,11 +69,91 @@ function database(initial = fixture(), { failWrite = -1, readOnly = "on" } = {})
   } };
   return { service: createPostgresHistoricalTrainingReconciler({ pool, ownerUserId: OWNER }), statements,
     snapshot: () => structuredClone(durable), revision: () => revision, connects: () => connects,
+    mutateRow(change, index = 0) { change(durable[index]); },
     changeVersion() { durable[0].version += 1; },
     changePayload() { durable[0].payload.payload.exercises[0].sets[0].reps += 1; } };
 }
 
 describe("historical Training owner-fenced preview and authorized transition", () => {
+  it("seals independent persisted and canonical identities; legacy keys never migrate", async () => {
+    const db = database(legacyFixture()), before = db.snapshot(), preview = await db.service.preview();
+    expect(preview.schema).toBe("historical-training-preview-v2");
+    expect(preview.pairs[0]).toMatchObject({ survivorId: "structured", retiredId: "telemetry",
+      survivorRecord: { recordId: "@index:101", canonicalId: "structured", version: 2, ownerUserId: OWNER },
+      retiredRecord: { recordId: "@index:102", canonicalId: "telemetry", version: 2, ownerUserId: OWNER } });
+    const result = await db.service.execute({ approvedPreview: preview, authorization: HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION });
+    expect(result.changedIds).toEqual(["@index:101", "@index:102", "@index:105"]);
+    expect(result.changedCanonicalIds).toEqual(["structured", "telemetry", "activity"]);
+    expect(db.snapshot().map(row => row.recordId)).toEqual(before.map(row => row.recordId));
+    expect(db.snapshot()[0]).toMatchObject({ version: 3, payload: { version: 3, canonicalId: "structured" } });
+    expect(db.statements.filter(sql => sql.startsWith("UPDATE physiqueos.canonical_evidence_records")).every(sql => sql.includes("payload->>'canonicalId'=$6"))).toBe(true);
+    const after = db.snapshot();
+    expect((await db.service.execute({ approvedPreview: preview, authorization: HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION })).outcome).toBe("replayed");
+    expect(db.snapshot()).toEqual(after); expect(db.revision()).toBe(41);
+  });
+  it("previews stale zero-derived Activity becoming current canonical projections without adding calories", async () => {
+    const records = legacyFixture({ staleActivity: true }), db = database(records), preview = await db.service.preview();
+    expect(preview.activityChanges).toHaveLength(1);
+    expect(preview.activityChanges[0]).toMatchObject({ identity: { recordId: "@index:105", canonicalId: "activity" },
+      before: { dailyActivity: { move_calories: 948 }, derivedMetrics: { workout_active_calories: 0, non_workout_active_calories: 948, training_sessions_referenced: 0 }, references: { training_session_ids: [] } },
+      after: { dailyActivity: { move_calories: 948 }, derivedMetrics: { workout_active_calories: 627, non_workout_active_calories: 321, training_sessions_referenced: 3 }, references: { training_session_ids: ["structured", "walk-0", "walk-1"] } } });
+    expect(preview.activityChanges[0].before.semanticFingerprint).toBe(preview.activityChanges[0].after.semanticFingerprint);
+    expect(preview.pairs[0]).toMatchObject({ beforeWorkoutActiveCalories: 627, afterWorkoutActiveCalories: 627, telemetry: { start_time: "07:45", end_time: "08:44", duration_seconds: 3518 } });
+    await db.service.execute({ approvedPreview: preview, authorization: HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION });
+    const after = db.snapshot();
+    expect(after[4].payload.payload.derived_metrics).toEqual(preview.activityChanges[0].after.derivedMetrics);
+    expect(after[4].payload.activityRevision).toEqual(records[4].payload.activityRevision);
+    expect(after.slice(2, 4)).toEqual(records.slice(2, 4));
+    expect(after[0].payload.payload.exercises).toEqual(records[0].payload.payload.exercises);
+    expect(after[0].payload.payload.exerciseRelationshipGroups).toEqual(records[0].payload.payload.exerciseRelationshipGroups);
+    expect(after[0].payload.provenance.evidence_package_ids).toEqual(["structured", "telemetry"]);
+  });
+  it.each([
+    ["storage key", row => { row.recordId = "@index:999"; }],
+    ["canonical ID", row => { row.payload.canonicalId = "replacement-canonical"; }],
+    ["database version", row => { row.version += 1; }],
+    ["payload digest", row => { row.payload.payload.exercises[0].sets[0].reps += 1; }],
+    ["database owner", row => { row.ownerUserId = "other-owner"; }],
+    ["payload owner", row => { row.payload.userId = "other-owner"; }],
+    ["database status", row => { row.databaseStatus = "superseded"; }],
+    ["canonical status", row => { row.payload.quality.status = "superseded"; }],
+    ["record type", row => { row.payload.payload.evidence_type = "activity_day"; }],
+    ["source identity", row => { row.sourceIdentity = "replacement-source"; }],
+  ])("rejects a changed %s before any update", async (_name, change) => {
+    const db = database(legacyFixture()), preview = await db.service.preview(); db.mutateRow(change);
+    await expect(db.service.execute({ approvedPreview: preview, authorization: HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION })).rejects.toThrow(/stale|owner-scoped/);
+    expect(db.statements.some(sql => sql.startsWith("UPDATE"))).toBe(false);
+  });
+  it("rejects duplicate storage/domain identities rather than collapsing records", () => {
+    for (const key of ["recordId", "canonicalId"]) {
+      const records = legacyFixture();
+      if (key === "recordId") records[1].recordId = records[0].recordId;
+      else records[1].payload.canonicalId = records[0].payload.canonicalId;
+      expect(() => previewHistoricalTrainingReconciliation({ ownerUserId: OWNER, records })).toThrow("owner-scoped");
+    }
+  });
+  it("rejects a changed Activity observation instead of applying an old consequence", async () => {
+    const db = database(legacyFixture({ staleActivity: true })), preview = await db.service.preview();
+    db.mutateRow(row => { row.payload.payload.daily_activity.move_calories = 1000; }, 4);
+    await expect(db.service.execute({ approvedPreview: preview, authorization: HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION })).rejects.toThrow("stale");
+    expect(db.statements.some(sql => sql.startsWith("UPDATE"))).toBe(false);
+  });
+  it("rejects a self-sealed v1 manifest before connecting", async () => {
+    const db = database(), preview = await db.service.preview();
+    const { digest: _digest, ...body } = { ...preview, schema: "historical-training-preview-v1" };
+    const approvedPreview = { ...body, digest: createPayloadHash(body) };
+    await expect(db.service.execute({ approvedPreview, authorization: HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION })).rejects.toThrow("authorization");
+    expect(db.connects()).toBe(1); // The earlier READ ONLY preview, no execute connection.
+  });
+  it("does not normalize unrelated Activity dates", async () => {
+    const records = legacyFixture({ staleActivity: true });
+    records.push({ ...structuredClone(records[4]), recordId: "@index:999", payload: { ...structuredClone(records[4].payload),
+      canonicalId: "other-day", payload: { ...structuredClone(records[4].payload.payload), observed_at: "2026-10-02" } } });
+    const db = database(records), preview = await db.service.preview();
+    expect(preview.activityChanges).toHaveLength(1);
+    await db.service.execute({ approvedPreview: preview, authorization: HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION });
+    expect(db.snapshot()[6]).toEqual(records[6]);
+  });
   it("previews one unique pair without changing records and preserves all 16 sets/identities", () => {
     const records = fixture(), before = JSON.stringify(records);
     const preview = previewHistoricalTrainingReconciliation({ ownerUserId: OWNER, records });
