@@ -414,6 +414,7 @@ describe("Native production contract boundary", () => {
 
   it("routes a structured Training log through its staged Evidence Review lifecycle", async () => {
     const current = fixture();
+    current.confirmEvidenceReview.mockResolvedValue({ state: "processing", reviewId: "review-training", trainingSessionDurable: true });
     current.executeCommand.mockResolvedValue({
       outcome: "committed",
       receipt: { commandId: "command-training", result: { reviewId: "review-training", status: "confirmation_requested" } },
@@ -426,6 +427,15 @@ describe("Native production contract boundary", () => {
     expect(current.confirmEvidenceReview).toHaveBeenCalledWith({
       principal, reviewId: "review-training", commandId: "command-training",
     });
+  });
+
+  it.each(["failed", "pending"])("does not acknowledge a logged workout when canonical confirmation is %s", async (state) => {
+    const current = fixture();
+    current.executeCommand.mockResolvedValue({ outcome: "committed", receipt: { commandId: "command-training", result: { reviewId: "review-training" } } });
+    if (state === "failed") current.confirmEvidenceReview.mockRejectedValue(new Error("canonical persistence failed"));
+    else current.confirmEvidenceReview.mockResolvedValue({ state: "processing", accepted: true });
+    await expect(current.service.command({ request: request(), commandType: "training-session.commit.v1", metadata: { idempotencyKey: "same-workout" }, payload: { sessionId: "session-one", localDate: "2026-09-09", exercises: [{ canonicalExerciseId: "bench_press", sets: [{ reps: 8, load: 185 }] }] } }))
+      .rejects.toMatchObject({ status: 503, code: "TRAINING_SESSION_NOT_DURABLE" });
   });
 
   it("authorizes asynchronous evidence intake creation and status through the same owner boundary", async () => {

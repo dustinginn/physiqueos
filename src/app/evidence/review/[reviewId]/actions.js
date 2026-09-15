@@ -209,6 +209,8 @@ async function executeEvidenceReviewConfirmation(formData, {
       state: "processing",
       reviewId,
       continuationKey: createEvidenceReviewContinuationKey(review),
+      trainingSessionDurable: isEvidenceReviewCanonicalSaveComplete(review) &&
+        (review.interpretedEvidence?.evidence_objects ?? []).some((item) => item.removed !== true && item.evidence_type === "training"),
     });
   }
   if (background) {
@@ -281,8 +283,8 @@ async function executeEvidenceReviewConfirmation(formData, {
   // other native evidence type (Nutrition/Activity/DEXA/Photos) keeps the
   // original zero-synchronous-steps behavior below: Native isn't held open
   // for canonical_commit, and nothing here asked for those to change.
-  const isTrainingConfirmation = committedPackage.evidence_objects.some(
-    (item) => item.evidence_type === "training"
+  const isTrainingConfirmation = (evidencePackage.evidence_objects ?? []).some(
+    (item) => item.removed !== true && item.evidence_type === "training"
   );
   if (nativeStart && supportsDurableCommitClaims && !isTrainingConfirmation) {
     // `beginCommit` persisted the exact reviewed package and an owned claim.
@@ -320,6 +322,8 @@ async function executeEvidenceReviewConfirmation(formData, {
           state: "processing",
           reviewId,
           completedStep: orchestrationResult.executedSteps[0] ?? null,
+          trainingSessionDurable: isTrainingConfirmation &&
+            [...orchestrationResult.executedSteps, ...orchestrationResult.skippedSteps].includes("canonical_commit"),
         });
       }
       revalidatePath(`/evidence/review/${reviewId}`);

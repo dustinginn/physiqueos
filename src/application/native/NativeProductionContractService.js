@@ -232,6 +232,9 @@ export function createNativeProductionContractService({
           commandId: result.receipt?.commandId ?? metadata.commandId,
         });
       } catch (error) {
+        if (commandType === Phase3Command.COMMIT_TRAINING_SESSION) {
+          throw new ApplicationProblem({ status: 503, code: "TRAINING_SESSION_NOT_DURABLE", title: "Your workout has not been confirmed yet.", detail: "Retry the same workout submission to check its saved result." });
+        }
         // The canonical command receipt already committed. A synchronous
         // continuation failure must not turn that accepted write into an
         // HTTP failure that invites clients to mutate again.
@@ -241,6 +244,10 @@ export function createNativeProductionContractService({
           accepted: true,
           continuationWarning: error?.code ?? "confirmation_continuation_pending",
         });
+      }
+      if (commandType === Phase3Command.COMMIT_TRAINING_SESSION &&
+          confirmation?.state !== "confirmed" && confirmation?.trainingSessionDurable !== true) {
+        throw new ApplicationProblem({ status: 503, code: "TRAINING_SESSION_NOT_DURABLE", title: "Your workout has not been confirmed yet.", detail: "Retry the same workout submission to check its saved result." });
       }
       return Object.freeze({ ...result, confirmation });
     },
