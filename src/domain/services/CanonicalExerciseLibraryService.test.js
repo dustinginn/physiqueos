@@ -24,11 +24,12 @@ describe("canonical exercise review resolution", () => {
     const existing = [
       { id: "test_row_one", name: "Test Row One", aliases: ["test shared row"] },
       { id: "test_row_two", name: "Test Row Two", aliases: ["test shared row"] },
-      { id: "test_row_two", name: "Test Row Two", aliases: ["test shared row"] },
+      { id: "test_row_two", name: "Later duplicate payload", aliases: ["test shared row"] },
     ];
     expect(findCanonicalExerciseConflicts({ name: "test shared row" }, existing).map((item) => item.id))
       .toEqual(["test_row_one", "test_row_two"]);
     expect(findCanonicalExerciseConflict({ name: "test shared row" }, existing)?.id).toBe("test_row_one");
+    expect(findCanonicalExerciseConflicts({ name: "test shared row" }, existing)[1].name).toBe("Test Row Two");
   });
   it("blocks unresolved confirmation without changing the package", () => {
     const evidencePackage = fixture();

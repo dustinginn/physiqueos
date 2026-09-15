@@ -67,7 +67,11 @@ export function findCanonicalExerciseConflicts(definition, existing = []) {
       .map(normalizeExercisePhrase)
       .some((value) => incoming.has(value))
   );
-  return [...new Map(matches.map((candidate) => [candidate.id, candidate])).values()];
+  const unique = new Map();
+  for (const candidate of matches) {
+    if (!unique.has(candidate.id)) unique.set(candidate.id, candidate);
+  }
+  return [...unique.values()];
 }
 
 export function searchCanonicalExerciseOptions(candidates = [], query = "") {
