@@ -36,6 +36,7 @@ struct TrainingAreaView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: TrainingAreaViewModel?
     let areaId: String
+    var browseAll = false
 
     var body: some View {
         ScrollView {
@@ -49,7 +50,7 @@ struct TrainingAreaView: View {
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId)
+            viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId, browseAll: browseAll)
             await viewModel?.load()
         }
     }
@@ -77,6 +78,10 @@ struct TrainingAreaView: View {
                 TrainingScopeSelectorView(scope: area.scope) { pillID in
                     Task { await viewModel?.selectScope(pillID: pillID) }
                 }
+                Button(viewModel?.browseAll == true ? "Show My Library" : "Browse All Exercises") {
+                    Task { await viewModel?.selectCatalog(browseAll: viewModel?.browseAll != true) }
+                }
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                 browseCard(area.exercises)
             }
         }

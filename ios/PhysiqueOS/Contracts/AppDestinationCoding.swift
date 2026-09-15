@@ -13,6 +13,7 @@ extension AppDestination {
         case strategyType, strategyId, protocolId, executionId, setId, poseId, category, supportType, supportId
         case evidenceRecoveryType, occurrenceDateKey, occurrenceDate
         case domain, title, detail, status
+        case areaId, browseAll
     }
 
     init(from decoder: Decoder) throws {
@@ -84,6 +85,12 @@ extension AppDestination {
         case "training.exercise":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .trainingExercise(exerciseId: try parameters.decode(String.self, forKey: .exerciseId))
+        case "native.training.library.area":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .trainingLibraryArea(
+                areaId: try parameters.decode(String.self, forKey: .areaId),
+                browseAll: try parameters.decode(Bool.self, forKey: .browseAll)
+            )
         case "progress.stream":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             let streamId = try parameters.decode(String.self, forKey: .streamId)
@@ -223,6 +230,9 @@ extension AppDestination {
         case .evidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
         case .trainingSession(let sessionId): try parameters.encode(sessionId, forKey: .sessionId)
         case .trainingExercise(let exerciseId): try parameters.encode(exerciseId, forKey: .exerciseId)
+        case .trainingLibraryArea(let areaId, let browseAll):
+            try parameters.encode(areaId, forKey: .areaId)
+            try parameters.encode(browseAll, forKey: .browseAll)
         case .progressStream(let streamId): try parameters.encode(streamId, forKey: .streamId)
         case .trainingDay(let date): try parameters.encode(Self.trainingDayStreamIdPrefix + date, forKey: .streamId)
         case .activityDay(let date): try parameters.encode(Self.activityDayStreamIdPrefix + date, forKey: .streamId)

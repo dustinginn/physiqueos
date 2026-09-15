@@ -18,6 +18,8 @@ protocol TrainingAPI: Sendable {
     /// is allowed to remain decorative. The no-`scope` overload below (`.all`, Training's own
     /// real default context) keeps every existing call site unchanged.
     func fetchTrainingLanding(scope: EvidenceScopeSelection) async throws -> TrainingLandingReadModel
+    func fetchTrainingLibrary(scope: EvidenceScopeSelection, browseAll: Bool) async throws -> TrainingLandingReadModel
+    func fetchTrainingLibraryArea(areaId: String, scope: EvidenceScopeSelection, browseAll: Bool) async throws -> TrainingAreaReadModel?
     func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel?
     func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel?
     /// Fixture-backed for all 10 canonical areas (see `TrainingAreaReadModel`).
@@ -50,6 +52,13 @@ protocol TrainingAPI: Sendable {
 }
 
 extension TrainingAPI {
+    func fetchTrainingLibrary(scope: EvidenceScopeSelection, browseAll: Bool) async throws -> TrainingLandingReadModel {
+        try await fetchTrainingLanding(scope: scope)
+    }
+
+    func fetchTrainingLibraryArea(areaId: String, scope: EvidenceScopeSelection, browseAll: Bool) async throws -> TrainingAreaReadModel? {
+        try await fetchTrainingArea(areaId: areaId, scope: scope)
+    }
     /// Training's own real default context is "all" (`normalizeTrainingContextId`
     /// defaults an absent/unmatched context to `"all"`, unlike Weight/
     /// Nutrition/Activity's `"build-lean-mass"` default) — every existing

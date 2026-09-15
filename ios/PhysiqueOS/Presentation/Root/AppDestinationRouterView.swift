@@ -151,6 +151,8 @@ struct AppDestinationRouterView: View {
         // placeholder.
         case .trainingExercise(let exerciseId) where TrainingAreaIcon.canonicalAreaIds.contains(exerciseId):
             TrainingAreaView(areaId: exerciseId)
+        case .trainingLibraryArea(let areaId, let browseAll):
+            TrainingAreaView(areaId: areaId, browseAll: browseAll)
         case .trainingExercise(let exerciseId):
             TrainingExerciseDetailView(exerciseId: exerciseId)
         case .operatingPlan:

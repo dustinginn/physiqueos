@@ -516,7 +516,10 @@ actor ProductionNativeAPI {
         let decodeStartedAt = ContinuousClock.now
         let envelope: ProductionResponseEnvelope<Payload>
         do { envelope = try decoder.decode(ProductionResponseEnvelope<Payload>.self, from: data) }
-        catch { throw ProductionNativeError.invalidResponse }
+        catch {
+            NativeReadFailureDiagnostics.recordDecode(resource: resource, error: error)
+            throw ProductionNativeError.invalidResponse
+        }
         let decodeMilliseconds = Self.elapsedMilliseconds(since: decodeStartedAt)
         try validate(envelope, expectedResource: resource)
         if let generationForStore, generationForStore == readCacheGeneration {
@@ -749,6 +752,9 @@ actor ProductionNativeAPI {
             let refreshedToken = try await refreshAccessToken()
             result = try await perform(path: path, method: method, query: query, body: nil, bearer: refreshedToken, accept: accept)
         }
+        if !(200..<300).contains(result.1.statusCode), path.contains("/read/") {
+            NativeReadFailureDiagnostics.recordHTTP(resource: String(path.split(separator: "/").last ?? "read"), status: result.1.statusCode)
+        }
         try validateHTTP(result.1, data: result.0)
         return result
     }
@@ -889,7 +895,12 @@ actor ProductionNativeAPI {
             ]
         }
         if commandType.contains("evidence") || commandType.contains("review") {
-            return ["home", "evidence-review-queue", "reporting", "weight", "nutrition", "activity", "energy", "dexa", "photos", "timeline"]
+            // Confirmed Training evidence can add history-backed My Library
+            // membership or reconcile telemetry onto an existing session.
+            return [
+                "home", "evidence-review-queue", "reporting", "weight", "nutrition", "activity", "energy", "dexa", "photos", "timeline",
+                "training-landing", "training-reporting", "training-library", "training-logger", "training-day", "training-session",
+            ]
         }
         return ["home"]
     }

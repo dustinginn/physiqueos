@@ -52,6 +52,9 @@ final class FounderServerAPITests: XCTestCase {
         let affected = await api.resourcesAffected(by: "evidence-review.commit.v1")
         XCTAssertTrue(affected.contains("evidence-review-queue"))
         XCTAssertFalse(affected.contains("log"))
+        for resource in ["training-library", "training-logger", "training-landing", "training-day", "training-session", "training-reporting"] {
+            XCTAssertTrue(affected.contains(resource), "Training evidence changes must invalidate membership and reconciled workout projections.")
+        }
     }
 
     func testProductionReadCacheDeduplicatesConcurrentCanonicalReads() async throws {
@@ -1212,6 +1215,70 @@ final class FounderServerAPITests: XCTestCase {
                            .unknownCanonicalExerciseArea(exerciseID: "canonical-unknown", muscleGroupID: "Unmapped Muscle"))
         }
         XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.workoutLogger, in: .founderProduction))
+    }
+
+    func testProductionLibraryMembershipIsRequiredAndAllCatalogCannotBecomeMyLibraryThroughCache() async throws {
+        var response = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(productionTrainingLibraryJSON(exerciseID: "performed_press", muscleGroup: "Chest").utf8)) as? [String: Any])
+        var data = try XCTUnwrap(response["data"] as? [String: Any])
+        var report = try XCTUnwrap(data["report"] as? [String: Any])
+        var exercises = try XCTUnwrap(report["canonicalExercises"] as? [[String: Any]])
+        var background = try XCTUnwrap(exercises.first)
+        background["canonicalExerciseId"] = "background_press"
+        background["label"] = "Background Press"
+        exercises.append(background)
+        report["canonicalExercises"] = exercises
+        data["report"] = report
+        response["data"] = data
+        let fullCatalogWithMembership = String(decoding: try JSONSerialization.data(withJSONObject: response), as: UTF8.self)
+        data.removeValue(forKey: "myLibraryExerciseIds")
+        response["data"] = data
+        let missingMembership = String(decoding: try JSONSerialization.data(withJSONObject: response), as: UTF8.self)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, fullCatalogWithMembership), .json(200, fullCatalogWithMembership), .json(200, missingMembership),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test")
+        let api = ProductionTrainingAPI(api: native)
+        let mine = try await api.fetchTrainingArea(areaId: "chest", scope: .all)
+        XCTAssertEqual(mine?.exercises.map(\.id), ["performed_press"])
+        let all = try await api.fetchTrainingLibraryArea(areaId: "chest", scope: .all, browseAll: true)
+        XCTAssertEqual(Set(all?.exercises.map(\.id) ?? []), ["performed_press", "background_press"])
+        let mineAgain = try await api.fetchTrainingArea(areaId: "chest", scope: .all)
+        XCTAssertEqual(mineAgain?.exercises.map(\.id), ["performed_press"])
+        let requests = await transport.requests
+        let libraryRequests = requests.filter { $0.url?.path.contains("training-library") == true }
+        XCTAssertEqual(libraryRequests.count, 2)
+        let scopes = libraryRequests.map { URLComponents(url: $0.url!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "libraryScope" })?.value }
+        XCTAssertEqual(scopes, ["my-library", "all"])
+        await native.invalidateReadResources(["training-library"])
+        await XCTAssertThrowsErrorAsync(try await api.fetchTrainingArea(areaId: "chest", scope: .all)) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .invalidResponse)
+        }
+    }
+
+    func testHyperextensionUsesCanonicalGlutesNavigationRatherThanLowerBackAnatomy() async throws {
+        let library = productionTrainingLibraryJSON(exerciseID: "hyperextension_machine", muscleGroup: "Lower Back")
+            .replacingOccurrences(of: "\"primaryNavigationCategory\":\"lower back\"", with: "\"primaryNavigationCategory\":\"glutes\"")
+        let logger = productionTrainingLoggerJSON(exerciseID: "hyperextension_machine", muscleGroup: "Lower Back")
+            .replacingOccurrences(of: "\"primaryNavigationCategory\":\"lower back\"", with: "\"primaryNavigationCategory\":\"glutes\"")
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, library), .json(200, logger)])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test")
+        let area = try await ProductionTrainingAPI(api: native).fetchTrainingArea(areaId: "glutes", scope: .all)
+        XCTAssertEqual(area?.exercises.map(\.id), ["hyperextension_machine"])
+        let configuration = try await ProductionTrainingLoggerAPI(api: native).fetchConfiguration()
+        XCTAssertEqual(configuration.exercises.first?.areaId, "glutes")
+    }
+
+    func testReadFailureDiagnosticRedactsIdentifiersAndExceptionDetails() {
+        struct Key: CodingKey { var stringValue: String; var intValue: Int? { nil }; init(stringValue: String) { self.stringValue = stringValue }; init?(intValue: Int) { return nil } }
+        let context = DecodingError.Context(codingPath: [], debugDescription: "Private response content must not escape")
+        let safe = NativeReadFailureDiagnostics.classification(DecodingError.keyNotFound(Key(stringValue: "methods"), context))
+        XCTAssertEqual(safe.kind, "missing-field")
+        XCTAssertEqual(safe.field, "methods")
+        let redacted = NativeReadFailureDiagnostics.classification(DecodingError.keyNotFound(Key(stringValue: "opaque-private-reference"), context))
+        XCTAssertEqual(redacted.field, "redacted")
     }
 
     func testProductionTrainingExerciseUsesCanonicalCatalogAndServerPerformanceRecords() async throws {
@@ -3464,6 +3531,8 @@ private func productionTrainingLibraryJSON(exerciseID: String, muscleGroup: Stri
     productionEnvelope(resource: "training-library", data: """
     {"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Training","selected":true}]},"report":{"canonicalExercises":[{"canonicalExerciseId":"\(exerciseID)","label":"Incline Press","primaryMuscleGroupId":"\(muscleGroup)","primaryMuscleGroups":["\(muscleGroup)"],"regionLabel":"Upper Body","equipment":"Dumbbells","defaultMeasurement":"reps_load","defaultLoadType":"external"}]}}
     """)
+        .replacingOccurrences(of: "\"report\":", with: "\"myLibraryExerciseIds\":[\"\(exerciseID)\"],\"report\":")
+        .replacingOccurrences(of: "\"primaryMuscleGroupId\":", with: "\"primaryNavigationCategory\":\"\(muscleGroup.lowercased())\",\"primaryMuscleGroupId\":")
 }
 
 /// `coreNavigation.getTrainingLogger`'s `initialHistorySessions` are the
@@ -3479,6 +3548,7 @@ private func productionTrainingLoggerJSON(exerciseID: String, muscleGroup: Strin
     productionEnvelope(resource: "training-logger", data: """
     {"initialDate":"2026-09-10","initialCanonicalExercises":[{"id":"\(exerciseID)","name":"Incline Press","equipment":"Dumbbells","bodyRegion":"Upper Body","primaryMuscleGroups":["\(muscleGroup)"],"defaultMeasurement":"reps_load","defaultLoadType":"external"}],"initialHistorySessions":[{"id":"session-canonical","evidence_type":"training","observed_at":"2026-09-09","exercises":[{"id":"exercise-occurrence-canonical","canonicalExerciseId":"\(exerciseID)","name":"Incline Press","body_region":"Upper Body","equipment":"Dumbbells","sets":[{"reps":10,"weight":135,"weight_unit":"lb","load_type":"external_load"},{"reps":8,"weight":145,"weight_unit":"lb","load_type":"external_load"}]}]}],"initialPerformedExerciseIds":["\(exerciseID)"],"initialMyLibraryExerciseIds":["\(exerciseID)"],"initialProgressionRecommendations":[{"canonicalExerciseId":"\(exerciseID)","state":"maintain","eyebrow":"Maintain current performance","message":"Canonical recommendation.","prescription":"145 lb x 8","suggestedLoad":145,"suggestedLoadType":"external_load","suggestedReps":8,"suggestedUnit":"lb"}]}
     """)
+        .replacingOccurrences(of: "\"bodyRegion\":", with: "\"primaryNavigationCategory\":\"\(muscleGroup.lowercased())\",\"bodyRegion\":")
 }
 
 private let productionTrainingExerciseJSON = productionEnvelope(resource: "training-exercise", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Training","selected":true}]},"report":{"entries":[]},"exerciseRecords":{"id":"records-canonical","heading":"Performance Records","canonicalExerciseId":"canonical-incline-press","canonicalExerciseName":"Incline Press","records":[{"id":"record-canonical","canonicalExerciseId":"canonical-incline-press","canonicalExerciseName":"Incline Press","title":"Volume PR","value":"4,200 lb","previousBaseline":null,"improvement":null,"detail":null,"workoutDate":"2026-09-09","executionVariant":null,"relationshipContext":null,"achievedValue":4200,"achievementType":"session_volume_pr","sourceEventId":"event-canonical"}],"visibleCount":1,"totalCount":1,"hiddenCount":0,"countLabel":null}}"#)
@@ -3586,6 +3656,7 @@ private let productionDexaJSON = productionEnvelope(resource: "dexa", data: #"{"
 private let productionTrainingLandingJSON = productionEnvelope(resource: "training-landing", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Training","selected":true}]},"report":{"title":"Training","subtitle":"Training evidence","tone":"success","latestTrainingDay":{"date":"2026-09-09","label":"Sep 9","summary":"Biceps · Triceps","destination":{"id":"progress.stream","parameters":{"streamId":"training"}},"sessions":[]},"reportingLinks":[],"trainingDays":[],"currentProtocol":{"sourceOfTruth":"Server","dailyActivityTarget":"1000 cal","resistanceTraining":"3x/week","goal":"Build Lean Mass"},"relatedGoals":[],"sourceEvidence":[]}}"#)
 
 private let productionEmptyTrainingLibraryJSON = productionEnvelope(resource: "training-library", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Training","selected":true}]},"report":{"canonicalExercises":[]}}"#)
+    .replacingOccurrences(of: "\"report\":", with: "\"myLibraryExerciseIds\":[],\"report\":")
 
 /// The `evidence-review-queue` resource is `coreNavigation.getLog`'s real
 /// response shape (`LoggedTodayService.composeLoggedTodaySummary` +

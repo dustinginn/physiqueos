@@ -891,12 +891,16 @@ struct ProductionTrainingAPI: TrainingAPI {
     let api: ProductionNativeAPI
 
     func fetchTrainingLanding(scope: EvidenceScopeSelection) async throws -> TrainingLandingReadModel {
+        try await fetchTrainingLibrary(scope: scope, browseAll: false)
+    }
+
+    func fetchTrainingLibrary(scope: EvidenceScopeSelection, browseAll: Bool) async throws -> TrainingLandingReadModel {
         let context = try ProductionContext.value(for: scope)
         async let landingRead = api.readResource("training-landing", query: ["context": context], as: LandingPayload.self)
-        async let libraryRead = api.readResource("training-library", query: ["context": context], as: LibraryPayload.self)
+        async let libraryRead = api.readResource("training-library", query: ["context": context, "libraryScope": browseAll ? "all" : "my-library"], as: LibraryPayload.self)
         let (landingEnvelope, libraryEnvelope) = try await (landingRead, libraryRead)
         let payload = landingEnvelope.data
-        let catalog = try CanonicalTrainingCatalog(exercises: libraryEnvelope.data.report.canonicalExercises)
+        let catalog = try CanonicalTrainingCatalog(exercises: libraryEnvelope.data.exercises(browseAll: browseAll))
         return TrainingLandingReadModel(
             title: payload.report.title,
             subtitle: payload.report.subtitle,
@@ -937,12 +941,16 @@ struct ProductionTrainingAPI: TrainingAPI {
     }
 
     func fetchTrainingArea(areaId: String, scope: EvidenceScopeSelection) async throws -> TrainingAreaReadModel? {
+        try await fetchTrainingLibraryArea(areaId: areaId, scope: scope, browseAll: false)
+    }
+
+    func fetchTrainingLibraryArea(areaId: String, scope: EvidenceScopeSelection, browseAll: Bool) async throws -> TrainingAreaReadModel? {
         let payload = try await api.readResource(
             "training-library",
-            query: ["context": try ProductionContext.value(for: scope), "path": areaId],
+            query: ["context": try ProductionContext.value(for: scope), "path": areaId, "libraryScope": browseAll ? "all" : "my-library"],
             as: LibraryPayload.self
         ).data
-        let catalog = try CanonicalTrainingCatalog(exercises: payload.report.canonicalExercises)
+        let catalog = try CanonicalTrainingCatalog(exercises: payload.exercises(browseAll: browseAll))
         guard let area = catalog.areas.first(where: { $0.id == areaId }) else { return nil }
         return TrainingAreaReadModel(
             id: area.id,
@@ -965,7 +973,7 @@ struct ProductionTrainingAPI: TrainingAPI {
     func fetchTrainingExercise(exerciseId: String, scope: EvidenceScopeSelection) async throws -> TrainingExerciseDetailReadModel? {
         let context = try ProductionContext.value(for: scope)
         let libraryEnvelope = try await api.readResource(
-            "training-library", query: ["context": context], as: LibraryPayload.self
+            "training-library", query: ["context": context, "libraryScope": "all"], as: LibraryPayload.self
         )
         let catalog = try CanonicalTrainingCatalog(exercises: libraryEnvelope.data.report.canonicalExercises)
         guard let canonicalExercise = catalog.exercise(id: exerciseId) else {
@@ -1241,7 +1249,17 @@ struct ProductionTrainingAPI: TrainingAPI {
         }
     }
     private struct ProtocolSummary: Decodable { var sourceOfTruth: String; var dailyActivityTarget: String; var resistanceTraining: String; var goal: String }
-    private struct LibraryPayload: Decodable, @unchecked Sendable { var timeline: ProductionTimeline; var report: LibraryReport }
+    private struct LibraryPayload: Decodable, @unchecked Sendable {
+        var timeline: ProductionTimeline
+        var report: LibraryReport
+        // Required: a missing authoritative membership projection is not All Exercises.
+        var myLibraryExerciseIds: [String]
+
+        func exercises(browseAll: Bool) -> [ProductionCanonicalExercise] {
+            let membership = Set(myLibraryExerciseIds)
+            return report.canonicalExercises.filter { browseAll || membership.contains($0.canonicalExerciseId) }
+        }
+    }
     private struct LibraryReport: Decodable { var canonicalExercises: [ProductionCanonicalExercise] }
     private struct ExercisePayload: Decodable, @unchecked Sendable {
         var timeline: ProductionTimeline
@@ -1383,11 +1401,13 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         var id: String; var name: String; var equipment: String?
         var bodyRegion: String?; var primaryMuscleGroups: [String]
         var defaultMeasurement: String?; var defaultLoadType: String?
+        var primaryNavigationCategory: String
     }
 }
 
 private struct ProductionCanonicalExercise: Decodable {
     var canonicalExerciseId: String
+    var primaryNavigationCategory: String
     var label: String
     var primaryMuscleGroupId: String?
     var primaryMuscleGroups: [String]
@@ -1398,6 +1418,7 @@ private struct ProductionCanonicalExercise: Decodable {
 
     init(_ raw: ProductionTrainingLoggerAPI.RawExercise) {
         canonicalExerciseId = raw.id
+        primaryNavigationCategory = raw.primaryNavigationCategory
         label = raw.name
         primaryMuscleGroupId = nil
         primaryMuscleGroups = raw.primaryMuscleGroups
@@ -1462,7 +1483,9 @@ private struct CanonicalTrainingCatalog {
     }
 
     private static func areaID(for exercise: ProductionCanonicalExercise) -> String? {
-        let candidates = [exercise.primaryMuscleGroupId] + exercise.primaryMuscleGroups.map(Optional.some) + [exercise.regionLabel]
+        // Category is canonical server navigation, not the first anatomical muscle.
+        // In particular Hyperextension Machine's Lower Back anatomy does not own its Glutes placement.
+        let candidates = [Optional(exercise.primaryNavigationCategory)]
         for candidate in candidates.compactMap({ $0 }).map(slug) {
             switch candidate {
             case "chest", "upper-chest": return "chest"

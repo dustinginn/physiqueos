@@ -64,7 +64,7 @@ final class TrainingLoggerViewModel {
             savedDraft = canWrite ? draftStore.load() : nil
             loadState = .loaded
         } catch {
-            loadState = .failed(error.localizedDescription)
+            loadState = .failed("Workout Logger couldn't be loaded. Try again.")
         }
     }
 

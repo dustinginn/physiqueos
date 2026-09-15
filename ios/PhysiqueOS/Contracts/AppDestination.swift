@@ -51,6 +51,7 @@ enum AppDestination: Hashable, Codable {
     /// distinguishes canonical Training Area ids from individual exercise
     /// ids and presents the corresponding typed Native screen.
     case trainingExercise(exerciseId: String)
+    case trainingLibraryArea(areaId: String, browseAll: Bool)
     /// `progress.stream` — the server's catch-all `/progress/*` pattern.
     /// Log's Nutrition and (multi-session/no-id) Training rows resolve
     /// here today because the server destination registry has no
@@ -183,6 +184,7 @@ enum AppDestination: Hashable, Codable {
         case .evidenceReview: "evidence.review"
         case .trainingSession: "training.session"
         case .trainingExercise: "training.exercise"
+        case .trainingLibraryArea: "native.training.library.area"
         case .progressStream: "progress.stream"
         case .trainingDay: "progress.stream"
         case .activityDay: "progress.stream"

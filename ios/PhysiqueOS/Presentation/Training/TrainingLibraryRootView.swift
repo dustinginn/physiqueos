@@ -34,7 +34,7 @@ struct TrainingLibraryRootView: View {
         }
         .refreshable {
             if environment.nativeAuthority == .founderProduction {
-                await environment.productionNativeAPI.invalidateReadResources(["training-library"])
+                await environment.productionNativeAPI.invalidateReadResources(["training-library", "training-landing"])
             }
             await viewModel?.load()
         }
@@ -65,6 +65,10 @@ struct TrainingLibraryRootView: View {
                 TrainingScopeSelectorView(scope: landing.scope) { pillID in
                     Task { await viewModel?.selectScope(pillID: pillID) }
                 }
+                Button(viewModel?.browseAll == true ? "Show My Library" : "Browse All Exercises") {
+                    Task { await viewModel?.selectCatalog(browseAll: viewModel?.browseAll != true) }
+                }
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                 browseCard(landing.trainingAreas)
             }
         }
@@ -76,7 +80,7 @@ struct TrainingLibraryRootView: View {
                 TrainingSectionHeaderView(title: "Browse")
                 VStack(spacing: 0) {
                     ForEach(areas) { area in
-                        NavigationLink(value: area.destination) {
+                        NavigationLink(value: AppDestination.trainingLibraryArea(areaId: area.id, browseAll: viewModel?.browseAll == true)) {
                             HStack(spacing: 8) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(area.label)

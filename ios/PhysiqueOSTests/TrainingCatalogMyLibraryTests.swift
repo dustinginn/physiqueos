@@ -8,6 +8,25 @@ import XCTest
 /// New Exercise routes through the server's full-catalog duplicate check
 /// rather than reimplementing matching policy in Swift.
 final class TrainingCatalogMyLibraryTests: XCTestCase {
+    @MainActor
+    func testLateAllExercisesResponseCannotReplaceTheSelectedMyLibraryState() async throws {
+        let api = ControlledTrainingLibraryAPI()
+        let model = TrainingLibraryRootViewModel(api: api)
+        await model.load()
+        let olderRead = Task { await model.selectCatalog(browseAll: true) }
+        await api.waitForAllRead()
+        await model.selectCatalog(browseAll: false)
+        await api.releaseAllRead()
+        await olderRead.value
+        XCTAssertFalse(model.browseAll)
+        guard case .loaded(let landing) = model.state else { return XCTFail("My Library must remain loaded") }
+        XCTAssertEqual(landing.title, "My Library result")
+    }
+
+    func testLibraryAreaDestinationPreservesExplicitAllExercisesChoice() throws {
+        let destination = AppDestination.trainingLibraryArea(areaId: "glutes", browseAll: true)
+        XCTAssertEqual(try JSONDecoder().decode(AppDestination.self, from: JSONEncoder().encode(destination)), destination)
+    }
     private func exercise(
         _ id: String, name: String? = nil, areaId: String = "chest",
         previouslyPerformed: Bool = false, inMyLibrary: Bool? = nil
@@ -220,4 +239,43 @@ final class TrainingCatalogMyLibraryTests: XCTestCase {
             return createResult
         }
     }
+}
+
+private actor ControlledTrainingLibraryAPI: TrainingAPI {
+    private var allRead: CheckedContinuation<TrainingLandingReadModel, Error>?
+    private var started: CheckedContinuation<Void, Never>?
+    private var allLanding: TrainingLandingReadModel?
+    private var allStarted = false
+
+    func fetchTrainingLibrary(scope: EvidenceScopeSelection, browseAll: Bool) async throws -> TrainingLandingReadModel {
+        var landing = try await FixtureTrainingAPI().fetchTrainingLanding(scope: scope)
+        landing.title = browseAll ? "All Exercises result" : "My Library result"
+        guard browseAll else { return landing }
+        allLanding = landing
+        return try await withCheckedThrowingContinuation { continuation in
+            allRead = continuation
+            allStarted = true
+            started?.resume()
+            started = nil
+        }
+    }
+
+    func waitForAllRead() async {
+        guard !allStarted else { return }
+        await withCheckedContinuation { started = $0 }
+    }
+
+    func releaseAllRead() {
+        if let allLanding { allRead?.resume(returning: allLanding) }
+        allRead = nil
+    }
+
+    func fetchTrainingLanding(scope: EvidenceScopeSelection) async throws -> TrainingLandingReadModel {
+        try await fetchTrainingLibrary(scope: scope, browseAll: false)
+    }
+    func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel? { try await FixtureTrainingAPI().fetchTrainingDay(date: date) }
+    func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel? { try await FixtureTrainingAPI().fetchTrainingSession(sessionId: sessionId) }
+    func fetchTrainingArea(areaId: String, scope: EvidenceScopeSelection) async throws -> TrainingAreaReadModel? { try await FixtureTrainingAPI().fetchTrainingArea(areaId: areaId, scope: scope) }
+    func fetchTrainingExercise(exerciseId: String, scope: EvidenceScopeSelection) async throws -> TrainingExerciseDetailReadModel? { try await FixtureTrainingAPI().fetchTrainingExercise(exerciseId: exerciseId, scope: scope) }
+    func fetchTrainingReporting(reportId: String, scope: EvidenceScopeSelection) async throws -> TrainingReportingReadModel? { try await FixtureTrainingAPI().fetchTrainingReporting(reportId: reportId, scope: scope) }
 }
