@@ -254,6 +254,44 @@ describe("provider-native Training navigation", () => {
     expect(store.listCanonicalTrainingEvidenceObjects).not.toHaveBeenCalled();
   });
 
+  it("Build 33: separates structured workout-level telemetry from the generated detail summary", async () => {
+    const record = training("canonical-session-telemetry", "2026-09-14");
+    record.payload.metadata = {
+      activity_type: "Traditional Strength Training",
+      start_time: "2026-09-14T07:45:00.000Z",
+      end_time: "2026-09-14T08:44:00.000Z",
+      duration_seconds: 3540,
+      active_calories: 438,
+      average_heart_rate: 121,
+    };
+    const session = await createTrainingNavigationReadService({ store: navigationStore([record]) })
+      .getSession({ sessionId: "canonical-session-telemetry" });
+
+    expect(session.telemetry).toEqual({
+      startTime: "2026-09-14T07:45:00.000Z",
+      endTime: "2026-09-14T08:44:00.000Z",
+      durationSeconds: 3540,
+      activeCalories: 438,
+      averageHeartRate: 121,
+    });
+    // `detail` still carries the fallback summary for surfaces that show
+    // only this string (Activity's linked-training-context rows, the
+    // Training Library history list) -- the session detail SCREEN is the
+    // only consumer that must prefer `telemetry` and skip `detail` when
+    // structured exercises are present; that's a Native presentation
+    // decision, not a server contract gap.
+    expect(session.detail).toContain("121 bpm avg HR");
+  });
+
+  it("Build 33: returns no telemetry object when a session carries no workout-level telemetry at all", async () => {
+    const record = training("canonical-session-no-telemetry", "2026-09-14");
+    record.payload.metadata = { activity_type: "Traditional Strength Training" };
+    const session = await createTrainingNavigationReadService({ store: navigationStore([record]) })
+      .getSession({ sessionId: "canonical-session-no-telemetry" });
+
+    expect(session.telemetry).toBeNull();
+  });
+
   it("projects exact-session private supporting media without selecting a different workout", async () => {
     const record = training("canonical-session-media", "2026-08-26");
     record.payload.metadata.supporting_media = [

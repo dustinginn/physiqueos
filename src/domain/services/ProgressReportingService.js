@@ -1533,6 +1533,7 @@ function getTrainingRecords(context = {}) {
         label: session.metadata?.activity_type ?? "Workout",
         value: formatTrainingRecordValue(session),
         detail: formatTrainingRecordDetail(session),
+        telemetry: buildTrainingSessionTelemetry(session),
         date: session.observed_at,
         sourceEvidence: getSessionSourceLabels(session),
       };
@@ -2639,6 +2640,26 @@ function formatTrainingRecordValue(session) {
   }
 
   return "";
+}
+
+/// Build 33: structured workout-level telemetry, separated from
+/// `formatTrainingRecordDetail`'s opaque generated string specifically so a
+/// session with structured exercises can be presented as telemetry once
+/// plus exercises once, never a duplicated backend-style summary rendered
+/// alongside the structured breakdown. Raw values only — no display
+/// formatting — Native formats the time range in the device's own current
+/// time zone rather than the server guessing one.
+function buildTrainingSessionTelemetry(session) {
+  const metadata = session.metadata ?? {};
+  const startTime = metadata.start_time ?? metadata.started_at ?? metadata.start ?? null;
+  const endTime = metadata.end_time ?? metadata.ended_at ?? metadata.end ?? null;
+  const durationSeconds = Number.isFinite(metadata.duration_seconds) ? metadata.duration_seconds : null;
+  const activeCalories = Number.isFinite(metadata.active_calories) ? metadata.active_calories : null;
+  const averageHeartRate = Number.isFinite(metadata.average_heart_rate) ? metadata.average_heart_rate : null;
+  if (!startTime && !endTime && durationSeconds === null && activeCalories === null && averageHeartRate === null) {
+    return null;
+  }
+  return { startTime, endTime, durationSeconds, activeCalories, averageHeartRate };
 }
 
 function formatTrainingRecordDetail(session) {
