@@ -169,6 +169,16 @@ export function specializedNotificationAction({ workflow, priorityId, occurrence
   });
 }
 
+// Protocol Support retains its domain workflow regardless of the reminder
+// used to schedule it. Editing a Support schedule does not authorize blind
+// notification completion; peptide completion remains dose-aware.
+export function protocolSupportNotificationAction({ category, ...occurrence }) {
+  return specializedNotificationAction({
+    ...occurrence,
+    workflow: category === "peptide" ? "peptide_protocol" : "priority_detail",
+  });
+}
+
 // For priorities with no in-app completion action at all — evidence-derived
 // tiles like Protein/Activity/Sleep that are satisfied by HealthKit/check-in
 // data, not a tap. A notification for one of these can still open its

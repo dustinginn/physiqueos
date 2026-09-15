@@ -30,6 +30,7 @@ import {
   resolveNotificationAction,
   resolvePriorityExecutionContract,
   specializedNotificationAction,
+  protocolSupportNotificationAction,
 } from "./ReminderOccurrenceCompletion.js";
 import {
   resolveCanonicalGoalRelationships,
@@ -150,9 +151,10 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                   projection,
                   protocol,
                 });
-          return withDosingNotificationAction(
+          return withProtocolSupportNotificationAction(
             withExecutionContract(detail, reminder, projection.localDate),
             {
+              category: protocol.category,
               priorityId: projection.priorityId,
               occurrenceDate: projection.localDate,
               timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
@@ -160,7 +162,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           );
         }
 
-        return withDosingNotificationAction(
+        return withProtocolSupportNotificationAction(
           withExecutionContract(createLegacyReminderOnlyProtocolPriorityDetail({
             reminder,
             protocol,
@@ -170,7 +172,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
             occurrenceDate,
             timeZone,
           }), reminder, occurrenceDate),
-          { priorityId: reminder.id, occurrenceDate, timeOfDay: reminder.schedule?.timeOfDay }
+          { category: protocol.category, priorityId: reminder.id, occurrenceDate, timeOfDay: reminder.schedule?.timeOfDay }
         );
       }
 
@@ -221,15 +223,12 @@ function withExecutionContractAndNotificationAction(detail, reminder, occurrence
   };
 }
 
-// Dosing semantics mean peptide/recovery/supplement execution items must
-// never expose blind direct completion from a notification — always
-// specialized, regardless of `actionable`/`completable` state, and
-// regardless of whether a canonical Execution projection was actually
-// found (the legacy reminder-only path below has no `projection` at all).
-function withDosingNotificationAction(detail, { priorityId, occurrenceDate, timeOfDay = null }) {
+// Support schedule editing does not authorize blind notification completion.
+// Apply the shared domain workflow to canonical and legacy reminder paths.
+function withProtocolSupportNotificationAction(detail, occurrence) {
   return detail ? {
     ...detail,
-    notificationAction: specializedNotificationAction({ workflow: "peptide_protocol", priorityId, occurrenceDate, timeOfDay }),
+    notificationAction: protocolSupportNotificationAction(occurrence),
   } : null;
 }
 

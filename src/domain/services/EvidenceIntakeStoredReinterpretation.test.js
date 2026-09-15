@@ -80,6 +80,25 @@ describe("stored Apple Health evidence reinterpretation", () => {
     })).rejects.toMatchObject({ code: "WORKOUT_SCREENSHOT_CONTEXT_CONFLICT" });
   });
 
+  it("keeps repeated distinct three-image submissions in Training despite changing attachment order", async () => {
+    const artifacts = [1, 2, 3].map((ordinal) => ({
+      id: `image-${ordinal}`, ordinal, fileName: `workout-${ordinal}.jpg`, mimeType: "image/jpeg",
+      buffer: Buffer.alloc(1_100_000), uploadedAt: "2026-09-15T19:00:00.000Z", observedDate: "2026-09-15",
+      dataUrl: "data:image/jpeg;base64,c3ludGhldGlj",
+    }));
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const ordered = attempt % 2 ? [...artifacts].reverse() : artifacts;
+      const result = await interpretEvidenceIntakeStoredArtifacts({
+        capturedAt: "2026-09-15T19:00:00.000Z", evidenceDate: "2026-09-15", expectedEvidenceType: "training",
+        submissionId: `distinct-submission-${attempt}`, userId: "owner", sourceArtifacts: ordered,
+        loadArtifact: async ({ artifact }) => artifact,
+      });
+      expect(result.evidencePackage.evidence_objects).toHaveLength(3);
+      expect(result.evidencePackage.evidence_objects.every((item) => item.evidence_type === "training")).toBe(true);
+    }
+    expect(mocks.interpretScreenshotsWithVision).toHaveBeenCalledTimes(12);
+  });
+
   it("reuses all three stored artifacts, their historical date, and the package identity", async () => {
     const sourceArtifacts = [1, 2, 3].map((index) => ({
       id: `artifact-${index}`,

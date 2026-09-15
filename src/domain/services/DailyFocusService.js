@@ -31,6 +31,7 @@ import {
   resolveNotificationAction,
   resolvePriorityExecutionContract,
   specializedNotificationAction,
+  protocolSupportNotificationAction,
 } from "./ReminderOccurrenceCompletion.js";
 
 const DAY_NAMES = [
@@ -834,25 +835,15 @@ function getExecutionBackedProtocolItems({
         executionContract: reminder
           ? resolvePriorityExecutionContract({ reminder, occurrenceDate: today })
           : null,
-        // Dosing semantics mean a peptide/recovery/supplement item must
-        // never expose blind direct completion from a notification, even
-        // when it happens to be built on top of an ordinary reminder for
-        // scheduling (`forceSpecialized`) — and when there's no reminder at
-        // all (`executionContract` null), it's still specialized rather
-        // than falling back to `open_only`.
-        notificationAction: reminder
-          ? resolveNotificationAction({
-              executionContract: resolvePriorityExecutionContract({ reminder, occurrenceDate: today }),
-              completable: projection.completable,
-              forceSpecialized: true,
-              timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
-            })
-          : specializedNotificationAction({
-              workflow: "peptide_protocol",
-              priorityId: projection.historyAnchorId,
-              occurrenceDate: today,
-              timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay,
-            }),
+        // Schedule editing does not authorize blind Support completion.
+        // Keep the same domain workflow as detail, independent of reminder
+        // type or presence; peptides remain dose-aware.
+        notificationAction: protocolSupportNotificationAction({
+          category: protocol.category,
+          priorityId: projection.priorityId,
+          occurrenceDate: today,
+          timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder?.schedule?.timeOfDay,
+        }),
         state: state.name,
         priority: state.priorityOffset + (recoverySupport ? 18 : 22) + index,
         changeLabel: setupRequired

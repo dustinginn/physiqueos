@@ -11,6 +11,38 @@ import {
 } from "./RecurringSupportManagementService";
 
 describe("recurring Support management", () => {
+  it("projects the incident-shaped Recovery occurrence consistently through Home and detail", async () => {
+    const fixture = setup();
+    const instant = new Date("2026-09-15T19:20:00.000Z");
+    const user = { id: "user", timezone: null }; // timeZone absent, as in production
+    const execution = fixture.live.executionItems[0];
+    execution.executionRevision = 4;
+    execution.preferredSchedule = { type: "daily", startDate: "2026-09-14", endDate: null, timeOfDay: "12:21", timezone: null };
+    const reminder = fixture.live.reminders[0];
+    reminder.schedule = { type: "daily", startDate: "2026-09-14", endDate: null, timeOfDay: "12:21", timezone: null };
+    reminder.completedAt = null;
+    reminder.nextDueAt = null;
+    const repositories = {
+      users: { getCurrentUser: async () => user },
+      goals: { listGoals: async () => [] },
+      reminders: { getReminderById: async () => reminder },
+      protocols: { listProtocols: async () => fixture.live.protocols },
+      operatingPlan: { getOperatingPlan: async () => null },
+      operatingRhythm: { getOperatingRhythm: async () => null },
+      executionItems: { listExecutionItems: async () => fixture.live.executionItems },
+    };
+    const home = foamPriority(fixture.live, instant.toISOString());
+    const detail = await createPriorityDetailService({ repositories, now: () => instant })
+      .getPriorityDetail(reminder.id);
+    expect(home.notificationAction).toEqual(detail.notificationAction);
+    expect(detail.notificationAction).toEqual({
+      classification: "specialized_workflow_required", workflow: "priority_detail",
+      destination: { priorityId: reminder.id, occurrenceDate: "2026-09-15" },
+      scheduledTime: "12:21", completionCommand: null,
+    });
+    expect(execution.preferredSchedule.timeOfDay).toBe("12:21");
+    expect(fixture.live.protocols[0].schedule.timeOfDay).toBe("17:00");
+  });
   it("hydrates the existing Foam Rolling schedule without fabricating notes", () => {
     const fixture = setup();
     const hydration = createRecurringSupportHydrationModel({

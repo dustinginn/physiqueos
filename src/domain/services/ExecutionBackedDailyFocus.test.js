@@ -58,6 +58,7 @@ describe("Execution-backed Daily Focus composition", () => {
     // item must never expose blind direct completion from a notification.
     expect(item.notificationAction).toMatchObject({
       classification: "specialized_workflow_required",
+      workflow: "peptide_protocol",
       completionCommand: null,
     });
   });

@@ -14,6 +14,7 @@ describe("Execution-backed priority detail", () => {
     }).getPriorityDetail(reminder.id);
 
     expect(detail).toMatchObject({
+      notificationAction: { classification: "specialized_workflow_required", workflow: "peptide_protocol", completionCommand: null, scheduledTime: "21:45" },
       id: reminder.id,
       title: "Shared Peptide",
       subtitle: "Tonight",

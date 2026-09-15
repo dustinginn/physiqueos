@@ -2,9 +2,20 @@ import { describe, expect, it } from "vitest";
 import {
   isReminderOccurrenceCompleted,
   resolveReminderOccurrenceDate,
+  protocolSupportNotificationAction,
 } from "./ReminderOccurrenceCompletion.js";
 
 describe("Reminder occurrence completion", () => {
+  it.each([
+    ["recovery", "priority_detail"],
+    ["supplement", "priority_detail"],
+    ["peptide", "peptide_protocol"],
+  ])("keeps %s Support notification routing domain-aware and specialized", (category, workflow) => {
+    expect(protocolSupportNotificationAction({ category, priorityId: "reminder", occurrenceDate: "2026-09-15", timeOfDay: "12:21" }))
+      .toEqual({ classification: "specialized_workflow_required", workflow,
+        destination: { priorityId: "reminder", occurrenceDate: "2026-09-15" },
+        completionCommand: null, scheduledTime: "12:21" });
+  });
   it("uses Founder-local date semantics for top-level completion", () => {
     const reminder = { completedAt: "2026-08-31T06:30:00Z" };
     expect(isReminderOccurrenceCompleted(reminder, {
