@@ -15,6 +15,7 @@ export function createPostgresCoreNavigationReadStore({
       let queryCount = 0;
       let rowCount = 0;
       let payloadBytes = 0;
+      let runtimeMetadata = null;
       const startedAt = performance.now();
       const readCollections = async (collections) => {
         const requested = [...new Set(collections ?? [])];
@@ -24,7 +25,9 @@ export function createPostgresCoreNavigationReadStore({
         const selections = [...grouped].map(([table, names], index) => {
           values.push(names);
           return `SELECT collection_name,source_ordinal,record_id,
-              ${payloadExpression(readModel)} AS payload
+              ${payloadExpression(readModel)} AS payload${readModel === "core.navigation.coaching-updates-detail" ? `,
+              (SELECT json_build_object('revision',revision,'lastCommitId',last_command_id,'updatedAt',updated_at)
+                 FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1) AS runtime_metadata` : ""}
             FROM physiqueos.${table}
             WHERE owner_user_id=$1 AND collection_name=ANY($${index + 2}::text[])
               ${canonicalEvidencePredicate(readModel)}`;
@@ -40,11 +43,28 @@ export function createPostgresCoreNavigationReadStore({
         const output = Object.fromEntries(requested.map((name) => [name, []]));
         for (const row of result.rows) {
           output[row.collection_name].push(Object.freeze(row.payload));
+          if (row.runtime_metadata) runtimeMetadata = Object.freeze(row.runtime_metadata);
         }
         return Object.freeze(output);
       };
+      const readRuntimeMetadata = async () => {
+        if (runtimeMetadata) return runtimeMetadata;
+        queryCount += 1;
+        const result = await pool.query(
+          `SELECT revision,last_command_id,updated_at
+             FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1`,
+          [ownerUserId]
+        );
+        const row = result.rows[0];
+        if (!row) throw new Error("Canonical runtime metadata is unavailable.");
+        return Object.freeze({
+          revision: Number(row.revision),
+          lastCommitId: row.last_command_id ?? null,
+          updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+        });
+      };
       try {
-        return await callback({ readCollections });
+        return await callback({ readCollections, readRuntimeMetadata });
       } finally {
         onComplete?.({
           readModel,
@@ -78,6 +98,14 @@ export function createRepositoryCoreNavigationReadStore({
     },
     run(_readModel, callback) {
       return callback({
+        readRuntimeMetadata: async () => {
+          const runtime = readRuntimeStore();
+          return Object.freeze({
+            revision: Number(runtime?.revision ?? 0),
+            lastCommitId: runtime?.lastCommitId ?? null,
+            updatedAt: runtime?.updatedAt ?? null,
+          });
+        },
         readCollections: async (collections) => {
           const runtime = readRuntimeStore();
           return Object.freeze(Object.fromEntries((collections ?? []).map((name) => [

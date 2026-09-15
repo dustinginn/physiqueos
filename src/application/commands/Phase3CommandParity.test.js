@@ -69,6 +69,11 @@ const payloads = {
   [Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE]: {
     protocolId: "supplement-protocol", operation: "pause", expectedCurrentVersionId: "supplement-protocol_v1",
   },
+  [Phase3Command.SAVE_COACHING_UPDATES]: {
+    protocolId: "coaching-protocol", expectedCurrentVersionId: "coaching-v1",
+    expectedSemanticDigest: "digest", photoExpectedCurrentVersionId: "photos-v1",
+    photoExpectedSemanticDigest: "photo-digest", dexaExpectedRevision: 1, draft: {},
+  },
 };
 
 describe("Phase 3 task command parity boundary", () => {
@@ -163,6 +168,7 @@ function commandPort(commandType) {
     [Phase3Command.SAVE_SUPPLEMENT_SUPPORT]: "saveSupplementSupport",
     [Phase3Command.SAVE_SUPPLEMENT_STRATEGY]: "saveSupplementStrategy",
     [Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE]: "changeSupplementLifecycle",
+    [Phase3Command.SAVE_COACHING_UPDATES]: "saveCoachingUpdates",
   })[commandType];
 }
 

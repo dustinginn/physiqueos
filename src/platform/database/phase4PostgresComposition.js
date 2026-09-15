@@ -134,10 +134,14 @@ export function createPhase4TransactionRunner({ pool }) {
   });
 }
 
-function createTransactionBoundPorts({ now, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority }) {
+export function createTransactionBoundPorts({ now, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority }) {
   return Object.freeze(Object.fromEntries(CANONICAL_PERSISTENCE_PORT_NAMES.map((name) => [
     name,
     async (context) => {
+      // Same owner lock/order as Web runtime mutations. It serializes
+      // composite plan dependencies with every canonical Native command,
+      // while record-specific expected versions remain unchanged.
+      await context.transaction.client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:${context.ownerUserId}`]);
       if (compatibilityMode) {
         const result = await context.transaction.client.query("SELECT current_database() AS database");
         const databaseName = String(result.rows[0]?.database ?? "");
@@ -156,7 +160,28 @@ function createTransactionBoundPorts({ now, authorityStore, migrationOperationId
           commandId: context.metadata.commandId,
         });
       }
-      return createCanonicalPersistenceCommandPorts({ records: context.transaction.canonicalRecords, now })[name](context);
+      const records = context.transaction.canonicalRecords;
+      const managesRuntimeRevision = authorityStore || requireCompatibilityAuthority;
+      const runtimeBefore = managesRuntimeRevision
+        ? await records.getRuntimeMetadata({ ownerUserId: context.ownerUserId, lock: true })
+        : null;
+      if (managesRuntimeRevision && !runtimeBefore) {
+        throw Object.assign(new Error("Canonical runtime metadata is unavailable."), { code: "CANONICAL_RUNTIME_METADATA_UNAVAILABLE" });
+      }
+      const mutationsBefore = records.getMutationCount();
+      const outcome = await createCanonicalPersistenceCommandPorts({ records, now })[name](context);
+      if (runtimeBefore && records.getMutationCount() > mutationsBefore) {
+        const runtimeAfter = await records.getRuntimeMetadata({ ownerUserId: context.ownerUserId });
+        // Coaching Updates already advances its composite revision. Other
+        // Native writes must also fence stale Web/Native composite editors.
+        if (runtimeAfter.revision === runtimeBefore.revision) {
+          await records.advanceRuntimeMetadata({
+            ownerUserId: context.ownerUserId, expectedRevision: runtimeBefore.revision,
+            commandId: context.metadata.commandId, at: now(),
+          });
+        }
+      }
+      return outcome;
     },
   ])));
 }

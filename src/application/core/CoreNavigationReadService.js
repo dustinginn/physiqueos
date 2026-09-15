@@ -35,6 +35,12 @@ import {
   createSupplementSupportHydrationModel,
   formatSupplementSupportSummary,
 } from "../../domain/services/SupplementSupportManagementService.js";
+import { createCoachingUpdatesReadService } from "../../domain/services/CoachingUpdatesReadService.js";
+import { createCoachingUpdatesEditorModel } from "../../domain/services/CoachingUpdatesEditorService.js";
+import { resolveCoachingUpdatesGoalCadencePolicy } from "../../domain/services/CoachingUpdatesGoalCadencePolicyService.js";
+import { createCoachingUpdatesSemanticDigest } from "../../domain/services/FounderRuntimeSemanticDigest.js";
+import { createProgressPhotosExecutionHydrationModel } from "../../domain/services/ProgressPhotosExecutionScheduleService.js";
+import { DEXA_APPOINTMENT_ID } from "../../domain/services/DexaAppointmentManagementService.js";
 
 export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   home: Object.freeze([
@@ -68,6 +74,10 @@ export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
     "weightEntries", "dexaScans", "progressPhotos",
   ]),
   tracking: Object.freeze(["user", "executionItems", "protocols", "reminders"]),
+  coachingUpdates: Object.freeze([
+    "user", "goals", "protocols", "protocolVersions", "executionItems", "reminders",
+    "dexaScans", "progressPhotos", "evidenceReviews",
+  ]),
 });
 
 export function createCoreNavigationReadService({
@@ -103,7 +113,7 @@ export function createCoreNavigationReadService({
     },
     getOperatingPlan() {
       return withContext("core.navigation.operating-plan", "operatingPlan", ({ principal, repositories }) =>
-        createOperatingPlanReadService({ repositories }).getOperatingPlan({ principal }));
+        createOperatingPlanReadService({ repositories }).getOperatingPlan({ principal, includePausedSupplements: true }));
     },
     getOperatingPlanProtocolDomain({ protocolId }) {
       return withContext("core.navigation.operating-plan-protocol-domain", "operatingPlan", ({ ownerUserId, runtime }) => {
@@ -403,6 +413,84 @@ export function createCoreNavigationReadService({
         });
       });
     },
+    getEnergyStrategyDetail({ strategyId }) {
+      return withContext("core.navigation.energy-strategy-detail", "operatingPlan", async ({ ownerUserId, repositories }) => {
+        const protocol = await repositories.protocols.getProtocolById(strategyId);
+        if (!protocol || protocol.userId !== ownerUserId || protocol.status !== "active" ||
+            (protocol.protocolType ?? protocol.category) !== "energy") return null;
+        const [version, goals, nutritionContext] = await Promise.all([
+          protocol.currentVersionId ? repositories.protocolVersions.getVersionById(protocol.currentVersionId) : null,
+          repositories.goals.listGoals(ownerUserId),
+          repositories.nutritionContext.getNutritionContext(ownerUserId),
+        ]);
+        const detail = composeOperatingPlanStrategyDetail({ goals, nutritionContext, protocol, strategyType: "energy", version });
+        if (!detail) return null;
+        return Object.freeze({ ...projectOperatingPlanStrategyDetail(protocol, detail), intentionallyReadOnly: true });
+      });
+    },
+    getCoachingUpdatesDetail({ strategyId }) {
+      return withContext("core.navigation.coaching-updates-detail", "coachingUpdates", async ({ ownerUserId, repositories, runtime }) => {
+        const protocol = await repositories.protocols.getProtocolById(strategyId);
+        if (!protocol || protocol.userId !== ownerUserId || protocol.status !== "active" ||
+            (protocol.protocolType ?? protocol.category) !== "briefings") return null;
+        const [version, goals, goal, readModel] = await Promise.all([
+          protocol.currentVersionId ? repositories.protocolVersions.getVersionById(protocol.currentVersionId) : null,
+          repositories.goals.listGoals(ownerUserId),
+          repositories.goals.getActiveGoal(ownerUserId),
+          createCoachingUpdatesReadService({ repositories }).getCurrent({ protocolId: protocol.id, userId: ownerUserId }),
+        ]);
+        const photoHydration = createProgressPhotosExecutionHydrationModel(runtime);
+        const dexa = runtime.executionItems?.find((item) => item.id === DEXA_APPOINTMENT_ID);
+        if (!version || !goal || !readModel || !photoHydration || !dexa) return null;
+        const editor = createCoachingUpdatesEditorModel({
+          readModel,
+          policy: resolveCoachingUpdatesGoalCadencePolicy(goal),
+          photos: {
+            cadence: photoHydration.item.recurrence.interval === 2 ? "weekly_interval_2" : "weekly",
+            day: photoHydration.item.recurrence.weekdays[0],
+            timeOfDay: photoHydration.item.recurrence.timeOfDay,
+            reminderEnabled: photoHydration.item.reminderEnabled,
+            timeOptions: ["morning", "afternoon", "evening"],
+          },
+          dexa: {
+            plannedDate: dexa.preferredSchedule?.date ?? "",
+            localTime: dexa.preferredSchedule?.timeOfDay ?? "",
+            reminderPreferences: structuredClone(dexa.reminderPreferences ?? []),
+            uploadReminder: dexa.uploadReminder === true,
+            preparationNote: dexa.preparationNote ?? "",
+          },
+        });
+        const detail = composeOperatingPlanStrategyDetail({ goals, protocol, strategyType: "briefings", version });
+        if (!editor || !detail) return null;
+        return Object.freeze({
+          ...projectOperatingPlanStrategyDetail(protocol, detail),
+          context: Object.freeze({
+            expectedCurrentVersionId: version.id,
+            expectedRevision: runtime.revision,
+            expectedSemanticDigest: createCoachingUpdatesSemanticDigest(runtime),
+            photoExpectedCurrentVersionId: photoHydration.context.expectedCurrentVersionId,
+            photoExpectedSemanticDigest: photoHydration.context.expectedSemanticDigest,
+            dexaExpectedRevision: dexa.executionRevision ?? 1,
+          }),
+          editor: Object.freeze({
+            strategyId: protocol.id,
+            midweek: editor.midweek,
+            weekly: editor.weekly,
+            monthly: editor.monthly,
+            photos: Object.freeze({
+              cadence: editor.photos.cadence,
+              day: editor.photos.day,
+              timeOfDay: editor.photos.timeOfDay,
+              reminderEnabled: editor.photos.reminderEnabled,
+            }),
+            dexa: editor.dexa,
+            photoEventBriefingEnabled: editor.eventBriefings.photo,
+            dexaEventBriefingEnabled: editor.eventBriefings.dexa,
+            notificationPreference: editor.notificationPreference,
+          }),
+        });
+      });
+    },
     /// The Nutrition Operating Plan strategy detail + editor read, combined
     /// into one payload so Native can render the detail screen and prime
     /// the editor from a single fetch. Reuses the exact same display
@@ -505,11 +593,15 @@ export function createCoreNavigationReadService({
   }
 
   function withContext(readModel, surface, callback) {
-    return store.run(readModel, async ({ readCollections }) => {
+    return store.run(readModel, async ({ readCollections, readRuntimeMetadata }) => {
       const ownerUserId = store.getOwnerUserId();
       if (!ownerUserId) throw new Error("Core navigation owner is unavailable.");
       const collections = await readCollections(CORE_NAVIGATION_COLLECTIONS[surface]);
       const runtime = createCompactRuntime(collections, surface);
+      if (surface === "coachingUpdates") {
+        if (!readRuntimeMetadata) throw new Error("Canonical Coaching Updates revision authority is unavailable.");
+        Object.assign(runtime, await readRuntimeMetadata());
+      }
       const repositories = createSeedRepositories(runtime, { allowStagedMutations: false });
       return callback({
         ownerUserId,
@@ -530,6 +622,19 @@ export function createCompactRuntime(collections = {}, surface = null) {
   runtime.nutritionContext = runtime.nutritionContext?.at(-1) ?? null;
   runtime.operatingPlan = runtime.operatingPlan?.at(-1) ?? null;
   return runtime;
+}
+
+function projectOperatingPlanStrategyDetail(protocol, detail) {
+  return Object.freeze({
+    protocolId: protocol.id,
+    title: detail.title,
+    purpose: detail.purpose,
+    goal: detail.goal ?? "",
+    startedDate: detail.startedDate ?? "",
+    status: detail.status,
+    fields: Object.freeze(detail.sections.filter(Boolean)),
+    editLabel: detail.editHref ? detail.editLabel : null,
+  });
 }
 
 function projectCollection(name, values, surface) {

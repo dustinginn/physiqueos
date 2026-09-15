@@ -18,4 +18,21 @@ describe("Phase 4 persistence ownership boundary", () => {
     const records = createPhase4CanonicalRecordStore({ query: vi.fn() });
     expect(() => records.get({ ownerUserId: "owner", collection: "futureUnknown", recordId: "id" })).rejects.toThrow("Unsupported required canonical collection");
   });
+
+  it("shares Web's owner lock and conditionally advances the canonical composite revision", async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ revision: "85", version: "2", last_command_id: "prior", updated_at: "2026-09-15T00:00:00Z" }] })
+      .mockResolvedValueOnce({ rows: [{ revision: "86", version: "3", last_command_id: "next", updated_at: "2026-09-15T19:00:00Z" }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const records = createPhase4CanonicalRecordStore({ query });
+    expect(await records.getRuntimeMetadata({ ownerUserId: "owner-a", lock: true })).toMatchObject({ revision: 85 });
+    expect(query.mock.calls[0]).toEqual(["SELECT pg_advisory_xact_lock(hashtextextended($1,0))", ["physiqueos:owner-a"]]);
+    expect(query.mock.calls[1][0]).toContain("owner_user_id=$1 FOR UPDATE");
+    expect(await records.advanceRuntimeMetadata({ ownerUserId: "owner-a", expectedRevision: 85, commandId: "next", at: new Date("2026-09-15T19:00:00Z") }))
+      .toMatchObject({ revision: 86, lastCommandId: "next" });
+    expect(query.mock.calls[2][0]).toContain("owner_user_id=$1 AND revision=$2");
+    await expect(records.advanceRuntimeMetadata({ ownerUserId: "owner-a", expectedRevision: 85, commandId: "stale" }))
+      .rejects.toMatchObject({ code: "EXPECTED_VERSION_CONFLICT" });
+  });
 });

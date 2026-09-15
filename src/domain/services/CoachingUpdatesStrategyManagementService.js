@@ -52,56 +52,14 @@ export function createCoachingUpdatesStrategyManagementService({
       const transaction = unit.begin();
       try {
         const staged = await transaction.mutate((store) => {
-          const protectedBefore = protectedState(store);
-          const coaching = prepareCoachingUpdatesTransaction(store, command.coaching, now());
-          if (!coaching.ok && coaching.outcome !== CoachingUpdatesTransactionOutcome.UNCHANGED_CONFIGURATION) {
-            throw typed(coaching.outcome, coaching.reason);
-          }
-          const photos = prepareProgressPhotosScheduleSuccessor(store, command.photos, now());
-          if (!photos.ok) throw typed(photos.outcome, photos.reason);
-          const photoReminder = prepareProgressPhotosReminderEnablement(store, {
-            enabled: command.photos?.reminderEnabled,
-          });
-          if (!photoReminder.ok) throw typed(photoReminder.outcome, photoReminder.reason);
-          const dexa = prepareDexaAppointmentUpdate(store, command.dexa, now(), {
-            requireAppointment: true,
-            preserveExistingFields: false,
-          });
-          if (!dexa.ok && dexa.outcome !== DexaAppointmentOutcome.UNCHANGED) {
-            throw typed(dexa.outcome, dexa.reason);
-          }
-          const coachingChanged = coaching.ok;
-          const photosChanged = photos.outcome !== "unchanged";
-          const photoReminderChanged = photoReminder.changed;
-          const dexaChanged = dexa.ok;
-          if (!coachingChanged && !photosChanged && !photoReminderChanged && !dexaChanged) {
-            throw typed(CoachingUpdatesStrategyOutcome.UNCHANGED, "No changes to save.");
-          }
-          if (coachingChanged) applyPreparedCoachingUpdatesTransaction(store, coaching);
-          if (photosChanged) applyPreparedProgressPhotosScheduleSuccessor(store, photos);
-          if (photoReminderChanged) {
-            applyPreparedProgressPhotosReminderEnablement(store, photoReminder);
-          }
-          if (dexaChanged) applyPreparedDexaAppointmentUpdate(store, dexa);
-          if (!same(protectedBefore, protectedState(store))) {
-            throw typed(CoachingUpdatesStrategyOutcome.VERIFICATION_FAILURE, "Protected evidence or completion history changed.");
-          }
-          return {
-            coaching, photos, photoReminder, dexa, coachingChanged, photosChanged,
-            photoReminderChanged, dexaChanged,
-            protectedBefore,
-          };
+          const prepared = prepareCoachingUpdatesStrategyTransition(store, command, now());
+          if (!prepared.ok) throw typed(prepared.outcome, prepared.reason);
+          applyPreparedCoachingUpdatesStrategyTransition(store, prepared);
+          return prepared;
         });
         const committed = await transaction.commit({
           validateFinalized(store) {
-            if (!same(staged.protectedBefore, protectedState(store))) return false;
-            if (staged.coachingChanged && !verifyPreparedCoachingUpdatesTransaction(
-              store, command.coaching, staged.coaching.successor.successor.id)) return false;
-            if (staged.photosChanged && !verifyPreparedProgressPhotosScheduleSuccessor(store, staged.photos)) return false;
-            if (staged.photoReminderChanged &&
-                !verifyPreparedProgressPhotosReminderEnablement(store, staged.photoReminder)) return false;
-            if (staged.dexaChanged && !verifyPreparedDexaAppointmentUpdate(store, staged.dexa)) return false;
-            return true;
+            return verifyPreparedCoachingUpdatesStrategyTransition(store, command, staged);
           },
         });
         return Object.freeze({
@@ -127,6 +85,79 @@ export function createCoachingUpdatesStrategyManagementService({
   };
 }
 
+/// The transport-independent composite transition used by both the Web
+/// file/runtime unit of work above and canonical Native persistence. This
+/// deliberately keeps Coaching Updates, Progress Photos, the photo
+/// reminder, and DEXA in one preparation/apply/verification boundary.
+export function prepareCoachingUpdatesStrategyTransition(store, command = {}, timestamp = new Date()) {
+  if (getFounderStoreRevision(store) !== Number(command.expectedRevision) ||
+      createCoachingUpdatesSemanticDigest(store) !== command.expectedSemanticDigest) {
+    return rejected(CoachingUpdatesStrategyOutcome.CONCURRENCY_CONFLICT,
+      "The plan changed while you were editing. Reload and try again.");
+  }
+  const protectedBefore = protectedState(store);
+  const coaching = prepareCoachingUpdatesTransaction(store, command.coaching, timestamp);
+  if (!coaching.ok && coaching.outcome !== CoachingUpdatesTransactionOutcome.UNCHANGED_CONFIGURATION) {
+    return rejected(coaching.outcome, coaching.reason);
+  }
+  const photos = prepareProgressPhotosScheduleSuccessor(store, command.photos, timestamp);
+  if (!photos.ok) return rejected(photos.outcome, photos.reason);
+  const photoReminder = prepareProgressPhotosReminderEnablement(store, {
+    enabled: command.photos?.reminderEnabled,
+  });
+  if (!photoReminder.ok) return rejected(photoReminder.outcome, photoReminder.reason);
+  const dexa = prepareDexaAppointmentUpdate(store, command.dexa, timestamp, {
+    requireAppointment: true,
+    preserveExistingFields: false,
+  });
+  if (!dexa.ok && dexa.outcome !== DexaAppointmentOutcome.UNCHANGED) {
+    return rejected(dexa.outcome, dexa.reason);
+  }
+  const coachingChanged = coaching.ok;
+  const photosChanged = photos.outcome !== "unchanged";
+  const photoReminderChanged = photoReminder.changed;
+  const dexaChanged = dexa.ok;
+  if (!coachingChanged && !photosChanged && !photoReminderChanged && !dexaChanged) {
+    return rejected(CoachingUpdatesStrategyOutcome.UNCHANGED, "No changes to save.");
+  }
+  return Object.freeze({
+    ok: true,
+    coaching, photos, photoReminder, dexa, coachingChanged, photosChanged,
+    photoReminderChanged, dexaChanged, protectedBefore,
+  });
+}
+
+export function applyPreparedCoachingUpdatesStrategyTransition(store, prepared) {
+  if (!prepared?.ok) throw new Error("A prepared Coaching Updates transition is required.");
+  if (prepared.coachingChanged) applyPreparedCoachingUpdatesTransaction(store, prepared.coaching);
+  if (prepared.photosChanged) applyPreparedProgressPhotosScheduleSuccessor(store, prepared.photos);
+  if (prepared.photoReminderChanged) {
+    applyPreparedProgressPhotosReminderEnablement(store, prepared.photoReminder);
+  }
+  if (prepared.dexaChanged) applyPreparedDexaAppointmentUpdate(store, prepared.dexa);
+  if (!same(prepared.protectedBefore, protectedState(store))) {
+    throw typed(CoachingUpdatesStrategyOutcome.VERIFICATION_FAILURE,
+      "Protected evidence or completion history changed.");
+  }
+  return Object.freeze({
+    coachingChanged: prepared.coachingChanged,
+    photosChanged: prepared.photosChanged,
+    photoReminderChanged: prepared.photoReminderChanged,
+    dexaChanged: prepared.dexaChanged,
+  });
+}
+
+export function verifyPreparedCoachingUpdatesStrategyTransition(store, command, prepared) {
+  if (!prepared?.ok || !same(prepared.protectedBefore, protectedState(store))) return false;
+  if (prepared.coachingChanged && !verifyPreparedCoachingUpdatesTransaction(
+    store, command.coaching, prepared.coaching.successor.successor.id)) return false;
+  if (prepared.photosChanged && !verifyPreparedProgressPhotosScheduleSuccessor(store, prepared.photos)) return false;
+  if (prepared.photoReminderChanged &&
+      !verifyPreparedProgressPhotosReminderEnablement(store, prepared.photoReminder)) return false;
+  if (prepared.dexaChanged && !verifyPreparedDexaAppointmentUpdate(store, prepared.dexa)) return false;
+  return true;
+}
+
 function protectedState(store) {
   return {
     dexaScans: structuredClone(store.dexaScans ?? []),
@@ -144,3 +175,4 @@ function same(left, right) { return JSON.stringify(left) === JSON.stringify(righ
 function typed(outcome, message) { const error = new Error(message); error.coachingStrategyOutcome = outcome; return error; }
 function findTyped(error) { let current = error; while (current) { if (current.coachingStrategyOutcome) return { outcome: current.coachingStrategyOutcome, message: current.message }; current = current.cause; } return null; }
 function failure(outcome, reason, committed = false) { return Object.freeze({ outcome, reason, committed }); }
+function rejected(outcome, reason) { return Object.freeze({ ok: false, outcome, reason }); }

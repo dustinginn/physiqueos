@@ -37,6 +37,8 @@ export const NativeProductionResource = Object.freeze({
   OPERATING_PLAN_PROTOCOL_DOMAIN: "operating-plan-protocol-domain",
   OPERATING_PLAN_SUPPLEMENT_SUPPORT: "operating-plan-supplement-support",
   OPERATING_PLAN_SUPPLEMENT_STRATEGY_EDITOR: "operating-plan-supplement-strategy-editor",
+  OPERATING_PLAN_ENERGY_STRATEGY: "operating-plan-energy-strategy",
+  OPERATING_PLAN_COACHING_UPDATES: "operating-plan-coaching-updates",
 });
 
 const reads = Object.freeze([
@@ -76,6 +78,8 @@ const reads = Object.freeze([
   read("operating-plan-protocol-domain", "/api/v1/native/read/operating-plan-protocol-domain", "coreNavigation.getOperatingPlanProtocolDomain"),
   read("operating-plan-supplement-support", "/api/v1/native/read/operating-plan-supplement-support", "coreNavigation.getSupplementSupport"),
   read("operating-plan-supplement-strategy-editor", "/api/v1/native/read/operating-plan-supplement-strategy-editor", "coreNavigation.getSupplementStrategyEditor"),
+  read("operating-plan-energy-strategy", "/api/v1/native/read/operating-plan-energy-strategy", "coreNavigation.getEnergyStrategyDetail"),
+  read("operating-plan-coaching-updates", "/api/v1/native/read/operating-plan-coaching-updates", "coreNavigation.getCoachingUpdatesDetail"),
 ]);
 
 const writes = Object.freeze([
@@ -97,6 +101,7 @@ const writes = Object.freeze([
   write(Phase3Command.SAVE_SUPPLEMENT_SUPPORT, ["protocolId", "supplementVersionId", "draft"], "supplementVersionId protects the active strategy version; If-Match carries executionRevision when Support is configured"),
   write(Phase3Command.SAVE_SUPPLEMENT_STRATEGY, ["operation", "draft"], "create is idempotent by command identity; edit uses expectedCurrentVersionId inside the canonical successor transition"),
   write(Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE, ["protocolId", "operation", "expectedCurrentVersionId"], "pause/restore require the protocol's authoritative currentVersionId"),
+  write(Phase3Command.SAVE_COACHING_UPDATES, ["protocolId", "expectedCurrentVersionId", "expectedSemanticDigest", "photoExpectedCurrentVersionId", "photoExpectedSemanticDigest", "dexaExpectedRevision", "draft"], "atomic composite save; If-Match carries global runtime revision alongside scoped semantic digest, both protocol versions, and DEXA executionRevision"),
 ]);
 
 export const nativeProductionContractManifest = Object.freeze({

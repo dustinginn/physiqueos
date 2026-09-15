@@ -81,4 +81,20 @@ describe("PostgreSQL core navigation read store", () => {
       .rejects.toThrow("Unsupported core navigation collection");
     expect(query).not.toHaveBeenCalled();
   });
+
+  it("reads Coaching Updates collections and revision from the same statement snapshot", async () => {
+    const query = vi.fn(async () => ({ rows: [{
+      collection_name: "user", source_ordinal: 0, record_id: "owner-one", payload: { id: "owner-one" },
+      runtime_metadata: { revision: 85, lastCommitId: "prior", updatedAt: "2026-09-15T00:00:00Z" },
+    }] }));
+    const store = createPostgresCoreNavigationReadStore({ pool: { query }, ownerUserId: "owner-one" });
+    const metadata = await store.run("core.navigation.coaching-updates-detail", async ({ readCollections, readRuntimeMetadata }) => {
+      await readCollections(["user", "protocols", "protocolVersions", "executionItems", "reminders"]);
+      return readRuntimeMetadata();
+    });
+    expect(metadata.revision).toBe(85);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0][0]).toContain("canonical_runtime_metadata WHERE owner_user_id=$1");
+    expect(query.mock.calls[0][0]).toContain("ORDER BY collection_name,source_ordinal,record_id");
+  });
 });

@@ -11,7 +11,7 @@ import { destinationFromWebHref } from "../../contracts/v1/destination.js";
 
 export function createOperatingPlanReadService({ repositories } = {}) {
   return scopeRepositoryReadService({ repositories, namespace: "operating-plan", service: Object.freeze({
-    async getOperatingPlan({ principal } = {}) {
+    async getOperatingPlan({ principal, includePausedSupplements = false } = {}) {
       const actor = requireAuthenticationPrincipal(principal);
       const activity = createActivityProtocolBuilderService({ repositories });
       const training = createTrainingProtocolBuilderService({ repositories });
@@ -28,7 +28,7 @@ export function createOperatingPlanReadService({ repositories } = {}) {
         repositories.operatingPlan.getOperatingPlan(actor.userId),
       ]);
       return Object.freeze({
-        sections: Object.freeze(buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, reminders, trainingProtocol: trainingContext.currentVersion })),
+        sections: Object.freeze(buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, reminders, trainingProtocol: trainingContext.currentVersion, includePausedSupplements })),
         sourceVersions: Object.freeze({
           activity: String(activityContext.currentVersion?.version ?? "1"),
           training: String(trainingContext.currentVersion?.version ?? "1"),
@@ -44,10 +44,16 @@ export function createOperatingPlanReadService({ repositories } = {}) {
   }) });
 }
 
-export function buildOperatingPlan({ energyStrategy, executionItems = [], nutritionContext, protocols = [], reminders = [], trainingProtocol }) {
+export function buildOperatingPlan({ energyStrategy, executionItems = [], nutritionContext, protocols = [], reminders = [], trainingProtocol, includePausedSupplements = false }) {
   const active = protocols.filter((protocol) => protocol.status === "active");
   const byCategory = (category) => active.filter((protocol) => protocol.category === category);
-  const supplements = byCategory("supplement");
+  // Native's canonical domain roll-up includes Restore. Retain its landing
+  // authority even when the last active supplement is paused. Web's
+  // existing active-only presentation remains unchanged by default.
+  const supplements = includePausedSupplements
+    ? protocols.filter((protocol) => protocol.category === "supplement" && ["active", "paused"].includes(protocol.status))
+    : byCategory("supplement");
+  const pausedSupplements = supplements.filter((protocol) => protocol.status === "paused");
   const recovery = byCategory("recovery");
   const peptides = byCategory("peptide");
   const coaching = active.find((protocol) => protocol.category === "briefings");
@@ -58,7 +64,7 @@ export function buildOperatingPlan({ energyStrategy, executionItems = [], nutrit
     section("training", "effort", "Training", trainingProtocol ? "Active protocol" : "Protocol not defined", [buildTrainingPlanItem(trainingProtocol)]),
     section("recovery", "success", "Recovery", recovery.length ? `${recovery.length} current method` : "Strategy coming soon", recovery.length ? [protocolItem("recovery-strategy", "Recovery Strategy", recovery)] : [{ id: "recovery-coming-soon", title: "Recovery", detail: "A dedicated recovery strategy will complete this layer", href: null, status: "Coming Soon" }]),
     section("peptide", "effort", "Peptides", `${peptides.length} current peptide${peptides.length === 1 ? "" : "s"}`, peptides.length ? [protocolItem("peptide-strategy", "Peptide Strategy", peptides)] : []),
-    section("supplement", "success", "Supplements", `${supplements.length} current supplement${supplements.length === 1 ? "" : "s"}`, supplements.length ? [protocolItem("supplement-strategy", "Supplement Strategy", supplements)] : [], { supplements: true }),
+    section("supplement", "success", "Supplements", pausedSupplements.length ? `${supplements.length - pausedSupplements.length} active · ${pausedSupplements.length} paused` : `${supplements.length} current supplement${supplements.length === 1 ? "" : "s"}`, supplements.length ? [{ ...protocolItem("supplement-strategy", "Supplement Strategy", supplements), status: supplements.every((protocol) => protocol.status === "paused") ? "Paused" : "Active" }] : [], { supplements: true }),
     section("tracking", "evidence", "Tracking", "Recurring measurements", [{ id: "tracking", title: "Tracking", detail: weighIn?.supportSummary ?? "Morning Weigh-In Support", href: "/profile/operating-plan/tracking", status: weighIn ? "Active" : "Review" }]),
     ...(coaching ? [section("coaching", "primary", "Coaching Updates", "Wednesday and Sunday", [{ id: coaching.id, title: "Coaching Updates", detail: "Midweek calibration and weekly synthesis", href: getOperatingPlanStrategyHref("briefings", coaching.id), status: "Active" }])] : []),
   ];
@@ -73,7 +79,15 @@ function section(iconKey, tone, title, subtitle, items, extra = {}) {
     subtitle,
     items: Object.freeze(items.map((item) => Object.freeze({
       ...item,
-      destination: destinationFromWebHref(item.href),
+      destination: destinationFromWebHref(item.href) ?? Object.freeze({
+        id: "native.operating-plan.status",
+        parameters: Object.freeze({
+          domain: iconKey,
+          title: item.title,
+          detail: item.detail,
+          status: item.status ?? "Not configured",
+        }),
+      }),
     }))),
     ...extra,
   });

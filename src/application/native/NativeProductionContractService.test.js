@@ -28,6 +28,8 @@ function fixture(overrides = {}) {
       getOperatingPlanProtocolDomain: call({ category: "peptide", title: "Peptide Strategy", methods: [] }),
       getSupplementSupport: call({ protocolId: "supplement-protocol", supplementVersionId: "supplement-protocol_v1", executionRevision: 2 }),
       getSupplementStrategyEditor: call({ mode: "edit", protocolId: "supplement-protocol", expectedCurrentVersionId: "supplement-protocol_v1" }),
+      getEnergyStrategyDetail: call({ protocolId: "energy-protocol", intentionallyReadOnly: true }),
+      getCoachingUpdatesDetail: call({ protocolId: "coaching-protocol", context: { expectedRevision: 85 } }),
     },
     activeGoal: { getPreview: call({ goalId: "goal-build", phaseId: "phase-2", confidence: { score: 62, band: "Moderate", movement: "held" } }) },
     completedGoal: { getVisibleAbs: call({ goalId: "goal-visible-abs", status: "completed" }) },
@@ -265,6 +267,8 @@ describe("Native production contract boundary", () => {
       "operating-plan-protocol-domain": { protocolId: "peptide-protocol" },
       "operating-plan-supplement-support": { protocolId: "supplement-protocol" },
       "operating-plan-supplement-strategy-editor": { protocolId: "supplement-protocol" },
+      "operating-plan-energy-strategy": { strategyId: "energy-protocol" },
+      "operating-plan-coaching-updates": { strategyId: "coaching-protocol" },
     };
     const results = new Map();
     for (const declaration of nativeProductionContractManifest.reads) {
@@ -453,6 +457,7 @@ describe("Native production contract boundary", () => {
       "operating-plan.supplement-support.save.v1",
       "operating-plan.supplement-strategy.save.v1",
       "operating-plan.supplement-lifecycle.change.v1",
+      "operating-plan.coaching-updates.save.v1",
     ]);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/HealthKit|activity-day\.sync/);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/storage_key|Spaces|databaseName|provider-authoritative/);

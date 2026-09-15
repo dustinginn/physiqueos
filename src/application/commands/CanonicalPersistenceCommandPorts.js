@@ -57,6 +57,16 @@ import {
 import { buildSupplementProvenance } from "../../domain/services/SupplementStrategyFormService.js";
 import { buildStrategySuccessorPayload } from "../../domain/services/StrategyEditorService.js";
 import { getLocalDateKey } from "../../domain/utils/localDate.js";
+import {
+  applyPreparedCoachingUpdatesStrategyTransition,
+  CoachingUpdatesStrategyOutcome,
+  prepareCoachingUpdatesStrategyTransition,
+  verifyPreparedCoachingUpdatesStrategyTransition,
+} from "../../domain/services/CoachingUpdatesStrategyManagementService.js";
+import { buildCoachingUpdatesRequest } from "../../domain/services/CoachingUpdatesEditorService.js";
+import { resolveCoachingUpdatesReadModel } from "../../domain/services/CoachingUpdatesReadService.js";
+import { createProgressPhotosExecutionHydrationModel } from "../../domain/services/ProgressPhotosExecutionScheduleService.js";
+import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
 
 export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "submitWeight", "submitCheckIn", "createEvidenceIntake", "editEvidenceReview",
@@ -68,6 +78,7 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
   "saveSupplementSupport",
   "saveSupplementStrategy", "changeSupplementLifecycle",
+  "saveCoachingUpdates",
 ]);
 
 const RECURRING_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "executionItems", "reminders"]);
@@ -85,6 +96,42 @@ const SUPPLEMENT_SUPPORT_READ_COLLECTIONS = Object.freeze([
 ]);
 const SUPPLEMENT_STRATEGY_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "protocolVersions"]);
 const SUPPLEMENT_STRATEGY_READ_COLLECTIONS = Object.freeze(["user", "goals", ...SUPPLEMENT_STRATEGY_BOUNDED_COLLECTIONS]);
+const COACHING_UPDATES_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "protocolVersions", "executionItems", "reminders"]);
+const COACHING_UPDATES_READ_COLLECTIONS = Object.freeze([
+  "user", "goals", ...COACHING_UPDATES_BOUNDED_COLLECTIONS,
+  "dexaScans", "progressPhotos", "evidenceReviews",
+]);
+
+function coachingUpdatesDraftForm(draft) {
+  const values = {
+    midweekDay: draft.midweek?.day,
+    midweekTime: draft.midweek?.localTime,
+    weeklyDay: draft.weekly?.day,
+    weeklyTime: draft.weekly?.localTime,
+    monthlyTime: draft.monthly?.localTime,
+    notificationPreference: draft.notificationPreference,
+    photoCadence: draft.photos?.cadence,
+    photoDay: draft.photos?.day,
+    photoTimeOfDay: draft.photos?.timeOfDay,
+    dexaPlannedDate: draft.dexa?.plannedDate,
+    dexaLocalTime: draft.dexa?.localTime,
+    dexaPreparationNote: draft.dexa?.preparationNote,
+  };
+  const checked = {
+    midweekEnabled: draft.midweek?.enabled === true,
+    weeklyEnabled: draft.weekly?.enabled === true,
+    monthlyEnabled: draft.monthly?.enabled === true,
+    photoEventBriefingEnabled: draft.photoEventBriefingEnabled === true,
+    dexaEventBriefingEnabled: draft.dexaEventBriefingEnabled === true,
+    photoReminderEnabled: draft.photos?.reminderEnabled === true,
+    dexaUploadReminder: draft.dexa?.uploadReminder === true,
+  };
+  return Object.freeze({
+    get: (key) => values[key] ?? null,
+    has: (key) => checked[key] === true,
+    getAll: (key) => key === "dexaReminderPreferences" ? draft.dexa?.reminderPreferences ?? [] : [],
+  });
+}
 
 export function createCanonicalPersistenceCommandPorts({ records, now = () => new Date() } = {}) {
   if (!records?.get || !records?.put) throw new Error("Canonical command ports require a record store.");
@@ -203,7 +250,113 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     saveSupplementSupport,
     saveSupplementStrategy,
     changeSupplementLifecycle,
+    saveCoachingUpdates,
   });
+
+  async function saveCoachingUpdates(context) {
+    if (!records.getRuntimeMetadata || !records.advanceRuntimeMetadata) {
+      throw problem(503, "COACHING_UPDATES_AUTHORITY_UNAVAILABLE", "Canonical Coaching Updates revision authority is unavailable.");
+    }
+    const metadata = await records.getRuntimeMetadata({ ownerUserId: context.ownerUserId, lock: true });
+    if (!metadata) throw problem(503, "COACHING_UPDATES_AUTHORITY_UNAVAILABLE", "Canonical runtime metadata is unavailable.");
+    const { candidate, before } = await loadCandidate(
+      COACHING_UPDATES_READ_COLLECTIONS, context.ownerUserId, { sourceOrder: true }
+    );
+    candidate.revision = metadata.revision;
+    candidate.lastCommitId = metadata.lastCommandId;
+    const protocol = candidate.protocols?.find((item) =>
+      item.id === context.payload.protocolId && item.userId === context.ownerUserId &&
+      item.status === "active" && (item.protocolType ?? item.category) === "briefings"
+    );
+    const version = candidate.protocolVersions?.find((item) => item.id === protocol?.currentVersionId);
+    const goal = selectCanonicalActiveGoal(candidate.goals ?? [], { ownerUserId: context.ownerUserId });
+    const readModel = resolveCoachingUpdatesReadModel({
+      protocol, version, goal, timeZone: candidate.user?.timeZone ?? "America/Los_Angeles",
+    });
+    const photos = createProgressPhotosExecutionHydrationModel(candidate);
+    if (!protocol || !version || !goal || !readModel || !photos) {
+      throw problem(404, "COACHING_UPDATES_UNAVAILABLE", "These coaching settings are no longer available.");
+    }
+    const requested = buildCoachingUpdatesRequest(coachingUpdatesDraftForm(context.payload.draft ?? {}), readModel);
+    const effectiveDate = getLocalDateKey(now(), candidate.user?.timeZone ?? candidate.user?.timezone);
+    const author = {
+      type: "user", id: context.ownerUserId,
+      displayName: candidate.user?.displayName ?? candidate.user?.name ?? "Founder",
+    };
+    const command = {
+      expectedRevision: context.metadata.expectedVersion,
+      expectedSemanticDigest: context.payload.expectedSemanticDigest,
+      coaching: {
+        protocolId: protocol.id,
+        expectedCurrentVersionId: context.payload.expectedCurrentVersionId,
+        effectiveDate,
+        ...requested,
+        goalAssociation: { goalId: goal.id, relationship: "supports" },
+        provenance: {
+          author,
+          reason: "Update active Coaching Updates strategy.",
+          confirmation: { confirmedByUser: true, authority: "founder_direct_strategy_edit" },
+          details: { source: "native_direct_coaching_updates_edit" },
+        },
+      },
+      photos: {
+        protocolId: photos.context.protocolId,
+        expectedCurrentVersionId: context.payload.photoExpectedCurrentVersionId,
+        expectedRevision: context.metadata.expectedVersion,
+        expectedSemanticDigest: context.payload.photoExpectedSemanticDigest,
+        effectiveDate,
+        reminderEnabled: requested.photos.reminderEnabled,
+        recurrence: {
+          ...photos.item.recurrence,
+          interval: requested.photos.cadence === "weekly_interval_2" ? 2 : 1,
+          weekdays: [requested.photos.day],
+          timeOfDay: requested.photos.timeOfDay,
+        },
+        author,
+      },
+      dexa: {
+        userId: context.ownerUserId,
+        goalId: goal.id,
+        timezone: readModel.timeZone,
+        expectedRevision: context.payload.dexaExpectedRevision,
+        draft: requested.dexa,
+        author,
+      },
+    };
+    const prepared = prepareCoachingUpdatesStrategyTransition(candidate, command, now());
+    if (!prepared.ok) {
+      if (prepared.outcome === CoachingUpdatesStrategyOutcome.UNCHANGED) {
+        return { status: "committed", result: { status: "unchanged", protocolId: protocol.id, revision: metadata.revision }, outbox: [] };
+      }
+      if (["concurrency_conflict", "version_conflict", "expected_version_conflict"].includes(prepared.outcome)) {
+        throw staleVersionProblem({
+          expectedVersion: context.metadata.expectedVersion,
+          actualVersion: metadata.revision,
+          resource: `coaching-updates:${protocol.id}`,
+        });
+      }
+      const notFound = ["not_found", "protocol_not_found", "protocol_not_active", "current_version_missing"].includes(prepared.outcome);
+      throw problem(notFound ? 404 : 400, notFound ? "COACHING_UPDATES_UNAVAILABLE" : "COACHING_UPDATES_INVALID", prepared.reason);
+    }
+    const changes = applyPreparedCoachingUpdatesStrategyTransition(candidate, prepared);
+    if (!verifyPreparedCoachingUpdatesStrategyTransition(candidate, command, prepared)) {
+      throw problem(500, "COACHING_UPDATES_VERIFICATION_FAILED", "Coaching Updates could not be verified. Nothing was changed.");
+    }
+    await persistCandidateCollections({
+      before, candidate, collections: COACHING_UPDATES_BOUNDED_COLLECTIONS, ownerUserId: context.ownerUserId,
+    });
+    const committed = await records.advanceRuntimeMetadata({
+      ownerUserId: context.ownerUserId,
+      expectedRevision: metadata.revision,
+      commandId: context.metadata.commandId,
+      at: now(),
+    });
+    return {
+      status: "committed",
+      result: { status: "updated", protocolId: protocol.id, revision: committed.revision, ...changes },
+      outbox: [],
+    };
+  }
 
   /// The one canonical write for every "recurring support" execution item
   /// (Foam Rolling under Recovery, Morning Weigh-In under Tracking, and any
@@ -1373,11 +1526,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     return { ...commit, canonicalEvidenceObjects };
   }
 
-  async function loadCandidate(collections, ownerUserId) {
+  async function loadCandidate(collections, ownerUserId, { sourceOrder = false } = {}) {
     const candidate = {};
     const before = new Map();
     await Promise.all(collections.map(async (collection) => {
-      const values = await records.list({ ownerUserId, collection });
+      const values = await records.list({ ownerUserId, collection, sourceOrder });
       before.set(collection, structuredClone(values));
       if (collection === "user") candidate.user = structuredClone(values[0] ?? null);
       else candidate[collection] = structuredClone(values);

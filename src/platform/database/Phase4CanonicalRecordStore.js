@@ -3,7 +3,34 @@ import { assertKnownPhase4Collection } from "../migration/phase4DomainCollection
 
 export function createPhase4CanonicalRecordStore({ query }) {
   if (typeof query !== "function") throw new Error("Canonical record storage requires a query function.");
+  let mutationCount = 0;
   return Object.freeze({
+    getMutationCount: () => mutationCount,
+    async getRuntimeMetadata({ ownerUserId, lock = false }) {
+      if (lock) {
+        // Share the Web/runtime owner's transaction lock so a composite
+        // Native save cannot race a staged Web replacement of these rows.
+        await query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:${ownerUserId}`]);
+      }
+      const result = await query(
+        `SELECT revision,version,last_command_id,updated_at
+           FROM physiqueos.canonical_runtime_metadata
+          WHERE owner_user_id=$1${lock ? " FOR UPDATE" : ""}`,
+        [ownerUserId]
+      );
+      return mapRuntimeMetadata(result.rows[0]);
+    },
+    async advanceRuntimeMetadata({ ownerUserId, expectedRevision, commandId, at = new Date() }) {
+      const result = await query(
+        `UPDATE physiqueos.canonical_runtime_metadata
+            SET revision=revision+1,last_command_id=$3,version=version+1,updated_at=$4
+          WHERE owner_user_id=$1 AND revision=$2
+          RETURNING revision,version,last_command_id,updated_at`,
+        [ownerUserId, Number(expectedRevision), commandId, at.toISOString()]
+      );
+      if (!result.rows[0]) throw runtimeRevisionConflict(expectedRevision);
+      return mapRuntimeMetadata(result.rows[0]);
+    },
     async get({ ownerUserId, collection, recordId }) {
       const table = assertKnownPhase4Collection(collection);
       const result = await query(
@@ -13,11 +40,11 @@ export function createPhase4CanonicalRecordStore({ query }) {
       );
       return mapRecord(result.rows[0]);
     },
-    async list({ ownerUserId, collection }) {
+    async list({ ownerUserId, collection, sourceOrder = false }) {
       const table = assertKnownPhase4Collection(collection);
       const result = await query(
         `SELECT payload,version FROM physiqueos.${table}
-         WHERE owner_user_id=$1 AND collection_name=$2 ORDER BY record_id`,
+         WHERE owner_user_id=$1 AND collection_name=$2 ORDER BY ${sourceOrder ? "source_ordinal,record_id" : "record_id"}`,
         [ownerUserId, collection]
       );
       return result.rows.map(mapRecord);
@@ -37,6 +64,7 @@ export function createPhase4CanonicalRecordStore({ query }) {
             dateTime(enriched.observedAt ?? enriched.createdAt), nullable(sourceIdentity), Number(expectedVersion)]
         );
         if (!updated.rows[0]) throw versionConflict(collection, recordId);
+        mutationCount += 1;
         return mapRecord(updated.rows[0]);
       }
       const inserted = await query(
@@ -56,6 +84,7 @@ export function createPhase4CanonicalRecordStore({ query }) {
           JSON.stringify(enriched.provenance ?? { source: "phase4-command" }), JSON.stringify(enriched)]
       );
       const row = inserted.rows[0];
+      mutationCount += 1;
       if (Number(row.version) !== version) {
         const corrected = { ...row.payload, version: Number(row.version) };
         await query(
@@ -69,13 +98,31 @@ export function createPhase4CanonicalRecordStore({ query }) {
   });
 }
 
-export function createInMemoryCanonicalRecordStore(collections) {
+export function createInMemoryCanonicalRecordStore(collections, {
+  runtimeMetadata = { revision: 1, version: 1, lastCommandId: null, updatedAt: null },
+} = {}) {
   const maps = new Map();
   for (const [collection, source] of Object.entries(collections)) {
     const values = source == null ? [] : Array.isArray(source) ? source : [source];
     maps.set(collection, new Map(values.map((record, position) => [resolveRecordId(record, position), structuredClone(record)])));
   }
+  let metadata = structuredClone(runtimeMetadata);
+  let mutationCount = 0;
   return Object.freeze({
+    getMutationCount: () => mutationCount,
+    async getRuntimeMetadata() { return clone(metadata); },
+    async advanceRuntimeMetadata({ expectedRevision, commandId, at = new Date() }) {
+      if (Number(metadata?.revision) !== Number(expectedRevision)) {
+        throw runtimeRevisionConflict(expectedRevision);
+      }
+      metadata = Object.freeze({
+        revision: Number(metadata.revision) + 1,
+        version: Number(metadata.version ?? 1) + 1,
+        lastCommandId: commandId,
+        updatedAt: at.toISOString(),
+      });
+      return clone(metadata);
+    },
     async get({ collection, recordId }) { return clone(maps.get(collection)?.get(recordId)); },
     async list({ collection }) { return [...(maps.get(collection)?.values() ?? [])].map(clone); },
     async put({ collection, recordId, payload, expectedVersion = null }) {
@@ -90,6 +137,7 @@ export function createInMemoryCanonicalRecordStore(collections) {
         : Number(expectedVersion) + 1;
       const result = Object.freeze({ ...structuredClone(payload), version });
       collectionMap.set(recordId, result);
+      mutationCount += 1;
       return clone(result);
     },
     snapshot() {
@@ -101,6 +149,14 @@ export function createInMemoryCanonicalRecordStore(collections) {
 function mapRecord(row) {
   return row ? Object.freeze({ ...row.payload, version: Number(row.version) }) : null;
 }
+function mapRuntimeMetadata(row) {
+  return row ? Object.freeze({
+    revision: Number(row.revision),
+    version: Number(row.version),
+    lastCommandId: row.last_command_id ?? null,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+  }) : null;
+}
 function clone(value) { return value == null ? null : structuredClone(value); }
 function resolveRecordId(record, position) { return String(record?.id ?? record?.canonicalId ?? record?.package_id ?? record?.review_id ?? `@index:${position}`); }
 function normalizeVersion(value) { const number = Number(value); return Number.isSafeInteger(number) && number > 0 ? number : 1; }
@@ -109,4 +165,12 @@ function calendarDate(value) { const text = nullable(value); return text && /^\d
 function dateTime(value) { const text = nullable(value); return text && !Number.isNaN(Date.parse(text)) ? new Date(text).toISOString() : null; }
 function versionConflict(collection, recordId) {
   return new ApplicationProblem({ status: 409, code: "EXPECTED_VERSION_CONFLICT", title: "The canonical record changed before this command completed.", detail: `${collection}:${recordId}` });
+}
+function runtimeRevisionConflict(expectedRevision) {
+  return new ApplicationProblem({
+    status: 409,
+    code: "EXPECTED_VERSION_CONFLICT",
+    title: "The canonical runtime changed before this command completed.",
+    detail: `runtime:${expectedRevision}`,
+  });
 }

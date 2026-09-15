@@ -36,6 +36,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.SAVE_SUPPLEMENT_SUPPORT,
   Phase3Command.SAVE_SUPPLEMENT_STRATEGY,
   Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE,
+  Phase3Command.SAVE_COACHING_UPDATES,
 ]);
 
 export function createNativeProductionContractService({
@@ -163,6 +164,12 @@ export function createNativeProductionContractService({
         }); break;
         case "operating-plan-supplement-strategy-editor": data = await readers.core.getSupplementStrategyEditor({
           protocolId: input.protocolId ?? null,
+        }); break;
+        case "operating-plan-energy-strategy": data = await readers.core.getEnergyStrategyDetail({
+          strategyId: required(input.strategyId, "strategyId"),
+        }); break;
+        case "operating-plan-coaching-updates": data = await readers.core.getCoachingUpdatesDetail({
+          strategyId: required(input.strategyId, "strategyId"),
         }); break;
         default: throw unavailableResource();
       }

@@ -4,7 +4,12 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { getFounderStoreRevision } from "../../data/repositories/FounderStoreUnitOfWork";
 import { createCoachingUpdatesSemanticDigest, createProgressPhotosScheduleSemanticDigest } from "./FounderRuntimeSemanticDigest";
-import { createCoachingUpdatesStrategyManagementService } from "./CoachingUpdatesStrategyManagementService";
+import {
+  applyPreparedCoachingUpdatesStrategyTransition,
+  createCoachingUpdatesStrategyManagementService,
+  prepareCoachingUpdatesStrategyTransition,
+  verifyPreparedCoachingUpdatesStrategyTransition,
+} from "./CoachingUpdatesStrategyManagementService";
 import { filterEligibleEventBriefingTypes, resolveCoachingUpdatesReadModel, resolveEventBriefingPreferencesFromStore } from "./CoachingUpdatesReadService";
 import { createProgressPhotosExecutionHydrationModel } from "./ProgressPhotosExecutionScheduleService";
 
@@ -13,6 +18,19 @@ afterEach(() => directories.splice(0).forEach((directory) =>
   fs.rmSync(directory, { recursive: true, force: true })));
 
 describe("Coaching Updates cross-owner strategy save", () => {
+  it("keeps Web readback exactly equivalent to the extracted transport-independent transition", async () => {
+    const fixture = setup();
+    const candidate = structuredClone(fixture.live);
+    const request = command(fixture.live);
+    const prepared = prepareCoachingUpdatesStrategyTransition(candidate, request, new Date("2026-08-07T19:00:00.000Z"));
+    expect(prepared.ok).toBe(true);
+    applyPreparedCoachingUpdatesStrategyTransition(candidate, prepared);
+    expect(verifyPreparedCoachingUpdatesStrategyTransition(candidate, request, prepared)).toBe(true);
+    expect((await fixture.service.save(request)).outcome).toBe("success");
+    for (const collection of ["protocols", "protocolVersions", "executionItems", "reminders", "dexaScans", "progressPhotos", "evidenceReviews", "dailyBriefings"]) {
+      expect(candidate[collection]).toEqual(fixture.live[collection]);
+    }
+  });
   it("scopes semantic guards to editable dependencies while retaining the global revision fence", async () => {
     const fixture = setup();
     const request = command(fixture.live);
