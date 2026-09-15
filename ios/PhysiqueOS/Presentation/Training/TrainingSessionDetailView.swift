@@ -72,8 +72,12 @@ struct TrainingSessionDetailView: View {
         case .loaded(.some(let session)):
             VStack(alignment: .leading, spacing: 24) {
                 header(for: session)
-                summaryCard(for: session)
-                if !session.exercises.isEmpty {
+                if let telemetry = session.telemetry {
+                    telemetryCard(telemetry)
+                }
+                if session.showsGeneratedSummaryInsteadOfStructuredExercises {
+                    summaryCard(for: session)
+                } else {
                     exercisesCard(for: session)
                 }
                 if let media = session.supportingMedia, !media.isEmpty {
@@ -82,6 +86,37 @@ struct TrainingSessionDetailView: View {
                 correctionCard(for: session)
             }
         }
+    }
+
+    /// Workout-level telemetry rendered once, structurally, instead of as
+    /// part of `session.detail`'s generated one-line string — the fix for
+    /// the Founder-observed duplicate summary above the structured exercise
+    /// list. Each field renders only when present, since an Apple-only
+    /// telemetry source may not carry all of them.
+    private func telemetryCard(_ telemetry: TrainingSessionTelemetryReadModel) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeading("Workout Telemetry")
+                if let timeRange = Self.formatTimeRange(start: telemetry.startTime, end: telemetry.endTime) {
+                    telemetryRow(timeRange)
+                }
+                if let duration = telemetry.durationSeconds, let label = Self.formatDuration(duration) {
+                    telemetryRow(label)
+                }
+                if let calories = telemetry.activeCalories {
+                    telemetryRow("\(Int(calories)) active cal")
+                }
+                if let heartRate = telemetry.averageHeartRate {
+                    telemetryRow("\(Int(heartRate)) bpm avg HR")
+                }
+            }
+        }
+    }
+
+    private func telemetryRow(_ text: String) -> some View {
+        Text(text)
+            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+            .foregroundStyle(PhysiqueOSTheme.textPrimary)
     }
 
     private func supportingMediaCard(_ media: [TrainingSessionSupportingMedia]) -> some View {
@@ -239,6 +274,43 @@ struct TrainingSessionDetailView: View {
         }
         return String(value.prefix(10))
     }
+
+    /// Formats a workout's telemetry time range in the device's own
+    /// current time zone — the server sends raw ISO instants and never
+    /// guesses a time zone for display (see `TrainingSessionTelemetryReadModel`).
+    private static func formatTimeRange(start: String?, end: String?) -> String? {
+        let startLabel = start.flatMap(parseISODate).map(Self.timeOfDayFormatter.string(from:))
+        let endLabel = end.flatMap(parseISODate).map(Self.timeOfDayFormatter.string(from:))
+        switch (startLabel, endLabel) {
+        case (let start?, let end?): return "\(start)–\(end)"
+        case (let start?, nil): return start
+        case (nil, let end?): return end
+        case (nil, nil): return nil
+        }
+    }
+
+    private static func formatDuration(_ seconds: Double) -> String? {
+        guard seconds > 0 else { return nil }
+        let minutes = Int((seconds / 60).rounded())
+        if minutes < 60 { return "\(minutes) min" }
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+        return remainingMinutes > 0 ? "\(hours)h \(remainingMinutes)m" : "\(hours)h"
+    }
+
+    private static func parseISODate(_ value: String) -> Date? {
+        let withFractionalSeconds = ISO8601DateFormatter()
+        withFractionalSeconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withFractionalSeconds.date(from: value) { return date }
+        return ISO8601DateFormatter().date(from: value)
+    }
+
+    private static let timeOfDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
 }
 
 private struct TrainingSupportingMediaImage: View {

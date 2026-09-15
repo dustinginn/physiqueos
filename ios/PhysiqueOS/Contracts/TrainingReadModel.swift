@@ -341,11 +341,26 @@ struct TrainingSessionDetailReadModel: Codable, Equatable, Identifiable {
     var id: String
     var label: String
     var value: String
+    /// A one-line fallback summary (time range/duration/calories/HR, plus a
+    /// truncated generated exercise summary when the session has structured
+    /// exercises). Build 33: kept for other surfaces that show ONLY this
+    /// string (Activity's linked-training-context rows, the Training
+    /// Library history list) — the session DETAIL screen must not render
+    /// this alongside the structured `exercises` list below when both are
+    /// present, since that duplicates the same information twice. Prefer
+    /// `telemetry` there instead; fall back to `detail` only when
+    /// `exercises` is empty (an Apple-only workout with no structured data).
     var detail: String
     var date: String
     var sourceEvidence: [String]
     var exercises: [TrainingExerciseOccurrence]
     var exerciseRelationshipGroups: [TrainingExerciseRelationshipGroup]
+    /// Structured workout-level telemetry (time range, duration, active
+    /// calories, average heart rate) — separated from `detail`'s opaque
+    /// generated string specifically so a session with structured exercises
+    /// can render telemetry once and exercises once, never a duplicated
+    /// backend-style summary on top of the structured breakdown.
+    var telemetry: TrainingSessionTelemetryReadModel? = nil
     /// Authenticated opaque screenshot descriptors canonically bound to
     /// this exact session. No storage URL/object key is exposed.
     var supportingMedia: [TrainingSessionSupportingMedia]? = nil
@@ -355,6 +370,26 @@ struct TrainingSessionDetailReadModel: Codable, Equatable, Identifiable {
     /// session's own Goal/Phase context was previously undiscoverable.
     /// Computed by `FixtureTrainingAPI` from `date`.
     var attributedScope: EvidenceScopeAttribution? = nil
+
+    /// The single decision point keeping `detail`'s generated summary and
+    /// the structured `exercises` list from ever both rendering for the
+    /// same session — Build 33's fix for the Founder-observed duplicate
+    /// Workout Detail summary. `detail` is the fallback ONLY when there is
+    /// no structured breakdown to show instead (an Apple-only telemetry
+    /// source not yet reconciled with a structured session).
+    var showsGeneratedSummaryInsteadOfStructuredExercises: Bool { exercises.isEmpty }
+}
+
+/// Raw values only — no server-side display formatting. A workout
+/// timestamp is formatted into a human-readable time range on Native, in
+/// the device's own current time zone, rather than the server guessing a
+/// time zone for a value it has no reliable way to know.
+struct TrainingSessionTelemetryReadModel: Codable, Equatable {
+    var startTime: String?
+    var endTime: String?
+    var durationSeconds: Double?
+    var activeCalories: Double?
+    var averageHeartRate: Double?
 }
 
 struct TrainingSessionSupportingMedia: Codable, Equatable, Identifiable {
