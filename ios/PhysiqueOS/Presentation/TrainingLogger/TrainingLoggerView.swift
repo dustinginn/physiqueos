@@ -57,6 +57,7 @@ struct TrainingLoggerView: View {
             viewModel = TrainingLoggerViewModel(
                 api: environment.trainingLoggerAPI,
                 writeAPI: environment.trainingWriteAPI,
+                catalogWriteAPI: environment.trainingExerciseCatalogWriteAPI,
                 draftStore: environment.trainingLoggerDraftStore,
                 attachmentStore: environment.trainingLoggerAttachmentStore,
                 authority: environment.nativeAuthority
@@ -317,7 +318,13 @@ struct TrainingLoggerView: View {
     private func exercisePicker(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             let adding = viewModel.draft?.isAddingExercises == true
-            stepHeader(viewModel, step: adding ? "Active workout" : "2 of 3", title: adding ? "Add exercises" : "Choose exercises", subtitle: "All eligible exercises · performed exercises first")
+            stepHeader(
+                viewModel, step: adding ? "Active workout" : "2 of 3",
+                title: adding ? "Add exercises" : "Choose exercises",
+                subtitle: viewModel.isBrowsingAllExercises
+                    ? "All Exercises · the full canonical catalog"
+                    : "My Library · performed exercises first"
+            )
 
             TextField("Search exercises", text: Binding(
                 get: { viewModel.searchText },
@@ -331,7 +338,7 @@ struct TrainingLoggerView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Eligible exercises")
+                    Text(viewModel.isBrowsingAllExercises ? "All Exercises" : "My Library")
                         .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                     Spacer()
@@ -357,19 +364,31 @@ struct TrainingLoggerView: View {
                 }
             }
 
-            Button {
-                viewModel.isBrowsingAllExercises.toggle()
-            } label: {
-                Label(
-                    viewModel.isBrowsingAllExercises ? "Hide new exercise form" : "Create New Exercise",
-                    systemImage: viewModel.isBrowsingAllExercises ? "minus.circle" : "plus.circle"
-                )
+            HStack(spacing: 20) {
+                Button {
+                    viewModel.isBrowsingAllExercises.toggle()
+                } label: {
+                    Label(
+                        viewModel.isBrowsingAllExercises ? "Back to My Library" : "Browse All Exercises",
+                        systemImage: viewModel.isBrowsingAllExercises ? "books.vertical.fill" : "magnifyingglass"
+                    )
+                }
+                .accessibilityIdentifier("trainingLogger.browseAll")
+
+                Button {
+                    viewModel.isCreatingNewExercise.toggle()
+                } label: {
+                    Label(
+                        viewModel.isCreatingNewExercise ? "Cancel" : "Create New Exercise",
+                        systemImage: viewModel.isCreatingNewExercise ? "minus.circle" : "plus.circle"
+                    )
+                }
+                .accessibilityIdentifier("trainingLogger.createNewExercise")
             }
             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             .foregroundStyle(PhysiqueOSTheme.accent)
-            .accessibilityIdentifier("trainingLogger.browseAll")
 
-            if viewModel.isBrowsingAllExercises {
+            if viewModel.isCreatingNewExercise {
                 provisionalExerciseForm(viewModel)
             }
 
@@ -385,13 +404,7 @@ struct TrainingLoggerView: View {
         let locked = viewModel.isLockedDuringAdd(exercise)
         return Button {
             guard !locked else { return }
-            viewModel.update { draft in
-                if let selectedExercise = draft.exercises.first(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) {
-                    draft.removeExercise(id: selectedExercise.id)
-                } else {
-                    draft.addExercise(exercise)
-                }
-            }
+            viewModel.toggleExerciseSelection(exercise)
         } label: {
             exerciseSelectionLabel(
                 name: exercise.name,
@@ -438,9 +451,13 @@ struct TrainingLoggerView: View {
                 Text("Create new exercise")
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text("Give the exercise a name and choose its Training Area.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Text(
+                    viewModel.authority == .founderProduction
+                        ? "Checked against the full exercise catalog first, so an existing match is never duplicated."
+                        : "Give the exercise a name and choose its Training Area."
+                )
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 TextField("Exercise name", text: $provisionalName)
                     .padding(10)
                     .background(PhysiqueOSTheme.surfaceMuted)
@@ -452,11 +469,20 @@ struct TrainingLoggerView: View {
                     }
                 }
                 .tint(PhysiqueOSTheme.accent)
-                Button("Add provisional exercise") {
-                    viewModel.update { $0.addProvisionalExercise(name: provisionalName, areaId: provisionalAreaId) }
+                if let newExerciseMessage = viewModel.newExerciseMessage {
+                    Text(newExerciseMessage)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+                Button(viewModel.isSubmittingNewExercise ? "Checking catalog…" : "Create New Exercise") {
+                    viewModel.submitNewExercise(name: provisionalName, areaId: provisionalAreaId)
                     provisionalName = ""
                 }
-                .disabled(provisionalName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || provisionalAreaId.isEmpty)
+                .disabled(
+                    provisionalName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                    provisionalAreaId.isEmpty || viewModel.isSubmittingNewExercise
+                )
+                .accessibilityIdentifier("trainingLogger.submitNewExercise")
                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                 .foregroundStyle(PhysiqueOSTheme.accent)
             }

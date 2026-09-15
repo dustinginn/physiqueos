@@ -27,6 +27,12 @@ enum TrainingExerciseCatalogLoader {
                     existing.canonicalExerciseId = canonicalID
                     existing.name = row.label
                     existing.areaId = area.id
+                    // Sandbox has no server-computed My Library membership
+                    // (and no explicit-add persistence to derive it from),
+                    // so it preserves its existing, pre-Build-33 contract:
+                    // the full canonical catalog is always browsable,
+                    // matching every established sandbox fixture test.
+                    existing.inMyLibrary = true
                     existing.history = existing.history.map { record in
                         var migrated = record
                         if var relationship = record.relationship {
@@ -46,6 +52,7 @@ enum TrainingExerciseCatalogLoader {
                     equipment: nil,
                     measurement: .repsLoad,
                     previouslyPerformed: false,
+                    inMyLibrary: true,
                     history: [],
                     progressionRecommendation: nil
                 )

@@ -44,6 +44,16 @@ struct TrainingLoggerCatalogExercise: Codable, Equatable, Identifiable {
     var measurement: TrainingLoggerMeasurement
     var defaultLoadType: String? = nil
     var previouslyPerformed: Bool
+    /// My Library membership — server-computed as performed history UNION
+    /// explicit Founder additions (`CoreNavigationReadService
+    /// .getTrainingLogger`'s `initialMyLibraryExerciseIds`). Optional (not
+    /// `= false`, matching `defaultLoadType`'s own precedent above) because
+    /// a Codable-synthesized decoder only treats a missing key as absent
+    /// for genuinely `Optional` properties — a non-optional default value
+    /// is a memberwise-init convenience only and still fails decoding a
+    /// fixture JSON that predates this field. Treat `nil` as `false`
+    /// everywhere this is read.
+    var inMyLibrary: Bool? = nil
     var history: [TrainingLoggerHistoryRecord]
     var progressionRecommendation: TrainingLoggerProgressionRecommendation?
 
@@ -363,9 +373,15 @@ extension TrainingLoggerDraft {
         }
     }
 
+    /// `browseAll == false` (the default, fast daily path) scopes the
+    /// picker to My Library — performed history UNION explicit Founder
+    /// additions, both server-computed (`inMyLibrary`). `browseAll == true`
+    /// is the deliberate "All Exercises" search: the full canonical
+    /// catalog, unfiltered by membership, for finding something not yet in
+    /// My Library or reaching Create New Exercise.
     func pickerExercises(
         in catalog: [TrainingLoggerCatalogExercise],
-        browseAll _: Bool,
+        browseAll: Bool,
         query: String,
         includeAllAreas: Bool = false
     ) -> [TrainingLoggerCatalogExercise] {
@@ -373,6 +389,7 @@ extension TrainingLoggerDraft {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return catalog
             .filter { includeAllAreas || selected.contains($0.areaId) }
+            .filter { browseAll || ($0.inMyLibrary ?? false) }
             .filter { normalizedQuery.isEmpty || $0.name.lowercased().contains(normalizedQuery) }
             .sorted {
                 if $0.previouslyPerformed != $1.previouslyPerformed { return $0.previouslyPerformed && !$1.previouslyPerformed }

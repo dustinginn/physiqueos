@@ -11,6 +11,7 @@ final class TrainingLoggerViewModel {
 
     private let api: TrainingLoggerAPI
     private let writeAPI: TrainingWriteAPI
+    private let catalogWriteAPI: TrainingExerciseCatalogWriteAPI
     private let draftStore: TrainingLoggerDraftStore
     private let attachmentStore: TrainingLoggerAttachmentStore
     let authority: NativeAPIEnvironment
@@ -21,6 +22,9 @@ final class TrainingLoggerViewModel {
     var savedDraft: TrainingLoggerDraft?
     var searchText = ""
     var isBrowsingAllExercises = false
+    var isCreatingNewExercise = false
+    var newExerciseMessage: String?
+    var isSubmittingNewExercise = false
     var validationMessage: String?
     var isSubmitting = false
     /// Set only when a workout already committed canonically but a
@@ -39,12 +43,14 @@ final class TrainingLoggerViewModel {
     init(
         api: TrainingLoggerAPI,
         writeAPI: TrainingWriteAPI = NotAvailableTrainingWriteAPI(),
+        catalogWriteAPI: TrainingExerciseCatalogWriteAPI = NotAvailableTrainingExerciseCatalogWriteAPI(),
         draftStore: TrainingLoggerDraftStore,
         attachmentStore: TrainingLoggerAttachmentStore = FileTrainingLoggerAttachmentStore(),
         authority: NativeAPIEnvironment = .sandbox
     ) {
         self.api = api
         self.writeAPI = writeAPI
+        self.catalogWriteAPI = catalogWriteAPI
         self.draftStore = draftStore
         self.attachmentStore = attachmentStore
         self.authority = authority
@@ -265,6 +271,83 @@ final class TrainingLoggerViewModel {
 
     func isSelected(_ exercise: TrainingLoggerCatalogExercise) -> Bool {
         draft?.exercises.contains(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) == true
+    }
+
+    func toggleExerciseSelection(_ exercise: TrainingLoggerCatalogExercise) {
+        guard let draft else { return }
+        if let selectedExercise = draft.exercises.first(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) {
+            update { $0.removeExercise(id: selectedExercise.id) }
+            return
+        }
+        update { $0.addExercise(exercise) }
+        addToMyLibraryIfNeeded(exercise)
+    }
+
+    /// Selecting from All Exercises immediately and durably adds the
+    /// exercise to My Library — even if the Founder backs out of the
+    /// workout before performing it. "Explicitly added" is the only
+    /// membership signal that can't be inferred from TrainingSession
+    /// history, so it must persist the moment the Founder chooses it, not
+    /// only on a completed workout.
+    private func addToMyLibraryIfNeeded(_ exercise: TrainingLoggerCatalogExercise) {
+        guard authority == .founderProduction, !(exercise.inMyLibrary ?? false) else { return }
+        markInMyLibraryLocally(exercise.canonicalExerciseId)
+        Task { [catalogWriteAPI] in
+            try? await catalogWriteAPI.addToMyLibrary(canonicalExerciseId: exercise.canonicalExerciseId)
+        }
+    }
+
+    private func markInMyLibraryLocally(_ canonicalExerciseId: String) {
+        guard var configuration else { return }
+        guard let index = configuration.exercises.firstIndex(where: { $0.canonicalExerciseId == canonicalExerciseId }) else { return }
+        configuration.exercises[index].inMyLibrary = true
+        self.configuration = configuration
+    }
+
+    /// Create New Exercise. Under Sandbox this is unchanged — a local
+    /// provisional exercise pending evidence-review resolution. Under
+    /// Founder Production it calls the standalone creation command (full-
+    /// catalog duplicate-checked server-side), which — unlike the
+    /// sandbox/provisional path — receives one canonical identity and
+    /// enters My Library immediately, before any workout completes. A
+    /// server-detected duplicate is not an error: the existing exercise is
+    /// surfaced and added to My Library instead, so the Founder never has
+    /// to understand the distinction between "created" and "matched".
+    func submitNewExercise(name: String, areaId: String) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty, !areaId.isEmpty else { return }
+        guard authority == .founderProduction else {
+            update { $0.addProvisionalExercise(name: trimmedName, areaId: areaId) }
+            return
+        }
+        isSubmittingNewExercise = true
+        newExerciseMessage = nil
+        Task { [catalogWriteAPI] in
+            defer { isSubmittingNewExercise = false }
+            do {
+                let outcome = try await catalogWriteAPI.createExercise(
+                    canonicalName: trimmedName, primaryMuscleGroupId: areaId, equipment: nil, aliases: []
+                )
+                switch outcome {
+                case .created(let canonicalExerciseId):
+                    await refreshCatalogAndSelect(canonicalExerciseId: canonicalExerciseId)
+                    isCreatingNewExercise = false
+                case .duplicate(let existingCanonicalExerciseId, let existingCanonicalExerciseName):
+                    newExerciseMessage = "\"\(existingCanonicalExerciseName)\" already exists — added it to My Library instead."
+                    await refreshCatalogAndSelect(canonicalExerciseId: existingCanonicalExerciseId)
+                }
+            } catch {
+                newExerciseMessage = "This exercise could not be created. Try again."
+            }
+        }
+    }
+
+    private func refreshCatalogAndSelect(canonicalExerciseId: String) async {
+        guard let refreshed = try? await api.fetchConfiguration() else { return }
+        configuration = refreshed
+        if let exercise = refreshed.exercises.first(where: { $0.canonicalExerciseId == canonicalExerciseId }) {
+            update { $0.addExercise(exercise) }
+        }
     }
 
     func isLockedDuringAdd(_ exercise: TrainingLoggerCatalogExercise) -> Bool {

@@ -314,6 +314,13 @@ final class AppEnvironment {
         }
     }
 
+    var trainingExerciseCatalogWriteAPI: TrainingExerciseCatalogWriteAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableTrainingExerciseCatalogWriteAPI()
+        case .founderProduction: ProductionTrainingExerciseCatalogWriteAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
+        }
+    }
+
     var dailyEvidenceWriteAPI: DailyEvidenceWriteAPI {
         switch nativeAuthority {
         case .sandbox: NotAvailableDailyEvidenceWriteAPI()

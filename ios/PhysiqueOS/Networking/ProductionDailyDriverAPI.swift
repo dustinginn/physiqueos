@@ -1264,6 +1264,7 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                         measurement: exercise.measurement,
                         defaultLoadType: exercise.defaultLoadType,
                         previouslyPerformed: payload.initialPerformedExerciseIds.contains(exercise.canonicalExerciseId),
+                        inMyLibrary: payload.initialMyLibraryExerciseIds.contains(exercise.canonicalExerciseId),
                         history: Self.history(for: exercise.canonicalExerciseId, in: history),
                         progressionRecommendation: recommendations[exercise.canonicalExerciseId]
                     )
@@ -1303,6 +1304,7 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         var initialCanonicalExercises: [RawExercise]
         var initialHistorySessions: [HistorySession]
         var initialPerformedExerciseIds: [String]
+        var initialMyLibraryExerciseIds: [String]
         var initialProgressionRecommendations: [RawRecommendation]?
     }
 
