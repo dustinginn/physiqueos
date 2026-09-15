@@ -387,7 +387,7 @@ final class FounderServerAPITests: XCTestCase {
     func testFounderProductionWriteGuardEnablesOnlyTheAcceptedDailyDriverDomainsAndSandboxRemainsIsolated() throws {
         XCTAssertEqual(
             NativeProductWriteDomain.enabledUnderFounderProduction,
-            [.morningCheckInAndWeight, .workoutLogger, .nutrition, .activityEvidence, .dexa, .priorityCompletion, .operatingPlan]
+            [.morningCheckInAndWeight, .workoutLogger, .nutrition, .activityEvidence, .evidenceReviewDismissal, .dexa, .priorityCompletion, .operatingPlan]
         )
         for domain in NativeProductWriteDomain.allCases {
             if NativeProductWriteDomain.enabledUnderFounderProduction.contains(domain) {
@@ -2561,7 +2561,7 @@ final class FounderServerAPITests: XCTestCase {
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(202, #"{"intakeId":"intake-training","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/api/v1/native/evidence/intakes/intake-training"}"#),
             .json(200, #"{"intakeId":"intake-training","status":"ready","reviewId":"review-training","reviewUrl":"/review","processingUrl":"/status"}"#),
-            .json(200, review), .json(200, confirmResponse),
+            .json(200, review), .json(200, review.replacingOccurrences(of: "\"version\":1", with: "\"version\":2")), .json(200, confirmResponse),
         ])
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
@@ -2589,8 +2589,10 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requests.map { $0.url?.path }, [
             "/api/v1/native/auth/pair", "/api/v1/native/evidence/intakes",
             "/api/v1/native/evidence/intakes/intake-training", "/api/v1/native/read/evidence-review",
+            "/api/v1/native/read/evidence-review",
             "/api/v1/native/commands",
-        ], "the two back-to-back reads of the same review coalesce via in-flight read dedup.")
+        ], "Review concurrency is re-read before the supporting screenshot confirmation.")
+        XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "If-Match"), "\"2\"")
         let command = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests.last?.httpBody)) as? [String: Any])
         XCTAssertEqual(command["commandType"] as? String, ProductionCommandType.commitEvidenceReview)
         XCTAssertEqual(command["payload"] as? [String: String], ["reviewId": "review-training"])
@@ -2823,8 +2825,10 @@ final class FounderServerAPITests: XCTestCase {
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
         let pipeline = ProductionEvidenceIntakePipeline(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
 
-        try await pipeline.dismissReview(domain: .activityEvidence, reviewId: "review-1", expectedVersion: "1")
-        try await pipeline.dismissReview(domain: .activityEvidence, reviewId: "review-1", expectedVersion: "1")
+        // A photo review maps to generic evidenceReview, whose confirmation
+        // remains disabled. Disposition has its own bounded authorization.
+        try await pipeline.dismissReview(domain: .evidenceReview, reviewId: "review-1", expectedVersion: "1")
+        try await pipeline.dismissReview(domain: .evidenceReview, reviewId: "review-1", expectedVersion: "1")
 
         let requests = await transport.requests
         XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"1\"")
@@ -2832,6 +2836,25 @@ final class FounderServerAPITests: XCTestCase {
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
         XCTAssertEqual(json["commandType"] as? String, "evidence-review.dispose.v1")
         XCTAssertEqual((json["payload"] as? [String: String])?["disposition"], "discarded")
+        let affected = await native.resourcesAffected(by: ProductionCommandType.disposeEvidenceReview)
+        XCTAssertTrue(affected.contains("evidence-review"))
+        XCTAssertTrue(affected.contains("evidence-review-queue"))
+    }
+
+    func testProductionReviewReadDoesNotReuseCachedConcurrencyOrLifecycleState() async throws {
+        let pending = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-1","status":"pending","version":1,"createdAt":"2026-09-15T19:00:00.000Z"}}"#)
+        let discarded = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-1","status":"discarded","version":2,"createdAt":"2026-09-15T19:00:00.000Z"}}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, pending), .json(200, discarded),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Review test")
+        let api = ProductionEvidenceReviewAPI(api: native)
+        let first = try await api.fetchReview(reviewId: "review-1")
+        let second = try await api.fetchReview(reviewId: "review-1")
+        XCTAssertEqual(first?.status, "pending")
+        XCTAssertEqual(second?.status, "discarded")
+        XCTAssertEqual(second?.version, 2)
     }
 
     /// Build 21's central async-intake correction (item 6): a real Build 20

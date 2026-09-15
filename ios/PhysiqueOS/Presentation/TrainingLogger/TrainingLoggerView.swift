@@ -893,7 +893,7 @@ struct TrainingLoggerView: View {
                                     Text("Couldn't read workout details")
                                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    Text("\(asset.displayName) · remove and re-attach to try again")
+                                    Text("\(asset.displayName) · Workout details weren’t recognized. You can continue without this screenshot.")
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                                 }

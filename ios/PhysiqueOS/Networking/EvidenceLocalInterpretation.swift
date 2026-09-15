@@ -876,9 +876,9 @@ enum EvidenceLocalInterpretation {
         line.range(of: #"\b(calories|heart rate|duration|workout time)\b"#, options: [.regularExpression, .caseInsensitive]) == nil
     }
     private static func isCardioText(_ text: String) -> Bool { text.range(of: #"\b(outdoor walk|indoor walk|run|running|cycling|treadmill|stair stepper|elliptical|rowing|hiking)\b"#, options: [.regularExpression, .caseInsensitive]) != nil }
-    private static func isStrengthText(_ text: String) -> Bool { text.range(of: #"\b(traditional strength training|functional strength training|strength workout)\b"#, options: [.regularExpression, .caseInsensitive]) != nil }
+    private static func isStrengthText(_ text: String) -> Bool { text.range(of: #"\b(traditional\s+strength\s+training|functional\s+strength\s+training|strength\s+workout)\b"#, options: [.regularExpression, .caseInsensitive]) != nil }
     private static func strengthTitle(_ text: String) -> String {
-        text.localizedCaseInsensitiveContains("functional strength training") ? "Functional Strength Training" : "Traditional Strength Training"
+        text.range(of: #"\bfunctional\s+strength\s+training\b"#, options: [.regularExpression, .caseInsensitive]) != nil ? "Functional Strength Training" : "Traditional Strength Training"
     }
     private static func cardioTitle(_ text: String) -> String {
         let titles = ["Outdoor Walk", "Indoor Walk", "Outdoor Run", "Indoor Run", "Stair Stepper", "Indoor Cycling", "Outdoor Cycling", "Elliptical", "Rowing", "Hiking"]

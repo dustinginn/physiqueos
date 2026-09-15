@@ -9,8 +9,8 @@ import UserNotifications
 /// center — a diagnostic that changed what it's inspecting would be
 /// worthless for exactly the question it exists to answer.
 ///
-/// Intended for a DEBUG-only surface (see `NotificationDiagnosticsView`) or
-/// direct inspection from a debugger/test — not exposed in production UI.
+/// Available in the explicit engineering diagnostic surface, including
+/// TestFlight. Never exposed in normal priority presentation.
 enum NotificationDiagnostics {
     struct PendingRequestSnapshot {
         let identifier: String
@@ -73,6 +73,10 @@ enum NotificationDiagnostics {
         let authorizationStatus: UNAuthorizationStatus
         let deliverySettings: DeliverySettings
         let pendingRequests: [PendingRequestSnapshot]
+        let deliveredRequests: [PendingRequestSnapshot]
+        let registeredCategories: [String]
+        let capturedAt: Date
+        let timeZoneIdentifier: String
         let itemOutcomes: [ItemOutcome]
         let lastSyncFailures: [(identifier: String, error: Error)]
     }
@@ -86,6 +90,8 @@ enum NotificationDiagnostics {
     ) async -> Report {
         let settings = await center.notificationSettings()
         let pending = await center.pendingNotificationRequests()
+        let delivered = await center.deliveredNotifications()
+        let categories = await center.notificationCategories()
         let physiqueOSPending = pending.filter {
             $0.identifier.hasPrefix(PriorityNotificationScheduler.scheduledPrefix)
                 || $0.identifier.hasPrefix(PriorityNotificationScheduler.snoozedPrefix)
@@ -119,6 +125,13 @@ enum NotificationDiagnostics {
                 timeSensitiveSetting: settings.timeSensitiveSetting
             ),
             pendingRequests: snapshots,
+            deliveredRequests: delivered.map(\.request).filter {
+                $0.identifier.hasPrefix(PriorityNotificationScheduler.scheduledPrefix)
+                    || $0.identifier.hasPrefix(PriorityNotificationScheduler.snoozedPrefix)
+            }.map { snapshot(for: $0, calendar: calendar) },
+            registeredCategories: categories.map(\.identifier).sorted(),
+            capturedAt: now,
+            timeZoneIdentifier: calendar.timeZone.identifier,
             itemOutcomes: outcomes,
             lastSyncFailures: PriorityNotificationScheduler.lastSyncFailures
         )
@@ -153,6 +166,7 @@ enum NotificationDiagnostics {
                 + " hour:\(components.hour.map(String.init) ?? "-")"
                 + " minute:\(components.minute.map(String.init) ?? "-")"
                 + " second:\(components.second.map(String.init) ?? "-")"
+                + " timeZone:\(components.timeZone?.identifier ?? "device default")"
                 + " repeats:\(calendarTrigger.repeats))"
             return (description, calendarTrigger.nextTriggerDate())
         case let intervalTrigger as UNTimeIntervalNotificationTrigger:

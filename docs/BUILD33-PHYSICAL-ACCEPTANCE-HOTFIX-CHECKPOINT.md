@@ -658,3 +658,113 @@ documentation project is intentionally deferred.
 Physical Actionable Priority Notification delivery remains UNPROVEN. Running-app
 Review-ready fallback remains accepted V1; terminated-app delivery is deferred,
 not a Build 34 hotfix blocker. Nothing deployed, reconciled, repaired, or mutated.
+
+## Build 34 physical follow-up — September 15, 2026
+
+This section supersedes the earlier *pending release* status, not its historical
+test evidence. Production hotfix `2d0d8818` is live/read-accepted, deployment
+`a81ed25f-8e84-4ab8-a37e-6580abc0730d`. The authorized historical Training/Activity
+repair is complete per verified PC handoff: active Training 210, total 217;
+Sep 14 Activity Move 948 / workout 627 / non-workout 321 / references 3.
+Both walks and the version-19 committing review remain unchanged.
+Native Build 34 shipping authority is `757294441e0ca6a9986119d55a21745223dd6d92`.
+
+Founder physically accepted Recovery/Peptides/Supplements loading, My Library,
+Hyperextension Machine under Glutes, Logger bootstrap, and Sep 14's two walks,
+one strength session, and unified detail presentation. Do not reopen these fixes
+without new evidence. Full physical acceptance is NOT complete.
+
+### Remaining failed notification occurrence
+
+Foam Rolling displayed Daily 12:21 PM on Sep 15; no notification was observed
+around 12:22. Request creation, cancellation and iOS presentation state remain
+UNKNOWN. Server SQL cannot prove local UNNotificationCenter state. Build 34's
+existing Home long-press diagnostic is the immediate evidence path. Home sync
+currently follows Home reads (including initial prefetch); editing a schedule in
+another destination is not itself a scheduling trace. These are hypotheses,
+NOT an established cause of this occurrence. No scheduling behavior was patched.
+
+The bounded Native diagnostic enhancement reads delivered notifications still
+retained by iOS, registered categories, capture time and trigger timezone. It
+neither schedules nor cancels requests. Missing delivered/pending state does not
+prove a historical request never existed. Physical delivery remains UNPROVEN.
+
+### Proven source defects and bounded patches
+
+- Intake pre-routing ignores explicit `training` context, sending JPEGs at least
+  1 MB, HEIC, and filename heuristics into Progress Photos before screenshot
+  interpretation. Explicit Workout Logger Training context now wins this routing
+  decision. Generic/normal Progress Photos routing is unchanged. No production
+  review was modified.
+- Photo-review dismissal fails locally because it maps to disabled generic
+  `.evidenceReview`; server Native command admission also rejects photo families
+  for disposition. A separate disposition-only Native domain and server photo
+  disposition allowlist now reuse the existing canonical dispose command.
+  Photo confirmation remains disabled; pending/commit_failed status, version and
+  owner protections remain intact. No raw history or canonical photo commit is
+  created by dismissal.
+- Review detail reads previously reused 90-second cached lifecycle/version data;
+  review mutations invalidated the queue but not the detail key. Volatile review
+  reads now reload; evidence commands invalidate both. A regression proves that
+  supporting screenshot confirmation uses the newly read version, not cached
+  binding state.
+- Dismiss confirmation now uses the existing system-alert pattern, rather than
+  the reported malformed confirmationDialog. Destructive action and Cancel stay
+  explicit. This still needs iOS 27 physical presentation verification.
+- Actual local Vision OCR on the supplied strength image reads `Traditional`
+  and `Strength Training` on separate lines. The local recognizer required literal
+  spaces and rejected it before metric extraction. Semantic whitespace recognition
+  fixes this small generic layout regression. Sanitized text tests cover 57:37,
+  288 active calories, 382 total calories and 106 HR; no private image is tracked.
+  The visible 07:58–08:55 clock text survives OCR; canonical workout-window
+  extraction remains the existing server screenshot interpreter's responsibility.
+  No coordinates, iOS-specific branches or new screenshot subsystem were added.
+  Error copy no longer promises re-attaching identical readable evidence will fix
+  an unsupported recognition result.
+
+### Production evidence still required
+
+The reported four Progress Photos rows are not yet identified at the database
+level. Do not label them all duplicates, delete them, or offer a fabricated cleanup
+preview. [Bounded PC audit](BUILD34-PHYSICAL-FOLLOWUP-PC-AUDIT.md) specifies the
+existing PC read-only path, owner/date fences, receipt/hash linkage, review states,
+and failed disposition logs needed to establish their exact chronology. No PC
+operator thread is accessible in the Mac's connected host inventory; the handoff
+must go to the existing PC operator. No Mac credential/access workaround was used.
+
+Deployment/build-number changes and production cleanup are not authorized in
+this follow-up. Native stays 1.0 (34). The source patches constitute a partial
+Build 35 acceptance candidate; notification root cause and review-count/cleanup
+evidence are outstanding. Do not call the complete investigation or candidate
+ready until those evidence gates are resolved.
+
+Running-app Review-ready fallback remains accepted V1; terminated-app delivery
+is deferred and unrelated to the Foam Rolling test. Confidence/Narrative V3,
+HealthKit, Photos redesign, PAT cleanup and broad documentation closeout remain
+untouched. Preserve PC read-only and separate deployment-context handoffs during
+the later post-acceptance stabilization stage.
+
+### Follow-up validation (undeployed partial candidate)
+
+- Full Native units: 984/984 PASS, zero skipped.
+- Affected sandbox UI journeys: 3/3 PASS (evidence navigation, unified Workout
+  Detail/correction, and Logger screenshot-review confirmation).
+- Debug build: PASS through the complete unit/UI builds.
+- Generic unsigned arm64 Release build: PASS.
+- Focused server routing/disposition/worker/canonical persistence: 88/88 PASS.
+- Broader evidence/contracts/core reads: 66/66 PASS.
+- Established Training regression: 151/151 PASS.
+- Final server production build and changed-file lint: PASS.
+- Project generation twice: identical SHA-256, no project change; Release
+  configuration remains 1.0 (34), existing bundle/team.
+- Changed-diff credential/private-key and backend-leakage review: PASS; technical
+  identifiers occur only in explicit engineering diagnostics/handoffs.
+- Diff checks: PASS. Preserved forensic script SHA-256 remains
+  `5dc1bebf4153ad3518c0732b37b4b3e8b23f7f9c542518b570d1dcf68b210275`.
+
+First full Native invocation was 983/984 because a cached-review fixture supplied
+only one response. The corrected fixture now supplies fresh version 2 and asserts
+If-Match 2; the final full invocation actually executed all 984 tests and passed.
+No failing fixture was replaced with production imagery/data. Simulator journeys
+do not prove iOS 27 dismiss presentation or physical notification delivery.
+No unrelated private-fixture suite was invoked or claimed green in this follow-up.

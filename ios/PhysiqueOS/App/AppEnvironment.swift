@@ -69,6 +69,8 @@ enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
     case nutrition
     case activityEvidence
     case evidenceReview
+    // Disposition only; does not authorize generic confirmation or photo writes.
+    case evidenceReviewDismissal
     case goalAndPhaseTransitions
     case operatingPlan
     case dexa
@@ -112,6 +114,7 @@ enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
         .workoutLogger,
         .nutrition,
         .activityEvidence,
+        .evidenceReviewDismissal,
         .operatingPlan,
         .dexa,
     ]

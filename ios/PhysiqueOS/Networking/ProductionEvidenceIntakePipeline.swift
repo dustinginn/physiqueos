@@ -130,7 +130,7 @@ struct ProductionEvidenceIntakePipeline {
         reviewId: String,
         expectedVersion: String
     ) async throws {
-        try NativeProductWriteGuard.authorize(domain, in: .founderProduction)
+        try NativeProductWriteGuard.authorize(.evidenceReviewDismissal, in: .founderProduction)
         let scope = "evidence-review.dispose.\(reviewId)"
         let signature = ProductionIdempotentSubmission.signature([
             ProductionCommandType.disposeEvidenceReview, reviewId, expectedVersion, "discarded",

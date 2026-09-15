@@ -94,6 +94,7 @@ final class NotificationDiagnosticsTests: XCTestCase {
         let (description, nextFireDate) = NotificationDiagnostics.describe(trigger, calendar: utc)
         XCTAssertTrue(description.contains("hour:8"))
         XCTAssertTrue(description.contains("minute:40"))
+        XCTAssertTrue(description.contains("timeZone:"))
         let resolved = try XCTUnwrap(nextFireDate)
         let resolvedComponents = utc.dateComponents([.year, .month, .day, .hour, .minute], from: resolved)
         XCTAssertEqual(resolvedComponents.year, 2099)

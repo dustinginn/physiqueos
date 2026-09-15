@@ -20,6 +20,10 @@ struct NotificationDiagnosticsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     if let report {
+                        section("Capture") {
+                            Text("\(report.capturedAt.formatted()) · \(report.timeZoneIdentifier)")
+                            Text("Registered categories: \(report.registeredCategories.joined(separator: ", "))")
+                        }
                         section("Authorization") {
                             Text(String(describing: report.authorizationStatus))
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -49,6 +53,14 @@ struct NotificationDiagnosticsView: View {
                                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                             }
                             ForEach(Array(report.pendingRequests.enumerated()), id: \.offset) { _, request in
+                                pendingRequestRow(request)
+                            }
+                        }
+
+                        section("Delivered Requests (\(report.deliveredRequests.count))") {
+                            Text("Only notifications still retained by iOS are visible. An empty list does not prove a request was never scheduled.")
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            ForEach(Array(report.deliveredRequests.enumerated()), id: \.offset) { _, request in
                                 pendingRequestRow(request)
                             }
                         }

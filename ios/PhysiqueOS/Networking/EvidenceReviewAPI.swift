@@ -19,15 +19,13 @@ struct NotAvailableEvidenceReviewAPI: EvidenceReviewAPI {
     }
 }
 
-/// Founder Production's read-only Evidence Review detail. Confirm/correct/
-/// reject/dismiss are explicitly NOT wired here — those remain the isolated
-/// Sandbox write flow (`LocalEvidenceReviewView`/`LoggingSandboxStore`),
-/// which this conformance never touches.
+/// Volatile production review state and concurrency identity. Confirmation
+/// and disposition use separate canonical commands; no sandbox state is used.
 struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
     let api: ProductionNativeAPI
 
     func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel? {
-        let envelope = try await api.readResource("evidence-review", query: ["reviewId": reviewId], as: Payload.self)
+        let envelope = try await api.readResource("evidence-review", query: ["reviewId": reviewId], policy: .reload, as: Payload.self)
         guard let review = envelope.data.review else { return nil }
         return EvidenceReviewDetailReadModel(
             id: review.id,

@@ -898,7 +898,7 @@ actor ProductionNativeAPI {
             // Confirmed Training evidence can add history-backed My Library
             // membership or reconcile telemetry onto an existing session.
             return [
-                "home", "evidence-review-queue", "reporting", "weight", "nutrition", "activity", "energy", "dexa", "photos", "timeline",
+                "home", "evidence-review", "evidence-review-queue", "reporting", "weight", "nutrition", "activity", "energy", "dexa", "photos", "timeline",
                 "training-landing", "training-reporting", "training-library", "training-logger", "training-day", "training-session",
             ]
         }

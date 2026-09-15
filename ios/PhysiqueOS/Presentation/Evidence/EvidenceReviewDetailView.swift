@@ -69,10 +69,9 @@ struct EvidenceReviewDetailView: View {
         .onDisappear {
             if environment.currentlyViewingReviewId == reviewId { environment.currentlyViewingReviewId = nil }
         }
-        .confirmationDialog(
+        .alert(
             "Dismiss this Evidence Review?",
-            isPresented: $showingDismissConfirmation,
-            titleVisibility: .visible
+            isPresented: $showingDismissConfirmation
         ) {
             Button("Dismiss Review", role: .destructive) {
                 guard case .loaded(.some(let review)) = state else { return }

@@ -425,6 +425,30 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(workout?.durationMinutes ?? 0, 71.85, accuracy: 0.001)
     }
 
+    func testAppleFitnessMultilineStrengthTitleAndSemanticMetrics() throws {
+        // Sanitized Vision text structure; no private image is retained.
+        let text = """
+        Traditional
+        Strength Training
+        September 15, 2026, 7:58-8:55 AM Apple Watch
+        Workout Time
+        0:57:37
+        Total Calories
+        382CAL
+        Active Calories
+        288CAL
+        Avg. Heart Rate
+        106BPM
+        """
+        let workout = try XCTUnwrap(EvidenceLocalInterpretation.supportingWorkout(id: "strength", sourceEvidenceIds: ["image"], from: text))
+        XCTAssertEqual(workout.activityName, "Traditional Strength Training")
+        XCTAssertEqual(workout.recordOwner, .trainingSession)
+        XCTAssertEqual(workout.durationMinutes, 57 + 37.0 / 60, accuracy: 0.001)
+        XCTAssertEqual(workout.activeCalories, 288)
+        XCTAssertEqual(workout.totalCalories, 382)
+        XCTAssertEqual(workout.averageHeartRate, 106)
+    }
+
     func testTwoDifferentRealScreenshotsInterpretIntoTwoDistinctWorkouts() {
         let stairsText = "Stair Stepper\nWorkout Time 42:18\nActive Calories 386"
         let runText = "Outdoor Run\nWorkout Time 31:00\nActive Calories 402\nDistance 3.2 mi"
