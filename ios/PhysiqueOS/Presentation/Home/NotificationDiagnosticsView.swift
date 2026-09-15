@@ -1,18 +1,13 @@
 import SwiftUI
 import UserNotifications
 
-/// Hidden diagnostic screen (long-press on Home — no visible affordance,
-/// but deliberately compiled into every configuration, TestFlight/Release
-/// included, since it exists to answer "does a pending local notification
-/// actually exist" on exactly the physical device that reported a delivery
-/// problem) answering that question and, if a request DOES exist, why iOS
-/// might still not have shown it — built from
-/// `NotificationDiagnostics.makeReport`, which reuses the live scheduler's
-/// own reconciliation logic rather than a second copy of it. Read-only: it
-/// never schedules, cancels, or otherwise mutates the notification center.
+/// Explicit Founder Production connection diagnostic, including TestFlight.
+/// Reads fresh canonical priorities and actual device state without scheduling,
+/// cancelling, requesting permission, or changing canonical state.
 struct NotificationDiagnosticsView: View {
-    let items: [PriorityOccurrence]
+    @Environment(AppEnvironment.self) private var environment
     @State private var report: NotificationDiagnostics.Report?
+    @State private var canonicalReadNotice: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -20,12 +15,13 @@ struct NotificationDiagnosticsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     if let report {
+                        if let canonicalReadNotice { Text(canonicalReadNotice) }
                         section("Capture") {
                             Text("\(report.capturedAt.formatted()) · \(report.timeZoneIdentifier)")
                             Text("Registered categories: \(report.registeredCategories.joined(separator: ", "))")
                         }
                         section("Authorization") {
-                            Text(String(describing: report.authorizationStatus))
+                            Text(authorizationLabel(report.authorizationStatus))
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         }
@@ -71,6 +67,23 @@ struct NotificationDiagnosticsView: View {
                             }
                         }
 
+                        section("Recent scheduling activity") {
+                            Text("Device-local observations only. Earlier activity before this build is unavailable; iOS may remove delivered notifications from its list.")
+                            ForEach(Array(report.recentEvents.enumerated()), id: \.offset) { _, event in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(event.operation) · \(event.capturedAt.formatted())")
+                                    Text(event.identifier).textSelection(.enabled)
+                                    if let category = event.categoryIdentifier { Text("Category: \(category)") }
+                                    if let trigger = event.triggerDescription { Text("Trigger: \(trigger)") }
+                                    Text(event.reason)
+                                    if let fireDate = event.fireDate {
+                                        Text("Fire: \(fireDate.formatted()) · \(event.timeZoneIdentifier)")
+                                    }
+                                }
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            }
+                        }
+
                         if !report.lastSyncFailures.isEmpty {
                             section("Last sync() failures") {
                                 ForEach(Array(report.lastSyncFailures.enumerated()), id: \.offset) { _, failure in
@@ -94,8 +107,25 @@ struct NotificationDiagnosticsView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .task { report = await NotificationDiagnostics.makeReport(items: items) }
+            .task { await capture() }
+            .refreshable { await capture() }
         }
+    }
+
+    @MainActor private func capture() async {
+        var items: [PriorityOccurrence] = []
+        // Device evidence must not be hidden behind network/session latency.
+        // Show the local capture first, then enrich with fresh canonical reads.
+        canonicalReadNotice = "Loading current production priorities…"
+        report = await NotificationDiagnostics.makeReport(items: [])
+        do {
+            await environment.productionNativeAPI.invalidateReadResources(["home"])
+            items = try await ProductionHomeAPI(api: environment.productionNativeAPI).fetchHome().todaysFocus
+            canonicalReadNotice = nil
+        } catch {
+            canonicalReadNotice = "Current production priorities could not be loaded. Device notification state is still shown below."
+        }
+        report = await NotificationDiagnostics.makeReport(items: items)
     }
 
     private func deliverySettingRow(_ label: String, _ setting: UNNotificationSetting) -> some View {
@@ -104,9 +134,29 @@ struct NotificationDiagnosticsView: View {
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
             Spacer()
-            Text(String(describing: setting))
+            Text(settingLabel(setting))
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(setting == .disabled ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.textPrimary)
+        }
+    }
+
+    private func authorizationLabel(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: "Permission not requested"
+        case .denied: "Denied"
+        case .authorized: "Authorized"
+        case .provisional: "Provisional (quiet delivery)"
+        case .ephemeral: "Temporary permission"
+        @unknown default: "Unknown"
+        }
+    }
+
+    private func settingLabel(_ setting: UNNotificationSetting) -> String {
+        switch setting {
+        case .enabled: "Enabled"
+        case .disabled: "Disabled"
+        case .notSupported: "Not supported"
+        @unknown default: "Unknown"
         }
     }
 

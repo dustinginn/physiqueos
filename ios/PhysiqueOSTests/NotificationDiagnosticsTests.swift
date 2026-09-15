@@ -10,6 +10,27 @@ import XCTest
 /// class this investigation found: a `notificationAction.scheduledTime`
 /// that resolved to nil server-side.
 final class NotificationDiagnosticsTests: XCTestCase {
+    @MainActor func testSchedulingHistoryIsBoundedPersistedAndDiagnosticOnly() throws {
+        let suite = "NotificationDiagnosticsTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        for index in 0..<70 {
+            NotificationDiagnostics.record(.init(capturedAt: Self.referenceNow, identifier: "request.\(index)",
+                operation: index == 69 ? "removal requested" : "scheduled", reason: "Completed canonical occurrence.",
+                fireDate: Self.referenceNow, timeZoneIdentifier: "America/Los_Angeles",
+                categoryIdentifier: PriorityNotificationCategory.specializedWorkflow,
+                triggerDescription: "calendar(timeZone:America/Los_Angeles repeats:false)"), defaults: defaults)
+        }
+        let events = NotificationDiagnostics.recentEvents(defaults: defaults)
+        XCTAssertEqual(events.count, 64)
+        XCTAssertEqual(events.first?.identifier, "request.69")
+        XCTAssertEqual(events.first?.operation, "removal requested")
+        XCTAssertEqual(events.first?.timeZoneIdentifier, "America/Los_Angeles")
+        XCTAssertEqual(events.first?.categoryIdentifier, PriorityNotificationCategory.specializedWorkflow)
+        XCTAssertTrue(events.first?.triggerDescription?.contains("America/Los_Angeles") == true)
+        let reread = try XCTUnwrap(UserDefaults(suiteName: suite))
+        XCTAssertEqual(NotificationDiagnostics.recentEvents(defaults: reread).first?.identifier, "request.69")
+    }
     private var utc: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!

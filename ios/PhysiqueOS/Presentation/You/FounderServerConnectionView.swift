@@ -369,6 +369,7 @@ private struct ProductionFounderConnectionView: View {
     @State private var contracts: ProductionContractManifest?
     @State private var weight: ProductionResponseEnvelope<FounderProductionWeightSummary>?
     @State private var message: String?
+    @State private var showingNotificationDiagnostics = false
 
     var body: some View {
         ScrollView {
@@ -383,6 +384,11 @@ private struct ProductionFounderConnectionView: View {
                     text: isConnected ? "Production session available" : "Not connected",
                     color: isConnected ? .success : .warning
                 )
+
+                Button("Notification diagnostics") { showingNotificationDiagnostics = true }
+                    .accessibilityIdentifier("founder.notifications.diagnostics")
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
 
                 if !isConnected {
                     VStack(alignment: .leading, spacing: 10) {
@@ -458,6 +464,9 @@ private struct ProductionFounderConnectionView: View {
         }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
+        .sheet(isPresented: $showingNotificationDiagnostics) {
+            NotificationDiagnosticsView()
+        }
         .task {
             isConnected = (try? await environment.productionNativeAPI.hasStoredSession()) == true
         }

@@ -3,6 +3,60 @@ import XCTest
 @testable import PhysiqueOS
 
 final class FounderServerAPITests: XCTestCase {
+    func testInvalidatedReviewReadCannotJoinOldFlightOrEraseNewFlight() async throws {
+        actor HeldReviewTransport: FounderHTTPTransport {
+            let responses: [String]
+            let started: [XCTestExpectation]
+            var reads = 0
+            var held: [Int: CheckedContinuation<Void, Never>] = [:]
+            init(responses: [String], started: [XCTestExpectation]) {
+                self.responses = responses
+                self.started = started
+            }
+            func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+                if request.url?.path.hasSuffix("/auth/pair") == true { return (Data(responses[0].utf8), response) }
+                reads += 1
+                let index = reads
+                if index <= 2 {
+                    await withCheckedContinuation { continuation in
+                        held[index] = continuation
+                        started[index - 1].fulfill()
+                    }
+                } else { started[2].fulfill() }
+                return (Data(responses[index == 1 ? 1 : 2].utf8), response)
+            }
+            func release(_ index: Int) { held.removeValue(forKey: index)?.resume() }
+        }
+        let oldStarted = expectation(description: "pre-disposition GET")
+        let newStarted = expectation(description: "post-disposition GET")
+        let unexpectedThird = expectation(description: "old completion must not detach new GET")
+        unexpectedThird.isInverted = true
+        let pending = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-1","status":"pending","version":1}}"#)
+        let discarded = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-1","status":"discarded","version":2}}"#)
+        let transport = HeldReviewTransport(responses: [sessionJSON(access: "a", refresh: "r"), pending, discarded], started: [oldStarted, newStarted, unexpectedThird])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Review race test")
+        let api = ProductionEvidenceReviewAPI(api: native)
+        let old = Task { try await api.fetchReview(reviewId: "review-1") }
+        await fulfillment(of: [oldStarted], timeout: 2)
+        await native.invalidateReadResources(["evidence-review"])
+        let fresh = Task { try await api.fetchReview(reviewId: "review-1") }
+        await fulfillment(of: [newStarted], timeout: 2)
+        await transport.release(1)
+        let oldValue = try await old.value
+        XCTAssertEqual(oldValue?.version, 1)
+        let joined = Task { try await api.fetchReview(reviewId: "review-1") }
+        await fulfillment(of: [unexpectedThird], timeout: 0.2)
+        await transport.release(2)
+        let freshValue = try await fresh.value
+        let joinedValue = try await joined.value
+        XCTAssertEqual(freshValue?.status, "discarded")
+        XCTAssertEqual(freshValue?.version, 2)
+        XCTAssertEqual(joinedValue?.version, 2)
+        let readCount = await transport.reads
+        XCTAssertEqual(readCount, 2)
+    }
     func testProductionExerciseConflictDecodesAllCandidatesWithoutAddingMembership() async throws {
         let conflict = #"{"status":409,"code":"CANONICAL_EXERCISE_DUPLICATE","title":"Choose an exercise","detail":"Several existing exercises match.","fieldErrors":[],"recovery":{"candidates":[{"id":"row_one","name":"Row One"},{"id":"row_two","name":"Row Two"}]}}"#
         let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(409, conflict)])

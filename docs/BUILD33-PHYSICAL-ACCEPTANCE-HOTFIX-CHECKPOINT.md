@@ -722,7 +722,7 @@ prove a historical request never existed. Physical delivery remains UNPROVEN.
   Error copy no longer promises re-attaching identical readable evidence will fix
   an unsupported recognition result.
 
-### Production evidence still required
+### Initial production evidence request (superseded by completed PC audit below)
 
 The reported four Progress Photos rows are not yet identified at the database
 level. Do not label them all duplicates, delete them, or offer a fabricated cleanup
@@ -768,3 +768,129 @@ If-Match 2; the final full invocation actually executed all 984 tests and passed
 No failing fixture was replaced with production imagery/data. Simulator journeys
 do not prove iOS 27 dismiss presentation or physical notification delivery.
 No unrelated private-fixture suite was invoked or claimed green in this follow-up.
+
+### Completed PC audit and bounded Build 35 continuation
+
+The Founder-provided sanitized PC audit closes the production chronology and
+server projection gaps. Production remains `2d0d8818db9e6b6f911348c3d0c93df400c0c63c`
+on deployment `a81ed25f-8e84-4ab8-a37e-6580abc0730d`; no Mac SQL rediscovery or
+credential escalation is needed.
+
+All four erroneous reviews are pending version 1. Each distinct submission
+contains the same three workout screenshots: 12 verified objects, three unique
+image hashes, four receipts/packages/submission identities. Every intake declared
+Training and every interpretation selected photo_session. These are repeated
+ingestions, not same-key replay or one review per image. Exact originating UI
+request attribution remains partial because recovery_context was not persisted.
+No linked canonical photo history or September 15 canonical TrainingSession was
+found. The separate [cleanup preview](BUILD35-ERRONEOUS-REVIEW-CLEANUP-PREVIEW.md)
+proposes version-protected discard only; no cleanup is executed or authorized.
+
+The failed dismiss request's exact target/status is unavailable. There was no
+observable state change. Both the disabled Native disposition domain and deployed
+server photo-disposition rejection were generic defects; the existing bounded
+candidate fixes those without enabling photo confirmation.
+
+Foam Rolling's execution/reminder correctly project 12:21 at the incident clock,
+with effective canonical zone America/Los_Angeles despite absent/null owner fields.
+Home used priority_detail, while detail incorrectly assigned peptide_protocol to
+all protocol Supports. One shared protocol-Support notification projection now
+keeps Recovery/Supplements in priority_detail and Peptides in peptide_protocol.
+All remain specialized, with no blind direct-completion command. The server time
+projection is unchanged.
+
+Native's pure reconciliation plan creates a stable specialized request at
+September 15 19:21 UTC from the exact corrected 12:21 Pacific contract. No
+scheduling-behavior defect is established by production evidence, so eligibility,
+trigger construction, categories and cancellation semantics are unchanged.
+The old physical request's existence and delivery/suppression remain UNKNOWN.
+
+Founder diagnostics are now explicitly reachable via **You → Founder device
+connection → Founder Production → Notification diagnostics**, without Home
+long-press or DEBUG gating. This entry is confined to the existing Founder
+Production connection surface. Capture reads fresh production priorities and
+actual authorization/settings/categories/pending/delivered state; it does not
+request permission, schedule, cancel, or mutate canonical state. A failed canonical
+read is reported honestly while device diagnostics remain available; no fixtures
+are substituted. Focus's current active mode is not exposed by Apple's API;
+settings and Scheduled Summary are observable, Focus must be checked in Settings.
+
+Device capture is rendered before awaiting production network reads. A separate
+synthetic review regression fences a shared freshness race: invalidation now
+detaches affected pre-mutation in-flight GETs, and local request correlation IDs
+prevent old completions from erasing newer coalescing slots. Existing generation
+fences still prevent old responses from entering cache; earlier callers are not
+cancelled. This strengthens disposition/readback and diagnostic refresh, without
+changing scheduling eligibility or claiming the race caused the physical failure.
+
+A bounded 64-event local diagnostic journal records actual accepted additions,
+replacements, removal requests, authorization gates and rejected additions. It is
+never a scheduler input or canonical schedule store. Captures include identifiers,
+categories, trigger timezone, next-fire date and capture timestamp. Earlier
+Build 34 activity cannot be reconstructed, and iOS's delivered list only contains
+notifications it still retains. Reconciliation previews are labeled separately
+from observed scheduling activity.
+
+Next physical test: open diagnostics first; check permission/categories; Founder
+sets Foam Rolling minutes ahead; return to Home so its existing refresh schedules
+the canonical occurrence; verify pending identifier/time/category before
+backgrounding; prove delivery; reopen diagnostics; test only authorized actions.
+Recovery opens Priority detail, Peptides retain dose-aware workflow. Then re-test
+Logger's three screenshots and iOS 27 strength recognition, and dismiss an
+appropriate disposable review or separately authorized cleanup candidate.
+
+Physical notification delivery and iOS 27 alert/screenshot end-to-end behavior
+remain AWAITING FOUNDER PHYSICAL ACCEPTANCE. No deployment, build-number change,
+production mutation, broad closeout, V3, HealthKit or Photos redesign is performed.
+
+Post-acceptance documentation must record explicit evidence-context precedence,
+disposition-only authority, domain notification workflow taxonomy, reachable
+Founder diagnostics, and whitespace-resilient Apple Fitness recognition, alongside
+the standing Build 33/34 architecture and PC read-only/deployment-context handoffs.
+
+### Final bounded-candidate validation
+
+- Full Native unit suite: 987/987 PASS, zero skipped, including invalidated
+  review-flight separation and protection of the newer coalescing slot.
+- All Native UI journeys: 11/11 PASS in the serial run after restarting only the
+  test Simulator. After the final freshness/journal changes, the four affected UI
+  journeys plus journal persistence recheck passed 5/5, zero skipped.
+- Focused server notification contracts, routing, disposition, worker and
+  canonical persistence: 131/131 PASS. Includes repeated distinct three-image
+  submissions, changing attachment order, normal Photos and fail-closed conflict.
+- Broader evidence/native contracts/core navigation: 66/66 PASS.
+- Additional priority/completion/projection regression: 41/41 PASS.
+- Established Training regression: 151/151 PASS.
+- Eight-domain Operating Plan production acceptance: 16/16 PASS.
+- Debug build: PASS through full unit and UI builds.
+- Final generic unsigned arm64 Release build: PASS; built binary is arm64,
+  embedded Info.plist confirms 1.0 (34) and the existing bundle ID.
+- Local server production build and changed-file lint: PASS.
+- Deterministic project generation twice: identical SHA-256
+  `d71f9d22e855c27fee516fc6838361aaa1cd31bca1b86adad17acb36a22d62be`;
+  no generated project change. Release configuration remains 1.0 (34), bundle
+  `com.physiqueos.native.dev`, team `33GMTRM6G9`.
+- Changed-range credential/private-key signature scan and diff checks: PASS.
+  Presentation boundary reviewed: technical identifiers remain confined to
+  explicit engineering diagnostics/handoffs, not ordinary user surfaces.
+- Preserved forensic script remains unchanged at SHA-256
+  `5dc1bebf4153ad3518c0732b37b4b3e8b23f7f9c542518b570d1dcf68b210275`.
+
+Validation history is retained, not hidden: the first broader UI run passed 7/11
+and failed three journeys with event/snapshot timeouts plus the new diagnostic
+test's incorrect title-case expectation for an uppercase section. A slow rerun
+was interrupted and its logs preserved. The actual section case was asserted,
+device capture was moved before network enrichment, and only the test Simulator
+was restarted without deleting device data/runtimes. The subsequent complete
+serial invocation passed all 11 journeys; final-code affected rechecks also pass.
+No product surface was weakened to satisfy the timeout failures. An established
+Swift warning about an unrelated mutable `bytes` local remains unchanged.
+No private production fixture/image was imported, and no unrelated missing-private-
+fixture suite was invoked or claimed green. iOS 26.5 Simulator results do not
+prove iOS 27 physical presentation or notification delivery.
+
+The candidate remains undeployed; Native remains Build 34. Erroneous reviews and
+the failed Foam Rolling occurrence remain untouched. Build 35 release and the
+separate four-review discard require Founder authorization. Physical notification
+delivery remains UNPROVEN, and running-app-only Review-ready fallback remains the
+accepted V1 limitation.

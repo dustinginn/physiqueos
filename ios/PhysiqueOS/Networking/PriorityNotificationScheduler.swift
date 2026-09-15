@@ -50,13 +50,37 @@ enum PriorityNotificationScheduler {
         center: UNUserNotificationCenter = .current()
     ) async -> UNAuthorizationStatus {
         let settings = await center.notificationSettings()
-        guard canSchedule(authorizationStatus: settings.authorizationStatus) else { return settings.authorizationStatus }
+        guard canSchedule(authorizationStatus: settings.authorizationStatus) else {
+            for item in items {
+                NotificationDiagnostics.record(.init(
+                    capturedAt: now, identifier: identifier(priorityId: item.routePriorityId ?? item.id, occurrenceDate: item.date),
+                    operation: "not scheduled", reason: "Notification authorization does not permit scheduling.",
+                    fireDate: nil, timeZoneIdentifier: calendar.timeZone.identifier
+                ))
+            }
+            return settings.authorizationStatus
+        }
 
         let pending = await center.pendingNotificationRequests()
         let existingScheduledIds = Set(pending.map(\.identifier).filter { $0.hasPrefix(scheduledPrefix) })
         let plan = reconciliationPlan(items: items, existingScheduledIdentifiers: existingScheduledIds, now: now, calendar: calendar)
 
-        if !plan.toRemove.isEmpty { center.removePendingNotificationRequests(withIdentifiers: plan.toRemove) }
+        if !plan.toRemove.isEmpty {
+            center.removePendingNotificationRequests(withIdentifiers: plan.toRemove)
+            for removedId in Set(plan.toRemove) {
+                let item = items.first {
+                    let id = $0.routePriorityId ?? $0.id
+                    return removedId == identifier(priorityId: id, occurrenceDate: $0.date)
+                        || removedId == snoozeIdentifier(priorityId: id, occurrenceDate: $0.date)
+                }
+                let reason = item.map {
+                    NotificationDiagnostics.itemOutcome(item: $0, existingScheduledIds: existingScheduledIds,
+                        planAddedIds: [], now: now, calendar: calendar).reason
+                } ?? "Occurrence absent from the latest canonical Home projection."
+                NotificationDiagnostics.record(.init(capturedAt: now, identifier: removedId, operation: "removal requested",
+                    reason: reason, fireDate: nil, timeZoneIdentifier: calendar.timeZone.identifier))
+            }
+        }
         // `add` replaces any existing request with the same identifier in
         // place (e.g. the canonical schedule's time changed) — no separate
         // "already scheduled, skip" branch is needed for correctness.
@@ -64,8 +88,18 @@ enum PriorityNotificationScheduler {
         for request in plan.toAdd {
             do {
                 try await center.add(request)
+                NotificationDiagnostics.record(.init(capturedAt: now, identifier: request.identifier,
+                    operation: existingScheduledIds.contains(request.identifier) ? "replaced" : "scheduled",
+                    reason: "iOS accepted the canonical occurrence request; presentation is not yet proven.",
+                    fireDate: (request.trigger as? UNCalendarNotificationTrigger).flatMap { calendar.date(from: $0.dateComponents) },
+                    timeZoneIdentifier: calendar.timeZone.identifier,
+                    categoryIdentifier: request.content.categoryIdentifier,
+                    triggerDescription: NotificationDiagnostics.describe(request.trigger, calendar: calendar).0))
             } catch {
                 failures.append((request.identifier, error))
+                NotificationDiagnostics.record(.init(capturedAt: now, identifier: request.identifier, operation: "rejected",
+                    reason: "iOS rejected the request. See the scheduling error in this diagnostic capture.",
+                    fireDate: nil, timeZoneIdentifier: calendar.timeZone.identifier))
             }
         }
         lastSyncFailures = failures
@@ -138,7 +172,18 @@ enum PriorityNotificationScheduler {
         else { return }
         let identifier = snoozeIdentifier(priorityId: priorityId, occurrenceDate: occurrenceDate)
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: snoozeInterval, repeats: false)
-        try? await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
+        let now = Date()
+        do {
+            try await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
+            await NotificationDiagnostics.record(.init(capturedAt: now, identifier: identifier, operation: "snoozed",
+                reason: "iOS accepted the device-only one-hour snooze; canonical state is unchanged.",
+                fireDate: now.addingTimeInterval(snoozeInterval), timeZoneIdentifier: TimeZone.current.identifier,
+                categoryIdentifier: content.categoryIdentifier, triggerDescription: "interval(3600s repeats:false)"))
+        } catch {
+            await NotificationDiagnostics.record(.init(capturedAt: now, identifier: identifier, operation: "snooze rejected",
+                reason: error.localizedDescription, fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier,
+                categoryIdentifier: content.categoryIdentifier, triggerDescription: "interval(3600s repeats:false)"))
+        }
     }
 
     /// Internal (not private) so this pure date computation is directly

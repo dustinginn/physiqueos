@@ -12,6 +12,33 @@ import UserNotifications
 /// Available in the explicit engineering diagnostic surface, including
 /// TestFlight. Never exposed in normal priority presentation.
 enum NotificationDiagnostics {
+    struct SchedulingEvent: Codable {
+        let capturedAt: Date
+        let identifier: String
+        let operation: String
+        let reason: String
+        let fireDate: Date?
+        let timeZoneIdentifier: String
+        var categoryIdentifier: String? = nil
+        var triggerDescription: String? = nil
+    }
+
+    // Bounded device-local diagnostic history, not schedule state. Persisting
+    // observations lets an after-fire capture distinguish known cancellation
+    // from a missing request. Never read by the scheduling decision itself.
+    private static let eventKey = "physiqueos.priority-notification.diagnostic-events.v1"
+    @MainActor static func recentEvents(defaults: UserDefaults = .standard) -> [SchedulingEvent] {
+        guard let data = defaults.data(forKey: eventKey) else { return [] }
+        return (try? JSONDecoder().decode([SchedulingEvent].self, from: data)) ?? []
+    }
+
+    @MainActor static func record(_ event: SchedulingEvent, defaults: UserDefaults = .standard) {
+        var events = recentEvents(defaults: defaults)
+        events.insert(event, at: 0)
+        if let data = try? JSONEncoder().encode(Array(events.prefix(64))) {
+            defaults.set(data, forKey: eventKey)
+        }
+    }
     struct PendingRequestSnapshot {
         let identifier: String
         let title: String
@@ -79,6 +106,7 @@ enum NotificationDiagnostics {
         let timeZoneIdentifier: String
         let itemOutcomes: [ItemOutcome]
         let lastSyncFailures: [(identifier: String, error: Error)]
+        let recentEvents: [SchedulingEvent]
     }
 
     @MainActor
@@ -133,7 +161,8 @@ enum NotificationDiagnostics {
             capturedAt: now,
             timeZoneIdentifier: calendar.timeZone.identifier,
             itemOutcomes: outcomes,
-            lastSyncFailures: PriorityNotificationScheduler.lastSyncFailures
+            lastSyncFailures: PriorityNotificationScheduler.lastSyncFailures,
+            recentEvents: recentEvents()
         )
     }
 

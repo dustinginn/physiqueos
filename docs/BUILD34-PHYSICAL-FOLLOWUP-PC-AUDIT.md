@@ -1,5 +1,12 @@
 # Build 34 physical follow-up — bounded PC READ ONLY audit
 
+Status: COMPLETED by the established PC operator. The Founder-provided sanitized
+findings are recorded in the Build 33 physical-acceptance checkpoint's completed
+PC audit / Build 35 section and the separate four-review cleanup preview. Do not
+repeat this audit from Mac or interpret this historical request as cleanup
+authorization. Preserve the read-only access handoff below for future bounded
+investigations; reverify authority before future use.
+
 Production expected: `2d0d8818db9e6b6f911348c3d0c93df400c0c63c`,
 deployment `a81ed25f-8e84-4ab8-a37e-6580abc0730d`. Reverify before use.
 This is NOT deployment, dismissal, confirmation, replay, or cleanup authorization.

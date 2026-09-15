@@ -19,6 +19,22 @@ final class TrainingAcceptanceUITests: XCTestCase {
         openTrainingLanding()
     }
 
+    func testFounderNotificationDiagnosticsAreReachableWithoutHomeGesture() throws {
+        launchInSandbox()
+        app.buttons["You"].tap()
+        tapText("Founder device connection")
+        app.segmentedControls.buttons["Founder Production"].tap()
+        let diagnostics = app.buttons["founder.notifications.diagnostics"]
+        XCTAssertTrue(diagnostics.waitForExistence(timeout: 5))
+        diagnostics.tap()
+        assertText("Notification Diagnostics")
+        assertText("CAPTURE")
+        assertText("AUTHORIZATION")
+        scrollToText("Only notifications still retained by iOS are visible. An empty list does not prove a request was never scheduled.")
+        scrollToText("RECENT SCHEDULING ACTIVITY")
+        app.buttons["Done"].tap()
+    }
+
     func testLibraryAreaAndExerciseHistoryJourney() throws {
         launchTraining()
         assertText("Latest Training Day")

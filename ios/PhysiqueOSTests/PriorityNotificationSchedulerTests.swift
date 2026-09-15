@@ -2,6 +2,30 @@ import XCTest
 @testable import PhysiqueOS
 
 final class PriorityNotificationSchedulerTests: XCTestCase {
+    func testIncidentRecoveryProjectionCreatesPacific1221RequestWithoutDirectCompletion() throws {
+        // Raw owner/reminder timezone fields are absent/null on the server;
+        // canonical resolution is Pacific. Native receives resolved HH:mm,
+        // not those raw fields, and uses the device's Pacific calendar.
+        var pacific = Calendar(identifier: .gregorian)
+        pacific.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        var item = Self.foamRolling(scheduledTime: "12:21")
+        item.id = "reminder_foam_roll_daily"
+        item.executionItemId = "execution_foam_roll"
+        item.date = "2026-09-15"
+        item.notificationAction = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(#"{"classification":"specialized_workflow_required","workflow":"priority_detail","destination":{"priorityId":"reminder_foam_roll_daily","occurrenceDate":"2026-09-15"},"scheduledTime":"12:21","completionCommand":null,"nextDueAt":null}"#.utf8))
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-15T19:20:00Z"))
+        let plan = PriorityNotificationScheduler.reconciliationPlan(items: [item], existingScheduledIdentifiers: [], now: now, calendar: pacific)
+        XCTAssertEqual(plan.toAdd.count, 1)
+        XCTAssertTrue(plan.toRemove.isEmpty)
+        let request = try XCTUnwrap(plan.toAdd.first)
+        XCTAssertEqual(request.identifier, "priority.scheduled.reminder_foam_roll_daily.2026-09-15")
+        XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.specializedWorkflow)
+        let trigger = try XCTUnwrap(request.trigger as? UNCalendarNotificationTrigger)
+        XCTAssertFalse(trigger.repeats)
+        XCTAssertEqual(trigger.dateComponents.timeZone?.identifier, "America/Los_Angeles")
+        XCTAssertEqual(pacific.date(from: trigger.dateComponents), ISO8601DateFormatter().date(from: "2026-09-15T19:21:00Z"))
+        XCTAssertNil(item.notificationAction?.completionCommand)
+    }
     private var utc: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!

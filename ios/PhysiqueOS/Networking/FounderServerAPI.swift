@@ -391,7 +391,11 @@ actor ProductionNativeAPI {
     }
     private var readCache: [String: CachedRead] = [:]
     private var readCacheOrder: [String] = []
-    private var inFlightReads: [String: Task<Data, Error>] = [:]
+    private struct InFlightRead {
+        let id: UUID
+        let task: Task<Data, Error>
+    }
+    private var inFlightReads: [String: InFlightRead] = [:]
     private var readCacheGeneration = 0
     private let maximumCachedReads = 32
 
@@ -499,17 +503,18 @@ actor ProductionNativeAPI {
             data = cached.data
             cacheHit = true
         } else if let active = inFlightReads[key] {
-            data = try await active.value
+            data = try await active.task.value
         } else {
             let generation = readCacheGeneration
             generationForStore = generation
             let task = Task { try await self.loadReadData(resource: resource, query: query) }
-            inFlightReads[key] = task
+            let flightId = UUID()
+            inFlightReads[key] = InFlightRead(id: flightId, task: task)
             do {
                 data = try await task.value
-                inFlightReads[key] = nil
+                if inFlightReads[key]?.id == flightId { inFlightReads[key] = nil }
             } catch {
-                inFlightReads[key] = nil
+                if inFlightReads[key]?.id == flightId { inFlightReads[key] = nil }
                 throw error
             }
         }
@@ -539,6 +544,12 @@ actor ProductionNativeAPI {
 
     func invalidateReadResources(_ resources: Set<String>) {
         readCacheGeneration += 1
+        // Detach affected pre-mutation GETs without cancelling their callers.
+        // A post-mutation read must not join old data; the flight ID prevents
+        // the old completion from erasing a newer request's coalescing slot.
+        inFlightReads = inFlightReads.filter { key, _ in
+            !resources.contains(where: { key == $0 || key.hasPrefix("\($0)?") })
+        }
         readCache = readCache.filter { key, _ in
             !resources.contains(where: { key == $0 || key.hasPrefix("\($0)?") })
         }
