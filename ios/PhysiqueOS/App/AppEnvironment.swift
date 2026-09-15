@@ -299,6 +299,16 @@ final class AppEnvironment {
         }
     }
 
+    /// Peptide Support preserves its own executionRevision concurrency and
+    /// specialized server-owned reminder/dosing semantics. Sandbox continues
+    /// to use OperatingPlanSandboxStore; production never falls back to it.
+    var peptideSupportAPI: PeptideSupportAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailablePeptideSupportAPI()
+        case .founderProduction: ProductionPeptideSupportAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
+        }
+    }
+
     var morningCheckInAPI: MorningCheckInAPI {
         switch nativeAuthority {
         case .sandbox: NotAvailableMorningCheckInAPI()

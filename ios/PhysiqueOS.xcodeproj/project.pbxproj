@@ -100,6 +100,7 @@
 		0000000000000000000010B6 /* NutritionStrategyAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B5 /* NutritionStrategyAPI.swift */; };
 		0000000000000000000010B8 /* TrainingExerciseCatalogWriteAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B7 /* TrainingExerciseCatalogWriteAPI.swift */; };
 		0000000000000000000010BA /* TrainingStrategyAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B9 /* TrainingStrategyAPI.swift */; };
+		000000000000000000001281 /* PeptideSupportAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001280 /* PeptideSupportAPI.swift */; };
 		0000000000000000000010BC /* PhysiqueOSTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010BB /* PhysiqueOSTheme.swift */; };
 		0000000000000000000010BE /* HomeGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010BD /* HomeGreeting.swift */; };
 		0000000000000000000010C0 /* IconBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010BF /* IconBadge.swift */; };
@@ -405,6 +406,7 @@
 		0000000000000000000010B5 /* NutritionStrategyAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionStrategyAPI.swift"; sourceTree = "<group>"; };
 		0000000000000000000010B7 /* TrainingExerciseCatalogWriteAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingExerciseCatalogWriteAPI.swift"; sourceTree = "<group>"; };
 		0000000000000000000010B9 /* TrainingStrategyAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingStrategyAPI.swift"; sourceTree = "<group>"; };
+		000000000000000000001280 /* PeptideSupportAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideSupportAPI.swift"; sourceTree = "<group>"; };
 		0000000000000000000010BB /* PhysiqueOSTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSTheme.swift"; sourceTree = "<group>"; };
 		0000000000000000000010BD /* HomeGreeting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeGreeting.swift"; sourceTree = "<group>"; };
 		0000000000000000000010BF /* IconBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IconBadge.swift"; sourceTree = "<group>"; };
@@ -752,6 +754,7 @@
 				0000000000000000000010B5 /* NutritionStrategyAPI.swift */,
 				0000000000000000000010B7 /* TrainingExerciseCatalogWriteAPI.swift */,
 				0000000000000000000010B9 /* TrainingStrategyAPI.swift */,
+				000000000000000000001280 /* PeptideSupportAPI.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -1355,6 +1358,7 @@
 				0000000000000000000010B6 /* NutritionStrategyAPI.swift in Sources */,
 				0000000000000000000010B8 /* TrainingExerciseCatalogWriteAPI.swift in Sources */,
 				0000000000000000000010BA /* TrainingStrategyAPI.swift in Sources */,
+				000000000000000000001281 /* PeptideSupportAPI.swift in Sources */,
 				0000000000000000000010BC /* PhysiqueOSTheme.swift in Sources */,
 				0000000000000000000010BE /* HomeGreeting.swift in Sources */,
 				0000000000000000000010C0 /* IconBadge.swift in Sources */,

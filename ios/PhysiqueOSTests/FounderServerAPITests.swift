@@ -684,6 +684,80 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.goalAndPhaseTransitions, in: .founderProduction))
     }
 
+    func testProductionPeptideSupportDecodesTheCanonicalEditorShape() async throws {
+        let peptide = productionEnvelope(resource: "operating-plan-peptide-support", data: #"{"protocolId":"peptide-protocol","executionId":"execution-peptide","executionRevision":3,"name":"Retatrutide","purpose":"Support the active body-composition strategy.","state":"CANONICAL","supportSchedule":{"frequency":"weekly","daysOfWeek":["thursday"],"intervalDays":1,"timing":"specific","specificTime":"21:45","startDate":"2026-05-21","endDate":null},"dosing":{"pattern":"stay","startingDoseAmount":0.5,"startingDoseUnit":"mg","startDate":"2026-05-21","stepAmount":0,"stepInterval":1,"stepUnit":"weeks","targetDoseAmount":0,"holdDuration":1,"holdUnit":"weeks","decreaseAmount":0,"decreaseInterval":1,"decreaseUnit":"weeks","landingDoseAmount":0,"endDate":null},"timeline":[{"id":"execution-peptide:phase:1:2026-05-21","label":"Phase 1","window":"May 21, 2026 – Until changed","doseAmount":0.5,"doseUnit":"mg","status":"active"}],"reminderPreference":"remind","timingContext":"fasted_before_bed","notes":"Current plan"}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, peptide),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionPeptideSupportAPI(
+            api: native,
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults())
+        ).fetchSupport(protocolId: "peptide-protocol")
+        let detail = try XCTUnwrap(fetched)
+
+        XCTAssertEqual(detail.executionRevision, 3)
+        XCTAssertEqual(detail.state, .canonical)
+        XCTAssertEqual(detail.supportSchedule.specificTime, "21:45")
+        XCTAssertEqual(detail.dosing.startingDoseAmount, 0.5)
+        XCTAssertEqual(detail.timeline.first?.status, "active")
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.last)
+        XCTAssertEqual(request.url?.path, "/api/v1/native/read/operating-plan-peptide-support")
+        XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems,
+                       [URLQueryItem(name: "protocolId", value: "peptide-protocol")])
+    }
+
+    func testProductionPeptideEditorRoundTripsDoseScheduleAndExecutionRevision() async throws {
+        let commandResult = #"{"outcome":"committed","receipt":{"status":"committed","result":{"status":"updated","protocolId":"peptide-protocol","executionId":"execution-peptide","executionRevision":4},"operationId":null,"commandId":"01911111-1111-7111-8111-111111111119"}}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, commandResult),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionPeptideSupportAPI(
+            api: native,
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults())
+        )
+        let schedule = OperatingPlanSupportScheduleReadModel(
+            frequency: .weekly, daysOfWeek: [.thursday], intervalDays: 1,
+            timing: .specific, specificTime: "20:30", startDate: "2026-05-21", endDate: nil
+        )
+        let dosing = PeptideDosingStrategyReadModel(
+            pattern: .titrateUp, startingDoseAmount: 0.75, startingDoseUnit: "mg", startDate: "2026-05-21",
+            stepAmount: 0.25, stepInterval: 1, stepUnit: .weeks, targetDoseAmount: 1.5,
+            holdDuration: 1, holdUnit: .weeks, decreaseAmount: 0.25, decreaseInterval: 1,
+            decreaseUnit: .weeks, landingDoseAmount: 0.75, endDate: nil
+        )
+
+        let saved = try await api.save(
+            protocolId: "peptide-protocol", expectedRevision: 3,
+            supportSchedule: schedule, dosing: dosing, timingContext: "fasted_before_bed",
+            reminderPreference: .remind, notes: "Combined edit"
+        )
+
+        XCTAssertEqual(saved.executionRevision, 4)
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.last)
+        XCTAssertEqual(request.url?.path, "/api/v1/native/commands")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "If-Match"), "\"3\"")
+        let envelope = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        XCTAssertEqual(envelope["commandType"] as? String, "operating-plan.peptide-support.save.v1")
+        let payload = try XCTUnwrap(envelope["payload"] as? [String: Any])
+        let draft = try XCTUnwrap(payload["draft"] as? [String: Any])
+        let encodedSchedule = try XCTUnwrap(draft["supportSchedule"] as? [String: Any])
+        let encodedDosing = try XCTUnwrap(draft["dosingStrategy"] as? [String: Any])
+        let startingDose = try XCTUnwrap(encodedDosing["startingDose"] as? [String: Any])
+        XCTAssertEqual(encodedSchedule["specificTime"] as? String, "20:30")
+        XCTAssertEqual(encodedDosing["pattern"] as? String, "titrate_up")
+        XCTAssertEqual(startingDose["amount"] as? Double, 0.75)
+        XCTAssertEqual(draft["reminderPreference"] as? String, "remind")
+    }
+
     /// Build 21 item 11 (Priority Detail timing parity): confirmed against
     /// the server's own `PriorityDetailService.js` — when a reminder's
     /// `schedule.timeOfDay` is an explicit `HH:MM` clock value (not a

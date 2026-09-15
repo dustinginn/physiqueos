@@ -4,7 +4,13 @@ import SwiftUI
 /// the web's own `?edit=1` toggle on the same route, the dosing-pattern
 /// editor (`PeptideDosingStrategyModel.js`). Mirrored here as a local
 /// `isEditing` toggle on one view rather than a second push destination,
-/// matching the web's own same-route pattern. Saves are local-only.
+/// matching the web's own same-route pattern.
+///
+/// Founder Production reads and writes the canonical peptide Support model
+/// through PeptideSupportAPI. A failed production read fails closed; sandbox
+/// data is never substituted. The server remains responsible for dosing
+/// timeline generation/history, reminder synchronization, and stale-revision
+/// rejection.
 struct OperatingPlanPeptideExecutionView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -13,9 +19,17 @@ struct OperatingPlanPeptideExecutionView: View {
     @State private var isEditing = false
     @State private var draft: OperatingPlanPeptideExecutionReadModel?
     @State private var errorMessage: String?
+    @State private var productionDetail: PeptideSupportDetail?
+    @State private var isLoadingProduction = false
+    @State private var loadError: String?
 
     private var store: OperatingPlanSandboxStore { environment.operatingPlanStore }
-    private var execution: OperatingPlanPeptideExecutionReadModel? { store.peptideExecution(protocolId: protocolId) }
+    private var execution: OperatingPlanPeptideExecutionReadModel? {
+        switch environment.nativeAuthority {
+        case .sandbox: store.peptideExecution(protocolId: protocolId)
+        case .founderProduction: productionDetail.map(Self.readModel(from:))
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -38,18 +52,34 @@ struct OperatingPlanPeptideExecutionView: View {
                 }
             }
         }
+        .task(id: "\(protocolId):\(environment.nativeAuthority)") { await loadProductionIfNeeded() }
+    }
+
+    private func loadProductionIfNeeded() async {
+        guard environment.nativeAuthority == .founderProduction else { return }
+        isLoadingProduction = true
+        loadError = nil
+        defer { isLoadingProduction = false }
+        do {
+            productionDetail = try await environment.peptideSupportAPI.fetchSupport(protocolId: protocolId)
+        } catch {
+            productionDetail = nil
+            loadError = "This peptide Support plan couldn't be loaded. Pull to refresh or try again."
+        }
     }
 
     @ViewBuilder
     private var content: some View {
-        if let execution {
+        if environment.nativeAuthority == .founderProduction, isLoadingProduction, productionDetail == nil {
+            ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+        } else if let execution {
             if isEditing, let draft {
                 editor(draft: draft)
             } else {
                 detail(execution)
             }
         } else {
-            OperatingPlanUnavailableView(message: "This peptide protocol is unavailable.")
+            OperatingPlanUnavailableView(message: loadError ?? "This peptide protocol is unavailable.")
         }
     }
 
@@ -277,13 +307,53 @@ struct OperatingPlanPeptideExecutionView: View {
     }
 
     private func save(_ model: OperatingPlanPeptideExecutionReadModel) {
-        switch store.savePeptideExecution(model) {
-        case .success:
-            errorMessage = nil
-            isEditing = false
-        case .failure(let error):
-            errorMessage = error.message
+        switch environment.nativeAuthority {
+        case .sandbox:
+            switch store.savePeptideExecution(model) {
+            case .success:
+                errorMessage = nil
+                isEditing = false
+            case .failure(let error):
+                errorMessage = error.message
+            }
+        case .founderProduction:
+            guard let detail = productionDetail else {
+                errorMessage = "This peptide Support plan's canonical identity is unavailable. Refresh and try again."
+                return
+            }
+            Task { @MainActor in
+                do {
+                    _ = try await environment.peptideSupportAPI.save(
+                        protocolId: detail.protocolId,
+                        expectedRevision: detail.executionRevision,
+                        supportSchedule: model.supportSchedule,
+                        dosing: model.dosing,
+                        timingContext: detail.timingContext,
+                        reminderPreference: model.reminderPreference,
+                        notes: model.notes
+                    )
+                    errorMessage = nil
+                    isEditing = false
+                    await loadProductionIfNeeded()
+                } catch {
+                    errorMessage = "The peptide Support plan was not saved. Refresh before retrying."
+                }
+            }
         }
+    }
+
+    private static func readModel(from detail: PeptideSupportDetail) -> OperatingPlanPeptideExecutionReadModel {
+        OperatingPlanPeptideExecutionReadModel(
+            protocolId: detail.protocolId,
+            name: detail.name,
+            purpose: detail.purpose,
+            state: detail.state,
+            supportSchedule: detail.supportSchedule,
+            dosing: detail.dosing,
+            timeline: detail.timeline,
+            reminderPreference: detail.reminderPreference,
+            notes: detail.notes
+        )
     }
 
     private func formatted(_ value: Double) -> String {
