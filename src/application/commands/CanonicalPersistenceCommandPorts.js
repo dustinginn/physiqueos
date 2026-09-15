@@ -45,6 +45,7 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "completeTrainingLogger", "confirmNutritionEvidence", "confirmPhotoEvidence", "confirmDexaEvidence",
   "upsertNutritionDay", "syncActivityDay", "commitTrainingSession", "upsertActivityDay",
   "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport", "saveNutritionStrategy",
+  "addToMyLibrary", "createCanonicalExercise",
 ]);
 
 const RECURRING_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "executionItems", "reminders"]);
@@ -163,6 +164,8 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     requestEvidenceReviewConfirmation,
     saveRecurringSupport,
     saveNutritionStrategy,
+    addToMyLibrary,
+    createCanonicalExercise,
   });
 
   /// The one canonical write for every "recurring support" execution item
@@ -324,6 +327,84 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       result: { status: "unchanged", protocolId: protocol.id, currentVersionId: protocol.currentVersionId },
       outbox: [],
     };
+  }
+
+  /// My Library membership — the only state that can't be inferred from
+  /// canonical TrainingSession history (a performed exercise needs no
+  /// membership record of its own; `CoreNavigationReadService.getTrainingLogger`
+  /// unions this with the performed-exercise set). Idempotent: adding an
+  /// already-member exercise is a no-op success, not an error, since Native
+  /// calls this on every All Exercises selection without first checking
+  /// membership itself.
+  async function addToMyLibrary(context) {
+    const canonicalExerciseId = String(context.payload.canonicalExerciseId ?? "").trim();
+    if (!canonicalExerciseId) {
+      throw problem(400, "MY_LIBRARY_EXERCISE_ID_REQUIRED", "A canonical exercise id is required.");
+    }
+    const existing = await records.get({
+      ownerUserId: context.ownerUserId, collection: "myLibraryMemberships", recordId: canonicalExerciseId,
+    });
+    if (existing) {
+      return { status: "committed", result: { status: "already_member", canonicalExerciseId }, outbox: [] };
+    }
+    await records.put({
+      ownerUserId: context.ownerUserId, collection: "myLibraryMemberships", recordId: canonicalExerciseId,
+      payload: { id: canonicalExerciseId, canonicalExerciseId, addedAt: now().toISOString() },
+      sourceIdentity: canonicalExerciseId,
+    });
+    return { status: "committed", result: { status: "added", canonicalExerciseId }, outbox: [] };
+  }
+
+  /// Create New Exercise — the standalone creation path reachable from the
+  /// Workout Logger's Add Exercise flow, independent of completing a
+  /// workout (the inline provisional-exercise path inside
+  /// `commitTrainingSession`/`createNativeTrainingPackage` below stays
+  /// exactly as it was; this is a second, deliberate entry point, not a
+  /// replacement). Reuses `createCanonicalExerciseDefinition` and
+  /// `findCanonicalExerciseConflict` — the SAME full-catalog (static +
+  /// runtime-created) duplicate-checking Web's own creation flow already
+  /// relies on — so canonical duplicate/matching policy stays server-owned
+  /// and lives in exactly one place. A genuinely new exercise immediately
+  /// enters My Library, since there is no history yet to imply membership.
+  async function createCanonicalExercise(context) {
+    const existingLibrary = await records.list({
+      ownerUserId: context.ownerUserId, collection: "canonicalExerciseLibrary",
+    });
+    let definition;
+    try {
+      definition = createCanonicalExerciseDefinition({
+        canonicalName: context.payload.canonicalName,
+        primaryMuscleGroupId: context.payload.primaryMuscleGroupId,
+        equipment: context.payload.equipment,
+        movementPattern: context.payload.movementPattern,
+        bodyRegion: context.payload.bodyRegion,
+        laterality: context.payload.laterality,
+        aliases: context.payload.aliases,
+        createdAt: now().toISOString(),
+      });
+    } catch (error) {
+      throw canonicalValidationProblem(error);
+    }
+    const conflict = findCanonicalExerciseConflict(definition, existingLibrary);
+    if (conflict) {
+      throw new ApplicationProblem({
+        status: 409,
+        code: "CANONICAL_EXERCISE_DUPLICATE",
+        title: "An existing canonical exercise already matches this name.",
+        detail: `"${context.payload.canonicalName}" matches the existing canonical exercise "${conflict.name}".`,
+        recovery: { existingCanonicalExerciseId: conflict.id, existingCanonicalExerciseName: conflict.name },
+      });
+    }
+    await records.put({
+      ownerUserId: context.ownerUserId, collection: "canonicalExerciseLibrary", recordId: definition.id,
+      payload: definition, sourceIdentity: definition.id,
+    });
+    await records.put({
+      ownerUserId: context.ownerUserId, collection: "myLibraryMemberships", recordId: definition.id,
+      payload: { id: definition.id, canonicalExerciseId: definition.id, addedAt: now().toISOString() },
+      sourceIdentity: definition.id,
+    });
+    return { status: "committed", result: { status: "created", exercise: definition }, outbox: [] };
   }
 
   async function commitMorningCheckIn(context, { reconcilePreviousDayPriorities }) {

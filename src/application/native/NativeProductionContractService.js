@@ -29,6 +29,8 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.DISPOSE_EVIDENCE_REVIEW,
   Phase3Command.SAVE_RECURRING_SUPPORT,
   Phase3Command.SAVE_NUTRITION_STRATEGY,
+  Phase3Command.ADD_TO_MY_LIBRARY,
+  Phase3Command.CREATE_CANONICAL_EXERCISE,
 ]);
 
 export function createNativeProductionContractService({

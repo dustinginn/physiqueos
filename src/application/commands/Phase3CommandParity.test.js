@@ -36,6 +36,8 @@ const payloads = {
     protocolId: "nutrition-protocol", expectedCurrentVersionId: "nutrition-protocol_v1",
     draft: { proteinBasis: "fixed_grams", proteinRatio: 1, fixedProteinGrams: 200, carbohydrateStrategy: "balanced", fatStrategy: "higher_fat" },
   },
+  [Phase3Command.ADD_TO_MY_LIBRARY]: { canonicalExerciseId: "dumbbell_reverse_lunge" },
+  [Phase3Command.CREATE_CANONICAL_EXERCISE]: { canonicalName: "Chest Supported Row", primaryMuscleGroupId: "back" },
 };
 
 describe("Phase 3 task command parity boundary", () => {
@@ -123,6 +125,8 @@ function commandPort(commandType) {
     [Phase3Command.EDIT_DEXA_REVIEW]: "editDexaReview", [Phase3Command.COMMIT_EVIDENCE_REVIEW]: "requestEvidenceReviewConfirmation",
     [Phase3Command.SAVE_RECURRING_SUPPORT]: "saveRecurringSupport",
     [Phase3Command.SAVE_NUTRITION_STRATEGY]: "saveNutritionStrategy",
+    [Phase3Command.ADD_TO_MY_LIBRARY]: "addToMyLibrary",
+    [Phase3Command.CREATE_CANONICAL_EXERCISE]: "createCanonicalExercise",
   })[commandType];
 }
 

@@ -44,7 +44,7 @@ export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
     "user", "goals", "operatingPlan", "protocols", "protocolVersions",
     "executionItems", "reminders", "nutritionContext", "canonicalEvidenceObjects",
   ]),
-  trainingLogger: Object.freeze(["user", "goals", "canonicalEvidenceObjects"]),
+  trainingLogger: Object.freeze(["user", "goals", "canonicalEvidenceObjects", "myLibraryMemberships"]),
   morningCheckIn: Object.freeze([
     "user", "weightEntries", "reminders", "dailyCheckIns", "dexaScans",
     "progressPhotos", "canonicalEvidenceObjects", "evidenceReviews", "executionItems",
@@ -106,6 +106,16 @@ export function createCoreNavigationReadService({
           .flatMap((record) => (record.payload ?? record).exercises ?? [])
           .map((exercise) => exercise.canonicalExerciseId)
           .filter(Boolean))];
+        /// My Library = performed OR explicitly added — the server computes
+        /// the union so Native only ever needs a single membership id list,
+        /// never Recovery-style local derivation. Explicit additions
+        /// (`myLibraryMemberships`) are the only state that can't be
+        /// inferred from history; a performed exercise needs no membership
+        /// record of its own.
+        const explicitLibraryMemberIds = (runtime.myLibraryMemberships ?? [])
+          .map((membership) => membership.canonicalExerciseId)
+          .filter(Boolean);
+        const myLibraryExerciseIds = [...new Set([...performedExerciseIds, ...explicitLibraryMemberIds])];
         const historySessions = confirmedTrainingRecords
           .map(projectTrainingHistorySession)
           .sort((left, right) => String(right.observed_at).localeCompare(String(left.observed_at)))
@@ -127,6 +137,7 @@ export function createCoreNavigationReadService({
           initialDate,
           initialHistorySessions: historySessions,
           initialPerformedExerciseIds: performedExerciseIds,
+          initialMyLibraryExerciseIds: myLibraryExerciseIds,
           initialProgressionRecommendations,
         });
       });

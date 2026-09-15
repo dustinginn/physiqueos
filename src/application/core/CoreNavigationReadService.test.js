@@ -129,6 +129,7 @@ describe("provider-native core navigation reads", () => {
       initialCanonicalExercises: expect.any(Array),
       initialHistorySessions: expect.any(Array),
       initialPerformedExerciseIds: expect.any(Array),
+      initialMyLibraryExerciseIds: expect.any(Array),
       initialProgressionRecommendations: expect.any(Array),
     });
     expect(morning).toMatchObject({
@@ -172,6 +173,42 @@ describe("provider-native core navigation reads", () => {
     const set = logger.initialHistorySessions
       .find((session) => session.id === "session-pull-up-2").exercises[0].sets[0];
     expect(set).toMatchObject({ weight: 25, weight_unit: "lb", load_type: "external_load" });
+  });
+
+  it("computes My Library as performed history UNION explicit additions, without a membership record for performed-only exercises", async () => {
+    const runtime = {
+      user: { id: "user" },
+      goals: [],
+      canonicalEvidenceObjects: [{
+        canonicalId: "training-performed-lunge",
+        quality: { status: "complete" },
+        payload: {
+          id: "session-performed-lunge",
+          evidence_type: "training",
+          observed_at: "2026-08-20",
+          exercises: [{
+            id: "lunge-occurrence", canonicalExerciseId: "dumbbell_reverse_lunge", name: "Dumbbell Reverse Lunge",
+            sets: [{ reps: 10, weight: 30, weight_unit: "lb", load_type: "external_load" }],
+          }],
+        },
+      }],
+      myLibraryMemberships: [
+        { id: "leg_press_feet_high", canonicalExerciseId: "leg_press_feet_high", addedAt: "2026-08-19T00:00:00.000Z" },
+      ],
+    };
+    const narrow = createCoreNavigationReadService({
+      store: createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime }),
+      now: () => NOW,
+    });
+
+    const logger = await narrow.getTrainingLogger();
+
+    expect(logger.initialPerformedExerciseIds).toContain("dumbbell_reverse_lunge");
+    expect(logger.initialPerformedExerciseIds).not.toContain("leg_press_feet_high");
+    expect(logger.initialMyLibraryExerciseIds).toEqual(expect.arrayContaining([
+      "dumbbell_reverse_lunge", "leg_press_feet_high",
+    ]));
+    expect(new Set(logger.initialMyLibraryExerciseIds).size).toBe(logger.initialMyLibraryExerciseIds.length);
   });
 
   it("hydrates the canonical registry before the first cold-start Workout Logger read", async () => {
@@ -234,7 +271,7 @@ describe("provider-native core navigation reads", () => {
     expect(CORE_NAVIGATION_COLLECTIONS.goals).not.toContain("executionItems");
     expect(CORE_NAVIGATION_COLLECTIONS.operatingPlan).not.toContain("dailyBriefings");
     expect(CORE_NAVIGATION_COLLECTIONS.operatingPlan).not.toContain("analyses");
-    expect(CORE_NAVIGATION_COLLECTIONS.trainingLogger).toEqual(["user", "goals", "canonicalEvidenceObjects"]);
+    expect(CORE_NAVIGATION_COLLECTIONS.trainingLogger).toEqual(["user", "goals", "canonicalEvidenceObjects", "myLibraryMemberships"]);
     expect(CORE_NAVIGATION_COLLECTIONS.profile).not.toContain("canonicalEvidenceObjects");
     expect(CORE_NAVIGATION_COLLECTIONS.tracking).toEqual(["user", "executionItems", "protocols", "reminders"]);
   });

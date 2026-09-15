@@ -40,6 +40,7 @@ const PERSISTED_COLLECTIONS = [
   "trainingPerformanceEvents",
   "trainingPerformanceEventBatches",
   "canonicalExerciseLibrary",
+  "myLibraryMemberships",
   "piEnergyConfidenceWorkItems",
   "piEnergyFinalizationReceipts",
   "piTrainingConfidenceWorkItems",
@@ -172,6 +173,10 @@ export function createFounderRuntimeStore(persisted = readPersistedRuntimeStore(
     canonicalExerciseLibrary: mergeSeedWithPersisted(
       [],
       persisted.canonicalExerciseLibrary
+    ),
+    myLibraryMemberships: mergeSeedWithPersisted(
+      [],
+      persisted.myLibraryMemberships
     ),
     piEnergyConfidenceWorkItems: mergeSeedWithPersisted(
       [],
@@ -589,6 +594,7 @@ function normalizeFounderRuntimeStore(store) {
     trainingPerformanceEventBatches:
       store.trainingPerformanceEventBatches ?? [],
     canonicalExerciseLibrary: store.canonicalExerciseLibrary ?? [],
+    myLibraryMemberships: store.myLibraryMemberships ?? [],
     piEnergyConfidenceWorkItems: store.piEnergyConfidenceWorkItems ?? [],
     piEnergyFinalizationReceipts: store.piEnergyFinalizationReceipts ?? [],
     piTrainingConfidenceWorkItems: store.piTrainingConfidenceWorkItems ?? [],

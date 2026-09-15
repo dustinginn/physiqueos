@@ -297,6 +297,73 @@ describe("Phase 4 canonical command persistence ports", () => {
     expect(records.snapshot().protocolVersions).toHaveLength(1);
   });
 
+  it("adds an existing canonical exercise to My Library idempotently", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const first = await ports.addToMyLibrary(commandContext({ canonicalExerciseId: "dumbbell_reverse_lunge" }, null, "my-library-add"));
+    expect(first.result).toEqual({ status: "added", canonicalExerciseId: "dumbbell_reverse_lunge" });
+    expect(records.snapshot().myLibraryMemberships).toEqual([
+      { id: "dumbbell_reverse_lunge", canonicalExerciseId: "dumbbell_reverse_lunge", addedAt: "2026-08-11T12:00:00.000Z", version: 1 },
+    ]);
+
+    const replay = await ports.addToMyLibrary(commandContext({ canonicalExerciseId: "dumbbell_reverse_lunge" }, null, "my-library-add-again"));
+    expect(replay.result).toEqual({ status: "already_member", canonicalExerciseId: "dumbbell_reverse_lunge" });
+    expect(records.snapshot().myLibraryMemberships).toHaveLength(1);
+  });
+
+  it("creates a new canonical exercise, persists it, and immediately adds it to My Library", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const created = await ports.createCanonicalExercise(commandContext({
+      canonicalName: "Chest Supported Row", primaryMuscleGroupId: "back", equipment: "machine",
+    }, null, "create-exercise"));
+    expect(created.result.status).toBe("created");
+    expect(created.result.exercise).toMatchObject({ id: "chest_supported_row", name: "Chest Supported Row" });
+    const snapshot = records.snapshot();
+    expect(snapshot.canonicalExerciseLibrary).toHaveLength(1);
+    expect(snapshot.canonicalExerciseLibrary[0]).toMatchObject({ id: "chest_supported_row" });
+    expect(snapshot.myLibraryMemberships).toEqual([
+      { id: "chest_supported_row", canonicalExerciseId: "chest_supported_row", addedAt: "2026-08-11T12:00:00.000Z", version: 1 },
+    ]);
+  });
+
+  it("rejects creating a canonical exercise that exactly matches an existing static identity", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.createCanonicalExercise(commandContext({
+      canonicalName: "Leg Press", primaryMuscleGroupId: "quads",
+    }, null, "create-exercise-duplicate-static"))).rejects.toMatchObject({
+      code: "CANONICAL_EXERCISE_DUPLICATE",
+      recovery: { existingCanonicalExerciseId: "leg_press" },
+    });
+    expect(records.snapshot().canonicalExerciseLibrary).toEqual([]);
+    expect(records.snapshot().myLibraryMemberships ?? []).toEqual([]);
+  });
+
+  it("rejects creating a canonical exercise that matches an already runtime-created identity for this owner", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await ports.createCanonicalExercise(commandContext({
+      canonicalName: "Chest Supported Row", primaryMuscleGroupId: "back",
+    }, null, "create-exercise-first"));
+    await expect(ports.createCanonicalExercise(commandContext({
+      canonicalName: "Chest Supported Rows", primaryMuscleGroupId: "back",
+    }, null, "create-exercise-second"))).rejects.toMatchObject({
+      code: "CANONICAL_EXERCISE_DUPLICATE",
+      recovery: { existingCanonicalExerciseId: "chest_supported_row" },
+    });
+    expect(records.snapshot().canonicalExerciseLibrary).toHaveLength(1);
+  });
+
+  it("rejects an invalid canonical exercise creation without mutating state", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.createCanonicalExercise(commandContext({
+      canonicalName: "Chest Supported Row", primaryMuscleGroupId: "not-a-real-muscle-group",
+    }, null, "create-exercise-invalid"))).rejects.toMatchObject({ code: "CANONICAL_EXERCISE_MUSCLE_GROUP_INVALID" });
+    expect(records.snapshot().canonicalExerciseLibrary).toEqual([]);
+  });
+
   it("saves recurring support (Foam Rolling) atomically across the execution item and its reminder, and rejects a stale edit", async () => {
     const records = recurringSupportFixture();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });

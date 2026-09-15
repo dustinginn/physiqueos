@@ -437,6 +437,7 @@ describe("Native production contract boundary", () => {
       "training-session.commit.v1", "nutrition-day.upsert.v1", "activity-day.upsert.v1",
       "dexa-review.measurements.v1", "evidence-review.commit.v1", "evidence-review.dispose.v1",
       "operating-plan.recurring-support.save.v1", "operating-plan.nutrition-strategy.save.v1",
+      "training-catalog.my-library.add.v1", "training-catalog.exercise.create.v1",
     ]);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/HealthKit|activity-day\.sync/);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/storage_key|Spaces|databaseName|provider-authoritative/);

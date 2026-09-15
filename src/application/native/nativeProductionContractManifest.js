@@ -80,6 +80,8 @@ const writes = Object.freeze([
   write(Phase3Command.DISPOSE_EVIDENCE_REVIEW, ["reviewId", "disposition"], "If-Match required; disposition must be discarded"),
   write(Phase3Command.SAVE_RECURRING_SUPPORT, ["protocolId", "protocolCategory", "executionId", "reminderId", "draft"], "If-Match required; expectedVersion compares against the execution item's own executionRevision"),
   write(Phase3Command.SAVE_NUTRITION_STRATEGY, ["protocolId", "expectedCurrentVersionId", "draft"], "If-Match not used; concurrency is enforced via expectedCurrentVersionId matching the protocol's own currentVersionId"),
+  write(Phase3Command.ADD_TO_MY_LIBRARY, ["canonicalExerciseId"], "If-Match not used; idempotent add of an existing canonical exercise to My Library"),
+  write(Phase3Command.CREATE_CANONICAL_EXERCISE, ["canonicalName", "primaryMuscleGroupId"], "If-Match not used; server rejects with 409 CANONICAL_EXERCISE_DUPLICATE when the full catalog already has a matching identity"),
 ]);
 
 export const nativeProductionContractManifest = Object.freeze({

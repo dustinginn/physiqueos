@@ -29,6 +29,8 @@ export const Phase3Command = Object.freeze({
   COMMIT_EVIDENCE_REVIEW: "evidence-review.commit.v1",
   SAVE_RECURRING_SUPPORT: "operating-plan.recurring-support.save.v1",
   SAVE_NUTRITION_STRATEGY: "operating-plan.nutrition-strategy.save.v1",
+  ADD_TO_MY_LIBRARY: "training-catalog.my-library.add.v1",
+  CREATE_CANONICAL_EXERCISE: "training-catalog.exercise.create.v1",
 });
 
 const DEFINITIONS = Object.freeze({
@@ -60,6 +62,10 @@ const DEFINITIONS = Object.freeze({
   ),
   [Phase3Command.SAVE_NUTRITION_STRATEGY]: define(
     "saveNutritionStrategy", ["protocolId", "expectedCurrentVersionId", "draft"], false
+  ),
+  [Phase3Command.ADD_TO_MY_LIBRARY]: define("addToMyLibrary", ["canonicalExerciseId"], false),
+  [Phase3Command.CREATE_CANONICAL_EXERCISE]: define(
+    "createCanonicalExercise", ["canonicalName", "primaryMuscleGroupId"], false
   ),
 });
 
@@ -140,7 +146,7 @@ function validatePayload(commandType, payload) {
   if (payload.draft != null && (!payload.draft || typeof payload.draft !== "object" || Array.isArray(payload.draft))) {
     throw validation("draft", "draft must be an object.");
   }
-  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId", "expectedCurrentVersionId"]) {
+  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId", "expectedCurrentVersionId", "canonicalExerciseId", "canonicalName", "primaryMuscleGroupId"]) {
     if (payload[field] != null && !String(payload[field]).trim()) throw validation(field, `${field} must be a non-empty identity.`);
   }
 }
