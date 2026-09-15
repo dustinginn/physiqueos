@@ -286,6 +286,19 @@ final class AppEnvironment {
         }
     }
 
+    /// `.operatingPlan` is enabled for Training — see
+    /// `NativeProductWriteDomain.enabledUnderFounderProduction`. Sandbox
+    /// never calls this seam (the Training strategy detail/editor reads
+    /// and writes `operatingPlanStore` directly under Sandbox) —
+    /// `NotAvailableTrainingStrategyAPI` exists only so the property is
+    /// total.
+    var trainingStrategyAPI: TrainingStrategyAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableTrainingStrategyAPI()
+        case .founderProduction: ProductionTrainingStrategyAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
+        }
+    }
+
     var morningCheckInAPI: MorningCheckInAPI {
         switch nativeAuthority {
         case .sandbox: NotAvailableMorningCheckInAPI()

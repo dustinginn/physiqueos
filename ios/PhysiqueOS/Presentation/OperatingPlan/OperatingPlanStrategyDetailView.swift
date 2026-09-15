@@ -6,13 +6,14 @@ import SwiftUI
 /// (confirmed dead editor route); the other three show an "Edit Strategy"/
 /// "Edit Coaching Updates" action into `OperatingPlanStrategyEditorView`.
 ///
-/// Under Founder Production, Nutrition alone reads the canonical
-/// `operating-plan-nutrition-strategy` resource (`NutritionStrategyAPI`) —
-/// the same composition Web's own strategy detail page calls — and fails
-/// closed (`OperatingPlanUnavailableView`) rather than falling back to
-/// sandbox/fixture data. Energy/Training/Coaching Updates remain on the
-/// sandbox store under every authority until their own Build 33 pass wires
-/// them, matching the "one domain at a time" sequencing already used for
+/// Under Founder Production, Nutrition and Training read their own canonical
+/// `operating-plan-nutrition-strategy`/`operating-plan-training-strategy`
+/// resources (`NutritionStrategyAPI`/`TrainingStrategyAPI`) — the same
+/// composition Web's own strategy detail page calls — and fail closed
+/// (`OperatingPlanUnavailableView`) rather than falling back to
+/// sandbox/fixture data. Energy/Coaching Updates remain on the sandbox
+/// store under every authority until their own Build 33 pass wires them,
+/// matching the "one domain at a time" sequencing already used for
 /// Recovery/Tracking.
 struct OperatingPlanStrategyDetailView: View {
     @Environment(AppEnvironment.self) private var environment
@@ -22,6 +23,7 @@ struct OperatingPlanStrategyDetailView: View {
     let onNavigate: (AppDestination) -> Void
 
     @State private var productionNutritionDetail: NutritionStrategyDetail?
+    @State private var productionTrainingDetail: TrainingStrategyDetail?
     @State private var isLoadingProduction = false
     @State private var loadError: String?
 
@@ -29,9 +31,18 @@ struct OperatingPlanStrategyDetailView: View {
         strategyType == "nutrition" && environment.nativeAuthority == .founderProduction
     }
 
+    private var isProductionTraining: Bool {
+        strategyType == "training" && environment.nativeAuthority == .founderProduction
+    }
+
+    private var isProductionManaged: Bool { isProductionNutrition || isProductionTraining }
+
     private var detail: OperatingPlanStrategyDetailReadModel? {
         if isProductionNutrition {
             return productionNutritionDetail.map(Self.readModel(from:))
+        }
+        if isProductionTraining {
+            return productionTrainingDetail.map(Self.readModel(from:))
         }
         return environment.operatingPlanStore.strategyDetail(strategyType: strategyType, strategyId: strategyId)
     }
@@ -61,14 +72,19 @@ struct OperatingPlanStrategyDetailView: View {
     }
 
     private func loadProductionIfNeeded() async {
-        guard isProductionNutrition else { return }
+        guard isProductionManaged else { return }
         isLoadingProduction = true
         loadError = nil
         defer { isLoadingProduction = false }
         do {
-            productionNutritionDetail = try await environment.nutritionStrategyAPI.fetchDetail(strategyId: strategyId)
+            if isProductionNutrition {
+                productionNutritionDetail = try await environment.nutritionStrategyAPI.fetchDetail(strategyId: strategyId)
+            } else if isProductionTraining {
+                productionTrainingDetail = try await environment.trainingStrategyAPI.fetchDetail(strategyId: strategyId)
+            }
         } catch {
             productionNutritionDetail = nil
+            productionTrainingDetail = nil
             loadError = "This strategy couldn't be loaded. Pull to refresh or try again."
         }
     }
@@ -88,9 +104,24 @@ struct OperatingPlanStrategyDetailView: View {
         )
     }
 
+    private static func readModel(from detail: TrainingStrategyDetail) -> OperatingPlanStrategyDetailReadModel {
+        OperatingPlanStrategyDetailReadModel(
+            strategyType: .training,
+            strategyId: detail.protocolId,
+            title: detail.title,
+            purpose: detail.purpose,
+            goal: detail.goal ?? "",
+            startedDate: detail.startedDate,
+            status: detail.status,
+            fields: detail.fields,
+            editLabel: "Edit Strategy",
+            energyPhaseHistory: []
+        )
+    }
+
     @ViewBuilder
     private var content: some View {
-        if isProductionNutrition, isLoadingProduction, productionNutritionDetail == nil {
+        if isProductionManaged, isLoadingProduction, productionNutritionDetail == nil, productionTrainingDetail == nil {
             ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
         } else if let detail {
             VStack(alignment: .leading, spacing: 16) {
@@ -129,7 +160,7 @@ struct OperatingPlanStrategyDetailView: View {
                 }
             }
         } else {
-            OperatingPlanUnavailableView(message: isProductionNutrition ? (loadError ?? "This strategy is unavailable.") : "This strategy is unavailable.")
+            OperatingPlanUnavailableView(message: isProductionManaged ? (loadError ?? "This strategy is unavailable.") : "This strategy is unavailable.")
         }
     }
 

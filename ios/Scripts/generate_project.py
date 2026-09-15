@@ -118,6 +118,7 @@ app_files = [
     ("Networking", "RecurringSupportAPI.swift"),
     ("Networking", "NutritionStrategyAPI.swift"),
     ("Networking", "TrainingExerciseCatalogWriteAPI.swift"),
+    ("Networking", "TrainingStrategyAPI.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "HomeGreeting.swift"),
     ("SharedUI", "IconBadge.swift"),
@@ -328,6 +329,7 @@ test_files = [
     ("PhysiqueOSTests", "NutritionStrategyAPITests.swift"),
     ("PhysiqueOSTests", "TrainingCatalogMyLibraryTests.swift"),
     ("PhysiqueOSTests", "TrainingSessionDetailPresentationTests.swift"),
+    ("PhysiqueOSTests", "TrainingStrategyAPITests.swift"),
 ]
 
 ui_test_files = [

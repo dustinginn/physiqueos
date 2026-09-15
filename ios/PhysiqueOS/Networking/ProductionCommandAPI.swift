@@ -23,6 +23,7 @@ enum ProductionCommandType {
     static let saveNutritionStrategy = "operating-plan.nutrition-strategy.save.v1"
     static let addToMyLibrary = "training-catalog.my-library.add.v1"
     static let createCanonicalExercise = "training-catalog.exercise.create.v1"
+    static let saveTrainingStrategy = "operating-plan.training-strategy.save.v1"
 }
 
 struct ProductionCommandRequestMetadata: Encodable {

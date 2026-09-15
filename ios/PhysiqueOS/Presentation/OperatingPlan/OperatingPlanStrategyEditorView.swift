@@ -183,16 +183,25 @@ private struct NutritionStrategyEditor: View {
 }
 
 private struct TrainingStrategyEditor: View {
+    @Environment(AppEnvironment.self) private var environment
     let strategyId: String
     let store: OperatingPlanSandboxStore
     let onSaved: () -> Void
 
     @State private var model: TrainingStrategyEditorReadModel?
     @State private var errorMessage: String?
+    @State private var expectedCurrentVersionId: String?
+    @State private var protocolId: String?
+    @State private var isLoadingProduction = false
+    @State private var loadError: String?
+
+    private var isProduction: Bool { environment.nativeAuthority == .founderProduction }
 
     var body: some View {
         ScrollView {
-            if let model {
+            if isProduction, isLoadingProduction, model == nil {
+                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+            } else if let model {
                 VStack(alignment: .leading, spacing: 18) {
                     OperatingPlanScreenHeader(eyebrow: "Training", title: "Edit Strategy", subtitle: "Weekly structure and progression intent for the current phase.")
 
@@ -246,17 +255,66 @@ private struct TrainingStrategyEditor: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
             } else {
-                OperatingPlanUnavailableView(message: "This strategy is unavailable.")
+                OperatingPlanUnavailableView(message: isProduction ? (loadError ?? "This strategy is unavailable.") : "This strategy is unavailable.")
             }
         }
         .physiqueOSScrollBottomClearance()
-        .onAppear { if model == nil { model = store.trainingEditor(strategyId: strategyId) } }
+        .task(id: "\(strategyId):\(environment.nativeAuthority)") { await loadIfNeeded() }
+    }
+
+    private func loadIfNeeded() async {
+        guard isProduction else {
+            if model == nil { model = store.trainingEditor(strategyId: strategyId) }
+            return
+        }
+        isLoadingProduction = true
+        loadError = nil
+        defer { isLoadingProduction = false }
+        do {
+            guard let detail = try await environment.trainingStrategyAPI.fetchDetail(strategyId: strategyId) else {
+                model = nil
+                return
+            }
+            protocolId = detail.protocolId
+            expectedCurrentVersionId = detail.editor.expectedCurrentVersionId
+            model = TrainingStrategyEditorReadModel(
+                strategyId: detail.protocolId,
+                frequencies: detail.editor.frequencies,
+                priorities: detail.editor.priorities,
+                progression: detail.editor.progression
+            )
+        } catch {
+            model = nil
+            loadError = "This strategy couldn't be loaded. Pull to refresh or try again."
+        }
     }
 
     private func save(_ model: TrainingStrategyEditorReadModel) {
-        switch store.saveTraining(model) {
-        case .success: errorMessage = nil; onSaved()
-        case .failure(let error): errorMessage = error.message
+        guard isProduction else {
+            switch store.saveTraining(model) {
+            case .success: errorMessage = nil; onSaved()
+            case .failure(let error): errorMessage = error.message
+            }
+            return
+        }
+        guard let protocolId, let expectedCurrentVersionId else {
+            errorMessage = "This strategy's canonical identity is unavailable. Refresh and try again."
+            return
+        }
+        Task { @MainActor in
+            do {
+                _ = try await environment.trainingStrategyAPI.save(
+                    protocolId: protocolId,
+                    expectedCurrentVersionId: expectedCurrentVersionId,
+                    frequencies: model.frequencies,
+                    priorities: model.priorities,
+                    progression: model.progression
+                )
+                errorMessage = nil
+                onSaved()
+            } catch {
+                errorMessage = "This strategy was not saved. Refresh before retrying."
+            }
         }
     }
 }
