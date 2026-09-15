@@ -154,10 +154,81 @@ Canonical Native command transactions now share the Web runtime's owner advisory
 
 ## Validation and storage closeout
 
-Final automated gate results and final commit identities are recorded in the completion response. Broad missing-private-fixture and invalid-date failures are compared against the untouched takeover authority, not concealed as green results.
+Validated source authorities:
+
+- Native: `78cb503c33f587c2d0b9371cfae538ba743e434b` (the final documentation-only closeout commit follows this source authority).
+- Server: `6728505dd3452f212bee585c5a550f3cb4c7867b`.
+- Workout scope/HTTP durability correction: `13903902709a6e6ba313fc5236d50f60581916c7`.
+- Full-catalog candidate correction: `b85094ced77f49b5facb18993946037eb7b42c55`; first-match Web payload compatibility: `4390338717d2dc29440e042a1f0e281c0c507ca8`.
+- Native corrective composition: `6509962bf20ec9030f061ae6c088c741ba7a0d31`, then `78cb503c33f587c2d0b9371cfae538ba743e434b`.
+
+| Final automated validation | Result |
+| --- | --- |
+| Full Native unit suite | **977/977 passed**, zero failures/skips, isolated iPhone 17 Pro iOS 26.5 simulator |
+| All established Native UI journeys | **10/10 passed**, zero failures/skips; 752.7-second completed run |
+| Focused Operating Plan Native / Peptide / Supplement / Coaching / notification / catalog / Workout Detail / Evidence / date tests | Passed; included in final full unit suite, with focused reruns during reconciliation |
+| Operating Plan server selection | 26 files, 203 passed / 7 baseline failures (210 tests); failures require absent private Founder fixtures |
+| Explicit all-eight-domain acceptance | **10/10 passed**; navigation/read, composite stale fences, rollback, replay |
+| Focused notification / strength reconciliation / real workout durability / catalog duplicates / contract / canonical persistence / Core reads / OpenAPI | **175/175 passed**, 13 files |
+| Canonical Phase 4 regression suite | **108/108 passed**, 14 files |
+| Training Phase 6 regression suite | **151/151 passed**, 16 files |
+| Foundation / OpenAPI suite | **36/36 passed**, 9 files |
+| Broader Phase 3 suite | 153 passed / 1 baseline failure (missing `private/founder/runtime-store.json`), 21 files |
+| Broader Package 7 suite | 280 passed / 6 baseline failures (4 missing migration-control fixture, 2 legacy Weight invalid-date fixtures), 32 files |
+| Debug build | Passed, isolated simulator output, signing disabled |
+| Generic iOS Release build | Passed, binary architecture verified **arm64**, signing disabled; no archive/upload |
+| Server optimized production-mode build | Passed, Next.js webpack; 48 pages generated into isolated disposable dist directory; no server/worker started |
+| Project generation determinism | Two regenerations unchanged; project SHA-256 `532b5ae6084bc97b0b136be27b84f3bd48bf14eea6506cc901154e0929800a71` |
+| Release configuration | Passed: version **1.0 (32)**, AppIcon, exempt encryption |
+| Changed-file server lint | All 40 changed JS/JSX/MJS files passed |
+| Credential/private-key pattern scan | Full Build 33 changed-diff scan passed; not a claim of a historical repository-wide audit |
+| Whitespace checks | Native and server full Build 33 `git diff --check` passed |
+
+Counts above overlap between selections and must not be summed as distinct tests. Missing-private-fixture and invalid-date failures were reproduced from the unchanged pre-collision server source `de9d71ddb443629848c44d53db204ea428d59804` in a temporary archive copy with isolated test fixtures. No production fixture was imported or mutated to turn a baseline green. Legacy private-fixture-only Web action tests cannot run here; extracted transition and fixture-independent command tests cover the changed behavior. A transient Native unit launch was killed before XCTest bootstrap; the isolated full rerun passed all 977 tests. Harmless LLDB-version warnings occurred during the successful UI run.
+
+The Foundation test's old four-route expectation is **SUPERSEDED**: the accepted pre-collision OpenAPI already defined nine routes and reproduced the same failure. The test now verifies all nine exact implemented routes, including dynamic read/media route files; it does not broaden the API.
+
+Native unit result summary was observed before Xcode's subsequent Debug build automatically pruned older task-owned result bundles. The completed UI result summary reported `Passed`, total 10, failed 0 and skipped 0. A read-only screenshot from the running sandbox Logger journey was inspected; this does not claim full pixel QA or live Founder production acceptance.
 
 Only explicitly task-owned isolated build output and temporary parent-baseline test copies are disposable. No protected archive, worktree, signing material, DeviceSupport, simulator/runtime/device, forensic artifact or another macOS user's data is removed.
+
+Storage was 16 GiB before final heavy validation, above the 10 GiB floor. Build 29/30/31/32 archive Info.plists were checked and their actual build numbers preserved. Task-owned cleanup targets are exactly the isolated Debug/UI DerivedData, isolated Release DerivedData, temporary parent archive copy and isolated `.next-build33-operating-plan-validation` output. The small collision-preservation directory (original workout diff/tests and inspected screenshot) is retained. Final free space and clean Git identities are recorded in the completion response. The pre-existing server forensic script remains untracked with unchanged SHA-256 `5dc1bebf4153ad3518c0732b37b4b3e8b23f7f9c542518b570d1dcf68b210275`.
 
 Remaining Founder physical acceptance: all eight live destinations against the authorized deployed server; production save/readback/stale-editor checks without fixture fallback; canonical schedule→Home→local-notification diagnostics/delivery; Workout logged→immediate Log visibility; one Apple/Logger strength workout and ambiguity/cardio controls; My Library/full-catalog duplicate selection; Workout Detail and Evidence presentation.
 
 No production data mutation, server deployment, TestFlight upload or incremental recurring service cost occurred.
+
+## Final hard gates
+
+These YES results describe the reconciled implementation and isolated production-shaped contracts, **not deployment or physical-device proof**. Existing canonical domain availability is preserved: an unconfigured domain is not populated with fixture content just to display a card.
+
+```text
+ALL 8 OPERATING PLAN DOMAINS PRODUCTION-REACHABLE: YES
+ALL EDITABLE OPERATING PLAN DOMAINS USE CANONICAL WRITES: YES
+ENERGY INTENTIONALLY READ-ONLY: YES
+PEPTIDE EXECUTION/DOSING EDITOR PRODUCTION-COMPLETE: YES
+COACHING UPDATES COMPOSITE SAVE ATOMIC: YES
+OPERATING PLAN SANDBOX DATA REACHABLE IN FOUNDER PRODUCTION: NO
+OPERATING PLAN EDITS PRESERVE DOMAIN-SPECIFIC CONCURRENCY: YES
+OPERATING PLAN SCHEDULES REMAIN SINGLE-SOURCE CANONICAL: YES
+MY LIBRARY / ALL EXERCISES COMPLETE: YES
+CREATE NEW EXERCISE FULL-CATALOG DUPLICATE CHECK: YES
+WORKOUT LOGGED REQUIRES DURABLE TRAININGSESSION: YES
+CONFIRMED WORKOUT IMMEDIATELY VISIBLE TO LOG READ PATH: YES
+APPLE/LOGGER SAME PHYSICAL STRENGTH WORKOUT RECONCILES TO ONE SESSION: YES
+AMBIGUOUS SAME-DAY STRENGTH MATCH FAILS SAFE: YES
+WORKOUT DETAIL DUPLICATE BACKEND SUMMARY REMOVED: YES
+EVIDENCE INTERNAL PROVENANCE HIDDEN FROM USER UI: YES
+NOTIFICATION DIAGNOSTICS READY FOR PHYSICAL ACCEPTANCE: YES
+PHYSICAL NOTIFICATION DELIVERY PROVEN: NO
+ALL 10 NATIVE UI JOURNEYS PASS AGAINST APPROVED BUILD 33 UX: YES
+CONFIDENCE V3 TOUCHED: NO
+NARRATIVE V3 TOUCHED: NO
+HEALTHKIT TOUCHED: NO
+PRODUCTION DATA MUTATED: NO
+SERVER DEPLOYED: NO
+BUILD 33 UPLOADED TO TESTFLIGHT: NO
+INCREMENTAL RECURRING COST: $0
+```
+
+Overall completion remains **PARTIAL pending Founder scope clarification** for requirement 7: the existing local Review-ready fallback runs while the app's task is alive; it does not guarantee delivery if the app is terminated before Review becomes ready. Supporting terminated-app delivery would require a separate background/server delivery design, not a polling or paid-service claim. No terminated-app solution was invented during this reconciliation.
