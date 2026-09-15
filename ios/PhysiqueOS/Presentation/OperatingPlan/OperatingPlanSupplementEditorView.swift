@@ -5,7 +5,8 @@ import SwiftUI
 /// (create-only) start date. Dose, timing, and reminders stay in
 /// Execution (`OperatingPlanProtocolDomainView`'s support summary) exactly
 /// as the web's own copy states — this editor intentionally does not
-/// include them. Saves are local-only.
+/// include them. Founder Production reads and writes the canonical
+/// Supplement strategy/version transition; sandbox remains isolated.
 struct OperatingPlanSupplementEditorView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -14,6 +15,9 @@ struct OperatingPlanSupplementEditorView: View {
 
     @State private var model: SupplementEditorReadModel?
     @State private var errorMessage: String?
+    @State private var productionDetail: SupplementStrategyDetail?
+    @State private var isLoadingProduction = false
+    @State private var loadError: String?
 
     private var store: OperatingPlanSandboxStore { environment.operatingPlanStore }
 
@@ -77,8 +81,10 @@ struct OperatingPlanSupplementEditorView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
+            } else if environment.nativeAuthority == .founderProduction, isLoadingProduction {
+                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
             } else {
-                OperatingPlanUnavailableView(message: "This supplement is unavailable.")
+                OperatingPlanUnavailableView(message: loadError ?? "This supplement is unavailable.")
             }
         }
         .physiqueOSScrollBottomClearance()
@@ -94,16 +100,56 @@ struct OperatingPlanSupplementEditorView: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
-        .onAppear { if model == nil { model = store.supplementEditor(protocolId: protocolId) } }
+        .task(id: "\(protocolId ?? "new"):\(environment.nativeAuthority)") { await load() }
+    }
+
+    @MainActor
+    private func load() async {
+        switch environment.nativeAuthority {
+        case .sandbox:
+            if model == nil { model = store.supplementEditor(protocolId: protocolId) }
+        case .founderProduction:
+            isLoadingProduction = true
+            loadError = nil
+            defer { isLoadingProduction = false }
+            do {
+                productionDetail = try await environment.supplementStrategyAPI.fetchEditor(protocolId: protocolId)
+                model = productionDetail?.readModel
+            } catch {
+                productionDetail = nil
+                model = nil
+                loadError = "This Supplement strategy couldn't be loaded. Try again."
+            }
+        }
     }
 
     private func save(_ model: SupplementEditorReadModel) {
-        switch store.saveSupplement(model) {
-        case .success:
-            errorMessage = nil
-            dismiss()
-        case .failure(let error):
-            errorMessage = error.message
+        switch environment.nativeAuthority {
+        case .sandbox:
+            switch store.saveSupplement(model) {
+            case .success:
+                errorMessage = nil
+                dismiss()
+            case .failure(let error):
+                errorMessage = error.message
+            }
+        case .founderProduction:
+            guard let detail = productionDetail else {
+                errorMessage = "This Supplement strategy's canonical identity is unavailable. Refresh and try again."
+                return
+            }
+            Task { @MainActor in
+                do {
+                    _ = try await environment.supplementStrategyAPI.save(detail, model: model)
+                    errorMessage = nil
+                    await environment.productionNativeAPI.invalidateReadResources([
+                        "operating-plan", "operating-plan-protocol-domain",
+                    ])
+                    dismiss()
+                } catch {
+                    errorMessage = "This Supplement strategy was not saved. Refresh before retrying."
+                }
+            }
         }
     }
 

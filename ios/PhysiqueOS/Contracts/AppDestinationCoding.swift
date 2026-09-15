@@ -10,7 +10,7 @@ extension AppDestination {
     private enum CodingKeys: String, CodingKey { case id, parameters }
     private enum ParameterKeys: String, CodingKey {
         case goalId, phaseId, focus, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
-        case strategyType, strategyId, protocolId, executionId, setId, poseId, category
+        case strategyType, strategyId, protocolId, executionId, setId, poseId, category, supportType, supportId
         case evidenceRecoveryType, occurrenceDateKey, occurrenceDate
     }
 
@@ -118,6 +118,28 @@ extension AppDestination {
             )
         case "native.operating-plan":
             self = .operatingPlan
+        case "plan":
+            self = .operatingPlan
+        case "plan.strategy":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanStrategy(
+                strategyType: try parameters.decode(String.self, forKey: .strategyType),
+                strategyId: try parameters.decode(String.self, forKey: .strategyId)
+            )
+        case "plan.support":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            let supportType = try parameters.decode(String.self, forKey: .supportType)
+            let supportId = try parameters.decode(String.self, forKey: .supportId)
+            switch (supportType, supportId) {
+            case ("protocol", _): self = .operatingPlanProtocolDomain(protocolId: supportId)
+            case ("tracking", _): self = .operatingPlanTracking
+            case ("training", "new"): self = .operatingPlanTrainingStrategyBuilder
+            default:
+                throw DecodingError.dataCorruptedError(
+                    forKey: .id, in: container,
+                    debugDescription: "Unsupported Operating Plan support destination: \(supportType)/\(supportId)"
+                )
+            }
         case "native.operating-plan.strategy":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .operatingPlanStrategy(

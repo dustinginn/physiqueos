@@ -13,9 +13,17 @@ struct OperatingPlanProtocolDomainView: View {
     @Environment(\.dismiss) private var dismiss
     let protocolId: String
     let onNavigate: (AppDestination) -> Void
+    @State private var productionDomain: OperatingPlanProtocolDomainReadModel?
+    @State private var isLoadingProduction = false
+    @State private var loadError: String?
+    @State private var lifecycleError: String?
+    @State private var changingLifecycleProtocolId: String?
 
     private var domain: OperatingPlanProtocolDomainReadModel? {
-        environment.operatingPlanStore.protocolDomain(protocolId: protocolId)
+        switch environment.nativeAuthority {
+        case .sandbox: environment.operatingPlanStore.protocolDomain(protocolId: protocolId)
+        case .founderProduction: productionDomain
+        }
     }
 
     var body: some View {
@@ -39,11 +47,14 @@ struct OperatingPlanProtocolDomainView: View {
                 }
             }
         }
+        .task(id: "\(protocolId):\(environment.nativeAuthority)") { await loadProductionIfNeeded() }
     }
 
     @ViewBuilder
     private var content: some View {
-        if let domain {
+        if environment.nativeAuthority == .founderProduction, isLoadingProduction, productionDomain == nil {
+            ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+        } else if let domain {
             VStack(alignment: .leading, spacing: 16) {
                 OperatingPlanScreenHeader(eyebrow: domain.category.rawValue.capitalized, title: domain.title, subtitle: domain.purpose)
                 VStack(spacing: 8) {
@@ -51,15 +62,38 @@ struct OperatingPlanProtocolDomainView: View {
                         methodCard(method, category: domain.category)
                     }
                 }
+                if let lifecycleError {
+                    OperatingPlanEditorErrorBanner(message: lifecycleError)
+                }
             }
         } else {
-            OperatingPlanUnavailableView(message: "This support strategy is unavailable.")
+            OperatingPlanUnavailableView(message: loadError ?? "This support strategy is unavailable.")
+        }
+    }
+
+    @MainActor
+    private func loadProductionIfNeeded() async {
+        guard environment.nativeAuthority == .founderProduction else { return }
+        isLoadingProduction = true
+        loadError = nil
+        defer { isLoadingProduction = false }
+        do {
+            productionDomain = try await environment.operatingPlanProtocolDomainAPI.fetchDomain(protocolId: protocolId)
+        } catch {
+            productionDomain = nil
+            loadError = "This support strategy couldn't be loaded. Try again."
         }
     }
 
     private func methodCard(_ method: OperatingPlanSupportMethodReadModel, category: ProtocolCategory) -> some View {
-        let status = category == .supplement ? environment.operatingPlanStore.supplementStatus(protocolId: method.protocolId) : "active"
+        let status = category == .supplement && environment.nativeAuthority == .sandbox
+            ? environment.operatingPlanStore.supplementStatus(protocolId: method.protocolId)
+            : method.lifecycleState ?? "active"
         let isPaused = status == "paused"
+        let lifecycleAction = OperatingPlanLifecycleActionReadModel(
+            label: isPaused ? "Restore" : "Pause",
+            isPause: !isPaused
+        )
         return CardContainer(padding: .sm) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 10) {
@@ -94,13 +128,49 @@ struct OperatingPlanProtocolDomainView: View {
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                 .foregroundStyle(PhysiqueOSTheme.accent)
                         }
-                        let action = environment.operatingPlanStore.lifecycleAction(protocolId: method.protocolId)
-                        Button(action.label) {
-                            environment.operatingPlanStore.setSupplementPaused(protocolId: method.protocolId, paused: action.isPause)
+                        Button(lifecycleAction.label) {
+                            changeLifecycle(method, action: lifecycleAction)
                         }
+                        .disabled(changingLifecycleProtocolId == method.protocolId)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(action.isPause ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.chartSuccess)
+                        .foregroundStyle(lifecycleAction.isPause ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.chartSuccess)
                     }
+                }
+            }
+        }
+    }
+
+    private func changeLifecycle(
+        _ method: OperatingPlanSupportMethodReadModel,
+        action: OperatingPlanLifecycleActionReadModel
+    ) {
+        switch environment.nativeAuthority {
+        case .sandbox:
+            environment.operatingPlanStore.setSupplementPaused(
+                protocolId: method.protocolId,
+                paused: action.isPause
+            )
+        case .founderProduction:
+            guard let expectedCurrentVersionId = method.currentVersionId else {
+                lifecycleError = "This Supplement strategy's canonical version is unavailable. Refresh before retrying."
+                return
+            }
+            Task { @MainActor in
+                changingLifecycleProtocolId = method.protocolId
+                lifecycleError = nil
+                defer { changingLifecycleProtocolId = nil }
+                do {
+                    _ = try await environment.supplementStrategyAPI.changeLifecycle(
+                        protocolId: method.protocolId,
+                        operation: action.isPause ? "pause" : "restore",
+                        expectedCurrentVersionId: expectedCurrentVersionId
+                    )
+                    await environment.productionNativeAPI.invalidateReadResources([
+                        "operating-plan", "operating-plan-protocol-domain",
+                    ])
+                    await loadProductionIfNeeded()
+                } catch {
+                    lifecycleError = "This Supplement lifecycle change was not saved. Refresh before retrying."
                 }
             }
         }

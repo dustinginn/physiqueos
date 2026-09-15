@@ -658,9 +658,20 @@ final class FounderServerAPITests: XCTestCase {
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
 
         let plan = try await ProductionOperatingPlanAPI(api: native).fetchOperatingPlan()
-        XCTAssertEqual(plan.sections.first?.title, "Energy Strategy")
-        XCTAssertNil(plan.sections.first?.items.first?.destination)
-        XCTAssertFalse(plan.sections.first?.supplementsAction == true)
+        XCTAssertEqual(plan.sections.map(\.title), [
+            "Energy Strategy", "Nutrition", "Training", "Recovery", "Peptides", "Supplements", "Tracking", "Coaching Updates",
+        ])
+        XCTAssertEqual(plan.sections.compactMap { $0.items.first?.destination }, [
+            .operatingPlanStrategy(strategyType: "energy", strategyId: "energy-canonical"),
+            .operatingPlanStrategy(strategyType: "nutrition", strategyId: "nutrition-canonical"),
+            .operatingPlanStrategy(strategyType: "training", strategyId: "training-canonical"),
+            .operatingPlanProtocolDomain(protocolId: "recovery-canonical"),
+            .operatingPlanProtocolDomain(protocolId: "peptide-canonical"),
+            .operatingPlanProtocolDomain(protocolId: "supplement-canonical"),
+            .operatingPlanTracking,
+            .operatingPlanStrategy(strategyType: "briefings", strategyId: "coaching-canonical"),
+        ])
+        XCTAssertTrue(plan.sections.first(where: { $0.title == "Supplements" })?.supplementsAction == true)
 
         let fetchedPriority = try await ProductionPriorityAPI(api: native).fetchPriority(priorityId: "priority-canonical", occurrenceDate: "2026-09-10")
         let priority = try XCTUnwrap(fetchedPriority)
@@ -709,6 +720,25 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(request.url?.path, "/api/v1/native/read/operating-plan-peptide-support")
         XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems,
                        [URLQueryItem(name: "protocolId", value: "peptide-protocol")])
+    }
+
+    func testProductionOperatingPlanProtocolDomainDecodesTypedSupportDestination() async throws {
+        let domain = productionEnvelope(resource: "operating-plan-protocol-domain", data: #"{"category":"peptide","title":"Peptide Strategy","purpose":"Canonical peptide support.","methods":[{"id":"peptide-protocol","protocolId":"peptide-protocol","name":"Retatrutide","purpose":"Body-composition support.","supportSummary":"Thu · 9:45 PM · 0.5 mg","currentDose":"0.5 mg","currentSchedule":"Thu · 9:45 PM","editDestination":{"id":"native.operating-plan.protocol.peptide","parameters":{"protocolId":"peptide-protocol"}}}]}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, domain),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let result = try await ProductionOperatingPlanProtocolDomainAPI(api: native)
+            .fetchDomain(protocolId: "peptide-protocol")
+        let method = try XCTUnwrap(result?.methods.first)
+        XCTAssertEqual(result?.category, .peptide)
+        XCTAssertEqual(method.editDestination, .operatingPlanPeptideExecution(protocolId: "peptide-protocol"))
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.last)
+        XCTAssertEqual(request.url?.path, "/api/v1/native/read/operating-plan-protocol-domain")
     }
 
     func testProductionPeptideEditorRoundTripsDoseScheduleAndExecutionRevision() async throws {
@@ -3260,7 +3290,7 @@ private let productionCompletedGoalJSON = productionEnvelope(resource: "complete
 /// `Journey.support: String` non-optional.
 private let productionActiveGoalJSON = productionEnvelope(resource: "active-goal", data: #"{"goalId":"goal-canonical","phaseId":"phase-canonical","confidence":{"score":74,"band":"Moderate","summary":"Server confidence","movement":"increased","priorScore":68,"delta":6,"explanation":{"qualitativeLevel":"Moderate","summary":"Training and adherence have both been strong recently.","supportingFactors":["Training has been consistently strong for the last few weeks."],"limitingFactors":["Calories still need more consistency before we can tell whether this intake is right."],"movementFactors":["Confidence increased because training consistency improved."],"clarifyingFactors":["Another body-composition check will confirm the trend."],"uncertaintyStatement":""}},"hero":{"title":"Build Lean Mass","status":"Active Goal","destination":"Add 10 lb lean mass by December 2026"},"journey":[{"name":"Establish Maintenance","number":1,"status":"Completed","dates":"Started Jul 19 · Completed","progress":"Completed","support":null,"percentage":100},{"name":"Foundation","number":2,"status":"Active","dates":"Started Sep 1 · Evidence-led review","progress":"In progress","support":"Server support","percentage":32}],"currentPhase":{"id":"phase-canonical","goalId":"goal-canonical","title":"Foundation","purpose":"Build deliberately","progress":"In progress","review":"Evidence-led","evidence":"Server evidence","readiness":"Server readiness"},"readiness":[],"guardrail":{"title":"Maintain 8–9% body fat","scope":"Every phase","body":"DEXA is authoritative","observation":null},"evidence":{"goalBaseline":null,"phaseStart":null,"support":"Server support"},"turningPoints":[{"title":"Goal journey activated","body":"The journey began.","date":"2026-07-19"}],"strategy":[{"label":"Energy","active":true}]}"#)
 
-private let productionOperatingPlanJSON = productionEnvelope(resource: "operating-plan", data: #"{"sections":[{"iconKey":"energy","tone":"primary","title":"Energy Strategy","subtitle":"Active","items":[{"id":"energy-canonical","title":"Phase Execution","detail":"2300 kcal/day intake","status":"Active","destination":{"id":"operating-plan","parameters":{}}}]}],"sourceVersions":{"energy":"4"},"relationshipContext":{"activeGoalId":"goal-canonical","activePhaseId":"phase-canonical"}}"#)
+private let productionOperatingPlanJSON = productionEnvelope(resource: "operating-plan", data: #"{"sections":[{"iconKey":"energy","tone":"primary","title":"Energy Strategy","subtitle":"Active","items":[{"id":"energy-canonical","title":"Phase Execution","detail":"2300 kcal/day intake","status":"Active","destination":{"id":"plan.strategy","parameters":{"strategyType":"energy","strategyId":"energy-canonical"}}}]},{"iconKey":"nutrition","tone":"primary","title":"Nutrition","subtitle":"Active","items":[{"id":"nutrition-canonical","title":"Nutrition","detail":"Current strategy","status":"Active","destination":{"id":"plan.strategy","parameters":{"strategyType":"nutrition","strategyId":"nutrition-canonical"}}}]},{"iconKey":"training","tone":"effort","title":"Training","subtitle":"Active","items":[{"id":"training-canonical","title":"Training","detail":"Current strategy","status":"Active","destination":{"id":"plan.strategy","parameters":{"strategyType":"training","strategyId":"training-canonical"}}}]},{"iconKey":"recovery","tone":"success","title":"Recovery","subtitle":"Active","items":[{"id":"recovery","title":"Recovery Strategy","detail":"Foam Rolling","status":"Active","destination":{"id":"plan.support","parameters":{"supportType":"protocol","supportId":"recovery-canonical"}}}]},{"iconKey":"peptide","tone":"effort","title":"Peptides","subtitle":"Active","items":[{"id":"peptides","title":"Peptide Strategy","detail":"Retatrutide","status":"Active","destination":{"id":"plan.support","parameters":{"supportType":"protocol","supportId":"peptide-canonical"}}}]},{"iconKey":"supplement","tone":"success","title":"Supplements","subtitle":"Active","supplements":true,"items":[{"id":"supplements","title":"Supplement Strategy","detail":"Electrolytes","status":"Active","destination":{"id":"plan.support","parameters":{"supportType":"protocol","supportId":"supplement-canonical"}}}]},{"iconKey":"tracking","tone":"evidence","title":"Tracking","subtitle":"Active","items":[{"id":"tracking","title":"Tracking","detail":"Morning Weigh-In","status":"Active","destination":{"id":"plan.support","parameters":{"supportType":"tracking","supportId":"current"}}}]},{"iconKey":"coaching","tone":"primary","title":"Coaching Updates","subtitle":"Active","items":[{"id":"coaching-canonical","title":"Coaching Updates","detail":"Midweek and weekly","status":"Active","destination":{"id":"plan.strategy","parameters":{"strategyType":"briefings","strategyId":"coaching-canonical"}}}]}],"sourceVersions":{"energy":"4"},"relationshipContext":{"activeGoalId":"goal-canonical","activePhaseId":"phase-canonical"}}"#)
 
 private let productionPriorityJSON = productionEnvelope(resource: "priority", data: #"{"id":"priority-canonical","title":"Morning weigh-in","subtitle":"Today","status":"Available","sections":[{"title":"Context","items":[{"label":"Goal","detail":"Build Lean Mass"}]}],"completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null},"executionContract":{"priorityId":"priority-canonical","occurrenceDate":"2026-09-10","occurrenceKey":"priority-canonical:2026-09-10","expectedVersion":11,"workflow":"priority_detail","destination":{"id":"priority.detail","parameters":{"priorityId":"priority-canonical"}}},"executionProjection":{"executionId":"execution-canonical"}}"#)
 

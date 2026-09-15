@@ -25,6 +25,9 @@ enum ProductionCommandType {
     static let createCanonicalExercise = "training-catalog.exercise.create.v1"
     static let saveTrainingStrategy = "operating-plan.training-strategy.save.v1"
     static let savePeptideSupport = "operating-plan.peptide-support.save.v1"
+    static let saveSupplementSupport = "operating-plan.supplement-support.save.v1"
+    static let saveSupplementStrategy = "operating-plan.supplement-strategy.save.v1"
+    static let changeSupplementLifecycle = "operating-plan.supplement-lifecycle.change.v1"
 }
 
 struct ProductionCommandRequestMetadata: Encodable {

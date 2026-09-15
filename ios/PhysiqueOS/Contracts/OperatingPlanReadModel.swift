@@ -327,6 +327,8 @@ struct OperatingPlanProtocolDomainReadModel: Codable, Equatable {
 struct OperatingPlanSupportMethodReadModel: Codable, Equatable, Identifiable {
     var id: String
     var protocolId: String
+    var lifecycleState: String? = nil
+    var currentVersionId: String? = nil
     var name: String
     var purpose: String
     var supportSummary: String

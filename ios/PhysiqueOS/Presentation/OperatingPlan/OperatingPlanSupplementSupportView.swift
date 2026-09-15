@@ -8,9 +8,15 @@ struct OperatingPlanSupplementSupportView: View {
     @State private var isEditing = false
     @State private var draft: OperatingPlanSupplementSupportReadModel?
     @State private var errorMessage: String?
+    @State private var productionDetail: SupplementSupportDetail?
+    @State private var isLoadingProduction = false
+    @State private var loadError: String?
 
     private var support: OperatingPlanSupplementSupportReadModel? {
-        environment.operatingPlanStore.supplementSupport(protocolId: protocolId)
+        switch environment.nativeAuthority {
+        case .sandbox: environment.operatingPlanStore.supplementSupport(protocolId: protocolId)
+        case .founderProduction: productionDetail?.readModel
+        }
     }
 
     var body: some View {
@@ -32,13 +38,30 @@ struct OperatingPlanSupplementSupportView: View {
                 }
             }
         }
+        .task(id: "\(protocolId):\(environment.nativeAuthority)") { await loadProductionIfNeeded() }
     }
 
     @ViewBuilder private var content: some View {
-        if let support {
+        if environment.nativeAuthority == .founderProduction, isLoadingProduction, productionDetail == nil {
+            ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+        } else if let support {
             if isEditing, let draft { editor(draft) } else { detail(support) }
         } else {
-            OperatingPlanUnavailableView(message: "This supplement support is unavailable.")
+            OperatingPlanUnavailableView(message: loadError ?? "This supplement support is unavailable.")
+        }
+    }
+
+    @MainActor
+    private func loadProductionIfNeeded() async {
+        guard environment.nativeAuthority == .founderProduction else { return }
+        isLoadingProduction = true
+        loadError = nil
+        defer { isLoadingProduction = false }
+        do {
+            productionDetail = try await environment.supplementSupportAPI.fetchSupport(protocolId: protocolId)
+        } catch {
+            productionDetail = nil
+            loadError = "This Supplement Support plan couldn't be loaded. Try again."
         }
     }
 
@@ -99,9 +122,36 @@ struct OperatingPlanSupplementSupportView: View {
     }
 
     private func save(_ model: OperatingPlanSupplementSupportReadModel) {
-        switch environment.operatingPlanStore.saveSupplementSupport(model) {
-        case .success: errorMessage = nil; isEditing = false
-        case .failure(let error): errorMessage = error.message
+        switch environment.nativeAuthority {
+        case .sandbox:
+            switch environment.operatingPlanStore.saveSupplementSupport(model) {
+            case .success: errorMessage = nil; isEditing = false
+            case .failure(let error): errorMessage = error.message
+            }
+        case .founderProduction:
+            guard let detail = productionDetail else {
+                errorMessage = "This Supplement Support plan's canonical identity is unavailable. Refresh and try again."
+                return
+            }
+            Task { @MainActor in
+                do {
+                    _ = try await environment.supplementSupportAPI.save(
+                        protocolId: detail.protocolId,
+                        supplementVersionId: detail.supplementVersionId,
+                        expectedRevision: detail.executionRevision,
+                        doseAmount: model.doseAmount,
+                        doseUnit: model.doseUnit,
+                        supportSchedule: model.supportSchedule,
+                        reminderPreference: model.reminderPreference,
+                        notes: model.notes
+                    )
+                    errorMessage = nil
+                    isEditing = false
+                    await loadProductionIfNeeded()
+                } catch {
+                    errorMessage = "This Supplement Support plan was not saved. Refresh before retrying."
+                }
+            }
         }
     }
 }

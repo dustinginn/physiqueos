@@ -679,17 +679,30 @@ struct ProductionOperatingPlanAPI: OperatingPlanAPI {
                 items: section.items.map {
                     OperatingPlanSectionItemReadModel(
                         id: $0.id, title: $0.title, detail: $0.detail,
-                        destination: nil, status: $0.status
+                        destination: $0.destination, status: $0.status
                     )
                 },
-                supplementsAction: false
+                supplementsAction: section.supplements == true
             )
         })
     }
 
     private struct Payload: Decodable, @unchecked Sendable { var sections: [Section] }
-    private struct Section: Decodable { var iconKey: String; var tone: OperatingPlanSectionTone; var title: String; var subtitle: String; var items: [Item] }
-    private struct Item: Decodable { var id: String; var title: String; var detail: String; var status: String? }
+    private struct Section: Decodable {
+        var iconKey: String
+        var tone: OperatingPlanSectionTone
+        var title: String
+        var subtitle: String
+        var items: [Item]
+        var supplements: Bool?
+    }
+    private struct Item: Decodable {
+        var id: String
+        var title: String
+        var detail: String
+        var destination: AppDestination?
+        var status: String?
+    }
 }
 
 // MARK: - Log / Logged Today

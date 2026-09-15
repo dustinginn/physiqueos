@@ -309,6 +309,33 @@ final class AppEnvironment {
         }
     }
 
+    var operatingPlanProtocolDomainAPI: OperatingPlanProtocolDomainAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableOperatingPlanProtocolDomainAPI()
+        case .founderProduction: ProductionOperatingPlanProtocolDomainAPI(api: productionNativeAPI)
+        }
+    }
+
+    var supplementSupportAPI: SupplementSupportAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableSupplementSupportAPI()
+        case .founderProduction: ProductionSupplementSupportAPI(
+            api: productionNativeAPI,
+            idempotencyStore: productionIdempotencyKeyStore
+        )
+        }
+    }
+
+    var supplementStrategyAPI: SupplementStrategyAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableSupplementStrategyAPI()
+        case .founderProduction: ProductionSupplementStrategyAPI(
+            api: productionNativeAPI,
+            idempotencyStore: productionIdempotencyKeyStore
+        )
+        }
+    }
+
     var morningCheckInAPI: MorningCheckInAPI {
         switch nativeAuthority {
         case .sandbox: NotAvailableMorningCheckInAPI()
