@@ -47,17 +47,19 @@ struct HomeView: View {
                 )
                 viewModelAuthority = environment.nativeAuthority
             }
-            await viewModel?.load()
-            await prefetchLikelyDestinations()
-            await syncPriorityNotifications()
+            await viewModel?.loadAndReconcileBeforePrefetch(
+                reconcileNotifications: { await syncPriorityNotifications() },
+                prefetch: { await prefetchLikelyDestinations() }
+            )
         }
         .refreshable {
             if environment.nativeAuthority == .founderProduction {
                 await environment.productionNativeAPI.invalidateReadResources(["home"])
             }
-            await viewModel?.load()
-            await prefetchLikelyDestinations()
-            await syncPriorityNotifications()
+            await viewModel?.loadAndReconcileBeforePrefetch(
+                reconcileNotifications: { await syncPriorityNotifications() },
+                prefetch: { await prefetchLikelyDestinations() }
+            )
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }

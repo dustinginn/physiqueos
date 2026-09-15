@@ -3,6 +3,87 @@ import XCTest
 @testable import PhysiqueOS
 
 final class FounderServerAPITests: XCTestCase {
+    @MainActor
+    func testHomeHandsOffNotificationsBeforeSlowSpeculativePrefetch() async throws {
+        let model = HomeViewModel(api: FixtureHomeAPI(), priorityStore: LoggingSandboxStore(), goalsSandboxStore: GoalsSandboxStore(), briefingStore: BriefingSandboxStore(), appliesSandboxProjections: false)
+        var calls: [String] = []
+        var clock = ISO8601DateFormatter().date(from: "2026-09-15T19:20:50Z")!
+        let fire = ISO8601DateFormatter().date(from: "2026-09-15T19:21:00Z")!
+        await model.loadAndReconcileBeforePrefetch(reconcileNotifications: {
+            guard case .loaded = model.state else { return XCTFail("Canonical Home must already be loaded") }
+            calls.append("handoff")
+            XCTAssertLessThan(clock, fire)
+        }, prefetch: {
+            calls.append("prefetch")
+            clock = clock.addingTimeInterval(30)
+        })
+        XCTAssertEqual(calls, ["handoff", "prefetch"])
+        XCTAssertGreaterThan(clock, fire, "The old prefetch-first sequence would miss this deadline")
+    }
+
+    func testProductionHomePreservesAllServerNotificationClassificationsAndFailsClosedOnUnknown() async throws {
+        for classification in ["specialized_workflow_required", "direct_completion_allowed", "open_only", "unsupported_classification"] {
+            var envelope = try JSONSerialization.jsonObject(with: Data(productionHomeJSON(priorityID: "reminder_foam_roll_daily", goalID: "goal-server", confidence: 74).utf8)) as! [String: Any]
+            var payload = envelope["data"] as! [String: Any]
+            var rows = payload["todaysFocus"] as! [[String: Any]]
+            var action: [String: Any] = ["classification": classification, "scheduledTime": "12:21", "completionCommand": NSNull()]
+            if classification == "direct_completion_allowed" {
+                action["completionCommand"] = ["commandType": "priority.complete.v1", "expectedVersion": 33, "payload": ["priorityId": "completion-canonical", "occurrenceDate": "2026-09-10"]]
+            }
+            rows[0]["notificationAction"] = action
+            payload["todaysFocus"] = rows
+            envelope["data"] = payload
+            let json = String(decoding: try JSONSerialization.data(withJSONObject: envelope), as: UTF8.self)
+            let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["home": json])
+            let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+            _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Isolated fixture")
+            do {
+                let home = try await ProductionHomeAPI(api: native).fetchHome()
+                XCTAssertNotEqual(classification, "unsupported_classification", "Unknown classification must not silently become open-only")
+                let decoded = try XCTUnwrap(home.todaysFocus.first?.notificationAction)
+                XCTAssertEqual(decoded.classification.rawValue, classification)
+                XCTAssertEqual(decoded.scheduledTime, "12:21")
+                XCTAssertEqual(decoded.completionCommand != nil, classification == "direct_completion_allowed")
+            } catch {
+                if classification != "unsupported_classification" { throw error }
+            }
+        }
+    }
+
+    func testProductionPriorityDetailPreservesSpecializedNotificationAction() async throws {
+        let json = productionEnvelope(resource: "priority", data: #"{"id":"reminder_foam_roll_daily","title":"Foam Rolling","subtitle":"Daily · 12:21 PM","status":"Active","sections":[],"executionContract":{"priorityId":"reminder_foam_roll_daily","occurrenceDate":"2026-09-15","expectedVersion":33},"notificationAction":{"classification":"specialized_workflow_required","workflow":"priority_detail","scheduledTime":"12:21","completionCommand":null}}"#)
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["priority": json])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Isolated fixture")
+        let value = try await ProductionPriorityAPI(api: native).fetchPriority(priorityId: "reminder_foam_roll_daily", occurrenceDate: "2026-09-15")
+        let item = try XCTUnwrap(value)
+        XCTAssertEqual(item.notificationAction?.classification, .specializedWorkflowRequired)
+        XCTAssertEqual(item.notificationAction?.scheduledTime, "12:21")
+        XCTAssertNil(item.notificationAction?.completionCommand)
+    }
+
+    func testProductionHomeForwardsIncidentNotificationActionThroughRealDecoder() async throws {
+        let homeJSON = productionEnvelope(resource: "home", data: #"{"header":{"greeting":"Hello","name":"Founder"},"hero":{"mode":"active","goalLabel":"Current Goal","headline":"On track","supportLine":"Canonical state"},"nextBestAction":{"title":"Foam Rolling","icon":"activity","destination":{"id":"priority.detail","parameters":{"priorityId":"reminder_foam_roll_daily","occurrenceDate":"2026-09-15"}}},"briefingCards":[],"goals":[],"timezone":null,"todaysFocus":[{"id":"reminder_foam_roll_daily","executionId":"execution_foam_roll","occurrenceDate":"2026-09-15","label":"Foam Rolling","subtitle":"Daily · 12:21 PM","icon":"activity","color":"primary","state":"available","completed":false,"completable":false,"nextDueAt":null,"executionContract":{"priorityId":"reminder_foam_roll_daily","occurrenceDate":"2026-09-15","expectedVersion":33},"notificationAction":{"classification":"specialized_workflow_required","workflow":"priority_detail","scheduledTime":"12:21","completionCommand":null}}]}"#)
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["home": homeJSON])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Isolated fixture")
+        let home = try await ProductionHomeAPI(api: native).fetchHome()
+        let item = try XCTUnwrap(home.todaysFocus.first)
+        XCTAssertEqual(item.notificationAction?.classification, .specializedWorkflowRequired)
+        XCTAssertEqual(item.notificationAction?.scheduledTime, "12:21")
+        XCTAssertNil(item.notificationAction?.completionCommand)
+        var pacific = Calendar(identifier: .gregorian)
+        pacific.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let now = ISO8601DateFormatter().date(from: "2026-09-15T19:20:00Z")!
+        let id = "priority.scheduled.reminder_foam_roll_daily.2026-09-15"
+        let plan = PriorityNotificationScheduler.reconciliationPlan(items: home.todaysFocus, existingScheduledIdentifiers: [id], now: now, calendar: pacific)
+        XCTAssertEqual(plan.toAdd.map(\.identifier), [id])
+        XCTAssertTrue(plan.toRemove.isEmpty)
+        let trigger = try XCTUnwrap(plan.toAdd.first?.trigger as? UNCalendarNotificationTrigger)
+        XCTAssertEqual(pacific.date(from: trigger.dateComponents), ISO8601DateFormatter().date(from: "2026-09-15T19:21:00Z"))
+        XCTAssertEqual(trigger.dateComponents.timeZone?.identifier, "America/Los_Angeles")
+        XCTAssertEqual(plan.toAdd.first?.content.categoryIdentifier, PriorityNotificationCategory.specializedWorkflow)
+    }
     func testInvalidatedReviewReadCannotJoinOldFlightOrEraseNewFlight() async throws {
         actor HeldReviewTransport: FounderHTTPTransport {
             let responses: [String]

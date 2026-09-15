@@ -286,6 +286,7 @@ struct ProductionHomeAPI: HomeAPI {
         var completionContext: PriorityCompletionContext?
         var sessionItems: [PrioritySessionItem]?
         var executionContract: ExecutionContract?
+        var notificationAction: PriorityNotificationAction?
 
         struct ExecutionContract: Decodable {
             var priorityId: String?
@@ -322,7 +323,8 @@ struct ProductionHomeAPI: HomeAPI {
                 completionContext: completionContext,
                 sessionItems: sessionItems,
                 continueActionDestination: nil,
-                attributedScope: nil
+                attributedScope: nil,
+                notificationAction: notificationAction
             )
         }
     }
@@ -853,7 +855,8 @@ struct ProductionPriorityAPI: PriorityAPI {
             actionLabel: value.action?.label, completionContext: value.completionContext,
             continueActionDestination: Self.destination(forActionHref: value.action?.href), attributedScope: nil,
             detailSections: value.sections.map { PrioritySectionReadModel(title: $0.title, items: $0.items.map { PriorityDetailFieldReadModel(label: $0.label, detail: $0.detail) }) },
-            relatedWeight: value.relatedWeight
+            relatedWeight: value.relatedWeight,
+            notificationAction: value.notificationAction
         )
     }
 
@@ -862,6 +865,7 @@ struct ProductionPriorityAPI: PriorityAPI {
         var completionContext: PriorityCompletionContext?
         var executionContract: ExecutionContract?
         var executionProjection: ExecutionProjection?
+        var notificationAction: PriorityNotificationAction?
         var action: ActionPayload?
         var sections: [Section]
         var relatedWeight: PriorityRelatedWeight?

@@ -48,6 +48,17 @@ final class HomeViewModel {
         self.appliesSandboxProjections = appliesSandboxProjections
     }
 
+    /// Hand canonical reminders to iOS before unrelated speculative reads.
+    /// Prefetch may take longer than a nearby reminder's remaining lead time.
+    func loadAndReconcileBeforePrefetch(
+        reconcileNotifications: () async -> Void,
+        prefetch: () async -> Void
+    ) async {
+        await load()
+        await reconcileNotifications()
+        await prefetch()
+    }
+
     func load(now: Date = Date()) async {
         do {
             var home = try await api.fetchHome()

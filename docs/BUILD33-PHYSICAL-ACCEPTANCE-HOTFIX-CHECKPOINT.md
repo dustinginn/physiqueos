@@ -894,3 +894,18 @@ the failed Foam Rolling occurrence remain untouched. Build 35 release and the
 separate four-review discard require Founder authorization. Physical notification
 delivery remains UNPROVEN, and running-app-only Review-ready fallback remains the
 accepted V1 limitation.
+
+### Notification-only exact Build 34 forensic pass — superseding finding
+
+The final exact-shipped-source pass proved a previously missed production adapter
+defect: `ProductionHomeAPI.Priority` and `ProductionPriorityAPI.Payload` neither
+decoded nor forwarded `notificationAction`. Home therefore passed nil actions to
+the scheduler, which skipped adds and could stale-remove existing requests.
+Earlier pure occurrence construction tests bypassed this boundary. Build 35 now
+preserves the canonical action and hands notifications to iOS before unrelated
+Goal/Briefing prefetch. The exact unchanged Build 34 scheduler delivered a real
+isolated Simulator request after two refreshes and backgrounding; this does not
+prove shipped production or physical iPhone delivery. See
+[the notification forensic report](BUILD34-NOTIFICATION-FORENSIC-ACCEPTANCE.md).
+This supersedes the earlier no-additional-scheduling-correction conclusion, not
+the accepted production server schedule evidence or preserved Build 35 fixes.
