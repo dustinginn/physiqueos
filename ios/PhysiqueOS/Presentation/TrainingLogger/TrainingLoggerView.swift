@@ -322,7 +322,7 @@ struct TrainingLoggerView: View {
                 viewModel, step: adding ? "Active workout" : "2 of 3",
                 title: adding ? "Add exercises" : "Choose exercises",
                 subtitle: viewModel.isBrowsingAllExercises
-                    ? "All Exercises · the full canonical catalog"
+                    ? "All Exercises · the full exercise catalog"
                     : "My Library · performed exercises first"
             )
 
@@ -473,6 +473,14 @@ struct TrainingLoggerView: View {
                     Text(newExerciseMessage)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+                ForEach(viewModel.newExerciseCandidates) { candidate in
+                    Button("Use \(candidate.name)") {
+                        Task { await viewModel.selectExistingExercise(candidate) }
+                    }
+                    .disabled(viewModel.isSubmittingNewExercise)
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
                 }
                 Button(viewModel.isSubmittingNewExercise ? "Checking catalog…" : "Create New Exercise") {
                     viewModel.submitNewExercise(name: provisionalName, areaId: provisionalAreaId)
@@ -912,7 +920,7 @@ struct TrainingLoggerView: View {
                 eyebrow: "Final Confirmation",
                 title: "Finish this workout?",
                 subtitle: viewModel.authority == .founderProduction
-                    ? "Confirm the canonical exercises and performed sets."
+                    ? "Confirm your exercises and completed sets."
                     : "Confirm the workout and any supporting screenshots together."
             )
             CardContainer {

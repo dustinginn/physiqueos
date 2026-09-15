@@ -83,7 +83,12 @@ final class TrainingAcceptanceUITests: XCTestCase {
 
         tapText("Traditional Strength Training")
         assertText("WORKOUT DETAIL")
-        assertText("Session Details")
+        // Structured workouts show the unified exercise/set breakdown,
+        // not a second generated serialization under Session Details.
+        assertText("Exercises")
+        assertText("Bench Press")
+        XCTAssertFalse(app.staticTexts["Session Details"].exists, "The generated workout summary duplicated the structured breakdown.")
+        XCTAssertEqual(app.staticTexts.matching(identifier: "Bench Press").count, 1, "The exercise was rendered more than once.")
         attachScreenshot("11-workout-detail")
 
         scrollToText("Add / Correct Workout Details")

@@ -3,6 +3,17 @@ import XCTest
 @testable import PhysiqueOS
 
 final class FounderServerAPITests: XCTestCase {
+    func testProductionExerciseConflictDecodesAllCandidatesWithoutAddingMembership() async throws {
+        let conflict = #"{"status":409,"code":"CANONICAL_EXERCISE_DUPLICATE","title":"Choose an exercise","detail":"Several existing exercises match.","fieldErrors":[],"recovery":{"candidates":[{"id":"row_one","name":"Row One"},{"id":"row_two","name":"Row Two"}]}}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(409, conflict)])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Catalog test")
+        let api = ProductionTrainingExerciseCatalogWriteAPI(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let result = try await api.createExercise(canonicalName: "Row", primaryMuscleGroupId: "back", equipment: nil, aliases: [])
+        XCTAssertEqual(result, .candidates([CanonicalExerciseMatch(id: "row_one", name: "Row One"), CanonicalExerciseMatch(id: "row_two", name: "Row Two")]))
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 2, "A duplicate response must not silently add membership or choose a candidate.")
+    }
     func testProductionReadCacheReusesCanonicalEnvelopeAndInvalidatesNarrowly() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),
@@ -2357,10 +2368,11 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.unfinishedPriorities.first?.occurrenceKey, "reminder-1:2026-09-10")
     }
 
-    func testProductionTrainingCommitReturnsAtDurableProcessingAcceptanceWithoutPolling() async throws {
+    func testProductionTrainingCommitRejectsStagedReceiptThenReturnsAtExplicitDurabilityWithoutPolling() async throws {
         let result = #"{"status":"confirmation_requested","reviewId":"review-1","reviewRevision":1,"sessionId":"native-session-1","intendedDate":"2026-09-11","exerciseIds":["barbell_bench_press","pull_up"]}"#
         let response = #"{"outcome":"committed","receipt":{"status":"committed","result":"# + result + #", "operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"},"confirmation":{"state":"processing","accepted":true,"reviewId":"review-1","continuationKey":"continuation","completedStep":null,"publication":null}}"#
-        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, response)])
+        let durableResponse = response.replacingOccurrences(of: "\"completedStep\":null", with: "\"completedStep\":\"canonical_commit\",\"trainingSessionDurable\":true")
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, response), .json(200, durableResponse)])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
         let writeAPI = ProductionTrainingWriteAPI(
@@ -2391,11 +2403,18 @@ final class FounderServerAPITests: XCTestCase {
             supportingWorkoutFailureAssetIds: nil
         )
 
+        do {
+            _ = try await writeAPI.commit(draft)
+            XCTFail("A staged receipt without canonical durability must not claim Workout logged.")
+        } catch TrainingWriteError.confirmationTimedOut {
+            // The saved draft and idempotency key are retained for retry.
+        }
         let committed = try await writeAPI.commit(draft)
 
         XCTAssertEqual(committed.exerciseIds, ["barbell_bench_press", "pull_up"])
         let requests = await transport.requests
-        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests.count, 3)
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
         XCTAssertEqual(json["commandType"] as? String, "training-session.commit.v1")
         let payload = try XCTUnwrap(json["payload"] as? [String: Any])

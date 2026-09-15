@@ -150,7 +150,7 @@ final class SharedUITests: XCTestCase {
     // MARK: - Evidence date parsing (used by the date field's upper bound)
 
     func testEvidenceDateParsingRoundTripsWithoutTimezoneDrift() {
-        let date = try! XCTUnwrap(EvidenceDateParsing.date(fromLocalDateString: "2026-08-28"))
+        let date = try! XCTUnwrap(EvidenceDateParsing.date(fromLocalDateString: "2026-08-28", timeZone: TimeZone(identifier: "UTC")!))
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
         let components = calendar.dateComponents([.year, .month, .day], from: date)
@@ -171,16 +171,34 @@ final class SharedUITests: XCTestCase {
     /// device (every US time zone, exercised here via a fixed UTC-8
     /// calendar rather than the device's actual zone, so this doesn't
     /// depend on where the test happens to run) rolled the visible
-    /// "Evidence date" back to the PREVIOUS calendar day — noon-UTC
-    /// anchoring (this file's actual convention) keeps it correct.
+    /// "Evidence date" back to the PREVIOUS calendar day. Local-noon
+    /// anchoring preserves the selected calendar date.
     func testEvidenceDateParsingSurvivesReinterpretationInATimezoneBehindUTC() {
-        let date = try! XCTUnwrap(EvidenceDateParsing.date(fromLocalDateString: "2026-08-28"))
+        let date = try! XCTUnwrap(EvidenceDateParsing.date(fromLocalDateString: "2026-08-28", timeZone: TimeZone(identifier: "America/Los_Angeles")!))
         var behindUTC = Calendar(identifier: .gregorian)
         behindUTC.timeZone = TimeZone(identifier: "America/Los_Angeles")!
         let components = behindUTC.dateComponents([.year, .month, .day], from: date)
         XCTAssertEqual(components.year, 2026)
         XCTAssertEqual(components.month, 8)
         XCTAssertEqual(components.day, 28)
+    }
+
+    func testEvidenceDateParsingPreservesExtremeOffsetsAndDSTDates() throws {
+        for offset in [-12, 14] {
+            let zone = try XCTUnwrap(TimeZone(secondsFromGMT: offset * 3600))
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = zone
+            for value in ["2026-03-08", "2026-11-01"] {
+                let date = try XCTUnwrap(EvidenceDateParsing.date(fromLocalDateString: value, timeZone: zone))
+                let formatter = DateFormatter()
+                formatter.calendar = calendar
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = zone
+                formatter.dateFormat = "yyyy-MM-dd"
+                XCTAssertEqual(formatter.string(from: date), value)
+            }
+        }
+        XCTAssertNil(EvidenceDateParsing.date(fromLocalDateString: "2026-02-30"))
     }
 
     func testNutritionCaloriesUsesADistinctGreenIdentityFromCarbohydrates() {

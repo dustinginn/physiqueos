@@ -575,10 +575,10 @@ struct EvidenceReviewDetailView: View {
                         actionState = .dismissed
                     } else {
                         if let refreshed { state = .loaded(refreshed) }
-                        actionState = .refreshRequired("Dismissal may have been accepted. Refresh its canonical status before attempting another action.")
+                        actionState = .refreshRequired("Dismissal may have been accepted. Refresh this review before trying again.")
                     }
                 } catch {
-                    actionState = .refreshRequired("Dismissal may have been accepted. Refresh its canonical status before attempting another action.")
+                    actionState = .refreshRequired("Dismissal may have been accepted. Refresh this review before trying again.")
                 }
             } else {
                 actionState = .failed(Self.errorMessage(for: error))
@@ -638,11 +638,21 @@ struct EvidenceReviewDetailView: View {
         case "partially_committed": "Partially Confirmed"
         case "committing": "Confirming"
         case "confirmed": "Confirmed"
-        default: status.replacingOccurrences(of: "_", with: " ").capitalized
+        default: "Review unavailable"
         }
     }
 
     private static func typeLabel(_ type: String) -> String {
-        type.replacingOccurrences(of: "_", with: " ").capitalized
+        switch type {
+        case "training": "Workout"
+        case "nutrition": "Nutrition"
+        case "activity": "Activity"
+        case "weight": "Weight"
+        case "dexa", "dexa_scan", "body_composition": "DEXA"
+        case "photo_session", "progress_photo": "Progress Photos"
+        case "recovery": "Recovery"
+        case "labs", "lab_result": "Labs"
+        default: "Evidence"
+        }
     }
 }

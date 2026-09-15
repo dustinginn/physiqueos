@@ -174,6 +174,9 @@ struct ProductionEvidenceReviewConfirmation: Decodable, Sendable {
     var continuationKey: String?
     var completedStep: String?
     var publication: String?
+    /// A staged receipt alone is not workout durability. The server sets
+    /// this only after Training's canonical commit has completed.
+    var trainingSessionDurable: Bool?
 }
 
 /// `AsyncEvidenceIntakeService`'s `responseFor(...)` shape

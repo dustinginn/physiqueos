@@ -77,7 +77,7 @@ struct TrainingSessionDetailView: View {
                 }
                 if session.showsGeneratedSummaryInsteadOfStructuredExercises {
                     summaryCard(for: session)
-                } else {
+                } else if !session.exercises.isEmpty {
                     exercisesCard(for: session)
                 }
                 if let media = session.supportingMedia, !media.isEmpty {
@@ -96,7 +96,7 @@ struct TrainingSessionDetailView: View {
     private func telemetryCard(_ telemetry: TrainingSessionTelemetryReadModel) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Workout Telemetry")
+                SectionHeading("Workout Summary")
                 if let timeRange = Self.formatTimeRange(start: telemetry.startTime, end: telemetry.endTime) {
                     telemetryRow(timeRange)
                 }
@@ -138,7 +138,7 @@ struct TrainingSessionDetailView: View {
             Text(session.label)
                 .physiqueOSFont(PhysiqueOSTypography.screenTitle)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text("\(session.value) · \(Self.formatDate(session.date))")
+            Text(session.showsWorkoutValueInHeader ? "\(session.value) · \(Self.formatDate(session.date))" : Self.formatDate(session.date))
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
         }
@@ -264,15 +264,14 @@ struct TrainingSessionDetailView: View {
         }
     }
 
-    private static func formatDate(_ value: String) -> String {
-        let isoWithTime = ISO8601DateFormatter()
-        if let date = isoWithTime.date(from: value) {
+    static func formatDate(_ value: String) -> String {
+        if let date = parseISODate(value) ?? EvidenceDateParsing.date(fromLocalDateString: value) {
             let display = DateFormatter()
             display.dateStyle = .medium
             display.timeStyle = .none
             return display.string(from: date)
         }
-        return String(value.prefix(10))
+        return "Date unavailable"
     }
 
     /// Formats a workout's telemetry time range in the device's own

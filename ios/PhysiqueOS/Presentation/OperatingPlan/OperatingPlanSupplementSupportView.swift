@@ -130,7 +130,7 @@ struct OperatingPlanSupplementSupportView: View {
             }
         case .founderProduction:
             guard let detail = productionDetail else {
-                errorMessage = "This Supplement Support plan's canonical identity is unavailable. Refresh and try again."
+                errorMessage = "This supplement plan is unavailable. Refresh and try again."
                 return
             }
             Task { @MainActor in

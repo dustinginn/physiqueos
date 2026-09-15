@@ -191,7 +191,7 @@ struct OperatingPlanTrackingSupportView: View {
             }
         case .founderProduction:
             guard let detail = productionDetail, let reminderId = detail.reminderId else {
-                errorMessage = "This support method's canonical identity is unavailable. Refresh and try again."
+                errorMessage = "This support plan is unavailable. Refresh and try again."
                 return
             }
             Task { @MainActor in

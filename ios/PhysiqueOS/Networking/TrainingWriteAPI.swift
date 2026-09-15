@@ -50,8 +50,8 @@ enum TrainingWriteError: Error, Equatable, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingCanonicalExercise(let name): "\(name) does not have a canonical Production exercise identity."
-        case .unsupportedDurationExercise(let name): "\(name) cannot be submitted because the current Production command does not accept duration sets."
+        case .missingCanonicalExercise(let name): "Refresh the exercise catalog before logging \(name)."
+        case .unsupportedDurationExercise(let name): "Duration sets for \(name) can't be logged here yet."
         case .noCompletedSets: "Complete at least one valid set before submitting."
         case .attachmentUnavailable(let name): "\(name) could not be uploaded. The workout draft is still saved."
         case .attachmentReviewUnavailable: "The supporting workout screenshots could not be prepared. The workout draft is still saved."
@@ -154,13 +154,13 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             idempotencyKey: key,
             payload: payload
         )
-        guard outcome.outcome != .pending, let result = outcome.receipt.result else {
+        guard outcome.outcome != .pending, let result = outcome.receipt.result,
+              outcome.confirmation?.state == "confirmed" || outcome.confirmation?.trainingSessionDurable == true else {
             throw TrainingWriteError.confirmationTimedOut
         }
-        // The command receipt is the durable authoritative boundary. The
-        // shared outbox owns canonical commit and every later continuation;
-        // waiting for the review to become fully confirmed here previously
-        // turned a successful workout into a false timeout/network error.
+        // Explicit Training durability acknowledgement is the boundary,
+        // not the staged command receipt. Downstream work stays asynchronous;
+        // a fully completed evidence pipeline is not required.
         // Any supporting-evidence binding is intentionally left in place here
         // (not cleared) — reconciling it onto this now-durable session is a
         // separate, later step; see `reconcileSupportingEvidenceAfterCommit`.

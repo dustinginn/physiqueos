@@ -7,6 +7,12 @@ import XCTest
 /// (structured), and the generated one-line `detail` summary never
 /// appears alongside a structured exercise breakdown for the same session.
 final class TrainingSessionDetailPresentationTests: XCTestCase {
+    @MainActor
+    func testWorkoutDateFormatsFractionalInstantsAndCalendarDatesWithoutRawSerialization() {
+        XCTAssertNotEqual(TrainingSessionDetailView.formatDate("2026-09-14T19:00:00.123Z"), "2026-09-14")
+        XCTAssertNotEqual(TrainingSessionDetailView.formatDate("2026-09-14"), "2026-09-14")
+        XCTAssertEqual(TrainingSessionDetailView.formatDate("not-a-date"), "Date unavailable")
+    }
     private func session(
         exercises: [TrainingExerciseOccurrence] = [],
         telemetry: TrainingSessionTelemetryReadModel? = nil
@@ -36,21 +42,28 @@ final class TrainingSessionDetailPresentationTests: XCTestCase {
 
         XCTAssertFalse(reconciled.showsGeneratedSummaryInsteadOfStructuredExercises, "A session with structured exercises must render the structured list, not the generated summary — that's the duplication this fixes.")
         XCTAssertNotNil(reconciled.telemetry, "The reconciled session must still carry its Apple telemetry.")
+        XCTAssertFalse(reconciled.showsWorkoutValueInHeader, "Calories/duration belong in the workout summary once, not also in the header.")
         XCTAssertEqual(reconciled.exercises.count, 1, "Structured data survives reconciliation.")
     }
 
-    func testAnAppleOnlyTelemetrySessionWithNoExercisesFallsBackToTheGeneratedSummary() {
+    func testAnAppleOnlyTelemetrySessionDoesNotRepeatItsTypedTelemetryInAGeneratedSummary() {
         let appleOnly = session(
             exercises: [],
             telemetry: TrainingSessionTelemetryReadModel(startTime: "2026-09-14T07:45:00.000Z", endTime: "2026-09-14T08:44:00.000Z", durationSeconds: 3540, activeCalories: 438, averageHeartRate: 121)
         )
 
-        XCTAssertTrue(appleOnly.showsGeneratedSummaryInsteadOfStructuredExercises, "With no structured exercises to show instead, the generated summary is the only content available.")
+        XCTAssertFalse(appleOnly.showsGeneratedSummaryInsteadOfStructuredExercises, "Typed telemetry is already presented once in the workout summary.")
+        XCTAssertFalse(appleOnly.showsWorkoutValueInHeader)
+    }
+
+    func testLegacySessionWithNeitherTelemetryNorExercisesRetainsItsSummary() {
+        XCTAssertTrue(session(exercises: [], telemetry: nil).showsGeneratedSummaryInsteadOfStructuredExercises)
     }
 
     func testASessionWithNoTelemetryRendersNoTelemetryCard() {
         let structuredOnly = session(exercises: [exercise("bench_press")], telemetry: nil)
         XCTAssertNil(structuredOnly.telemetry)
+        XCTAssertTrue(structuredOnly.showsWorkoutValueInHeader)
         XCTAssertFalse(structuredOnly.showsGeneratedSummaryInsteadOfStructuredExercises)
     }
 

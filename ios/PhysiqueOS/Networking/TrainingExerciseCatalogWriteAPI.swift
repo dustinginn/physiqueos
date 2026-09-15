@@ -25,6 +25,12 @@ protocol TrainingExerciseCatalogWriteAPI: Sendable {
 enum CreateCanonicalExerciseOutcome: Sendable, Equatable {
     case created(canonicalExerciseId: String)
     case duplicate(existingCanonicalExerciseId: String, existingCanonicalExerciseName: String)
+    case candidates([CanonicalExerciseMatch])
+}
+
+struct CanonicalExerciseMatch: Sendable, Equatable, Identifiable {
+    var id: String
+    var name: String
 }
 
 struct ProductionTrainingExerciseCatalogWriteAPI: TrainingExerciseCatalogWriteAPI {
@@ -74,6 +80,15 @@ struct ProductionTrainingExerciseCatalogWriteAPI: TrainingExerciseCatalogWriteAP
             guard let result = outcome.receipt.result else { throw ProductionNativeError.invalidResponse }
             return .created(canonicalExerciseId: result.exercise.id)
         } catch ProductionNativeError.conflict(let problem) where problem.code == "CANONICAL_EXERCISE_DUPLICATE" {
+            if case .object(let fields) = problem.recovery,
+               case .array(let values) = fields["candidates"] {
+                let candidates = values.compactMap { value -> CanonicalExerciseMatch? in
+                    guard let id = value.stringField("id"), let name = value.stringField("name") else { return nil }
+                    return CanonicalExerciseMatch(id: id, name: name)
+                }
+                guard !candidates.isEmpty, candidates.count == values.count else { throw ProductionNativeError.invalidResponse }
+                return .candidates(candidates)
+            }
             guard
                 let existingId = problem.recovery?.stringField("existingCanonicalExerciseId"),
                 let existingName = problem.recovery?.stringField("existingCanonicalExerciseName")

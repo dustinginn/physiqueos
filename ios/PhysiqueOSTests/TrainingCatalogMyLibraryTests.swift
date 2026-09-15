@@ -49,9 +49,31 @@ final class TrainingCatalogMyLibraryTests: XCTestCase {
         viewModel.toggleExerciseSelection(target)
 
         XCTAssertTrue(viewModel.isSelected(target))
-        XCTAssertEqual(viewModel.configuration?.exercises.first?.inMyLibrary, true, "The current session's catalog should reflect the addition immediately, without waiting on the network call.")
+        XCTAssertEqual(viewModel.configuration?.exercises.first?.inMyLibrary, false, "Membership must not be claimed before the canonical write succeeds.")
         try await Task.sleep(nanoseconds: 20_000_000)
         XCTAssertEqual(catalogWriteAPI.addedCanonicalExerciseIds, ["dumbbell_reverse_lunge"])
+        XCTAssertEqual(viewModel.configuration?.exercises.first?.inMyLibrary, true)
+    }
+
+    @MainActor
+    func testFailedMembershipWriteDoesNotClaimDurableMembershipAndCanBeRetried() async throws {
+        let catalogWriteAPI = RecordingCatalogWriteAPI()
+        catalogWriteAPI.failMembership = true
+        let api = StubTrainingLoggerAPI(exercises: [exercise("leg_press", inMyLibrary: false)])
+        let viewModel = TrainingLoggerViewModel(api: api, catalogWriteAPI: catalogWriteAPI, draftStore: MemoryTrainingLoggerDraftStore(), authority: .founderProduction)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        let target = try XCTUnwrap(viewModel.configuration?.exercises.first)
+        viewModel.toggleExerciseSelection(target)
+        try await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertTrue(viewModel.isSelected(target))
+        XCTAssertEqual(viewModel.configuration?.exercises.first?.inMyLibrary, false)
+        XCTAssertNotNil(viewModel.validationMessage)
+        catalogWriteAPI.failMembership = false
+        viewModel.toggleExerciseSelection(target)
+        viewModel.toggleExerciseSelection(target)
+        try await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertEqual(viewModel.configuration?.exercises.first?.inMyLibrary, true)
     }
 
     @MainActor
@@ -96,7 +118,7 @@ final class TrainingCatalogMyLibraryTests: XCTestCase {
     }
 
     @MainActor
-    func testCreatingADuplicateExerciseAddsTheExistingMatchInsteadOfErroring() async throws {
+    func testCreatingADuplicateExerciseRequiresSelectionAndPersistsTheExistingMatch() async throws {
         let api = StubTrainingLoggerAPI(exercises: [])
         api.nextFetch = [exercise("leg_press", areaId: "quads", inMyLibrary: true)]
         let catalogWriteAPI = RecordingCatalogWriteAPI(
@@ -112,8 +134,31 @@ final class TrainingCatalogMyLibraryTests: XCTestCase {
         viewModel.submitNewExercise(name: "Leg Presses", areaId: "quads")
         try await Task.sleep(nanoseconds: 20_000_000)
 
-        XCTAssertEqual(viewModel.newExerciseMessage, "\"Leg Press\" already exists — added it to My Library instead.")
+        XCTAssertTrue(catalogWriteAPI.addedCanonicalExerciseIds.isEmpty)
+        XCTAssertFalse(viewModel.draft?.exercises.contains { $0.canonicalExerciseId == "leg_press" } == true)
+        let candidate = try XCTUnwrap(viewModel.newExerciseCandidates.first)
+        await viewModel.selectExistingExercise(candidate)
+        XCTAssertEqual(catalogWriteAPI.addedCanonicalExerciseIds, ["leg_press"])
         XCTAssertTrue(viewModel.draft?.exercises.contains { $0.canonicalExerciseId == "leg_press" } == true)
+    }
+
+    @MainActor
+    func testAmbiguousCatalogMatchesAreNotSelectedUntilFounderChooses() async throws {
+        let candidates = [CanonicalExerciseMatch(id: "row_one", name: "Row One"), CanonicalExerciseMatch(id: "row_two", name: "Row Two")]
+        let api = StubTrainingLoggerAPI(exercises: [])
+        api.nextFetch = [exercise("row_two", name: "Row Two", areaId: "back", inMyLibrary: true)]
+        let writes = RecordingCatalogWriteAPI(createResult: .candidates(candidates))
+        let viewModel = TrainingLoggerViewModel(api: api, catalogWriteAPI: writes, draftStore: MemoryTrainingLoggerDraftStore(), authority: .founderProduction)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        viewModel.submitNewExercise(name: "Row", areaId: "back")
+        try await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertEqual(viewModel.newExerciseCandidates, candidates)
+        XCTAssertTrue(writes.addedCanonicalExerciseIds.isEmpty)
+        XCTAssertTrue(viewModel.draft?.exercises.isEmpty == true)
+        await viewModel.selectExistingExercise(candidates[1])
+        XCTAssertEqual(writes.addedCanonicalExerciseIds, ["row_two"])
+        XCTAssertEqual(viewModel.draft?.exercises.map(\.canonicalExerciseId), ["row_two"])
     }
 
     @MainActor
@@ -154,6 +199,7 @@ final class TrainingCatalogMyLibraryTests: XCTestCase {
     }
 
     private final class RecordingCatalogWriteAPI: TrainingExerciseCatalogWriteAPI, @unchecked Sendable {
+        var failMembership = false
         private(set) var addedCanonicalExerciseIds: [String] = []
         private(set) var createdRequests: [(canonicalName: String, primaryMuscleGroupId: String)] = []
         private let createResult: CreateCanonicalExerciseOutcome
@@ -163,6 +209,7 @@ final class TrainingCatalogMyLibraryTests: XCTestCase {
         }
 
         func addToMyLibrary(canonicalExerciseId: String) async throws {
+            if failMembership { throw URLError(.notConnectedToInternet) }
             addedCanonicalExerciseIds.append(canonicalExerciseId)
         }
 

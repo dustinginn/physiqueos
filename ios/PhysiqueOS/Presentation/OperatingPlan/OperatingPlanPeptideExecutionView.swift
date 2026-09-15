@@ -318,7 +318,7 @@ struct OperatingPlanPeptideExecutionView: View {
             }
         case .founderProduction:
             guard let detail = productionDetail else {
-                errorMessage = "This peptide Support plan's canonical identity is unavailable. Refresh and try again."
+                errorMessage = "This peptide plan is unavailable. Refresh and try again."
                 return
             }
             Task { @MainActor in

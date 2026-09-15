@@ -164,7 +164,7 @@ private struct NutritionStrategyEditor: View {
             return
         }
         guard let protocolId, let expectedCurrentVersionId else {
-            errorMessage = "This strategy's canonical identity is unavailable. Refresh and try again."
+            errorMessage = "This strategy is unavailable. Refresh and try again."
             return
         }
         Task { @MainActor in
@@ -478,7 +478,7 @@ private struct CoachingUpdatesEditor: View {
             onSaved()
         case .founderProduction:
             guard let detail = productionDetail else {
-                errorMessage = "Coaching Updates' canonical revision is unavailable. Refresh before retrying."
+                errorMessage = "Refresh Coaching Updates before trying again."
                 return
             }
             Task { @MainActor in

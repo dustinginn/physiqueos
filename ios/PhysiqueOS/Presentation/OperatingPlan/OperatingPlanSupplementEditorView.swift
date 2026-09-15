@@ -138,7 +138,7 @@ struct OperatingPlanSupplementEditorView: View {
             }
         case .founderProduction:
             guard let detail = productionDetail else {
-                errorMessage = "This Supplement strategy's canonical identity is unavailable. Refresh and try again."
+                errorMessage = "This supplement strategy is unavailable. Refresh and try again."
                 return
             }
             Task { @MainActor in

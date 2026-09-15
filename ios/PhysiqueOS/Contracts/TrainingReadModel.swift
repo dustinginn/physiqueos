@@ -361,6 +361,9 @@ struct TrainingSessionDetailReadModel: Codable, Equatable, Identifiable {
     /// can render telemetry once and exercises once, never a duplicated
     /// backend-style summary on top of the structured breakdown.
     var telemetry: TrainingSessionTelemetryReadModel? = nil
+    /// Telemetry already carries calories/duration; the header must not
+    /// repeat those values above the workout summary.
+    var showsWorkoutValueInHeader: Bool { telemetry == nil }
     /// Authenticated opaque screenshot descriptors canonically bound to
     /// this exact session. No storage URL/object key is exposed.
     var supportingMedia: [TrainingSessionSupportingMedia]? = nil
@@ -375,9 +378,8 @@ struct TrainingSessionDetailReadModel: Codable, Equatable, Identifiable {
     /// the structured `exercises` list from ever both rendering for the
     /// same session — Build 33's fix for the Founder-observed duplicate
     /// Workout Detail summary. `detail` is the fallback ONLY when there is
-    /// no structured breakdown to show instead (an Apple-only telemetry
-    /// source not yet reconciled with a structured session).
-    var showsGeneratedSummaryInsteadOfStructuredExercises: Bool { exercises.isEmpty }
+    /// neither a structured breakdown nor typed workout telemetry exists.
+    var showsGeneratedSummaryInsteadOfStructuredExercises: Bool { exercises.isEmpty && telemetry == nil }
 }
 
 /// Raw values only — no server-side display formatting. A workout

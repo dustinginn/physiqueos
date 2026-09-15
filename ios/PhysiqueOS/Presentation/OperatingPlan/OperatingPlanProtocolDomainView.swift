@@ -152,7 +152,7 @@ struct OperatingPlanProtocolDomainView: View {
             )
         case .founderProduction:
             guard let expectedCurrentVersionId = method.currentVersionId else {
-                lifecycleError = "This Supplement strategy's canonical version is unavailable. Refresh before retrying."
+                lifecycleError = "Refresh this supplement strategy before trying again."
                 return
             }
             Task { @MainActor in
