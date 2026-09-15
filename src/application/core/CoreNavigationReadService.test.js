@@ -170,6 +170,27 @@ describe("provider-native core navigation reads", () => {
     expect(result).not.toHaveProperty("timelineHistory");
   });
 
+  it("projects a bounded protocol-domain roll-up with typed Native support destinations", async () => {
+    const { narrow } = peptideSupportServices();
+    const result = await narrow.getOperatingPlanProtocolDomain({ protocolId: "peptide-protocol" });
+    expect(result).toMatchObject({
+      category: "peptide",
+      title: "Peptide Strategy",
+      methods: [{
+        id: "peptide-protocol",
+        protocolId: "peptide-protocol",
+        name: "Retatrutide",
+        currentDose: "0.5 mg",
+        editDestination: {
+          id: "native.operating-plan.protocol.peptide",
+          parameters: { protocolId: "peptide-protocol" },
+        },
+      }],
+    });
+    expect(result).not.toHaveProperty("protocols");
+    expect(result).not.toHaveProperty("executionItems");
+  });
+
   it("fails closed for an unavailable or ambiguous peptide Support plan", async () => {
     const { narrow, runtime } = peptideSupportServices();
     expect(await narrow.getPeptideSupport({ protocolId: "missing" })).toBeNull();

@@ -2,31 +2,23 @@ import Link from "next/link";
 import { Activity, ArrowLeft, Dumbbell, Syringe } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
-import { resolvePeptideDose, formatPeptideDose, formatPeptideExecutionSummary } from "../domain/services/ExecutionPhaseResolver";
-import { formatSupplementSupportSummary } from "../domain/services/SupplementSupportManagementService";
-import { formatExecutionSchedule } from "./OperatingPlanScreen";
+import {
+  buildStrategyDomainModel,
+  STRATEGY_DOMAIN_PRESENTATION,
+} from "../domain/services/StrategyDomainReadService";
 
 const DOMAIN_PRESENTATION = Object.freeze({
   recovery: {
-    title: "Recovery Strategy",
-    collectionTitle: "Current Recovery Methods",
-    helperCopy: "Your current recovery strategy is supported by the following methods.",
+    ...STRATEGY_DOMAIN_PRESENTATION.recovery,
     icon: Activity,
-    tone: "success",
   },
   peptide: {
-    title: "Peptide Strategy",
-    collectionTitle: "Current Peptides",
-    helperCopy: "The following peptides currently support this strategy.",
+    ...STRATEGY_DOMAIN_PRESENTATION.peptide,
     icon: Syringe,
-    tone: "effort",
   },
   supplement: {
-    title: "Supplement Strategy",
-    collectionTitle: "Current Supplements",
-    helperCopy: "The following supplements currently support this strategy.",
+    ...STRATEGY_DOMAIN_PRESENTATION.supplement,
     icon: Dumbbell,
-    tone: "success",
   },
 });
 
@@ -159,149 +151,4 @@ function SupportDetail({ label, value }) {
   );
 }
 
-export function buildStrategyDomainModel({
-  category,
-  executionItems = [],
-  goals = [],
-  localDate,
-  protocols = [],
-  versions = [],
-} = {}) {
-  const presentation = DOMAIN_PRESENTATION[category];
-  if (!presentation) return null;
-
-  const activeProtocols = protocols.filter(
-    (protocol) => protocol.category === category && protocol.status === "active"
-  );
-  const linkedActiveGoals = goals.filter(
-    (goal) => goal.status === "active" && activeProtocols.some((protocol) => protocol.relatedGoalIds?.includes(goal.id))
-  );
-  const activeGoal = linkedActiveGoals.find((goal) => goal.primary === true)
-    ?? goals.find((goal) => goal.status === "active" && goal.primary === true)
-    ?? linkedActiveGoals[0]
-    ?? null;
-  const versionByProtocolId = new Map(versions.map((version) => [version?.protocolId, version]));
-  const goalLabel = formatGoalLabel(activeGoal?.title);
-  const goalReference = goalLabel ? `your ${goalLabel}` : "your current strategy";
-
-  return Object.freeze({
-    category,
-    goalTitle: activeGoal?.title ?? null,
-    helperCopy: presentation.helperCopy,
-    purpose: strategyPurpose(category, goalReference),
-    supportingLine: goalLabel ? `Supporting your ${goalLabel}.` : null,
-    methods: activeProtocols.map((protocol) => buildSupportMethod({
-      category,
-      executionItem: findExecutionItem({ category, executionItems, protocol }),
-      goalReference,
-      localDate,
-      protocol,
-      version: versionByProtocolId.get(protocol.id) ?? null,
-    })),
-  });
-}
-
-function buildSupportMethod({ category, executionItem, goalReference, localDate, protocol, version }) {
-  if (category === "peptide") {
-    const current = resolvePeptideDose(executionItem, localDate).current;
-    return Object.freeze({
-      id: protocol.id,
-      name: protocol.name,
-      purpose: peptideStrategicRole(protocol, goalReference),
-      supportSummary: formatPeptideExecutionSummary(executionItem, localDate),
-      currentDose: current ? formatPeptideDose(current.dose) : "No active phase",
-      currentSchedule: formatPeptideSchedule(executionItem, localDate),
-      editSupportHref: `/profile/operating-plan/execution/peptides/${encodeURIComponent(protocol.id)}?edit=1`,
-    });
-  }
-
-  if (category === "supplement") {
-    return Object.freeze({
-      id: protocol.id,
-      name: protocol.name,
-      purpose: supplementPurpose(protocol, version, goalReference),
-      supportSummary: formatSupplementSupportSummary(executionItem),
-      editSupportHref: `/profile/operating-plan/execution/supplements/${encodeURIComponent(protocol.id)}?edit=1`,
-    });
-  }
-
-  return Object.freeze({
-    id: protocol.id,
-    name: protocol.name,
-    purpose: recoveryMethodPurpose(protocol, goalReference),
-    supportSummary: executionItem ? formatExecutionSchedule(executionItem) : "Not configured",
-    editSupportHref: executionItem
-      ? `/profile/operating-plan/execution/${encodeURIComponent(executionItem.id)}`
-      : "/profile/operating-plan",
-  });
-}
-
-function findExecutionItem({ category, executionItems, protocol }) {
-  return executionItems.find((item) => {
-    if (item.active !== true) return false;
-    const linked = [item.protocolRootId, item.linkedProtocolId].includes(protocol.id);
-    if (category === "peptide") {
-      return linked && ["peptide", "protocol"].includes(item.type);
-    }
-    if (category === "supplement") {
-      return linked && item.type === "supplement";
-    }
-    return linked && item.type === "recovery";
-  }) ?? null;
-}
-
-function formatPeptideSchedule(item, localDate) {
-  if (!item) return "Not configured";
-  return formatPeptideExecutionSummary({ ...item, timeline: [] }, localDate);
-}
-
-function strategyPurpose(category, goalReference) {
-  if (category === "recovery") {
-    return `Support consistent training and day-to-day readiness as you work toward ${goalReference}.`;
-  }
-  if (category === "peptide") {
-    return `Coordinate the current peptide plan around the recovery, appetite, and body-composition needs of ${goalReference}.`;
-  }
-  return `Provide consistent nutrition, hydration, training, and recovery support for ${goalReference}.`;
-}
-
-function peptideStrategicRole(protocol, goalReference) {
-  if (protocol.name === "Retatrutide") {
-    return `Support nutrition consistency and body-composition direction as you work toward ${goalReference}.`;
-  }
-  if (protocol.name === "Tesamorelin") {
-    return `Support recovery and training consistency as you work toward ${goalReference}.`;
-  }
-  return `Provide targeted peptide support within ${goalReference}.`;
-}
-
-function recoveryMethodPurpose(protocol, goalReference) {
-  if (protocol.name === "Foam Rolling") {
-    return `Support movement quality and readiness so training stays consistent with ${goalReference}.`;
-  }
-  return `Support recovery quality and training readiness within ${goalReference}.`;
-}
-
-function supplementPurpose(protocol, version, goalReference) {
-  const configured = version?.supplementStrategy?.purpose;
-  const defaults = {
-    Electrolytes: `Support hydration and electrolyte consistency across the training and recovery demands of ${goalReference}.`,
-    "Fadogia Agrestis": `Support consistency in the supplement plan accompanying ${goalReference}.`,
-    Multivitamin: `Provide foundational micronutrient coverage while you work toward ${goalReference}.`,
-    "Tongkat Ali": `Support consistency in the supplement plan accompanying ${goalReference}.`,
-  };
-  return defaults[protocol.name]
-    ?? (configured ? `${withoutTerminalPunctuation(configured)} as part of ${goalReference}.` : null)
-    ?? `Provide targeted supplemental support within ${goalReference}.`;
-}
-
-function formatGoalLabel(title) {
-  const value = String(title ?? "").trim();
-  if (!value) return null;
-  const withoutGoalSuffix = value.replace(/\s+goal$/i, "");
-  return `${withoutGoalSuffix} goal`;
-}
-
-function withoutTerminalPunctuation(value) {
-  return String(value).trim().replace(/[.!?]+$/, "");
-}
+export { buildStrategyDomainModel };

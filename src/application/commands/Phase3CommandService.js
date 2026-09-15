@@ -33,6 +33,9 @@ export const Phase3Command = Object.freeze({
   CREATE_CANONICAL_EXERCISE: "training-catalog.exercise.create.v1",
   SAVE_TRAINING_STRATEGY: "operating-plan.training-strategy.save.v1",
   SAVE_PEPTIDE_SUPPORT: "operating-plan.peptide-support.save.v1",
+  SAVE_SUPPLEMENT_SUPPORT: "operating-plan.supplement-support.save.v1",
+  SAVE_SUPPLEMENT_STRATEGY: "operating-plan.supplement-strategy.save.v1",
+  CHANGE_SUPPLEMENT_LIFECYCLE: "operating-plan.supplement-lifecycle.change.v1",
 });
 
 const DEFINITIONS = Object.freeze({
@@ -74,6 +77,15 @@ const DEFINITIONS = Object.freeze({
   ),
   [Phase3Command.SAVE_PEPTIDE_SUPPORT]: define(
     "savePeptideSupport", ["protocolId", "draft"], false
+  ),
+  [Phase3Command.SAVE_SUPPLEMENT_SUPPORT]: define(
+    "saveSupplementSupport", ["protocolId", "supplementVersionId", "draft"], false
+  ),
+  [Phase3Command.SAVE_SUPPLEMENT_STRATEGY]: define(
+    "saveSupplementStrategy", ["operation", "draft"], false
+  ),
+  [Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE]: define(
+    "changeSupplementLifecycle", ["protocolId", "operation", "expectedCurrentVersionId"], false
   ),
 });
 

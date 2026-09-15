@@ -133,175 +133,19 @@ export function createSupplementSupportManagementService({
         stageFrom: liveStore,
       }).begin();
       try {
-        let recordId;
-        let expectedExecution;
-        let expectedReminder;
-        let preservedLegacy;
-        let preservedReminderHistory;
+        let prepared;
         const staged = await transaction.mutate((store) => {
-          const protocol = store.protocols?.find((item) =>
-            item.id === command.protocolId &&
-            item.userId === command.userId &&
-            item.category === "supplement" &&
-            item.status === "active"
-          );
-          if (!protocol) {
-            throw typed(SupplementSupportOutcome.NOT_FOUND, "This supplement is no longer available.");
-          }
-          if (
-            !protocol.currentVersionId ||
-            protocol.currentVersionId !== command.supplementVersionId ||
-            !store.protocolVersions?.some((item) =>
-              item.id === protocol.currentVersionId && item.status === "active" && !item.endedAt
-            )
-          ) {
-            throw typed(SupplementSupportOutcome.VERSION_CONFLICT, "This supplement changed while you were editing it.");
-          }
-          if (
-            ![...(protocol.currentGoalIds ?? []), ...(protocol.relatedGoalIds ?? [])].includes(command.goalId) ||
-            !store.goals?.some((goal) =>
-              goal.id === command.goalId && goal.userId === command.userId && goal.status === "active"
-            )
-          ) {
-            throw typed(SupplementSupportOutcome.INVALID, "The supported strategy is unavailable.");
-          }
-
-          const draft = normalizeSupplementSupportDraft(command.draft);
-          const errors = validateSupplementSupportDraft(draft);
-          if (errors.length) throw typed(SupplementSupportOutcome.INVALID, errors[0]);
-
-          store.executionItems ??= [];
-          recordId = `execution_supplement_${protocol.id}`;
-          const matches = store.executionItems.filter((item) =>
-            item.type === "supplement" && item.protocolRootId === protocol.id
-          );
-          if (matches.length > 1) {
-            throw typed(SupplementSupportOutcome.INVALID, "This Supplement Support item is not available to edit right now.");
-          }
-          const existing = matches[0] ?? null;
-          if (
-            existing &&
-            Number(command.expectedRevision) !== Number(existing.executionRevision ?? 1)
-          ) {
-            throw typed(SupplementSupportOutcome.VERSION_CONFLICT, "This Support schedule changed while you were editing it.");
-          }
-          if (
-            !existing &&
-            command.expectedRevision !== null &&
-            command.expectedRevision !== undefined &&
-            command.expectedRevision !== ""
-          ) {
-            throw typed(SupplementSupportOutcome.VERSION_CONFLICT, "This Support schedule changed while you were editing it.");
-          }
-          if (existing && !LOSSLESS_CADENCES.has(existing.cadence?.type)) {
-            throw typed(SupplementSupportOutcome.INVALID, "This legacy schedule cannot be changed safely with the current Support editor.");
-          }
-
-          const timestamp = now().toISOString();
-          preservedLegacy = legacySemantic(existing);
-          const executionCandidate = {
-            ...(existing ?? {}),
-            id: existing?.id ?? recordId,
-            userId: command.userId,
-            type: "supplement",
-            title: protocol.name,
-            description: existing?.description ?? "Supplement Support",
-            active: true,
-            protocolRootId: protocol.id,
-            supplementVersionId: protocol.currentVersionId,
-            linkedStrategyIds: existing?.linkedStrategyIds ?? [protocol.id],
-            linkedGoalIds: existing?.linkedGoalIds ?? [command.goalId],
-            dose: draft.dose,
-            cadence: draft.cadence,
-            preferredSchedule: draft.preferredSchedule,
-            reminderPreference: draft.reminderPreference,
-            notes: draft.notes,
-            executionRevision: (existing?.executionRevision ?? 0) + 1,
-            author: command.author,
-            createdAt: existing?.createdAt ?? timestamp,
-            updatedAt: timestamp,
-          };
-          recordId = executionCandidate.id;
-          const executionChanged = !existing || executionSemantic(existing) !== executionSemantic(executionCandidate);
-          expectedExecution = executionSemantic(executionCandidate);
-          if (executionChanged) {
-            const index = existing ? store.executionItems.findIndex((item) => item.id === existing.id) : -1;
-            if (index >= 0) store.executionItems[index] = executionCandidate;
-            else store.executionItems.push(executionCandidate);
-          }
-
-          store.reminders ??= [];
-          const reminderMatches = store.reminders.filter((item) =>
-            item.userId === command.userId &&
-            item.type === "supplement_reminder" &&
-            item.linkedEntityId === protocol.id
-          );
-          if (reminderMatches.length > 1) {
-            throw typed(SupplementSupportOutcome.INVALID, "This Supplement Support reminder is not available to edit right now.");
-          }
-          const reminder = reminderMatches[0] ?? null;
-          preservedReminderHistory = reminderHistory(reminder);
-          const reminderCandidate = {
-            ...(reminder ?? {}),
-            id: reminder?.id ?? `reminder_${protocol.id}`,
-            userId: command.userId,
-            title: protocol.name,
-            type: "supplement_reminder",
-            linkedEntityType: "protocol",
-            linkedEntityId: protocol.id,
-            linkedExecutionId: executionCandidate.id,
-            relatedGoalIds: reminder?.relatedGoalIds ?? executionCandidate.linkedGoalIds,
-            schedule: {
-              ...supportScheduleToReminder(draft.supportSchedule, "supplement"),
-              timezone: reminder?.schedule?.timezone ?? null,
-            },
-            persistenceMode: reminder?.persistenceMode ?? "scheduled",
-            active: draft.reminderPreference === "remind",
-            createdAt: reminder?.createdAt ?? timestamp,
-            updatedAt: timestamp,
-          };
-          expectedReminder = reminderSemantic(reminderCandidate);
-          const reminderChanged = !reminder || reminderSemantic(reminder) !== expectedReminder;
-          if (reminderChanged) {
-            const index = reminder ? store.reminders.findIndex((item) => item.id === reminder.id) : -1;
-            if (index >= 0) store.reminders[index] = reminderCandidate;
-            else store.reminders.push(reminderCandidate);
-          }
-
-          if (!executionChanged && !reminderChanged) {
-            throw typed(SupplementSupportOutcome.UNCHANGED, "No changes to save.");
-          }
-          faults.afterWrite?.(store, executionCandidate);
-          return {
-            created: !existing,
-            executionId: executionCandidate.id,
-            executionRevision: executionChanged
-              ? executionCandidate.executionRevision
-              : existing.executionRevision ?? 1,
-            reminderId: reminderCandidate.id,
-          };
+          prepared = prepareSupplementSupportTransition(store, command, now());
+          if (!prepared.ok) throw typed(prepared.outcome, prepared.reason);
+          const result = applyPreparedSupplementSupportTransition(store, prepared);
+          faults.afterWrite?.(store, prepared.executionCandidate);
+          return result;
         });
 
         const committed = await transaction.commit({
           validateFinalized(store) {
             faults.beforeVerification?.(store);
-            const executions = store.executionItems.filter((item) =>
-              item.type === "supplement" && item.protocolRootId === command.protocolId
-            );
-            const reminders = store.reminders.filter((item) =>
-              item.userId === command.userId &&
-              item.type === "supplement_reminder" &&
-              item.linkedEntityId === command.protocolId
-            );
-            return Boolean(
-              executions.length === 1 &&
-              executions[0].id === recordId &&
-              executionSemantic(executions[0]) === expectedExecution &&
-              legacySemantic(executions[0]) === preservedLegacy &&
-              reminders.length === 1 &&
-              reminderSemantic(reminders[0]) === expectedReminder &&
-              reminderHistory(reminders[0]) === preservedReminderHistory
-            );
+            return verifyPreparedSupplementSupportTransition(store, prepared);
           },
         });
         return {
@@ -330,6 +174,146 @@ export function createSupplementSupportManagementService({
       }
     },
   };
+}
+
+export function prepareSupplementSupportTransition(store, command = {}, at = new Date()) {
+  const protocol = store.protocols?.find((item) =>
+    item.id === command.protocolId && item.userId === command.userId &&
+    item.category === "supplement" && item.status === "active"
+  );
+  if (!protocol) return rejected(SupplementSupportOutcome.NOT_FOUND, "This supplement is no longer available.");
+  if (!protocol.currentVersionId || protocol.currentVersionId !== command.supplementVersionId ||
+      !store.protocolVersions?.some((item) => item.id === protocol.currentVersionId && item.status === "active" && !item.endedAt)) {
+    return rejected(SupplementSupportOutcome.VERSION_CONFLICT, "This supplement changed while you were editing it.");
+  }
+  if (![...(protocol.currentGoalIds ?? []), ...(protocol.relatedGoalIds ?? [])].includes(command.goalId) ||
+      !store.goals?.some((goal) => goal.id === command.goalId && goal.userId === command.userId && goal.status === "active")) {
+    return rejected(SupplementSupportOutcome.INVALID, "The supported strategy is unavailable.");
+  }
+  const draft = normalizeSupplementSupportDraft(command.draft);
+  const errors = validateSupplementSupportDraft(draft);
+  if (errors.length) return rejected(SupplementSupportOutcome.INVALID, errors[0]);
+
+  const executions = store.executionItems ?? [];
+  const matches = executions.filter((item) => item.type === "supplement" && item.protocolRootId === protocol.id);
+  if (matches.length > 1) return rejected(SupplementSupportOutcome.INVALID, "This Supplement Support item is not available to edit right now.");
+  const existing = matches[0] ?? null;
+  if (existing && Number(command.expectedRevision) !== Number(existing.executionRevision ?? 1)) {
+    return rejected(SupplementSupportOutcome.VERSION_CONFLICT, "This Support schedule changed while you were editing it.");
+  }
+  if (!existing && command.expectedRevision !== null && command.expectedRevision !== undefined && command.expectedRevision !== "") {
+    return rejected(SupplementSupportOutcome.VERSION_CONFLICT, "This Support schedule changed while you were editing it.");
+  }
+  if (existing && !LOSSLESS_CADENCES.has(existing.cadence?.type)) {
+    return rejected(SupplementSupportOutcome.INVALID, "This legacy schedule cannot be changed safely with the current Support editor.");
+  }
+
+  const timestamp = new Date(at).toISOString();
+  const executionCandidate = {
+    ...(existing ?? {}),
+    id: existing?.id ?? `execution_supplement_${protocol.id}`,
+    userId: command.userId,
+    type: "supplement",
+    title: protocol.name,
+    description: existing?.description ?? "Supplement Support",
+    active: true,
+    protocolRootId: protocol.id,
+    supplementVersionId: protocol.currentVersionId,
+    linkedStrategyIds: existing?.linkedStrategyIds ?? [protocol.id],
+    linkedGoalIds: existing?.linkedGoalIds ?? [command.goalId],
+    dose: draft.dose,
+    cadence: draft.cadence,
+    preferredSchedule: draft.preferredSchedule,
+    reminderPreference: draft.reminderPreference,
+    notes: draft.notes,
+    executionRevision: (existing?.executionRevision ?? 0) + 1,
+    author: command.author,
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+  const executionChanged = !existing || executionSemantic(existing) !== executionSemantic(executionCandidate);
+  const reminderMatches = (store.reminders ?? []).filter((item) =>
+    item.userId === command.userId && item.type === "supplement_reminder" && item.linkedEntityId === protocol.id
+  );
+  if (reminderMatches.length > 1) return rejected(SupplementSupportOutcome.INVALID, "This Supplement Support reminder is not available to edit right now.");
+  const reminder = reminderMatches[0] ?? null;
+  const reminderCandidate = {
+    ...(reminder ?? {}),
+    id: reminder?.id ?? `reminder_${protocol.id}`,
+    userId: command.userId,
+    title: protocol.name,
+    type: "supplement_reminder",
+    linkedEntityType: "protocol",
+    linkedEntityId: protocol.id,
+    linkedExecutionId: executionCandidate.id,
+    relatedGoalIds: reminder?.relatedGoalIds ?? executionCandidate.linkedGoalIds,
+    schedule: { ...supportScheduleToReminder(draft.supportSchedule, "supplement"), timezone: reminder?.schedule?.timezone ?? null },
+    persistenceMode: reminder?.persistenceMode ?? "scheduled",
+    active: draft.reminderPreference === "remind",
+    createdAt: reminder?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+  const reminderChanged = !reminder || reminderSemantic(reminder) !== reminderSemantic(reminderCandidate);
+  if (!executionChanged && !reminderChanged) return rejected(SupplementSupportOutcome.UNCHANGED, "No changes to save.");
+  return Object.freeze({
+    ok: true,
+    protocolId: protocol.id,
+    userId: command.userId,
+    created: !existing,
+    existingExecutionId: existing?.id ?? null,
+    executionCandidate,
+    executionChanged,
+    preservedLegacy: legacySemantic(existing),
+    existingReminderId: reminder?.id ?? null,
+    reminderCandidate,
+    reminderChanged,
+    preservedReminderHistory: reminderHistory(reminder),
+  });
+}
+
+export function applyPreparedSupplementSupportTransition(store, prepared) {
+  if (!prepared?.ok) throw new Error("A prepared Supplement Support transition is required.");
+  store.executionItems ??= [];
+  if (prepared.executionChanged) {
+    const index = prepared.existingExecutionId
+      ? store.executionItems.findIndex((item) => item.id === prepared.existingExecutionId)
+      : -1;
+    if (index >= 0) store.executionItems[index] = structuredClone(prepared.executionCandidate);
+    else store.executionItems.push(structuredClone(prepared.executionCandidate));
+  }
+  store.reminders ??= [];
+  if (prepared.reminderChanged) {
+    const index = prepared.existingReminderId
+      ? store.reminders.findIndex((item) => item.id === prepared.existingReminderId)
+      : -1;
+    if (index >= 0) store.reminders[index] = structuredClone(prepared.reminderCandidate);
+    else store.reminders.push(structuredClone(prepared.reminderCandidate));
+  }
+  return {
+    created: prepared.created,
+    executionId: prepared.executionCandidate.id,
+    executionRevision: prepared.executionChanged
+      ? prepared.executionCandidate.executionRevision
+      : prepared.executionCandidate.executionRevision - 1,
+    reminderId: prepared.reminderCandidate.id,
+  };
+}
+
+export function verifyPreparedSupplementSupportTransition(store, prepared) {
+  if (!prepared?.ok) return false;
+  const executions = (store.executionItems ?? []).filter((item) =>
+    item.type === "supplement" && item.protocolRootId === prepared.protocolId
+  );
+  const reminders = (store.reminders ?? []).filter((item) =>
+    item.userId === prepared.userId && item.type === "supplement_reminder" && item.linkedEntityId === prepared.protocolId
+  );
+  return Boolean(
+    executions.length === 1 && executions[0].id === prepared.executionCandidate.id &&
+    executionSemantic(executions[0]) === executionSemantic(prepared.executionCandidate) &&
+    legacySemantic(executions[0]) === prepared.preservedLegacy &&
+    reminders.length === 1 && reminderSemantic(reminders[0]) === reminderSemantic(prepared.reminderCandidate) &&
+    reminderHistory(reminders[0]) === prepared.preservedReminderHistory
+  );
 }
 
 export function formatSupplementSupportSummary(item) {
@@ -437,6 +421,10 @@ function humanize(value) {
   return String(value ?? "")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function rejected(outcome, reason) {
+  return Object.freeze({ ok: false, outcome, reason });
 }
 
 function typed(outcome, message) {

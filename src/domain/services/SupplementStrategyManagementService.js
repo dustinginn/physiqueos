@@ -58,110 +58,28 @@ export function createSupplementStrategyManagementService({
       const invalid = validateBaseCommand(command);
       if (invalid) return failure(SupplementManagementOutcome.INVALID, invalid);
       return transact((store, timestamp) => {
-        assertGoal(store, command.userId, command.goalId);
-        assertUniqueName(store, command.userId, command.name);
-        const protocolId = command.protocolId;
-        if (!protocolId || store.protocols.some((item) => item.id === protocolId)) {
-          throw new ManagementFailure(SupplementManagementOutcome.DUPLICATE, "This supplement is already in your plan.");
-        }
-        const createdAt = timestamp.toISOString();
-        const versionId = `${protocolId}_v1`;
-        const protocol = createProtocol({
-          id: protocolId,
-          userId: command.userId,
-          protocolType: "supplement",
-          category: "supplement",
-          name: clean(command.name),
-          purpose: clean(command.purpose),
-          notes: clean(command.role),
-          relatedGoalIds: [command.goalId],
-          currentGoalIds: [command.goalId],
-          startDate: command.startDate,
-          status: "active",
-          currentVersionId: versionId,
-          source: structuredClone(command.provenance.source),
-          fieldProvenance: structuredClone(command.provenance.fieldProvenance ?? {}),
-          createdAt,
-          updatedAt: createdAt,
-        });
-        const version = createSupplementVersion({
-          command,
-          protocol,
-          versionId,
-          versionNumber: 1,
-          status: "active",
-          endedAt: null,
-          createdAt,
-        });
-        store.protocols.push(protocol);
-        store.protocolVersions ??= [];
-        store.protocolVersions.push(version);
+        const result = applySupplementStrategyOperation(store, "create", command, timestamp);
+        if (!result.ok) throw new ManagementFailure(result.outcome, result.reason);
         faults.afterCreate?.(store);
-        return { protocolId, versionId };
+        return result.value;
       }, (store, result) => verifyCreated(store, result.protocolId, result.versionId));
     },
 
     async edit(command = {}) {
       return transact((store, timestamp) => {
-        const protocol = getOwnedSupplement(store, command);
-        if (protocol.status !== "active") throw new ManagementFailure(SupplementManagementOutcome.NOT_ACTIVE, "This supplement is no longer active.");
-        assertGoal(store, command.userId, command.goalId);
-        assertUniqueName(store, command.userId, command.name, protocol.id);
-        const current = store.protocolVersions.find((item) => item.id === protocol.currentVersionId);
-        if (!current) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement changed while you were editing it.");
-        const successorVersion = {
-          ...structuredClone(current),
-          intent: { ...current.intent, summary: clean(command.role) },
-          supplementStrategy: {
-            ...current.supplementStrategy,
-            name: clean(command.name),
-            purpose: clean(command.purpose),
-            role: clean(command.role),
-          },
-          evidenceBasis: {
-            ...current.evidenceBasis,
-            rootName: clean(command.name),
-            rootStrategyContext: clean(command.role),
-          },
-        };
-        const prepared = prepareActiveProtocolSuccessorTransition(store, {
-          protocolId: protocol.id,
-          expectedCurrentVersionId: command.expectedCurrentVersionId,
-          effectiveDate: command.effectiveDate,
-          successorVersion,
-          goalAssociation: { goalId: command.goalId, relationship: "supports" },
-          provenance: command.provenance,
-        }, timestamp);
-        if (!prepared.ok) {
-          const outcome = ["unchanged_successor", "duplicate_successor"].includes(prepared.outcome)
-            ? SupplementManagementOutcome.NO_CHANGES
-            : prepared.outcome === "expected_version_conflict"
-              ? SupplementManagementOutcome.VERSION_CONFLICT
-              : SupplementManagementOutcome.INVALID;
-          throw new ManagementFailure(outcome, prepared.reason);
-        }
-        applyPreparedActiveProtocolSuccessor(store, prepared);
-        Object.assign(prepared.protocol, {
-          name: clean(command.name),
-          purpose: clean(command.purpose),
-          notes: clean(command.role),
-        });
+        const result = applySupplementStrategyOperation(store, "edit", command, timestamp);
+        if (!result.ok) throw new ManagementFailure(result.outcome, result.reason);
         faults.afterEdit?.(store);
-        return { protocolId: protocol.id, versionId: prepared.successor.id };
+        return result.value;
       }, (store, result) => verifyActiveProtocolSuccessorState(store, result.protocolId, result.versionId));
     },
 
     async pause(command = {}) {
       return transact((store, timestamp) => {
-        const protocol = getOwnedSupplement(store, command);
-        if (protocol.status !== "active") throw new ManagementFailure(SupplementManagementOutcome.NOT_ACTIVE, "This supplement is not active.");
-        if (protocol.currentVersionId !== command.expectedCurrentVersionId) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement changed while you were viewing it.");
-        const current = store.protocolVersions.find((item) => item.id === protocol.currentVersionId);
-        if (!current || current.status !== "active" || current.endedAt) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement changed while you were viewing it.");
-        Object.assign(current, { status: "superseded", endedAt: command.effectiveDate });
-        Object.assign(protocol, { status: "paused", updatedAt: timestamp.toISOString() });
+        const result = applySupplementStrategyOperation(store, "pause", command, timestamp);
+        if (!result.ok) throw new ManagementFailure(result.outcome, result.reason);
         faults.afterPause?.(store);
-        return { protocolId: protocol.id, versionId: current.id };
+        return result.value;
       }, (store, result) => {
         const protocol = store.protocols.find((item) => item.id === result.protocolId);
         const versions = store.protocolVersions.filter((item) => item.protocolId === result.protocolId);
@@ -171,39 +89,163 @@ export function createSupplementStrategyManagementService({
 
     async restore(command = {}) {
       return transact((store, timestamp) => {
-        const protocol = getOwnedSupplement(store, command);
-        if (protocol.status !== "paused") throw new ManagementFailure(SupplementManagementOutcome.NOT_PAUSED, "This supplement is not paused.");
-        if (protocol.currentVersionId !== command.expectedCurrentVersionId) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement changed while you were viewing it.");
-        assertUniqueName(store, command.userId, protocol.name, protocol.id);
-        const prior = store.protocolVersions.find((item) => item.id === protocol.currentVersionId);
-        if (!prior || prior.status !== "superseded" || !prior.endedAt) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement cannot be restored from its current state.");
-        const versions = store.protocolVersions.filter((item) => item.protocolId === protocol.id);
-        const versionNumber = Math.max(...versions.map((item) => item.versionNumber)) + 1;
-        const version = createProtocolVersion({
-          ...structuredClone(prior),
-          id: `${protocol.id}_v${versionNumber}`,
-          versionNumber,
-          status: "active",
-          effectiveAt: command.effectiveDate,
-          endedAt: null,
-          author: structuredClone(command.provenance.author),
-          change: {
-            reason: command.provenance.reason,
-            previousVersionId: prior.id,
-            provenance: structuredClone(command.provenance.details ?? {}),
-          },
-          confirmation: structuredClone(command.provenance.confirmation),
-          createdAt: timestamp.toISOString(),
-        });
-        const validation = validateProtocolVersion(version);
-        if (!validation.valid) throw new ManagementFailure(SupplementManagementOutcome.INVALID, validation.errors.join(" "));
-        store.protocolVersions.push(version);
-        Object.assign(protocol, { status: "active", currentVersionId: version.id, updatedAt: timestamp.toISOString() });
+        const result = applySupplementStrategyOperation(store, "restore", command, timestamp);
+        if (!result.ok) throw new ManagementFailure(result.outcome, result.reason);
         faults.afterRestore?.(store);
-        return { protocolId: protocol.id, versionId: version.id };
+        return result.value;
       }, (store, result) => verifyActiveProtocolSuccessorState(store, result.protocolId, result.versionId));
     },
   };
+}
+
+/// One transport-independent Supplement strategy/lifecycle transition used
+/// by Web's file/runtime transaction and Native's canonical PostgreSQL
+/// command transaction. The caller owns the transaction; this function owns
+/// validation, successor construction, lifecycle semantics, and provenance.
+export function applySupplementStrategyOperation(store, operation, command = {}, at = new Date()) {
+  try {
+    if (operation === "create") {
+      const invalid = validateBaseCommand(command);
+      if (invalid) throw new ManagementFailure(SupplementManagementOutcome.INVALID, invalid);
+      assertGoal(store, command.userId, command.goalId);
+      assertUniqueName(store, command.userId, command.name);
+      const protocolId = command.protocolId;
+      if (!protocolId || store.protocols.some((item) => item.id === protocolId)) {
+        throw new ManagementFailure(SupplementManagementOutcome.DUPLICATE, "This supplement is already in your plan.");
+      }
+      const createdAt = new Date(at).toISOString();
+      const versionId = `${protocolId}_v1`;
+      const protocol = createProtocol({
+        id: protocolId,
+        userId: command.userId,
+        protocolType: "supplement",
+        category: "supplement",
+        name: clean(command.name),
+        purpose: clean(command.purpose),
+        notes: clean(command.role),
+        relatedGoalIds: [command.goalId],
+        currentGoalIds: [command.goalId],
+        startDate: command.startDate,
+        status: "active",
+        currentVersionId: versionId,
+        source: structuredClone(command.provenance.source),
+        fieldProvenance: structuredClone(command.provenance.fieldProvenance ?? {}),
+        createdAt,
+        updatedAt: createdAt,
+      });
+      const version = createSupplementVersion({
+        command, protocol, versionId, versionNumber: 1, status: "active", endedAt: null, createdAt,
+      });
+      store.protocols.push(protocol);
+      store.protocolVersions ??= [];
+      store.protocolVersions.push(version);
+      return succeeded(operation, { protocolId, versionId });
+    }
+
+    if (operation === "edit") {
+      const protocol = getOwnedSupplement(store, command);
+      if (protocol.status !== "active") throw new ManagementFailure(SupplementManagementOutcome.NOT_ACTIVE, "This supplement is no longer active.");
+      assertGoal(store, command.userId, command.goalId);
+      assertUniqueName(store, command.userId, command.name, protocol.id);
+      const current = store.protocolVersions.find((item) => item.id === protocol.currentVersionId);
+      if (!current) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement changed while you were editing it.");
+      const successorVersion = {
+        ...structuredClone(current),
+        intent: { ...current.intent, summary: clean(command.role) },
+        supplementStrategy: {
+          ...current.supplementStrategy,
+          name: clean(command.name), purpose: clean(command.purpose), role: clean(command.role),
+        },
+        evidenceBasis: {
+          ...current.evidenceBasis,
+          rootName: clean(command.name), rootStrategyContext: clean(command.role),
+        },
+      };
+      const prepared = prepareActiveProtocolSuccessorTransition(store, {
+        protocolId: protocol.id,
+        expectedCurrentVersionId: command.expectedCurrentVersionId,
+        effectiveDate: command.effectiveDate,
+        successorVersion,
+        goalAssociation: { goalId: command.goalId, relationship: "supports" },
+        provenance: command.provenance,
+      }, new Date(at));
+      if (!prepared.ok) {
+        const outcome = ["unchanged_successor", "duplicate_successor"].includes(prepared.outcome)
+          ? SupplementManagementOutcome.NO_CHANGES
+          : prepared.outcome === "expected_version_conflict"
+            ? SupplementManagementOutcome.VERSION_CONFLICT
+            : SupplementManagementOutcome.INVALID;
+        throw new ManagementFailure(outcome, prepared.reason);
+      }
+      applyPreparedActiveProtocolSuccessor(store, prepared);
+      Object.assign(prepared.protocol, {
+        name: clean(command.name), purpose: clean(command.purpose), notes: clean(command.role),
+      });
+      return succeeded(operation, { protocolId: protocol.id, versionId: prepared.successor.id });
+    }
+
+    if (operation === "pause") {
+      const protocol = getOwnedSupplement(store, command);
+      if (protocol.status !== "active") throw new ManagementFailure(SupplementManagementOutcome.NOT_ACTIVE, "This supplement is not active.");
+      if (protocol.currentVersionId !== command.expectedCurrentVersionId) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement changed while you were viewing it.");
+      const current = store.protocolVersions.find((item) => item.id === protocol.currentVersionId);
+      if (!current || current.status !== "active" || current.endedAt) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement changed while you were viewing it.");
+      Object.assign(current, { status: "superseded", endedAt: command.effectiveDate });
+      Object.assign(protocol, { status: "paused", updatedAt: new Date(at).toISOString() });
+      return succeeded(operation, { protocolId: protocol.id, versionId: current.id });
+    }
+
+    if (operation === "restore") {
+      const protocol = getOwnedSupplement(store, command);
+      if (protocol.status !== "paused") throw new ManagementFailure(SupplementManagementOutcome.NOT_PAUSED, "This supplement is not paused.");
+      if (protocol.currentVersionId !== command.expectedCurrentVersionId) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement changed while you were viewing it.");
+      assertUniqueName(store, command.userId, protocol.name, protocol.id);
+      const prior = store.protocolVersions.find((item) => item.id === protocol.currentVersionId);
+      if (!prior || prior.status !== "superseded" || !prior.endedAt) throw new ManagementFailure(SupplementManagementOutcome.VERSION_CONFLICT, "This supplement cannot be restored from its current state.");
+      const versions = store.protocolVersions.filter((item) => item.protocolId === protocol.id);
+      const versionNumber = Math.max(...versions.map((item) => item.versionNumber)) + 1;
+      const version = createProtocolVersion({
+        ...structuredClone(prior),
+        id: `${protocol.id}_v${versionNumber}`,
+        versionNumber,
+        status: "active",
+        effectiveAt: command.effectiveDate,
+        endedAt: null,
+        author: structuredClone(command.provenance.author),
+        change: {
+          reason: command.provenance.reason,
+          previousVersionId: prior.id,
+          provenance: structuredClone(command.provenance.details ?? {}),
+        },
+        confirmation: structuredClone(command.provenance.confirmation),
+        createdAt: new Date(at).toISOString(),
+      });
+      const validation = validateProtocolVersion(version);
+      if (!validation.valid) throw new ManagementFailure(SupplementManagementOutcome.INVALID, validation.errors.join(" "));
+      store.protocolVersions.push(version);
+      Object.assign(protocol, { status: "active", currentVersionId: version.id, updatedAt: new Date(at).toISOString() });
+      return succeeded(operation, { protocolId: protocol.id, versionId: version.id });
+    }
+    throw new ManagementFailure(SupplementManagementOutcome.INVALID, "This Supplement operation is unsupported.");
+  } catch (error) {
+    if (error instanceof ManagementFailure) return Object.freeze({ ok: false, outcome: error.outcome, reason: error.message });
+    throw error;
+  }
+}
+
+export function verifySupplementStrategyOperation(store, prepared) {
+  if (!prepared?.ok) return false;
+  const { operation, value } = prepared;
+  if (operation === "create") return verifyCreated(store, value.protocolId, value.versionId);
+  if (operation === "edit" || operation === "restore") {
+    return verifyActiveProtocolSuccessorState(store, value.protocolId, value.versionId);
+  }
+  if (operation === "pause") {
+    const protocol = store.protocols.find((item) => item.id === value.protocolId);
+    const versions = store.protocolVersions.filter((item) => item.protocolId === value.protocolId);
+    return protocol?.status === "paused" && versions.every((item) => item.status !== "active" || item.endedAt);
+  }
+  return false;
 }
 
 function createSupplementVersion({ command, protocol, versionId, versionNumber, status, endedAt, createdAt }) {
@@ -257,6 +299,7 @@ function verifyCreated(store, protocolId, versionId) {
 }
 function semanticName(value) { return clean(value).toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g, ""); }
 function clean(value) { return String(value ?? "").trim().replace(/\s+/g, " "); }
+function succeeded(operation, value) { return Object.freeze({ ok: true, operation, value: Object.freeze(value) }); }
 function failure(outcome, reason) { return Object.freeze({ outcome, committed: false, reason }); }
 function findManagementFailure(error) { let current = error; while (current) { if (current instanceof ManagementFailure) return current; current = current.cause; } return null; }
 class ManagementFailure extends Error { constructor(outcome, message) { super(message); this.outcome = outcome; } }

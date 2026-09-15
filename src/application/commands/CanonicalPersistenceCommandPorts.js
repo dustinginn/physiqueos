@@ -43,6 +43,18 @@ import {
   preparePeptideExecutionTransition,
   verifyPreparedPeptideExecutionTransition,
 } from "../../domain/services/PeptideExecutionManagementService.js";
+import {
+  applyPreparedSupplementSupportTransition,
+  prepareSupplementSupportTransition,
+  SupplementSupportOutcome,
+  verifyPreparedSupplementSupportTransition,
+} from "../../domain/services/SupplementSupportManagementService.js";
+import {
+  applySupplementStrategyOperation,
+  SupplementManagementOutcome,
+  verifySupplementStrategyOperation,
+} from "../../domain/services/SupplementStrategyManagementService.js";
+import { buildSupplementProvenance } from "../../domain/services/SupplementStrategyFormService.js";
 import { buildStrategySuccessorPayload } from "../../domain/services/StrategyEditorService.js";
 import { getLocalDateKey } from "../../domain/utils/localDate.js";
 
@@ -54,6 +66,8 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "upsertNutritionDay", "syncActivityDay", "commitTrainingSession", "upsertActivityDay",
   "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport", "saveNutritionStrategy",
   "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
+  "saveSupplementSupport",
+  "saveSupplementStrategy", "changeSupplementLifecycle",
 ]);
 
 const RECURRING_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "executionItems", "reminders"]);
@@ -65,6 +79,12 @@ const TRAINING_STRATEGY_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "proto
 const TRAINING_STRATEGY_READ_COLLECTIONS = Object.freeze(["user", ...TRAINING_STRATEGY_BOUNDED_COLLECTIONS]);
 const PEPTIDE_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["executionItems", "reminders"]);
 const PEPTIDE_SUPPORT_READ_COLLECTIONS = Object.freeze(["user", "protocols", ...PEPTIDE_SUPPORT_BOUNDED_COLLECTIONS]);
+const SUPPLEMENT_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["executionItems", "reminders"]);
+const SUPPLEMENT_SUPPORT_READ_COLLECTIONS = Object.freeze([
+  "user", "goals", "protocols", "protocolVersions", ...SUPPLEMENT_SUPPORT_BOUNDED_COLLECTIONS,
+]);
+const SUPPLEMENT_STRATEGY_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "protocolVersions"]);
+const SUPPLEMENT_STRATEGY_READ_COLLECTIONS = Object.freeze(["user", "goals", ...SUPPLEMENT_STRATEGY_BOUNDED_COLLECTIONS]);
 
 export function createCanonicalPersistenceCommandPorts({ records, now = () => new Date() } = {}) {
   if (!records?.get || !records?.put) throw new Error("Canonical command ports require a record store.");
@@ -180,6 +200,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     createCanonicalExercise,
     saveTrainingStrategy,
     savePeptideSupport,
+    saveSupplementSupport,
+    saveSupplementStrategy,
+    changeSupplementLifecycle,
   });
 
   /// The one canonical write for every "recurring support" execution item
@@ -422,6 +445,165 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         protocolId: context.payload.protocolId,
         executionId: result.executionId,
         executionRevision: result.executionRevision,
+      },
+      outbox: [],
+    };
+  }
+
+  async function saveSupplementSupport(context) {
+    const { candidate, before } = await loadCandidate(SUPPLEMENT_SUPPORT_READ_COLLECTIONS, context.ownerUserId);
+    const protocol = (candidate.protocols ?? []).find((item) =>
+      item.id === context.payload.protocolId && item.userId === context.ownerUserId && item.category === "supplement"
+    );
+    const version = (candidate.protocolVersions ?? []).find((item) => item.id === protocol?.currentVersionId);
+    const goalId = version?.goalLinks?.[0]?.goalId ?? protocol?.currentGoalIds?.[0] ?? protocol?.relatedGoalIds?.[0] ?? null;
+    const prepared = prepareSupplementSupportTransition(candidate, {
+      protocolId: context.payload.protocolId,
+      userId: context.ownerUserId,
+      expectedRevision: context.metadata.expectedVersion,
+      supplementVersionId: context.payload.supplementVersionId,
+      goalId,
+      draft: context.payload.draft,
+      author: {
+        type: "user",
+        id: context.ownerUserId,
+        displayName: candidate.user?.displayName ?? candidate.user?.name ?? "Founder",
+      },
+    }, now());
+    if (!prepared.ok) {
+      if (prepared.outcome === SupplementSupportOutcome.NOT_FOUND) {
+        throw problem(404, "SUPPLEMENT_SUPPORT_UNAVAILABLE", prepared.reason);
+      }
+      if (prepared.outcome === SupplementSupportOutcome.VERSION_CONFLICT) {
+        const execution = (candidate.executionItems ?? []).find((item) =>
+          item.type === "supplement" && item.protocolRootId === context.payload.protocolId
+        );
+        throw staleVersionProblem({
+          expectedVersion: context.metadata.expectedVersion ?? context.payload.supplementVersionId,
+          actualVersion: execution?.executionRevision ?? protocol?.currentVersionId ?? null,
+          resource: `supplement-support:${context.payload.protocolId}`,
+        });
+      }
+      if (prepared.outcome === SupplementSupportOutcome.UNCHANGED) {
+        const execution = (candidate.executionItems ?? []).find((item) =>
+          item.type === "supplement" && item.protocolRootId === context.payload.protocolId
+        );
+        return {
+          status: "committed",
+          result: {
+            status: "unchanged",
+            protocolId: context.payload.protocolId,
+            executionId: execution?.id ?? null,
+            executionRevision: execution?.executionRevision ?? null,
+            reminderId: (candidate.reminders ?? []).find((item) =>
+              item.type === "supplement_reminder" && item.linkedEntityId === context.payload.protocolId
+            )?.id ?? null,
+          },
+          outbox: [],
+        };
+      }
+      throw problem(400, "SUPPLEMENT_SUPPORT_INVALID", prepared.reason ?? "This Supplement Support plan is invalid.");
+    }
+    const result = applyPreparedSupplementSupportTransition(candidate, prepared);
+    if (!verifyPreparedSupplementSupportTransition(candidate, prepared)) {
+      throw problem(500, "SUPPLEMENT_SUPPORT_PERSISTENCE_FAILED", "We could not confirm this Supplement Support update. Nothing was changed.");
+    }
+    await persistCandidateCollections({
+      before,
+      candidate,
+      collections: SUPPLEMENT_SUPPORT_BOUNDED_COLLECTIONS,
+      ownerUserId: context.ownerUserId,
+    });
+    return {
+      status: "committed",
+      result: { status: "updated", protocolId: context.payload.protocolId, ...result },
+      outbox: [],
+    };
+  }
+
+  async function saveSupplementStrategy(context) {
+    const operation = context.payload.operation;
+    if (!["create", "edit"].includes(operation)) {
+      throw problem(400, "SUPPLEMENT_STRATEGY_INVALID", "Choose a supported Supplement strategy operation.");
+    }
+    const { candidate, before } = await loadCandidate(SUPPLEMENT_STRATEGY_READ_COLLECTIONS, context.ownerUserId);
+    const draft = context.payload.draft ?? {};
+    const protocolId = operation === "create"
+      ? createSupplementProtocolId(draft.name, context.metadata.commandId)
+      : draft.protocolId;
+    const prepared = applySupplementStrategyOperation(candidate, operation, {
+      ...draft,
+      protocolId,
+      userId: context.ownerUserId,
+      effectiveDate: getLocalDateKey(now(), candidate.user?.timeZone ?? candidate.user?.timezone),
+      initialStatus: draft.initialStatus ?? "active",
+      provenance: buildSupplementProvenance(
+        candidate.user,
+        operation === "create" ? "Add supplement strategy." : "Update supplement strategy.",
+        operation === "create" ? "native_supplement_creation" : "native_supplement_strategy_edit",
+      ),
+    }, now());
+    return persistSupplementStrategyResult({ candidate, before, context, prepared });
+  }
+
+  async function changeSupplementLifecycle(context) {
+    const operation = context.payload.operation;
+    if (!["pause", "restore"].includes(operation)) {
+      throw problem(400, "SUPPLEMENT_LIFECYCLE_INVALID", "Choose Pause or Restore.");
+    }
+    const { candidate, before } = await loadCandidate(SUPPLEMENT_STRATEGY_READ_COLLECTIONS, context.ownerUserId);
+    const prepared = applySupplementStrategyOperation(candidate, operation, {
+      protocolId: context.payload.protocolId,
+      expectedCurrentVersionId: context.payload.expectedCurrentVersionId,
+      userId: context.ownerUserId,
+      effectiveDate: getLocalDateKey(now(), candidate.user?.timeZone ?? candidate.user?.timezone),
+      provenance: buildSupplementProvenance(
+        candidate.user,
+        operation === "pause" ? "Pause supplement strategy." : "Restore supplement strategy.",
+        operation === "pause" ? "native_supplement_pause" : "native_supplement_restore",
+      ),
+    }, now());
+    return persistSupplementStrategyResult({ candidate, before, context, prepared });
+  }
+
+  async function persistSupplementStrategyResult({ candidate, before, context, prepared }) {
+    if (!prepared.ok) {
+      if (prepared.outcome === SupplementManagementOutcome.NOT_FOUND) {
+        throw problem(404, "SUPPLEMENT_STRATEGY_UNAVAILABLE", prepared.reason);
+      }
+      if (prepared.outcome === SupplementManagementOutcome.VERSION_CONFLICT) {
+        const protocolId = context.payload.protocolId ?? context.payload.draft?.protocolId;
+        const current = (candidate.protocols ?? []).find((item) => item.id === protocolId);
+        throw staleVersionProblem({
+          expectedVersion: context.payload.expectedCurrentVersionId ?? context.payload.draft?.expectedCurrentVersionId,
+          actualVersion: current?.currentVersionId ?? null,
+          resource: `supplement-strategy:${protocolId ?? "new"}`,
+        });
+      }
+      if (prepared.outcome === SupplementManagementOutcome.NO_CHANGES) {
+        return { status: "committed", result: { status: "unchanged" }, outbox: [] };
+      }
+      const status = prepared.outcome === SupplementManagementOutcome.DUPLICATE ? 409 : 400;
+      throw problem(status, prepared.outcome === SupplementManagementOutcome.DUPLICATE
+        ? "SUPPLEMENT_STRATEGY_DUPLICATE" : "SUPPLEMENT_STRATEGY_INVALID", prepared.reason);
+    }
+    if (!verifySupplementStrategyOperation(candidate, prepared)) {
+      throw problem(500, "SUPPLEMENT_STRATEGY_PERSISTENCE_FAILED", "We could not confirm this Supplement strategy update. Nothing was changed.");
+    }
+    await persistCandidateCollections({
+      before,
+      candidate,
+      collections: SUPPLEMENT_STRATEGY_BOUNDED_COLLECTIONS,
+      ownerUserId: context.ownerUserId,
+    });
+    return {
+      status: "committed",
+      result: {
+        status: "updated",
+        operation: prepared.operation,
+        protocolId: prepared.value.protocolId,
+        currentVersionId: (candidate.protocols ?? []).find((item) => item.id === prepared.value.protocolId)?.currentVersionId ?? prepared.value.versionId,
+        lifecycleState: (candidate.protocols ?? []).find((item) => item.id === prepared.value.protocolId)?.status ?? "active",
       },
       outbox: [],
     };
@@ -1357,6 +1539,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     };
   }
   function commandProvenance(context) { return { source: "phase4-application-command", commandId: context.metadata.commandId, deviceId: context.principal.deviceId, ...(context.canonicalStoreEpoch ? { canonicalStoreEpoch: context.canonicalStoreEpoch } : {}) }; }
+}
+
+function createSupplementProtocolId(name, commandId) {
+  const slug = String(name ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "supplement";
+  const suffix = String(commandId ?? "command").replace(/[^a-z0-9]/gi, "").slice(-8).toLowerCase();
+  return `protocol_supplement_${slug}_${suffix}`;
 }
 
 function assertManualActivitySource(source) {

@@ -34,6 +34,9 @@ export const NativeProductionResource = Object.freeze({
   OPERATING_PLAN_NUTRITION_STRATEGY: "operating-plan-nutrition-strategy",
   OPERATING_PLAN_TRAINING_STRATEGY: "operating-plan-training-strategy",
   OPERATING_PLAN_PEPTIDE_SUPPORT: "operating-plan-peptide-support",
+  OPERATING_PLAN_PROTOCOL_DOMAIN: "operating-plan-protocol-domain",
+  OPERATING_PLAN_SUPPLEMENT_SUPPORT: "operating-plan-supplement-support",
+  OPERATING_PLAN_SUPPLEMENT_STRATEGY_EDITOR: "operating-plan-supplement-strategy-editor",
 });
 
 const reads = Object.freeze([
@@ -70,6 +73,9 @@ const reads = Object.freeze([
   read("operating-plan-nutrition-strategy", "/api/v1/native/read/operating-plan-nutrition-strategy", "coreNavigation.getNutritionStrategyDetail"),
   read("operating-plan-training-strategy", "/api/v1/native/read/operating-plan-training-strategy", "coreNavigation.getTrainingStrategyDetail"),
   read("operating-plan-peptide-support", "/api/v1/native/read/operating-plan-peptide-support", "coreNavigation.getPeptideSupport"),
+  read("operating-plan-protocol-domain", "/api/v1/native/read/operating-plan-protocol-domain", "coreNavigation.getOperatingPlanProtocolDomain"),
+  read("operating-plan-supplement-support", "/api/v1/native/read/operating-plan-supplement-support", "coreNavigation.getSupplementSupport"),
+  read("operating-plan-supplement-strategy-editor", "/api/v1/native/read/operating-plan-supplement-strategy-editor", "coreNavigation.getSupplementStrategyEditor"),
 ]);
 
 const writes = Object.freeze([
@@ -88,6 +94,9 @@ const writes = Object.freeze([
   write(Phase3Command.CREATE_CANONICAL_EXERCISE, ["canonicalName", "primaryMuscleGroupId"], "If-Match not used; server rejects with 409 CANONICAL_EXERCISE_DUPLICATE when the full catalog already has a matching identity"),
   write(Phase3Command.SAVE_TRAINING_STRATEGY, ["protocolId", "expectedCurrentVersionId", "draft"], "If-Match not used; concurrency is enforced via expectedCurrentVersionId matching the protocol's own currentVersionId"),
   write(Phase3Command.SAVE_PEPTIDE_SUPPORT, ["protocolId", "draft"], "If-Match carries executionRevision when configured; omission is valid only while no execution exists"),
+  write(Phase3Command.SAVE_SUPPLEMENT_SUPPORT, ["protocolId", "supplementVersionId", "draft"], "supplementVersionId protects the active strategy version; If-Match carries executionRevision when Support is configured"),
+  write(Phase3Command.SAVE_SUPPLEMENT_STRATEGY, ["operation", "draft"], "create is idempotent by command identity; edit uses expectedCurrentVersionId inside the canonical successor transition"),
+  write(Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE, ["protocolId", "operation", "expectedCurrentVersionId"], "pause/restore require the protocol's authoritative currentVersionId"),
 ]);
 
 export const nativeProductionContractManifest = Object.freeze({

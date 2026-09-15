@@ -25,6 +25,9 @@ function fixture(overrides = {}) {
       getNutritionStrategyDetail: call({ protocolId: "nutrition-protocol", title: "Macro Strategy", editor: { expectedCurrentVersionId: "nutrition-protocol_v1" } }),
       getTrainingStrategyDetail: call({ protocolId: "training-protocol", title: "Current Training Strategy", editor: { expectedCurrentVersionId: "training-protocol_v1" } }),
       getPeptideSupport: call({ protocolId: "peptide-protocol", executionId: "execution-peptide", executionRevision: 2, name: "Retatrutide" }),
+      getOperatingPlanProtocolDomain: call({ category: "peptide", title: "Peptide Strategy", methods: [] }),
+      getSupplementSupport: call({ protocolId: "supplement-protocol", supplementVersionId: "supplement-protocol_v1", executionRevision: 2 }),
+      getSupplementStrategyEditor: call({ mode: "edit", protocolId: "supplement-protocol", expectedCurrentVersionId: "supplement-protocol_v1" }),
     },
     activeGoal: { getPreview: call({ goalId: "goal-build", phaseId: "phase-2", confidence: { score: 62, band: "Moderate", movement: "held" } }) },
     completedGoal: { getVisibleAbs: call({ goalId: "goal-visible-abs", status: "completed" }) },
@@ -259,6 +262,9 @@ describe("Native production contract boundary", () => {
       "operating-plan-nutrition-strategy": { strategyId: "nutrition-protocol" },
       "operating-plan-training-strategy": { strategyId: "training-protocol" },
       "operating-plan-peptide-support": { protocolId: "peptide-protocol" },
+      "operating-plan-protocol-domain": { protocolId: "peptide-protocol" },
+      "operating-plan-supplement-support": { protocolId: "supplement-protocol" },
+      "operating-plan-supplement-strategy-editor": { protocolId: "supplement-protocol" },
     };
     const results = new Map();
     for (const declaration of nativeProductionContractManifest.reads) {
@@ -444,6 +450,9 @@ describe("Native production contract boundary", () => {
       "training-catalog.my-library.add.v1", "training-catalog.exercise.create.v1",
       "operating-plan.training-strategy.save.v1",
       "operating-plan.peptide-support.save.v1",
+      "operating-plan.supplement-support.save.v1",
+      "operating-plan.supplement-strategy.save.v1",
+      "operating-plan.supplement-lifecycle.change.v1",
     ]);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/HealthKit|activity-day\.sync/);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/storage_key|Spaces|databaseName|provider-authoritative/);

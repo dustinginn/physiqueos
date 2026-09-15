@@ -53,6 +53,22 @@ const payloads = {
       timingContext: "fasted_before_bed", reminderPreference: "remind", notes: "",
     },
   },
+  [Phase3Command.SAVE_SUPPLEMENT_SUPPORT]: {
+    protocolId: "supplement-protocol",
+    supplementVersionId: "supplement-protocol_v1",
+    draft: {
+      dose: { amount: "5", unit: "g" },
+      supportSchedule: { frequency: "daily", daysOfWeek: [], intervalDays: 1, timing: "morning", specificTime: "", startDate: "2026-05-21", endDate: null },
+      reminderPreference: "remind", notes: "With breakfast",
+    },
+  },
+  [Phase3Command.SAVE_SUPPLEMENT_STRATEGY]: {
+    operation: "edit",
+    draft: { protocolId: "supplement-protocol", expectedCurrentVersionId: "supplement-protocol_v1", name: "Creatine", purpose: "Training support", role: "Daily support", goalId: "goal-build", startDate: "2026-05-21" },
+  },
+  [Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE]: {
+    protocolId: "supplement-protocol", operation: "pause", expectedCurrentVersionId: "supplement-protocol_v1",
+  },
 };
 
 describe("Phase 3 task command parity boundary", () => {
@@ -144,6 +160,9 @@ function commandPort(commandType) {
     [Phase3Command.CREATE_CANONICAL_EXERCISE]: "createCanonicalExercise",
     [Phase3Command.SAVE_TRAINING_STRATEGY]: "saveTrainingStrategy",
     [Phase3Command.SAVE_PEPTIDE_SUPPORT]: "savePeptideSupport",
+    [Phase3Command.SAVE_SUPPLEMENT_SUPPORT]: "saveSupplementSupport",
+    [Phase3Command.SAVE_SUPPLEMENT_STRATEGY]: "saveSupplementStrategy",
+    [Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE]: "changeSupplementLifecycle",
   })[commandType];
 }
 

@@ -142,12 +142,13 @@ describe("Operating Plan strategy domains", () => {
 
   it("uses Support terminology without changing the existing editor implementations", () => {
     const screen = fs.readFileSync(new URL("./StrategyDomainScreen.jsx", import.meta.url), "utf8");
-    expect(screen).toContain("Recovery Strategy");
-    expect(screen).toContain("Peptide Strategy");
-    expect(screen).toContain("Supplement Strategy");
-    expect(screen).toContain("Current Recovery Methods");
-    expect(screen).toContain("Current Peptides");
-    expect(screen).toContain("Current Supplements");
+    const readService = fs.readFileSync(new URL("../domain/services/StrategyDomainReadService.js", import.meta.url), "utf8");
+    expect(readService).toContain("Recovery Strategy");
+    expect(readService).toContain("Peptide Strategy");
+    expect(readService).toContain("Supplement Strategy");
+    expect(readService).toContain("Current Recovery Methods");
+    expect(readService).toContain("Current Peptides");
+    expect(readService).toContain("Current Supplements");
     expect(screen).toContain("Edit Support");
     expect(screen).not.toContain("Edit Execution");
     expect(screen).not.toContain("current Goal");

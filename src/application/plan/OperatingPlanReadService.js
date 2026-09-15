@@ -7,6 +7,7 @@ import { requireAuthenticationPrincipal } from "../auth/principal.js";
 import { describeEnergyStrategyIdentity } from "../../domain/presentation/strategyIdentityPresentation.js";
 import { scopeRepositoryReadService } from "../read-models/RepositoryReadScope.js";
 import { resolveCanonicalGoalRelationships } from "../../domain/services/CanonicalGoalRelationshipService.js";
+import { destinationFromWebHref } from "../../contracts/v1/destination.js";
 
 export function createOperatingPlanReadService({ repositories } = {}) {
   return scopeRepositoryReadService({ repositories, namespace: "operating-plan", service: Object.freeze({
@@ -64,7 +65,19 @@ export function buildOperatingPlan({ energyStrategy, executionItems = [], nutrit
   return sections.filter((item) => item.items.length > 0);
 }
 
-function section(iconKey, tone, title, subtitle, items, extra = {}) { return Object.freeze({ iconKey, tone, title, subtitle, items: Object.freeze(items), ...extra }); }
+function section(iconKey, tone, title, subtitle, items, extra = {}) {
+  return Object.freeze({
+    iconKey,
+    tone,
+    title,
+    subtitle,
+    items: Object.freeze(items.map((item) => Object.freeze({
+      ...item,
+      destination: destinationFromWebHref(item.href),
+    }))),
+    ...extra,
+  });
+}
 function protocolItem(id, title, protocols) { return { id, title, detail: protocols.map((item) => item.name).join(", "), href: `/profile/protocols/${protocols[0].id}?from=operating-plan`, status: "Active" }; }
 function energyItem(link) {
   if (!link) return { id: "energy-strategy-create", title: "Energy Strategy", detail: "Activity and Nutrition work together to define the Goal strategy", href: null, status: "Build Strategy" };

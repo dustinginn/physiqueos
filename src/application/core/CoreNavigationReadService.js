@@ -27,6 +27,14 @@ import {
   createTrainingLoggerProgressionRecommendation,
   TRAINING_LOGGER_PROGRESSION_STATUS,
 } from "../../domain/services/TrainingLoggerProgressionService.js";
+import {
+  buildStrategyDomainModel,
+  STRATEGY_DOMAIN_PRESENTATION,
+} from "../../domain/services/StrategyDomainReadService.js";
+import {
+  createSupplementSupportHydrationModel,
+  formatSupplementSupportSummary,
+} from "../../domain/services/SupplementSupportManagementService.js";
 
 export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   home: Object.freeze([
@@ -96,6 +104,50 @@ export function createCoreNavigationReadService({
     getOperatingPlan() {
       return withContext("core.navigation.operating-plan", "operatingPlan", ({ principal, repositories }) =>
         createOperatingPlanReadService({ repositories }).getOperatingPlan({ principal }));
+    },
+    getOperatingPlanProtocolDomain({ protocolId }) {
+      return withContext("core.navigation.operating-plan-protocol-domain", "operatingPlan", ({ ownerUserId, runtime }) => {
+        const representative = (runtime.protocols ?? []).find((item) =>
+          item.id === protocolId && item.userId === ownerUserId &&
+          (item.status === "active" || (item.category === "supplement" && item.status === "paused")) &&
+          ["recovery", "peptide", "supplement"].includes(item.category)
+        );
+        if (!representative) return null;
+        const protocols = (runtime.protocols ?? []).filter((item) =>
+          item.userId === ownerUserId &&
+          (item.status === "active" || (representative.category === "supplement" && item.status === "paused")) &&
+          item.category === representative.category
+        );
+        if (protocols.some((protocol) => hasAmbiguousDomainExecution(protocol, runtime.executionItems ?? []))) return null;
+        const currentVersionIds = new Set(protocols.map((item) => item.currentVersionId).filter(Boolean));
+        const model = buildStrategyDomainModel({
+          category: representative.category,
+          executionItems: runtime.executionItems ?? [],
+          goals: runtime.goals ?? [],
+          localDate: getLocalDateKey(now(), runtime.user?.timeZone ?? runtime.user?.timezone),
+          protocols,
+          versions: (runtime.protocolVersions ?? []).filter((item) => currentVersionIds.has(item.id)),
+          includePaused: representative.category === "supplement",
+        });
+        if (!model) return null;
+        return Object.freeze({
+          category: model.category,
+          title: STRATEGY_DOMAIN_PRESENTATION[model.category].title,
+          purpose: model.purpose,
+          methods: Object.freeze(model.methods.map((method) => Object.freeze({
+            id: method.id,
+            protocolId: method.protocolId,
+            lifecycleState: method.lifecycleState,
+            currentVersionId: method.currentVersionId,
+            name: method.name,
+            purpose: method.purpose,
+            supportSummary: method.supportSummary,
+            currentDose: method.currentDose ?? null,
+            currentSchedule: method.currentSchedule ?? null,
+            editDestination: domainSupportDestination(model.category, method),
+          }))),
+        });
+      });
     },
     async getTrainingLogger() {
       const canonicalExercises = await ensureCanonicalExerciseRegistry();
@@ -261,6 +313,93 @@ export function createCoreNavigationReadService({
           reminderPreference: hydration.reminderPreference,
           timingContext: hydration.timingContext,
           notes: hydration.notes,
+        });
+      });
+    },
+    getSupplementSupport({ protocolId }) {
+      return withContext("core.navigation.supplement-support", "operatingPlan", ({ ownerUserId, runtime }) => {
+        const protocol = (runtime.protocols ?? []).find((item) =>
+          item.id === protocolId && item.userId === ownerUserId && item.category === "supplement" && item.status === "active"
+        );
+        const version = (runtime.protocolVersions ?? []).find((item) =>
+          item.id === protocol?.currentVersionId && item.protocolId === protocol?.id && item.status === "active" && !item.endedAt
+        );
+        if (!protocol || !version) return null;
+        const executions = (runtime.executionItems ?? []).filter((item) =>
+          item.type === "supplement" && item.protocolRootId === protocol.id
+        );
+        const reminders = (runtime.reminders ?? []).filter((item) =>
+          item.userId === ownerUserId && item.type === "supplement_reminder" && item.linkedEntityId === protocol.id
+        );
+        if (executions.length > 1 || reminders.length > 1) return null;
+        const executionItem = executions[0] ?? null;
+        const hydration = createSupplementSupportHydrationModel({
+          executionItem,
+          protocol,
+          reminder: reminders[0] ?? null,
+        });
+        if (hydration.compatibilityIssue) return null;
+        const goalId = version.goalLinks?.[0]?.goalId ?? protocol.currentGoalIds?.[0] ?? protocol.relatedGoalIds?.[0] ?? null;
+        if (!goalId || !(runtime.goals ?? []).some((goal) =>
+          goal.id === goalId && goal.userId === ownerUserId && goal.status === "active"
+        )) return null;
+        return Object.freeze({
+          protocolId: protocol.id,
+          supplementVersionId: version.id,
+          goalId,
+          executionId: executionItem?.id ?? null,
+          executionRevision: hydration.executionRevision,
+          name: protocol.name,
+          supportSummary: formatSupplementSupportSummary(executionItem),
+          doseAmount: hydration.draft.dose.amount,
+          doseUnit: hydration.draft.dose.unit,
+          supportSchedule: hydration.draft.supportSchedule,
+          reminderPreference: hydration.draft.reminderPreference,
+          notes: hydration.draft.notes,
+        });
+      });
+    },
+    getSupplementStrategyEditor({ protocolId = null } = {}) {
+      return withContext("core.navigation.supplement-strategy-editor", "operatingPlan", ({ ownerUserId, runtime }) => {
+        const activeGoals = (runtime.goals ?? []).filter((goal) =>
+          goal.userId === ownerUserId && goal.status === "active"
+        );
+        if (!protocolId) {
+          return Object.freeze({
+            mode: "create",
+            protocolId: null,
+            expectedCurrentVersionId: null,
+            lifecycleState: "active",
+            goalId: activeGoals[0]?.id ?? "",
+            goalOptions: Object.freeze(activeGoals.map((goal) => Object.freeze({ id: goal.id, title: goal.title }))),
+            name: "",
+            purpose: "",
+            role: "",
+            startDate: getLocalDateKey(now(), runtime.user?.timeZone ?? runtime.user?.timezone),
+            initialStatus: "active",
+          });
+        }
+        const protocol = (runtime.protocols ?? []).find((item) =>
+          item.id === protocolId && item.userId === ownerUserId && item.category === "supplement" && item.status === "active"
+        );
+        const version = (runtime.protocolVersions ?? []).find((item) =>
+          item.id === protocol?.currentVersionId && item.protocolId === protocol?.id && item.status === "active" && !item.endedAt
+        );
+        if (!protocol || !version) return null;
+        const goals = activeGoals.filter((goal) => protocol.relatedGoalIds?.includes(goal.id));
+        const strategy = version.supplementStrategy ?? {};
+        return Object.freeze({
+          mode: "edit",
+          protocolId: protocol.id,
+          expectedCurrentVersionId: version.id,
+          lifecycleState: protocol.status,
+          goalId: version.goalLinks?.[0]?.goalId ?? goals[0]?.id ?? "",
+          goalOptions: Object.freeze(goals.map((goal) => Object.freeze({ id: goal.id, title: goal.title }))),
+          name: strategy.name ?? protocol.name,
+          purpose: strategy.purpose ?? protocol.purpose ?? "",
+          role: strategy.role ?? protocol.notes ?? "",
+          startDate: protocol.startDate ?? String(version.effectiveAt ?? "").slice(0, 10),
+          initialStatus: "active",
         });
       });
     },
@@ -605,6 +744,37 @@ function formatPeptideDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return String(value ?? "");
   return new Date(`${value}T12:00:00Z`).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+  });
+}
+
+function hasAmbiguousDomainExecution(protocol, executionItems) {
+  const matches = executionItems.filter((item) => {
+    if (item.active !== true) return false;
+    const linked = [item.protocolRootId, item.linkedProtocolId].includes(protocol.id);
+    if (!linked) return false;
+    if (protocol.category === "peptide") return ["peptide", "protocol"].includes(item.type);
+    return item.type === protocol.category;
+  });
+  return matches.length > 1;
+}
+
+function domainSupportDestination(category, method) {
+  if (category === "peptide") {
+    return Object.freeze({
+      id: "native.operating-plan.protocol.peptide",
+      parameters: Object.freeze({ protocolId: method.protocolId }),
+    });
+  }
+  if (category === "supplement") {
+    return Object.freeze({
+      id: "native.operating-plan.protocol.supplement.support",
+      parameters: Object.freeze({ protocolId: method.protocolId }),
+    });
+  }
+  if (!method.executionId) return null;
+  return Object.freeze({
+    id: "native.operating-plan.protocol.recovery",
+    parameters: Object.freeze({ executionId: method.executionId }),
   });
 }
 

@@ -33,6 +33,9 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.CREATE_CANONICAL_EXERCISE,
   Phase3Command.SAVE_TRAINING_STRATEGY,
   Phase3Command.SAVE_PEPTIDE_SUPPORT,
+  Phase3Command.SAVE_SUPPLEMENT_SUPPORT,
+  Phase3Command.SAVE_SUPPLEMENT_STRATEGY,
+  Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE,
 ]);
 
 export function createNativeProductionContractService({
@@ -151,6 +154,15 @@ export function createNativeProductionContractService({
         }); break;
         case "operating-plan-peptide-support": data = await readers.core.getPeptideSupport({
           protocolId: required(input.protocolId, "protocolId"),
+        }); break;
+        case "operating-plan-protocol-domain": data = await readers.core.getOperatingPlanProtocolDomain({
+          protocolId: required(input.protocolId, "protocolId"),
+        }); break;
+        case "operating-plan-supplement-support": data = await readers.core.getSupplementSupport({
+          protocolId: required(input.protocolId, "protocolId"),
+        }); break;
+        case "operating-plan-supplement-strategy-editor": data = await readers.core.getSupplementStrategyEditor({
+          protocolId: input.protocolId ?? null,
         }); break;
         default: throw unavailableResource();
       }
