@@ -14,7 +14,7 @@ import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupp
 import { createRecurringSupportHydrationModel } from "../../domain/services/RecurringSupportManagementService.js";
 import { formatSupportScheduleSummary } from "../../domain/models/SupportScheduleModel.js";
 import { composeOperatingPlanStrategyDetail } from "../../domain/services/OperatingPlanStrategyDetailService.js";
-import { createStrategyEditorModel } from "../../domain/services/StrategyEditorService.js";
+import { createStrategyEditorModel, TRAINING_AREAS } from "../../domain/services/StrategyEditorService.js";
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
 import { resolveCanonicalGoalPhaseChronology } from "../../domain/services/CanonicalGoalPhaseChronologyService.js";
@@ -268,6 +268,50 @@ export function createCoreNavigationReadService({
             fixedProteinGrams: editorModel.fixedProtein ?? 150,
             carbohydrateStrategy: editorModel.carbohydrateStrategy,
             fatStrategy: editorModel.fatStrategy,
+          }),
+        });
+      });
+    },
+    /// The Training Operating Plan strategy detail + editor read — same
+    /// composition pattern as Nutrition above (Web's own detail/edit pages
+    /// reused verbatim), but Training's editor field shape is genuinely
+    /// different (weekly area frequencies + priorities + progression
+    /// pace, not macro targets), preserved here rather than forced into
+    /// Nutrition's shape. `frequencies` is projected from
+    /// `createStrategyEditorModel`'s object map into an ordered array so
+    /// Native's `TrainingAreaFrequency` list decodes directly.
+    getTrainingStrategyDetail({ strategyId }) {
+      return withContext("core.navigation.training-strategy-detail", "operatingPlan", async ({ ownerUserId, repositories }) => {
+        const protocol = await repositories.protocols.getProtocolById(strategyId);
+        if (!protocol || protocol.userId !== ownerUserId || protocol.status !== "active" ||
+            (protocol.protocolType ?? protocol.category) !== "training") {
+          return null;
+        }
+        const version = protocol.currentVersionId
+          ? await repositories.protocolVersions.getVersionById(protocol.currentVersionId)
+          : null;
+        if (!version) return null;
+        const goals = await repositories.goals.listGoals(ownerUserId);
+        const detail = composeOperatingPlanStrategyDetail({
+          goals, protocol, strategyType: "training", version,
+        });
+        const editorModel = createStrategyEditorModel({ protocol, strategyType: "training", version });
+        if (!detail || !editorModel) return null;
+        return Object.freeze({
+          protocolId: protocol.id,
+          title: detail.title,
+          purpose: detail.purpose,
+          goal: detail.goal,
+          startedDate: detail.startedDate,
+          status: detail.status,
+          fields: detail.sections,
+          editor: Object.freeze({
+            expectedCurrentVersionId: protocol.currentVersionId,
+            frequencies: Object.freeze(TRAINING_AREAS.map((area) => Object.freeze({
+              area, count: editorModel.frequencies[area] ?? 0,
+            }))),
+            priorities: Object.freeze([...editorModel.priorities]),
+            progression: editorModel.progression,
           }),
         });
       });

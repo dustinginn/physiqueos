@@ -31,6 +31,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.SAVE_NUTRITION_STRATEGY,
   Phase3Command.ADD_TO_MY_LIBRARY,
   Phase3Command.CREATE_CANONICAL_EXERCISE,
+  Phase3Command.SAVE_TRAINING_STRATEGY,
 ]);
 
 export function createNativeProductionContractService({
@@ -142,6 +143,9 @@ export function createNativeProductionContractService({
           executionId: required(input.executionId, "executionId"),
         }); break;
         case "operating-plan-nutrition-strategy": data = await readers.core.getNutritionStrategyDetail({
+          strategyId: required(input.strategyId, "strategyId"),
+        }); break;
+        case "operating-plan-training-strategy": data = await readers.core.getTrainingStrategyDetail({
           strategyId: required(input.strategyId, "strategyId"),
         }); break;
         default: throw unavailableResource();

@@ -38,6 +38,13 @@ const payloads = {
   },
   [Phase3Command.ADD_TO_MY_LIBRARY]: { canonicalExerciseId: "dumbbell_reverse_lunge" },
   [Phase3Command.CREATE_CANONICAL_EXERCISE]: { canonicalName: "Chest Supported Row", primaryMuscleGroupId: "back" },
+  [Phase3Command.SAVE_TRAINING_STRATEGY]: {
+    protocolId: "training-protocol", expectedCurrentVersionId: "training-protocol_v1",
+    draft: {
+      frequencies: [{ area: "chest", count: 2 }, { area: "back", count: 2 }],
+      priorities: ["chest", "back"], progression: "aggressive",
+    },
+  },
 };
 
 describe("Phase 3 task command parity boundary", () => {
@@ -127,6 +134,7 @@ function commandPort(commandType) {
     [Phase3Command.SAVE_NUTRITION_STRATEGY]: "saveNutritionStrategy",
     [Phase3Command.ADD_TO_MY_LIBRARY]: "addToMyLibrary",
     [Phase3Command.CREATE_CANONICAL_EXERCISE]: "createCanonicalExercise",
+    [Phase3Command.SAVE_TRAINING_STRATEGY]: "saveTrainingStrategy",
   })[commandType];
 }
 

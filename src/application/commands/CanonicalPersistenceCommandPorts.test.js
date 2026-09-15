@@ -297,6 +297,84 @@ describe("Phase 4 canonical command persistence ports", () => {
     expect(records.snapshot().protocolVersions).toHaveLength(1);
   });
 
+  it("saves a Training strategy successor, superseding the current version and advancing currentVersionId", async () => {
+    const records = trainingStrategyFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const saved = await ports.saveTrainingStrategy(commandContext({
+      protocolId: "training-protocol",
+      expectedCurrentVersionId: "training-protocol_v1",
+      draft: {
+        frequencies: [
+          { area: "arms", count: 0 }, { area: "core", count: 1 }, { area: "lower_body", count: 2 },
+          { area: "back", count: 2 }, { area: "chest", count: 2 }, { area: "shoulders", count: 1 },
+        ],
+        priorities: ["back", "shoulders"],
+        progression: "aggressive",
+      },
+    }, null, "training-strategy-save"));
+    expect(saved.result.status).toBe("updated");
+    const successorId = saved.result.currentVersionId;
+    expect(successorId).not.toBe("training-protocol_v1");
+    const snapshot = records.snapshot();
+    const protocol = snapshot.protocols.find((item) => item.id === "training-protocol");
+    expect(protocol.currentVersionId).toBe(successorId);
+    const previous = snapshot.protocolVersions.find((item) => item.id === "training-protocol_v1");
+    expect(previous.status).toBe("superseded");
+    const successor = snapshot.protocolVersions.find((item) => item.id === successorId);
+    expect(successor.trainingStrategy).toMatchObject({
+      weeklyFrequencies: { arms: 0, core: 1, lower_body: 2, back: 2, chest: 2, shoulders: 1 },
+      physiquePriorities: ["back", "shoulders"],
+      progression: { pace: "aggressive" },
+    });
+  });
+
+  it("rejects a Training strategy save against a stale expectedCurrentVersionId without mutating state", async () => {
+    const records = trainingStrategyFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.saveTrainingStrategy(commandContext({
+      protocolId: "training-protocol",
+      expectedCurrentVersionId: "training-protocol_v0-stale",
+      draft: {
+        frequencies: [{ area: "chest", count: 3 }],
+        priorities: ["chest"],
+        progression: "aggressive",
+      },
+    }, null, "training-strategy-stale"))).rejects.toMatchObject({ code: "STALE_VERSION" });
+    const snapshot = records.snapshot();
+    expect(snapshot.protocols.find((item) => item.id === "training-protocol").currentVersionId).toBe("training-protocol_v1");
+    expect(snapshot.protocolVersions).toHaveLength(1);
+  });
+
+  it("treats an unchanged Training strategy save as a no-op rather than an error", async () => {
+    const records = trainingStrategyFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const saved = await ports.saveTrainingStrategy(commandContext({
+      protocolId: "training-protocol",
+      expectedCurrentVersionId: "training-protocol_v1",
+      draft: {
+        frequencies: [
+          { area: "arms", count: 0 }, { area: "core", count: 0 }, { area: "lower_body", count: 1 },
+          { area: "back", count: 1 }, { area: "chest", count: 1 }, { area: "shoulders", count: 0 },
+        ],
+        priorities: ["chest"],
+        progression: "moderate",
+      },
+    }, null, "training-strategy-unchanged"));
+    expect(saved.result).toMatchObject({ status: "unchanged", currentVersionId: "training-protocol_v1" });
+    expect(records.snapshot().protocolVersions).toHaveLength(1);
+  });
+
+  it("rejects an invalid Training strategy draft (zero total weekly sessions) without mutating state", async () => {
+    const records = trainingStrategyFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.saveTrainingStrategy(commandContext({
+      protocolId: "training-protocol",
+      expectedCurrentVersionId: "training-protocol_v1",
+      draft: { frequencies: [], priorities: ["chest"], progression: "moderate" },
+    }, null, "training-strategy-invalid"))).rejects.toMatchObject({ code: "TRAINING_STRATEGY_INVALID" });
+    expect(records.snapshot().protocolVersions).toHaveLength(1);
+  });
+
   it("adds an existing canonical exercise to My Library idempotently", async () => {
     const records = fixture();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });
@@ -603,6 +681,42 @@ function nutritionStrategyFixture() {
       goalLinks: [{ goalId: "goal-one", relationship: "supports" }],
       author: { type: "user", id: ownerUserId, displayName: "Founder" },
       intent: { summary: "Support the active Goal with the current Nutrition strategy." },
+      change: { reason: "Initial strategy.", changedFields: [], previousVersionId: null },
+      confirmation: { confirmedByUser: true }, createdAt: "2026-07-01T00:00:00.000Z", version: 1,
+    }],
+    goals: [{ id: "goal-one", userId: ownerUserId, title: "Goal", primary: true, status: "active", version: 1,
+      operatingState: { value: "build_lean_mass" }, phases: [] }],
+    executionItems: [], reminders: [], evidenceReviews: [], trainingPerformanceEvents: [],
+    weightEntries: [], dailyCheckIns: [], evidencePackages: [], canonicalEvidenceObjects: [],
+    dexaScans: [], progressPhotos: [], dailyBriefings: [], analyses: [],
+    briefingReconciliationWorkItems: [],
+    canonicalExerciseLibrary: [], piEnergyConfidenceWorkItems: [], piTrainingConfidenceWorkItems: [],
+  });
+}
+
+/// Isolated from the shared `fixture()` above — a realistic active Training
+/// protocol/version pair, mirroring `nutritionStrategyFixture()`'s shape but
+/// with Training's own `trainingStrategy` field (weeklyFrequencies,
+/// physiquePriorities, progression), not Nutrition's `effectiveStrategy`.
+function trainingStrategyFixture() {
+  return createInMemoryCanonicalRecordStore({
+    user: [{ id: ownerUserId, timeZone: "America/Los_Angeles", displayName: "Founder", version: 1 }],
+    protocols: [{
+      id: "training-protocol", userId: ownerUserId, category: "training", protocolType: "training",
+      name: "Training Strategy", status: "active", currentVersionId: "training-protocol_v1",
+      currentGoalIds: ["goal-one"], relatedGoalIds: [], activatedAt: "2026-07-01T00:00:00.000Z", version: 1,
+    }],
+    protocolVersions: [{
+      id: "training-protocol_v1", protocolId: "training-protocol", versionNumber: 1,
+      status: "active", effectiveAt: "2026-07-01", endedAt: null,
+      trainingStrategy: {
+        weeklyFrequencies: { arms: 0, core: 0, lower_body: 1, back: 1, chest: 1, shoulders: 0 },
+        physiquePriorities: ["chest"],
+        progression: { pace: "moderate" },
+      },
+      goalLinks: [{ goalId: "goal-one", relationship: "supports" }],
+      author: { type: "user", id: ownerUserId, displayName: "Founder" },
+      intent: { summary: "Support the active Goal with the current Training strategy." },
       change: { reason: "Initial strategy.", changedFields: [], previousVersionId: null },
       confirmation: { confirmedByUser: true }, createdAt: "2026-07-01T00:00:00.000Z", version: 1,
     }],

@@ -31,6 +31,7 @@ export const Phase3Command = Object.freeze({
   SAVE_NUTRITION_STRATEGY: "operating-plan.nutrition-strategy.save.v1",
   ADD_TO_MY_LIBRARY: "training-catalog.my-library.add.v1",
   CREATE_CANONICAL_EXERCISE: "training-catalog.exercise.create.v1",
+  SAVE_TRAINING_STRATEGY: "operating-plan.training-strategy.save.v1",
 });
 
 const DEFINITIONS = Object.freeze({
@@ -66,6 +67,9 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.ADD_TO_MY_LIBRARY]: define("addToMyLibrary", ["canonicalExerciseId"], false),
   [Phase3Command.CREATE_CANONICAL_EXERCISE]: define(
     "createCanonicalExercise", ["canonicalName", "primaryMuscleGroupId"], false
+  ),
+  [Phase3Command.SAVE_TRAINING_STRATEGY]: define(
+    "saveTrainingStrategy", ["protocolId", "expectedCurrentVersionId", "draft"], false
   ),
 });
 

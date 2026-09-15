@@ -120,6 +120,32 @@ describe("provider-native core navigation reads", () => {
     expect(await narrow.getNutritionStrategyDetail({ strategyId: "does-not-exist" })).toBeNull();
   });
 
+  it("composes the Training strategy detail and editor from the active protocol version", async () => {
+    const { narrow } = trainingStrategyServices();
+    const result = await narrow.getTrainingStrategyDetail({ strategyId: "training-protocol" });
+    expect(result.protocolId).toBe("training-protocol");
+    expect(result.title).toBe("Lean Mass Goal Training");
+    expect(result.fields).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Weekly Structure", value: "3 area sessions" }),
+      expect.objectContaining({ label: "Training Focus", value: "Chest" }),
+      expect.objectContaining({ label: "Progression", value: "Moderate" }),
+    ]));
+    expect(result.editor).toEqual({
+      expectedCurrentVersionId: "training-protocol_v1",
+      frequencies: [
+        { area: "arms", count: 0 }, { area: "core", count: 0 }, { area: "lower_body", count: 1 },
+        { area: "back", count: 1 }, { area: "chest", count: 1 }, { area: "shoulders", count: 0 },
+      ],
+      priorities: ["chest"],
+      progression: "moderate",
+    });
+  });
+
+  it("returns null for a Training strategy id that is not an active, owned Training protocol", async () => {
+    const { narrow } = trainingStrategyServices();
+    expect(await narrow.getTrainingStrategyDetail({ strategyId: "does-not-exist" })).toBeNull();
+  });
+
   it("provides bounded Workout Logger and Morning Check-In models", async () => {
     const { narrow } = services();
     const logger = await narrow.getTrainingLogger();
@@ -348,6 +374,38 @@ function nutritionStrategyServices() {
       effectiveStrategy: {
         proteinBasis: "body_weight", proteinRatio: 1, fixedProtein: null, proteinTarget: null,
         carbohydrateStrategy: "performance", fatStrategy: "sustainable_minimum",
+      },
+      goalLinks: [{ goalId: "goal-one", relationship: "supports" }],
+    }],
+  };
+  return {
+    runtime,
+    narrow: createCoreNavigationReadService({
+      store: createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime }),
+      now: () => NOW,
+    }),
+  };
+}
+
+/// Mirrors `nutritionStrategyServices()` above with Training's own
+/// `trainingStrategy` field shape (weeklyFrequencies/physiquePriorities/
+/// progression), not Nutrition's `effectiveStrategy`.
+function trainingStrategyServices() {
+  const runtime = {
+    user: { id: "user", displayName: "Founder" },
+    goals: [{ id: "goal-one", userId: "user", title: "Lean Mass Goal", primary: true, status: "active" }],
+    protocols: [{
+      id: "training-protocol", userId: "user", category: "training", protocolType: "training",
+      name: "Training Strategy", status: "active", currentVersionId: "training-protocol_v1",
+      currentGoalIds: ["goal-one"], activatedAt: "2026-07-01T00:00:00.000Z",
+    }],
+    protocolVersions: [{
+      id: "training-protocol_v1", protocolId: "training-protocol", versionNumber: 1,
+      status: "active", effectiveAt: "2026-07-01", endedAt: null,
+      trainingStrategy: {
+        weeklyFrequencies: { arms: 0, core: 0, lower_body: 1, back: 1, chest: 1, shoulders: 0 },
+        physiquePriorities: ["chest"],
+        progression: { pace: "moderate" },
       },
       goalLinks: [{ goalId: "goal-one", relationship: "supports" }],
     }],
