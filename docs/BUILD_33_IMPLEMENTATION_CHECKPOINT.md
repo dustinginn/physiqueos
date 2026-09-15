@@ -40,6 +40,8 @@ Catalog corrections reuse the existing exact-name/alias policy in one shared hel
 
 Changed presentation error messages no longer expose canonical identity/revision/version terminology; unknown Evidence statuses/types use neutral labels, not raw backend enums. Workout Summary renders typed telemetry once, without repeating calories/duration in the header or generated Apple-only summary. Legacy summary content remains available only when neither typed telemetry nor structured exercises exists.
 
+The existing standalone workout-correction editor has no authorized live Native endpoint. It is now explicitly unavailable in Founder Production rather than accepting local-only changes there. Sandbox correction testing remains isolated and uses nontechnical, honest local-only copy. A production workout-correction workflow is not claimed by this presentation cleanup. The UI journey uses the existing fixture's actual time/duration/calorie values projected into typed telemetry (no invented HR), asserting calories and structured exercises once.
+
 Date/time review covered presentation formatter call sites and shared calendar-date, chronology, editor schedule, greeting, notification and telemetry boundaries. Two corrective regressions cover local-noon date anchoring at UTC-12/UTC+14 (fixed UTC noon fails at UTC+14), invalid calendar dates, and friendly fractional-instant/date-only workout labels. Canonical schedule/calendar ownership is unchanged.
 
 ## Full Build 33 requirement audit

@@ -83,12 +83,15 @@ final class TrainingAcceptanceUITests: XCTestCase {
 
         tapText("Traditional Strength Training")
         assertText("WORKOUT DETAIL")
+        assertText("Workout Summary")
+        assertText("420 active cal")
         // Structured workouts show the unified exercise/set breakdown,
         // not a second generated serialization under Session Details.
         assertText("Exercises")
         assertText("Bench Press")
         XCTAssertFalse(app.staticTexts["Session Details"].exists, "The generated workout summary duplicated the structured breakdown.")
         XCTAssertEqual(app.staticTexts.matching(identifier: "Bench Press").count, 1, "The exercise was rendered more than once.")
+        XCTAssertEqual(app.staticTexts.matching(identifier: "420 active cal").count, 1, "Workout calories were duplicated in the header or generated summary.")
         attachScreenshot("11-workout-detail")
 
         scrollToText("Add / Correct Workout Details")
@@ -106,7 +109,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         XCTAssertTrue(save.waitForExistence(timeout: 3) && save.isHittable, "Save workout details was not actionable.")
         save.tap()
         XCTAssertFalse((editor.value as? String)?.contains("Cable row") == true, "The local correction was not accepted.")
-        scrollToText("Saved to this device only — Native has no live correction endpoint yet. The original evidence above stays exactly as recorded.")
+        scrollToText("Saved to this device only. Your original workout is unchanged.")
         attachScreenshot("12-add-correct-workout-details")
     }
 

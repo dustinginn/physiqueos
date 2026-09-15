@@ -172,13 +172,17 @@ struct TrainingSessionDetailView: View {
     /// "Workout details saved." success copy, which would misrepresent a
     /// server-side commit that did not happen.
     private func submitCorrection() {
+        guard environment.nativeAuthority == .sandbox else {
+            correctionStatusMessage = "Workout corrections aren't available here yet. Your saved workout is unchanged."
+            return
+        }
         if let validationError = TrainingSessionCorrectionValidation.validationError(forText: correctionDraftText) {
             correctionStatusMessage = validationError
             return
         }
         localDraftCorrections.append(correctionDraftText.trimmingCharacters(in: .whitespacesAndNewlines))
         correctionDraftText = ""
-        correctionStatusMessage = "Saved to this device only — Native has no live correction endpoint yet. The original evidence above stays exactly as recorded."
+        correctionStatusMessage = "Saved to this device only. Your original workout is unchanged."
     }
 
     /// Mirrors `TrainingSessionCorrectionCard`
@@ -194,6 +198,11 @@ struct TrainingSessionDetailView: View {
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
 
+                if environment.nativeAuthority == .founderProduction {
+                    Text("Workout corrections aren't available here yet. Your saved workout is unchanged.")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                } else {
                 ZStack(alignment: .topLeading) {
                     if correctionDraftText.isEmpty {
                         Text("Shoulder Press Machine\n15 x #120\n12 x #130\n10 x #140\n8 x #150")
@@ -243,6 +252,7 @@ struct TrainingSessionDetailView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
+                }
                 }
             }
         }

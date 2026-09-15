@@ -1665,6 +1665,12 @@
       "value": "420 active cal",
       "detail": "6:02 AM\u20136:54 AM \u00b7 52 min \u00b7 420 active cal \u00b7 Bench Press, Cable Fly, Overhead Triceps Extension, Push-ups",
       "date": "2026-08-26T06:02:00-07:00",
+      "telemetry": {
+        "startTime": "2026-08-26T06:02:00-07:00",
+        "endTime": "2026-08-26T06:54:00-07:00",
+        "durationSeconds": 3120,
+        "activeCalories": 420
+      },
       "sourceEvidence": [
         "Typed evidence"
       ],
