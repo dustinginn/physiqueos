@@ -23,7 +23,7 @@ struct OperatingPlanSupplementEditorView: View {
 
     var body: some View {
         ScrollView {
-            if let model {
+            if let model, environment.nativeAuthority == .sandbox || productionDetail != nil {
                 VStack(alignment: .leading, spacing: 18) {
                     OperatingPlanScreenHeader(
                         eyebrow: "Supplement",
@@ -107,8 +107,11 @@ struct OperatingPlanSupplementEditorView: View {
     private func load() async {
         switch environment.nativeAuthority {
         case .sandbox:
-            if model == nil { model = store.supplementEditor(protocolId: protocolId) }
+            productionDetail = nil
+            model = store.supplementEditor(protocolId: protocolId)
         case .founderProduction:
+            model = nil
+            productionDetail = nil
             isLoadingProduction = true
             loadError = nil
             defer { isLoadingProduction = false }

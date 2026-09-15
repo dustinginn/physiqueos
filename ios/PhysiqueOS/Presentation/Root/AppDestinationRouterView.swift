@@ -45,7 +45,11 @@ struct AppDestinationRouterView: View {
         case .goalTransitionSuccess:
             GoalTransitionSuccessView(onNavigate: onNavigate)
         case .goalPhaseTransition(let goalId, let phaseId):
-            PhaseTransitionView(goalId: goalId, phaseId: phaseId)
+            if environment.nativeAuthority == .founderProduction {
+                GoalUnavailableView(message: "Phase transitions are not available in Native production.")
+            } else {
+                PhaseTransitionView(goalId: goalId, phaseId: phaseId)
+            }
         case .checkIn(let checkInType) where ["morning", "morning-weight", "morning_weigh_in", "weight"].contains(checkInType):
             MorningCheckInView(onNavigate: onNavigate)
         case .priorityDetail(let priorityId):
@@ -171,6 +175,18 @@ struct AppDestinationRouterView: View {
             OperatingPlanSupplementEditorView(protocolId: nil)
         case .operatingPlanSupplementEdit(let protocolId):
             OperatingPlanSupplementEditorView(protocolId: protocolId)
+        case .operatingPlanStatus(_, let title, let detail, let status):
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    OperatingPlanScreenHeader(eyebrow: "Operating Plan", title: title, subtitle: detail)
+                    CardContainer(padding: .sm) {
+                        OperatingPlanFieldRow(label: "Status", value: status)
+                    }
+                }
+                .padding(16)
+            }
+            .background(PhysiqueOSTheme.background)
+            .navigationTitle(title)
         case .operatingPlanDexaAppointment:
             OperatingPlanDexaAppointmentView()
         case .operatingPlanTrainingStrategyBuilder:

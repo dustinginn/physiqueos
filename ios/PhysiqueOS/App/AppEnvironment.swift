@@ -101,13 +101,11 @@ enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
     /// Weigh-In — both route through the same server-owned
     /// `operating-plan.recurring-support.save.v1` command Web's own
     /// `saveFoamRollingSupport`/`saveMorningWeighInSupport` actions already
-    /// call). The other six Operating Plan domains (Energy Strategy,
-    /// Nutrition strategy, Training strategy, Peptides, Supplements,
-    /// Coaching Updates) each need their own server command and remain
-    /// sandbox-only until that work lands — enabling this flag does not by
-    /// itself make every Operating Plan screen production-safe; each
-    /// screen's own read/write API decides whether it actually calls
-    /// production or stays on `OperatingPlanSandboxStore`.
+    /// call). Build 33 now exposes canonical, domain-specific writes for
+    /// Nutrition, Training, Peptides, Supplements, and the atomic Coaching
+    /// Updates composite. Energy remains canonical and read-only. The flag
+    /// does not authorize fixture-backed or unrelated writes; production
+    /// screens use their typed APIs and fail closed.
     static let enabledUnderFounderProduction: Set<NativeProductWriteDomain> = [
         .morningCheckInAndWeight,
         .priorityCompletion,
@@ -332,6 +330,22 @@ final class AppEnvironment {
         case .founderProduction: ProductionSupplementStrategyAPI(
             api: productionNativeAPI,
             idempotencyStore: productionIdempotencyKeyStore
+        )
+        }
+    }
+
+    var energyStrategyAPI: EnergyStrategyAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableEnergyStrategyAPI()
+        case .founderProduction: ProductionEnergyStrategyAPI(api: productionNativeAPI)
+        }
+    }
+
+    var coachingUpdatesAPI: CoachingUpdatesAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailableCoachingUpdatesAPI()
+        case .founderProduction: ProductionCoachingUpdatesAPI(
+            api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore
         )
         }
     }

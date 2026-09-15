@@ -13,6 +13,15 @@ struct OperatingPlanTrainingProtocolBuilderView: View {
     private var store: OperatingPlanSandboxStore { environment.operatingPlanStore }
 
     var body: some View {
+        if environment.nativeAuthority == .founderProduction {
+            OperatingPlanUnavailableView(message: "Training creation is not available through this legacy builder. Return to your current production Training strategy.")
+        } else {
+            sandboxContent
+        }
+    }
+
+    @ViewBuilder
+    private var sandboxContent: some View {
         let context = store.trainingProtocolBuilderContext()
         Group {
             if context.hasActiveProtocol {
@@ -71,6 +80,10 @@ private struct TrainingProtocolBuilderWizard: View {
     }
 
     private func activate() {
+        guard environment.nativeAuthority == .sandbox else {
+            errorMessage = "This legacy builder cannot save to Founder Production."
+            return
+        }
         let store = environment.operatingPlanStore
         switch store.activateTrainingProtocol(draft) {
         case .success: errorMessage = nil; onActivated()

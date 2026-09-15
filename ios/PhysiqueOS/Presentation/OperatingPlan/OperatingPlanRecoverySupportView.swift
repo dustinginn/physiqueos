@@ -96,7 +96,7 @@ struct OperatingPlanRecoverySupportView: View {
                 CardContainer(padding: .sm) {
                     VStack(alignment: .leading, spacing: 8) {
                         OperatingPlanFieldRow(label: "Summary", value: support.supportSummary)
-                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSandboxStore.formatSupportSchedule(support.supportSchedule))
+                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSchedulePresentation.formatSupportSchedule(support.supportSchedule))
                         OperatingPlanFieldRow(label: "Starts", value: OperatingPlanDateValues.readableDate(support.supportSchedule.startDate))
                         OperatingPlanFieldRow(label: "Ends", value: support.supportSchedule.endDate.map(OperatingPlanDateValues.readableDate) ?? "Until changed")
                         OperatingPlanFieldRow(label: "Reminder", value: support.reminderPreference.label)

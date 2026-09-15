@@ -536,15 +536,7 @@ final class OperatingPlanSandboxStore {
     }
 
     static func formatSupportSchedule(_ model: OperatingPlanSupportScheduleReadModel) -> String {
-        let cadence: String
-        switch model.frequency {
-        case .daily: cadence = "Daily"
-        case .weekly: cadence = model.daysOfWeek.first.map { "\($0.label)s" } ?? "Weekly"
-        case .specificDays: cadence = model.daysOfWeek.map(\.shortLabel).joined(separator: ", ")
-        case .everyXDays: cadence = model.intervalDays == 2 ? "Every other day" : "Every \(model.intervalDays) days"
-        }
-        let time = model.timing == .specific ? formattedLocalTime(model.specificTime) : model.timing.label
-        return [cadence, time].filter { !$0.isEmpty }.joined(separator: " · ")
+        OperatingPlanSchedulePresentation.formatSupportSchedule(model)
     }
 
     private static func coachingScheduleSummary(_ model: CoachingUpdateScheduleReadModel) -> String {
@@ -557,12 +549,7 @@ final class OperatingPlanSandboxStore {
     }
 
     static func formattedLocalTime(_ value: String) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "HH:mm"
-        guard let date = formatter.date(from: value) else { return value }
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: date)
+        OperatingPlanSchedulePresentation.formattedLocalTime(value)
     }
 
     private static func formatDose(_ amount: Double, _ unit: String) -> String {

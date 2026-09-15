@@ -4,8 +4,8 @@ import SwiftUI
 /// `StrategyEditorService.js` — the real, currently reachable editors for
 /// Nutrition, Training, and Coaching Updates (Energy has none; guarded by
 /// `OperatingPlanStrategyDetailView` never offering an edit destination for
-/// it). Saves are local-only via `OperatingPlanSandboxStore` — nothing
-/// here reaches a server.
+/// it). Founder Production uses each domain's canonical API and concurrency
+/// model; OperatingPlanSandboxStore is used only under Sandbox authority.
 struct OperatingPlanStrategyEditorView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -56,7 +56,7 @@ private struct NutritionStrategyEditor: View {
         ScrollView {
             if isProduction, isLoadingProduction, model == nil {
                 ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
-            } else if let model {
+            } else if let model, !isProduction || expectedCurrentVersionId != nil {
                 VStack(alignment: .leading, spacing: 18) {
                     OperatingPlanScreenHeader(eyebrow: "Nutrition", title: "Edit Strategy", subtitle: "Macro targets that translate the Energy strategy into daily nutrition.")
 
@@ -123,10 +123,15 @@ private struct NutritionStrategyEditor: View {
 
     private func loadIfNeeded() async {
         guard isProduction else {
-            if model == nil { model = store.nutritionEditor(strategyId: strategyId) }
+            protocolId = nil
+            expectedCurrentVersionId = nil
+            model = store.nutritionEditor(strategyId: strategyId)
             return
         }
         isLoadingProduction = true
+        model = nil
+        protocolId = nil
+        expectedCurrentVersionId = nil
         loadError = nil
         defer { isLoadingProduction = false }
         do {
@@ -201,7 +206,7 @@ private struct TrainingStrategyEditor: View {
         ScrollView {
             if isProduction, isLoadingProduction, model == nil {
                 ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
-            } else if let model {
+            } else if let model, !isProduction || expectedCurrentVersionId != nil {
                 VStack(alignment: .leading, spacing: 18) {
                     OperatingPlanScreenHeader(eyebrow: "Training", title: "Edit Strategy", subtitle: "Weekly structure and progression intent for the current phase.")
 
@@ -264,10 +269,15 @@ private struct TrainingStrategyEditor: View {
 
     private func loadIfNeeded() async {
         guard isProduction else {
-            if model == nil { model = store.trainingEditor(strategyId: strategyId) }
+            protocolId = nil
+            expectedCurrentVersionId = nil
+            model = store.trainingEditor(strategyId: strategyId)
             return
         }
         isLoadingProduction = true
+        model = nil
+        protocolId = nil
+        expectedCurrentVersionId = nil
         loadError = nil
         defer { isLoadingProduction = false }
         do {
@@ -320,15 +330,25 @@ private struct TrainingStrategyEditor: View {
 }
 
 private struct CoachingUpdatesEditor: View {
+    @Environment(AppEnvironment.self) private var environment
     let strategyId: String
     let store: OperatingPlanSandboxStore
     let onSaved: () -> Void
 
     @State private var model: CoachingUpdatesEditorReadModel?
+    @State private var productionDetail: CoachingUpdatesProductionDetail?
+    @State private var isLoadingProduction = false
+    @State private var isSaving = false
+    @State private var loadError: String?
+    @State private var errorMessage: String?
+
+    private var isProduction: Bool { environment.nativeAuthority == .founderProduction }
 
     var body: some View {
         ScrollView {
-            if let model {
+            if isProduction, isLoadingProduction, model == nil {
+                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+            } else if let model, !isProduction || productionDetail != nil {
                 VStack(alignment: .leading, spacing: 18) {
                     OperatingPlanScreenHeader(eyebrow: "Coaching Updates", title: "Edit Coaching Updates", subtitle: "How and when PhysiqueOS synthesizes progress into a readable update.")
 
@@ -413,17 +433,66 @@ private struct CoachingUpdatesEditor: View {
                         }
                     }
 
-                    PrimaryActionButton(title: "Save Coaching Updates") { store.saveCoaching(model); onSaved() }
+                    if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
+                    PrimaryActionButton(title: isSaving ? "Saving Coaching Updates…" : "Save Coaching Updates") { save(model) }
+                        .disabled(isSaving)
                         .accessibilityIdentifier("operatingPlan.coaching.save")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
             } else {
-                OperatingPlanUnavailableView(message: "Coaching Updates are unavailable.")
+                OperatingPlanUnavailableView(message: loadError ?? "Coaching Updates are unavailable.")
             }
         }
         .physiqueOSScrollBottomClearance()
-        .onAppear { if model == nil { model = store.coachingEditor(strategyId: strategyId) } }
+        .task(id: "\(strategyId):\(environment.nativeAuthority)") { await load() }
+    }
+
+    @MainActor
+    private func load() async {
+        switch environment.nativeAuthority {
+        case .sandbox:
+            productionDetail = nil
+            model = store.coachingEditor(strategyId: strategyId)
+        case .founderProduction:
+            isLoadingProduction = true
+            model = nil
+            productionDetail = nil
+            loadError = nil
+            defer { isLoadingProduction = false }
+            do {
+                productionDetail = try await environment.coachingUpdatesAPI.fetchDetail(strategyId: strategyId)
+                model = productionDetail?.editor
+            } catch {
+                productionDetail = nil
+                model = nil
+                loadError = "Coaching Updates couldn't be loaded. Try again."
+            }
+        }
+    }
+
+    private func save(_ model: CoachingUpdatesEditorReadModel) {
+        switch environment.nativeAuthority {
+        case .sandbox:
+            store.saveCoaching(model)
+            onSaved()
+        case .founderProduction:
+            guard let detail = productionDetail else {
+                errorMessage = "Coaching Updates' canonical revision is unavailable. Refresh before retrying."
+                return
+            }
+            Task { @MainActor in
+                isSaving = true
+                errorMessage = nil
+                defer { isSaving = false }
+                do {
+                    _ = try await environment.coachingUpdatesAPI.save(detail, model: model)
+                    onSaved()
+                } catch {
+                    errorMessage = "Coaching Updates were not saved. No partial configuration was accepted. Refresh before retrying."
+                }
+            }
+        }
     }
 
     private func cadenceSection(_ title: String, schedule: Binding<CoachingUpdateScheduleReadModel>) -> some View {

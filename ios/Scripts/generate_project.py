@@ -123,6 +123,7 @@ app_files = [
     ("Networking", "OperatingPlanProtocolDomainAPI.swift"),
     ("Networking", "SupplementSupportAPI.swift"),
     ("Networking", "SupplementStrategyAPI.swift"),
+    ("Networking", "OperatingPlanCanonicalStrategyAPI.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "HomeGreeting.swift"),
     ("SharedUI", "IconBadge.swift"),

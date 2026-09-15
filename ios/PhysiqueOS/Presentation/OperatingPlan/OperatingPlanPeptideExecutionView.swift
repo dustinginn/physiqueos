@@ -92,7 +92,7 @@ struct OperatingPlanPeptideExecutionView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         OperatingPlanFieldRow(label: "Current dose", value: currentDose(execution))
                         OperatingPlanFieldRow(label: "Current phase", value: currentPhase(execution))
-                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSandboxStore.formatSupportSchedule(execution.supportSchedule))
+                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSchedulePresentation.formatSupportSchedule(execution.supportSchedule))
                         OperatingPlanFieldRow(label: "Next dose change", value: nextDoseChange(execution))
                         OperatingPlanFieldRow(label: "Status", value: execution.state == .invalid ? "Needs dosing update" : "Current")
                     }

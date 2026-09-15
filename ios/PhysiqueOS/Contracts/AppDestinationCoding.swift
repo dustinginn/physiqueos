@@ -12,6 +12,7 @@ extension AppDestination {
         case goalId, phaseId, focus, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
         case strategyType, strategyId, protocolId, executionId, setId, poseId, category, supportType, supportId
         case evidenceRecoveryType, occurrenceDateKey, occurrenceDate
+        case domain, title, detail, status
     }
 
     init(from decoder: Decoder) throws {
@@ -146,6 +147,14 @@ extension AppDestination {
                 strategyType: try parameters.decode(String.self, forKey: .strategyType),
                 strategyId: try parameters.decode(String.self, forKey: .strategyId)
             )
+        case "native.operating-plan.status":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanStatus(
+                domain: try parameters.decode(String.self, forKey: .domain),
+                title: try parameters.decode(String.self, forKey: .title),
+                detail: try parameters.decode(String.self, forKey: .detail),
+                status: try parameters.decode(String.self, forKey: .status)
+            )
         case "native.operating-plan.strategy.edit":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .operatingPlanStrategyEdit(
@@ -237,6 +246,11 @@ extension AppDestination {
         case .operatingPlanTrackingSupport(let executionId): try parameters.encode(executionId, forKey: .executionId)
         case .operatingPlanSupplementSupport(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .operatingPlanSupplementEdit(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
+        case .operatingPlanStatus(let domain, let title, let detail, let status):
+            try parameters.encode(domain, forKey: .domain)
+            try parameters.encode(title, forKey: .title)
+            try parameters.encode(detail, forKey: .detail)
+            try parameters.encode(status, forKey: .status)
         case .photoUpload, .dexaUpload, .briefingList, .trainingLogger, .manualWeighIn, .evidenceIntake,
              .operatingPlan, .operatingPlanTracking, .operatingPlanSupplementNew,
              .operatingPlanDexaAppointment, .operatingPlanTrainingStrategyBuilder, .founderServerConnection,

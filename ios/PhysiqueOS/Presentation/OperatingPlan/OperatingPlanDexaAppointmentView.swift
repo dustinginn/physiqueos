@@ -16,7 +16,9 @@ struct OperatingPlanDexaAppointmentView: View {
 
     var body: some View {
         Group {
-            if isEditing {
+            if environment.nativeAuthority == .founderProduction {
+                OperatingPlanUnavailableView(message: "Manage your production DEXA schedule in Coaching Updates, where Progress Photos and DEXA are saved together.")
+            } else if isEditing {
                 OperatingPlanDexaAppointmentEditor(
                     initial: store.dexaAppointment ?? CoachingDexaReadModel(plannedDate: "", localTime: "", reminderPreferences: [], uploadReminder: false, preparationNote: ""),
                     onSave: { model in
@@ -113,7 +115,7 @@ struct OperatingPlanDexaAppointmentView: View {
             display.timeZone = TimeZone(identifier: "UTC")
             return display.string(from: date)
         } ?? item.plannedDate
-        let timeText = item.localTime.isEmpty ? "" : OperatingPlanSandboxStore.formattedLocalTime(item.localTime)
+        let timeText = item.localTime.isEmpty ? "" : OperatingPlanSchedulePresentation.formattedLocalTime(item.localTime)
         return [dateText, timeText].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 

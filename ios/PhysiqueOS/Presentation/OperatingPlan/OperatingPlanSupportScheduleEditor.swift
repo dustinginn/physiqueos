@@ -95,7 +95,7 @@ struct OperatingPlanSupportScheduleEditor: View {
                     Text("SCHEDULE PREVIEW")
                         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    Text(OperatingPlanSandboxStore.formatSupportSchedule(schedule))
+                    Text(OperatingPlanSchedulePresentation.formatSupportSchedule(schedule))
                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     Text(dateWindow)

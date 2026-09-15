@@ -741,6 +741,153 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(request.url?.path, "/api/v1/native/read/operating-plan-protocol-domain")
     }
 
+    func testCanonicalUnconfiguredOperatingPlanDestinationRoundTripsWithoutWebRouting() throws {
+        let data = Data(#"{"id":"native.operating-plan.status","parameters":{"domain":"energy","title":"Energy Strategy","detail":"No active strategy","status":"Not configured"}}"#.utf8)
+        let destination = try JSONDecoder().decode(AppDestination.self, from: data)
+        XCTAssertEqual(destination, .operatingPlanStatus(domain: "energy", title: "Energy Strategy", detail: "No active strategy", status: "Not configured"))
+        XCTAssertEqual(try JSONDecoder().decode(AppDestination.self, from: JSONEncoder().encode(destination)), destination)
+    }
+
+    func testOperatingPlanPresentationHasExplicitProductionAuthorityBoundaries() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        func source(_ file: String) throws -> String {
+            try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/OperatingPlan/" + file), encoding: .utf8)
+        }
+        for file in ["OperatingPlanLandingView.swift", "OperatingPlanProtocolDomainView.swift", "OperatingPlanStrategyDetailView.swift", "OperatingPlanStrategyEditorView.swift", "OperatingPlanRecoverySupportView.swift", "OperatingPlanPeptideExecutionView.swift", "OperatingPlanSupplementSupportView.swift", "OperatingPlanSupplementEditorView.swift", "OperatingPlanTrackingView.swift"] {
+            let text = try source(file)
+            XCTAssertTrue(text.contains(".founderProduction"), file)
+            XCTAssertFalse(text.contains("try?"), "Production errors must not be swallowed: " + file)
+        }
+        for file in ["OperatingPlanTrainingProtocolBuilderView.swift", "OperatingPlanDexaAppointmentView.swift"] {
+            let text = try source(file)
+            XCTAssertTrue(text.contains("environment.nativeAuthority == .founderProduction"), file)
+            XCTAssertTrue(text.contains("OperatingPlanUnavailableView"), file)
+        }
+        let presentation = try source("OperatingPlanComponents.swift")
+        XCTAssertFalse(presentation.contains("OperatingPlanSandboxStore"))
+    }
+
+    func testProductionSupplementSupportDecodesAndRoundTripsDualConcurrency() async throws {
+        let json = productionEnvelope(resource: "operating-plan-supplement-support", data: #"{"protocolId":"supplement","supplementVersionId":"supplement-v1","goalId":"goal","executionId":"execution-supplement","executionRevision":3,"name":"Tongkat Ali","supportSummary":"Daily · Morning","doseAmount":"1","doseUnit":"capsule","supportSchedule":{"frequency":"daily","daysOfWeek":[],"intervalDays":1,"timing":"morning","specificTime":"","startDate":"2026-07-25","endDate":null},"reminderPreference":"remind","notes":"Current Support"}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, json),
+            .json(200, #"{"outcome":"committed","receipt":{"status":"committed","result":{"status":"updated","protocolId":"supplement","executionId":"execution-supplement","executionRevision":4,"reminderId":"reminder-supplement"}}}"#),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Supplement test")
+        let api = ProductionSupplementSupportAPI(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let fetched = try await api.fetchSupport(protocolId: "supplement")
+        let detail = try XCTUnwrap(fetched)
+        XCTAssertEqual(detail.readModel.doseAmount, "1")
+        var schedule = detail.supportSchedule
+        schedule.timing = .specific
+        schedule.specificTime = "08:40"
+        schedule.endDate = "2026-12-31"
+        let saved = try await api.save(
+            protocolId: detail.protocolId, supplementVersionId: detail.supplementVersionId,
+            expectedRevision: detail.executionRevision, doseAmount: "2", doseUnit: "capsules",
+            supportSchedule: schedule, reminderPreference: .remind, notes: "With breakfast"
+        )
+        XCTAssertEqual(saved.executionRevision, 4)
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.last)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "If-Match"), "\"3\"")
+        let envelope = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        XCTAssertEqual(envelope["commandType"] as? String, ProductionCommandType.saveSupplementSupport)
+        let payload = try XCTUnwrap(envelope["payload"] as? [String: Any])
+        XCTAssertEqual(payload["supplementVersionId"] as? String, "supplement-v1")
+        let draft = try XCTUnwrap(payload["draft"] as? [String: Any])
+        XCTAssertEqual((draft["dose"] as? [String: String])?["amount"], "2")
+        XCTAssertEqual((draft["supportSchedule"] as? [String: Any])?["specificTime"] as? String, "08:40")
+    }
+
+    func testProductionSupplementStrategyAndLifecycleUseCanonicalVersionTokens() async throws {
+        let json = productionEnvelope(resource: "operating-plan-supplement-strategy-editor", data: #"{"mode":"edit","protocolId":"supplement","expectedCurrentVersionId":"supplement-v1","lifecycleState":"active","goalId":"goal","goalOptions":[{"id":"goal","title":"Build Lean Mass"}],"name":"Creatine","purpose":"Training support","role":"Daily support","startDate":"2026-07-25","initialStatus":"active"}"#)
+        let receipt = #"{"outcome":"committed","receipt":{"status":"committed","result":{"status":"updated","operation":"edit","protocolId":"supplement","currentVersionId":"supplement-v2","lifecycleState":"active"}}}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, json), .json(200, receipt), .json(200, receipt),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Supplement strategy test")
+        let api = ProductionSupplementStrategyAPI(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let fetched = try await api.fetchEditor(protocolId: "supplement")
+        let detail = try XCTUnwrap(fetched)
+        var model = detail.readModel
+        model.purpose = "Strength support"
+        _ = try await api.save(detail, model: model)
+        _ = try await api.changeLifecycle(protocolId: "supplement", operation: "pause", expectedCurrentVersionId: "supplement-v2")
+        let requests = await transport.requests
+        let writes = requests.filter { $0.url?.path.hasSuffix("/commands") == true }
+        XCTAssertEqual(writes.count, 2)
+        XCTAssertNil(writes[0].value(forHTTPHeaderField: "If-Match"))
+        let edit = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(writes[0].httpBody)) as? [String: Any])
+        let editPayload = try XCTUnwrap(edit["payload"] as? [String: Any])
+        XCTAssertEqual((editPayload["draft"] as? [String: Any])?["expectedCurrentVersionId"] as? String, "supplement-v1")
+        let lifecycle = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(writes[1].httpBody)) as? [String: Any])
+        XCTAssertEqual(lifecycle["commandType"] as? String, ProductionCommandType.changeSupplementLifecycle)
+        let lifecyclePayload = try XCTUnwrap(lifecycle["payload"] as? [String: Any])
+        XCTAssertEqual(lifecyclePayload["operation"] as? String, "pause")
+        XCTAssertEqual(lifecyclePayload["expectedCurrentVersionId"] as? String, "supplement-v2")
+    }
+
+    func testProductionEnergyStrategyIsCanonicalReadOnlyAndReadErrorsFailClosed() async throws {
+        let json = productionEnvelope(resource: "operating-plan-energy-strategy", data: #"{"protocolId":"energy","title":"Maintenance Calibration","purpose":"Canonical energy strategy","goal":"Your Build Lean Mass goal","startedDate":"July 25, 2026","status":"Active","fields":[{"label":"Caloric Intake","value":"2300 kcal/day"}],"editLabel":null,"intentionallyReadOnly":true}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, json),
+            .json(404, #"{"problemVersion":"1","status":404,"code":"RESOURCE_NOT_FOUND","title":"Unavailable"}"#),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Energy test")
+        let api = ProductionEnergyStrategyAPI(api: native)
+        let detail = try await api.fetchDetail(strategyId: "energy")
+        XCTAssertNil(detail?.readModel.editDestination)
+        XCTAssertEqual(detail?.readModel.fields.first?.value, "2300 kcal/day")
+        do {
+            _ = try await api.fetchDetail(strategyId: "missing")
+            XCTFail("Production failures must not return a fixture detail")
+        } catch {}
+    }
+
+    func testProductionCoachingEditorRoundTripsOneCompositeSaveAndAllConcurrencyFences() async throws {
+        let json = productionEnvelope(resource: "operating-plan-coaching-updates", data: #"{"protocolId":"coaching","title":"Wednesday and Sunday Coaching","purpose":"Timely coaching","goal":"Your current goal","startedDate":"July 25, 2026","status":"Active","fields":[],"editLabel":"Edit Coaching Updates","context":{"expectedCurrentVersionId":"coaching-v1","expectedRevision":85,"expectedSemanticDigest":"coaching-digest","photoExpectedCurrentVersionId":"photos-v1","photoExpectedSemanticDigest":"photo-digest","dexaExpectedRevision":3},"editor":{"strategyId":"coaching","midweek":{"enabled":true,"day":"wednesday","localTime":"08:15"},"weekly":{"enabled":true,"day":"sunday","localTime":"09:00"},"monthly":{"enabled":true,"dayOfMonth":1,"localTime":"08:00"},"photos":{"cadence":"weekly_interval_2","day":"saturday","timeOfDay":"afternoon","reminderEnabled":true},"dexa":{"plannedDate":"2026-10-15","localTime":"07:30","reminderPreferences":["day_before"],"uploadReminder":true,"preparationNote":"Arrive hydrated"},"photoEventBriefingEnabled":true,"dexaEventBriefingEnabled":true,"notificationPreference":"available_without_notification"}}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, json),
+            .json(200, #"{"outcome":"committed","receipt":{"status":"committed","result":{"status":"updated","protocolId":"coaching","revision":86,"coachingChanged":true,"photosChanged":true,"photoReminderChanged":true,"dexaChanged":true}}}"#),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Coaching test")
+        let api = ProductionCoachingUpdatesAPI(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let fetched = try await api.fetchDetail(strategyId: "coaching")
+        let detail = try XCTUnwrap(fetched)
+        XCTAssertEqual(detail.editor.photos.cadence, .everyTwoWeeks)
+        var model = detail.editor
+        model.photos.day = .sunday
+        model.photos.reminderEnabled = false
+        model.dexa.plannedDate = "2026-10-22"
+        model.dexa.preparationNote = "Updated clinic note"
+        model.photoEventBriefingEnabled = false
+        let saved = try await api.save(detail, model: model)
+        XCTAssertEqual(saved.revision, 86)
+        let requests = await transport.requests
+        let writes = requests.filter { $0.url?.path.hasSuffix("/commands") == true }
+        XCTAssertEqual(writes.count, 1, "Coaching, Photos, and DEXA must not be independent writes")
+        let request = try XCTUnwrap(writes.first)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "If-Match"), "\"85\"")
+        let envelope = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        XCTAssertEqual(envelope["commandType"] as? String, ProductionCommandType.saveCoachingUpdates)
+        let payload = try XCTUnwrap(envelope["payload"] as? [String: Any])
+        XCTAssertEqual(payload["expectedCurrentVersionId"] as? String, "coaching-v1")
+        XCTAssertEqual(payload["expectedSemanticDigest"] as? String, "coaching-digest")
+        XCTAssertEqual(payload["photoExpectedCurrentVersionId"] as? String, "photos-v1")
+        XCTAssertEqual(payload["photoExpectedSemanticDigest"] as? String, "photo-digest")
+        XCTAssertEqual(payload["dexaExpectedRevision"] as? Int, 3)
+        let draft = try XCTUnwrap(payload["draft"] as? [String: Any])
+        XCTAssertEqual((draft["photos"] as? [String: Any])?["day"] as? String, "sunday")
+        XCTAssertEqual((draft["dexa"] as? [String: Any])?["plannedDate"] as? String, "2026-10-22")
+        let affected = await native.resourcesAffected(by: ProductionCommandType.saveCoachingUpdates)
+        XCTAssertTrue(affected.isSuperset(of: ["operating-plan", "operating-plan-coaching-updates", "home", "priority", "photos", "dexa"]))
+    }
+
     func testProductionPeptideEditorRoundTripsDoseScheduleAndExecutionRevision() async throws {
         let commandResult = #"{"outcome":"committed","receipt":{"status":"committed","result":{"status":"updated","protocolId":"peptide-protocol","executionId":"execution-peptide","executionRevision":4},"operationId":null,"commandId":"01911111-1111-7111-8111-111111111119"}}"#
         let transport = SequencedFounderTransport([

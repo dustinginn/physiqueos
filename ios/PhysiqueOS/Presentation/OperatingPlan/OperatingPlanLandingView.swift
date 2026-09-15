@@ -101,8 +101,12 @@ struct OperatingPlanLandingView: View {
     @MainActor
     private func load() async {
         state = .loading
-        guard let api = environment.operatingPlanAPI else {
+        if environment.nativeAuthority == .sandbox {
             state = .loaded(environment.operatingPlanStore.landing)
+            return
+        }
+        guard let api = environment.operatingPlanAPI else {
+            state = .failed
             return
         }
         do { state = .loaded(try await api.fetchOperatingPlan()) }

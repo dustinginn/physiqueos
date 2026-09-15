@@ -870,6 +870,17 @@ actor ProductionNativeAPI {
     // no error anywhere, exactly the Build 32/33 workout-visibility defect
     // this was found fixing.
     func resourcesAffected(by commandType: String) -> Set<String> {
+        if commandType.hasPrefix("operating-plan.") {
+            return [
+                "home", "priority", "operating-plan", "operating-plan-recurring-support",
+                "operating-plan-nutrition-strategy", "operating-plan-training-strategy",
+                "operating-plan-peptide-support", "operating-plan-protocol-domain",
+                "operating-plan-supplement-support", "operating-plan-supplement-strategy-editor",
+                "operating-plan-energy-strategy", "operating-plan-coaching-updates",
+                "training-logger", "training-landing", "training-reporting", "dexa", "photos",
+                "briefing-history", "briefing",
+            ]
+        }
         if commandType.contains("priority") { return ["home", "priority"] }
         if commandType.contains("training") || commandType.contains("workout") {
             return [

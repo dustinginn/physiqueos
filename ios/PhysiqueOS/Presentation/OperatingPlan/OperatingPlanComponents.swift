@@ -1,5 +1,30 @@
 import SwiftUI
 
+/// Presentation-only formatting shared by canonical and sandbox models.
+/// This owns no schedules, membership, fixtures, or domain mutations.
+enum OperatingPlanSchedulePresentation {
+    static func formatSupportSchedule(_ model: OperatingPlanSupportScheduleReadModel) -> String {
+        let cadence: String
+        switch model.frequency {
+        case .daily: cadence = "Daily"
+        case .weekly: cadence = model.daysOfWeek.first.map { "\($0.label)s" } ?? "Weekly"
+        case .specificDays: cadence = model.daysOfWeek.map(\.shortLabel).joined(separator: ", ")
+        case .everyXDays: cadence = model.intervalDays == 2 ? "Every other day" : "Every \(model.intervalDays) days"
+        }
+        let time = model.timing == .specific ? formattedLocalTime(model.specificTime) : model.timing.label
+        return [cadence, time].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    static func formattedLocalTime(_ value: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        guard let date = formatter.date(from: value) else { return value }
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
+}
+
 /// Shared visual vocabulary for the Operating Plan vertical. Unlike Goals'
 /// gradient "atmospheric" cards, the web Operating Plan screens
 /// (`OperatingPlanScreen.jsx`, `ProtocolDetailScreen.jsx`,

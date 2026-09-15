@@ -6,15 +6,9 @@ import SwiftUI
 /// (confirmed dead editor route); the other three show an "Edit Strategy"/
 /// "Edit Coaching Updates" action into `OperatingPlanStrategyEditorView`.
 ///
-/// Under Founder Production, Nutrition and Training read their own canonical
-/// `operating-plan-nutrition-strategy`/`operating-plan-training-strategy`
-/// resources (`NutritionStrategyAPI`/`TrainingStrategyAPI`) — the same
-/// composition Web's own strategy detail page calls — and fail closed
-/// (`OperatingPlanUnavailableView`) rather than falling back to
-/// sandbox/fixture data. Energy/Coaching Updates remain on the sandbox
-/// store under every authority until their own Build 33 pass wires them,
-/// matching the "one domain at a time" sequencing already used for
-/// Recovery/Tracking.
+/// Every Founder Production strategy reads its bounded canonical resource
+/// and fails closed. Energy remains intentionally read-only; Coaching
+/// Updates edits retain their canonical composite write boundary.
 struct OperatingPlanStrategyDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -24,6 +18,8 @@ struct OperatingPlanStrategyDetailView: View {
 
     @State private var productionNutritionDetail: NutritionStrategyDetail?
     @State private var productionTrainingDetail: TrainingStrategyDetail?
+    @State private var productionEnergyDetail: EnergyStrategyDetail?
+    @State private var productionCoachingDetail: CoachingUpdatesProductionDetail?
     @State private var isLoadingProduction = false
     @State private var loadError: String?
 
@@ -35,16 +31,21 @@ struct OperatingPlanStrategyDetailView: View {
         strategyType == "training" && environment.nativeAuthority == .founderProduction
     }
 
-    private var isProductionManaged: Bool { isProductionNutrition || isProductionTraining }
+    private var isProductionManaged: Bool { environment.nativeAuthority == .founderProduction }
 
     private var detail: OperatingPlanStrategyDetailReadModel? {
+        guard isProductionManaged else {
+            return environment.operatingPlanStore.strategyDetail(strategyType: strategyType, strategyId: strategyId)
+        }
         if isProductionNutrition {
             return productionNutritionDetail.map(Self.readModel(from:))
         }
         if isProductionTraining {
             return productionTrainingDetail.map(Self.readModel(from:))
         }
-        return environment.operatingPlanStore.strategyDetail(strategyType: strategyType, strategyId: strategyId)
+        if strategyType == "energy" { return productionEnergyDetail?.readModel }
+        if strategyType == "briefings" { return productionCoachingDetail?.readModel }
+        return nil
     }
 
     var body: some View {
@@ -69,8 +70,18 @@ struct OperatingPlanStrategyDetailView: View {
             }
         }
         .task(id: "\(strategyId):\(environment.nativeAuthority)") { await loadProductionIfNeeded() }
+        .refreshable {
+            if isProductionManaged {
+                await environment.productionNativeAPI.invalidateReadResources([
+                    "operating-plan-nutrition-strategy", "operating-plan-training-strategy",
+                    "operating-plan-energy-strategy", "operating-plan-coaching-updates",
+                ])
+            }
+            await loadProductionIfNeeded()
+        }
     }
 
+    @MainActor
     private func loadProductionIfNeeded() async {
         guard isProductionManaged else { return }
         isLoadingProduction = true
@@ -81,10 +92,16 @@ struct OperatingPlanStrategyDetailView: View {
                 productionNutritionDetail = try await environment.nutritionStrategyAPI.fetchDetail(strategyId: strategyId)
             } else if isProductionTraining {
                 productionTrainingDetail = try await environment.trainingStrategyAPI.fetchDetail(strategyId: strategyId)
+            } else if strategyType == "energy" {
+                productionEnergyDetail = try await environment.energyStrategyAPI.fetchDetail(strategyId: strategyId)
+            } else if strategyType == "briefings" {
+                productionCoachingDetail = try await environment.coachingUpdatesAPI.fetchDetail(strategyId: strategyId)
             }
         } catch {
             productionNutritionDetail = nil
             productionTrainingDetail = nil
+            productionEnergyDetail = nil
+            productionCoachingDetail = nil
             loadError = "This strategy couldn't be loaded. Pull to refresh or try again."
         }
     }
@@ -121,7 +138,7 @@ struct OperatingPlanStrategyDetailView: View {
 
     @ViewBuilder
     private var content: some View {
-        if isProductionManaged, isLoadingProduction, productionNutritionDetail == nil, productionTrainingDetail == nil {
+        if isProductionManaged, isLoadingProduction, detail == nil {
             ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
         } else if let detail {
             VStack(alignment: .leading, spacing: 16) {

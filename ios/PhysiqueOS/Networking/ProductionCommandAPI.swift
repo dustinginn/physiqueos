@@ -28,6 +28,7 @@ enum ProductionCommandType {
     static let saveSupplementSupport = "operating-plan.supplement-support.save.v1"
     static let saveSupplementStrategy = "operating-plan.supplement-strategy.save.v1"
     static let changeSupplementLifecycle = "operating-plan.supplement-lifecycle.change.v1"
+    static let saveCoachingUpdates = "operating-plan.coaching-updates.save.v1"
 }
 
 struct ProductionCommandRequestMetadata: Encodable {

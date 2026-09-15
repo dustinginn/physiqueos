@@ -142,6 +142,9 @@ enum AppDestination: Hashable, Codable {
     case operatingPlanSupplementSupport(protocolId: String)
     case operatingPlanSupplementNew
     case operatingPlanSupplementEdit(protocolId: String)
+    /// Server-projected, intentionally read-only canonical configuration
+    /// state when a landing item has no established detail/editor route.
+    case operatingPlanStatus(domain: String, title: String, detail: String, status: String)
     /// `/profile/operating-plan/execution/dexa` — view/edit the next DEXA
     /// appointment. Reached from Priority Detail's "View DEXA Appointment"
     /// action, not from a landing card (the real Tracking section only
@@ -201,6 +204,7 @@ enum AppDestination: Hashable, Codable {
         case .operatingPlanSupplementSupport: "native.operating-plan.protocol.supplement.support"
         case .operatingPlanSupplementNew: "native.operating-plan.supplement.new"
         case .operatingPlanSupplementEdit: "native.operating-plan.supplement.edit"
+        case .operatingPlanStatus: "native.operating-plan.status"
         case .operatingPlanDexaAppointment: "native.operating-plan.dexa-appointment"
         case .operatingPlanTrainingStrategyBuilder: "native.operating-plan.training.new"
         case .founderServerConnection: "native.founder-server-connection"

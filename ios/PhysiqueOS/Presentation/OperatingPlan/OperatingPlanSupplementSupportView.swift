@@ -72,7 +72,7 @@ struct OperatingPlanSupplementSupportView: View {
                 CardContainer(padding: .sm) {
                     VStack(alignment: .leading, spacing: 10) {
                         OperatingPlanFieldRow(label: "Dose / Quantity", value: [support.doseAmount, support.doseUnit].filter { !$0.isEmpty }.joined(separator: " "))
-                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSandboxStore.formatSupportSchedule(support.supportSchedule))
+                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSchedulePresentation.formatSupportSchedule(support.supportSchedule))
                         OperatingPlanFieldRow(label: "Reminder", value: support.reminderPreference.label)
                         if !support.notes.isEmpty { OperatingPlanFieldRow(label: "Execution Notes", value: support.notes) }
                     }
