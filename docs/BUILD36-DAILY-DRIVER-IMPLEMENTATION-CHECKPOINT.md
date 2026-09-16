@@ -1,120 +1,196 @@
-# Build 36 daily-driver correctness — partial engineering checkpoint
+# Build 36 daily-driver correctness — candidate checkpoint
 
-Status: **NOT a complete release candidate. Awaiting the bounded PC production
-incident audit.** No deployment, build-number bump, archive, upload, production
-mutation, workspace cleanup, V3 implementation, or HealthKit work.
+Status: **validated engineering candidate; not deployed or uploaded.** No build
+number change, archive, TestFlight upload, Founder production mutation,
+workspace cleanup, Confidence/Narrative V3 work, or HealthKit work occurred.
 
-Native base: `3ab5ccd8c601a817ec0e098d77a37f7640144160`, 1.0 (35).
-Server base / accepted production: `f88fa541b5805c38e72a0ae7ba2d1a82bd8ecf30`.
-Accepted production deployment: `d58978c0-f2fe-4907-963f-b3d03c40cd0d`.
-Existing branches retained. These authorities were not reset or rewritten.
+- Native Build 35 base: `3ab5ccd8c601a817ec0e098d77a37f7640144160`,
+  version 1.0 (35).
+- Native Build 36 functional candidate: `9c22bf8b`.
+- Server production base: `f88fa541b5805c38e72a0ae7ba2d1a82bd8ecf30`.
+- Server Build 36 candidate: `51e3e11f`.
+- Production remains deployment `d58978c0-f2fe-4907-963f-b3d03c40cd0d`
+  on `f88fa541`; it was not changed or queried from Mac during implementation.
 
-Founder has physically accepted Build 35 notification delivery/diagnostics,
-iOS 27 strength recognition, review dismissal, Operating Plan reads,
-Training Library scope, Hyperextension navigation, and Sep 14 reconciliation.
-Those accepted fixes remain untouched.
+Founder has physically accepted the Build 35 notification, diagnostics, iOS 27
+strength screenshot, Evidence Review disposition, Operating Plan, Training
+Library, Hyperextension, and Sep 14 reconciliation work. Build 36 does not
+reopen those results.
 
-## Implemented source-proven improvements
+## Production incident evidence
 
-1. Automatic uploads previously discarded accepted intake results and never
-   performed the explicit-upload flow's quick review-ready follow-up, even
-   for one Nutrition group. Both flows now share the follow-up. Mixed groups
-   check concurrently and offer ready review links; one ready group opens
-   its exact review in-flow. Publication already present in an upload response
-   needs no redundant GET. A review ID without ready status is not publication.
-2. Unresolved accepted groups use the existing running-app notifier and clear
-   evidence-received / can-leave / notify-when-ready handoff. Failed
-   interpretation is distinguished from unresolved processing; no blind
-   resubmission occurs in follow-up. Fully terminated-app delivery remains
-   the accepted deferred V1 limitation. The backend is still asynchronous:
-   this is NOT proof that common production interpretation is now instant.
-3. Server Nutrition presentation previously re-compared already-derived daily
-   totals against meal sums, concealing retained original-source conflicts
-   that commit admission still rejects. Presentation now honors the same
-   retained interpreted reconciliation authority as admission. A sanitized
-   aggregate/conflict fixture proves the old misleading match and the new
-   warning without weakening validation or changing any package. This proves
-   a generic contradiction, NOT the exact Sep 15 incident fields or chronology.
-4. Shared Native date sheets have Today, respecting date-only calendar bounds;
-   Today is disabled for future-only appointments rather than silently
-   selecting tomorrow. Schedule start/end and dosing controls permit future
-   selection while leaving historical persisted values unchanged on open.
-   Coaching's next-DEXA picker now permits future scans, with the existing
-   canonical future-only appointment validation retained.
-5. Tracking and Peptide support editor headers identify the canonical object.
-   Existing Recovery/Supplement support editors already identify their object.
+The bounded PC audit ran in repeatable-read, read-only transactions and is
+recorded in `BUILD36-PC-READ-ONLY-INCIDENT-AUDIT.md`.
 
-## Pending incident evidence and architecture
+### Nutrition
 
-Use [the exact bounded PC handoff](BUILD36-PC-READ-ONLY-INCIDENT-AUDIT.md).
-No production SQL was attempted on Mac; no credential was requested.
+- Intake accepted at 17:42:03.846 PDT; interpretation began 4.6 seconds later;
+  Review became ready 55.3 seconds after submission. Interpretation itself
+  consumed 50.7 seconds.
+- Review `evidence_review_22DD208D2B84436ABCDE09D668E56A80` remains pending,
+  version 1. No confirmation receipt or canonical write exists.
+- Presentation had recomputed a meal-derived aggregate and displayed a match,
+  while admission trusted retained reconciliation metadata from the original
+  source totals. This allowed “Meal totals match” and
+  `NUTRITION_DAILY_TOTALS_CONFLICT` to coexist.
+- Presentation and admission now use one resolver. It recomputes from retained
+  source daily totals plus the current meal model. A real conflict remains
+  fail-closed and Native names the safe conflicting fields with a usable
+  dismiss/correct/re-upload path; a resolved/stale flag cannot block confirmation.
 
-- Nutrition: exact intake/queue/interpretation/publication times, original
-  meals/totals/reconciliation for ALL objects, confirmation rejection and
-  receipt/canonical-mutation state remain unknown. A usable canonical Native
-  Nutrition correction path still needs implementation once the invariant
-  and intended correction are proven; do not treat warning copy as a fix.
-- Logger: structured session durability, response loss/timeout, screenshot
-  review relationship, and what confirmation would do remain unknown.
-  Source retains a draft whenever `commit` throws, with no acknowledgement
-  recovery. The posted success guard still requires explicit durable Training
-  acknowledgement; it was not weakened. Supporting screenshots are prewarmed
-  separately and reconciled only after acknowledged structured commit.
-- Shared lifecycle: ordinary JSON requests use 15 seconds; fast follow-up
-  uses three polls rather than an end-to-end wall-clock budget. Non-Training
-  Native confirmation intentionally pauses before canonical commit; Native
-  review follow-up generally waits for full `confirmed` lifecycle. These
-  existing boundaries must be revisited for the new instant-path target using
-  measured evidence, receipt recovery and durable canonical readback—not a
-  speculative timeout increase or synchronous downstream PI/Goal/Briefing work.
-- Tracking: exact reported error is a Native pre-request guard on absent
-  detail/reminder ID. The generic recurring-support reader only selects
-  protocol/recovery reminder types, while canonical Tracking's resolver and
-  fixtures use an evidence reminder. Production shape must be audited before
-  changing that selector; do not invent a server response for an unsent request.
-- Coaching: the exact rejected composite operation/fence is not yet proven.
-  Atomicity and existing domain-specific concurrency remain unchanged.
+### Workout Logger
 
-## Remaining requested implementation
+- Commit receipt: 17:36:33.821 PDT. Durable canonical TrainingSession row:
+  +12.7 seconds. Full canonical payload finalized: +18.8 seconds.
+- The active canonical session exists with the exact three exercises and 12
+  sets. It is the source of “Strength Training logged.” Native's former
+  15-second transport deadline expired before the durable response, so the
+  draft remained even though the server succeeded.
+- The separate three-screenshot Training review predates Finish Workout by
+  roughly 26 minutes and is not the Logger commit package. Its duplicate/
+  enrichment consequence was not mutated or guessed.
 
-Not implemented yet: receipt/durability-based Logger recovery and draft
-lifecycle, measured shared server instant path, usable Nutrition correction,
-Tracking/Coaching incident fixes, published-briefing ready notifications and
-removal of redundant notification preference, specialized dose-aware Peptide
-Complete/Snooze, authorized Recovery/Supplement completion, Progress Photos
-specific time, canonical support Next due, reminder-on indicators.
+### Tracking and Coaching
 
-No production cleanup candidate is asserted before the audit establishes exact
-persisted state. Do not retry/confirm/discard the incident objects as a diagnostic.
+- Morning Weigh-In's canonical reminder is an `evidence_reminder`. The
+  recurring-support projection excluded that valid type and returned no
+  reminder identity, so Native stopped before HTTP. The projection now accepts
+  the canonical Tracking type and fails closed on missing/ambiguous linkage.
+- Coaching had two generic preconditions matching production: the save boundary
+  passed a nullable raw owner timezone into local-date formatting, and the read
+  projected a completed historical DEXA back into the future “next DEXA” field.
+  The save now uses canonical timezone resolution; completed DEXA remains
+  protected history and is not a mandatory future appointment for an unrelated
+  atomic Coaching change. A new future scan may still be scheduled explicitly.
 
-## Validation of the bounded changes
+## Evidence latency decomposition and changes
 
-- Full Native units: 997/997, including final source/header checks.
-- Focused Native evidence/shared-date/Operating Plan/Logger: 278/278.
-- A pre-existing test expected Build 34 despite accepted Build 35 metadata:
-  updated only its test name/expectation; no build-number bump.
-- Affected UI: Today picker and evidence presentation passed; workout review
-  initially failed on Simulator event synthesis, then passed unchanged on a
-  bounded rerun. All three journeys have passing runs; initial failure retained.
-- Focused server Nutrition/readiness/confirmation/Logger/Support/Coaching/Log:
-  112/112. Canonical recurrence/Tracking and eight-domain Operating Plan
-  acceptance: 36/36. Future anchors suppress earlier daily/weekly/interval
-  occurrences; no parallel Swift recurrence was introduced.
-- Debug test build and generic unsigned arm64 Release builds passed.
-- Local server production build passed; changed-file lint passed.
-- Deterministic project regeneration twice produced unchanged hash
+### Nutrition T1/T2
+
+Before:
+
+- T1 (accepted to interpretation start): 4.6 seconds. This includes queue/
+  worker acquisition after intake/storage acknowledgement.
+- T2 (interpretation start to Review ready): 50.7 seconds. Deployed Build 35
+  did not emit sub-stage timings, so the old run cannot be split more finely
+  after the fact. Source tracing proves the external screenshot interpreter was
+  awaited once per attachment, sequentially; normalization, Nutrition
+  reconciliation, and Review persistence are local work after those calls.
+- End-to-end: 55.3 seconds. The external interpretation boundary dominates the
+  measured interval; exact provider versus local milliseconds require the new
+  instrumentation on a deployed candidate.
+
+After candidate:
+
+- Artifact loads are bounded at concurrency 3; per-screenshot external model
+  calls are bounded at concurrency 2 while preserving original ordering.
+- Exercise-registry read, photo-session context read, each artifact load, each
+  external interpretation, normalization/reconciliation, Review persistence,
+  worker total, and queue wait are separately timed.
+- Common uploads share the quick follow-up path. Review opens in-flow when it
+  becomes ready inside the short interactive window. Otherwise the UI says the
+  evidence is received, may be left, and will notify on canonical Review-ready
+  publication under the accepted running-app notifier boundary.
+- Provider/model time is not weakened or bypassed. No post-change production
+  latency is claimed before deployment; the candidate removes provable serial
+  work and makes the remaining latency measurable.
+
+### Workout T3
+
+Before:
+
+- Receipt to durable Training row: 12.7 seconds; receipt to full finalized
+  canonical payload: 18.8 seconds.
+- Critical path contained validation, idempotent receipt, duplicate/reconciliation
+  preparation, canonical Training write, Activity consistency, transaction/
+  locking, and durable readback. The bounded canonical commit also loaded
+  unrelated Founder collections/application metadata.
+- Supporting-evidence interpretation and downstream PI/confidence/briefing work
+  were already asynchronous and must remain downstream.
+
+After candidate:
+
+- The durable canonical commit loads only the collections required for source
+  commit/reconciliation and omits unrelated application/import metadata.
+- Durable acknowledgement still requires the canonical TrainingSession and the
+  reconciliation needed to prevent duplicates and make Log immediately honest.
+  Workout Complete is never shown from a staged receipt.
+- Native gives the ordinary path 3 seconds, then performs one 1-second replay
+  using the identical persisted idempotency key, with canonical readback after
+  each ambiguous result. A readback validates canonical ID, date, exercises,
+  and set count before recovering success and clearing the draft.
+- If the result is still genuinely processing after that bounded budget, Native
+  says exactly that and retains the draft. Established rejection remains a real
+  failure. There is no minute-long spinner and no timeout increase masquerading
+  as a fix.
+- Server logs receipt-commit and durable-acknowledgement durations; Native logs
+  T3 outcome/duration without IDs or evidence payloads.
+
+The <=3-second ordinary T3 objective is an engineering target, not a result yet:
+the candidate removes unnecessary runtime loading, but deployment measurement
+is required to prove it. If reconciliation/transaction work remains above the
+target, that irreducible work must be reported rather than moved past the
+durability boundary.
+
+## Product behavior included
+
+- Enabled Midweek, Weekly, Monthly, DEXA Event, and Photo Event briefings have
+  one canonical notify-on-publication policy; the redundant product-level
+  notification toggle is removed. Native observes newly published Home briefing
+  artifacts, not scheduled generation clocks, and deep-links to the exact
+  artifact. This is a running-app local publication observer; no unsupported
+  remote/background execution architecture is claimed.
+- Peptide notifications preserve `peptide_protocol` workflow and carry the
+  scheduled dose/protocol into the specialized completion command. Recovery and
+  Supplements expose Complete/Snooze only when the canonical projection proves
+  the occurrence completable and supplies an expected version. Blind generic
+  completion remains prohibited.
+- Shared date pickers provide Today. Future start dates are valid recurrence
+  anchors with no earlier occurrences; historical existing anchors are
+  preserved. DEXA permits the next future scan.
+- Progress Photos supports a canonical specific time as well as dayparts.
+- Support reads expose canonical Next due; overview cards show a reminder icon
+  only for enabled reminders; editor headers identify their support object.
+
+## Observability contract
+
+- T1: accepted timestamp to worker interpretation-start timestamp.
+- T2: interpretation-start timestamp to canonical Review-ready persistence.
+- T3: Confirm/Finish pressed to durable acknowledgement or validated canonical
+  readback.
+- Logs contain stage names, counts, durations, and outcomes only. They do not
+  contain evidence bytes, OCR/model text, filenames, tokens, or credentials.
+
+## Validation
+
+- Full Native unit suite: 1001/1001.
+- Expanded focused Native API/notification/Operating Plan/evidence: 239/239.
+- Bounded Logger ambiguity/durable-readback regression: 3/3.
+- Affected Native UI journeys: 3/3 (Evidence, Today picker, Logger review).
+- Focused server changed-path suite: 161/161. Earlier expanded candidate suite:
+  207/207. Production-shaped Coaching/DEXA follow-up: 23/23.
+- Server production build passed. Changed-file ESLint and syntax checks passed.
+- Native Debug test build passed. Generic unsigned arm64 Release build passed.
+- Project generation was deterministic twice at SHA-256
   `af80f6d336a42917d7b50094fcf1ae7ba24084fb8828ffd73357655b650ba3c4`.
-- Release configuration remains 1.0 (35); bundle/team unchanged.
-- Credential/private-key signature scans and whitespace diff checks passed.
-- Existing unrelated Swift actor warnings remain; new Today tests execute
-  on MainActor. No private Founder data/image fixtures were retained.
-- Forensic script remains unmodified, SHA256
+- Release configuration remains 1.0 (35), bundle
+  `com.physiqueos.native.dev`, team `33GMTRM6G9`.
+- Native/server whitespace diff and changed-range credential/private-key scans
+  passed. The forensic script remains unmodified at SHA-256
   `5dc1bebf4153ad3518c0732b37b4b3e8b23f7f9c542518b570d1dcf68b210275`.
-- Validation artifacts retained under
-  `/private/tmp/physiqueos-build36-validation.2ZUWNI`; no archive/worktree or
-  workspace cleanup. Last observed free disk space: 19 GiB.
+- The repository-wide server unit command was also run and retained its known
+  fixture/environment failures: absent private Founder runtime files, migration/
+  backup fixtures, and sandbox-denied local listeners. It produced 299 failing
+  historical/environment cases and does not supersede the green bounded suites.
 
-Next: existing PC operator returns sanitized bounded audit evidence, then
-compose the incident fixes and remaining product decisions into one validated
-Build 36 candidate for Founder review. These partial commits are not shipping
-authorization and must not be deployed as a complete Build 36 candidate.
+## Production state and follow-up
+
+No production object was changed. The pending Nutrition review remains available
+for a post-deployment corrected read/correction flow. The earlier screenshot-only
+Training review should not be confirmed until a bounded read-only comparison
+proves whether current duplicate reconciliation would enrich the durable Logger
+session or reject/no-op; no cleanup mutation is proposed here.
+
+The candidate is ready for Founder engineering review. Deployment, build 36
+metadata, archive, TestFlight, and physical acceptance require separate
+authorization.
