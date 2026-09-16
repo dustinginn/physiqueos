@@ -169,13 +169,11 @@ final class UserDefaultsNativeAuthoritySelectionStore: NativeAuthoritySelectionS
 @Observable
 final class AppEnvironment {
     private(set) var nativeAuthority: NativeAPIEnvironment
-    /// Set by `PriorityNotificationDelegate` when the Founder taps a
-    /// priority notification (or its default action). `RootTabView`
-    /// observes this and clears it once consumed — the one deliberate
-    /// exception to "views own their own navigation state" in this app,
-    /// since a notification response can arrive before any view exists to
-    /// receive it directly (cold launch).
-    var pendingNotificationDestination: AppDestination?
+    /// Retains exact notification destinations until the root navigation
+    /// scene is ready. The coordinator owns main-thread delivery and
+    /// request-id idempotency for cold launch, resume, and already-running
+    /// notification responses.
+    let notificationDeepLinkCoordinator = NotificationDeepLinkCoordinator()
     /// The Evidence Review id currently on screen, if any — set/cleared by
     /// `EvidenceReviewDetailView` itself. `EvidenceReviewReadyNotifier`
     /// checks this before posting a fallback "ready to review" notification

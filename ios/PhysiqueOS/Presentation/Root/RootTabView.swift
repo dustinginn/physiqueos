@@ -74,31 +74,33 @@ struct RootTabView: View {
             .tag(AppTab.you)
         }
         .tint(PhysiqueOSTheme.accent)
-        .onChange(of: environment.pendingNotificationDestination) { _, destination in
-            guard let destination else { return }
-            openFromNotification(destination)
+        .onChange(of: environment.notificationDeepLinkCoordinator.pendingRequest) { _, request in
+            guard request != nil else { return }
+            consumeNotificationDestination()
         }
         .task {
-            if let destination = environment.pendingNotificationDestination {
-                openFromNotification(destination)
-            }
+            consumeNotificationDestination()
         }
     }
 
-    /// A priority notification always opens on Home's stack — priorities
-    /// are Home's own surface, and Home is where the underlying data (and
-    /// its own completion animation, deep-link or not) already lives.
+    /// External notification destinations open on Home's shared stack — it
+    /// owns priorities and already hosts exact published Briefing detail.
     /// Same tab-switch-then-clear-stack pattern as `returnToLog`/
     /// `returnToHome`, so a stale push from whatever the Founder was doing
     /// before the notification arrived is never left behind.
     private func openFromNotification(_ destination: AppDestination) {
         selectedTab = .home
-        environment.pendingNotificationDestination = nil
         Task { @MainActor in
             await Task.yield()
             homePath = NavigationPath()
             homePath.append(destination)
         }
+    }
+
+    @MainActor
+    private func consumeNotificationDestination() {
+        guard let request = environment.notificationDeepLinkCoordinator.consume() else { return }
+        openFromNotification(request.destination)
     }
 
     private func returnToLog() {

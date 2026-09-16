@@ -188,14 +188,22 @@ enum BriefingReadyNotifier {
         cards.compactMap { card in
             guard !observedIDs.contains(card.id),
                   let destination = card.destination,
-                  let destinationData = try? JSONEncoder().encode(destination)
+                  let destinationData = try? JSONEncoder().encode(destination),
+                  let destinationJSON = String(data: destinationData, encoding: .utf8)
             else { return nil }
             let content = UNMutableNotificationContent()
             content.title = card.title
             content.body = "Your \(card.sectionLabel.lowercased()) is ready."
             content.sound = .default
             content.categoryIdentifier = PriorityNotificationCategory.briefingReady
-            content.userInfo = ["destination": destinationData]
+            // A JSON string is a stable property-list value across the
+            // notification daemon/process-launch boundary. Seal the artifact
+            // id separately so the response handler can reject a mismatched
+            // or generic destination without losing the exact target.
+            content.userInfo = [
+                "destinationJSON": destinationJSON,
+                "briefingArtifactId": card.id,
+            ]
             return UNNotificationRequest(
                 identifier: "briefing.ready.\(card.id)", content: content, trigger: nil
             )

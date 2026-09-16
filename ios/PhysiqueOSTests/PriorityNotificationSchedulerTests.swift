@@ -2,28 +2,79 @@ import XCTest
 @testable import PhysiqueOS
 
 final class PriorityNotificationSchedulerTests: XCTestCase {
-    func testBriefingNotificationRequiresCanonicalPublishedCardAndDeepLinksToExactArtifact() throws {
+    func testBriefingNotificationRequiresCanonicalPublishedMidweekCardAndDeepLinksToExactArtifact() throws {
         let card = HomeBriefingCard(
-            id: "weekly_briefing_2026-09-13",
-            sectionLabel: "Weekly Briefing",
-            title: "Your Weekly Briefing is ready",
+            id: "midweek_briefing_2026-09-16",
+            sectionLabel: "Midweek Briefing",
+            title: "Your Midweek Briefing is ready",
             prompt: "Review the published update.",
-            createdAt: "2026-09-15T19:21:00.000Z",
-            destination: .briefingDetail(briefingId: "weekly_briefing_2026-09-13")
+            createdAt: "2026-09-16T12:21:00.000Z",
+            destination: .briefingDetail(briefingId: "midweek_briefing_2026-09-16")
         )
         let requests = BriefingReadyNotifier.requestsForNewPublications(cards: [card], observedIDs: [])
         let request = try XCTUnwrap(requests.first)
         XCTAssertEqual(requests.count, 1)
-        XCTAssertEqual(request.identifier, "briefing.ready.weekly_briefing_2026-09-13")
+        XCTAssertEqual(request.identifier, "briefing.ready.midweek_briefing_2026-09-16")
         XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.briefingReady)
-        let destinationData = try XCTUnwrap(request.content.userInfo["destination"] as? Data)
+        XCTAssertEqual(request.content.userInfo["briefingArtifactId"] as? String, card.id)
+        let destinationJSON = try XCTUnwrap(request.content.userInfo["destinationJSON"] as? String)
+        let destinationData = try XCTUnwrap(destinationJSON.data(using: .utf8))
         XCTAssertEqual(
             try JSONDecoder().decode(AppDestination.self, from: destinationData),
-            .briefingDetail(briefingId: "weekly_briefing_2026-09-13")
+            .briefingDetail(briefingId: "midweek_briefing_2026-09-16")
         )
         XCTAssertTrue(BriefingReadyNotifier.requestsForNewPublications(
             cards: [card], observedIDs: [card.id]
         ).isEmpty)
+    }
+
+    @MainActor
+    func testColdStartBriefingTapWaitsForNavigationConsumerAndPreservesExactIdentity() throws {
+        let coordinator = NotificationDeepLinkCoordinator()
+        let destination = AppDestination.briefingDetail(briefingId: "midweek_briefing_2026-09-16")
+        XCTAssertTrue(coordinator.enqueue(identifier: "briefing.ready.midweek_briefing_2026-09-16", destination: destination))
+        XCTAssertEqual(coordinator.pendingRequest?.destination, destination)
+        XCTAssertEqual(coordinator.consume()?.destination, destination)
+        XCTAssertNil(coordinator.pendingRequest)
+    }
+
+    @MainActor
+    func testBackgroundResumeBriefingTapCanRouteAfterAnEarlierNotificationWasConsumed() {
+        let coordinator = NotificationDeepLinkCoordinator()
+        XCTAssertTrue(coordinator.enqueue(identifier: "briefing.ready.earlier", destination: .briefingList))
+        XCTAssertNotNil(coordinator.consume())
+        let exact = AppDestination.briefingDetail(briefingId: "midweek_briefing_2026-09-16")
+        XCTAssertTrue(coordinator.enqueue(identifier: "briefing.ready.midweek", destination: exact))
+        XCTAssertEqual(coordinator.consume()?.destination, exact)
+    }
+
+    @MainActor
+    func testAlreadyRunningBriefingTapIsIdempotentForTheSameNotificationResponse() {
+        let coordinator = NotificationDeepLinkCoordinator()
+        let destination = AppDestination.briefingDetail(briefingId: "midweek_briefing_2026-09-16")
+        XCTAssertTrue(coordinator.enqueue(identifier: "briefing.ready.midweek", destination: destination))
+        XCTAssertFalse(coordinator.enqueue(identifier: "briefing.ready.midweek", destination: destination))
+        XCTAssertEqual(coordinator.consume()?.destination, destination)
+        XCTAssertFalse(coordinator.enqueue(identifier: "briefing.ready.midweek", destination: destination))
+        XCTAssertNil(coordinator.consume())
+    }
+
+    func testBriefingTapPayloadRejectsMissingInvalidOrMismatchedExactIdentity() throws {
+        XCTAssertThrowsError(try PriorityNotificationDelegate.validatedDestination(
+            userInfo: [:], categoryIdentifier: PriorityNotificationCategory.briefingReady
+        ))
+        XCTAssertThrowsError(try PriorityNotificationDelegate.validatedDestination(
+            userInfo: ["destinationJSON": "not-json", "briefingArtifactId": "midweek"],
+            categoryIdentifier: PriorityNotificationCategory.briefingReady
+        ))
+        let destination = try JSONEncoder().encode(AppDestination.briefingDetail(briefingId: "midweek-a"))
+        XCTAssertThrowsError(try PriorityNotificationDelegate.validatedDestination(
+            userInfo: [
+                "destinationJSON": String(decoding: destination, as: UTF8.self),
+                "briefingArtifactId": "midweek-b",
+            ],
+            categoryIdentifier: PriorityNotificationCategory.briefingReady
+        ))
     }
 
     func testIncidentRecoveryProjectionCreatesPacific1221RequestWithoutDirectCompletion() throws {

@@ -1,5 +1,47 @@
 import UserNotifications
 
+/// Main-thread handoff between notification response delivery and SwiftUI's
+/// navigation shell. A response may arrive before the root scene exists;
+/// retaining it here makes cold launch safe. Request-identifier fencing makes
+/// repeated callbacks idempotent while still allowing a later notification
+/// for the same destination to navigate normally.
+@Observable
+final class NotificationDeepLinkCoordinator {
+    struct Request: Equatable {
+        let identifier: String
+        let destination: AppDestination
+    }
+
+    private(set) var pendingRequest: Request?
+    private var consumedIdentifiers = Set<String>()
+    private var consumedOrder: [String] = []
+
+    @MainActor
+    @discardableResult
+    func enqueue(identifier: String, destination: AppDestination) -> Bool {
+        let normalized = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty,
+              !consumedIdentifiers.contains(normalized),
+              pendingRequest?.identifier != normalized
+        else { return false }
+        pendingRequest = Request(identifier: normalized, destination: destination)
+        return true
+    }
+
+    @MainActor
+    func consume() -> Request? {
+        guard let request = pendingRequest else { return nil }
+        pendingRequest = nil
+        consumedIdentifiers.insert(request.identifier)
+        consumedOrder.append(request.identifier)
+        if consumedOrder.count > 128 {
+            let expired = consumedOrder.removeFirst(consumedOrder.count - 128)
+            consumedIdentifiers.subtract(expired)
+        }
+        return request
+    }
+}
+
 /// Handles Actionable Priority Notification responses. `environment` is
 /// injected once at launch (`PhysiqueOSApp`) rather than captured at
 /// scheduling time, since a response can arrive well after the app that
@@ -36,7 +78,11 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         case PriorityNotificationActionIdentifier.snooze:
             await PriorityNotificationScheduler.scheduleSnooze(for: response.notification.request)
         case UNNotificationDefaultActionIdentifier:
-            openDestination(userInfo: userInfo)
+            await openDestination(
+                userInfo: userInfo,
+                requestIdentifier: response.notification.request.identifier,
+                categoryIdentifier: response.notification.request.content.categoryIdentifier
+            )
         default:
             break
         }
@@ -99,11 +145,81 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         }
     }
 
-    private func openDestination(userInfo: [AnyHashable: Any]) {
-        guard let environment,
-              let data = userInfo["destination"] as? Data,
-              let destination = try? JSONDecoder().decode(AppDestination.self, from: data)
-        else { return }
-        environment.pendingNotificationDestination = destination
+    private func openDestination(
+        userInfo: [AnyHashable: Any],
+        requestIdentifier: String,
+        categoryIdentifier: String
+    ) async {
+        guard let environment else {
+            await recordOpenResult(identifier: requestIdentifier, operation: "deep link rejected", reason: "The application environment was unavailable.")
+            return
+        }
+        do {
+            let destination = try Self.validatedDestination(
+                userInfo: userInfo,
+                categoryIdentifier: categoryIdentifier
+            )
+            let accepted = await environment.notificationDeepLinkCoordinator.enqueue(
+                identifier: requestIdentifier,
+                destination: destination
+            )
+            await recordOpenResult(
+                identifier: requestIdentifier,
+                operation: accepted ? "deep link queued" : "deep link ignored",
+                reason: accepted
+                    ? "The exact notification destination is queued for the ready navigation scene."
+                    : "This notification response was already queued or consumed."
+            )
+        } catch {
+            await recordOpenResult(
+                identifier: requestIdentifier,
+                operation: "deep link rejected",
+                reason: "The notification did not carry a valid exact destination."
+            )
+        }
     }
+
+    static func decodeDestination(userInfo: [AnyHashable: Any]) throws -> AppDestination {
+        let data: Data
+        if let encoded = userInfo["destinationJSON"] as? String,
+           let value = encoded.data(using: .utf8) {
+            data = value
+        } else if let value = userInfo["destination"] as? Data {
+            // Backward-compatible with Build 36 priority/review requests.
+            data = value
+        } else {
+            throw NotificationDestinationError.missingDestination
+        }
+        return try JSONDecoder().decode(AppDestination.self, from: data)
+    }
+
+    static func validatedDestination(
+        userInfo: [AnyHashable: Any],
+        categoryIdentifier: String
+    ) throws -> AppDestination {
+        let destination = try decodeDestination(userInfo: userInfo)
+        guard categoryIdentifier == PriorityNotificationCategory.briefingReady else {
+            return destination
+        }
+        guard case .briefingDetail(let briefingId) = destination,
+              !briefingId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let sealedId = userInfo["briefingArtifactId"] as? String,
+              sealedId == briefingId
+        else { throw NotificationDestinationError.invalidBriefingIdentity }
+        return destination
+    }
+
+    @MainActor
+    private func recordOpenResult(identifier: String, operation: String, reason: String) {
+        NotificationDiagnostics.record(.init(
+            capturedAt: Date(), identifier: identifier,
+            operation: operation, reason: reason,
+            fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
+        ))
+    }
+}
+
+private enum NotificationDestinationError: Error {
+    case missingDestination
+    case invalidBriefingIdentity
 }
