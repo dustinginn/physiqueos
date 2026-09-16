@@ -18,6 +18,7 @@ import SwiftUI
 /// detail/pager, so a filtered or reordered grid cannot open the wrong image.
 struct PhotoBriefingSections: View {
     static let sectionInventory = ["Hero", "Snapshot", "Progress", "Interpretation", "Coach's Insight", "Completion Decision"]
+    static let heroTypeLabel = "PHOTO EVENT"
     @Environment(AppEnvironment.self) private var environment
     let content: PhotoBriefingContent
     var onNavigate: (AppDestination) -> Void = { _ in }
@@ -44,7 +45,7 @@ struct PhotoBriefingSections: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 10) {
                 IconBadge(systemImage: "wand.and.stars", color: .warning, size: .md, isCircular: false)
-                Text("PHOTO EVENT")
+                Text(Self.heroTypeLabel)
                     .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
                     .foregroundStyle(PhysiqueOSTheme.accent)
             }

@@ -5,7 +5,9 @@ import SwiftUI
 /// the SAME `BriefingSandboxStore` History reads from (never a duplicate
 /// fixture), renders the shared top-of-Detail navigation the Founder asked
 /// for (clear access to Home and to Briefing History from every Briefing
-/// Detail), the shared revision disclosure, then dispatches to the
+/// Detail), then dispatches directly to the cadence hero and sections. Any
+/// revision disclosure follows the briefing content so backend/history
+/// metadata never competes with the hero.
 /// cadence-specific section content — Weekly, Midweek, Monthly, and DEXA
 /// Event are genuinely distinct screens on the real product (verified
 /// per-cadence across this and a prior task's audit), not one reskinned
@@ -72,13 +74,10 @@ struct BriefingDetailView: View {
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let briefing?) :
             VStack(alignment: .leading, spacing: 24) {
-                BriefingDetailHeader(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
-
-                if let provenance = briefing.revisionProvenance {
-                    BriefingRevisionBanner(provenance: provenance, replacedHistory: briefing.replacedHistory)
-                }
-
-                header(for: briefing)
+                BriefingDetailPreHeroNavigation(
+                    onHome: onReturnToHome,
+                    onHistory: { onNavigate(.briefingList) }
+                )
 
                 switch briefing.cadence {
                 case .weekly:
@@ -102,10 +101,14 @@ struct BriefingDetailView: View {
                 case .daily:
                     EmptyView()
                 }
+
+                if let provenance = briefing.revisionProvenance {
+                    BriefingRevisionBanner(provenance: provenance, replacedHistory: briefing.replacedHistory)
+                }
             }
         case .loaded(nil):
             VStack(spacing: 12) {
-                BriefingDetailHeader(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
+                BriefingDetailPreHeroNavigation(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
                 Text("This Briefing is unavailable.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -113,7 +116,7 @@ struct BriefingDetailView: View {
             }
         case .failed:
             VStack(spacing: 16) {
-                BriefingDetailHeader(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
+                BriefingDetailPreHeroNavigation(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
                 Text("Briefing could not be loaded.")
                 Button("Try Again") { Task { await load(showLoading: true) } }
                     .buttonStyle(.borderedProminent)
@@ -131,23 +134,4 @@ struct BriefingDetailView: View {
         }
     }
 
-    private func header(for briefing: BriefingReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                BriefingCadenceBadge(briefing: briefing)
-                Text(BriefingDateFormatting.timestamp(briefing.generatedAt))
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-            Text(attributionLabel(for: briefing))
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func attributionLabel(for briefing: BriefingReadModel) -> String {
-        guard let phaseName = briefing.attribution.phaseName else { return PresentationLanguage.displayName(briefing.attribution.goalTitle) }
-        return "\(PresentationLanguage.displayName(briefing.attribution.goalTitle)) · \(PresentationLanguage.displayName(phaseName))"
-    }
 }

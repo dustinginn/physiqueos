@@ -11,6 +11,7 @@ import SwiftUI
 /// received, same as every other cadence, with no special-cased logic.
 struct MidweekBriefingSections: View {
     static let sectionInventory = ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"]
+    static let heroTypeLabel = "MIDWEEK BRIEFING"
     let content: MidweekBriefingContent
     let confidence: BriefingConfidenceReadModel?
 
@@ -35,8 +36,8 @@ struct MidweekBriefingSections: View {
 
     private var hero: some View {
         BriefingLeadCard(
-            eyebrow: "MIDWEEK BRIEFING",
-            rangeLabel: content.reportingRangeLabel,
+            eyebrow: Self.heroTypeLabel,
+            rangeLabel: BriefingDateFormatting.humanizedPeriodLabel(content.reportingRangeLabel),
             headline: content.heroVerdict,
             narrative: content.heroSummary,
             confidence: confidence

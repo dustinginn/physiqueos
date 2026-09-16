@@ -14,6 +14,7 @@ struct MonthlyBriefingSections: View {
     static let sectionInventory = ["Integrated Lead", "Goal Milestone", "Training Progress", "Energy Evolution", "New Baseline", "What Changed", "Defining Moments", "Month Ahead"]
     static let leadFeatureDomains = ["Training", "New Baseline", "Calories"]
     static let trainingPresentationStyle = "gold-featured-lift"
+    static let heroTypeLabel = "MONTHLY BRIEFING"
     let content: MonthlyBriefingContent
     let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
@@ -33,8 +34,8 @@ struct MonthlyBriefingSections: View {
 
     private var hero: some View {
         BriefingLeadCard(
-            eyebrow: "MONTHLY BRIEFING",
-            rangeLabel: content.monthLabel,
+            eyebrow: Self.heroTypeLabel,
+            rangeLabel: BriefingDateFormatting.humanizedPeriodLabel(content.monthLabel),
             headline: content.heroHeadline,
             narrative: content.heroBody,
             confidence: confidence,

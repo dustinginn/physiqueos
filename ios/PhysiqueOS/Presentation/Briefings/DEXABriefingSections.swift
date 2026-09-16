@@ -19,6 +19,7 @@ struct DEXABriefingSections: View {
     static let sectionInventory = ["Hero", "Current Scan", "What Measurably Changed", "Since Last Scan", "Regional Fat Change", "Measured Lean Tissue Change", "Other Notable Changes", "Cut Timeline", "What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"]
     static let heroMetricPresentationStyle = "semantic-two-by-two"
     static let inlineComparisonSectionTitles = ["Regional Fat Change", "Measured Lean Tissue Change", "Other Notable Changes"]
+    static let heroTypeLabel = "DEXA EVENT BRIEFING"
     let content: DEXABriefingContent
     let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
@@ -40,7 +41,7 @@ struct DEXABriefingSections: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 10) {
                     IconBadge(systemImage: "scope", color: .primary, size: .md, isCircular: false)
-                    Text("DEXA EVENT BRIEFING")
+                    Text(Self.heroTypeLabel)
                         .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
                         .foregroundStyle(PhysiqueOSTheme.accent)
                 }

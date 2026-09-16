@@ -8,6 +8,7 @@ import SwiftUI
 /// real screen.
 struct WeeklyBriefingSections: View {
     static let sectionInventory = ["Integrated Lead", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"]
+    static let heroTypeLabel = "WEEKLY BRIEFING"
     let content: WeeklyBriefingContent
     let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
@@ -26,8 +27,8 @@ struct WeeklyBriefingSections: View {
 
     private var hero: some View {
         BriefingLeadCard(
-            eyebrow: "WEEKLY BRIEFING",
-            rangeLabel: "\(content.periodLabel)\n\(content.reportingRangeLabel)",
+            eyebrow: Self.heroTypeLabel,
+            rangeLabel: BriefingDateFormatting.humanizedPeriodLabel("\(content.periodLabel)\n\(content.reportingRangeLabel)"),
             headline: content.heroHeadline,
             narrative: content.heroBody,
             confidence: confidence,

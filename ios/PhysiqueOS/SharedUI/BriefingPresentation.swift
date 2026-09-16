@@ -46,6 +46,91 @@ enum BriefingDateFormatting {
         display.timeStyle = .short
         return display.string(from: date)
     }
+
+    /// Converts machine date ranges embedded in server-owned hero labels
+    /// into concise editorial copy without changing the canonical dates.
+    /// Already-humanized labels pass through unchanged.
+    static func humanizedPeriodLabel(_ label: String) -> String {
+        let pattern = #"(\d{4}-\d{2}-\d{2})\s*[\-–—]\s*(\d{4}-\d{2}-\d{2})"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return collapseRepeatedMonth(in: label) }
+        let sourceRange = NSRange(label.startIndex..<label.endIndex, in: label)
+        let matches = expression.matches(in: label, range: sourceRange)
+
+        var result = label
+        for match in matches.reversed() {
+            guard
+                let matchRange = Range(match.range(at: 0), in: result),
+                let startRange = Range(match.range(at: 1), in: result),
+                let endRange = Range(match.range(at: 2), in: result)
+            else { continue }
+            let replacement = conciseDateRange(
+                start: String(result[startRange]),
+                end: String(result[endRange])
+            )
+            result.replaceSubrange(matchRange, with: replacement)
+        }
+        return collapseRepeatedMonth(in: result)
+    }
+
+    static func conciseDateRange(start: String, end: String) -> String {
+        guard
+            let startDate = dateKeyParser.date(from: String(start.prefix(10))),
+            let endDate = dateKeyParser.date(from: String(end.prefix(10)))
+        else { return start == end ? start : "\(start)–\(end)" }
+
+        let calendar = dateKeyParser.calendar!
+        let startComponents = calendar.dateComponents([.year, .month, .day], from: startDate)
+        let endComponents = calendar.dateComponents([.year, .month, .day], from: endDate)
+
+        if startComponents.year != endComponents.year {
+            return "\(formatDate(startDate, pattern: "MMM d, yyyy"))–\(formatDate(endDate, pattern: "MMM d, yyyy"))"
+        }
+        if startComponents.month != endComponents.month {
+            return "\(formatDate(startDate, pattern: "MMM d"))–\(formatDate(endDate, pattern: "MMM d"))"
+        }
+        if startComponents.day == endComponents.day {
+            return formatDate(startDate, pattern: "MMM d")
+        }
+        return "\(formatDate(startDate, pattern: "MMM d"))–\(formatDate(endDate, pattern: "d"))"
+    }
+
+    private static func formatDate(_ date: Date, pattern: String) -> String {
+        let display = DateFormatter()
+        display.calendar = Calendar(identifier: .gregorian)
+        display.locale = Locale(identifier: "en_US_POSIX")
+        display.timeZone = TimeZone(identifier: "UTC")
+        display.dateFormat = pattern
+        return display.string(from: date)
+    }
+
+    private static func collapseRepeatedMonth(in label: String) -> String {
+        let month = #"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"#
+        let pattern = #"\#(month)\s+(\d{1,2})\s*[\-–—]\s*\#(month)\s+(\d{1,2})"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return label }
+        var result = label
+        let matches = expression.matches(
+            in: result,
+            range: NSRange(result.startIndex..<result.endIndex, in: result)
+        )
+        for match in matches.reversed() {
+            guard
+                let matchRange = Range(match.range(at: 0), in: result),
+                let startMonthRange = Range(match.range(at: 1), in: result),
+                let startDayRange = Range(match.range(at: 2), in: result),
+                let endMonthRange = Range(match.range(at: 3), in: result),
+                let endDayRange = Range(match.range(at: 4), in: result)
+            else { continue }
+            let startMonth = String(result[startMonthRange])
+            guard startMonth == String(result[endMonthRange]) else { continue }
+            let startDay = String(result[startDayRange])
+            let endDay = String(result[endDayRange])
+            result.replaceSubrange(
+                matchRange,
+                with: "\(startMonth) \(startDay)–\(endDay)"
+            )
+        }
+        return result
+    }
 }
 
 extension ISO8601DateFormatter {
@@ -340,16 +425,30 @@ struct BriefingCoachFinale: View {
 
 // MARK: - Detail-top navigation header
 
+/// The complete pre-hero surface. Keeping this as a dedicated component
+/// makes the navigation-only contract structural rather than a per-cadence
+/// convention that can drift.
+struct BriefingDetailPreHeroNavigation: View {
+    static let contentRoles = ["navigation"]
+    var onHome: () -> Void
+    var onHistory: () -> Void
+
+    var body: some View {
+        BriefingDetailHeader(onHome: onHome, onHistory: onHistory)
+    }
+}
+
 /// The Founder's explicit requirement: clear navigation to Home and to
 /// Briefing History from the top of every Briefing Detail screen.
 struct BriefingDetailHeader: View {
+    static let navigationLabels = ["Home", "Briefing History"]
     var onHome: () -> Void
     var onHistory: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            navButton(title: "Home", systemImage: "house.fill", action: onHome)
-            navButton(title: "Briefing History", systemImage: "clock.arrow.circlepath", action: onHistory)
+            navButton(title: Self.navigationLabels[0], systemImage: "house.fill", action: onHome)
+            navButton(title: Self.navigationLabels[1], systemImage: "clock.arrow.circlepath", action: onHistory)
             Spacer(minLength: 0)
         }
     }

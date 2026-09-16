@@ -7,6 +7,50 @@ final class BriefingReadModelTests: XCTestCase {
         XCTAssertEqual(BriefingDetailView.architectureInvariant, "shared-artifact-detail-renderer")
     }
 
+    func testEveryBriefingDetailUsesNavigationOnlyBeforeItsHero() {
+        XCTAssertEqual(BriefingDetailPreHeroNavigation.contentRoles, ["navigation"])
+        XCTAssertEqual(BriefingDetailHeader.navigationLabels, ["Home", "Briefing History"])
+    }
+
+    func testEveryBriefingTypeRetainsItsIdentityInsideTheHero() {
+        XCTAssertEqual(WeeklyBriefingSections.heroTypeLabel, "WEEKLY BRIEFING")
+        XCTAssertEqual(MidweekBriefingSections.heroTypeLabel, "MIDWEEK BRIEFING")
+        XCTAssertEqual(MonthlyBriefingSections.heroTypeLabel, "MONTHLY BRIEFING")
+        XCTAssertEqual(DEXABriefingSections.heroTypeLabel, "DEXA EVENT BRIEFING")
+        XCTAssertEqual(PhotoBriefingSections.heroTypeLabel, "PHOTO EVENT")
+    }
+
+    func testBriefingHeroPeriodRangesAreConciseAndUnambiguous() {
+        XCTAssertEqual(
+            BriefingDateFormatting.humanizedPeriodLabel("2026-09-13–2026-09-15"),
+            "Sep 13–15"
+        )
+        XCTAssertEqual(
+            BriefingDateFormatting.humanizedPeriodLabel("2026-08-30–2026-09-05"),
+            "Aug 30–Sep 5"
+        )
+        XCTAssertEqual(
+            BriefingDateFormatting.humanizedPeriodLabel("2025-12-29–2026-01-04"),
+            "Dec 29, 2025–Jan 4, 2026"
+        )
+        XCTAssertEqual(
+            BriefingDateFormatting.humanizedPeriodLabel("Completed week\n2026-09-13 - 2026-09-15"),
+            "Completed week\nSep 13–15"
+        )
+        XCTAssertEqual(
+            BriefingDateFormatting.humanizedPeriodLabel("Sun–Tue, Sep 13–15"),
+            "Sun–Tue, Sep 13–15"
+        )
+        XCTAssertEqual(
+            BriefingDateFormatting.humanizedPeriodLabel("Completed week\nSep 6–Sep 12"),
+            "Completed week\nSep 6–12"
+        )
+        XCTAssertEqual(
+            BriefingDateFormatting.humanizedPeriodLabel("Oct 26–Nov 1"),
+            "Oct 26–Nov 1"
+        )
+    }
+
     func testEveryBriefingKeepsItsCompleteEditorialSectionInventory() {
         XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"])
         XCTAssertEqual(MidweekBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"])
