@@ -19,6 +19,7 @@ import {
   PeptideExecutionState,
 } from "../../domain/services/PeptideExecutionManagementService.js";
 import { formatSupportScheduleSummary } from "../../domain/models/SupportScheduleModel.js";
+import { ReminderType } from "../../domain/models/reminder.js";
 import { composeOperatingPlanStrategyDetail } from "../../domain/services/OperatingPlanStrategyDetailService.js";
 import { createStrategyEditorModel, TRAINING_AREAS } from "../../domain/services/StrategyEditorService.js";
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
@@ -42,6 +43,11 @@ import { resolveCoachingUpdatesGoalCadencePolicy } from "../../domain/services/C
 import { createCoachingUpdatesSemanticDigest } from "../../domain/services/FounderRuntimeSemanticDigest.js";
 import { createProgressPhotosExecutionHydrationModel } from "../../domain/services/ProgressPhotosExecutionScheduleService.js";
 import { DEXA_APPOINTMENT_ID } from "../../domain/services/DexaAppointmentManagementService.js";
+import { isCurrentScheduledDexaAppointment } from "../../domain/services/DexaAppointmentLifecycleService.js";
+import {
+  isReminderOccurrenceCompleted,
+  resolveScheduledTime,
+} from "../../domain/services/ReminderOccurrenceCompletion.js";
 
 export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   home: Object.freeze([
@@ -155,6 +161,8 @@ export function createCoreNavigationReadService({
             supportSummary: method.supportSummary,
             currentDose: method.currentDose ?? null,
             currentSchedule: method.currentSchedule ?? null,
+            reminderEnabled: (runtime.reminders ?? []).some((reminder) =>
+              reminder.userId === ownerUserId && reminder.linkedEntityId === method.protocolId && reminder.active !== false),
             editDestination: domainSupportDestination(model.category, method),
           }))),
         });
@@ -283,19 +291,30 @@ export function createCoreNavigationReadService({
           item.id === protocolId && item.userId === ownerUserId && item.status === "active"
         );
         if (!protocol) return null;
-        const reminder = (runtime.reminders ?? []).find((item) =>
+        const reminderTypes = recurringSupportReminderTypes({ protocol, executionItem });
+        const reminders = (runtime.reminders ?? []).filter((item) =>
           item.userId === ownerUserId && item.linkedEntityId === protocol.id &&
-          ["protocol_reminder", "recovery_reminder"].includes(item.type)
-        ) ?? null;
+          reminderTypes.has(item.type)
+        );
+        // A recurring Support editor must never silently shed its canonical
+        // reminder identity. Missing or ambiguous linkage is an unavailable
+        // read, not an editable object with `reminderId: null` that Native
+        // can only reject before reaching the server.
+        if (reminders.length !== 1) return null;
+        const reminder = reminders[0];
         const hydration = createRecurringSupportHydrationModel({ executionItem, protocol, reminder });
         return Object.freeze({
           protocolId: protocol.id,
           protocolCategory: protocol.category,
           executionId: executionItem.id,
-          reminderId: reminder?.id ?? null,
+          reminderId: reminder.id,
           title: executionItem.title ?? protocol.name ?? "",
           purpose: executionItem.description ?? "",
           supportSummary: formatSupportScheduleSummary(hydration.supportSchedule),
+          nextDue: projectNextSupportDue({
+            schedule: hydration.supportSchedule, reminder,
+            localDate: getLocalDateKey(now(), resolveLocalTimeZone(runtime.user?.timeZone ?? runtime.user?.timezone)),
+          }),
           hydration,
         });
       });
@@ -333,6 +352,7 @@ export function createCoreNavigationReadService({
           reminderPreference: hydration.reminderPreference,
           timingContext: hydration.timingContext,
           notes: hydration.notes,
+          nextDue: projectNextSupportDue({ schedule: hydration.supportSchedule, reminder, localDate }),
         });
       });
     },
@@ -376,6 +396,10 @@ export function createCoreNavigationReadService({
           supportSchedule: hydration.draft.supportSchedule,
           reminderPreference: hydration.draft.reminderPreference,
           notes: hydration.draft.notes,
+          nextDue: projectNextSupportDue({
+            schedule: hydration.draft.supportSchedule, reminder: reminders[0] ?? null,
+            localDate: getLocalDateKey(now(), resolveLocalTimeZone(runtime.user?.timeZone ?? runtime.user?.timezone)),
+          }),
         });
       });
     },
@@ -452,22 +476,30 @@ export function createCoreNavigationReadService({
         const photoHydration = createProgressPhotosExecutionHydrationModel(runtime);
         const dexa = runtime.executionItems?.find((item) => item.id === DEXA_APPOINTMENT_ID);
         if (!version || !goal || !readModel || !photoHydration || !dexa) return null;
+        // A completed DEXA execution is history, not the next appointment.
+        // Do not feed its past date back into the composite editor: the
+        // atomic transition correctly validates this field as a future next
+        // scan and would otherwise reject an unrelated Coaching edit.
+        const scheduledDexa = isCurrentScheduledDexaAppointment(dexa) ? dexa : null;
         const editor = createCoachingUpdatesEditorModel({
           readModel,
           policy: resolveCoachingUpdatesGoalCadencePolicy(goal),
           photos: {
             cadence: photoHydration.item.recurrence.interval === 2 ? "weekly_interval_2" : "weekly",
             day: photoHydration.item.recurrence.weekdays[0],
-            timeOfDay: photoHydration.item.recurrence.timeOfDay,
+            timeOfDay: /^\d{2}:\d{2}$/.test(photoHydration.item.recurrence.timeOfDay ?? "")
+              ? "specific" : photoHydration.item.recurrence.timeOfDay,
+            specificTime: /^\d{2}:\d{2}$/.test(photoHydration.item.recurrence.timeOfDay ?? "")
+              ? photoHydration.item.recurrence.timeOfDay : null,
             reminderEnabled: photoHydration.item.reminderEnabled,
             timeOptions: ["morning", "afternoon", "evening"],
           },
           dexa: {
-            plannedDate: dexa.preferredSchedule?.date ?? "",
-            localTime: dexa.preferredSchedule?.timeOfDay ?? "",
-            reminderPreferences: structuredClone(dexa.reminderPreferences ?? []),
-            uploadReminder: dexa.uploadReminder === true,
-            preparationNote: dexa.preparationNote ?? "",
+            plannedDate: scheduledDexa?.preferredSchedule?.date ?? "",
+            localTime: scheduledDexa?.preferredSchedule?.timeOfDay ?? "",
+            reminderPreferences: structuredClone(scheduledDexa?.reminderPreferences ?? []),
+            uploadReminder: scheduledDexa?.uploadReminder === true,
+            preparationNote: scheduledDexa?.preparationNote ?? "",
           },
         });
         const detail = composeOperatingPlanStrategyDetail({ goals, protocol, strategyType: "briefings", version });
@@ -491,6 +523,7 @@ export function createCoreNavigationReadService({
               cadence: editor.photos.cadence,
               day: editor.photos.day,
               timeOfDay: editor.photos.timeOfDay,
+              specificTime: editor.photos.specificTime,
               reminderEnabled: editor.photos.reminderEnabled,
             }),
             dexa: editor.dexa,
@@ -882,6 +915,60 @@ function hasAmbiguousDomainExecution(protocol, executionItems) {
     return item.type === protocol.category;
   });
   return matches.length > 1;
+}
+
+function recurringSupportReminderTypes({ protocol, executionItem }) {
+  const result = new Set([ReminderType.PROTOCOL_REMINDER, "recovery_reminder"]);
+  const trackingEvidenceTypes = new Set(executionItem.linkedEvidenceTypes ?? []);
+  const isMorningWeighIn = protocol.category === "weight" || protocol.protocolType === "weight" ||
+    trackingEvidenceTypes.has("morning_weight");
+  if (isMorningWeighIn) {
+    result.add(ReminderType.EVIDENCE_REMINDER);
+    result.add(ReminderType.MORNING_WEIGH_IN);
+  }
+  return result;
+}
+
+function projectNextSupportDue({ schedule, reminder, localDate }) {
+  if (!schedule || !localDate || reminder?.active === false) return null;
+  const start = /^\d{4}-\d{2}-\d{2}$/.test(schedule.startDate ?? "") ? schedule.startDate : localDate;
+  const end = /^\d{4}-\d{2}-\d{2}$/.test(schedule.endDate ?? "") ? schedule.endDate : null;
+  for (let offset = 0; offset <= 370; offset += 1) {
+    const candidate = shiftDate(localDate, offset);
+    if (candidate < start) continue;
+    if (end && candidate > end) return null;
+    if (!supportScheduleIncludesDate(schedule, candidate, start)) continue;
+    if (offset === 0 && isReminderOccurrenceCompleted(reminder, { occurrenceDate: candidate })) continue;
+    const time = resolveScheduledTime(schedule.timing === "specific" ? schedule.specificTime : schedule.timing);
+    const date = new Intl.DateTimeFormat("en-US", {
+      month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+    }).format(new Date(`${candidate}T12:00:00Z`));
+    return `${date}${time ? ` · ${formatClock(time)}` : ""}`;
+  }
+  return null;
+}
+
+function supportScheduleIncludesDate(schedule, candidate, start) {
+  if (schedule.frequency === "daily") return true;
+  if (schedule.frequency === "every_x_days") {
+    const elapsed = Math.floor((Date.parse(`${candidate}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000);
+    return elapsed >= 0 && elapsed % Math.max(1, Number(schedule.intervalDays ?? 1)) === 0;
+  }
+  if (["weekly", "specific_days"].includes(schedule.frequency)) {
+    const weekday = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][new Date(`${candidate}T12:00:00Z`).getUTCDay()];
+    return (schedule.daysOfWeek ?? []).includes(weekday);
+  }
+  return false;
+}
+
+function shiftDate(date, days) {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+function formatClock(value) {
+  const [hour, minute] = value.split(":").map(Number);
+  const suffix = hour >= 12 ? "PM" : "AM";
+  return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 
 function domainSupportDestination(category, method) {

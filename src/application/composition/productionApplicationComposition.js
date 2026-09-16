@@ -89,6 +89,8 @@ import { createBriefingNavigationReadService } from "../briefings/BriefingNaviga
 import { createAsyncEvidenceIntakeService } from "../evidence/AsyncEvidenceIntakeService.js";
 import { createPostgresEvidenceIntakeStore } from "../../platform/database/PostgresEvidenceIntakeStore.js";
 import { createProviderCanonicalUploadService } from "../media/ProviderCanonicalUploadService.js";
+import { createStructuredLogger } from "../../platform/observability/structuredLogger.js";
+import { readBuildIdentity } from "../../platform/observability/buildIdentity.js";
 import { createFoundationPostgresTransactionRunner } from "../../platform/database/foundationPostgresComposition.js";
 import { createFounderAuthService } from "../../platform/auth/FounderAuthService.js";
 import { createFounderWeightSummaryReadService } from "../weight/FounderWeightSummaryReadService.js";
@@ -230,6 +232,7 @@ export function getProductionAsyncEvidenceIntakeService(env = process.env) {
     environment: required(env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"),
   });
   return createAsyncEvidenceIntakeService({
+    logger: createStructuredLogger({ buildIdentity: readBuildIdentity(env) }),
     store: createPostgresEvidenceIntakeStore({
       pool: runtime.pool,
       ownerUserId: runtime.ownerUserId,

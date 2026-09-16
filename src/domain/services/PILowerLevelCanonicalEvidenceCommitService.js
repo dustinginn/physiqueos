@@ -189,6 +189,15 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
       try {
         if (typeof mutateCanonicalRuntime === "function") {
           let committedExerciseLibrary = [];
+          const canonicalCommitCollections = [
+            "evidencePackages",
+            "canonicalExerciseLibrary",
+            "canonicalEvidenceObjects",
+            "goals",
+            "piEnergyConfidenceWorkItems",
+            "piTrainingConfidenceWorkItems",
+            "briefingReconciliationWorkItems",
+          ];
           const committed = await mutateCanonicalRuntime({
             operation: "evidence-review-canonical-commit",
             allowedCollections: [
@@ -199,6 +208,12 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
               "piTrainingConfidenceWorkItems",
               "briefingReconciliationWorkItems",
             ],
+            // The durable acknowledgement does not need the rest of the
+            // Founder runtime. Loading every collection made a three-record
+            // Training commit wait behind unrelated Briefing/Protocol state.
+            readCollections: canonicalCommitCollections,
+            readApplicationContext: false,
+            readImportMetadata: false,
             allowApplicationContextMutation: false,
             mutate(candidate, { commandId }) {
               stageCandidate(candidate);

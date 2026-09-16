@@ -32,7 +32,7 @@ describe("Coaching Updates editor model", () => {
       midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
       weekly: { enabled: true, day: "sunday", localTime: "00:00" },
       daily: { enabled: false },
-      notificationPreference: "available_without_notification",
+      notificationPreference: "notify_when_ready",
       eventBriefings: { photo: true, dexa: true },
       dexa: {
         plannedDate: "2026-08-15",

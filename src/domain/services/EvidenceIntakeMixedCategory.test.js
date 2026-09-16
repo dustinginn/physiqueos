@@ -99,6 +99,35 @@ describe("mixed-category screenshot intake", () => {
     expect(dispositions(result).some((item) => item.disposition === "unrecognized")).toBe(true);
   });
 
+  it("bounds external screenshot interpretation at two while preserving artifact order", async () => {
+    let active = 0;
+    let maximumActive = 0;
+    const releases = [];
+    const interpret = vi.fn(async ({ screenshots, submissionId }) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => releases.push(resolve));
+      active -= 1;
+      return createInterpreterResult(screenshots[0], submissionId);
+    });
+    const pending = interpretScreenshotArtifactsIndividually({
+      artifacts: ["nutrition-a.png", "activity-a.png", "nutrition-detail.png"].map(artifact),
+      evidenceDate: DATE,
+      expectedEvidenceType: "auto",
+      interpret,
+      submissionId: "bounded_parallel_fixture",
+    });
+    await vi.waitFor(() => expect(interpret).toHaveBeenCalledTimes(2));
+    releases.shift()();
+    await vi.waitFor(() => expect(interpret).toHaveBeenCalledTimes(3));
+    while (releases.length) releases.shift()();
+    const result = await pending;
+
+    expect(maximumActive).toBe(2);
+    expect(perFileOutcomes(result).map((item) => item.fileId))
+      .toEqual(["file_0", "file_1", "file_2"]);
+  });
+
   it("stages one mixed review without canonical writes", async () => {
     const result = await run(["nutrition-a.png", "activity-a.png"]);
     const reviews = [];
@@ -169,8 +198,11 @@ function artifact(fileName, index) {
 }
 
 function createInterpreterStub() {
-  return vi.fn(async ({ screenshots, submissionId }) => {
-    const screenshot = screenshots[0];
+  return vi.fn(async ({ screenshots, submissionId }) =>
+    createInterpreterResult(screenshots[0], submissionId));
+}
+
+function createInterpreterResult(screenshot, submissionId) {
     if (screenshot.fileName.includes("failure")) {
       throw new Error("fixture interpretation failure");
     }
@@ -206,7 +238,6 @@ function createInterpreterStub() {
         },
       },
     };
-  });
 }
 
 function evidenceObject(type, id) {

@@ -293,6 +293,14 @@ export function applyNutritionDayMealAggregation(evidenceObject = {}) {
   };
 }
 
+/// One authority for both Review presentation and confirmation admission.
+/// Recompute from the retained source totals plus the current meal model;
+/// never compare meal-derived `daily_totals` back to those same meals, and
+/// never trust a stale status after the reviewed object has changed.
+export function resolveNutritionDayReconciliation(evidenceObject = {}) {
+  return applyNutritionDayMealAggregation(evidenceObject).metadata.daily_totals_reconciliation;
+}
+
 // Older pending reviews may contain a gap left by former name-based food
 // deduplication. Recover only when item sequence and meal calories independently
 // identify one exact duplicate.

@@ -47,8 +47,8 @@ function CoachingUpdatesFields({ model }) {
       <div className="space-y-2 border-t border-[var(--divider)] pt-3"><p className="text-xs font-bold text-[var(--text-secondary)]">Briefing</p><Checkbox defaultChecked={model.eventBriefings.dexa} label="Enable DEXA Event briefing" name="dexaEventBriefingEnabled"/></div>
     </Section>
     <Section title="Notifications">
-      <label className="flex min-h-12 items-center gap-3"><input defaultChecked={model.notificationPreference==="notify_when_ready"} name="notificationPreference" type="radio" value="notify_when_ready"/><span className="text-sm font-bold">Notify me when an update is ready</span></label>
-      <label className="flex min-h-12 items-center gap-3"><input defaultChecked={model.notificationPreference==="available_without_notification"} name="notificationPreference" type="radio" value="available_without_notification"/><span className="text-sm font-bold">Keep updates available without a notification</span></label>
+      <input name="notificationPreference" type="hidden" value="notify_when_ready"/>
+      <p className="text-sm font-semibold">Enabled briefings notify you when the canonical update is published. iOS notification permission controls delivery.</p>
     </Section>
   </div>;
 }

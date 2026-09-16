@@ -7,7 +7,7 @@ import {
   normalizeTrainingExerciseRelationshipGroups,
 } from "../models/trainingExerciseRelationship";
 import {
-  reconcileNutritionDayEvidence,
+  resolveNutritionDayReconciliation,
   restoreCollapsedNutritionFoodDuplicates,
 } from "../models/nutritionDayEvidence";
 import {
@@ -291,9 +291,7 @@ function presentNutrition(object, common) {
   // sums. Comparing those derived values again conceals a retained conflict
   // that canonical admission still rejects. Present the same interpreted
   // reconciliation authority used by commit readiness, without changing it.
-  const reconciliation = metadata.daily_totals_reconciliation ??
-    reconcileNutritionDayEvidence({ dailyTotals: totals, meals,
-      dailyTotalsScope: metadata.daily_totals_scope });
+  const reconciliation = resolveNutritionDayReconciliation(object);
 
   return {
     ...common,

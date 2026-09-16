@@ -24,6 +24,7 @@ const reminder = {
   type: "protocol_reminder",
   linkedEntityId: protocol.id,
   active: true,
+  version: 4,
   schedule: {
     type: "weekly",
     daysOfWeek: ["thursday"],
@@ -55,11 +56,15 @@ describe("Execution-backed Daily Focus composition", () => {
     // Dosing semantics: even though this item is completable and its
     // reminder-derived executionContract.workflow is "priority_detail" (the
     // same shape an ordinary direct-completable reminder has), a peptide
-    // item must never expose blind direct completion from a notification.
+    // item must preserve dose-aware completion from a notification.
     expect(item.notificationAction).toMatchObject({
       classification: "specialized_workflow_required",
       workflow: "peptide_protocol",
-      completionCommand: null,
+      completionCommand: {
+        commandType: "priority.complete.v1",
+        expectedVersion: 4,
+        payload: { priorityId: reminder.id, occurrenceDate: "2026-07-30", dose: "1 mg", protocolId: protocol.id },
+      },
     });
   });
 

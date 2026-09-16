@@ -16,6 +16,21 @@ describe("Reminder occurrence completion", () => {
         destination: { priorityId: "reminder", occurrenceDate: "2026-09-15" },
         completionCommand: null, scheduledTime: "12:21" });
   });
+  it("carries the canonical dose-aware completion command for an actionable peptide", () => {
+    expect(protocolSupportNotificationAction({
+      category: "peptide", priorityId: "reminder", occurrenceDate: "2026-09-15", timeOfDay: "21:45",
+      executionContract: { priorityId: "reminder", occurrenceDate: "2026-09-15", expectedVersion: 33 },
+      completable: true,
+      completionContext: { dose: "0.5 mg", protocolId: "retatrutide" },
+    })).toMatchObject({
+      classification: "specialized_workflow_required",
+      workflow: "peptide_protocol",
+      completionCommand: {
+        commandType: "priority.complete.v1", expectedVersion: 33,
+        payload: { priorityId: "reminder", occurrenceDate: "2026-09-15", dose: "0.5 mg", protocolId: "retatrutide" },
+      },
+    });
+  });
   it("uses Founder-local date semantics for top-level completion", () => {
     const reminder = { completedAt: "2026-08-31T06:30:00Z" };
     expect(isReminderOccurrenceCompleted(reminder, {

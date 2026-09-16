@@ -152,7 +152,8 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
       ...after, now: new Date("2026-09-17T15:00:00.000Z"), timeZone: "America/Los_Angeles",
     }).find((item) => item.protocolId === "supplement");
     expect(homePriority.notificationAction).toMatchObject({
-      scheduledTime: "08:40", classification: "specialized_workflow_required", completionCommand: null,
+      scheduledTime: "08:40", classification: "specialized_workflow_required",
+      completionCommand: { commandType: "priority.complete.v1", payload: { protocolId: "supplement" } },
     });
     expect(await fixture.reads().getSupplementSupport({ protocolId: "supplement" })).toMatchObject({
       doseAmount: "2", doseUnit: "capsules", supportSchedule: { specificTime: "08:40", endDate: "2026-12-31" },
@@ -262,6 +263,33 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     expect(JSON.stringify(fixture.snapshot())).toBe(snapshot);
   });
 
+  it("treats a completed historical DEXA as history and saves Coaching with the production null-timezone owner shape", async () => {
+    const fixture = setup({
+      timezoneFields: { timezone: null },
+      completedDexa: true,
+    });
+    const detail = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    expect(detail.editor.dexa).toMatchObject({
+      plannedDate: "",
+      localTime: "",
+      reminderPreferences: [],
+      uploadReminder: false,
+      preparationNote: "",
+    });
+    const draft = structuredClone(detail.editor);
+    draft.weekly.localTime = "08:15";
+    const payload = { protocolId: detail.protocolId, ...detail.context, draft };
+    delete payload.expectedRevision;
+
+    const saved = await fixture.ports.saveCoachingUpdates(
+      context(payload, detail.context.expectedRevision)
+    );
+
+    expect(saved.result).toMatchObject({ status: "updated", coachingChanged: true });
+    const readback = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    expect(readback.editor.weekly.localTime).toBe("08:15");
+  });
+
   it("rolls back a mid-persistence composite failure and replays one durable save without duplicate versions", async () => {
     const initial = setup();
     const detail = await initial.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
@@ -338,12 +366,19 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
   });
 });
 
-function setup({ timezoneFields } = {}) {
+function setup({ timezoneFields, completedDexa = false } = {}) {
   const runtime = source();
   if (timezoneFields) {
     delete runtime.user.timeZone;
     Object.assign(runtime.user, timezoneFields);
     for (const reminder of runtime.reminders) reminder.schedule.timezone = null;
+  }
+  if (completedDexa) {
+    const dexa = runtime.executionItems.find((item) => item.id === "execution_next_dexa");
+    dexa.active = false;
+    dexa.status = "completed";
+    dexa.completedAt = "2026-08-15T15:00:00.000Z";
+    dexa.preferredSchedule.date = "2026-08-15";
   }
   let clock = NOW;
   let revision = runtime.revision;

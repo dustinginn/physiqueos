@@ -161,7 +161,7 @@ export function createPostgresEvidenceIntakeStore({
              version=version+1,updated_at=$5 WHERE id=$1 AND owner_user_id=$2 RETURNING *`,
           [receiptId, ownerUserId, workerId, new Date(at.getTime() + INTERPRETATION_LEASE_MS), at],
         )).rows[0];
-        return Object.freeze({ outcome: "claimed", receipt: mapReceipt(updated) });
+        return Object.freeze({ outcome: "claimed", receipt: mapReceipt(updated), queuedAt: iso(row.updated_at) });
       });
     },
 
@@ -219,6 +219,8 @@ export function mapReceipt(row) {
     storedArtifacts: Object.freeze([...(row.stored_artifacts ?? [])].sort((a, b) => a.ordinal - b.ordinal)),
     interpretationState: row.interpretation_state, packageId: row.package_id, reviewId: row.review_id,
     lastErrorCode: row.last_error_code, createdAt: iso(row.created_at), updatedAt: iso(row.updated_at),
+    interpretationStartedAt: iso(row.interpretation_started_at),
+    interpretationCompletedAt: iso(row.interpretation_completed_at),
   });
 }
 

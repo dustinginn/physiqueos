@@ -3,6 +3,8 @@ import { scopeRepositoryReadService } from "../../application/read-models/Reposi
 export const COACHING_UPDATES_SCHEMA_VERSION = "coaching_updates_schedule_v1";
 export const COACHING_NOTIFICATION_PREFERENCES = Object.freeze([
   "notify_when_ready",
+  // Historical wire compatibility only; read/editor/save normalization
+  // promotes this retired choice to notify_when_ready.
   "available_without_notification",
 ]);
 export const WEEKDAYS = Object.freeze([
@@ -69,7 +71,7 @@ export function mapLegacyCoachingUpdates({ protocol, version, timeZone = DEFAULT
     monthly: { enabled: true, dayOfMonth: 1, localTime: LEGACY_TIME },
     daily: { enabled: false },
     eventBriefings: { photo: true, dexa: true },
-    notificationPreference: "available_without_notification",
+    notificationPreference: "notify_when_ready",
     scheduleApplication: { status: "active", appliesTo: "future_eligible_runs" },
     compatibility: { source: "legacy_twice_weekly_v1", dailyEvidenceCollection: legacy.dailyEvidenceCollection === true },
   };
@@ -113,6 +115,10 @@ export function filterEligibleEventBriefingTypes(types = [], preferences = {}) {
 function normalizeCanonicalCoachingUpdates(canonical, timeZone) {
   return {
     ...structuredClone(canonical),
+    // Enabled briefings notify on canonical publication. iOS notification
+    // permission is the only user opt-out; the former product-level toggle
+    // is retained only in historical protocol versions.
+    notificationPreference: "notify_when_ready",
     timeZone: canonical.timeZone ?? timeZone,
     monthly: structuredClone(canonical.monthly ?? {
       enabled: true, dayOfMonth: 1, localTime: LEGACY_TIME,

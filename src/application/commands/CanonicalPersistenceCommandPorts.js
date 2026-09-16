@@ -57,7 +57,7 @@ import {
 } from "../../domain/services/SupplementStrategyManagementService.js";
 import { buildSupplementProvenance } from "../../domain/services/SupplementStrategyFormService.js";
 import { buildStrategySuccessorPayload } from "../../domain/services/StrategyEditorService.js";
-import { getLocalDateKey } from "../../domain/utils/localDate.js";
+import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";
 import {
   applyPreparedCoachingUpdatesStrategyTransition,
   CoachingUpdatesStrategyOutcome,
@@ -113,7 +113,9 @@ function coachingUpdatesDraftForm(draft) {
     notificationPreference: draft.notificationPreference,
     photoCadence: draft.photos?.cadence,
     photoDay: draft.photos?.day,
-    photoTimeOfDay: draft.photos?.timeOfDay,
+    photoTimeOfDay: draft.photos?.timeOfDay === "specific"
+      ? draft.photos?.specificTime
+      : draft.photos?.timeOfDay,
     dexaPlannedDate: draft.dexa?.plannedDate,
     dexaLocalTime: draft.dexa?.localTime,
     dexaPreparationNote: draft.dexa?.preparationNote,
@@ -279,7 +281,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       throw problem(404, "COACHING_UPDATES_UNAVAILABLE", "These coaching settings are no longer available.");
     }
     const requested = buildCoachingUpdatesRequest(coachingUpdatesDraftForm(context.payload.draft ?? {}), readModel);
-    const effectiveDate = getLocalDateKey(now(), candidate.user?.timeZone ?? candidate.user?.timezone);
+    const effectiveDate = getLocalDateKey(
+      now(), resolveLocalTimeZone(candidate.user?.timeZone ?? candidate.user?.timezone)
+    );
     const author = {
       type: "user", id: context.ownerUserId,
       displayName: candidate.user?.displayName ?? candidate.user?.name ?? "Founder",
@@ -689,7 +693,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       ...draft,
       protocolId,
       userId: context.ownerUserId,
-      effectiveDate: getLocalDateKey(now(), candidate.user?.timeZone ?? candidate.user?.timezone),
+      effectiveDate: getLocalDateKey(
+        now(), resolveLocalTimeZone(candidate.user?.timeZone ?? candidate.user?.timezone)
+      ),
       initialStatus: draft.initialStatus ?? "active",
       provenance: buildSupplementProvenance(
         candidate.user,
@@ -710,7 +716,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       protocolId: context.payload.protocolId,
       expectedCurrentVersionId: context.payload.expectedCurrentVersionId,
       userId: context.ownerUserId,
-      effectiveDate: getLocalDateKey(now(), candidate.user?.timeZone ?? candidate.user?.timezone),
+      effectiveDate: getLocalDateKey(
+        now(), resolveLocalTimeZone(candidate.user?.timeZone ?? candidate.user?.timezone)
+      ),
       provenance: buildSupplementProvenance(
         candidate.user,
         operation === "pause" ? "Pause supplement strategy." : "Restore supplement strategy.",

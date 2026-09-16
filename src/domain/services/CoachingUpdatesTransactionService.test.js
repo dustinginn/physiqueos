@@ -25,7 +25,7 @@ describe("Coaching Updates canonical transaction", () => {
       midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
       weekly: { enabled: true, day: "sunday", localTime: "00:00" },
       daily: { enabled: false },
-      notificationPreference: "available_without_notification",
+      notificationPreference: "notify_when_ready",
       eventBriefings: { photo: true, dexa: true },
     });
     expect(model.compatibility.dailyEvidenceCollection).toBe(true);

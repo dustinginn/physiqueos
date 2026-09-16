@@ -107,7 +107,10 @@ export function prepareCoachingUpdatesStrategyTransition(store, command = {}, ti
   });
   if (!photoReminder.ok) return rejected(photoReminder.outcome, photoReminder.reason);
   const dexa = prepareDexaAppointmentUpdate(store, command.dexa, timestamp, {
-    requireAppointment: true,
+    // A completed appointment is DEXA history, not a mandatory future
+    // appointment. Unrelated Coaching/Briefing changes remain atomic without
+    // forcing the Founder to schedule the next scan in the same save.
+    requireAppointment: false,
     preserveExistingFields: false,
   });
   if (!dexa.ok && dexa.outcome !== DexaAppointmentOutcome.UNCHANGED) {

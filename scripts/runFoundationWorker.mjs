@@ -133,6 +133,7 @@ const handlers = Object.freeze({
   ...(evidenceIntakeStore ? {
     [EVIDENCE_INTAKE_INTERPRETATION_TOPIC]: createEvidenceIntakeInterpretationWorkerHandler({
       store: evidenceIntakeStore,
+      logger,
       loadArtifact: createProviderEvidenceIntakeArtifactLoader({
         pool,
         objectProvider: evidenceIntakeObjectProvider,

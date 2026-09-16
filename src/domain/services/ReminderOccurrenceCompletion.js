@@ -172,10 +172,29 @@ export function specializedNotificationAction({ workflow, priorityId, occurrence
 // Protocol Support retains its domain workflow regardless of the reminder
 // used to schedule it. Editing a Support schedule does not authorize blind
 // notification completion; peptide completion remains dose-aware.
-export function protocolSupportNotificationAction({ category, ...occurrence }) {
-  return specializedNotificationAction({
-    ...occurrence,
-    workflow: category === "peptide" ? "peptide_protocol" : "priority_detail",
+export function protocolSupportNotificationAction({
+  category,
+  executionContract = null,
+  completable = false,
+  completionContext = null,
+  ...occurrence
+}) {
+  const workflow = category === "peptide" ? "peptide_protocol" : "priority_detail";
+  const base = specializedNotificationAction({ ...occurrence, workflow });
+  if (completable !== true || executionContract?.expectedVersion === null ||
+      executionContract?.expectedVersion === undefined) return base;
+  return Object.freeze({
+    ...base,
+    completionCommand: Object.freeze({
+      commandType: "priority.complete.v1",
+      expectedVersion: executionContract.expectedVersion,
+      payload: Object.freeze({
+        priorityId: executionContract.priorityId,
+        occurrenceDate: executionContract.occurrenceDate,
+        dose: completionContext?.dose ?? null,
+        protocolId: completionContext?.protocolId ?? null,
+      }),
+    }),
   });
 }
 

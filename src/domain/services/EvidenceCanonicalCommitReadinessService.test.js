@@ -22,6 +22,7 @@ describe("Evidence canonical commit readiness", () => {
             canonical_meal_sums: { calories: 4190, protein_g: 192, carbs_g: 313, fat_g: 239 },
           },
         },
+        meals: [{ id: "all-meals", name: "All meals", totals: { calories: 4190, protein_g: 192, carbs_g: 313, fat_g: 239 } }],
       }],
     };
 
@@ -31,6 +32,23 @@ describe("Evidence canonical commit readiness", () => {
         fields: ["calories", "protein_g", "carbs_g", "fat_g"],
       })
     );
+  });
+
+  it("recomputes a stale stored conflict from retained source totals and the current reviewed meals", () => {
+    const evidencePackage = { evidence_objects: [{
+      id: "nutrition", evidence_type: "nutrition",
+      daily_totals: { calories: 1900, protein_g: 180 },
+      meals: [{ id: "day", name: "All meals", totals: { calories: 1900, protein_g: 180 } }],
+      metadata: {
+        daily_totals_scope: "full_day_summary",
+        daily_totals_reconciliation: {
+          status: "needs_review", conflicting_fields: ["calories"],
+          source_daily_totals: { calories: 1900, protein_g: 180 },
+        },
+      },
+    }] };
+
+    expect(assertEvidenceCanonicalCommitReady(evidencePackage)).toBe(true);
   });
 
   it("accepts matched Nutrition and unrelated evidence without changing either", () => {

@@ -44,6 +44,11 @@ describe("provider-bounded lower-level canonical evidence commit", () => {
         fullRuntimeSerializationCount: 0,
       },
     });
+    expect(fixture.lastInput).toMatchObject({
+      readApplicationContext: false,
+      readImportMetadata: false,
+      readCollections: expect.arrayContaining(["canonicalEvidenceObjects", "goals", "evidencePackages"]),
+    });
     expect([
       PILowerLevelSourceCommitOutcome.SOURCE_MATCHED,
       PILowerLevelSourceCommitOutcome.SOURCE_COMMITTED_WORK_MATCHED,
@@ -343,6 +348,7 @@ function boundedFixture({
   };
   fixture.mutateCanonicalRuntime = async (input) => {
     fixture.calls += 1;
+    fixture.lastInput = input;
     const loadedRuntime = Object.freeze({ ...fixture.store });
     if (preserveLoadedRuntime) fixture.loadedRuntime = loadedRuntime;
     const candidate = createShallowWritableFounderRuntime(loadedRuntime);

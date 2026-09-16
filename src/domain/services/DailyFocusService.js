@@ -843,6 +843,13 @@ function getExecutionBackedProtocolItems({
           priorityId: projection.priorityId,
           occurrenceDate: today,
           timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder?.schedule?.timeOfDay,
+          executionContract: reminder
+            ? resolvePriorityExecutionContract({ reminder, occurrenceDate: today })
+            : null,
+          completable: projection.completable,
+          completionContext: projection.completable
+            ? { occurrenceDate: today, dose: doseText, protocolId }
+            : null,
         }),
         state: state.name,
         priority: state.priorityOffset + (recoverySupport ? 18 : 22) + index,

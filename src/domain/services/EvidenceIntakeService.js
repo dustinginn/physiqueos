@@ -303,6 +303,7 @@ async function createEvidencePackageFromStoredArtifacts({
   typedEvidence,
   userId,
   photoSessionContext = null,
+  onStage = null,
 }) {
   const imageArtifacts = storedArtifacts.filter((artifact) => isImageArtifact(artifact));
   const pdfArtifacts = storedArtifacts.filter((artifact) => isPdfArtifact(artifact));
@@ -317,6 +318,7 @@ async function createEvidencePackageFromStoredArtifacts({
         expectedEvidenceType,
         submissionId,
         typedEvidence,
+        onStage,
       })
     );
   }
@@ -406,14 +408,19 @@ export async function interpretEvidenceIntakeStoredArtifacts({
   typedEvidence = null,
   userId = "founder",
   photoSessionContext = null,
+  onStage = null,
 } = {}) {
   if (typeof loadArtifact !== "function" || !submissionId) {
     throw new Error("Stored Evidence intake requires a media loader and submission identity.");
   }
-  const storedArtifacts = [];
-  for (const artifact of [...sourceArtifacts].sort((a, b) => a.ordinal - b.ordinal)) {
-    storedArtifacts.push(await loadArtifact({ artifact, userId }));
-  }
+  const orderedSources = [...sourceArtifacts].sort((a, b) => a.ordinal - b.ordinal);
+  const storedArtifacts = new Array(orderedSources.length);
+  await mapWithConcurrency(orderedSources, 3, async (artifact, index) => {
+    const startedAt = performance.now();
+    storedArtifacts[index] = await loadArtifact({ artifact, userId });
+    onStage?.({ stage: "artifact_load", ordinal: artifact.ordinal, durationMs: roundedElapsed(startedAt) });
+  });
+  const packageStartedAt = performance.now();
   const evidencePackage = await createEvidencePackageFromStoredArtifacts({
     capturedAt,
     evidenceDate,
@@ -423,7 +430,9 @@ export async function interpretEvidenceIntakeStoredArtifacts({
     typedEvidence,
     userId,
     photoSessionContext,
+    onStage,
   });
+  onStage?.({ stage: "package_normalization_and_reconciliation", durationMs: roundedElapsed(packageStartedAt) });
   return Object.freeze({ evidencePackage, provider: getPackageProvider(evidencePackage), storedArtifacts });
 }
 
@@ -433,6 +442,7 @@ async function createImageEvidencePackage({
   expectedEvidenceType,
   submissionId,
   typedEvidence,
+  onStage = null,
 }) {
   return interpretScreenshotArtifactsIndividually({
     artifacts,
@@ -440,6 +450,7 @@ async function createImageEvidencePackage({
     expectedEvidenceType,
     submissionId: `${submissionId}_images`,
     typedEvidence,
+    onStage,
   });
 }
 
@@ -450,9 +461,10 @@ export async function interpretScreenshotArtifactsIndividually({
   interpret = interpretScreenshotsWithVision,
   submissionId,
   typedEvidence,
+  onStage = null,
 } = {}) {
-  const outcomes = [];
-  const candidatePackages = [];
+  const outcomes = new Array(artifacts.length);
+  const candidatePackages = new Array(artifacts.length);
   const screenshots = artifacts.map((artifact) => ({
     dataUrl: artifact.dataUrl,
     evidenceDate,
@@ -462,11 +474,12 @@ export async function interpretScreenshotArtifactsIndividually({
     uploadedAt: artifact.uploadedAt,
   }));
 
-  // Deliberately sequential: bounded concurrency of one avoids request bursts while
-  // preserving stable file ordering independent of provider response latency.
-  for (let index = 0; index < artifacts.length; index += 1) {
-    const artifact = artifacts[index];
+  // Two-at-a-time is the bounded interactive compromise: it removes linear
+  // multi-attachment model latency without turning one upload into an
+  // unbounded provider burst. Results remain ordinally stable.
+  await mapWithConcurrency(artifacts, 2, async (artifact, index) => {
     const screenshot = screenshots[index];
+    const startedAt = performance.now();
     try {
       const result = await interpret({
         expectedEvidenceType,
@@ -500,15 +513,16 @@ export async function interpretScreenshotArtifactsIndividually({
         status,
         uploadSessionId: submissionId,
       });
-      outcomes.push(outcome);
+      outcomes[index] = outcome;
       if (!failed && candidates.length > 0) {
-        candidatePackages.push({
+        candidatePackages[index] = {
           ...evidencePackage,
           evidence_objects: candidates,
-        });
+        };
       }
+      onStage?.({ stage: "screenshot_interpretation", ordinal: index + 1, durationMs: roundedElapsed(startedAt), status });
     } catch (error) {
-      outcomes.push(
+      outcomes[index] =
         createPerFileInterpretationOutcome({
           artifact,
           candidates: [],
@@ -516,18 +530,22 @@ export async function interpretScreenshotArtifactsIndividually({
           reason: error?.message ?? "Screenshot interpretation failed.",
           status: "interpretation_failure",
           uploadSessionId: submissionId,
-        })
-      );
+        });
+      onStage?.({ stage: "screenshot_interpretation", ordinal: index + 1, durationMs: roundedElapsed(startedAt), status: "interpretation_failure" });
     }
-  }
+  });
+  const orderedOutcomes = outcomes.filter(Boolean);
+  const orderedCandidatePackages = candidatePackages.filter(Boolean);
 
+  const reconciliationStartedAt = performance.now();
   const reconciled = reconcileIndependentlyInterpretedScreenshotPackages({
     expectedEvidenceType,
-    packages: candidatePackages,
+    packages: orderedCandidatePackages,
     screenshots,
     submissionId,
     typedEvidence: normalizeText(typedEvidence),
   });
+  onStage?.({ stage: "screenshot_normalization_and_reconciliation", durationMs: roundedElapsed(reconciliationStartedAt) });
 
   return {
     ...reconciled,
@@ -537,14 +555,14 @@ export async function interpretScreenshotArtifactsIndividually({
           id: `${submissionId}_per_file_interpretation`,
           label: "Per-file screenshot interpretation",
           inputScreenshotCount: artifacts.length,
-          perFileOutcomeCount: outcomes.length,
-          perFileOutcomes: outcomes,
-          evidenceObjectCount: outcomes.reduce(
+          perFileOutcomeCount: orderedOutcomes.length,
+          perFileOutcomes: orderedOutcomes,
+          evidenceObjectCount: orderedOutcomes.reduce(
             (count, outcome) => count + outcome.candidateCount,
             0
           ),
           canonicalObjectCounts: createCanonicalObjectCounts(
-            candidatePackages.flatMap((evidencePackage) => evidencePackage.evidence_objects)
+            orderedCandidatePackages.flatMap((evidencePackage) => evidencePackage.evidence_objects)
           ),
         },
         {
@@ -556,7 +574,7 @@ export async function interpretScreenshotArtifactsIndividually({
           ),
           sourceArtifactRefs: artifacts.map((artifact) => artifact.id),
           dispositions: createReconciliationDispositions({
-            outcomes,
+            outcomes: orderedOutcomes,
             reconciledObjects: reconciled.evidence_objects ?? [],
           }),
           canonicalObjectCounts: createCanonicalObjectCounts(
@@ -567,12 +585,27 @@ export async function interpretScreenshotArtifactsIndividually({
       ],
       warnings: [
         ...(reconciled.diagnostics?.warnings ?? []),
-        ...outcomes
+        ...orderedOutcomes
           .filter((outcome) => outcome.status !== "candidates")
           .map((outcome) => `${outcome.fileId}: ${outcome.reason}`),
       ],
     },
   };
+}
+
+async function mapWithConcurrency(values, limit, operation) {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, values.length) }, async () => {
+    while (next < values.length) {
+      const index = next++;
+      await operation(values[index], index);
+    }
+  });
+  await Promise.all(workers);
+}
+
+function roundedElapsed(startedAt) {
+  return Math.max(0, Math.round((performance.now() - startedAt) * 100) / 100);
 }
 
 function createPerFileInterpretationOutcome({

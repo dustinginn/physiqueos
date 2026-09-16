@@ -228,7 +228,12 @@ function withExecutionContractAndNotificationAction(detail, reminder, occurrence
 function withProtocolSupportNotificationAction(detail, occurrence) {
   return detail ? {
     ...detail,
-    notificationAction: protocolSupportNotificationAction(occurrence),
+    notificationAction: protocolSupportNotificationAction({
+      ...occurrence,
+      executionContract: detail.executionContract,
+      completable: detail.completable,
+      completionContext: detail.completionContext,
+    }),
   } : null;
 }
 

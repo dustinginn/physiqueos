@@ -20,7 +20,7 @@ describe("production briefing cadence registry", () => {
       validLocalWeekdays: ["wednesday"],
       timeZone: "America/Los_Angeles",
       catchUpHorizon: "local_cadence_day",
-      notificationEnabled: false,
+      notificationEnabled: true,
       artifactIdempotent: true,
       expectedArtifactId:
         "midweek_briefing_user_founder_001_20260726_20260728",

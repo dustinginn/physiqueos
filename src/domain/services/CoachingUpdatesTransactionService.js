@@ -180,7 +180,12 @@ function canonicalConfiguration(command) {
     monthly: structuredClone(command.monthly ?? { enabled: true, dayOfMonth: 1, localTime: "00:00" }),
     daily: structuredClone(command.daily ?? { enabled: false }),
     eventBriefings: structuredClone(command.eventBriefings ?? { photo: true, dexa: true }),
-    notificationPreference: command.notificationPreference,
+    // Preserve validation of unknown wire values while retiring the old
+    // user-facing opt-out. Historical clients may still send the legacy
+    // value; canonical storage always promotes it to notify_when_ready.
+    notificationPreference: command.notificationPreference === "available_without_notification"
+      ? "notify_when_ready"
+      : command.notificationPreference,
     scheduleApplication: { status: "active", appliesTo: "future_eligible_runs" },
   };
 }

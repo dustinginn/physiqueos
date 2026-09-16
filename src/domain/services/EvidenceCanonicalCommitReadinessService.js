@@ -12,7 +12,7 @@ export const EvidenceCanonicalCommitReadinessCode = Object.freeze({
 export function assertEvidenceCanonicalCommitReady(evidencePackage) {
   for (const object of evidencePackage?.evidence_objects ?? []) {
     if (object?.removed === true || object?.evidence_type !== "nutrition") continue;
-    const reconciliation = object.metadata?.daily_totals_reconciliation;
+    const reconciliation = resolveNutritionDayReconciliation(object);
     if (reconciliation?.status !== "needs_review") continue;
     const fields = [...new Set((reconciliation.conflicting_fields ?? [])
       .map((field) => String(field ?? "").trim())
@@ -27,3 +27,4 @@ export function assertEvidenceCanonicalCommitReady(evidencePackage) {
   }
   return true;
 }
+import { resolveNutritionDayReconciliation } from "../models/nutritionDayEvidence.js";

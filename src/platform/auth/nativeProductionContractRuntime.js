@@ -18,10 +18,12 @@ import {
   getProductionTrainingNavigationReadService,
   getProductionAsyncEvidenceIntakeService,
 } from "../../application/composition/productionApplicationComposition.js";
+import { createStructuredLogger } from "../observability/structuredLogger.js";
+import { readBuildIdentity } from "../observability/buildIdentity.js";
 
 let runtime;
 
-export function createNativeProductionContractRuntime({ founderAuthService, ownerUserId, readers, commands, media, evidenceIntake = null, confirmEvidenceReview = null, now } = {}) {
+export function createNativeProductionContractRuntime({ founderAuthService, ownerUserId, readers, commands, media, evidenceIntake = null, confirmEvidenceReview = null, now, logger = null } = {}) {
   const authenticator = createFounderBearerAuthenticator(founderAuthService);
   return createNativeProductionContractService({
     authenticate: (request) => authenticator.authenticate(request),
@@ -32,6 +34,7 @@ export function createNativeProductionContractRuntime({ founderAuthService, owne
     evidenceIntake,
     openMedia: (input) => media.openRead(input),
     now,
+    logger,
   });
 }
 export async function getProductionNativeContractRuntime(env = process.env) {
@@ -57,6 +60,7 @@ export async function getProductionNativeContractRuntime(env = process.env) {
     commands: composition.commands,
     media: getProductionProviderMediaDelivery(env),
     evidenceIntake: getProductionAsyncEvidenceIntakeService(env),
+    logger: createStructuredLogger({ buildIdentity: readBuildIdentity(env) }),
     confirmEvidenceReview: async ({ principal, reviewId, commandId }) => {
       const actions = await import("../../app/evidence/review/[reviewId]/actions.js");
       return actions.beginNativeEvidenceReviewConfirmation({

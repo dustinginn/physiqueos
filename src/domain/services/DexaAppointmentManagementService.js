@@ -33,6 +33,10 @@ export function prepareDexaAppointmentUpdate(store,command={},timestamp=new Date
   if(errors.length)return rejectedDexa(DexaAppointmentOutcome.INVALID,errors[0]);
   if(!draft.plannedDate){
     if(!existing)return rejectedDexa(DexaAppointmentOutcome.UNCHANGED,"No changes to save.");
+    // The fixed `execution_next_dexa` record also retains the most recently
+    // completed appointment. A blank future-appointment editor must not
+    // delete that history when another Coaching field is saved.
+    if(existing.active===false||existing.status==="completed")return rejectedDexa(DexaAppointmentOutcome.UNCHANGED,"No changes to save.");
     return{ok:true,cleared:true,index,existing,candidate:null,created:false};
   }
   const iso=timestamp.toISOString();

@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { createStoredEvidenceArtifactDescriptor } from "../../domain/services/EvidenceIntakeService.js";
 
-export function createAsyncEvidenceIntakeService({ store, uploads, now = () => new Date() } = {}) {
+export function createAsyncEvidenceIntakeService({ store, uploads, now = () => new Date(), logger = null,
+  performanceClock = () => performance.now() } = {}) {
   if (!store?.beginUpload || !uploads?.store) {
     throw new Error("Asynchronous Evidence intake requires receipt and provider upload storage.");
   }
@@ -13,6 +14,7 @@ export function createAsyncEvidenceIntakeService({ store, uploads, now = () => n
     },
     async accept({ submissionIdentity, effectiveDate, expectedEvidenceType = "auto", files = [],
       artifactManifest, typedEvidence = null, recoveryContext = null }) {
+      const intakeStartedAt = performanceClock();
       validateSubmissionIdentity(submissionIdentity);
       const source = effectiveDate < founderDate(now()) ? "historical_universal_intake" : "universal_intake";
       const begun = await store.beginUpload({ submissionIdentity, effectiveDate, expectedEvidenceType,
@@ -24,6 +26,7 @@ export function createAsyncEvidenceIntakeService({ store, uploads, now = () => n
         let receipt = begun.receipt;
         const existing = new Map(receipt.storedArtifacts.map((artifact) => [artifact.ordinal, artifact]));
         const stores = files.map(async (file, index) => {
+          const artifactStartedAt = performanceClock();
           const ordinal = index + 1;
           if (existing.has(ordinal)) return existing.get(ordinal);
           const bytes = Buffer.from(await file.arrayBuffer());
@@ -38,7 +41,7 @@ export function createAsyncEvidenceIntakeService({ store, uploads, now = () => n
             artifactId,
             provenance: { ordinal },
           });
-          return store.recordStoredArtifact({
+          const recorded = await store.recordStoredArtifact({
             receiptId: receipt.id,
             claimToken: begun.claimToken,
             artifact: {
@@ -48,11 +51,20 @@ export function createAsyncEvidenceIntakeService({ store, uploads, now = () => n
               uploadedAt: now().toISOString(),
             },
           });
+          logger?.info?.("evidence.intake.artifact_stored", {
+            intakeId: receipt.id, ordinal, durationMs: elapsed(performanceClock, artifactStartedAt),
+          });
+          return recorded;
         });
         const outcomes = await Promise.allSettled(stores);
         const failed = outcomes.find((outcome) => outcome.status === "rejected");
         if (failed) throw failed.reason;
         receipt = await store.completeUpload({ receiptId: receipt.id, claimToken: begun.claimToken });
+        logger?.info?.("evidence.intake.accepted", {
+          intakeId: receipt.id,
+          artifactCount: files.length,
+          durationMs: elapsed(performanceClock, intakeStartedAt),
+        });
         return responseFor(receipt);
       } catch (error) {
         await store.failUpload({ receiptId: begun.receipt.id, claimToken: begun.claimToken, errorCode: error?.code }).catch(() => undefined);
@@ -60,6 +72,10 @@ export function createAsyncEvidenceIntakeService({ store, uploads, now = () => n
       }
     },
   });
+}
+
+function elapsed(clock, startedAt) {
+  return Math.max(0, Math.round((clock() - startedAt) * 100) / 100);
 }
 
 export function createProviderEvidenceIntakeArtifactLoader({ pool, objectProvider, fetchImpl = globalThis.fetch } = {}) {
@@ -104,6 +120,11 @@ function responseFor(receipt) {
     reviewId: receipt.reviewId ?? null,
     reviewUrl: receipt.reviewId ? `/evidence/review/${receipt.reviewId}` : null,
     processingUrl: `/log?intake=${encodeURIComponent(receipt.id)}&upload=received`,
+    // Safe lifecycle timestamps let Native and operations calculate T1/T2
+    // without exposing evidence content or storage identity.
+    acceptedAt: receipt.createdAt ?? null,
+    interpretationStartedAt: receipt.interpretationStartedAt ?? null,
+    reviewReadyAt: receipt.interpretationCompletedAt ?? null,
   });
 }
 

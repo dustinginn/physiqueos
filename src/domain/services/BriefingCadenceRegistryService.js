@@ -26,7 +26,7 @@ const DEFAULT_SCHEDULE = Object.freeze({
   midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
   weekly: { enabled: true, day: "sunday", localTime: "00:00" },
   monthly: { enabled: true, dayOfMonth: 1, localTime: "00:00" },
-  notificationPreference: "available_without_notification",
+  notificationPreference: "notify_when_ready",
 });
 
 export async function resolveBriefingCadenceRegistry({
@@ -99,7 +99,10 @@ export async function resolveBriefingCadenceRegistry({
     ...entry,
     registryVersion: BRIEFING_CADENCE_REGISTRY_VERSION,
     catchUpHorizon: BRIEFING_CADENCE_CATCH_UP_POLICY.horizon,
-    notificationEnabled: false,
+    // This expresses publication-time notification intent. Consumers must
+    // publish only after the immutable briefing artifact exists — never at
+    // the scheduled generation clock.
+    notificationEnabled: entry.enabled,
     artifactIdempotent: true,
     executionId: entry.expectedArtifactId && entry.userId
       ? createBriefingCadenceExecutionIdentity({

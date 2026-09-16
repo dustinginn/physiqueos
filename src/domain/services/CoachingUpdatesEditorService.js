@@ -11,7 +11,7 @@ export function createCoachingUpdatesEditorModel({ readModel, policy, photos = n
     weekly: structuredClone(readModel.weekly),
     monthly: structuredClone(readModel.monthly),
     daily: structuredClone(readModel.daily),
-    notificationPreference: readModel.notificationPreference,
+    notificationPreference: "notify_when_ready",
     eventBriefings: structuredClone(readModel.eventBriefings),
     photos: photos ? structuredClone(photos) : null,
     dexa: dexa ? structuredClone(dexa) : null,
@@ -37,7 +37,7 @@ export function buildCoachingUpdatesRequest(form, model) {
       photo: form.has("photoEventBriefingEnabled"),
       dexa: form.has("dexaEventBriefingEnabled"),
     },
-    notificationPreference: String(form.get("notificationPreference") ?? ""),
+    notificationPreference: "notify_when_ready",
     photos: {
       cadence: String(form.get("photoCadence") ?? ""),
       day: String(form.get("photoDay") ?? ""),

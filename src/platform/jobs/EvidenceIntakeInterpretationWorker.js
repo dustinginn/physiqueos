@@ -9,11 +9,14 @@ export function createEvidenceIntakeInterpretationWorkerHandler({
   loadArtifact,
   now = () => new Date(),
   readCanonicalExerciseRegistry = null,
+  logger = null,
+  performanceClock = () => performance.now(),
 } = {}) {
   if (!store?.claimInterpretation || typeof loadArtifact !== "function") {
     throw new Error("Evidence intake worker requires receipt and provider media storage.");
   }
   return async ({ messageId, workerId, payloadVersion, payload, assertLease }) => {
+    const workerStartedAt = performanceClock();
     if (payloadVersion !== EVIDENCE_INTAKE_INTERPRETATION_PAYLOAD_VERSION) {
       throw new WorkerMessageError("EVIDENCE_INTAKE_VERSION_UNSUPPORTED", "Evidence intake payload version is unsupported.");
     }
@@ -23,12 +26,22 @@ export function createEvidenceIntakeInterpretationWorkerHandler({
     const claimed = await store.claimInterpretation({ receiptId, workerId: claimOwner });
     if (!claimed || claimed.outcome === "completed" || claimed.outcome === "claimed_elsewhere") return claimed;
     const receipt = claimed.receipt;
+    logger?.info?.("evidence.intake.interpretation_started", {
+      intakeId: receipt.id,
+      queueWaitMs: millisecondsBetween(claimed.queuedAt ?? receipt.createdAt, receipt.interpretationStartedAt),
+      artifactCount: receipt.storedArtifacts.length,
+    });
     try {
       // Interpretation uses synchronous identity resolution. Refresh the bounded provider
       // registry before the first interpretation in a fresh worker process so an exact
       // Founder-created exercise cannot be misclassified as provisional.
+      const registryStartedAt = performanceClock();
       await readCanonicalExerciseRegistry?.();
+      const registryDurationMs = elapsed(performanceClock, registryStartedAt);
+      const contextStartedAt = performanceClock();
       const context = await store.loadPhotoSessionContext(receipt.effectiveDate);
+      const contextDurationMs = elapsed(performanceClock, contextStartedAt);
+      const interpretationStartedAt = performanceClock();
       const result = await interpretEvidenceIntakeStoredArtifacts({
         capturedAt: receipt.createdAt,
         evidenceDate: receipt.effectiveDate,
@@ -45,7 +58,12 @@ export function createEvidenceIntakeInterpretationWorkerHandler({
             executionItems: context.executionItems,
           }),
         },
+        onStage: (stage) => logger?.info?.("evidence.intake.interpretation_stage", {
+          intakeId: receipt.id,
+          ...stage,
+        }),
       });
+      const interpretationDurationMs = elapsed(performanceClock, interpretationStartedAt);
       const evidencePackage = {
         ...result.evidencePackage,
         provenance: { ...(result.evidencePackage.provenance ?? {}), intake_receipt_id: receipt.id },
@@ -62,10 +80,29 @@ export function createEvidenceIntakeInterpretationWorkerHandler({
         createdAt: receipt.createdAt,
       });
       assertLease?.();
-      return store.completeInterpretation({ receiptId, workerId: claimOwner, evidencePackage, review, assertLease });
+      const persistenceStartedAt = performanceClock();
+      const completed = await store.completeInterpretation({ receiptId, workerId: claimOwner, evidencePackage, review, assertLease });
+      logger?.info?.("evidence.intake.review_ready", {
+        intakeId: receipt.id,
+        registryDurationMs,
+        contextDurationMs,
+        interpretationDurationMs,
+        persistenceDurationMs: elapsed(performanceClock, persistenceStartedAt),
+        totalWorkerDurationMs: elapsed(performanceClock, workerStartedAt),
+      });
+      return completed;
     } catch (error) {
       await store.failInterpretation({ receiptId, workerId: claimOwner, errorCode: error?.code }).catch(() => undefined);
       throw error;
     }
   };
+}
+
+function elapsed(clock, startedAt) {
+  return Math.max(0, Math.round((clock() - startedAt) * 100) / 100);
+}
+
+function millisecondsBetween(start, end) {
+  const value = Date.parse(end ?? "") - Date.parse(start ?? "");
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }

@@ -48,6 +48,8 @@ export function createNativeProductionContractService({
   evidenceIntake,
   openMedia,
   now = () => new Date(),
+  logger = null,
+  performanceClock = () => performance.now(),
 } = {}) {
   if (typeof authenticate !== "function" || !ownerUserId || !readers) {
     throw new Error("Native production contracts require authentication, owner authority, and readers.");
@@ -197,6 +199,7 @@ export function createNativeProductionContractService({
     },
 
     async command({ request, commandType, metadata, payload }) {
+      const commandStartedAt = performanceClock();
       const principal = await authorize(request, "founder:write");
       if (typeof executeCommand !== "function") throw unavailableResource();
       if (!NATIVE_WRITE_COMMANDS.has(commandType)) {
@@ -245,15 +248,26 @@ export function createNativeProductionContractService({
         }
       }
       const result = await executeCommand({ commandType, principal, metadata, payload });
+      logger?.info?.("native.command.receipt_committed", {
+        commandType,
+        durationMs: elapsed(performanceClock, commandStartedAt),
+      });
       if (![Phase3Command.COMMIT_EVIDENCE_REVIEW, Phase3Command.COMMIT_TRAINING_SESSION].includes(commandType)) return result;
       if (typeof confirmEvidenceReview !== "function") throw unavailableResource();
       const reviewId = payload.reviewId ?? result.receipt?.result?.reviewId;
       let confirmation;
       try {
+        const durableStartedAt = performanceClock();
         confirmation = await confirmEvidenceReview({
           principal,
           reviewId,
           commandId: result.receipt?.commandId ?? metadata.commandId,
+        });
+        logger?.info?.("native.command.durable_acknowledgement", {
+          commandType,
+          durationMs: elapsed(performanceClock, commandStartedAt),
+          confirmationDurationMs: elapsed(performanceClock, durableStartedAt),
+          durable: confirmation?.state === "confirmed" || confirmation?.trainingSessionDurable === true,
         });
       } catch (error) {
         if (commandType === Phase3Command.COMMIT_TRAINING_SESSION) {
@@ -308,6 +322,10 @@ export function createNativeProductionContractService({
       }),
     });
   }
+}
+
+function elapsed(clock, startedAt) {
+  return Math.max(0, Math.round((clock() - startedAt) * 100) / 100);
 }
 
 function required(value, field) {

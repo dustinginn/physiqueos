@@ -92,6 +92,24 @@ describe("provider-native core navigation reads", () => {
     });
   });
 
+  it("preserves Tracking's canonical evidence reminder identity for Morning Weigh-In edits", async () => {
+    const { narrow } = morningWeighInRecurringSupportServices();
+    const result = await narrow.getRecurringSupport({ executionId: "execution_morning_weigh_in" });
+    expect(result).toMatchObject({
+      protocolId: "weight",
+      protocolCategory: "weight",
+      executionId: "execution_morning_weigh_in",
+      reminderId: "reminder_morning_weight",
+      hydration: { executionRevision: 7 },
+    });
+  });
+
+  it("fails a recurring Support read closed when canonical reminder linkage is ambiguous", async () => {
+    const { narrow, runtime } = morningWeighInRecurringSupportServices();
+    runtime.reminders.push({ ...runtime.reminders[0], id: "reminder_morning_weight_duplicate" });
+    expect(await narrow.getRecurringSupport({ executionId: "execution_morning_weigh_in" })).toBeNull();
+  });
+
   it("returns null for an execution id that does not exist or is not owned by this Founder", async () => {
     const { narrow } = recurringSupportServices();
     expect(await narrow.getRecurringSupport({ executionId: "execution_does_not_exist" })).toBeNull();
@@ -436,6 +454,33 @@ function recurringSupportServices() {
       id: "reminder_foam_roll_daily", userId: "user", title: "Foam Roll", type: "recovery_reminder",
       linkedEntityType: "protocol", linkedEntityId: "recovery", active: true,
       schedule: { type: "daily", timeOfDay: "17:00" },
+    }],
+  };
+  return {
+    runtime,
+    narrow: createCoreNavigationReadService({
+      store: createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime }),
+      now: () => NOW,
+    }),
+  };
+}
+
+function morningWeighInRecurringSupportServices() {
+  const runtime = {
+    user: { id: "user" },
+    protocols: [{
+      id: "weight", userId: "user", category: "weight", name: "Morning Weigh-In",
+      status: "active", activatedAt: "2026-07-23T16:54:00.550Z",
+    }],
+    executionItems: [{
+      id: "execution_morning_weigh_in", userId: "user", type: "evidence", title: "Morning Weigh-In",
+      active: true, linkedProtocolId: "weight", linkedEvidenceTypes: ["morning_weight"],
+      cadence: { type: "daily" }, preferredSchedule: { timeOfDay: "morning" }, executionRevision: 7,
+    }],
+    reminders: [{
+      id: "reminder_morning_weight", userId: "user", title: "Morning Weigh-In", type: "evidence_reminder",
+      linkedEntityType: "protocol", linkedEntityId: "weight", active: true,
+      schedule: { type: "daily", timeOfDay: "morning" },
     }],
   };
   return {

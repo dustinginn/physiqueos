@@ -392,6 +392,8 @@ describe("Native production contract boundary", () => {
       id: "review-1", evidenceTypes: ["nutrition"],
       interpretedEvidence: { evidence_objects: [{
         id: "nutrition_2026-09-12", evidence_type: "nutrition",
+        daily_totals: { calories: 900, protein_g: 40 },
+        meals: [{ name: "Dinner", totals: { calories: 600, protein_g: 25 } }],
         metadata: { daily_totals_reconciliation: {
           status: "needs_review",
           conflicting_fields: ["calories", "protein_g"],
