@@ -2874,7 +2874,10 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "If-Match"), "\"2\"")
         let command = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests.last?.httpBody)) as? [String: Any])
         XCTAssertEqual(command["commandType"] as? String, ProductionCommandType.commitEvidenceReview)
-        XCTAssertEqual(command["payload"] as? [String: String], ["reviewId": "review-training"])
+        XCTAssertEqual(command["payload"] as? [String: String], [
+            "reviewId": "review-training",
+            "targetTrainingSessionCanonicalId": "training|authoritative|training_logger_draft_native-session-media",
+        ])
         XCTAssertThrowsError(try attachments.load(reference: reference), "the screenshot file is cleaned up once reconciliation finishes.")
     }
 
