@@ -50,6 +50,13 @@ export async function parseNativeEvidenceIntakeRequest(request) {
   const files = formData.getAll("evidenceFiles")
     .filter((file) => typeof file?.arrayBuffer === "function" && file.size > 0);
   await validateFiles({ expectedEvidenceType, files });
+  const clientExtractedText = String(formData.get("clientExtractedText") ?? "").trim();
+  if (clientExtractedText.length > 20_000) {
+    throw problem(413, "CLIENT_EXTRACTION_TOO_LARGE", "The local extraction is larger than PhysiqueOS accepts.");
+  }
+  if (clientExtractedText && expectedEvidenceType !== "activity_day") {
+    throw problem(400, "CLIENT_EXTRACTION_CONTEXT_INVALID", "Local extraction is accepted only for explicit Activity evidence.");
+  }
   const artifactManifest = createEvidenceUploadArtifactManifest(files);
   assertEvidenceUploadReceiptMatchesManifest({ manifest: artifactManifest, receivedFiles: files });
   return Object.freeze({
@@ -58,7 +65,10 @@ export async function parseNativeEvidenceIntakeRequest(request) {
     expectedEvidenceType,
     files,
     artifactManifest,
-    typedEvidence: null,
+    // This is device Vision OCR from the uploaded Activity image, not a
+    // user-authored canonical claim. The interpreter owns strict parsing
+    // and falls back to visual interpretation when it is incomplete.
+    typedEvidence: clientExtractedText || null,
     recoveryContext: null,
   });
 }

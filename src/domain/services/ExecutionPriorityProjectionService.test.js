@@ -73,7 +73,7 @@ describe("canonical Execution priority projection", () => {
       executionStatus: "active",
       occurrenceEligible: true,
       exactLocalTime: "21:45",
-      timeOfDayLabel: "Tonight",
+      timeOfDayLabel: "9:45 PM",
       currentDose: "1",
       doseUnit: "mg",
       transitionEffectiveToday: true,

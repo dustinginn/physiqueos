@@ -25,13 +25,28 @@ describe("Native production Evidence intake", () => {
     const badImage = request("activity_day", new File(["not png"], "screen.png", { type: "image/png" }));
     await expect(parseNativeEvidenceIntakeRequest(badImage)).rejects.toMatchObject({ code: "SCREENSHOT_INVALID" });
   });
+
+  it("accepts local OCR only for explicit Activity and preserves it as non-authoritative interpreter input", async () => {
+    const file = new File([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])], "screen.png", { type: "image/png" });
+    const activity = request("activity_day", file, ID, "Move 948/700 CAL Exercise 67/30 MIN Stand 13/12 HRS");
+    await expect(parseNativeEvidenceIntakeRequest(activity)).resolves.toMatchObject({
+      expectedEvidenceType: "activity_day",
+      typedEvidence: "Move 948/700 CAL Exercise 67/30 MIN Stand 13/12 HRS",
+      files: [file],
+    });
+    const nutrition = request("nutrition", file, ID, "Move 948/700 CAL Exercise 67/30 MIN Stand 13/12 HRS");
+    await expect(parseNativeEvidenceIntakeRequest(nutrition)).rejects.toMatchObject({
+      code: "CLIENT_EXTRACTION_CONTEXT_INVALID", status: 400,
+    });
+  });
 });
 
-function request(type, file, key = ID) {
+function request(type, file, key = ID, clientExtractedText = null) {
   const body = new FormData();
   body.set("submissionIdentity", ID);
   body.set("effectiveDate", "2026-09-11");
   body.set("expectedEvidenceType", type);
+  if (clientExtractedText) body.set("clientExtractedText", clientExtractedText);
   body.append("evidenceFiles", file);
   return new Request("https://physiqueos.example/api/v1/native/evidence/intakes", {
     method: "POST", headers: { authorization: `Bearer ${"x".repeat(43)}`, "idempotency-key": key }, body,

@@ -16,6 +16,7 @@ import {
   inferPhotoSessionCaptureMetadata,
 } from "./PhotoSessionMetadataService";
 import { assertStoredEvidenceArtifactsMatchManifest } from "./EvidenceUploadArtifactManifest";
+import { createActivityDayEvidenceObject } from "../models/activityDayEvidence";
 
 const EVIDENCE_SCHEMA_VERSION = "physiqueos-evidence-v1";
 const INTAKE_ENGINE_NAME = "PhysiqueOS Evidence Intake Engine";
@@ -444,6 +445,17 @@ async function createImageEvidencePackage({
   typedEvidence,
   onStage = null,
 }) {
+  const fastActivity = createAppleActivityOCRPackage({
+    artifacts, evidenceDate, expectedEvidenceType,
+    submissionId: `${submissionId}_images`, typedEvidence,
+  });
+  if (fastActivity) {
+    onStage?.({
+      stage: "deterministic_activity_ocr", durationMs: 0,
+      status: "candidates", provider: "apple_vision_ocr",
+    });
+    return fastActivity;
+  }
   return interpretScreenshotArtifactsIndividually({
     artifacts,
     evidenceDate,
@@ -452,6 +464,103 @@ async function createImageEvidencePackage({
     typedEvidence,
     onStage,
   });
+}
+
+/// Strict, no-network fast path for a single explicit Apple Activity ring
+/// summary. It requires all three canonical ring rows and never guesses a
+/// missing number. Anything less complete continues through the general
+/// screenshot interpreter unchanged.
+export function createAppleActivityOCRPackage({
+  artifacts = [], evidenceDate, expectedEvidenceType, submissionId, typedEvidence,
+} = {}) {
+  if (expectedEvidenceType !== "activity_day" || artifacts.length !== 1) return null;
+  const text = normalizeText(typedEvidence);
+  if (!text || !/\bmove\b/i.test(text) || !/\bexercise\b/i.test(text) || !/\bstand\b/i.test(text)) {
+    return null;
+  }
+  const move = activityRingPair(text, "move", "(?:cal|kcal|calories?)");
+  const exercise = activityRingPair(text, "exercise", "(?:min|minutes?)");
+  const stand = activityRingPair(text, "stand", "(?:hr|hrs|hours?)");
+  if (!move || !exercise || !stand) return null;
+  const totalCalories = activityLabeledNumber(text, ["total calories", "total calories burned"], "(?:cal|kcal|calories?)");
+  const artifactRefs = artifacts.map((artifact) => artifact.id);
+  const object = createActivityDayEvidenceObject({
+    capturedAt: artifacts[0]?.uploadedAt ?? null,
+    date: evidenceDate,
+    id: `${submissionId}_activity_day`,
+    dailyActivity: {
+      move_calories: move.actual,
+      move_goal: move.goal,
+      exercise_minutes: exercise.actual,
+      exercise_goal: exercise.goal,
+      stand_hours: stand.actual,
+      stand_goal: stand.goal,
+      total_calories_burned: totalCalories,
+      ring_completion: {
+        move: move.goal > 0 ? move.actual / move.goal : null,
+        exercise: exercise.goal > 0 ? exercise.actual / exercise.goal : null,
+        stand: stand.goal > 0 ? stand.actual / stand.goal : null,
+      },
+    },
+    source: {
+      modality: "screenshot", application: "Apple Fitness", integration: null,
+      source_artifact_refs: artifactRefs,
+    },
+    provenance: { source_artifact_refs: artifactRefs },
+    confidence: { extraction: "high", interpretation: "high" },
+    quality: { status: "complete", limitations: [] },
+  });
+  return {
+    package_id: submissionId,
+    schema_version: EVIDENCE_SCHEMA_VERSION,
+    source_modality: "screenshot",
+    detected_source_application: "Apple Fitness",
+    detected_source_confidence: "high",
+    detected_evidence_type: "activity_day",
+    detected_evidence_objects: [{ evidence_type: "activity_day", count: 1 }],
+    detected_evidence_type_confidence: "high",
+    captured_at: artifacts[0]?.uploadedAt ?? null,
+    interpreter: {
+      name: INTAKE_ENGINE_NAME,
+      version: "apple-activity-ocr-v1",
+      provider: "apple_vision_ocr",
+      model: null,
+    },
+    quality: {
+      extraction_confidence: "high", interpreter_confidence: "high",
+      status: "complete", limitations: [],
+    },
+    evidence_objects: [object],
+    provenance: { submission_id: submissionId, source_artifacts: [] },
+    diagnostics: {
+      stages: [{
+        id: `${submissionId}_apple_activity_ocr`,
+        label: "Deterministic Apple Activity extraction",
+        evidenceObjectCount: 1,
+        provider: "apple_vision_ocr",
+        sourceArtifactRefs: artifactRefs,
+        canonicalObjectCounts: [{ evidence_type: "activity_day", count: 1 }],
+      }],
+      warnings: [],
+    },
+  };
+}
+
+function activityRingPair(text, label, unitPattern) {
+  const normalized = String(text).replace(/,/g, "").replace(/\s+/g, " ");
+  const direct = normalized.match(new RegExp(`\\b${label}\\b[^0-9]{0,40}(\\d+(?:\\.\\d+)?)\\s*\\/?\\s*(\\d+(?:\\.\\d+)?)\\s*${unitPattern}`, "i"));
+  if (direct) return { actual: Number(direct[1]), goal: Number(direct[2]) };
+  const reversed = normalized.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*\\/?\\s*(\\d+(?:\\.\\d+)?)\\s*${unitPattern}[^a-z0-9]{0,40}\\b${label}\\b`, "i"));
+  return reversed ? { actual: Number(reversed[1]), goal: Number(reversed[2]) } : null;
+}
+
+function activityLabeledNumber(text, labels, unitPattern) {
+  const normalized = String(text).replace(/,/g, "").replace(/\s+/g, " ");
+  for (const label of labels) {
+    const match = normalized.match(new RegExp(`\\b${label}\\b[^0-9]{0,32}(\\d+(?:\\.\\d+)?)\\s*${unitPattern}`, "i"));
+    if (match) return Number(match[1]);
+  }
+  return null;
 }
 
 export async function interpretScreenshotArtifactsIndividually({

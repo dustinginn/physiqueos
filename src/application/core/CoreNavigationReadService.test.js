@@ -221,6 +221,24 @@ describe("provider-native core navigation reads", () => {
     expect(JSON.stringify(runtime)).toBe(before);
   });
 
+  it("projects each Supplement's own reminder state and keeps Next due when notifications are off", async () => {
+    const { narrow } = supplementSupportServices();
+    const domain = await narrow.getOperatingPlanProtocolDomain({ protocolId: "fadogia" });
+    expect(domain.methods.map((item) => ({ id: item.protocolId, reminderEnabled: item.reminderEnabled })))
+      .toEqual([
+        { id: "electrolytes", reminderEnabled: false },
+        { id: "fadogia", reminderEnabled: true },
+      ]);
+    await expect(narrow.getSupplementSupport({ protocolId: "fadogia" })).resolves.toMatchObject({
+      reminderPreference: "remind",
+      nextDue: "Aug 30, 2026 · 8:00 AM",
+    });
+    await expect(narrow.getSupplementSupport({ protocolId: "electrolytes" })).resolves.toMatchObject({
+      reminderPreference: "none",
+      nextDue: "Aug 29, 2026 · 8:00 AM",
+    });
+  });
+
   it("projects a bounded protocol-domain roll-up with typed Native support destinations", async () => {
     const { narrow } = peptideSupportServices();
     const result = await narrow.getOperatingPlanProtocolDomain({ protocolId: "peptide-protocol" });
@@ -578,6 +596,66 @@ function peptideSupportServices() {
       id: "reminder-peptide", userId: "user", type: "protocol_reminder", linkedEntityId: "peptide-protocol",
       active: true, schedule: { type: "weekly", daysOfWeek: ["thursday"], timeOfDay: "21:45" },
     }],
+  };
+  return {
+    runtime,
+    narrow: createCoreNavigationReadService({
+      store: createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime }),
+      now: () => NOW,
+    }),
+  };
+}
+
+function supplementSupportServices() {
+  const protocols = [
+    { id: "electrolytes", name: "Electrolytes" },
+    { id: "fadogia", name: "Fadogia Agrestis" },
+  ].map(({ id, name }) => ({
+    id, name, userId: "user", category: "supplement", status: "active",
+    currentVersionId: `${id}_v1`, currentGoalIds: ["goal-one"], relatedGoalIds: ["goal-one"],
+  }));
+  const runtime = {
+    user: { id: "user", displayName: "Founder", timeZone: "America/Los_Angeles" },
+    goals: [{ id: "goal-one", userId: "user", title: "Lean Mass Goal", status: "active" }],
+    protocols,
+    protocolVersions: protocols.map((protocol) => ({
+      id: protocol.currentVersionId, protocolId: protocol.id, status: "active", endedAt: null,
+      effectiveAt: "2026-07-25", goalLinks: [{ goalId: "goal-one", relationship: "supports" }],
+    })),
+    executionItems: [
+      {
+        id: "execution-electrolytes", userId: "user", type: "supplement", title: "Electrolytes",
+        active: true, protocolRootId: "electrolytes", linkedGoalIds: ["goal-one"],
+        supplementVersionId: "electrolytes_v1", cadence: { type: "daily" },
+        preferredSchedule: { daysOfWeek: [], timeOfDay: "08:00", startDate: "2026-07-25", endDate: null },
+        reminderPreference: "none", dose: { amount: "", unit: "" }, executionRevision: 1,
+        createdAt: "2026-07-25T19:09:22.991Z",
+      },
+      {
+        id: "execution-fadogia", userId: "user", type: "supplement", title: "Fadogia Agrestis",
+        active: true, protocolRootId: "fadogia", linkedGoalIds: ["goal-one"],
+        supplementVersionId: "fadogia_v1", cadence: { type: "every_other_day" },
+        preferredSchedule: { daysOfWeek: [], timeOfDay: "08:00", startDate: "2026-07-25", endDate: null },
+        reminderPreference: "remind", dose: { amount: "", unit: "" }, executionRevision: 1,
+        createdAt: "2026-07-25T19:09:22.991Z",
+      },
+    ],
+    reminders: [
+      {
+        id: "reminder-electrolytes", userId: "user", type: "supplement_reminder",
+        linkedEntityId: "electrolytes", linkedExecutionId: "execution-electrolytes", active: false,
+        schedule: { type: "daily", timeOfDay: "08:00", startDate: "2026-07-25" }, completionHistory: [],
+      },
+      {
+        id: "unrelated-electrolytes-reminder", userId: "user", type: "recovery_reminder",
+        linkedEntityId: "electrolytes", active: true,
+      },
+      {
+        id: "reminder-fadogia", userId: "user", type: "supplement_reminder",
+        linkedEntityId: "fadogia", linkedExecutionId: "execution-fadogia", active: true,
+        schedule: { type: "every_other_day", timeOfDay: "08:00", startDate: "2026-07-25" }, completionHistory: [],
+      },
+    ],
   };
   return {
     runtime,

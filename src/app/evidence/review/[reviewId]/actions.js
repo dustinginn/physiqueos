@@ -205,11 +205,13 @@ async function executeEvidenceReviewConfirmation(formData, {
   // (confirmedBy), If-Match version protection and commitProgress
   // auditability are all unchanged.
   if (nativeStart && review.status === "committing") {
+    const canonicalStateDurable = isEvidenceReviewCanonicalSaveComplete(review);
     return Object.freeze({
       state: "processing",
       reviewId,
       continuationKey: createEvidenceReviewContinuationKey(review),
-      trainingSessionDurable: isEvidenceReviewCanonicalSaveComplete(review) &&
+      canonicalStateDurable,
+      trainingSessionDurable: canonicalStateDurable &&
         (review.interpretedEvidence?.evidence_objects ?? []).some((item) => item.removed !== true && item.evidence_type === "training"),
     });
   }
@@ -277,28 +279,17 @@ async function executeEvidenceReviewConfirmation(formData, {
   });
   const supportsDurableCommitClaims = typeof FounderRepositories.evidenceReviews
     .claimEvidenceReviewCommit === "function";
-  // A Training confirmation is the one case where Native's own UI tells the
-  // Founder "Workout logged" the instant this request returns — that claim
-  // must not outrun the canonical TrainingSession actually existing. Every
-  // other native evidence type (Nutrition/Activity/DEXA/Photos) keeps the
-  // original zero-synchronous-steps behavior below: Native isn't held open
-  // for canonical_commit, and nothing here asked for those to change.
+  // Native may only acknowledge user success after the canonical record its
+  // immediate read model needs is durable. Build 36 released non-Training
+  // reviews immediately after beginCommit, so Activity could say
+  // "Confirmation accepted" while Log correctly still showed nothing. Run
+  // exactly one bounded orchestration step (canonical_commit) for every
+  // Native confirmation, then release analysis/Goal/Briefing work to the
+  // durable continuation. This preserves Training's stricter invariant and
+  // gives Nutrition/Activity/DEXA the same truthful canonical boundary.
   const isTrainingConfirmation = (evidencePackage.evidence_objects ?? []).some(
     (item) => item.removed !== true && item.evidence_type === "training"
   );
-  if (nativeStart && supportsDurableCommitClaims && !isTrainingConfirmation) {
-    // `beginCommit` persisted the exact reviewed package and an owned claim.
-    // Release it transactionally so the repository enqueues the first durable
-    // continuation. Native is no longer held open while canonical_commit
-    // loads and writes the provider runtime.
-    const released = await service.pauseCommit(reviewId, { operationId });
-    return Object.freeze({
-      state: "processing",
-      accepted: true,
-      reviewId,
-      continuationKey: createEvidenceReviewContinuationKey(released),
-    });
-  }
   let orchestrationResult;
   let continuationPath = null;
   try {
@@ -318,12 +309,16 @@ async function executeEvidenceReviewConfirmation(formData, {
     if (!orchestrationResult.complete) {
       await service.pauseCommit(reviewId, { operationId });
       if (background) {
+        const canonicalStateDurable = [...orchestrationResult.executedSteps, ...orchestrationResult.skippedSteps]
+          .includes("canonical_commit");
         return Object.freeze({
           state: "processing",
+          accepted: canonicalStateDurable,
           reviewId,
           completedStep: orchestrationResult.executedSteps[0] ?? null,
+          canonicalStateDurable,
           trainingSessionDurable: isTrainingConfirmation &&
-            [...orchestrationResult.executedSteps, ...orchestrationResult.skippedSteps].includes("canonical_commit"),
+            canonicalStateDurable,
         });
       }
       revalidatePath(`/evidence/review/${reviewId}`);
@@ -365,7 +360,11 @@ async function executeEvidenceReviewConfirmation(formData, {
   if (continuationPath) redirect(continuationPath);
   const publication = publishPostConfirmationRefreshes(orchestrationResult);
   if (background) {
-    return Object.freeze({ state: "confirmed", reviewId, publication: publication.status });
+    return Object.freeze({
+      state: "confirmed", accepted: true, canonicalStateDurable: true,
+      trainingSessionDurable: isTrainingConfirmation,
+      reviewId, publication: publication.status,
+    });
   }
   if (recoveryContext) {
     revalidatePath(recoveryContext.returnTo);

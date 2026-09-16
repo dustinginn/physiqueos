@@ -31,16 +31,29 @@ describe("Coaching Updates cross-owner strategy save", () => {
       expect(candidate[collection]).toEqual(fixture.live[collection]);
     }
   });
-  it("scopes semantic guards to editable dependencies while retaining the global revision fence", async () => {
+  it("allows unrelated runtime publication while retaining scoped semantic and sub-resource fences", async () => {
     const fixture = setup();
     const request = command(fixture.live);
     const digest = request.expectedSemanticDigest;
     fixture.live.dailyBriefings = [{ id: "unrelated-publication" }];
     expect(createCoachingUpdatesSemanticDigest(fixture.live)).toBe(digest);
     fixture.live.revision += 1;
+    fs.writeFileSync(fixture.file, `${JSON.stringify(fixture.live)}\n`);
     expect(await fixture.service.save(request)).toMatchObject({
-      outcome: "concurrency_conflict",
-      committed: false,
+      outcome: "success",
+      committed: true,
+    });
+  });
+
+  it("still rejects a real scoped Coaching change even when the global revision is current", async () => {
+    const fixture = setup();
+    const request = command(fixture.live);
+    fixture.live.protocolVersions.find((item) => item.id === "coaching-v1")
+      .change.reviewedChanges.days = ["Monday", "Sunday"];
+    fixture.live.revision += 1;
+    fs.writeFileSync(fixture.file, `${JSON.stringify(fixture.live)}\n`);
+    expect(await fixture.service.save(request)).toMatchObject({
+      outcome: "concurrency_conflict", committed: false,
     });
   });
 

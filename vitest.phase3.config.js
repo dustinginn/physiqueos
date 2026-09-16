@@ -16,6 +16,7 @@ export default defineConfig({
       "src/application/progress/ProgressHubReadService.test.js",
       "src/application/timeline/EvidenceTimelineReadService.test.js",
       "src/application/core/CoreNavigationReadService.test.js",
+      "src/application/plan/OperatingPlanProductionAcceptance.test.js",
       "src/application/platform/openApiConsistency.test.js",
       "src/domain/services/EvidenceHubUsageService.test.js",
       "src/domain/services/ProgressReadSafety.test.js",

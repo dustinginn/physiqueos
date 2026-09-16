@@ -289,7 +289,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       displayName: candidate.user?.displayName ?? candidate.user?.name ?? "Founder",
     };
     const command = {
-      expectedRevision: context.metadata.expectedVersion,
+      // The global runtime revision serializes this transaction but is not a
+      // user-visible Coaching fence. Use the lock-protected current value for
+      // mutation; scoped semantic/version fences below still come from the
+      // editor read and reject real changes to this composite resource.
+      expectedRevision: metadata.revision,
       expectedSemanticDigest: context.payload.expectedSemanticDigest,
       coaching: {
         protocolId: protocol.id,
@@ -307,7 +311,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       photos: {
         protocolId: photos.context.protocolId,
         expectedCurrentVersionId: context.payload.photoExpectedCurrentVersionId,
-        expectedRevision: context.metadata.expectedVersion,
+        expectedRevision: metadata.revision,
         expectedSemanticDigest: context.payload.photoExpectedSemanticDigest,
         effectiveDate,
         reminderEnabled: requested.photos.reminderEnabled,

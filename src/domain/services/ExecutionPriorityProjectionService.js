@@ -349,12 +349,11 @@ function formatTimeOfDayLabel(value) {
   if (["evening", "night", "before_bed"].includes(value)) return "Tonight";
   if (value === "morning") return "Morning";
   if (value === "afternoon") return "Afternoon";
-  if (/^\d{2}:\d{2}$/.test(value)) {
-    const hour = Number(value.slice(0, 2));
-    if (hour >= 17) return "Tonight";
-    if (hour >= 12) return "Afternoon";
-    return "Morning";
-  }
+  // A canonical clock time outranks daypart presentation. Home previously
+  // collapsed 22:29 to "Tonight" even though the same canonical projection
+  // already carried the exact time used by detail and notifications. Keep
+  // dayparts only for schedules that genuinely have no exact clock value.
+  if (/^\d{2}:\d{2}$/.test(value)) return formatExactTime(value);
 
   return "Today";
 }

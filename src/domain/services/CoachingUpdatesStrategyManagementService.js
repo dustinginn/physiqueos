@@ -44,22 +44,28 @@ export function createCoachingUpdatesStrategyManagementService({
   if (!runtimeStorePath || !liveStore) throw new Error("Coaching Updates strategy requires a bound Founder store.");
   return {
     async save(command = {}) {
-      if (getFounderStoreRevision(liveStore) !== Number(command.expectedRevision) ||
-          createCoachingUpdatesSemanticDigest(liveStore) !== command.expectedSemanticDigest) {
+      if (createCoachingUpdatesSemanticDigest(liveStore) !== command.expectedSemanticDigest) {
         return failure(CoachingUpdatesStrategyOutcome.CONCURRENCY_CONFLICT, "The plan changed while you were editing. Reload and try again.");
       }
+      const currentCommand = {
+        ...command,
+        expectedRevision: getFounderStoreRevision(liveStore),
+        photos: command.photos
+          ? { ...command.photos, expectedRevision: getFounderStoreRevision(liveStore) }
+          : command.photos,
+      };
       const unit = createUnitOfWork({ filePath: runtimeStorePath, liveStore, now, stageFrom: liveStore });
       const transaction = unit.begin();
       try {
         const staged = await transaction.mutate((store) => {
-          const prepared = prepareCoachingUpdatesStrategyTransition(store, command, now());
+          const prepared = prepareCoachingUpdatesStrategyTransition(store, currentCommand, now());
           if (!prepared.ok) throw typed(prepared.outcome, prepared.reason);
           applyPreparedCoachingUpdatesStrategyTransition(store, prepared);
           return prepared;
         });
         const committed = await transaction.commit({
           validateFinalized(store) {
-            return verifyPreparedCoachingUpdatesStrategyTransition(store, command, staged);
+            return verifyPreparedCoachingUpdatesStrategyTransition(store, currentCommand, staged);
           },
         });
         return Object.freeze({
@@ -90,8 +96,14 @@ export function createCoachingUpdatesStrategyManagementService({
 /// deliberately keeps Coaching Updates, Progress Photos, the photo
 /// reminder, and DEXA in one preparation/apply/verification boundary.
 export function prepareCoachingUpdatesStrategyTransition(store, command = {}, timestamp = new Date()) {
-  if (getFounderStoreRevision(store) !== Number(command.expectedRevision) ||
-      createCoachingUpdatesSemanticDigest(store) !== command.expectedSemanticDigest) {
+  // The semantic digest and the individual protocol/execution versions below
+  // are Coaching's real concurrency fences. The Founder store revision is a
+  // runtime-wide serialization counter: an unrelated Evidence worker can
+  // advance it while this editor is open without changing any Coaching,
+  // Progress Photos, reminder, or DEXA input. Requiring the stale client
+  // revision here caused false all-or-nothing conflicts. The persistence
+  // transaction still locks and advances the CURRENT runtime revision.
+  if (createCoachingUpdatesSemanticDigest(store) !== command.expectedSemanticDigest) {
     return rejected(CoachingUpdatesStrategyOutcome.CONCURRENCY_CONFLICT,
       "The plan changed while you were editing. Reload and try again.");
   }

@@ -161,8 +161,9 @@ export function createCoreNavigationReadService({
             supportSummary: method.supportSummary,
             currentDose: method.currentDose ?? null,
             currentSchedule: method.currentSchedule ?? null,
-            reminderEnabled: (runtime.reminders ?? []).some((reminder) =>
-              reminder.userId === ownerUserId && reminder.linkedEntityId === method.protocolId && reminder.active !== false),
+            reminderEnabled: projectMethodReminderEnabled({
+              category: model.category, method, ownerUserId, runtime,
+            }),
             editDestination: domainSupportDestination(model.category, method),
           }))),
         });
@@ -929,8 +930,45 @@ function recurringSupportReminderTypes({ protocol, executionItem }) {
   return result;
 }
 
+function projectMethodReminderEnabled({ category, method, ownerUserId, runtime }) {
+  const protocol = (runtime.protocols ?? []).find((item) =>
+    item.id === method.protocolId && item.userId === ownerUserId
+  );
+  const executions = (runtime.executionItems ?? []).filter((item) =>
+    item.userId === ownerUserId &&
+    [item.protocolRootId, item.linkedProtocolId].includes(method.protocolId)
+  );
+  if (!protocol || executions.length > 1) return false;
+  const executionItem = executions[0] ?? null;
+  const expectedTypes = category === "supplement"
+    ? new Set(["supplement_reminder"])
+    : category === "peptide"
+      ? new Set([ReminderType.PROTOCOL_REMINDER])
+      : recurringSupportReminderTypes({ protocol, executionItem: executionItem ?? {} });
+  const reminders = (runtime.reminders ?? []).filter((item) =>
+    item.userId === ownerUserId && item.linkedEntityId === method.protocolId &&
+    expectedTypes.has(item.type)
+  );
+  if (reminders.length > 1) return false;
+  const reminder = reminders[0] ?? null;
+  if (category === "supplement") {
+    return createSupplementSupportHydrationModel({ executionItem, protocol, reminder })
+      .draft.reminderPreference === "remind";
+  }
+  if (category === "peptide") {
+    return createPeptideSupportHydrationModel({ executionItem, protocol, reminder })
+      .reminderPreference === "remind";
+  }
+  return createRecurringSupportHydrationModel({ executionItem, protocol, reminder })
+    .reminderPreference === "remind";
+}
+
 function projectNextSupportDue({ schedule, reminder, localDate }) {
-  if (!schedule || !localDate || reminder?.active === false) return null;
+  // "Next due" belongs to the canonical execution schedule, not to iOS
+  // reminder delivery. Turning reminders off must hide the bell without
+  // erasing when the Support itself is next due. Completion history still
+  // comes from the reminder occurrence anchor when one exists.
+  if (!schedule || !localDate) return null;
   const start = /^\d{4}-\d{2}-\d{2}$/.test(schedule.startDate ?? "") ? schedule.startDate : localDate;
   const end = /^\d{4}-\d{2}-\d{2}$/.test(schedule.endDate ?? "") ? schedule.endDate : null;
   for (let offset = 0; offset <= 370; offset += 1) {

@@ -783,7 +783,7 @@ describe("confirmEvidenceReview", () => {
     mockState.value = createIsolatedReviewState(runtimeStore);
   });
 
-  it("returns Native at the durable claim boundary before canonical work, for a NON-Training review", async () => {
+  it("runs canonical_commit before Native acknowledgement for a NON-Training review", async () => {
     // This fixture (evidence_review_20260727161133407, see
     // createIsolatedReviewState) is a Training review — reassign it to a
     // non-Training evidence type so this test exercises the still-fully-
@@ -809,13 +809,14 @@ describe("confirmEvidenceReview", () => {
       state: "processing",
       accepted: true,
       reviewId: review.id,
-      continuationKey: expect.stringContaining(":canonical_commit:not_started:0"),
+      completedStep: "canonical_commit",
+      canonicalStateDurable: true,
     });
-    expect(mockState.value.canonicalCommitCalls).toBe(0);
+    expect(mockState.value.canonicalCommitCalls).toBe(1);
     expect(mockState.value.evidenceReviews[0]).toMatchObject({
       status: "committing",
       commitClaim: { status: "available", operationId: "native-confirm:command-one" },
-      commitProgress: {},
+      commitProgress: { canonical_commit: { status: "completed" } },
     });
   });
 
