@@ -108,7 +108,7 @@ struct OperatingPlanProtocolDomainView: View {
                     }
                     Spacer(minLength: 6)
                     if isPaused { StatusChip(text: "Paused", color: .muted) }
-                    else if method.reminderEnabled == true {
+                    else if Self.showsReminderIndicator(method: method, lifecycleState: status) {
                         Image(systemName: "bell.fill")
                             .foregroundStyle(PhysiqueOSTheme.accent)
                             .accessibilityLabel("Reminder on")
@@ -143,6 +143,16 @@ struct OperatingPlanProtocolDomainView: View {
                 }
             }
         }
+    }
+
+    /// The card bell is owned only by this method's canonical reminder
+    /// projection. Schedule existence, sibling methods, and category state
+    /// are deliberately irrelevant.
+    static func showsReminderIndicator(
+        method: OperatingPlanSupportMethodReadModel,
+        lifecycleState: String
+    ) -> Bool {
+        lifecycleState != "paused" && method.reminderEnabled == true
     }
 
     private func changeLifecycle(

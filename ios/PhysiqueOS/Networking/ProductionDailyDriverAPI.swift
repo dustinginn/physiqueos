@@ -1304,7 +1304,8 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                         progressionRecommendation: recommendations[exercise.canonicalExerciseId]
                     )
                 }
-            }
+            },
+            categorySuggestion: payload.initialCategorySuggestion
         )
     }
 
@@ -1341,6 +1342,7 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         var initialPerformedExerciseIds: [String]
         var initialMyLibraryExerciseIds: [String]
         var initialProgressionRecommendations: [RawRecommendation]?
+        var initialCategorySuggestion: TrainingLoggerCategorySuggestion?
     }
 
     /// `coreNavigation.getTrainingLogger`'s `initialHistorySessions` are a

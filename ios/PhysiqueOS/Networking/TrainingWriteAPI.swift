@@ -139,6 +139,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             sessionId: draft.id,
             localDate: draft.workoutDate,
             mode: draft.mode == .live ? "live" : "retrospective",
+            startedAt: draft.startedAt,
             exercises: exercises,
             supersets: supersets,
             supportingEvidenceReviewId: nil,
@@ -339,7 +340,10 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         else { return }
         let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: idempotencyStore)
         _ = try? await pipeline.commitReview(
-            domain: .workoutLogger, reviewId: binding.reviewId, expectedVersion: String(version)
+            domain: .workoutLogger,
+            reviewId: binding.reviewId,
+            expectedVersion: String(version),
+            targetTrainingSessionCanonicalId: "training|authoritative|training_logger_draft_\(draft.id)"
         )
         bindingStore.remove(draftId: draft.id)
     }
@@ -377,6 +381,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         var sessionId: String
         var localDate: String
         var mode: String
+        var startedAt: String?
         var exercises: [Exercise]
         var supersets: [Superset]
         var supportingEvidenceReviewId: String?

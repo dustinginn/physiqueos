@@ -33,6 +33,20 @@ struct TrainingLoggerConfiguration: Codable, Equatable {
     var areas: [TrainingLoggerArea]
     var variants: [TrainingExecutionVariant]
     var exercises: [TrainingLoggerCatalogExercise]
+    /// Server-owned learned category suggestion derived from confirmed
+    /// canonical Training history. Optional keeps older fixtures and
+    /// production payloads forward-decodable.
+    var categorySuggestion: TrainingLoggerCategorySuggestion? = nil
+}
+
+struct TrainingLoggerCategorySuggestion: Codable, Equatable, Identifiable {
+    var id: String
+    var date: String
+    var label: String
+    var categoryIds: [String]
+    var reason: String
+    var source: String
+    var historyReferences: [String]
 }
 
 struct TrainingLoggerCatalogExercise: Codable, Equatable, Identifiable {
@@ -118,8 +132,11 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// so a failed screenshot never silently falls back to a fixture
     /// result and is never confused with a genuinely successful read.
     var supportingWorkoutFailureAssetIds: [String]?
+    /// Exact live-workout start instant when Native observed one. Legacy
+    /// drafts and date-only past workouts intentionally remain nil.
+    var startedAt: String? = nil
 
-    static func fresh(mode: TrainingLoggerMode, workoutDate: String) -> Self {
+    static func fresh(mode: TrainingLoggerMode, workoutDate: String, startedAt: String? = nil) -> Self {
         .init(
             id: UUID().uuidString,
             mode: mode,
@@ -132,7 +149,8 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
             exercisePickerExistingExerciseIds: nil,
             supportingEvidence: nil,
             supportingWorkouts: nil,
-            supportingWorkoutFailureAssetIds: nil
+            supportingWorkoutFailureAssetIds: nil,
+            startedAt: startedAt
         )
     }
 

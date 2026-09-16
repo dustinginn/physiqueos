@@ -153,18 +153,24 @@ struct ProductionEvidenceIntakePipeline {
     func commitReview(
         domain: NativeProductWriteDomain,
         reviewId: String,
-        expectedVersion: String
+        expectedVersion: String,
+        targetTrainingSessionCanonicalId: String? = nil
     ) async throws -> ProductionEvidenceReviewConfirmation? {
         try NativeProductWriteGuard.authorize(domain, in: .founderProduction)
         let scope = "evidence-review.commit.\(reviewId)"
         let signature = ProductionIdempotentSubmission.signature([
             ProductionCommandType.commitEvidenceReview, reviewId, expectedVersion,
+            targetTrainingSessionCanonicalId ?? "-",
         ])
+        var payload = ["reviewId": reviewId]
+        if let targetTrainingSessionCanonicalId {
+            payload["targetTrainingSessionCanonicalId"] = targetTrainingSessionCanonicalId
+        }
         let outcome: ProductionCommandOutcome<ProductionJSONValue> = try await api.submitCommand(
             ProductionCommandType.commitEvidenceReview,
             idempotencyKey: idempotencyStore.resolvedKey(scope: scope, signature: signature),
             expectedVersion: expectedVersion,
-            payload: ["reviewId": reviewId]
+            payload: payload
         )
         return outcome.confirmation
     }

@@ -922,6 +922,28 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(request.url?.path, "/api/v1/native/read/operating-plan-protocol-domain")
     }
 
+    @MainActor
+    func testSupplementCardsUseEachProductionReminderStateForBellAB() async throws {
+        let domainJSON = productionEnvelope(resource: "operating-plan-protocol-domain", data: #"{"category":"supplement","title":"Supplement Strategy","purpose":"Canonical support.","methods":[{"id":"fadogia","protocolId":"fadogia","lifecycleState":"active","name":"Fadogia","purpose":"Support","supportSummary":"Daily","currentSchedule":"Daily","reminderEnabled":true},{"id":"electrolytes","protocolId":"electrolytes","lifecycleState":"active","name":"Electrolytes","purpose":"Support","supportSummary":"Daily","currentSchedule":"Daily","reminderEnabled":false}]}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, domainJSON),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let domain = try await ProductionOperatingPlanProtocolDomainAPI(api: native)
+            .fetchDomain(protocolId: "supplements")
+        let methods = try XCTUnwrap(domain?.methods)
+        let fadogia = try XCTUnwrap(methods.first { $0.id == "fadogia" })
+        let electrolytes = try XCTUnwrap(methods.first { $0.id == "electrolytes" })
+
+        XCTAssertTrue(OperatingPlanProtocolDomainView.showsReminderIndicator(
+            method: fadogia, lifecycleState: fadogia.lifecycleState ?? "active"
+        ))
+        XCTAssertFalse(OperatingPlanProtocolDomainView.showsReminderIndicator(
+            method: electrolytes, lifecycleState: electrolytes.lifecycleState ?? "active"
+        ))
+    }
+
     func testCanonicalUnconfiguredOperatingPlanDestinationRoundTripsWithoutWebRouting() throws {
         let data = Data(#"{"id":"native.operating-plan.status","parameters":{"domain":"energy","title":"Energy Strategy","detail":"No active strategy","status":"Not configured"}}"#.utf8)
         let destination = try JSONDecoder().decode(AppDestination.self, from: data)
@@ -1379,6 +1401,9 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(history.sets.map(\.setNumber), [1, 2])
         XCTAssertEqual(logger.exercises.first?.progressionRecommendation?.eyebrow, "Maintain current performance")
         XCTAssertEqual(logger.exercises.first?.progressionRecommendation?.suggestedLoad, 145)
+        XCTAssertEqual(logger.categorySuggestion?.label, "Biceps + Triceps")
+        XCTAssertEqual(logger.categorySuggestion?.categoryIds, ["biceps", "triceps"])
+        XCTAssertEqual(logger.categorySuggestion?.reason, "Repeated on Wednesdays across 6 confirmed workouts")
 
         await native.invalidateReadResources(["training-library"])
         await XCTAssertThrowsErrorAsync(try await ProductionTrainingAPI(api: native).fetchTrainingArea(areaId: "chest", scope: .all)) { error in
@@ -3201,6 +3226,31 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(affected.contains("evidence-review-queue"))
     }
 
+    func testTrainingSupportingReviewConfirmationCarriesExactCanonicalSessionTarget() async throws {
+        let response = productionCommandOutcomeJSON(result: #"{"status":"confirmation_requested","reviewId":"review-training","revision":2}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, response),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let pipeline = ProductionEvidenceIntakePipeline(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let target = "training|authoritative|training_logger_draft_exact-draft"
+
+        _ = try await pipeline.commitReview(
+            domain: .workoutLogger,
+            reviewId: "review-training",
+            expectedVersion: "1",
+            targetTrainingSessionCanonicalId: target
+        )
+
+        let requests = await transport.requests
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        let payload = try XCTUnwrap(json["payload"] as? [String: String])
+        XCTAssertEqual(payload["reviewId"], "review-training")
+        XCTAssertEqual(payload["targetTrainingSessionCanonicalId"], target)
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"1\"")
+    }
+
     func testProductionReviewReadDoesNotReuseCachedConcurrencyOrLifecycleState() async throws {
         let pending = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-1","status":"pending","version":1,"createdAt":"2026-09-15T19:00:00.000Z"}}"#)
         let discarded = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-1","status":"discarded","version":2,"createdAt":"2026-09-15T19:00:00.000Z"}}"#)
@@ -3929,7 +3979,7 @@ private func productionTrainingLibraryJSON(exerciseID: String, muscleGroup: Stri
 /// `TrainingSessionDetailReadModel` here.
 private func productionTrainingLoggerJSON(exerciseID: String, muscleGroup: String) -> String {
     productionEnvelope(resource: "training-logger", data: """
-    {"initialDate":"2026-09-10","initialCanonicalExercises":[{"id":"\(exerciseID)","name":"Incline Press","equipment":"Dumbbells","bodyRegion":"Upper Body","primaryMuscleGroups":["\(muscleGroup)"],"defaultMeasurement":"reps_load","defaultLoadType":"external"}],"initialHistorySessions":[{"id":"session-canonical","evidence_type":"training","observed_at":"2026-09-09","exercises":[{"id":"exercise-occurrence-canonical","canonicalExerciseId":"\(exerciseID)","name":"Incline Press","body_region":"Upper Body","equipment":"Dumbbells","sets":[{"reps":10,"weight":135,"weight_unit":"lb","load_type":"external_load"},{"reps":8,"weight":145,"weight_unit":"lb","load_type":"external_load"}]}]}],"initialPerformedExerciseIds":["\(exerciseID)"],"initialMyLibraryExerciseIds":["\(exerciseID)"],"initialProgressionRecommendations":[{"canonicalExerciseId":"\(exerciseID)","state":"maintain","eyebrow":"Maintain current performance","message":"Canonical recommendation.","prescription":"145 lb x 8","suggestedLoad":145,"suggestedLoadType":"external_load","suggestedReps":8,"suggestedUnit":"lb"}]}
+    {"initialDate":"2026-09-10","initialCanonicalExercises":[{"id":"\(exerciseID)","name":"Incline Press","equipment":"Dumbbells","bodyRegion":"Upper Body","primaryMuscleGroups":["\(muscleGroup)"],"defaultMeasurement":"reps_load","defaultLoadType":"external"}],"initialHistorySessions":[{"id":"session-canonical","evidence_type":"training","observed_at":"2026-09-09","exercises":[{"id":"exercise-occurrence-canonical","canonicalExerciseId":"\(exerciseID)","name":"Incline Press","body_region":"Upper Body","equipment":"Dumbbells","sets":[{"reps":10,"weight":135,"weight_unit":"lb","load_type":"external_load"},{"reps":8,"weight":145,"weight_unit":"lb","load_type":"external_load"}]}]}],"initialPerformedExerciseIds":["\(exerciseID)"],"initialMyLibraryExerciseIds":["\(exerciseID)"],"initialCategorySuggestion":{"id":"confirmed_history_3_biceps_triceps","date":"2026-09-10","label":"Biceps + Triceps","categoryIds":["biceps","triceps"],"reason":"Repeated on Wednesdays across 6 confirmed workouts","source":"confirmed_training_evidence_history","historyReferences":["session-1","session-2","session-3","session-4","session-5","session-6"]},"initialProgressionRecommendations":[{"canonicalExerciseId":"\(exerciseID)","state":"maintain","eyebrow":"Maintain current performance","message":"Canonical recommendation.","prescription":"145 lb x 8","suggestedLoad":145,"suggestedLoadType":"external_load","suggestedReps":8,"suggestedUnit":"lb"}]}
     """)
         .replacingOccurrences(of: "\"bodyRegion\":", with: "\"primaryNavigationCategory\":\"\(muscleGroup.lowercased())\",\"bodyRegion\":")
 }

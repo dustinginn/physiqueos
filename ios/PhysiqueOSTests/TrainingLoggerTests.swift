@@ -589,6 +589,151 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertNil(store.load())
     }
 
+    func testLegacySingleDraftMigratesLosslesslyIntoMultipleDraftCollection() throws {
+        let suite = "TrainingLoggerDraftMigrationTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let key = "logger-drafts"
+        var legacy = draft(mode: .past, date: "2026-09-15", areas: ["shoulders"])
+        legacy.id = "legacy-sep-15"
+        legacy.supportingEvidence = [.init(id: "image-1", displayName: "Workout.png", source: .photos, storageReference: "legacy-sep-15/image-1", contentType: "image/png")]
+        defaults.set(try JSONEncoder().encode(legacy), forKey: key)
+
+        let store = UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: key)
+        XCTAssertEqual(store.loadAll(), [legacy])
+
+        var sibling = draft(mode: .live, date: "2026-09-16", areas: ["quads"])
+        sibling.id = "new-sep-16"
+        store.save(sibling)
+        XCTAssertEqual(Set(store.loadAll().map(\.id)), [legacy.id, sibling.id])
+        XCTAssertEqual(store.loadAll().first(where: { $0.id == legacy.id }), legacy)
+
+        let relaunchedStore = UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: key)
+        XCTAssertEqual(Set(relaunchedStore.loadAll().map(\.id)), [legacy.id, sibling.id], "Every draft must survive app restart independently.")
+    }
+
+    @MainActor
+    func testMultipleSameDayDraftsStartResumeAndDiscardByExactIdentity() async throws {
+        var first = draft(mode: .past, date: "2026-09-16", areas: ["biceps"])
+        first.id = "same-day-first"
+        var second = draft(mode: .past, date: "2026-09-16", areas: ["triceps"])
+        second.id = "same-day-second"
+        let store = MemoryTrainingLoggerDraftStore(drafts: [first, second])
+        let viewModel = TrainingLoggerViewModel(api: api, draftStore: store)
+        await viewModel.load()
+
+        XCTAssertEqual(Set(viewModel.savedDrafts.map(\.id)), [first.id, second.id])
+        viewModel.resume(draftId: second.id)
+        XCTAssertEqual(viewModel.draft?.id, second.id)
+        XCTAssertEqual(viewModel.draft?.selectedAreaIds, ["triceps"])
+
+        viewModel.discardSavedDraft(draftId: first.id)
+        XCTAssertEqual(store.loadAll().map(\.id), [second.id])
+        XCTAssertEqual(viewModel.draft?.id, second.id, "Discarding a sibling must not disturb the resumed draft.")
+
+        viewModel.start(mode: .past, date: try XCTUnwrap(Self.testDate("2026-09-16T07:20:00Z")))
+        let thirdId = try XCTUnwrap(viewModel.draft?.id)
+        XCTAssertNotEqual(thirdId, second.id)
+        XCTAssertEqual(Set(store.loadAll().map(\.id)), [second.id, thirdId])
+    }
+
+    @MainActor
+    func testStartingLiveWorkoutWithExistingDraftCreatesIndependentPersistedIdentity() async throws {
+        var saved = draft(mode: .past, date: "2026-09-15", areas: ["shoulders"])
+        saved.id = "preserved-sep-15"
+        let store = MemoryTrainingLoggerDraftStore(draft: saved)
+        let viewModel = TrainingLoggerViewModel(api: api, draftStore: store)
+        await viewModel.load()
+
+        let liveStart = try XCTUnwrap(Self.testDate("2026-09-16T14:20:00Z"))
+        viewModel.start(mode: .live, date: liveStart)
+
+        let live = try XCTUnwrap(viewModel.draft)
+        XCTAssertNotEqual(live.id, saved.id)
+        XCTAssertEqual(live.workoutDate, "2026-09-16")
+        XCTAssertNotNil(live.startedAt)
+        XCTAssertEqual(Set(store.loadAll().map(\.id)), [saved.id, live.id])
+        XCTAssertEqual(store.loadAll().first(where: { $0.id == saved.id }), saved, "Starting live must never overwrite or inherit the saved draft.")
+    }
+
+    func testDraftAttachmentsAndIdempotencyAreExactIdentityScoped() throws {
+        let attachments = MemoryTrainingLoggerAttachmentStore()
+        let first = try attachments.save(data: Data([1]), draftId: "draft-a", assetId: "shared-name", displayName: "Workout.png")
+        let second = try attachments.save(data: Data([2]), draftId: "draft-b", assetId: "shared-name", displayName: "Workout.png")
+        XCTAssertNotEqual(first, second)
+        attachments.removeAll(draftId: "draft-a")
+        XCTAssertThrowsError(try attachments.load(reference: first))
+        XCTAssertEqual(try attachments.load(reference: second), Data([2]))
+
+        let suite = "TrainingLoggerIdempotencyIsolation.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let keys = ProductionIdempotencyKeyStore(defaults: defaults)
+        let keyA = keys.resolvedKey(scope: "training-session.draft-a", signature: "same-payload")
+        let keyB = keys.resolvedKey(scope: "training-session.draft-b", signature: "same-payload")
+        XCTAssertNotEqual(keyA, keyB)
+        XCTAssertEqual(keys.resolvedKey(scope: "training-session.draft-a", signature: "same-payload"), keyA)
+    }
+
+    @MainActor
+    func testSavedDraftCardsUseTrustworthyDateTimeCategoryAndExerciseCount() async throws {
+        let config = try await FixtureTrainingLoggerAPI().fetchConfiguration()
+        var saved = TrainingLoggerDraft.fresh(
+            mode: .live,
+            workoutDate: "2026-09-15",
+            startedAt: "2026-09-16T00:36:00Z"
+        )
+        saved.id = "presentation-draft"
+        saved.selectedAreaIds = ["shoulders"]
+        saved.addExercise(try XCTUnwrap(config.exercises.first { $0.areaId == "shoulders" }))
+        let viewModel = TrainingLoggerViewModel(api: api, draftStore: MemoryTrainingLoggerDraftStore(draft: saved))
+        await viewModel.load()
+
+        let presentation = viewModel.savedDraftPresentation(saved)
+        XCTAssertEqual(presentation.date, "Sep 15")
+        XCTAssertNotNil(presentation.time)
+        XCTAssertEqual(presentation.detail, "Shoulders · 1 exercise")
+    }
+
+    @MainActor
+    func testSuggestedTodayUsesServerOwnedMultiCategoryCombinationAndRemainsOverridable() async throws {
+        struct SuggestionAPI: TrainingLoggerAPI {
+            var base: TrainingLoggerConfiguration
+            func fetchConfiguration() async throws -> TrainingLoggerConfiguration { base }
+        }
+        var config = try await FixtureTrainingLoggerAPI().fetchConfiguration()
+        config.categorySuggestion = .init(
+            id: "confirmed_history_3_biceps_triceps",
+            date: TrainingLoggerViewModel.dateKey(Date()),
+            label: "Biceps + Triceps",
+            categoryIds: ["biceps", "triceps"],
+            reason: "Repeated on Wednesdays across 6 confirmed workouts",
+            source: "confirmed_training_evidence_history",
+            historyReferences: (1...6).map { "session-\($0)" }
+        )
+        let viewModel = TrainingLoggerViewModel(api: SuggestionAPI(base: config), draftStore: MemoryTrainingLoggerDraftStore())
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        XCTAssertEqual(viewModel.availableCategorySuggestion?.label, "Biceps + Triceps")
+        XCTAssertFalse(viewModel.isCategorySuggestionAccepted)
+        viewModel.acceptCategorySuggestion()
+        XCTAssertEqual(viewModel.draft?.selectedAreaIds, ["biceps", "triceps"])
+        XCTAssertTrue(viewModel.isCategorySuggestionAccepted)
+        viewModel.update { $0.toggleArea("triceps") }
+        XCTAssertEqual(viewModel.draft?.selectedAreaIds, ["biceps"], "Founder override must remain authoritative.")
+        XCTAssertFalse(viewModel.isCategorySuggestionAccepted)
+    }
+
+    @MainActor
+    func testInsufficientHistorySuggestionIsAbsent() async {
+        let viewModel = TrainingLoggerViewModel(api: api, draftStore: MemoryTrainingLoggerDraftStore())
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        XCTAssertNil(viewModel.availableCategorySuggestion)
+    }
+
+    private static func testDate(_ value: String) -> Date? { ISO8601DateFormatter().date(from: value) }
+
     @MainActor
     func testSaveAndLeavePersistsWhileCancelDiscardsLocalDraft() async throws {
         let store = MemoryTrainingLoggerDraftStore()
@@ -711,6 +856,14 @@ final class TrainingLoggerTests: XCTestCase {
         func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { isDurable }
     }
 
+    private struct DurableDraftIDsProbeTrainingWriteAPI: TrainingWriteAPI {
+        let durableIDs: Set<String>
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
+            throw StubFailingTrainingWriteAPI.Failure()
+        }
+        func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { durableIDs.contains(draft.id) }
+    }
+
     @MainActor
     func testLoadClearsOnlyAnExactlyProvenDurableLegacyDraft() async throws {
         let store = MemoryTrainingLoggerDraftStore()
@@ -747,6 +900,26 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(store.load(), unresolvedDraft)
         XCTAssertEqual(viewModel.savedDraft, unresolvedDraft)
         XCTAssertEqual(viewModel.loadState, .loaded)
+    }
+
+    @MainActor
+    func testStartupReconcilesOnlyExactDurableDraftAndPreservesSameDateSibling() async throws {
+        var durable = draft(date: "2026-09-15", areas: ["shoulders"])
+        durable.id = "durable-exact-id"
+        var sibling = draft(date: "2026-09-15", areas: ["shoulders"])
+        sibling.id = "legitimate-same-date-sibling"
+        let store = MemoryTrainingLoggerDraftStore(drafts: [durable, sibling])
+        let viewModel = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: DurableDraftIDsProbeTrainingWriteAPI(durableIDs: [durable.id]),
+            draftStore: store,
+            authority: .founderProduction
+        )
+
+        await viewModel.load()
+
+        XCTAssertEqual(store.loadAll().map(\.id), [sibling.id])
+        XCTAssertEqual(viewModel.savedDrafts.map(\.id), [sibling.id])
     }
 
     /// A successful canonical submission must clear the device-only draft —

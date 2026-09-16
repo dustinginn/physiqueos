@@ -225,25 +225,38 @@ struct TrainingLoggerView: View {
                 }
             }
 
-            if viewModel.savedDraft != nil {
+            if !viewModel.savedDrafts.isEmpty {
                 // Build 20 regression: this card (and therefore the only
                 // way to reach `resume()`) was gated to Sandbox even
                 // though `savedDraft`/`canWrite` are both already valid
                 // under Founder Production — Save & Leave genuinely
                 // persisted the draft, but nothing in Production could
                 // ever surface it again. Restoring for both authorities.
-                CardContainer {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Saved workout")
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text("Pick up where you left off without losing sets or exercise details.")
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        PrimaryActionButton(title: "Resume workout") { viewModel.resume() }
-                            .accessibilityIdentifier("trainingLogger.resume")
-                        Button("Discard saved draft", role: .destructive) { viewModel.discardSavedDraft() }
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Saved workouts")
+                        .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    ForEach(viewModel.savedDrafts) { draft in
+                        let presentation = viewModel.savedDraftPresentation(draft)
+                        CardContainer {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text([presentation.date, presentation.time].compactMap { $0 }.joined(separator: " · "))
+                                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                if !presentation.detail.isEmpty {
+                                    Text(presentation.detail)
+                                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                }
+                                PrimaryActionButton(title: "Resume") { viewModel.resume(draftId: draft.id) }
+                                    .accessibilityIdentifier("trainingLogger.resume.\(draft.id)")
+                                Button("Discard draft", role: .destructive) {
+                                    viewModel.discardSavedDraft(draftId: draft.id)
+                                }
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .accessibilityIdentifier("trainingLogger.discard.\(draft.id)")
+                            }
+                        }
                     }
                 }
             }
@@ -286,6 +299,33 @@ struct TrainingLoggerView: View {
             stepHeader(viewModel, step: "1 of 3", title: "What are you training?", subtitle: "Choose one or more Training Areas.")
             if let draft = viewModel.draft, draft.mode == .past {
                 infoRow(icon: "calendar", title: "Workout date", value: draft.workoutDate)
+            }
+            if let suggestion = viewModel.availableCategorySuggestion {
+                Button { viewModel.acceptCategorySuggestion() } label: {
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack {
+                            Label("Suggested Today", systemImage: "sparkles")
+                                .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
+                            Spacer()
+                            Image(systemName: viewModel.isCategorySuggestionAccepted
+                                ? "checkmark.circle.fill"
+                                : "circle")
+                        }
+                        Text(suggestion.label)
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        Text(suggestion.reason)
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .padding(16)
+                    .background(PhysiqueOSTheme.surfaceAccent)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(PhysiqueOSTheme.accent))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("trainingLogger.suggestedToday")
             }
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(viewModel.configuration?.areas ?? []) { area in

@@ -19,7 +19,10 @@ final class TrainingLoggerViewModel {
     var loadState: LoadState = .loading
     var configuration: TrainingLoggerConfiguration?
     var draft: TrainingLoggerDraft?
-    var savedDraft: TrainingLoggerDraft?
+    var savedDrafts: [TrainingLoggerDraft] = []
+    /// Compatibility for older presentation/tests. New flows always select
+    /// an exact draft identity from `savedDrafts`.
+    var savedDraft: TrainingLoggerDraft? { savedDrafts.first }
     var searchText = ""
     var isBrowsingAllExercises = false
     var isCreatingNewExercise = false
@@ -61,17 +64,21 @@ final class TrainingLoggerViewModel {
         guard configuration == nil else { return }
         do {
             configuration = try await api.fetchConfiguration()
-            savedDraft = canWrite ? draftStore.load() : nil
-            if authority == .founderProduction,
-               let savedDraft,
-               await writeAPI.isDraftAlreadyDurable(savedDraft) {
-                // Exact deterministic identity/fingerprint proof means this
-                // is the local residue of an acknowledged-ambiguity case,
-                // not an editable unsaved workout. Never invite a duplicate
-                // Finish attempt.
-                attachmentStore.removeAll(draftId: savedDraft.id)
-                draftStore.discard()
-                self.savedDraft = nil
+            savedDrafts = canWrite ? draftStore.loadAll() : []
+            if authority == .founderProduction {
+                var remaining: [TrainingLoggerDraft] = []
+                for candidate in savedDrafts {
+                    if await writeAPI.isDraftAlreadyDurable(candidate) {
+                        // Exact deterministic identity/fingerprint proof
+                        // clears only this residue. Same-date/category sibling
+                        // drafts remain independent and untouched.
+                        attachmentStore.removeAll(draftId: candidate.id)
+                        draftStore.discard(id: candidate.id)
+                    } else {
+                        remaining.append(candidate)
+                    }
+                }
+                savedDrafts = Self.sortDrafts(remaining)
             }
             loadState = .loaded
         } catch {
@@ -81,15 +88,21 @@ final class TrainingLoggerViewModel {
 
     func start(mode: TrainingLoggerMode, date: Date = Date()) {
         guard canWrite else { return }
-        let workoutDate = mode == .live ? Self.dateKey(Date()) : Self.dateKey(date)
-        draft = .fresh(mode: mode, workoutDate: workoutDate)
+        let workoutDate = Self.dateKey(date)
+        let startedAt = mode == .live ? ISO8601DateFormatter().string(from: date) : nil
+        draft = .fresh(mode: mode, workoutDate: workoutDate, startedAt: startedAt)
         validationMessage = nil
         persist()
     }
 
     func resume() {
+        guard let savedDraft else { return }
+        resume(draftId: savedDraft.id)
+    }
+
+    func resume(draftId: String) {
         guard canWrite else { return }
-        draft = savedDraft
+        draft = savedDrafts.first { $0.id == draftId }
         if draft?.supportingEvidenceAssets.isEmpty == false,
            draft?.supportingWorkouts == nil {
             update { $0.addSupportingEvidence([]) }
@@ -98,18 +111,26 @@ final class TrainingLoggerViewModel {
     }
 
     func discardSavedDraft() {
+        guard let savedDraft else { return }
+        discardSavedDraft(draftId: savedDraft.id)
+    }
+
+    func discardSavedDraft(draftId: String) {
         guard canWrite else { return }
-        if let draftId = savedDraft?.id { attachmentStore.removeAll(draftId: draftId) }
-        draftStore.discard()
-        savedDraft = nil
-        draft = nil
+        guard savedDrafts.contains(where: { $0.id == draftId }) else { return }
+        attachmentStore.removeAll(draftId: draftId)
+        draftStore.discard(id: draftId)
+        savedDrafts.removeAll { $0.id == draftId }
+        if draft?.id == draftId { draft = nil }
     }
 
     func cancelWorkout() {
         guard canWrite else { return }
-        if let draftId = draft?.id { attachmentStore.removeAll(draftId: draftId) }
-        draftStore.discard()
-        savedDraft = nil
+        if let draftId = draft?.id {
+            attachmentStore.removeAll(draftId: draftId)
+            draftStore.discard(id: draftId)
+            savedDrafts.removeAll { $0.id == draftId }
+        }
         draft = nil
         validationMessage = nil
     }
@@ -176,8 +197,8 @@ final class TrainingLoggerViewModel {
         if draft.supportingEvidenceAssets.isEmpty {
             attachmentStore.removeAll(draftId: draft.id)
         }
-        draftStore.discard()
-        savedDraft = nil
+        draftStore.discard(id: draft.id)
+        savedDrafts.removeAll { $0.id == draft.id }
     }
 
     func submit() async {
@@ -228,7 +249,44 @@ final class TrainingLoggerViewModel {
         guard canWrite else { return }
         guard let draft, draft.step != .complete else { return }
         draftStore.save(draft)
-        savedDraft = draft
+        savedDrafts.removeAll { $0.id == draft.id }
+        savedDrafts.append(draft)
+        savedDrafts = Self.sortDrafts(savedDrafts)
+    }
+
+    var availableCategorySuggestion: TrainingLoggerCategorySuggestion? {
+        guard let draft, let suggestion = configuration?.categorySuggestion,
+              suggestion.date == draft.workoutDate,
+              !suggestion.categoryIds.isEmpty,
+              suggestion.categoryIds.allSatisfy({ id in configuration?.areas.contains(where: { $0.id == id }) == true })
+        else { return nil }
+        return suggestion
+    }
+
+    var isCategorySuggestionAccepted: Bool {
+        guard let suggestion = availableCategorySuggestion, let draft else { return false }
+        return draft.selectedAreaIds.count == suggestion.categoryIds.count &&
+            Set(draft.selectedAreaIds) == Set(suggestion.categoryIds)
+    }
+
+    func acceptCategorySuggestion() {
+        guard let suggestion = availableCategorySuggestion else { return }
+        update { $0.selectedAreaIds = suggestion.categoryIds }
+    }
+
+    func savedDraftPresentation(_ draft: TrainingLoggerDraft) -> SavedDraftPresentation {
+        let categoryIds = draft.selectedAreaIds.isEmpty
+            ? Array(Set(draft.exercises.map(\.areaId))).sorted()
+            : draft.selectedAreaIds
+        let labels = categoryIds.map(areaLabel)
+        let category = labels.isEmpty ? nil : labels.joined(separator: " + ")
+        let count = draft.exercises.count
+        let exerciseText = count == 0 ? nil : "\(count) exercise\(count == 1 ? "" : "s")"
+        return SavedDraftPresentation(
+            date: Self.displayDate(draft.workoutDate),
+            time: Self.displayTime(draft.startedAt),
+            detail: [category, exerciseText].compactMap { $0 }.joined(separator: " · ")
+        )
     }
 
     func retainSupportingEvidence(assetId: String, data: Data, contentType: String) throws {
@@ -279,6 +337,41 @@ final class TrainingLoggerViewModel {
 
     func areaLabel(_ id: String) -> String {
         configuration?.areas.first(where: { $0.id == id })?.label ?? PresentationLanguage.displayName(fromIdentifier: id)
+    }
+
+    struct SavedDraftPresentation: Equatable {
+        var date: String
+        var time: String?
+        var detail: String
+    }
+
+    private static func sortDrafts(_ drafts: [TrainingLoggerDraft]) -> [TrainingLoggerDraft] {
+        drafts.sorted {
+            let left = $0.startedAt ?? $0.workoutDate
+            let right = $1.startedAt ?? $1.workoutDate
+            return left == right ? $0.id < $1.id : left > right
+        }
+    }
+
+    private static func displayDate(_ value: String) -> String {
+        let input = DateFormatter()
+        input.locale = Locale(identifier: "en_US_POSIX")
+        input.calendar = Calendar(identifier: .gregorian)
+        input.dateFormat = "yyyy-MM-dd"
+        guard let date = input.date(from: value) else { return value }
+        let output = DateFormatter()
+        output.locale = Locale(identifier: "en_US")
+        output.dateFormat = "MMM d"
+        return output.string(from: date)
+    }
+
+    private static func displayTime(_ value: String?) -> String? {
+        guard let value, let date = ISO8601DateFormatter().date(from: value) else { return nil }
+        let output = DateFormatter()
+        output.locale = Locale(identifier: "en_US")
+        output.timeStyle = .short
+        output.dateStyle = .none
+        return output.string(from: date)
     }
 
     func isSelected(_ exercise: TrainingLoggerCatalogExercise) -> Bool {
