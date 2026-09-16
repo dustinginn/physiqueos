@@ -133,7 +133,7 @@ struct OperatingPlanPeptideExecutionView: View {
     private func editor(draft: OperatingPlanPeptideExecutionReadModel) -> some View {
         let dosing = draft.dosing
         return VStack(alignment: .leading, spacing: 18) {
-            OperatingPlanScreenHeader(eyebrow: "PEPTIDE SUPPORT", title: "Edit Support", subtitle: "Describe the schedule and dosing strategy you intend to follow. The dated support plan is generated for you.")
+            OperatingPlanScreenHeader(eyebrow: draft.name, title: "Edit Support", subtitle: "Describe the schedule and dosing strategy you intend to follow. The dated support plan is generated for you.")
 
             OperatingPlanSupportScheduleEditor(schedule: Binding(
                 get: { draft.supportSchedule }, set: { self.draft?.supportSchedule = $0 }
@@ -165,7 +165,7 @@ struct OperatingPlanPeptideExecutionView: View {
                     DateField(date: Binding(
                         get: { OperatingPlanDateValues.date(from: dosing.startDate) },
                         set: { self.draft?.dosing.startDate = OperatingPlanDateValues.dateKey(from: $0) }
-                    ), label: "Dosing start date")
+                    ), maximumDate: .distantFuture, label: "Dosing start date")
                 }
             }
 
@@ -241,7 +241,7 @@ struct OperatingPlanPeptideExecutionView: View {
                         DateField(date: Binding(
                             get: { OperatingPlanDateValues.date(from: dosing.endDate ?? dosing.startDate) },
                             set: { self.draft?.dosing.endDate = OperatingPlanDateValues.dateKey(from: $0) }
-                        ), label: "End date")
+                        ), maximumDate: .distantFuture, label: "End date")
                     }
                 }
             }

@@ -2874,6 +2874,61 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(sent["restingMetabolicRate"] is NSNull)
     }
 
+    func testReadyUploadResponseOpensReviewWithoutAnotherRead() async throws {
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r"))])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test device")
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let intake = ProductionEvidenceIntakeStatus(intakeId: "intake", status: "ready", reviewId: "review", reviewUrl: nil, processingUrl: nil)
+        let reviewId = try await pipeline.readyReview(for: intake)
+        XCTAssertEqual(reviewId, "review")
+        let count = await transport.requests.count
+        XCTAssertEqual(count, 1, "A published upload result needs no redundant GET")
+    }
+
+    func testUnpublishedReviewIdentityDoesNotCountAsReviewReady() async throws {
+        let processing = #"{"intakeId":"intake","status":"processing","reviewId":"review","reviewUrl":null,"processingUrl":null}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, processing),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test device")
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let intake = ProductionEvidenceIntakeStatus(intakeId: "intake", status: "processing", reviewId: "review", reviewUrl: nil, processingUrl: nil)
+        await XCTAssertThrowsErrorAsync(try await pipeline.readyReview(for: intake, pollInterval: .zero, maxPolls: 0)) { error in
+            XCTAssertEqual(error as? ProductionEvidenceIntakePipeline.Error, .stillProcessing)
+        }
+    }
+
+    func testProcessingIntakeFollowsPublicationWithoutResubmitting() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, #"{"intakeId":"intake","status":"processing","reviewId":null}"#),
+            .json(200, #"{"intakeId":"intake","status":"ready","reviewId":"review"}"#),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test device")
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let intake = ProductionEvidenceIntakeStatus(intakeId: "intake", status: "processing", reviewId: nil, reviewUrl: nil, processingUrl: nil)
+        let reviewId = try await pipeline.readyReview(for: intake, pollInterval: .zero, maxPolls: 1)
+        XCTAssertEqual(reviewId, "review")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.dropFirst().map(\.httpMethod), ["GET", "GET"])
+    }
+
+    func testFailedIntakeDoesNotPromiseReviewReadyOrSubmitAgain() async throws {
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r"))])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test device")
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let intake = ProductionEvidenceIntakeStatus(intakeId: "intake", status: "processing_failed", reviewId: nil, reviewUrl: nil, processingUrl: nil)
+        await XCTAssertThrowsErrorAsync(try await pipeline.readyReview(for: intake)) { error in
+            XCTAssertEqual(error as? ProductionEvidenceIntakePipeline.Error, .interpretationFailed)
+        }
+        let count = await transport.requests.count
+        XCTAssertEqual(count, 1)
+    }
+
     func testProductionEvidenceIntakeContentFingerprintDistinguishesEqualLengthFiles() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),

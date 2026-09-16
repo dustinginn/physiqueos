@@ -397,7 +397,7 @@ private struct CoachingUpdatesEditor: View {
                                 DateField(date: Binding(
                                     get: { OperatingPlanDateValues.date(from: model.dexa.plannedDate) },
                                     set: { self.model?.dexa.plannedDate = OperatingPlanDateValues.dateKey(from: $0) }
-                                ), label: "Date")
+                                ), maximumDate: .distantFuture, minimumDate: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())), label: "Next scan date")
                                 exactTimePicker(label: "Time", value: Binding(get: { model.dexa.localTime }, set: { self.model?.dexa.localTime = $0 }))
                                 TextField("Preparation note (optional)", text: Binding(get: { model.dexa.preparationNote }, set: { self.model?.dexa.preparationNote = $0 }), axis: .vertical)
                                     .lineLimit(2...5).textFieldStyle(.roundedBorder)

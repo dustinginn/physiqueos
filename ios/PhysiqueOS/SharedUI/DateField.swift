@@ -67,6 +67,15 @@ struct DateField: View {
                     .navigationTitle(label)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Today") {
+                                if let today = Self.selectableToday(minimumDate: minimumDate, maximumDate: maximumDate) {
+                                    date = today
+                                }
+                            }
+                            .disabled(Self.selectableToday(minimumDate: minimumDate, maximumDate: maximumDate) == nil)
+                            .accessibilityIdentifier("datePicker.today")
+                        }
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { isPresented = false }
                         }
@@ -74,6 +83,18 @@ struct DateField: View {
             }
             .presentationDetents([.medium])
         }
+    }
+
+    /// Date-only affordance; never clamp Today to a future appointment or
+    /// change the stored selection just because the picker was opened.
+    static func selectableToday(
+        now: Date = Date(), minimumDate: Date?, maximumDate: Date,
+        calendar: Calendar = .current
+    ) -> Date? {
+        let today = calendar.startOfDay(for: now)
+        if let minimumDate, today < calendar.startOfDay(for: minimumDate) { return nil }
+        guard today <= calendar.startOfDay(for: maximumDate) else { return nil }
+        return today
     }
 
     private static let formatter: DateFormatter = {

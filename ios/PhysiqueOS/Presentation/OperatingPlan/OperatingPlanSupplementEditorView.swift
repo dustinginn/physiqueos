@@ -71,7 +71,7 @@ struct OperatingPlanSupplementEditorView: View {
                             DateField(date: Binding(
                                 get: { Self.dateFormatter.date(from: model.startDate) ?? Date() },
                                 set: { self.model?.startDate = Self.dateFormatter.string(from: $0) }
-                            ), label: "Start date")
+                            ), maximumDate: .distantFuture, label: "Start date")
                         }
                     }
 

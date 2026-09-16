@@ -110,7 +110,7 @@ struct OperatingPlanTrackingSupportView: View {
             if let draft {
                 VStack(alignment: .leading, spacing: 18) {
                     OperatingPlanScreenHeader(
-                        eyebrow: "TRACKING SUPPORT",
+                        eyebrow: draft.title,
                         title: "Edit Support",
                         subtitle: "Set when this measurement is expected and whether Home should remind you. Weight evidence completes it automatically."
                     )

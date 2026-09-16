@@ -164,6 +164,7 @@ struct ProductionEvidenceUploadView: View {
     @State private var acceptanceSeconds: Double?
     @State private var transferProgress: Double = 0
     @State private var groupedTransferProgress: [Scenario: Double] = [:]
+    @State private var readyReviews: [Scenario: String] = [:]
 
     @State private var caloriesText = ""
     @State private var proteinText = ""
@@ -457,11 +458,16 @@ struct ProductionEvidenceUploadView: View {
     private func acceptedContent(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             CardContainer { VStack(alignment: .leading, spacing: 8) {
-                Label("Uploaded", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                Label("Evidence received", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess)
                 Text(message).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                Text("PhysiqueOS is reading it now. Check Log's pending review list shortly — no need to wait here.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textMuted)
             }.frame(maxWidth: .infinity, alignment: .leading) }
+            ForEach(Self.automaticScenarios) { scenario in
+                if let reviewId = readyReviews[scenario] {
+                    PrimaryActionButton(title: "Review \(scenario.label)", tone: .accent) {
+                        onNavigate(.evidenceReview(reviewId: reviewId))
+                    }
+                }
+            }
             PrimaryActionButton(title: "Return to Log", tone: .accent) { onReturnToLog(); dismiss() }
                 .accessibilityIdentifier("productionEvidenceUpload.returnToLog")
         }
@@ -557,12 +563,12 @@ struct ProductionEvidenceUploadView: View {
         let pipeline = environment.evidenceIntakePipeline
         let groupCount = grouped.count
         do {
-            try await withThrowingTaskGroup(of: Void.self) { group in
+            let intakes = try await withThrowingTaskGroup(of: (Scenario, ProductionEvidenceIntakeStatus).self) { group in
                 for (scenarioOptional, groupAttachments) in grouped {
                     guard let scenario = scenarioOptional else { continue }
                     let files = Self.files(from: groupAttachments, scenario: scenario)
                     group.addTask {
-                        _ = try await pipeline.submitIntake(
+                        let intake = try await pipeline.submitIntake(
                             scope: "automatic-\(scenario.rawValue)-intake.\(localDate)",
                             effectiveDate: localDate,
                             expectedEvidenceType: scenario.expectedEvidenceType,
@@ -574,13 +580,15 @@ struct ProductionEvidenceUploadView: View {
                                 }
                             }
                         )
+                        return (scenario, intake)
                     }
                 }
-                try await group.waitForAll()
+                var results: [(Scenario, ProductionEvidenceIntakeStatus)] = []
+                for try await result in group { results.append(result) }
+                return results
             }
             acceptanceSeconds = Date().timeIntervalSince(startedAt)
-            let counts = Dictionary(grouping: attachmentScenarios.values, by: { $0 }).mapValues(\.count)
-            phase = .accepted("Your grouped evidence was accepted for \(Self.mediumDate.string(from: effectiveDate)): \(Self.groupSummary(counts)).")
+            await followUpOnAcceptedIntakes(intakes, effectiveDate: localDate)
         } catch {
             phase = .failed(Self.errorMessage(for: error))
         }
@@ -613,32 +621,61 @@ struct ProductionEvidenceUploadView: View {
                 }
             )
             acceptanceSeconds = Date().timeIntervalSince(startedAt)
-            let noun = scenario == .dexa ? "scan" : "screenshots"
-            let acceptedMessage = "Your \(noun) \(files.count == 1 && scenario != .dexa ? "was" : "were") accepted for \(Self.mediumDate.string(from: effectiveDate))."
-            phase = .processing
-            if let reviewId = try? await environment.evidenceIntakePipeline.awaitReadyIntake(
-                intakeId: intake.intakeId, pollInterval: Self.fastFollowUpPollInterval, maxPolls: Self.fastFollowUpMaxPolls
-            ) {
-                onNavigate(.evidenceReview(reviewId: reviewId))
-                return
-            }
-            phase = .accepted(acceptedMessage)
-            // Interpretation is taking longer than the fast in-flow look —
-            // this is the fallback path (Finding 7): keep watching in the
-            // background and notify the instant it's actually ready, rather
-            // than leaving the Founder to remember to check Log later.
-            Task {
-                await EvidenceReviewReadyNotifier.pollAndNotify(
-                    pipeline: environment.evidenceIntakePipeline,
-                    reviewAPI: environment.evidenceReviewAPI,
-                    intakeId: intake.intakeId,
-                    domainLabel: scenario.label,
-                    effectiveDate: localDate,
-                    environment: environment
-                )
-            }
+            await followUpOnAcceptedIntakes([(scenario, intake)], effectiveDate: localDate)
         } catch {
             phase = .failed(Self.errorMessage(for: error))
+        }
+    }
+
+    /// Automatic and explicit uploads share one publication follow-up.
+    /// Mixed groups are checked concurrently, so a slow group cannot hide
+    /// another group's ready review. Only genuinely unresolved groups get
+    /// the existing running-app notification fallback; never resubmit here.
+    private func followUpOnAcceptedIntakes(
+        _ intakes: [(Scenario, ProductionEvidenceIntakeStatus)], effectiveDate: String
+    ) async {
+        phase = .processing
+        readyReviews = [:]
+        var failedScenarios = Set<Scenario>()
+        let pipeline = environment.evidenceIntakePipeline
+        await withTaskGroup(of: (Scenario, String?, Bool).self) { group in
+            for (scenario, intake) in intakes {
+                group.addTask {
+                    do {
+                        let reviewId = try await pipeline.readyReview(
+                            for: intake, pollInterval: Self.fastFollowUpPollInterval, maxPolls: Self.fastFollowUpMaxPolls
+                        )
+                        return (scenario, reviewId, false)
+                    } catch ProductionEvidenceIntakePipeline.Error.interpretationFailed {
+                        return (scenario, nil, true)
+                    } catch {
+                        return (scenario, nil, false)
+                    }
+                }
+            }
+            for await (scenario, reviewId, failed) in group {
+                if let reviewId { readyReviews[scenario] = reviewId }
+                if failed { failedScenarios.insert(scenario) }
+            }
+        }
+        if intakes.count == 1, let reviewId = readyReviews.values.first {
+            onNavigate(.evidenceReview(reviewId: reviewId))
+            return
+        }
+        let unresolved = intakes.filter { readyReviews[$0.0] == nil && !failedScenarios.contains($0.0) }
+        phase = .accepted(!failedScenarios.isEmpty
+            ? "Your files were received, but some evidence could not be read. Open Log to check its status before uploading again."
+            : unresolved.isEmpty
+            ? "Your evidence is ready to review."
+            : "You can leave. We’ll notify you when your evidence is ready to review.")
+        for (scenario, intake) in unresolved {
+            Task {
+                await EvidenceReviewReadyNotifier.pollAndNotify(
+                    pipeline: pipeline, reviewAPI: environment.evidenceReviewAPI,
+                    intakeId: intake.intakeId, domainLabel: scenario.label,
+                    effectiveDate: effectiveDate, environment: environment
+                )
+            }
         }
     }
 

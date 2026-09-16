@@ -91,8 +91,21 @@ struct ProductionEvidenceIntakePipeline {
             attempts += 1
         }
         if status.isFailed { throw Error.interpretationFailed }
-        guard let reviewId = status.reviewId else { throw Error.stillProcessing }
+        guard status.isReady, let reviewId = status.reviewId else { throw Error.stillProcessing }
         return reviewId
+    }
+
+    /// The upload response may already carry canonical review-ready
+    /// publication. Do not add a network round trip in that ordinary case.
+    /// A review identity alone is not proof that publication completed.
+    func readyReview(
+        for intake: ProductionEvidenceIntakeStatus,
+        pollInterval: Duration = .seconds(1),
+        maxPolls: Int = 3
+    ) async throws -> String {
+        if intake.isFailed { throw Error.interpretationFailed }
+        if intake.isReady, let reviewId = intake.reviewId { return reviewId }
+        return try await awaitReadyIntake(intakeId: intake.intakeId, pollInterval: pollInterval, maxPolls: maxPolls)
     }
 
     /// Step 3 — kick off confirmation. A durable outbox worker drives the

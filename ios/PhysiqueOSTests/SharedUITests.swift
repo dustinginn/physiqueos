@@ -8,6 +8,26 @@ import SwiftUI
 /// `UIAppFonts`-registered font is genuinely available to these assertions
 /// — this is not a mock or a fixture stand-in.
 final class SharedUITests: XCTestCase {
+    @MainActor
+    func testTodayUsesLocalCalendarDateAndRespectsFutureOnlyScheduling() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-16T00:40:00Z"))
+        let today = calendar.startOfDay(for: now)
+        XCTAssertEqual(DateField.selectableToday(now: now, minimumDate: nil, maximumDate: .distantFuture, calendar: calendar), today)
+        XCTAssertEqual(calendar.component(.day, from: today), 15)
+        let tomorrow = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: today))
+        XCTAssertNil(DateField.selectableToday(now: now, minimumDate: tomorrow, maximumDate: .distantFuture, calendar: calendar))
+    }
+
+    @MainActor
+    func testTodayDoesNotSelectOutsideHistoricalEvidenceBounds() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-16T00:40:00Z"))
+        let yesterday = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: -1, to: now))
+        XCTAssertNil(DateField.selectableToday(now: now, minimumDate: nil, maximumDate: yesterday))
+        XCTAssertNotNil(DateField.selectableToday(now: now, minimumDate: nil, maximumDate: now))
+    }
+
     func testPresentationLanguageSeparatesNamedLabelsFromNaturalProse() {
         XCTAssertEqual(PresentationLanguage.displayName("Build Lean Mass"), "Build Lean Mass")
         XCTAssertEqual(PresentationLanguage.displayName("Lean Mass Build"), "Lean Mass Build")

@@ -35,6 +35,23 @@ final class TrainingAcceptanceUITests: XCTestCase {
         app.buttons["Done"].tap()
     }
 
+    func testDatePickerTodayIsReachableWithoutSavingEvidence() throws {
+        launchInSandbox()
+        app.buttons["Log"].tap()
+        tapText("Log weight for another date")
+        assertText("Log Weight")
+        let dateField = app.buttons["Date measured"]
+        XCTAssertTrue(dateField.waitForExistence(timeout: 5))
+        dateField.tap()
+        let today = app.buttons["datePicker.today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 5))
+        XCTAssertTrue(today.isEnabled)
+        today.tap()
+        app.buttons["Done"].tap()
+        XCTAssertTrue(dateField.waitForExistence(timeout: 5))
+        // Picker navigation only: never submit even sandbox evidence here.
+    }
+
     func testLibraryAreaAndExerciseHistoryJourney() throws {
         launchTraining()
         assertText("Latest Training Day")

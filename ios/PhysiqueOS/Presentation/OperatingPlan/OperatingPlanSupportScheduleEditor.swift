@@ -74,7 +74,7 @@ struct OperatingPlanSupportScheduleEditor: View {
                 }
 
                 labeled("Starts") {
-                    DateField(date: startDate, label: "Start date")
+                    DateField(date: startDate, maximumDate: .distantFuture, label: "Start date")
                 }
 
                 labeled("Ends") {
@@ -87,7 +87,7 @@ struct OperatingPlanSupportScheduleEditor: View {
                         }
                     }
                     if schedule.endDate != nil {
-                        DateField(date: endDate, label: "End date")
+                        DateField(date: endDate, maximumDate: .distantFuture, label: "End date")
                     }
                 }
 
