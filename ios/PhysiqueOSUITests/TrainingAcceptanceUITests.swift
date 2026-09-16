@@ -358,7 +358,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         // real regression: the Founder's Build 20 report was specifically
         // that the draft did NOT restore after Save & Leave and reopen.
         openWorkoutLoggerFromLog()
-        assertText("Saved workouts")
+        assertText("SAVED WORKOUTS")
         let resume = app.buttons["Resume"].firstMatch
         XCTAssertTrue(resume.waitForExistence(timeout: 3), "Resume workout control was not offered after reopening.")
         attachScreenshot("27-saved-workout-offered-after-reopen")
