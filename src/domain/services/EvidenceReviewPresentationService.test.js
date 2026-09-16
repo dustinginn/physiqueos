@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import { createEvidenceReviewService } from "./EvidenceReviewService";
+import { applyNutritionDayMealAggregation } from "../models/nutritionDayEvidence";
+import { assertEvidenceCanonicalCommitReady } from "./EvidenceCanonicalCommitReadinessService";
 import {
   createEvidenceReviewPresentation,
   formatExerciseSet,
@@ -41,6 +43,36 @@ const evidencePackage = (objects = [training()]) => ({
 });
 
 describe("Evidence Review presentation", () => {
+  it("does not conceal a commit-blocking source conflict after meal aggregation", () => {
+    const object = applyNutritionDayMealAggregation({
+      id: "nutrition-conflict", evidence_type: "nutrition",
+      daily_totals: { calories: 1500, protein_g: 90 },
+      metadata: { daily_totals_scope: "full_day_summary" },
+      meals: [{ id: "meal", name: "Dinner", totals: { calories: 2000, protein_g: 120 }, foods: [] }],
+    });
+    expect(object.daily_totals.calories).toBe(2000);
+    expect(object.metadata.daily_totals_reconciliation.status).toBe("needs_review");
+    const before = structuredClone(object);
+    const card = presentEvidenceObject(object, evidencePackage([object]));
+    expect(card.reconciliation).toContain("differ");
+    expect(card.reconciliation).not.toContain("match the daily total");
+    expect(() => assertEvidenceCanonicalCommitReady(evidencePackage([object])))
+      .toThrow(expect.objectContaining({ code: "NUTRITION_DAILY_TOTALS_CONFLICT" }));
+    expect(object).toEqual(before);
+  });
+
+  it("preserves partial-subtotal scope and does not manufacture a daily conflict", () => {
+    const object = applyNutritionDayMealAggregation({
+      id: "nutrition-partial", evidence_type: "nutrition",
+      daily_totals: { calories: 500 },
+      metadata: { daily_totals_scope: "partial_meal_subtotal" },
+      meals: [{ id: "meal", name: "Dinner", totals: { calories: 2000 }, foods: [] }],
+    });
+    const card = presentEvidenceObject(object, evidencePackage([object]));
+    expect(card.reconciliation).toBe("Meal totals match the daily total.");
+    expect(assertEvidenceCanonicalCommitReady(evidencePackage([object]))).toBe(true);
+  });
+
   it("presents a Superset once with human-readable ordered occurrence labels", () => {
     const exercises = [
       {

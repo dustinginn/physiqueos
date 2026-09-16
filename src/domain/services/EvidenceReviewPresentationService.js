@@ -287,7 +287,13 @@ function presentNutrition(object, common) {
     (mealOrder.get(first.name.toLowerCase()) ?? 99) -
     (mealOrder.get(second.name.toLowerCase()) ?? 99)
   );
-  const reconciliation = reconcileNutritionDayEvidence({ dailyTotals: totals, meals });
+  // Aggregation may already have replaced displayed daily totals with meal
+  // sums. Comparing those derived values again conceals a retained conflict
+  // that canonical admission still rejects. Present the same interpreted
+  // reconciliation authority used by commit readiness, without changing it.
+  const reconciliation = metadata.daily_totals_reconciliation ??
+    reconcileNutritionDayEvidence({ dailyTotals: totals, meals,
+      dailyTotalsScope: metadata.daily_totals_scope });
 
   return {
     ...common,
@@ -304,7 +310,7 @@ function presentNutrition(object, common) {
     reconciliation: reconciliation.status === "reconciled"
       ? "Meal totals match the daily total."
       : reconciliation.status === "needs_review"
-        ? "Daily totals are authoritative; meal totals need review."
+        ? "The uploaded daily total and complete meal totals differ. Review the conflicting totals before confirming."
         : null,
   };
 }

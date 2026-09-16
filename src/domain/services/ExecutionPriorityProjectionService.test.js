@@ -38,6 +38,22 @@ const reminder = {
 };
 
 describe("canonical Execution priority projection", () => {
+  it("anchors future schedules without emitting earlier daily, weekly, or interval occurrences", () => {
+    const startDate = "2026-09-20";
+    const daily = { type: "daily", startDate };
+    expect(scheduleAppliesOnDate(daily, "2026-09-19")).toBe(false);
+    expect(scheduleAppliesOnDate(daily, startDate)).toBe(true);
+    const weekly = { type: "weekly", startDate, daysOfWeek: ["sunday"] };
+    expect(scheduleAppliesOnDate(weekly, "2026-09-13")).toBe(false);
+    expect(scheduleAppliesOnDate(weekly, startDate)).toBe(true);
+    expect(scheduleAppliesOnDate(weekly, "2026-09-27")).toBe(true);
+    const interval = { type: "every_x_days", startDate, anchorDate: startDate, intervalDays: 3 };
+    expect(scheduleAppliesOnDate(interval, "2026-09-17")).toBe(false);
+    expect(scheduleAppliesOnDate(interval, startDate)).toBe(true);
+    expect(scheduleAppliesOnDate(interval, "2026-09-21")).toBe(false);
+    expect(scheduleAppliesOnDate(interval, "2026-09-23")).toBe(true);
+  });
+
   it("projects active phase, exact schedule, history identity, and field provenance from Execution", () => {
     const result = projectExecutionPriority({
       executionItem: peptideExecution({

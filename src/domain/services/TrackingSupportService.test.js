@@ -8,6 +8,14 @@ import {
 } from "./TrackingSupportService";
 
 describe("Morning Weigh-In Tracking Support", () => {
+  it("does not create weigh-in occurrences before a future persisted recurrence anchor", () => {
+    const schedule = { frequency: "every_x_days", startDate: "2026-09-20", intervalDays: 3 };
+    expect(isMorningWeighInDue(schedule, "2026-09-17")).toBe(false);
+    expect(isMorningWeighInDue(schedule, "2026-09-20")).toBe(true);
+    expect(isMorningWeighInDue(schedule, "2026-09-21")).toBe(false);
+    expect(isMorningWeighInDue(schedule, "2026-09-23")).toBe(true);
+  });
+
   it("hydrates the canonical daily semantic-morning schedule and summary", () => {
     const support = resolveMorningWeighInSupport(fixture());
     expect(support.supportSchedule).toEqual({
