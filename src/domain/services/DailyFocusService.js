@@ -671,6 +671,25 @@ function getDailySessionsFromItems(items) {
 }
 
 function mapSessionToPriority(session, occurrenceDate) {
+  // A one-item Morning Weigh-In session is not a separate canonical
+  // "Morning Check-In" obligation. Preserve the Tracking reminder's exact
+  // identity, schedule, destination, and notification action end to end.
+  // Only genuinely composite sessions receive the synthetic grouped-session
+  // identity/daypart action below.
+  const morningWeighIn =
+    session.items.length === 1 &&
+    session.items[0].id === MORNING_WEIGH_IN_REMINDER_ID
+      ? session.items[0]
+      : null;
+
+  if (morningWeighIn) {
+    return {
+      ...morningWeighIn,
+      occurrenceDate:
+        morningWeighIn.executionContract?.occurrenceDate ?? occurrenceDate,
+    };
+  }
+
   return {
     id: session.id,
     label: session.label,

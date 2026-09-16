@@ -54,8 +54,21 @@ describe("Morning Weigh-In Tracking Support", () => {
   it("projects Home only when canonical Support is due, enabled, and unsatisfied", () => {
     const data = fixture();
     const due = home(data);
-    expect(due.flatMap((item) => item.sessionItems ?? []).find((item) => item.id === "reminder_morning_weight"))
-      .toMatchObject({ label: "Morning Weigh-In", completed: false });
+    expect(due.find((item) => item.id === "reminder_morning_weight"))
+      .toMatchObject({
+        label: "Morning Weigh-In",
+        completed: false,
+        href: "/check-in/morning",
+        occurrenceDate: "2026-08-07",
+        executionContract: {
+          priorityId: "reminder_morning_weight",
+          occurrenceDate: "2026-08-07",
+        },
+        notificationAction: {
+          workflow: "morning_check_in",
+          scheduledTime: "07:00",
+        },
+      });
 
     data.reminders[0].active = false;
     expect(findMorning(home(data))).toBeUndefined();
@@ -65,6 +78,29 @@ describe("Morning Weigh-In Tracking Support", () => {
     data.executionItems[0].preferredSchedule.daysOfWeek = ["saturday"];
     data.reminders[0].schedule = { type: "daily", timeOfDay: "morning" };
     expect(findMorning(home(data))).toBeUndefined();
+  });
+
+  it("preserves the exact canonical Morning Weigh-In time for Home and notification scheduling", () => {
+    const data = fixture();
+    data.executionItems[0].preferredSchedule.timeOfDay = "05:30";
+    data.reminders[0].schedule.timeOfDay = "05:30";
+
+    const item = home(data).find((priority) => priority.id === "reminder_morning_weight");
+
+    expect(item).toMatchObject({
+      id: "reminder_morning_weight",
+      label: "Morning Weigh-In",
+      subtitle: "Overdue",
+      executionContract: {
+        priorityId: "reminder_morning_weight",
+        occurrenceKey: "reminder_morning_weight:2026-08-07",
+      },
+      notificationAction: {
+        workflow: "morning_check_in",
+        scheduledTime: "05:30",
+      },
+    });
+    expect(item.id).not.toBe("morning-check-in");
   });
 
   it("marks today's matching Weight as satisfied but not a prior-day Weight", () => {

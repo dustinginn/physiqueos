@@ -22,6 +22,8 @@ export default defineConfig({
       "src/domain/services/ProgressReadSafety.test.js",
       "src/domain/services/RemainingHotspotReadSafety.test.js",
       "src/domain/services/EvidenceTimelineService.test.js",
+      "src/domain/services/DailyFocusFallbackOccurrenceDate.test.js",
+      "src/domain/services/TrackingSupportService.test.js",
       "src/domain/services/CoachingUpdatesStrategyManagementService.test.js",
       "src/screens/ProgressHubScreen.test.js",
       "src/screens/ProgressHubPrefetch.test.jsx",
