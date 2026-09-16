@@ -59,6 +59,20 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertNil(coordinator.consume())
     }
 
+    @MainActor
+    func testConsumedNotificationIdentityFenceRemainsBoundedWithoutForgettingRecentResponses() {
+        let coordinator = NotificationDeepLinkCoordinator()
+        for index in 0..<129 {
+            let identifier = "briefing.ready.\(index)"
+            XCTAssertTrue(coordinator.enqueue(identifier: identifier, destination: .briefingList))
+            XCTAssertEqual(coordinator.consume()?.identifier, identifier)
+        }
+
+        XCTAssertTrue(coordinator.enqueue(identifier: "briefing.ready.0", destination: .briefingList))
+        XCTAssertNotNil(coordinator.consume())
+        XCTAssertFalse(coordinator.enqueue(identifier: "briefing.ready.128", destination: .briefingList))
+    }
+
     func testBriefingTapPayloadRejectsMissingInvalidOrMismatchedExactIdentity() throws {
         XCTAssertThrowsError(try PriorityNotificationDelegate.validatedDestination(
             userInfo: [:], categoryIdentifier: PriorityNotificationCategory.briefingReady

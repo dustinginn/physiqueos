@@ -94,7 +94,7 @@ final class FounderServerAPITests: XCTestCase {
         let home = try await ProductionHomeAPI(api: native).fetchHome()
         let item = try XCTUnwrap(home.todaysFocus.first)
         XCTAssertEqual(item.id, "reminder_morning_weight")
-        XCTAssertEqual(item.label, "Morning Weigh-In")
+        XCTAssertEqual(item.title, "Morning Weigh-In")
         XCTAssertEqual(item.notificationAction?.scheduledTime, "05:30")
         XCTAssertEqual(item.destination, .checkIn(checkInType: "morning"))
 
@@ -3050,7 +3050,8 @@ final class FounderServerAPITests: XCTestCase {
         )
 
         XCTAssertEqual(reviewId, "review")
-        XCTAssertEqual((await transport.requests).count, 3)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 3)
     }
 
     func testFailedIntakeDoesNotPromiseReviewReadyOrSubmitAgain() async throws {
@@ -3100,7 +3101,8 @@ final class FounderServerAPITests: XCTestCase {
             files: [("activity.png", "image/png", Data([1, 2, 3]))]
         )
 
-        let request = try XCTUnwrap((await transport.requests).last)
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.last)
         let body = try XCTUnwrap(request.httpBody)
         XCTAssertEqual(multipartField(named: "clientExtractedText", from: body), extraction)
         XCTAssertTrue(String(decoding: body, as: UTF8.self).contains("filename=\"activity.png\""))

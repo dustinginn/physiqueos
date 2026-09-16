@@ -19,8 +19,7 @@ struct PhysiqueOSApp: App {
         // specialized command before dispatch. Establish the response path
         // before SwiftUI creates the first scene.
         let environment = AppEnvironment()
-        let notificationDelegate = PriorityNotificationDelegate()
-        notificationDelegate.environment = environment
+        let notificationDelegate = PriorityNotificationDelegate(environment: environment)
         UNUserNotificationCenter.current().delegate = notificationDelegate
         PriorityNotificationCategoryRegistrar.registerCategories()
         _environment = State(initialValue: environment)

@@ -35,7 +35,9 @@ final class NotificationDeepLinkCoordinator {
         consumedIdentifiers.insert(request.identifier)
         consumedOrder.append(request.identifier)
         if consumedOrder.count > 128 {
-            let expired = consumedOrder.removeFirst(consumedOrder.count - 128)
+            let expiredCount = consumedOrder.count - 128
+            let expired = Array(consumedOrder.prefix(expiredCount))
+            consumedOrder.removeFirst(expiredCount)
             consumedIdentifiers.subtract(expired)
         }
         return request
@@ -57,8 +59,55 @@ final class NotificationDeepLinkCoordinator {
 /// in-app taps already use, decoded from what the scheduler encoded at
 /// scheduling time.
 @Observable
-final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
-    var environment: AppEnvironment?
+final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    private struct CompleteActionPayload: Sendable {
+        let commandType: String?
+        let expectedVersion: Int?
+        let priorityId: String?
+        let occurrenceDate: String?
+        let dose: String?
+        let protocolId: String?
+
+        init(userInfo: [AnyHashable: Any]) {
+            commandType = userInfo["commandType"] as? String
+            expectedVersion = userInfo["expectedVersion"] as? Int
+            priorityId = userInfo["payloadPriorityId"] as? String
+            occurrenceDate = userInfo["payloadOccurrenceDate"] as? String
+            dose = userInfo["payloadDose"] as? String
+            protocolId = userInfo["payloadProtocolId"] as? String
+        }
+    }
+
+    private struct OpenActionPayload: Sendable {
+        let requestIdentifier: String
+        let categoryIdentifier: String
+        let destinationJSON: String?
+        let briefingArtifactId: String?
+
+        init(userInfo: [AnyHashable: Any], requestIdentifier: String, categoryIdentifier: String) {
+            self.requestIdentifier = requestIdentifier
+            self.categoryIdentifier = categoryIdentifier
+            if let value = userInfo["destinationJSON"] as? String {
+                destinationJSON = value
+            } else if let value = userInfo["destination"] as? Data {
+                destinationJSON = String(data: value, encoding: .utf8)
+            } else {
+                destinationJSON = nil
+            }
+            briefingArtifactId = userInfo["briefingArtifactId"] as? String
+        }
+    }
+
+    /// Immutable and installed before the notification center receives this
+    /// delegate. Apple may invoke delegate methods off-main; response payloads
+    /// are reduced to Sendable values before this environment is touched on
+    /// the main actor.
+    private let environment: AppEnvironment
+
+    init(environment: AppEnvironment) {
+        self.environment = environment
+        super.init()
+    }
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
@@ -74,37 +123,29 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         let userInfo = response.notification.request.content.userInfo
         switch response.actionIdentifier {
         case PriorityNotificationActionIdentifier.complete:
-            await handleComplete(userInfo: userInfo)
+            await handleComplete(payload: CompleteActionPayload(userInfo: userInfo))
         case PriorityNotificationActionIdentifier.snooze:
             await PriorityNotificationScheduler.scheduleSnooze(for: response.notification.request)
         case UNNotificationDefaultActionIdentifier:
-            await openDestination(
+            await openDestination(payload: OpenActionPayload(
                 userInfo: userInfo,
                 requestIdentifier: response.notification.request.identifier,
                 categoryIdentifier: response.notification.request.content.categoryIdentifier
-            )
+            ))
         default:
             break
         }
     }
 
-    private func handleComplete(userInfo: [AnyHashable: Any]) async {
-        guard let environment else {
-            await NotificationDiagnostics.record(.init(
-                capturedAt: Date(), identifier: "action.complete.unavailable",
-                operation: "completion not dispatched",
-                reason: "The notification response arrived before the application environment was available.",
-                fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
-            ))
-            return
-        }
-        guard let commandType = userInfo["commandType"] as? String,
+    @MainActor
+    private func handleComplete(payload: CompleteActionPayload) async {
+        guard let commandType = payload.commandType,
               commandType == ProductionCommandType.completePriority,
-              let expectedVersion = userInfo["expectedVersion"] as? Int,
-              let priorityId = userInfo["payloadPriorityId"] as? String,
-              let occurrenceDate = userInfo["payloadOccurrenceDate"] as? String
+              let expectedVersion = payload.expectedVersion,
+              let priorityId = payload.priorityId,
+              let occurrenceDate = payload.occurrenceDate
         else {
-            await NotificationDiagnostics.record(.init(
+            NotificationDiagnostics.record(.init(
                 capturedAt: Date(), identifier: "action.complete.invalid-payload",
                 operation: "completion not dispatched",
                 reason: "The notification did not carry the complete canonical command contract.",
@@ -124,19 +165,19 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 occurrenceDate: occurrenceDate,
                 context: PriorityCompletionContext(
                     occurrenceDate: occurrenceDate,
-                    dose: userInfo["payloadDose"] as? String,
-                    protocolId: userInfo["payloadProtocolId"] as? String
+                    dose: payload.dose,
+                    protocolId: payload.protocolId
                 ),
                 expectedVersion: expectedVersion
             )
-            await NotificationDiagnostics.record(.init(
+            NotificationDiagnostics.record(.init(
                 capturedAt: Date(), identifier: "action.complete.\(priorityId).\(occurrenceDate)",
                 operation: "completion accepted",
                 reason: "The canonical specialized completion command succeeded.",
                 fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
             ))
         } catch {
-            await NotificationDiagnostics.record(.init(
+            NotificationDiagnostics.record(.init(
                 capturedAt: Date(), identifier: "action.complete.\(priorityId).\(occurrenceDate)",
                 operation: "completion rejected",
                 reason: "The canonical completion command did not succeed; the occurrence remains unchanged.",
@@ -145,34 +186,28 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         }
     }
 
-    private func openDestination(
-        userInfo: [AnyHashable: Any],
-        requestIdentifier: String,
-        categoryIdentifier: String
-    ) async {
-        guard let environment else {
-            await recordOpenResult(identifier: requestIdentifier, operation: "deep link rejected", reason: "The application environment was unavailable.")
-            return
-        }
+    @MainActor
+    private func openDestination(payload: OpenActionPayload) async {
         do {
             let destination = try Self.validatedDestination(
-                userInfo: userInfo,
-                categoryIdentifier: categoryIdentifier
+                destinationJSON: payload.destinationJSON,
+                briefingArtifactId: payload.briefingArtifactId,
+                categoryIdentifier: payload.categoryIdentifier
             )
-            let accepted = await environment.notificationDeepLinkCoordinator.enqueue(
-                identifier: requestIdentifier,
+            let accepted = environment.notificationDeepLinkCoordinator.enqueue(
+                identifier: payload.requestIdentifier,
                 destination: destination
             )
-            await recordOpenResult(
-                identifier: requestIdentifier,
+            recordOpenResult(
+                identifier: payload.requestIdentifier,
                 operation: accepted ? "deep link queued" : "deep link ignored",
                 reason: accepted
                     ? "The exact notification destination is queued for the ready navigation scene."
                     : "This notification response was already queued or consumed."
             )
         } catch {
-            await recordOpenResult(
-                identifier: requestIdentifier,
+            recordOpenResult(
+                identifier: payload.requestIdentifier,
                 operation: "deep link rejected",
                 reason: "The notification did not carry a valid exact destination."
             )
@@ -180,14 +215,21 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     }
 
     static func decodeDestination(userInfo: [AnyHashable: Any]) throws -> AppDestination {
-        let data: Data
+        let destinationJSON: String?
         if let encoded = userInfo["destinationJSON"] as? String,
-           let value = encoded.data(using: .utf8) {
-            data = value
+           !encoded.isEmpty {
+            destinationJSON = encoded
         } else if let value = userInfo["destination"] as? Data {
             // Backward-compatible with Build 36 priority/review requests.
-            data = value
+            destinationJSON = String(data: value, encoding: .utf8)
         } else {
+            throw NotificationDestinationError.missingDestination
+        }
+        return try decodeDestination(destinationJSON: destinationJSON)
+    }
+
+    private static func decodeDestination(destinationJSON: String?) throws -> AppDestination {
+        guard let destinationJSON, let data = destinationJSON.data(using: .utf8) else {
             throw NotificationDestinationError.missingDestination
         }
         return try JSONDecoder().decode(AppDestination.self, from: data)
@@ -197,13 +239,26 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         userInfo: [AnyHashable: Any],
         categoryIdentifier: String
     ) throws -> AppDestination {
-        let destination = try decodeDestination(userInfo: userInfo)
+        try validatedDestination(
+            destinationJSON: (userInfo["destinationJSON"] as? String)
+                ?? (userInfo["destination"] as? Data).flatMap { String(data: $0, encoding: .utf8) },
+            briefingArtifactId: userInfo["briefingArtifactId"] as? String,
+            categoryIdentifier: categoryIdentifier
+        )
+    }
+
+    private static func validatedDestination(
+        destinationJSON: String?,
+        briefingArtifactId: String?,
+        categoryIdentifier: String
+    ) throws -> AppDestination {
+        let destination = try decodeDestination(destinationJSON: destinationJSON)
         guard categoryIdentifier == PriorityNotificationCategory.briefingReady else {
             return destination
         }
         guard case .briefingDetail(let briefingId) = destination,
               !briefingId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              let sealedId = userInfo["briefingArtifactId"] as? String,
+              let sealedId = briefingArtifactId,
               sealedId == briefingId
         else { throw NotificationDestinationError.invalidBriefingIdentity }
         return destination
