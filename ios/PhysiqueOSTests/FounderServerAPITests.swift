@@ -84,6 +84,38 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(trigger.dateComponents.timeZone?.identifier, "America/Los_Angeles")
         XCTAssertEqual(plan.toAdd.first?.content.categoryIdentifier, PriorityNotificationCategory.specializedWorkflow)
     }
+
+    func testProductionHomeKeepsMorningWeighInCanonicalIdentityAnd0530Trigger() async throws {
+        let homeJSON = productionEnvelope(resource: "home", data: #"{"header":{"greeting":"Good morning","name":"Founder"},"hero":{"mode":"active","goalLabel":"Current Goal","headline":"On track","supportLine":"Canonical state"},"nextBestAction":{"title":"Morning Weigh-In","icon":"scale","destination":{"id":"check-in","parameters":{"checkInType":"morning"}}},"briefingCards":[],"goals":[],"timezone":"America/Los_Angeles","todaysFocus":[{"id":"reminder_morning_weight","executionItemId":"execution_morning_weigh_in","occurrenceDate":"2026-09-16","label":"Morning Weigh-In","subtitle":"Overdue","metadata":"Daily · 5:30 AM","icon":"scale","color":"evidence","state":"overdue","completed":false,"completable":false,"executionContract":{"priorityId":"reminder_morning_weight","occurrenceDate":"2026-09-16","occurrenceKey":"reminder_morning_weight:2026-09-16","workflow":"morning_check_in","destination":"/check-in/morning"},"notificationAction":{"classification":"specialized_workflow_required","workflow":"morning_check_in","scheduledTime":"05:30","completionCommand":null}}]}"#)
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["home": homeJSON])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Isolated fixture")
+
+        let home = try await ProductionHomeAPI(api: native).fetchHome()
+        let item = try XCTUnwrap(home.todaysFocus.first)
+        XCTAssertEqual(item.id, "reminder_morning_weight")
+        XCTAssertEqual(item.label, "Morning Weigh-In")
+        XCTAssertEqual(item.notificationAction?.scheduledTime, "05:30")
+        XCTAssertEqual(item.destination, .checkIn(checkInType: "morning"))
+
+        var pacific = Calendar(identifier: .gregorian)
+        pacific.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-16T12:20:00Z"))
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: home.todaysFocus,
+            existingScheduledIdentifiers: ["priority.scheduled.morning-check-in.2026-09-16"],
+            now: now,
+            calendar: pacific
+        )
+        let request = try XCTUnwrap(plan.toAdd.first)
+        XCTAssertEqual(request.identifier, "priority.scheduled.reminder_morning_weight.2026-09-16")
+        XCTAssertEqual(request.content.title, "Morning Weigh-In")
+        XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.specializedWorkflow)
+        let trigger = try XCTUnwrap(request.trigger as? UNCalendarNotificationTrigger)
+        XCTAssertEqual(pacific.date(from: trigger.dateComponents), ISO8601DateFormatter().date(from: "2026-09-16T12:30:00Z"))
+        XCTAssertTrue(plan.toRemove.contains("priority.scheduled.morning-check-in.2026-09-16"))
+    }
+
     func testInvalidatedReviewReadCannotJoinOldFlightOrEraseNewFlight() async throws {
         actor HeldReviewTransport: FounderHTTPTransport {
             let responses: [String]

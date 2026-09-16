@@ -11,7 +11,7 @@ struct MorningCheckInView: View {
     /// form's own per-item `${occurrenceKey}_status`/`${occurrenceKey}_note`
     /// fields, submitted together in one save (see
     /// `LoggingSandboxStore.saveMorningCheckIn`'s doc comment). Not written
-    /// to the shared store until "Complete Morning Check-In" is tapped —
+    /// to the shared store until "Complete Morning Weigh-In" is tapped —
     /// matching the real form's single-submit behavior.
     @State private var choices: [String: (disposition: PriorityDisposition?, note: String)] = [:]
     /// Recovery Evidence (sleep/subjective recovery/soreness) — a
@@ -49,8 +49,8 @@ struct MorningCheckInView: View {
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("MORNING CHECK-IN").physiqueOSFont(PhysiqueOSTypography.screenEyebrow).foregroundStyle(PhysiqueOSTheme.accent)
-                Text(complete ? "Check-in complete" : "Good morning").physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
+                Text("MORNING WEIGH-IN").physiqueOSFont(PhysiqueOSTypography.screenEyebrow).foregroundStyle(PhysiqueOSTheme.accent)
+                Text(complete ? "Weigh-in complete" : "Good morning").physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
                 Text(Self.fullDate.string(from: Date())).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
             if let briefingReconciliation, briefingReconciliation.visible {
@@ -73,14 +73,14 @@ struct MorningCheckInView: View {
                     HStack { NumericEditField(text: $weightText, accessibilityLabel: "Morning weight", placeholder: "150.5").frame(height: 48); Text("lb").physiqueOSFont(PhysiqueOSTypography.cardHeading16) }
                 } }
                 if let message { Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(PhysiqueOSTheme.destructive) }
-                PrimaryActionButton(title: isSubmitting ? "Saving…" : "Complete Morning Check-In") { save() }
+                PrimaryActionButton(title: isSubmitting ? "Saving…" : "Complete Morning Weigh-In") { save() }
                     .disabled(isSubmitting)
                     .accessibilityIdentifier("morningCheckIn.save")
                 if !isProduction { recoveryEvidenceCard }
             }
         }.padding(16) }
         .scrollDismissesKeyboard(.interactively)
-        .background(PhysiqueOSTheme.background).navigationTitle("Morning Check-In").navigationBarTitleDisplayMode(.inline)
+        .background(PhysiqueOSTheme.background).navigationTitle("Morning Weigh-In").navigationBarTitleDisplayMode(.inline)
         .task(id: environment.nativeAuthority) {
             guard isProduction else {
                 if let entry = store.weighIn(on: Date()) { weightText = formatWeight(entry.value) }
@@ -92,7 +92,7 @@ struct MorningCheckInView: View {
     }
 
     /// `EvidenceRecoveryCard` — plain navigation, no form fields; never
-    /// gates "Complete Morning Check-In" (verified: the real button's
+    /// gates "Complete Morning Weigh-In" (verified: the real button's
     /// `required` fields are the Priority reconciliation radios only).
     private func evidenceRecoveryCard(_ item: MorningEvidenceRecoveryItem) -> some View {
         Button { onNavigate(item.destination) } label: {
@@ -244,7 +244,7 @@ struct MorningCheckInView: View {
         for occurrence in unfinished {
             guard let disposition = resolved[occurrence.id]?.disposition else { continue }
             guard let canonicalOccurrence = productionCheckIn?.reconciliationItems.first(where: { $0.id == occurrence.id }) else {
-                message = "This priority's canonical occurrence could not be loaded. Refresh Morning Check-In before saving."
+                message = "This priority's canonical occurrence could not be loaded. Refresh Morning Weigh-In before saving."
                 return
             }
             submissions.append(MorningCheckInReconciliationSubmission(
