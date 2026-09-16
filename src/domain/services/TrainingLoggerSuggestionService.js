@@ -34,7 +34,9 @@ export function createTrainingLoggerSuggestion({ date, sessions = [] } = {}) {
   const categories = best[0].split("|").map(formatAreaLabel);
   return {
     id: `confirmed_history_${targetWeekday}_${best[0].replaceAll("|", "_")}`,
+    date: String(date).slice(0, 10),
     label: categories.join(" + "),
+    categoryIds: best[0].split("|"),
     categories,
     reason: `Repeated on ${weekdayLabel(targetWeekday)} across ${best[1].length} confirmed workouts`,
     source: "confirmed_training_evidence_history",

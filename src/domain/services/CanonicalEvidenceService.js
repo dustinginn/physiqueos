@@ -785,20 +785,13 @@ function findCompatibleCanonicalObjects(canonicalById, evidenceObject) {
     return [];
   }
 
-  const openReconciliationMatchIds = isTrainingSession(evidenceObject)
-    ? new Set(findOpenWorkoutLoggerAppleHealthMatch(canonicalById, evidenceObject).map(
-        (object) => object.canonicalId
-      ))
-    : null;
-
   return [...canonicalById.values()].filter((canonicalObject) =>
     isNutritionDay(evidenceObject)
       ? isNutritionDay(canonicalObject.payload) &&
         getNutritionDayLogicalKey(canonicalObject) ===
           getNutritionDayLogicalKey(evidenceObject)
       : isTrainingSession(evidenceObject)
-      ? isCompatibleTrainingPayload(canonicalObject.payload, evidenceObject) ||
-        openReconciliationMatchIds.has(canonicalObject.canonicalId)
+      ? isCompatibleTrainingPayload(canonicalObject.payload, evidenceObject)
       : isDexaEvidence(evidenceObject)
       ? isDexaEvidence(canonicalObject.payload) &&
         getDexaLogicalScanKey(canonicalObject) ===
@@ -884,23 +877,11 @@ function comparableActivityMetric(left, right) {
   return Number(left) === Number(right);
 }
 
-// Build 33: the Founder's structured Workout Logger entry (real exercises,
-// no workout-level timing) and an independently-submitted Apple Watch
-// strength-workout screenshot (real start/end/duration/calories, no
-// exercises) score ZERO confidence under `assessWorkoutDuplicatePair` —
-// that scorer needs overlapping temporal/metric/exercise signal on BOTH
-// sides, and the structured side carries none of that today. Left alone,
-// each becomes its OWN canonical TrainingSession, doubling the Founder's
-// visible strength-session count for one physical workout. This is a
-// narrow, explicit pairing rule for exactly that shape, layered on top of
-// (never replacing) the generic scorer: same calendar day, one side is
-// Apple strength telemetry with no exercises, the other is a structured
-// session with exercises and no telemetry yet. It only fires when exactly
-// one candidate exists on the other side that day — the Founder may
-// legitimately run multiple strength sessions in one day, and guessing
-// among several open candidates would risk merging two genuinely distinct
-// workouts. Ambiguous or absent matches fall back to today's unmerged
-// behavior unchanged.
+// Timestamp-poor Logger sessions must never acquire an Apple strength
+// workout merely because both happened on the same calendar date. The
+// normal duplicate scorer requires shared identity or real temporal/metric
+// evidence; Native supporting screenshots use the explicit target binding
+// below after the structured session is already durable.
 const STRENGTH_ACTIVITY_TYPE_PATTERN = /strength|resistance|weight training|lifting|weights?/i;
 
 function hasWorkoutTemporalWindow(payload) {
@@ -926,8 +907,7 @@ function isOpenStructuredTrainingSession(payload = {}) {
   return (
     isTrainingSession(payload) &&
     STRENGTH_ACTIVITY_TYPE_PATTERN.test(String(payload.metadata?.activity_type ?? "")) &&
-    (payload.exercises ?? []).length > 0 &&
-    !hasWorkoutTemporalWindow(payload)
+    (payload.exercises ?? []).length > 0
   );
 }
 
@@ -944,21 +924,37 @@ function isOpenWorkoutLoggerAppleHealthPair(left = {}, right = {}) {
   );
 }
 
-function findOpenWorkoutLoggerAppleHealthMatch(canonicalById, evidenceObject) {
-  const isIncomingAppleTelemetry = isOpenAppleStrengthTelemetry(evidenceObject);
-  const isIncomingStructuredSession = isOpenStructuredTrainingSession(evidenceObject);
-  if (!isIncomingAppleTelemetry && !isIncomingStructuredSession) return [];
-
-  const dateKey = getDateKey(evidenceObject.observed_at);
-  const candidates = [...canonicalById.values()].filter((object) =>
-    object.quality?.status !== "superseded" &&
-    getDateKey(object.payload?.observed_at) === dateKey &&
-    (isIncomingAppleTelemetry
-      ? isOpenStructuredTrainingSession(object.payload)
-      : isOpenAppleStrengthTelemetry(object.payload))
+export function bindTrainingSupportingEvidencePackage({
+  evidencePackage,
+  targetCanonicalId,
+  targetSession,
+} = {}) {
+  if (!targetCanonicalId || !isOpenStructuredTrainingSession(targetSession)) {
+    throw new Error("Supporting Training evidence requires an active structured Training target.");
+  }
+  const objects = evidencePackage?.evidence_objects ?? [];
+  const targetDate = getDateKey(targetSession.observed_at);
+  const strength = objects.filter((object) =>
+    isOpenAppleStrengthTelemetry(object) && getDateKey(object.observed_at) === targetDate
   );
-
-  return candidates.length === 1 ? candidates : [];
+  if (strength.length !== 1) {
+    throw new Error("Supporting Training evidence must contain exactly one same-date Apple strength workout.");
+  }
+  return {
+    ...evidencePackage,
+    review_metadata: {
+      ...(evidencePackage.review_metadata ?? {}),
+      targetTrainingSessionCanonicalId: targetCanonicalId,
+    },
+    evidence_objects: objects.map((object) => object === strength[0] ? {
+      ...object,
+      reconciliation: {
+        ...(object.reconciliation ?? {}),
+        target_canonical_id: targetCanonicalId,
+        match_basis: "explicit_native_training_support_binding",
+      },
+    } : object),
+  };
 }
 
 /// Pure engineering audit: no repositories, persistence, scheduler, or automatic
@@ -976,9 +972,15 @@ export function auditHistoricalWorkoutLoggerApplePairs({ canonicalObjects = [], 
     const telemetry = active.filter((record) => getDateKey(record.payload.observed_at) === date &&
       isOpenAppleStrengthTelemetry(record.payload));
     if (telemetry.length === 0) continue;
-    const match = findOpenWorkoutLoggerAppleHealthMatch(canonicalById, structured.payload);
-    const mutualMatch = match.length === 1 &&
-      findOpenWorkoutLoggerAppleHealthMatch(canonicalById, match[0].payload).length === 1;
+    // Historical candidates are intentionally never inferred from date
+    // alone. Only explicit source identity/correction metadata may make a
+    // timestamp-poor pair executable; otherwise it remains an audit-only
+    // ambiguity requiring a newly sealed repair decision.
+    const match = telemetry.filter((record) =>
+      record.payload.reconciliation?.target_canonical_id === structured.canonicalId ||
+      structured.payload.reconciliation?.target_canonical_id === record.canonicalId
+    );
+    const mutualMatch = match.length === 1;
     const row = {
       date,
       structuredCanonicalId: structured.canonicalId,

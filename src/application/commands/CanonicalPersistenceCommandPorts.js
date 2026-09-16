@@ -1,4 +1,7 @@
-import { reconcileConfirmedEvidencePackage } from "../../domain/services/CanonicalEvidenceService.js";
+import {
+  bindTrainingSupportingEvidencePackage,
+  reconcileConfirmedEvidencePackage,
+} from "../../domain/services/CanonicalEvidenceService.js";
 import { ApplicationProblem, staleVersionProblem } from "../../contracts/v1/problem.js";
 import {
   MORNING_CHECK_IN_BOUNDED_COLLECTIONS,
@@ -1270,6 +1273,46 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     requireExpectedVersion(context, review, `evidence-review:${review.id}`);
     if (!["pending", "commit_failed", "partially_committed", "committing"].includes(review.status)) {
       throw problem(409, "EVIDENCE_REVIEW_NOT_COMMITTABLE", "This evidence review cannot be committed.");
+    }
+    const targetCanonicalId = context.payload.targetTrainingSessionCanonicalId ?? null;
+    if (targetCanonicalId) {
+      // Canonical domain identity is intentionally independent of the
+      // persistence record key (legacy production rows may still use
+      // @index:*). Resolve and fence the exact domain identity without
+      // assuming or migrating its storage identity.
+      const targetMatches = (await records.list({
+        ownerUserId: context.ownerUserId,
+        collection: "canonicalEvidenceObjects",
+      })).filter((record) => record.canonicalId === targetCanonicalId);
+      if (targetMatches.length !== 1) {
+        throw problem(409, "TRAINING_SUPPORTING_EVIDENCE_TARGET_UNAVAILABLE", "The exact target Training session is unavailable.");
+      }
+      const [target] = targetMatches;
+      if (target.quality?.status === "superseded" || target.quality?.supersededBy) {
+        throw problem(409, "TRAINING_SUPPORTING_EVIDENCE_TARGET_UNAVAILABLE", "The target Training session is no longer active.");
+      }
+      let interpretedEvidence;
+      try {
+        interpretedEvidence = bindTrainingSupportingEvidencePackage({
+          evidencePackage: review.interpretedEvidence,
+          targetCanonicalId,
+          targetSession: target.payload,
+        });
+      } catch (error) {
+        throw problem(409, "TRAINING_SUPPORTING_EVIDENCE_MATCH_REQUIRED", error.message);
+      }
+      const updated = await records.put({
+        ownerUserId: context.ownerUserId,
+        collection: "evidenceReviews",
+        recordId: review.id,
+        expectedVersion: review.version,
+        payload: { ...review, interpretedEvidence, updatedAt: now().toISOString() },
+      });
+      return {
+        status: "committed",
+        result: { status: "confirmation_requested", reviewId: review.id, revision: updated.version },
+        outbox: [],
+      };
     }
     return {
       status: "committed",

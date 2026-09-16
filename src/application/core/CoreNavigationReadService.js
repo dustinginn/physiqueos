@@ -29,6 +29,7 @@ import {
   createTrainingLoggerProgressionRecommendation,
   TRAINING_LOGGER_PROGRESSION_STATUS,
 } from "../../domain/services/TrainingLoggerProgressionService.js";
+import { createTrainingLoggerSuggestion } from "../../domain/services/TrainingLoggerSuggestionService.js";
 import {
   buildStrategyDomainModel,
   STRATEGY_DOMAIN_PRESENTATION,
@@ -217,6 +218,10 @@ export function createCoreNavigationReadService({
             }),
           })),
           initialDate,
+          initialCategorySuggestion: createTrainingLoggerSuggestion({
+            date: initialDate,
+            sessions: confirmedTrainingRecords,
+          }),
           initialHistorySessions: historySessions,
           initialPerformedExerciseIds: performedExerciseIds,
           initialMyLibraryExerciseIds: myLibraryExerciseIds,

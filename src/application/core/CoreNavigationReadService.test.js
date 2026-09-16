@@ -276,6 +276,7 @@ describe("provider-native core navigation reads", () => {
     const morning = await narrow.getMorningCheckIn();
     expect(logger).toMatchObject({
       initialDate: "2026-08-29",
+      initialCategorySuggestion: null,
       initialCanonicalExercises: expect.any(Array),
       initialHistorySessions: expect.any(Array),
       initialPerformedExerciseIds: expect.any(Array),

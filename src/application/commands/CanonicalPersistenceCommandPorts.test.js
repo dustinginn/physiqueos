@@ -744,6 +744,36 @@ describe("Phase 4 canonical command persistence ports", () => {
     expect(review.interpretedEvidence.review_metadata?.nativeTrainingSessionId).toBeUndefined();
     expect(records.snapshot().evidencePackages).toEqual([]);
   });
+
+  it("version-fences an Evidence Review and binds Apple strength support to one exact durable Logger session", async () => {
+    const records = fixture();
+    const targetCanonicalId = "training|authoritative|training_logger_draft_native-session-media";
+    await records.put({
+      ownerUserId, collection: "canonicalEvidenceObjects", recordId: "@index:507",
+      payload: {
+        canonicalId: targetCanonicalId, userId: ownerUserId, evidence_type: "training",
+        quality: { status: "active" },
+        payload: {
+          id: "training_logger_draft_native-session-media", evidence_type: "training", observed_at: "2026-08-11",
+          source: { application: "Training Logger", modality: "manual" },
+          metadata: { activity_type: "Traditional Strength Training" },
+          exercises: [{ id: "press", canonicalExerciseId: "bench_press", name: "Bench Press", sets: [{ reps: 8, weight: 185 }] }],
+        },
+      },
+    });
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const result = await ports.requestEvidenceReviewConfirmation(commandContext({
+      reviewId: "review-training-support", targetTrainingSessionCanonicalId: targetCanonicalId,
+    }, 1, "bind-training-support"));
+    expect(result.result.revision).toBe(2);
+    const review = records.snapshot().evidenceReviews.find((item) => item.id === "review-training-support");
+    expect(review.version).toBe(2);
+    expect(review.interpretedEvidence.review_metadata.targetTrainingSessionCanonicalId).toBe(targetCanonicalId);
+    expect(review.interpretedEvidence.evidence_objects[0].reconciliation).toMatchObject({
+      target_canonical_id: targetCanonicalId,
+      match_basis: "explicit_native_training_support_binding",
+    });
+  });
 });
 
 function fixture() {
@@ -768,7 +798,7 @@ function fixture() {
             id: "apple-training-1", evidence_type: "training", observed_at: "2026-08-11",
             source: { application: "Apple Fitness", source_artifact_refs: ["training-screen-1"] },
             provenance: { source_artifact_refs: ["training-screen-1"] },
-            metadata: { activity_type: "Traditional Strength Training", duration_seconds: 3600 },
+            metadata: { activity_type: "Traditional Strength Training", start_time: "2026-08-11T07:00:00Z", end_time: "2026-08-11T08:00:00Z", duration_seconds: 3600 },
             exercises: [],
           }],
         } },
