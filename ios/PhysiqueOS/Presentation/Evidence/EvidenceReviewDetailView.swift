@@ -501,6 +501,25 @@ struct EvidenceReviewDetailView: View {
             let confirmation = try await environment.evidenceIntakePipeline.commitReview(
                 domain: domain, reviewId: reviewId, expectedVersion: String(version)
             )
+            if confirmation?.canonicalStateDurable == true {
+                // The server has crossed the canonical durability boundary,
+                // but Log may still hold a pre-confirm cache. Detach it and
+                // prove this review's own date is immediately readable before
+                // showing any accepted/success state.
+                guard await verifyImmediateCanonicalReadback(review: review, domain: domain) else {
+                    actionState = .stillProcessing
+                    Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "durable_readback_pending")
+                    return
+                }
+                if confirmation?.state == "confirmed" {
+                    Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "confirmed")
+                    actionState = .confirmed
+                } else {
+                    Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "canonical_durable_readback")
+                    actionState = .accepted
+                }
+                return
+            }
             if confirmation?.state == "confirmed" {
                 Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "confirmed")
                 actionState = .confirmed
@@ -559,6 +578,42 @@ struct EvidenceReviewDetailView: View {
             }
         } catch {
             actionState = .stillProcessing
+        }
+    }
+
+    @MainActor
+    private func verifyImmediateCanonicalReadback(
+        review: EvidenceReviewDetailReadModel,
+        domain: NativeProductWriteDomain
+    ) async -> Bool {
+        guard let date = review.items.compactMap(\.date).first else { return false }
+        switch domain {
+        case .activityEvidence:
+            await environment.productionNativeAPI.invalidateReadResources([
+                "activity", "evidence-review-queue",
+            ])
+            return (try? await environment.activityAPI.fetchActivityDay(date: date)) != nil
+        case .nutrition:
+            await environment.productionNativeAPI.invalidateReadResources([
+                "nutrition", "evidence-review-queue",
+            ])
+            guard let landing = try? await environment.nutritionAPI.fetchNutritionLanding(scope: .all) else {
+                return false
+            }
+            return landing.nutritionHistory.contains(where: { $0.date == date })
+        case .workoutLogger:
+            await environment.productionNativeAPI.invalidateReadResources([
+                "training-landing", "training-day", "evidence-review-queue",
+            ])
+            return true
+        case .dexa:
+            await environment.productionNativeAPI.invalidateReadResources([
+                "dexa", "evidence-review-queue",
+            ])
+            return true
+        default:
+            await environment.productionNativeAPI.invalidateReadResources(["evidence-review-queue"])
+            return true
         }
     }
 

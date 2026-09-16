@@ -9,8 +9,23 @@ import UserNotifications
 /// global or constructing their own dependencies.
 @main
 struct PhysiqueOSApp: App {
-    @State private var environment = AppEnvironment()
-    @State private var notificationDelegate = PriorityNotificationDelegate()
+    @State private var environment: AppEnvironment
+    @State private var notificationDelegate: PriorityNotificationDelegate
+
+    init() {
+        // A notification action may be the process-launch event. Registering
+        // the delegate in RootTabView.task was too late: iOS could deliver
+        // Complete/Snooze before the delegate had its environment, losing the
+        // specialized command before dispatch. Establish the response path
+        // before SwiftUI creates the first scene.
+        let environment = AppEnvironment()
+        let notificationDelegate = PriorityNotificationDelegate()
+        notificationDelegate.environment = environment
+        UNUserNotificationCenter.current().delegate = notificationDelegate
+        PriorityNotificationCategoryRegistrar.registerCategories()
+        _environment = State(initialValue: environment)
+        _notificationDelegate = State(initialValue: notificationDelegate)
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -26,13 +41,8 @@ struct PhysiqueOSApp: App {
                 // custom-drawn view.
                 .preferredColorScheme(.dark)
                 .task {
-                    // The delegate is injected once, here, rather than
-                    // captured at scheduling time — a notification response
-                    // can arrive well after whatever scheduled it. Category
-                    // registration is idempotent and cheap enough to redo on
-                    // every launch rather than tracking whether it's needed.
-                    notificationDelegate.environment = environment
-                    UNUserNotificationCenter.current().delegate = notificationDelegate
+                    // Idempotent defensive refresh. The action-response path
+                    // is already live from init; this is not its authority.
                     PriorityNotificationCategoryRegistrar.registerCategories()
                 }
         }

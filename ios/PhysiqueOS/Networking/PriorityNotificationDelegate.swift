@@ -43,29 +43,60 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     }
 
     private func handleComplete(userInfo: [AnyHashable: Any]) async {
-        guard let environment,
-              let commandType = userInfo["commandType"] as? String,
+        guard let environment else {
+            await NotificationDiagnostics.record(.init(
+                capturedAt: Date(), identifier: "action.complete.unavailable",
+                operation: "completion not dispatched",
+                reason: "The notification response arrived before the application environment was available.",
+                fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
+            ))
+            return
+        }
+        guard let commandType = userInfo["commandType"] as? String,
               commandType == ProductionCommandType.completePriority,
               let expectedVersion = userInfo["expectedVersion"] as? Int,
               let priorityId = userInfo["payloadPriorityId"] as? String,
               let occurrenceDate = userInfo["payloadOccurrenceDate"] as? String
-        else { return }
+        else {
+            await NotificationDiagnostics.record(.init(
+                capturedAt: Date(), identifier: "action.complete.invalid-payload",
+                operation: "completion not dispatched",
+                reason: "The notification did not carry the complete canonical command contract.",
+                fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
+            ))
+            return
+        }
         // Best-effort: there is no UI here to surface a failure to. A
         // network failure or stale version simply leaves the occurrence
         // exactly as it was — the Founder can still complete it normally
         // in-app, where a real failure path exists. Never fabricate
         // success by suppressing the notification locally without this
         // command actually succeeding.
-        try? await environment.priorityCompletionWriteAPI.complete(
-            priorityId: priorityId,
-            occurrenceDate: occurrenceDate,
-            context: PriorityCompletionContext(
+        do {
+            try await environment.priorityCompletionWriteAPI.complete(
+                priorityId: priorityId,
                 occurrenceDate: occurrenceDate,
-                dose: userInfo["payloadDose"] as? String,
-                protocolId: userInfo["payloadProtocolId"] as? String
-            ),
-            expectedVersion: expectedVersion
-        )
+                context: PriorityCompletionContext(
+                    occurrenceDate: occurrenceDate,
+                    dose: userInfo["payloadDose"] as? String,
+                    protocolId: userInfo["payloadProtocolId"] as? String
+                ),
+                expectedVersion: expectedVersion
+            )
+            await NotificationDiagnostics.record(.init(
+                capturedAt: Date(), identifier: "action.complete.\(priorityId).\(occurrenceDate)",
+                operation: "completion accepted",
+                reason: "The canonical specialized completion command succeeded.",
+                fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
+            ))
+        } catch {
+            await NotificationDiagnostics.record(.init(
+                capturedAt: Date(), identifier: "action.complete.\(priorityId).\(occurrenceDate)",
+                operation: "completion rejected",
+                reason: "The canonical completion command did not succeed; the occurrence remains unchanged.",
+                fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
+            ))
+        }
     }
 
     private func openDestination(userInfo: [AnyHashable: Any]) {

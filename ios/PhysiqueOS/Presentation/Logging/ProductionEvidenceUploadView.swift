@@ -572,6 +572,9 @@ struct ProductionEvidenceUploadView: View {
                             scope: "automatic-\(scenario.rawValue)-intake.\(localDate)",
                             effectiveDate: localDate,
                             expectedEvidenceType: scenario.expectedEvidenceType,
+                            clientExtractedText: Self.activityExtractedText(
+                                from: groupAttachments, scenario: scenario
+                            ),
                             files: files,
                             onUploadProgress: { progress in
                                 Task { @MainActor in
@@ -608,6 +611,14 @@ struct ProductionEvidenceUploadView: View {
         phase = .uploading
         transferProgress = 0
         let localDate = Self.localDateKey.string(from: effectiveDate)
+        if scenario == .activity {
+            var prepared: [SandboxAttachment] = []
+            prepared.reserveCapacity(attachments.count)
+            for attachment in attachments {
+                prepared.append(await EvidenceLocalInterpretation.prepare(attachment))
+            }
+            attachments = prepared
+        }
         let files = Self.files(from: attachments, scenario: scenario)
         let startedAt = Date()
         do {
@@ -615,6 +626,9 @@ struct ProductionEvidenceUploadView: View {
                 scope: "\(scenario.rawValue)-intake.\(localDate)",
                 effectiveDate: localDate,
                 expectedEvidenceType: scenario.expectedEvidenceType,
+                clientExtractedText: Self.activityExtractedText(
+                    from: attachments, scenario: scenario
+                ),
                 files: files,
                 onUploadProgress: { progress in
                     Task { @MainActor in transferProgress = progress }
@@ -669,13 +683,11 @@ struct ProductionEvidenceUploadView: View {
             ? "Your evidence is ready to review."
             : "You can leave. We’ll notify you when your evidence is ready to review.")
         for (scenario, intake) in unresolved {
-            Task {
-                await EvidenceReviewReadyNotifier.pollAndNotify(
-                    pipeline: pipeline, reviewAPI: environment.evidenceReviewAPI,
-                    intakeId: intake.intakeId, domainLabel: scenario.label,
-                    effectiveDate: effectiveDate, environment: environment
-                )
-            }
+            EvidenceReviewReadyNotifier.beginObservation(
+                pipeline: pipeline, reviewAPI: environment.evidenceReviewAPI,
+                intakeId: intake.intakeId, domainLabel: scenario.label,
+                effectiveDate: effectiveDate, environment: environment
+            )
         }
     }
 
@@ -753,6 +765,21 @@ struct ProductionEvidenceUploadView: View {
             guard let data = attachment.data else { return nil }
             return (attachment.displayName, attachment.contentType ?? (scenario == .dexa ? "application/pdf" : "image/jpeg"), data)
         }
+    }
+
+    /// Apple Vision provides a no-network, deterministic first pass for the
+    /// explicit one-screen Activity path. The server remains authoritative:
+    /// it accepts this text only when its strict Apple Activity parser can
+    /// prove the ring metrics; otherwise the existing model interpreter is
+    /// used unchanged. No image bytes or OCR text enter diagnostics.
+    private static func activityExtractedText(
+        from attachments: [SandboxAttachment], scenario: Scenario
+    ) -> String? {
+        guard scenario == .activity else { return nil }
+        let value = attachments.compactMap(\.extractedText)
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n--- attachment ---\n\n")
+        return value.isEmpty ? nil : value
     }
 
     private static func groupSummary(_ counts: [Scenario: Int]) -> String {

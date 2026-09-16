@@ -24,11 +24,17 @@ protocol TrainingWriteAPI: Sendable {
     /// confirmable later — never lost, and never reverses the session's
     /// already-durable commit.
     func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async
+    /// Read-only startup recovery for an old local draft whose exact
+    /// deterministic canonical identity may already be durable. Returns
+    /// true only when identity, date, exercises, sets, variants, and
+    /// relationships all match; callers may then safely clear local state.
+    func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool
 }
 
 extension TrainingWriteAPI {
     func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async {}
     func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async {}
+    func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { false }
 }
 
 struct TrainingCommitResult: Decodable, Equatable, Sendable {
@@ -258,6 +264,54 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             status: "durable_readback", reviewId: nil, sessionId: payload.sessionId,
             intendedDate: payload.localDate, exerciseIds: actualExerciseIds
         )
+    }
+
+    func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool {
+        let canonicalId = "training|authoritative|training_logger_draft_\(draft.id)"
+        guard let session = try? await api.readResource(
+            "training-session", query: ["sessionId": canonicalId],
+            as: TrainingSessionDetailReadModel.self
+        ).data,
+              session.id == canonicalId,
+              session.date == draft.workoutDate
+        else { return false }
+
+        let expectedExercises = draft.exercises.compactMap { exercise -> TrainingLoggerDraftExercise? in
+            exercise.sets.contains(where: \.isCompleted) ? exercise : nil
+        }
+        guard session.exercises.count == expectedExercises.count else { return false }
+        for expected in expectedExercises {
+            guard let actual = session.exercises.first(where: { $0.id == expected.id }),
+                  actual.canonicalExerciseId == expected.canonicalExerciseId,
+                  (expected.canonicalExerciseId != nil || actual.name == expected.name),
+                  actual.executionVariant?.key == expected.executionVariant?.key
+            else { return false }
+            let expectedSets = expected.sets.filter(\.isCompleted).sorted { $0.setNumber < $1.setNumber }
+            let actualSets = actual.sets.sorted { $0.setNumber < $1.setNumber }
+            guard expectedSets.count == actualSets.count else { return false }
+            for (left, right) in zip(expectedSets, actualSets) {
+                let expectedLoadType = left.loadType ?? (expected.defaultLoadType == "bodyweight" && left.load == nil
+                    ? "bodyweight" : "external_load")
+                let expectedWeightUnit = expectedLoadType == "bodyweight" ? "bodyweight" : "lb"
+                guard left.setNumber == right.setNumber,
+                      left.reps == right.reps,
+                      left.durationSeconds == right.durationSeconds,
+                      left.load == right.weight,
+                      expectedLoadType == right.loadType,
+                      expectedWeightUnit == right.weightUnit
+                else { return false }
+            }
+        }
+        let expectedRelationships = draft.relationships.map {
+            ($0.id, $0.relationshipType, $0.memberExerciseIds)
+        }.sorted { $0.0 < $1.0 }
+        let actualRelationships = session.exerciseRelationshipGroups.map {
+            ($0.id, $0.relationshipType, $0.memberExerciseIds)
+        }.sorted { $0.0 < $1.0 }
+        guard expectedRelationships.count == actualRelationships.count else { return false }
+        return zip(expectedRelationships, actualRelationships).allSatisfy { expected, actual in
+            expected.0 == actual.0 && expected.1 == actual.1 && expected.2 == actual.2
+        }
     }
 
     private struct DurableTrainingOutcome {

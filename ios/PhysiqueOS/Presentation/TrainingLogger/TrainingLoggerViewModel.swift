@@ -62,6 +62,17 @@ final class TrainingLoggerViewModel {
         do {
             configuration = try await api.fetchConfiguration()
             savedDraft = canWrite ? draftStore.load() : nil
+            if authority == .founderProduction,
+               let savedDraft,
+               await writeAPI.isDraftAlreadyDurable(savedDraft) {
+                // Exact deterministic identity/fingerprint proof means this
+                // is the local residue of an acknowledged-ambiguity case,
+                // not an editable unsaved workout. Never invite a duplicate
+                // Finish attempt.
+                attachmentStore.removeAll(draftId: savedDraft.id)
+                draftStore.discard()
+                self.savedDraft = nil
+            }
             loadState = .loaded
         } catch {
             loadState = .failed("Workout Logger couldn't be loaded. Try again.")

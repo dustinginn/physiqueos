@@ -174,6 +174,10 @@ struct ProductionEvidenceReviewConfirmation: Decodable, Sendable {
     var continuationKey: String?
     var completedStep: String?
     var publication: String?
+    /// True only after canonical_commit has durably written the domain
+    /// record required by immediate Nutrition/Activity/DEXA/Training reads.
+    /// Analysis, Goal evaluation, Events, and Briefings may still continue.
+    var canonicalStateDurable: Bool?
     /// A staged receipt alone is not workout durability. The server sets
     /// this only after Training's canonical commit has completed.
     var trainingSessionDurable: Bool?

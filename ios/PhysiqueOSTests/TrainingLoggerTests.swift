@@ -703,6 +703,52 @@ final class TrainingLoggerTests: XCTestCase {
         func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult { throw Failure() }
     }
 
+    private struct DurableDraftProbeTrainingWriteAPI: TrainingWriteAPI {
+        let isDurable: Bool
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
+            throw StubFailingTrainingWriteAPI.Failure()
+        }
+        func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { isDurable }
+    }
+
+    @MainActor
+    func testLoadClearsOnlyAnExactlyProvenDurableLegacyDraft() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let staleDraft = draft()
+        store.save(staleDraft)
+        let viewModel = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: DurableDraftProbeTrainingWriteAPI(isDurable: true),
+            draftStore: store,
+            authority: .founderProduction
+        )
+
+        await viewModel.load()
+
+        XCTAssertNil(store.load())
+        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertEqual(viewModel.loadState, .loaded)
+    }
+
+    @MainActor
+    func testLoadPreservesDraftWhenExactDurableIdentityCannotBeProven() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let unresolvedDraft = draft()
+        store.save(unresolvedDraft)
+        let viewModel = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: DurableDraftProbeTrainingWriteAPI(isDurable: false),
+            draftStore: store,
+            authority: .founderProduction
+        )
+
+        await viewModel.load()
+
+        XCTAssertEqual(store.load(), unresolvedDraft)
+        XCTAssertEqual(viewModel.savedDraft, unresolvedDraft)
+        XCTAssertEqual(viewModel.loadState, .loaded)
+    }
+
     /// A successful canonical submission must clear the device-only draft —
     /// there is nothing left to resume once the server holds the canonical
     /// session. This exercises the exact `submit()` → `completeLocalCapture()`

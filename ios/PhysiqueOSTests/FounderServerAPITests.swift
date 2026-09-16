@@ -3003,6 +3003,24 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requests.dropFirst().map(\.httpMethod), ["GET", "GET"])
     }
 
+    func testRunningAppReviewReadyObservationSurvivesOneAmbiguousStatusRead() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.networkConnectionLost)),
+            .json(200, #"{"intakeId":"intake","status":"ready","reviewId":"review"}"#),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test device")
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        let reviewId = try await pipeline.awaitReadyIntakeResilient(
+            intakeId: "intake", pollInterval: .zero, maxPolls: 2
+        )
+
+        XCTAssertEqual(reviewId, "review")
+        XCTAssertEqual((await transport.requests).count, 3)
+    }
+
     func testFailedIntakeDoesNotPromiseReviewReadyOrSubmitAgain() async throws {
         let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r"))])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
@@ -3032,6 +3050,37 @@ final class FounderServerAPITests: XCTestCase {
         let requests = await transport.requests
         XCTAssertNotEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
         XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), multipartField(named: "submissionIdentity", from: try XCTUnwrap(requests[1].httpBody)))
+    }
+
+    func testExplicitActivityIntakeCarriesBoundedLocalOCRWithoutReplacingTheImage() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(202, #"{"intakeId":"activity-fast","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/activity-fast"}"#),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let pipeline = ProductionEvidenceIntakePipeline(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let extraction = "Move\n948/700 CAL\nExercise\n67/30 MIN\nStand\n13/12 HRS"
+
+        _ = try await pipeline.submitIntake(
+            scope: "activity-intake.2026-09-15", effectiveDate: "2026-09-15",
+            expectedEvidenceType: "activity_day", clientExtractedText: extraction,
+            files: [("activity.png", "image/png", Data([1, 2, 3]))]
+        )
+
+        let request = try XCTUnwrap((await transport.requests).last)
+        let body = try XCTUnwrap(request.httpBody)
+        XCTAssertEqual(multipartField(named: "clientExtractedText", from: body), extraction)
+        XCTAssertTrue(String(decoding: body, as: UTF8.self).contains("filename=\"activity.png\""))
+    }
+
+    func testEvidenceConfirmationDecodesCanonicalDurabilityBoundary() throws {
+        let value = try JSONDecoder().decode(
+            ProductionEvidenceReviewConfirmation.self,
+            from: Data(#"{"state":"processing","accepted":true,"reviewId":"review-activity","completedStep":"canonical_commit","canonicalStateDurable":true}"#.utf8)
+        )
+        XCTAssertEqual(value.state, "processing")
+        XCTAssertEqual(value.canonicalStateDurable, true)
     }
 
     func testProductionEvidenceIntakeReportsTransferCompletionAtDurableAcceptance() async throws {

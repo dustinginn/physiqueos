@@ -43,6 +43,7 @@ struct ProductionEvidenceIntakePipeline {
         scope: String,
         effectiveDate: String,
         expectedEvidenceType: String,
+        clientExtractedText: String? = nil,
         files: [(filename: String, contentType: String, data: Data)],
         onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> ProductionEvidenceIntakeStatus {
@@ -62,12 +63,16 @@ struct ProductionEvidenceIntakePipeline {
                 let digest = SHA256.hash(data: file.data).map { String(format: "%02x", $0) }.joined()
                 return "\(file.filename)|\(file.contentType)|\(digest)"
             }.joined(separator: ","),
+            clientExtractedText.map {
+                SHA256.hash(data: Data($0.utf8)).map { String(format: "%02x", $0) }.joined()
+            } ?? "-",
         ])
         let submissionIdentity = idempotencyStore.resolvedKey(scope: scope, signature: signature)
         return try await api.submitEvidenceIntake(
             submissionIdentity: submissionIdentity,
             effectiveDate: effectiveDate,
             expectedEvidenceType: expectedEvidenceType,
+            clientExtractedText: clientExtractedText,
             files: files,
             onUploadProgress: onUploadProgress
         )
@@ -110,6 +115,32 @@ struct ProductionEvidenceIntakePipeline {
             return reviewId
         }
         return try await awaitReadyIntake(intakeId: intake.intakeId, pollInterval: pollInterval, maxPolls: maxPolls)
+    }
+
+    /// Running-app publication observation must not disappear because one
+    /// status poll hit a transient transport interruption. Unlike the brief
+    /// in-flow wait above, this owns a longer bounded deadline and retries
+    /// only ambiguity-class transport failures; explicit server rejection
+    /// and a published processing failure still stop immediately.
+    func awaitReadyIntakeResilient(
+        intakeId: String,
+        pollInterval: Duration = .seconds(5),
+        maxPolls: Int = 60
+    ) async throws -> String {
+        for attempt in 0..<maxPolls {
+            do {
+                let status = try await api.fetchEvidenceIntakeStatus(intakeId: intakeId)
+                if status.isFailed { throw Error.interpretationFailed }
+                if status.isReady, let reviewId = status.reviewId {
+                    EvidenceLifecycleDiagnostics.recordReady(status)
+                    return reviewId
+                }
+            } catch {
+                guard Self.acceptanceIsUncertain(after: error) else { throw error }
+            }
+            if attempt + 1 < maxPolls { try await Task.sleep(for: pollInterval) }
+        }
+        throw Error.stillProcessing
     }
 
     /// Step 3 — kick off confirmation. A durable outbox worker drives the

@@ -10,6 +10,20 @@ import XCTest
 /// class this investigation found: a `notificationAction.scheduledTime`
 /// that resolved to nil server-side.
 final class NotificationDiagnosticsTests: XCTestCase {
+    func testReviewReadyPublicationBuildsExactImmediateDeepLinkRequest() throws {
+        let request = EvidenceReviewReadyNotifier.request(
+            reviewId: "review-activity", domainLabel: "Activity", effectiveDate: "2026-09-15"
+        )
+        XCTAssertEqual(request.identifier, "evidence.reviewReady.review-activity")
+        XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.evidenceReviewReady)
+        XCTAssertNil(request.trigger)
+        let destinationData = try XCTUnwrap(request.content.userInfo["destination"] as? Data)
+        XCTAssertEqual(
+            try JSONDecoder().decode(AppDestination.self, from: destinationData),
+            .evidenceReview(reviewId: "review-activity")
+        )
+    }
+
     @MainActor func testSchedulingHistoryIsBoundedPersistedAndDiagnosticOnly() throws {
         let suite = "NotificationDiagnosticsTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

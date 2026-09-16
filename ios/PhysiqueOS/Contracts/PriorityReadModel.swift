@@ -281,6 +281,10 @@ struct PriorityNotificationAction: Codable, Equatable {
     }
 
     var classification: Classification
+    /// Server-owned workflow taxonomy (`peptide_protocol`,
+    /// `priority_detail`, ...). Native uses this only to present the
+    /// canonical payload; it never derives specialized completion rules.
+    var workflow: String? = nil
     /// Canonical "HH:mm" (24-hour, already resolved server-side from
     /// whatever raw schedule value — exact time or a named daypart bucket
     /// — the underlying reminder/execution item carries). `nil` means

@@ -136,7 +136,7 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
     }
 
     func testDoseAwarePeptideUsesActionableSpecializedCategoryAndPreservesDoseContext() throws {
-        let json = #"{"classification":"specialized_workflow_required","scheduledTime":"21:45","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":4,"payload":{"priorityId":"reminder_retatrutide","occurrenceDate":"2026-09-15","dose":"0.5 mg","protocolId":"protocol_retatrutide"}}}"#
+        let json = #"{"classification":"specialized_workflow_required","workflow":"peptide_protocol","scheduledTime":"21:45","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":4,"payload":{"priorityId":"reminder_retatrutide","occurrenceDate":"2026-09-15","dose":"0.5 mg","protocolId":"protocol_retatrutide"}}}"#
         let action = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(json.utf8))
         var item = Self.foamRolling(scheduledTime: "21:45")
         item.id = "reminder_retatrutide"
@@ -148,6 +148,7 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         )
         let request = try XCTUnwrap(plan.toAdd.first)
         XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.specializedActionable)
+        XCTAssertTrue(request.content.body.contains("Scheduled dose 0.5 mg"))
         XCTAssertEqual(request.content.userInfo["payloadDose"] as? String, "0.5 mg")
         XCTAssertEqual(request.content.userInfo["payloadProtocolId"] as? String, "protocol_retatrutide")
     }

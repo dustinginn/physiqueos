@@ -626,6 +626,7 @@ actor ProductionNativeAPI {
         submissionIdentity: String,
         effectiveDate: String,
         expectedEvidenceType: String,
+        clientExtractedText: String? = nil,
         files: [(filename: String, contentType: String, data: Data)],
         onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> ProductionEvidenceIntakeStatus {
@@ -634,6 +635,12 @@ actor ProductionNativeAPI {
         body.appendMultipartField(name: "submissionIdentity", value: Data(submissionIdentity.utf8), boundary: boundary, contentType: "text/plain")
         body.appendMultipartField(name: "effectiveDate", value: Data(effectiveDate.utf8), boundary: boundary, contentType: "text/plain")
         body.appendMultipartField(name: "expectedEvidenceType", value: Data(expectedEvidenceType.utf8), boundary: boundary, contentType: "text/plain")
+        if let clientExtractedText, !clientExtractedText.isEmpty {
+            body.appendMultipartField(
+                name: "clientExtractedText", value: Data(clientExtractedText.utf8),
+                boundary: boundary, contentType: "text/plain"
+            )
+        }
         for file in files {
             body.appendMultipartFile(name: "evidenceFiles", filename: file.filename, contentType: file.contentType, data: file.data, boundary: boundary)
         }

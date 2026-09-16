@@ -206,7 +206,7 @@ enum PriorityNotificationScheduler {
     ) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = item.title
-        content.body = item.subtitle ?? "Open PhysiqueOS to view this priority."
+        content.body = notificationBody(item: item, action: action)
         content.sound = .default
         content.categoryIdentifier = PriorityNotificationCategory.category(for: action)
         content.userInfo = userInfo(for: item, action: action)
@@ -225,6 +225,28 @@ enum PriorityNotificationScheduler {
         components.timeZone = calendar.timeZone
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         return UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+    }
+
+    static func notificationBody(
+        item: PriorityOccurrence, action: PriorityNotificationAction
+    ) -> String {
+        if action.workflow == "peptide_protocol",
+           let dose = action.completionCommand?.payload.dose,
+           !dose.isEmpty {
+            let timing = item.subtitle ?? action.scheduledTime.map(Self.localizedTime) ?? "Scheduled"
+            return "Scheduled dose \(dose) · \(timing)"
+        }
+        return item.subtitle ?? "Open PhysiqueOS to view this priority."
+    }
+
+    private static func localizedTime(_ value: String) -> String {
+        let components = value.split(separator: ":").compactMap { Int($0) }
+        guard components.count == 2 else { return value }
+        var date = DateComponents()
+        date.hour = components[0]
+        date.minute = components[1]
+        guard let resolved = Calendar.current.date(from: date) else { return value }
+        return resolved.formatted(date: .omitted, time: .shortened)
     }
 
     /// Carries everything `PriorityNotificationDelegate` needs to act on a
