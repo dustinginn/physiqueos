@@ -92,6 +92,7 @@ struct ProductionEvidenceIntakePipeline {
         }
         if status.isFailed { throw Error.interpretationFailed }
         guard status.isReady, let reviewId = status.reviewId else { throw Error.stillProcessing }
+        EvidenceLifecycleDiagnostics.recordReady(status)
         return reviewId
     }
 
@@ -104,7 +105,10 @@ struct ProductionEvidenceIntakePipeline {
         maxPolls: Int = 3
     ) async throws -> String {
         if intake.isFailed { throw Error.interpretationFailed }
-        if intake.isReady, let reviewId = intake.reviewId { return reviewId }
+        if intake.isReady, let reviewId = intake.reviewId {
+            EvidenceLifecycleDiagnostics.recordReady(intake)
+            return reviewId
+        }
         return try await awaitReadyIntake(intakeId: intake.intakeId, pollInterval: pollInterval, maxPolls: maxPolls)
     }
 

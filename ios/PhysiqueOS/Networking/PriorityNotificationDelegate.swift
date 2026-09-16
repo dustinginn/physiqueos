@@ -59,7 +59,11 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         try? await environment.priorityCompletionWriteAPI.complete(
             priorityId: priorityId,
             occurrenceDate: occurrenceDate,
-            context: nil,
+            context: PriorityCompletionContext(
+                occurrenceDate: occurrenceDate,
+                dose: userInfo["payloadDose"] as? String,
+                protocolId: userInfo["payloadProtocolId"] as? String
+            ),
             expectedVersion: expectedVersion
         )
     }

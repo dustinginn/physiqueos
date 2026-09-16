@@ -100,6 +100,7 @@ struct OperatingPlanRecoverySupportView: View {
                         OperatingPlanFieldRow(label: "Starts", value: OperatingPlanDateValues.readableDate(support.supportSchedule.startDate))
                         OperatingPlanFieldRow(label: "Ends", value: support.supportSchedule.endDate.map(OperatingPlanDateValues.readableDate) ?? "Until changed")
                         OperatingPlanFieldRow(label: "Reminder", value: support.reminderPreference.label)
+                        if let nextDue = support.nextDue { OperatingPlanFieldRow(label: "Next due", value: nextDue) }
                         if !support.notes.isEmpty { OperatingPlanFieldRow(label: "Execution Notes", value: support.notes) }
                     }
                 }
@@ -184,7 +185,8 @@ struct OperatingPlanRecoverySupportView: View {
             supportSummary: detail.supportSummary,
             supportSchedule: detail.hydration.supportSchedule,
             reminderPreference: detail.hydration.reminderPreference,
-            notes: detail.hydration.notes
+            notes: detail.hydration.notes,
+            nextDue: detail.nextDue
         )
     }
 }

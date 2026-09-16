@@ -798,7 +798,8 @@ actor ProductionNativeAPI {
         body: Data?,
         bearer: String?,
         accept: String,
-        headers: [String: String] = [:]
+        headers: [String: String] = [:],
+        timeoutInterval: TimeInterval = 15
     ) async throws -> (Data, HTTPURLResponse) {
         let endpoint = baseURL.appending(path: path)
         guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
@@ -812,7 +813,7 @@ actor ProductionNativeAPI {
         request.httpMethod = method
         request.httpBody = body
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 15
+        request.timeoutInterval = timeoutInterval
         request.setValue(accept, forHTTPHeaderField: "Accept")
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         if let bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
@@ -836,6 +837,7 @@ actor ProductionNativeAPI {
         _ commandType: String,
         idempotencyKey: String,
         expectedVersion: String? = nil,
+        timeoutInterval: TimeInterval = 15,
         payload: Payload
     ) async throws -> ProductionCommandOutcome<Result> {
         let metadata = ProductionCommandRequestMetadata(
@@ -858,7 +860,8 @@ actor ProductionNativeAPI {
             body: encoded,
             bearer: token,
             accept: "application/json",
-            headers: headers
+            headers: headers,
+            timeoutInterval: timeoutInterval
         )
         if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
             let refreshedToken = try await refreshAccessToken()
@@ -868,7 +871,8 @@ actor ProductionNativeAPI {
                 body: encoded,
                 bearer: refreshedToken,
                 accept: "application/json",
-                headers: headers
+                headers: headers,
+                timeoutInterval: timeoutInterval
             )
         }
         try validateHTTP(result.1, data: result.0)

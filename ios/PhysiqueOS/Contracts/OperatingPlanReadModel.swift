@@ -248,6 +248,7 @@ struct CoachingProgressPhotosReadModel: Codable, Equatable {
     var cadence: ProgressPhotoCadence
     var day: OperatingPlanWeekday
     var timeOfDay: TimeOfDayChoice
+    var specificTime: String?
     var reminderEnabled: Bool
 }
 
@@ -301,7 +302,7 @@ struct CoachingUpdatesEditorReadModel: Codable, Equatable {
 }
 
 enum TimeOfDayChoice: String, Codable, CaseIterable, Identifiable {
-    case morning, afternoon, evening
+    case morning, afternoon, evening, specific
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
 }
@@ -334,6 +335,9 @@ struct OperatingPlanSupportMethodReadModel: Codable, Equatable, Identifiable {
     var supportSummary: String
     var currentDose: String?
     var currentSchedule: String?
+    /// Optional for compatibility with the frozen Build 33 fixture and older
+    /// production payloads. New production reads always project the value.
+    var reminderEnabled: Bool?
     var editDestination: AppDestination?
 }
 
@@ -452,6 +456,7 @@ struct OperatingPlanPeptideExecutionReadModel: Codable, Equatable {
     var timeline: [PeptideDoseTimelinePhaseReadModel]
     var reminderPreference: OperatingPlanReminderPreference
     var notes: String
+    var nextDue: String? = nil
 }
 
 // MARK: - Recovery support (generic execution item)
@@ -464,6 +469,7 @@ struct OperatingPlanRecoverySupportReadModel: Codable, Equatable {
     var supportSchedule: OperatingPlanSupportScheduleReadModel
     var reminderPreference: OperatingPlanReminderPreference
     var notes: String
+    var nextDue: String? = nil
 }
 
 struct OperatingPlanSupplementSupportReadModel: Codable, Equatable {
@@ -475,6 +481,7 @@ struct OperatingPlanSupplementSupportReadModel: Codable, Equatable {
     var supportSchedule: OperatingPlanSupportScheduleReadModel
     var reminderPreference: OperatingPlanReminderPreference
     var notes: String
+    var nextDue: String? = nil
 }
 
 struct OperatingPlanTrackingReadModel: Codable, Equatable {
@@ -486,6 +493,7 @@ struct OperatingPlanTrackingReadModel: Codable, Equatable {
     var supportSchedule: OperatingPlanSupportScheduleReadModel
     var reminderPreference: OperatingPlanReminderPreference
     var notes: String
+    var nextDue: String? = nil
 }
 
 // MARK: - Supplement strategy editor

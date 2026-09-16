@@ -1011,6 +1011,8 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(detail.editor.photos.cadence, .everyTwoWeeks)
         var model = detail.editor
         model.photos.day = .sunday
+        model.photos.timeOfDay = .specific
+        model.photos.specificTime = "17:35"
         model.photos.reminderEnabled = false
         model.dexa.plannedDate = "2026-10-22"
         model.dexa.preparationNote = "Updated clinic note"
@@ -1032,6 +1034,8 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(payload["dexaExpectedRevision"] as? Int, 3)
         let draft = try XCTUnwrap(payload["draft"] as? [String: Any])
         XCTAssertEqual((draft["photos"] as? [String: Any])?["day"] as? String, "sunday")
+        XCTAssertEqual((draft["photos"] as? [String: Any])?["timeOfDay"] as? String, "specific")
+        XCTAssertEqual((draft["photos"] as? [String: Any])?["specificTime"] as? String, "17:35")
         XCTAssertEqual((draft["dexa"] as? [String: Any])?["plannedDate"] as? String, "2026-10-22")
         let affected = await native.resourcesAffected(by: ProductionCommandType.saveCoachingUpdates)
         XCTAssertTrue(affected.isSuperset(of: ["operating-plan", "operating-plan-coaching-updates", "home", "priority", "photos", "dexa"]))
@@ -2570,17 +2574,23 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.unfinishedPriorities.first?.occurrenceKey, "reminder-1:2026-09-10")
     }
 
-    func testProductionTrainingCommitRejectsStagedReceiptThenReturnsAtExplicitDurabilityWithoutPolling() async throws {
+    func testProductionTrainingCommitReplaysStagedReceiptUntilExplicitDurability() async throws {
         let result = #"{"status":"confirmation_requested","reviewId":"review-1","reviewRevision":1,"sessionId":"native-session-1","intendedDate":"2026-09-11","exerciseIds":["barbell_bench_press","pull_up"]}"#
         let response = #"{"outcome":"committed","receipt":{"status":"committed","result":"# + result + #", "operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"},"confirmation":{"state":"processing","accepted":true,"reviewId":"review-1","continuationKey":"continuation","completedStep":null,"publication":null}}"#
         let durableResponse = response.replacingOccurrences(of: "\"completedStep\":null", with: "\"completedStep\":\"canonical_commit\",\"trainingSessionDurable\":true")
-        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, response), .json(200, durableResponse)])
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, response),
+            .json(404, #"{"type":"about:blank","title":"Not Found","status":404,"detail":"No durable session yet"}"#),
+            .json(200, durableResponse),
+        ])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
         let writeAPI = ProductionTrainingWriteAPI(
             api: api,
             reviewAPI: NotAvailableEvidenceReviewAPI(),
-            idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults())
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()),
+            durabilityRetryDelay: .zero
         )
         let draft = TrainingLoggerDraft(
             id: "native-session-1", mode: .live, workoutDate: "2026-09-11", selectedAreaIds: ["chest"],
@@ -2605,18 +2615,14 @@ final class FounderServerAPITests: XCTestCase {
             supportingWorkoutFailureAssetIds: nil
         )
 
-        do {
-            _ = try await writeAPI.commit(draft)
-            XCTFail("A staged receipt without canonical durability must not claim Workout logged.")
-        } catch TrainingWriteError.confirmationTimedOut {
-            // The saved draft and idempotency key are retained for retry.
-        }
         let committed = try await writeAPI.commit(draft)
 
         XCTAssertEqual(committed.exerciseIds, ["barbell_bench_press", "pull_up"])
         let requests = await transport.requests
-        XCTAssertEqual(requests.count, 3)
-        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
+        XCTAssertEqual(requests.count, 4)
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[3].value(forHTTPHeaderField: "Idempotency-Key"))
+        XCTAssertEqual(requests[1].timeoutInterval, 3)
+        XCTAssertEqual(requests[3].timeoutInterval, 1)
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
         XCTAssertEqual(json["commandType"] as? String, "training-session.commit.v1")
         let payload = try XCTUnwrap(json["payload"] as? [String: Any])
@@ -2628,6 +2634,87 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertNil(bodyweightSets[0]["load"])
         XCTAssertEqual(bodyweightSets[1]["loadType"] as? String, "external_load")
         XCTAssertEqual(bodyweightSets[1]["load"] as? Double, 25)
+    }
+
+    func testProductionTrainingCommitRecoversLostAcknowledgementWithSameIdempotencyKey() async throws {
+        let readback = productionEnvelope(resource: "training-session", data: #"{"id":"training|authoritative|training_logger_draft_native-session-lost-ack","label":"Traditional Strength Training","value":"Shoulders · 1 exercise","detail":"","date":"2026-09-15","sourceEvidence":[],"exercises":[{"id":"occurrence-1","name":"Shoulder Press Machine","canonicalExerciseId":"shoulder_press_machine","executionVariant":null,"sets":[{"setNumber":1,"reps":8,"weight":100,"weightUnit":"lb","durationSeconds":null,"loadType":"external_load","setType":null}]}],"exerciseRelationshipGroups":[]}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.timedOut)),
+            .json(200, readback),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionTrainingWriteAPI(
+            api: api, reviewAPI: NotAvailableEvidenceReviewAPI(),
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()),
+            durabilityRetryDelay: .zero
+        )
+        let draft = TrainingLoggerDraft(
+            id: "native-session-lost-ack", mode: .live, workoutDate: "2026-09-15", selectedAreaIds: ["shoulders"],
+            exercises: [TrainingLoggerDraftExercise(
+                id: "occurrence-1", canonicalExerciseId: "shoulder_press_machine", name: "Shoulder Press Machine",
+                areaId: "shoulders", measurement: .repsLoad, executionVariant: nil,
+                sets: [TrainingLoggerDraftSet(id: "set-1", setNumber: 1, reps: 8, load: 100, durationSeconds: nil, isCompleted: true)],
+                previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
+                isProvisional: false, provenance: nil
+            )], relationships: [], step: .review, exercisePickerReturnStep: nil,
+            exercisePickerExistingExerciseIds: nil, supportingEvidence: nil, supportingWorkouts: nil,
+            supportingWorkoutFailureAssetIds: nil
+        )
+
+        let committed = try await writeAPI.commit(draft)
+
+        XCTAssertEqual(committed.sessionId, "native-session-lost-ack")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 3)
+        XCTAssertNil(requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
+        XCTAssertEqual(requests[1].timeoutInterval, 3)
+        XCTAssertEqual(requests[2].url?.path, "/api/v1/native/read/training-session")
+    }
+
+    func testProductionTrainingCommitStopsWithHonestProcessingStateAfterBoundedRecovery() async throws {
+        let result = #"{"status":"confirmation_requested","reviewId":"review-processing","reviewRevision":1,"sessionId":"native-session-processing","intendedDate":"2026-09-15","exerciseIds":["shoulder_press_machine"]}"#
+        let processing = #"{"outcome":"committed","receipt":{"status":"committed","result":"# + result + #", "operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"},"confirmation":{"state":"processing","accepted":true,"reviewId":"review-processing","continuationKey":"continuation","completedStep":null,"publication":null}}"#
+        let missing = #"{"type":"about:blank","title":"Not Found","status":404,"detail":"No durable session yet"}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, processing), .json(404, missing),
+            .json(200, processing), .json(404, missing),
+            .json(404, missing),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionTrainingWriteAPI(
+            api: api, reviewAPI: NotAvailableEvidenceReviewAPI(),
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()),
+            durabilityRetryDelay: .zero
+        )
+        let draft = TrainingLoggerDraft(
+            id: "native-session-processing", mode: .live, workoutDate: "2026-09-15", selectedAreaIds: ["shoulders"],
+            exercises: [TrainingLoggerDraftExercise(
+                id: "occurrence-1", canonicalExerciseId: "shoulder_press_machine", name: "Shoulder Press Machine",
+                areaId: "shoulders", measurement: .repsLoad, executionVariant: nil,
+                sets: [TrainingLoggerDraftSet(id: "set-1", setNumber: 1, reps: 8, load: 100, durationSeconds: nil, isCompleted: true)],
+                previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
+                isProvisional: false, provenance: nil
+            )], relationships: [], step: .review, exercisePickerReturnStep: nil,
+            exercisePickerExistingExerciseIds: nil, supportingEvidence: nil, supportingWorkouts: nil,
+            supportingWorkoutFailureAssetIds: nil
+        )
+
+        await XCTAssertThrowsErrorAsync(try await writeAPI.commit(draft)) { error in
+            XCTAssertEqual(error as? TrainingWriteError, .confirmationTimedOut)
+            XCTAssertEqual((error as? LocalizedError)?.errorDescription,
+                           "The workout is still processing. Check Training history shortly.")
+        }
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 6)
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"),
+                       requests[3].value(forHTTPHeaderField: "Idempotency-Key"))
+        XCTAssertEqual(requests[1].timeoutInterval, 3)
+        XCTAssertEqual(requests[3].timeoutInterval, 1)
+        XCTAssertEqual(requests.filter { $0.url?.path == "/api/v1/native/read/training-session" }.count, 3)
     }
 
     /// Build 32: the structured TrainingSession must become durable

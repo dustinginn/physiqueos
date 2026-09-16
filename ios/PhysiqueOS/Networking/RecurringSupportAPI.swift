@@ -35,6 +35,7 @@ struct RecurringSupportDetail: Decodable, Equatable, Sendable {
     var title: String
     var purpose: String
     var supportSummary: String
+    var nextDue: String?
     var hydration: Hydration
 
     struct Hydration: Decodable, Equatable, Sendable {

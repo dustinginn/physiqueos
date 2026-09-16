@@ -160,8 +160,8 @@ enum PriorityUrgency: String, Codable, Equatable {
 /// occurrenceDate, dose, AND protocolId are all present.
 struct PriorityCompletionContext: Codable, Equatable {
     var occurrenceDate: String
-    var dose: String?
-    var protocolId: String?
+    var dose: String? = nil
+    var protocolId: String? = nil
 }
 
 struct PrioritySessionItem: Codable, Equatable, Identifiable {
@@ -298,6 +298,8 @@ struct PriorityNotificationCompletionCommand: Codable, Equatable {
 struct PriorityNotificationCompletionPayload: Codable, Equatable {
     var priorityId: String
     var occurrenceDate: String
+    var dose: String?
+    var protocolId: String?
 }
 
 /// One `priority` resource `sections[]` entry (`PriorityDetailService.js`).

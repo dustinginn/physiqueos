@@ -63,3 +63,57 @@ enum EvidenceReviewReadyNotifier {
         return formatter.string(from: date)
     }
 }
+
+/// A canonical-publication notifier for Midweek, Weekly, Monthly, DEXA,
+/// and Photo Event briefings. Home cards exist only for already-published
+/// briefing artifacts, so this never guesses from a scheduled generation
+/// time. The first production read establishes a baseline without alerting
+/// for old history; each later unseen artifact produces exactly one local
+/// notification and deep-links to that artifact.
+///
+/// This uses the same running-app local delivery boundary as the accepted
+/// Evidence Review-ready notifier. A future remote/background publication
+/// architecture can replace the observation transport without changing the
+/// canonical artifact identity or deep link encoded here.
+enum BriefingReadyNotifier {
+    private static let observedKey = "physiqueos.briefing-publications-observed.v1"
+
+    @MainActor
+    static func reconcile(
+        cards: [HomeBriefingCard],
+        center: UNUserNotificationCenter = .current(),
+        defaults: UserDefaults = .standard
+    ) async {
+        let currentIDs = Set(cards.map(\.id))
+        guard defaults.object(forKey: observedKey) != nil else {
+            defaults.set(Array(currentIDs).sorted(), forKey: observedKey)
+            return
+        }
+        let observed = Set(defaults.stringArray(forKey: observedKey) ?? [])
+        let requests = requestsForNewPublications(cards: cards, observedIDs: observed)
+        for request in requests {
+            try? await center.add(request)
+        }
+        defaults.set(Array(observed.union(currentIDs)).sorted(), forKey: observedKey)
+    }
+
+    static func requestsForNewPublications(
+        cards: [HomeBriefingCard], observedIDs: Set<String>
+    ) -> [UNNotificationRequest] {
+        cards.compactMap { card in
+            guard !observedIDs.contains(card.id),
+                  let destination = card.destination,
+                  let destinationData = try? JSONEncoder().encode(destination)
+            else { return nil }
+            let content = UNMutableNotificationContent()
+            content.title = card.title
+            content.body = "Your \(card.sectionLabel.lowercased()) is ready."
+            content.sound = .default
+            content.categoryIdentifier = PriorityNotificationCategory.briefingReady
+            content.userInfo = ["destination": destinationData]
+            return UNNotificationRequest(
+                identifier: "briefing.ready.\(card.id)", content: content, trigger: nil
+            )
+        }
+    }
+}

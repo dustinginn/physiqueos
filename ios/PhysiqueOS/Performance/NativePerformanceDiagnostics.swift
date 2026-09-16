@@ -1,6 +1,27 @@
 import Foundation
 import os
 
+/// Release-safe evidence lifecycle timings. These logs intentionally carry
+/// only stage names and durations — never review IDs, filenames, evidence
+/// payloads, dates, or server error text.
+enum EvidenceLifecycleDiagnostics {
+    private static let logger = Logger(subsystem: "com.physiqueos.native", category: "EvidenceLifecycle")
+
+    static func recordReady(_ status: ProductionEvidenceIntakeStatus) {
+        let parser = ISO8601DateFormatter()
+        guard let accepted = status.acceptedAt.flatMap(parser.date),
+              let started = status.interpretationStartedAt.flatMap(parser.date),
+              let ready = status.reviewReadyAt.flatMap(parser.date) else { return }
+        let t1 = max(0, Int(started.timeIntervalSince(accepted) * 1_000))
+        let t2 = max(0, Int(ready.timeIntervalSince(started) * 1_000))
+        logger.info("review_ready t1_ms=\(t1) t2_ms=\(t2)")
+    }
+
+    static func recordConfirmation(milliseconds: Int, outcome: String) {
+        logger.info("confirmation t3_ms=\(max(0, milliseconds)) outcome=\(outcome, privacy: .public)")
+    }
+}
+
 /// Release-visible engineering logs, not Founder UI. No bodies, query values,
 /// headers, identifiers, credentials, enum values, or exception text are logged.
 enum NativeReadFailureDiagnostics {

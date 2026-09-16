@@ -10,17 +10,23 @@ import UserNotifications
 enum PriorityNotificationCategory {
     static let directCompletion = "priority.directCompletion"
     static let specializedWorkflow = "priority.specializedWorkflow"
+    static let specializedActionable = "priority.specializedActionable"
     static let openOnly = "priority.openOnly"
     /// The Evidence Review-ready fallback (Finding 7) — a distinct event,
     /// not a scheduled priority, but registered alongside these since it
     /// shares the same notification infrastructure rather than a second
     /// framework.
     static let evidenceReviewReady = "evidence.reviewReady"
+    /// Published Coaching briefings are a separate canonical event from
+    /// evidence review readiness. They carry no mutation actions; tapping
+    /// opens the exact published artifact.
+    static let briefingReady = "briefing.ready"
 
-    static func category(for classification: PriorityNotificationAction.Classification) -> String {
-        switch classification {
+    static func category(for action: PriorityNotificationAction) -> String {
+        switch action.classification {
         case .directCompletionAllowed: directCompletion
-        case .specializedWorkflowRequired: specializedWorkflow
+        case .specializedWorkflowRequired:
+            action.completionCommand == nil ? specializedWorkflow : specializedActionable
         case .openOnly: openOnly
         }
     }
@@ -58,6 +64,12 @@ enum PriorityNotificationCategoryRegistrar {
             intentIdentifiers: [],
             options: []
         )
+        let specializedActionable = UNNotificationCategory(
+            identifier: PriorityNotificationCategory.specializedActionable,
+            actions: [complete, snooze],
+            intentIdentifiers: [],
+            options: []
+        )
         let openOnly = UNNotificationCategory(
             identifier: PriorityNotificationCategory.openOnly,
             actions: [],
@@ -70,6 +82,15 @@ enum PriorityNotificationCategoryRegistrar {
             intentIdentifiers: [],
             options: []
         )
-        center.setNotificationCategories([directCompletion, specializedWorkflow, openOnly, evidenceReviewReady])
+        let briefingReady = UNNotificationCategory(
+            identifier: PriorityNotificationCategory.briefingReady,
+            actions: [],
+            intentIdentifiers: [],
+            options: []
+        )
+        center.setNotificationCategories([
+            directCompletion, specializedWorkflow, specializedActionable,
+            openOnly, evidenceReviewReady, briefingReady,
+        ])
     }
 }

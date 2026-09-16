@@ -2,6 +2,30 @@ import XCTest
 @testable import PhysiqueOS
 
 final class PriorityNotificationSchedulerTests: XCTestCase {
+    func testBriefingNotificationRequiresCanonicalPublishedCardAndDeepLinksToExactArtifact() throws {
+        let card = HomeBriefingCard(
+            id: "weekly_briefing_2026-09-13",
+            sectionLabel: "Weekly Briefing",
+            title: "Your Weekly Briefing is ready",
+            prompt: "Review the published update.",
+            createdAt: "2026-09-15T19:21:00.000Z",
+            destination: .briefingDetail(briefingId: "weekly_briefing_2026-09-13")
+        )
+        let requests = BriefingReadyNotifier.requestsForNewPublications(cards: [card], observedIDs: [])
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(request.identifier, "briefing.ready.weekly_briefing_2026-09-13")
+        XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.briefingReady)
+        let destinationData = try XCTUnwrap(request.content.userInfo["destination"] as? Data)
+        XCTAssertEqual(
+            try JSONDecoder().decode(AppDestination.self, from: destinationData),
+            .briefingDetail(briefingId: "weekly_briefing_2026-09-13")
+        )
+        XCTAssertTrue(BriefingReadyNotifier.requestsForNewPublications(
+            cards: [card], observedIDs: [card.id]
+        ).isEmpty)
+    }
+
     func testIncidentRecoveryProjectionCreatesPacific1221RequestWithoutDirectCompletion() throws {
         // Raw owner/reminder timezone fields are absent/null on the server;
         // canonical resolution is Pacific. Native receives resolved HH:mm,
@@ -109,6 +133,23 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertEqual(openOnly.classification, .openOnly)
         XCTAssertNil(openOnly.scheduledTime)
         XCTAssertNil(openOnly.completionCommand)
+    }
+
+    func testDoseAwarePeptideUsesActionableSpecializedCategoryAndPreservesDoseContext() throws {
+        let json = #"{"classification":"specialized_workflow_required","scheduledTime":"21:45","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":4,"payload":{"priorityId":"reminder_retatrutide","occurrenceDate":"2026-09-15","dose":"0.5 mg","protocolId":"protocol_retatrutide"}}}"#
+        let action = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(json.utf8))
+        var item = Self.foamRolling(scheduledTime: "21:45")
+        item.id = "reminder_retatrutide"
+        item.date = "2026-09-15"
+        item.notificationAction = action
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-15T20:00:00Z"))
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [item], existingScheduledIdentifiers: [], now: now, calendar: utc
+        )
+        let request = try XCTUnwrap(plan.toAdd.first)
+        XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.specializedActionable)
+        XCTAssertEqual(request.content.userInfo["payloadDose"] as? String, "0.5 mg")
+        XCTAssertEqual(request.content.userInfo["payloadProtocolId"] as? String, "protocol_retatrutide")
     }
 
     // MARK: - reconciliationPlan: the schedule-change acceptance requirement.

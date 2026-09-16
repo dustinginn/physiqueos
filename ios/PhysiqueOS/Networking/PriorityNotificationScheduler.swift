@@ -208,7 +208,7 @@ enum PriorityNotificationScheduler {
         content.title = item.title
         content.body = item.subtitle ?? "Open PhysiqueOS to view this priority."
         content.sound = .default
-        content.categoryIdentifier = PriorityNotificationCategory.category(for: action.classification)
+        content.categoryIdentifier = PriorityNotificationCategory.category(for: action)
         content.userInfo = userInfo(for: item, action: action)
         var components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
         // `Calendar.dateComponents(_:from:)` only populates the component
@@ -250,6 +250,8 @@ enum PriorityNotificationScheduler {
             info["expectedVersion"] = command.expectedVersion
             info["payloadPriorityId"] = command.payload.priorityId
             info["payloadOccurrenceDate"] = command.payload.occurrenceDate
+            if let dose = command.payload.dose { info["payloadDose"] = dose }
+            if let protocolId = command.payload.protocolId { info["payloadProtocolId"] = protocolId }
         }
         return info
     }

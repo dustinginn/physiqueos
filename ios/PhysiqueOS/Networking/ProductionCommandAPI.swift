@@ -193,6 +193,9 @@ struct ProductionEvidenceIntakeStatus: Decodable, Equatable, Sendable {
     var reviewId: String?
     var reviewUrl: String?
     var processingUrl: String?
+    var acceptedAt: String?
+    var interpretationStartedAt: String?
+    var reviewReadyAt: String?
 
     var isReady: Bool { status == "ready" }
     var isFailed: Bool { status == "processing_failed" }

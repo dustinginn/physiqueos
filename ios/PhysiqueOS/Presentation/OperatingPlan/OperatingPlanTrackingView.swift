@@ -42,6 +42,7 @@ struct OperatingPlanTrackingView: View {
                                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                                 OperatingPlanFieldRow(label: "Current Support", value: tracking.currentSupport)
+                                if let nextDue = tracking.nextDue { OperatingPlanFieldRow(label: "Next due", value: nextDue) }
                                 OperatingPlanFieldRow(label: "Completion", value: tracking.completion)
                                 PrimaryActionButton(title: "Edit Support") {
                                     onNavigate(.operatingPlanTrackingSupport(executionId: tracking.executionId))
@@ -89,7 +90,8 @@ struct OperatingPlanTrackingView: View {
             completion: "Weight evidence completes it automatically.",
             supportSchedule: detail.hydration.supportSchedule,
             reminderPreference: detail.hydration.reminderPreference,
-            notes: detail.hydration.notes
+            notes: detail.hydration.notes,
+            nextDue: detail.nextDue
         )
     }
 }
@@ -174,7 +176,7 @@ struct OperatingPlanTrackingSupportView: View {
                     executionId: detail.executionId, title: detail.title, purpose: detail.purpose,
                     currentSupport: detail.supportSummary, completion: "Weight evidence completes it automatically.",
                     supportSchedule: detail.hydration.supportSchedule, reminderPreference: detail.hydration.reminderPreference,
-                    notes: detail.hydration.notes
+                    notes: detail.hydration.notes, nextDue: detail.nextDue
                 )
             } catch {
                 loadError = "This support method couldn't be loaded. Pull to refresh or try again."

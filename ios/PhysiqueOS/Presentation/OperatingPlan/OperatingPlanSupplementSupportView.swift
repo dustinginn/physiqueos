@@ -74,6 +74,7 @@ struct OperatingPlanSupplementSupportView: View {
                         OperatingPlanFieldRow(label: "Dose / Quantity", value: [support.doseAmount, support.doseUnit].filter { !$0.isEmpty }.joined(separator: " "))
                         OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSchedulePresentation.formatSupportSchedule(support.supportSchedule))
                         OperatingPlanFieldRow(label: "Reminder", value: support.reminderPreference.label)
+                        if let nextDue = support.nextDue { OperatingPlanFieldRow(label: "Next due", value: nextDue) }
                         if !support.notes.isEmpty { OperatingPlanFieldRow(label: "Execution Notes", value: support.notes) }
                     }
                 }

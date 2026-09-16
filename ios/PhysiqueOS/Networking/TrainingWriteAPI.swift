@@ -33,7 +33,7 @@ extension TrainingWriteAPI {
 
 struct TrainingCommitResult: Decodable, Equatable, Sendable {
     var status: String
-    var reviewId: String
+    var reviewId: String?
     var reviewRevision: Int?
     var sessionId: String
     var intendedDate: String
@@ -66,19 +66,22 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
     let idempotencyStore: ProductionIdempotencyKeyStore
     let attachmentStore: TrainingLoggerAttachmentStore
     let bindingStore: TrainingEvidenceBindingStore
+    let durabilityRetryDelay: Duration
 
     init(
         api: ProductionNativeAPI,
         reviewAPI: EvidenceReviewAPI,
         idempotencyStore: ProductionIdempotencyKeyStore,
         attachmentStore: TrainingLoggerAttachmentStore = FileTrainingLoggerAttachmentStore(),
-        bindingStore: TrainingEvidenceBindingStore = TrainingEvidenceBindingStore()
+        bindingStore: TrainingEvidenceBindingStore = TrainingEvidenceBindingStore(),
+        durabilityRetryDelay: Duration = .milliseconds(500)
     ) {
         self.api = api
         self.reviewAPI = reviewAPI
         self.idempotencyStore = idempotencyStore
         self.attachmentStore = attachmentStore
         self.bindingStore = bindingStore
+        self.durabilityRetryDelay = durabilityRetryDelay
     }
 
     func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
@@ -149,22 +152,117 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             supersets.map { "\($0.id):\($0.memberExerciseIds.joined(separator: ","))" }.joined(separator: ";"),
         ])
         let key = idempotencyStore.resolvedKey(scope: "training-session.\(draft.id)", signature: signature)
-        let outcome: ProductionCommandOutcome<TrainingCommitResult> = try await api.submitCommand(
-            ProductionCommandType.commitTrainingSession,
-            idempotencyKey: key,
-            payload: payload
-        )
-        guard outcome.outcome != .pending, let result = outcome.receipt.result,
-              outcome.confirmation?.state == "confirmed" || outcome.confirmation?.trainingSessionDurable == true else {
-            throw TrainingWriteError.confirmationTimedOut
+        let confirmationStartedAt = Date()
+        do {
+            let outcome = try await submitDurableTrainingCommand(
+                payload: payload, idempotencyKey: key,
+                expectedExerciseIds: exercises.compactMap(\.canonicalExerciseId)
+            )
+            if let recovered = outcome.recovered {
+                EvidenceLifecycleDiagnostics.recordConfirmation(
+                    milliseconds: Int(Date().timeIntervalSince(confirmationStartedAt) * 1_000),
+                    outcome: "training_durable_readback"
+                )
+                return recovered
+            }
+            guard let commandOutcome = outcome.commandOutcome else { throw TrainingWriteError.confirmationTimedOut }
+            guard commandOutcome.outcome != .pending, let result = commandOutcome.receipt.result,
+                  commandOutcome.confirmation?.state == "confirmed" || commandOutcome.confirmation?.trainingSessionDurable == true else {
+                throw TrainingWriteError.confirmationTimedOut
+            }
+            EvidenceLifecycleDiagnostics.recordConfirmation(
+                milliseconds: Int(Date().timeIntervalSince(confirmationStartedAt) * 1_000),
+                outcome: "training_durable_acknowledgement"
+            )
+            // Explicit Training durability acknowledgement is the boundary,
+            // not the staged command receipt. Downstream work stays asynchronous;
+            // a fully completed evidence pipeline is not required.
+            // Any supporting-evidence binding is intentionally left in place here
+            // (not cleared) — reconciling it onto this now-durable session is a
+            // separate, later step; see `reconcileSupportingEvidenceAfterCommit`.
+            return result
+        } catch {
+            EvidenceLifecycleDiagnostics.recordConfirmation(
+                milliseconds: Int(Date().timeIntervalSince(confirmationStartedAt) * 1_000),
+                outcome: "training_unresolved"
+            )
+            throw error
         }
-        // Explicit Training durability acknowledgement is the boundary,
-        // not the staged command receipt. Downstream work stays asynchronous;
-        // a fully completed evidence pipeline is not required.
-        // Any supporting-evidence binding is intentionally left in place here
-        // (not cleared) — reconciling it onto this now-durable session is a
-        // separate, later step; see `reconcileSupportingEvidenceAfterCommit`.
-        return result
+    }
+
+    /// Training's server boundary deliberately does not acknowledge success
+    /// until the canonical TrainingSession is durable. Production proved
+    /// that this can take ~19 seconds. Do not paper over that latency with a
+    /// longer transport deadline: wait briefly for the interactive path and,
+    /// if acknowledgement is still ambiguous, replay the exact same payload with
+    /// the exact same persisted idempotency key. The server can only return
+    /// the original receipt; it cannot create a second workout.
+    private func submitDurableTrainingCommand(
+        payload: Payload,
+        idempotencyKey: String,
+        expectedExerciseIds: [String]
+    ) async throws -> DurableTrainingOutcome {
+        // Keep the interactive ambiguity budget bounded. The initial request
+        // gets the ordinary <=3s target; one short same-key replay plus
+        // canonical readback distinguishes a lost acknowledgement from work
+        // that is genuinely still processing. We do not turn a server-side
+        // continuation into a minute-long blocking spinner.
+        let maximumAttempts = 2
+        var lastUncertainError: Swift.Error?
+        for attempt in 0..<maximumAttempts {
+            do {
+                let outcome: ProductionCommandOutcome<TrainingCommitResult> = try await api.submitCommand(
+                    ProductionCommandType.commitTrainingSession,
+                    idempotencyKey: idempotencyKey,
+                    timeoutInterval: attempt == 0 ? 3 : 1,
+                    payload: payload
+                )
+                let durable = outcome.confirmation?.state == "confirmed" || outcome.confirmation?.trainingSessionDurable == true
+                if outcome.outcome != .pending, durable {
+                    return .init(commandOutcome: outcome, recovered: nil)
+                }
+            } catch {
+                guard ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) else { throw error }
+                lastUncertainError = error
+            }
+            if let recovered = try? await durableCanonicalReadback(
+                payload: payload, expectedExerciseIds: expectedExerciseIds
+            ) {
+                return .init(commandOutcome: nil, recovered: recovered)
+            }
+            if attempt + 1 < maximumAttempts {
+                try await Task.sleep(for: durabilityRetryDelay)
+            }
+        }
+        if let recovered = try? await durableCanonicalReadback(payload: payload, expectedExerciseIds: expectedExerciseIds) {
+            return .init(commandOutcome: nil, recovered: recovered)
+        }
+        if let lastUncertainError { throw lastUncertainError }
+        throw TrainingWriteError.confirmationTimedOut
+    }
+
+    private func durableCanonicalReadback(
+        payload: Payload,
+        expectedExerciseIds: [String]
+    ) async throws -> TrainingCommitResult? {
+        let canonicalId = "training|authoritative|training_logger_draft_\(payload.sessionId)"
+        let session = try await api.readResource(
+            "training-session", query: ["sessionId": canonicalId], as: TrainingSessionDetailReadModel.self
+        ).data
+        guard session.id == canonicalId, session.date == payload.localDate else { return nil }
+        let actualExerciseIds = session.exercises.compactMap(\.canonicalExerciseId)
+        guard Set(actualExerciseIds) == Set(expectedExerciseIds),
+              session.exercises.reduce(0, { $0 + $1.sets.count }) == payload.exercises.reduce(0, { $0 + $1.sets.count })
+        else { return nil }
+        return TrainingCommitResult(
+            status: "durable_readback", reviewId: nil, sessionId: payload.sessionId,
+            intendedDate: payload.localDate, exerciseIds: actualExerciseIds
+        )
+    }
+
+    private struct DurableTrainingOutcome {
+        var commandOutcome: ProductionCommandOutcome<TrainingCommitResult>?
+        var recovered: TrainingCommitResult?
     }
 
     func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async {

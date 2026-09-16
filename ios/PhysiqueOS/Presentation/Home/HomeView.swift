@@ -104,6 +104,7 @@ struct HomeView: View {
         // visible notice on denial instead of silently scheduling nothing.
         _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
         environment.notificationAuthorizationStatus = await PriorityNotificationScheduler.sync(items: home.todaysFocus, center: center)
+        await BriefingReadyNotifier.reconcile(cards: home.briefingCards, center: center)
     }
 
     /// Whether at least one of today's focus items would actually have

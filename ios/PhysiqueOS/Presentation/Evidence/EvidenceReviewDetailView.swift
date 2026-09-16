@@ -495,12 +495,14 @@ struct EvidenceReviewDetailView: View {
     private func confirm(review: EvidenceReviewDetailReadModel) async {
         guard let version = review.version else { return }
         let domain = Self.domain(for: review)
+        let confirmationStartedAt = ContinuousClock.now
         actionState = .confirming("Confirming…")
         do {
             let confirmation = try await environment.evidenceIntakePipeline.commitReview(
                 domain: domain, reviewId: reviewId, expectedVersion: String(version)
             )
             if confirmation?.state == "confirmed" {
+                Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "confirmed")
                 actionState = .confirmed
                 return
             }
@@ -518,6 +520,7 @@ struct EvidenceReviewDetailView: View {
                     pollInterval: Self.fastFollowUpPollInterval, maxPolls: Self.fastFollowUpMaxPolls
                 )
                 actionState = .confirmed
+                Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "confirmed_readback")
                 return
             } catch ProductionEvidenceIntakePipeline.Error.commitFailed {
                 actionState = .failed("This review needs another look — the canonical commit failed. Reopen it to try again.")
@@ -528,6 +531,7 @@ struct EvidenceReviewDetailView: View {
                 // false Confirm failure. The outbox still owns finishing it.
             }
             actionState = .accepted
+            Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "accepted_processing")
             return
         } catch {
             if !ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) {
@@ -556,6 +560,12 @@ struct EvidenceReviewDetailView: View {
         } catch {
             actionState = .stillProcessing
         }
+    }
+
+    private static func recordConfirmationTiming(from start: ContinuousClock.Instant, outcome: String) {
+        let components = start.duration(to: .now).components
+        let milliseconds = Int(components.seconds * 1_000 + components.attoseconds / 1_000_000_000_000_000)
+        EvidenceLifecycleDiagnostics.recordConfirmation(milliseconds: milliseconds, outcome: outcome)
     }
 
     private func dismissReview(review: EvidenceReviewDetailReadModel) async {
@@ -626,7 +636,24 @@ struct EvidenceReviewDetailView: View {
     }
 
     private static func errorMessage(for error: Error) -> String {
-        if let productionError = error as? ProductionNativeError { return productionError.errorDescription ?? "This review could not be updated." }
+        if let productionError = error as? ProductionNativeError {
+            let problem: ProductionProblemDetails? = switch productionError {
+            case .validation(let value), .failedPrecondition(let value),
+                 .preconditionRequired(let value), .conflict(let value): value
+            default: nil
+            }
+            if problem?.code == "NUTRITION_DAILY_TOTALS_CONFLICT" {
+                let fields = problem?.fieldErrors.compactMap { field -> String? in
+                    guard field.code == "conflicts_with_meal_totals" else { return nil }
+                    return field.field.split(separator: ".").last.map {
+                        String($0).replacingOccurrences(of: "_", with: " ")
+                    }
+                } ?? []
+                let fieldCopy = fields.isEmpty ? "one or more totals" : fields.joined(separator: ", ")
+                return "The meal sum conflicts with the daily total for \(fieldCopy). Dismiss this review, correct the source totals, and upload it again."
+            }
+            return productionError.errorDescription ?? "This review could not be updated."
+        }
         return "This review could not be updated."
     }
 

@@ -93,6 +93,7 @@ struct OperatingPlanPeptideExecutionView: View {
                         OperatingPlanFieldRow(label: "Current dose", value: currentDose(execution))
                         OperatingPlanFieldRow(label: "Current phase", value: currentPhase(execution))
                         OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSchedulePresentation.formatSupportSchedule(execution.supportSchedule))
+                        if let nextDue = execution.nextDue { OperatingPlanFieldRow(label: "Next due", value: nextDue) }
                         OperatingPlanFieldRow(label: "Next dose change", value: nextDoseChange(execution))
                         OperatingPlanFieldRow(label: "Status", value: execution.state == .invalid ? "Needs dosing update" : "Current")
                     }

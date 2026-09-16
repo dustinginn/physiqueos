@@ -380,6 +380,12 @@ private struct CoachingUpdatesEditor: View {
                                 Picker("Preferred time", selection: Binding(get: { model.photos.timeOfDay }, set: { self.model?.photos.timeOfDay = $0 })) {
                                     ForEach(TimeOfDayChoice.allCases) { Text($0.label).tag($0) }
                                 }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
+                                if model.photos.timeOfDay == .specific {
+                                    exactTimePicker(label: "Specific time", value: Binding(
+                                        get: { model.photos.specificTime ?? "08:00" },
+                                        set: { self.model?.photos.specificTime = $0 }
+                                    ))
+                                }
                                 Divider().overlay(PhysiqueOSTheme.divider)
                                 Toggle("Remind me about Progress Photos", isOn: Binding(get: { model.photos.reminderEnabled }, set: { self.model?.photos.reminderEnabled = $0 }))
                                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy).tint(PhysiqueOSTheme.accent)
@@ -424,13 +430,9 @@ private struct CoachingUpdatesEditor: View {
                     }
 
                     OperatingPlanSection("Notifications") {
-                        VStack(spacing: 8) {
-                            ForEach(CoachingNotificationPreference.allCases) { preference in
-                                OperatingPlanChoicePill(title: preference.label, isSelected: model.notificationPreference == preference) {
-                                    self.model?.notificationPreference = preference
-                                }
-                            }
-                        }
+                        Text("Enabled briefings notify you when the canonical update is published. iOS notification permission controls delivery.")
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
 
                     if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
@@ -472,6 +474,8 @@ private struct CoachingUpdatesEditor: View {
     }
 
     private func save(_ model: CoachingUpdatesEditorReadModel) {
+        var model = model
+        model.notificationPreference = .notifyWhenReady
         switch environment.nativeAuthority {
         case .sandbox:
             store.saveCoaching(model)
@@ -489,7 +493,12 @@ private struct CoachingUpdatesEditor: View {
                     _ = try await environment.coachingUpdatesAPI.save(detail, model: model)
                     onSaved()
                 } catch {
-                    errorMessage = "Coaching Updates were not saved. No partial configuration was accepted. Refresh before retrying."
+                    if let productionError = error as? ProductionNativeError,
+                       let message = productionError.errorDescription {
+                        errorMessage = "\(message) No partial configuration was accepted."
+                    } else {
+                        errorMessage = "Coaching Updates were not saved. No partial configuration was accepted. Refresh before retrying."
+                    }
                 }
             }
         }

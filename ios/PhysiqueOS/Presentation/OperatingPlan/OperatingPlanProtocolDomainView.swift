@@ -108,6 +108,11 @@ struct OperatingPlanProtocolDomainView: View {
                     }
                     Spacer(minLength: 6)
                     if isPaused { StatusChip(text: "Paused", color: .muted) }
+                    else if method.reminderEnabled == true {
+                        Image(systemName: "bell.fill")
+                            .foregroundStyle(PhysiqueOSTheme.accent)
+                            .accessibilityLabel("Reminder on")
+                    }
                 }
                 OperatingPlanFieldRow(label: "Support", value: method.supportSummary)
                 if let dose = method.currentDose {
