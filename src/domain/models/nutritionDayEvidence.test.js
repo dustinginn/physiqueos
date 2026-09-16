@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyNutritionDayMealAggregation,
   createNutritionDayEvidenceObject,
+  reconcilePersistedNutritionPartialSubtotal,
   reconcileNutritionDayEvidence,
   restoreCollapsedNutritionFoodDuplicates,
 } from "./nutritionDayEvidence";
@@ -115,6 +116,71 @@ describe("NutritionDay evidence structure", () => {
       .toContain("carbs_g");
   });
 
+  it("deterministically recovers a persisted split-artifact subtotal without rereading evidence", () => {
+    const persisted = createNutritionDayEvidenceObject({
+      id: "nutrition-sep-15",
+      date: "2026-09-15",
+      dailyTotals: { calories: 1496, protein_g: 59, carbs_g: 114, fat_g: 91 },
+      metadata: {
+        daily_totals_scope: "full_day_summary",
+        daily_totals_source_artifact_refs: ["artifact-dinner-snacks"],
+      },
+      meals: [
+        meal("Breakfast", 400, 61, 27, 6, "artifact-breakfast-lunch"),
+        meal("Lunch", 588, 61, 24, 23, "artifact-breakfast-lunch"),
+        meal("Dinner", 809, 47, 27, 57, "artifact-dinner-snacks"),
+        meal("Snacks", 687, 12, 87, 34, "artifact-dinner-snacks"),
+      ],
+    });
+
+    expect(persisted.metadata.daily_totals_reconciliation.status).toBe("needs_review");
+    const recovered = reconcilePersistedNutritionPartialSubtotal(persisted);
+
+    expect(recovered.changed).toBe(true);
+    expect(recovered.proof).toEqual({
+      sourceArtifactRefs: ["artifact-dinner-snacks"],
+      sourceMealIds: ["dinner", "snacks"],
+      totalMealCount: 4,
+    });
+    expect(recovered.evidenceObject.daily_totals).toEqual(expect.objectContaining({
+      calories: 2484,
+      protein_g: 181,
+      carbs_g: 165,
+      fat_g: 120,
+    }));
+    expect(recovered.evidenceObject.metadata).toEqual(expect.objectContaining({
+      daily_totals_scope: "partial_meal_subtotal",
+      daily_totals_source_artifact_refs: ["artifact-dinner-snacks"],
+      daily_totals_reconciliation: expect.objectContaining({
+        status: "reconciled",
+        conflicting_fields: [],
+        source_daily_totals: expect.objectContaining({ calories: 1496 }),
+      }),
+    }));
+  });
+
+  it("does not demote a genuine independent full-day summary", () => {
+    const persisted = createNutritionDayEvidenceObject({
+      id: "nutrition-full-summary",
+      date: "2026-09-15",
+      dailyTotals: { calories: 2484, protein_g: 181, carbs_g: 165, fat_g: 120 },
+      metadata: {
+        daily_totals_scope: "full_day_summary",
+        daily_totals_source_artifact_refs: ["artifact-summary"],
+      },
+      meals: [
+        meal("Breakfast", 400, 61, 27, 6, "artifact-meals"),
+        meal("Lunch", 588, 61, 24, 23, "artifact-meals"),
+        meal("Dinner", 809, 47, 27, 57, "artifact-meals"),
+        meal("Snacks", 687, 12, 87, 34, "artifact-meals"),
+      ],
+    });
+
+    const recovered = reconcilePersistedNutritionPartialSubtotal(persisted);
+    expect(recovered).toEqual({ changed: false, evidenceObject: persisted });
+    expect(persisted.metadata.daily_totals_scope).toBe("full_day_summary");
+  });
+
   it("recovers a legacy collapsed duplicate only with corroborating ID and calorie gaps", () => {
     const foods = restoreCollapsedNutritionFoodDuplicates({
       totals: { calories: 420 },
@@ -132,3 +198,13 @@ describe("NutritionDay evidence structure", () => {
     expect(foods[1]).toEqual(expect.objectContaining({ name: "Chicken" }));
   });
 });
+
+function meal(name, calories, protein_g, carbs_g, fat_g, artifactRef) {
+  return {
+    id: name.toLowerCase(),
+    name,
+    totals: { calories, protein_g, carbs_g, fat_g },
+    provenance_ref: artifactRef,
+    provenance: { source_artifact_refs: [artifactRef] },
+  };
+}

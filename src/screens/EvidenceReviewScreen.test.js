@@ -188,7 +188,8 @@ describe("EvidenceReviewScreen selection interaction", () => {
   it("preserves save-for-later, discard, and reprocessing controls", () => {
     expect(screen).toContain("Save and return later");
     expect(screen).toContain("Discard review");
-    expect(screen).toContain("Read upload again");
+    expect(screen).toContain("Update saved review");
+    expect(screen).toContain('name="expectedVersion"');
     expect(screen).toContain("reprocessEligibility.eligible");
     expect(page).toContain("resolveEvidenceReviewReprocessEligibility");
   });
@@ -201,7 +202,7 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain('reprocessOutcome === "current"');
     expect(screen).toContain("No newer interpretation is available.");
     expect(screen).toContain('reprocessOutcome === "failed"');
-    expect(screen).toContain("Re-read failed. Your previous review is still intact.");
+    expect(screen).toContain("Review update failed. Your previous review is still intact.");
     expect(screen).toContain('aria-live="polite"');
     expect(screen).toContain('aria-live="assertive"');
   });

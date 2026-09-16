@@ -215,10 +215,10 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
             ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
           </form>
         )}
-        {canEdit && reprocessEligibility.eligible && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
+        {canEdit && reprocessEligibility.eligible && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><input name="expectedVersion" type="hidden" value={review.version} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
         {reprocessOutcome === "updated" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">Review updated from the original evidence.</p></Card>}
         {reprocessOutcome === "current" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">No newer interpretation is available.</p></Card>}
-        {reprocessOutcome === "failed" && <Card className="mt-3" variant="warning"><p aria-live="assertive" className="text-sm font-bold text-[var(--text-primary)]">Re-read failed. Your previous review is still intact.</p></Card>}
+        {reprocessOutcome === "failed" && <Card className="mt-3" variant="warning"><p aria-live="assertive" className="text-sm font-bold text-[var(--text-primary)]">Review update failed. Your previous review is still intact.</p></Card>}
         {dexaEditOutcome === "updated" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">DEXA measurements updated. Review them once more before saving.</p></Card>}
         {dexaEditOutcome === "stale" && <Card className="mt-3" variant="warning"><p aria-live="assertive" className="text-sm font-bold text-[var(--text-primary)]">This review changed before the DEXA correction was saved. Review the current values and try again.</p></Card>}
         {photoEditOutcome === "stale" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">This photo review changed while an update was saving. Your saved selections are intact, and the current review has been refreshed.</p></Card>}
@@ -802,7 +802,7 @@ function EvidenceContinuationButton() {
 
 function ReprocessButton() {
   const { pending } = useFormStatus();
-  return <button className="min-h-12 w-full cursor-pointer rounded-2xl border border-[var(--divider)] px-4 text-sm font-bold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={pending} type="submit">{pending ? "Reading upload again\u2026" : "Read upload again"}</button>;
+  return <button className="min-h-12 w-full cursor-pointer rounded-2xl border border-[var(--divider)] px-4 text-sm font-bold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={pending} type="submit">{pending ? "Updating saved review\u2026" : "Update saved review"}</button>;
 }
 
 function DiscardReviewControl({ action, recoveryContext, reviewId }) {

@@ -2222,7 +2222,7 @@ function selectNutritionDailyTotalsAuthority(objects = []) {
     .filter((object) => hasMeaningfulNutritionTotals(object.daily_totals))
     .map((object) => ({
       object,
-      scope: resolveNutritionDailyTotalsScope(object),
+      scope: resolveNutritionDailyTotalsScope(object, objects),
       sourceArtifactRefs: getNutritionDailyTotalsSourceArtifactRefs(object),
     }))
     .sort(compareNutritionAuthorityCandidates);
@@ -2233,8 +2233,8 @@ function selectNutritionDailyTotalsAuthority(objects = []) {
 function orderNutritionObjectsByAuthority(objects = []) {
   return [...objects].sort((first, second) =>
     compareNutritionAuthorityCandidates(
-      { object: first, scope: resolveNutritionDailyTotalsScope(first) },
-      { object: second, scope: resolveNutritionDailyTotalsScope(second) }
+      { object: first, scope: resolveNutritionDailyTotalsScope(first, objects) },
+      { object: second, scope: resolveNutritionDailyTotalsScope(second, objects) }
     )
   );
 }
@@ -2256,7 +2256,17 @@ function nutritionScopeRank(scope) {
   })[scope] ?? 1;
 }
 
-function resolveNutritionDailyTotalsScope(object = {}) {
+function resolveNutritionDailyTotalsScope(object = {}, sameDateObjects = []) {
+  // Interpreter scope is evidence, not authority. When multiple same-date
+  // artifacts each show a strict subset of the day's meals and a candidate's
+  // totals exactly reconcile to only that artifact's visible meals, those
+  // totals are structurally a partial subtotal. This protects split diary
+  // screenshots even if a model labels the artifact `unknown` or incorrectly
+  // calls it a full-day summary. An independent summary (normally no meals) or
+  // an artifact containing the complete merged meal set is left untouched.
+  if (isStructurallyPartialNutritionSubtotal(object, sameDateObjects)) {
+    return NutritionDailyTotalsScope.PARTIAL_MEAL_SUBTOTAL;
+  }
   const explicit = object.metadata?.daily_totals_scope;
   if (Object.values(NutritionDailyTotalsScope).includes(explicit)) {
     return explicit;
@@ -2285,6 +2295,30 @@ function resolveNutritionDailyTotalsScope(object = {}) {
     return NutritionDailyTotalsScope.FULL_DAY_SUMMARY;
   }
   return NutritionDailyTotalsScope.UNKNOWN;
+}
+
+function isStructurallyPartialNutritionSubtotal(object = {}, sameDateObjects = []) {
+  const meals = object.meals ?? [];
+  if (meals.length === 0 || sameDateObjects.length < 2) return false;
+  if (!hasMeaningfulNutritionTotals(object.daily_totals)) return false;
+
+  const reconciliation = reconcileNutritionDayEvidence({
+    dailyTotals: object.daily_totals,
+    meals,
+  });
+  if (reconciliation.status !== "reconciled") return false;
+
+  const candidateMealKeys = new Set(meals.map(nutritionMealScopeKey).filter(Boolean));
+  const mergedMealKeys = new Set(
+    sameDateObjects.flatMap((candidate) =>
+      (candidate.meals ?? []).map(nutritionMealScopeKey).filter(Boolean)
+    )
+  );
+  return candidateMealKeys.size > 0 && candidateMealKeys.size < mergedMealKeys.size;
+}
+
+function nutritionMealScopeKey(meal = {}) {
+  return cleanMetadataText(meal.name ?? meal.id)?.toLowerCase() ?? null;
 }
 
 function getNutritionDailyTotalsSourceArtifactRefs(object = {}) {

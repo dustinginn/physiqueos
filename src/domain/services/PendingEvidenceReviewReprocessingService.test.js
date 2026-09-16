@@ -13,6 +13,7 @@ import {
   PENDING_REVIEW_REPROCESS_VERSION,
 } from "./PendingEvidenceReviewReprocessingService";
 import { registerRuntimeTrainingExercises } from "../models/trainingExerciseIdentity";
+import { createNutritionDayEvidenceObject } from "../models/nutritionDayEvidence";
 
 const REVIEW_ID = "evidence_review_20260715011556399";
 const PACKAGE_ID = "evidence_submission_20260715011517048_images";
@@ -32,6 +33,7 @@ function fixture({ status = "pending", sources, canonical = [] } = {}) {
   const malformed = { ...trainingObject([{ id: "leg_press_feet_middle", name: "Leg Press (Feet Middle)", sets: Array.from({ length: 10 }, (_, index) => ({ set_number: index + 1, reps: 10, weight: 35, weight_unit: "lb", provenance_ref: "typed_evidence_0" })), provenance_ref: "typed_evidence_0" }]), captured_at: "2026-07-14T18:01:00-07:00" };
   const review = {
     id: REVIEW_ID, userId: "founder", source: "universal_intake", status,
+    version: 1,
     createdAt: "2026-07-15T01:15:56.399Z", updatedAt: "2026-07-15T01:15:56.399Z",
     interpretedEvidence: { ...structuredClone(evidencePackage), evidence_objects: [malformed] },
     evidenceTypes: ["training"], confirmation: null, commitProgress: {}, itemDecisions: {},
@@ -43,6 +45,82 @@ function fixture({ status = "pending", sources, canonical = [] } = {}) {
     canonicalEvidence: { listCanonicalEvidenceObjects: vi.fn(async () => canonical) },
   };
   return { changes, evidencePackage, repositories, review };
+}
+
+function nutritionFixture({ genuineFullDaySummary = false } = {}) {
+  const packageId = "evidence_submission_sep15_nutrition_images";
+  const reviewId = "evidence_review_sep15_nutrition";
+  const dinnerArtifact = "artifact-dinner-snacks";
+  const breakfastArtifact = "artifact-breakfast-lunch";
+  const summaryArtifact = "artifact-full-day-summary";
+  const sourceArtifactRef = genuineFullDaySummary ? summaryArtifact : dinnerArtifact;
+  const dailyTotals = genuineFullDaySummary
+    ? { calories: 2484, protein_g: 181, carbs_g: 165, fat_g: 120 }
+    : { calories: 1496, protein_g: 59, carbs_g: 114, fat_g: 91 };
+  const nutrition = createNutritionDayEvidenceObject({
+    id: "nutrition|2026-09-15",
+    date: "2026-09-15",
+    dailyTotals,
+    metadata: {
+      daily_totals_scope: "full_day_summary",
+      daily_totals_source_artifact_refs: [sourceArtifactRef],
+    },
+    meals: [
+      nutritionMeal("Breakfast", 400, 61, 27, 6, breakfastArtifact),
+      nutritionMeal("Lunch", 588, 61, 24, 23, breakfastArtifact),
+      nutritionMeal("Dinner", 809, 47, 27, 57, dinnerArtifact),
+      nutritionMeal("Snacks", 687, 12, 87, 34, dinnerArtifact),
+    ],
+  });
+  const sourceArtifacts = [
+    { id: dinnerArtifact, kind: "screenshot", storage_path: "private/nutrition-1" },
+    { id: breakfastArtifact, kind: "screenshot", storage_path: "private/nutrition-2" },
+    ...(genuineFullDaySummary
+      ? [{ id: summaryArtifact, kind: "screenshot", storage_path: "private/nutrition-summary" }]
+      : []),
+  ];
+  const evidencePackage = {
+    package_id: packageId,
+    userId: "founder",
+    provenance: { source_artifacts: sourceArtifacts },
+    evidence_objects: [structuredClone(nutrition)],
+  };
+  const review = {
+    id: reviewId,
+    userId: "founder",
+    source: "universal_intake",
+    status: "pending",
+    version: 1,
+    createdAt: "2026-09-16T00:42:59.103Z",
+    updatedAt: "2026-09-16T00:42:59.103Z",
+    interpretedEvidence: {
+      ...structuredClone(evidencePackage),
+      evidence_objects: [structuredClone(nutrition)],
+    },
+    evidenceTypes: ["nutrition"],
+    confirmation: null,
+    commitProgress: {},
+    itemDecisions: {},
+  };
+  const changes = [];
+  const repositories = {
+    evidenceReviews: createEvidenceReviewRepository([review], {
+      onChange: (name) => changes.push(name),
+    }),
+    evidencePackages: createEvidencePackageRepository([evidencePackage]),
+    canonicalEvidence: { listCanonicalEvidenceObjects: vi.fn(async () => []) },
+  };
+  return { changes, evidencePackage, repositories, review };
+}
+
+function nutritionMeal(name, calories, protein_g, carbs_g, fat_g, artifactRef) {
+  return {
+    id: name.toLowerCase(),
+    name,
+    totals: { calories, protein_g, carbs_g, fat_g },
+    provenance_ref: artifactRef,
+    provenance: { source_artifact_refs: [artifactRef] },
+  };
 }
 
 function trainingObject(exercises = parseStrengthTrainingText(JUL_14_STRENGTH_NOTE)) {
@@ -165,7 +243,7 @@ describe("reprocessPendingReviewInPlace", () => {
 
     const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
 
-    expect(PENDING_REVIEW_REPROCESS_VERSION).toBe("pending-review-parser-v5");
+    expect(PENDING_REVIEW_REPROCESS_VERSION).toBe("pending-review-parser-v6");
     expect(result).toMatchObject({ changed: true, idempotent: false });
     expect(result.review.reprocessing.version).toBe(PENDING_REVIEW_REPROCESS_VERSION);
     expect(result.review.reprocessing.sourceArtifactFingerprint).toBe(previousSourceFingerprint);
@@ -448,6 +526,102 @@ Skull crushers
     expect(reinterpret).toHaveBeenCalledTimes(1);
     expect((await state.repositories.evidenceReviews.getReviewById(REVIEW_ID)).updatedAt).toBe(updatedAt);
     expect(state.changes).toHaveLength(2);
+  });
+
+  it("reconciles a retained Nutrition partial subtotal without invoking the provider", async () => {
+    const state = nutritionFixture();
+    const reinterpret = vi.fn();
+    const service = createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+      reinterpret,
+      now: clock(),
+    });
+
+    const result = await service.reconcilePendingNutritionReviewInPlace(
+      state.review.id,
+      { expectedVersion: 1 }
+    );
+
+    expect(reinterpret).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ changed: true, idempotent: false });
+    expect(result.review).toMatchObject({
+      id: state.review.id,
+      status: "pending",
+      version: 1,
+      confirmation: null,
+      commitProgress: {},
+      reprocessing: {
+        operation: "reconcilePendingNutritionReviewInPlace",
+        status: "complete",
+        expectedVersion: 1,
+        version: "pending-nutrition-structural-reconciliation-v1",
+      },
+    });
+    expect(result.review.interpretedEvidence.evidence_objects[0]).toMatchObject({
+      daily_totals: {
+        calories: 2484,
+        protein_g: 181,
+        carbs_g: 165,
+        fat_g: 120,
+      },
+      metadata: {
+        daily_totals_scope: "partial_meal_subtotal",
+        daily_totals_reconciliation: {
+          status: "reconciled",
+          conflicting_fields: [],
+        },
+      },
+    });
+    expect(await state.repositories.evidencePackages.getEvidencePackageById(
+      state.evidencePackage.package_id
+    )).toEqual(state.evidencePackage);
+    expect(state.changes).toEqual(["evidenceReviews", "evidenceReviews"]);
+  });
+
+  it("rejects stale deterministic Nutrition reconciliation before changing the review", async () => {
+    const state = nutritionFixture();
+    const before = structuredClone(state.review);
+
+    await expect(createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+    }).reconcilePendingNutritionReviewInPlace(state.review.id, {
+      expectedVersion: 2,
+    })).rejects.toMatchObject({ code: "EVIDENCE_REVIEW_VERSION_CONFLICT" });
+
+    expect(state.review).toEqual(before);
+    expect(state.changes).toHaveLength(0);
+  });
+
+  it("rechecks the Nutrition review version atomically when claiming recovery", async () => {
+    const state = nutritionFixture();
+    const claim = state.repositories.evidenceReviews.claimPendingReviewReprocess;
+    state.repositories.evidenceReviews.claimPendingReviewReprocess = async (...args) => {
+      state.review.version = 2;
+      return claim(...args);
+    };
+
+    await expect(createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+    }).reconcilePendingNutritionReviewInPlace(state.review.id, {
+      expectedVersion: 1,
+    })).rejects.toMatchObject({ code: "EVIDENCE_REVIEW_VERSION_CONFLICT" });
+
+    expect(state.review.reprocessing).toBeUndefined();
+    expect(state.changes).toHaveLength(0);
+  });
+
+  it("refuses deterministic Nutrition reconciliation without strict artifact-subset proof", async () => {
+    const state = nutritionFixture({ genuineFullDaySummary: true });
+    const before = structuredClone(state.review);
+
+    await expect(createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+    }).reconcilePendingNutritionReviewInPlace(state.review.id, {
+      expectedVersion: 1,
+    })).rejects.toMatchObject({ code: "NUTRITION_RECONCILIATION_NOT_APPLICABLE" });
+
+    expect(state.review).toEqual(before);
+    expect(state.changes).toHaveLength(0);
   });
 
   it("preserves the prior candidate on failure and permits retry", async () => {

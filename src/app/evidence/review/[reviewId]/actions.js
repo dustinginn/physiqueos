@@ -99,17 +99,29 @@ function uniqueStrings(values = []) {
 
 export async function reprocessEvidenceReview(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
+  const expectedVersion = Number(formData.get("expectedVersion"));
   const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   const user = await FounderRepositories.users.getCurrentUser();
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   const recoveryContext = resolveRecoveryContext(review, formData);
   let outcome = "failed";
   try {
-    const result = await createPendingEvidenceReviewReprocessingService({
+    const service = createPendingEvidenceReviewReprocessingService({
       repositories: FounderRepositories,
       loadArtifact: createApplicationStoredArtifactLoader({ userId: user.id }),
-    })
-      .reprocessPendingReviewInPlace(reviewId);
+    });
+    const evidenceTypes = uniqueStrings(
+      review.evidenceTypes?.length
+        ? review.evidenceTypes
+        : (review.interpretedEvidence?.evidence_objects ?? []).map(
+            (object) => object.evidence_type
+          )
+    );
+    const result = evidenceTypes.length === 1 && evidenceTypes[0] === "nutrition"
+      ? await service.reconcilePendingNutritionReviewInPlace(reviewId, {
+          expectedVersion,
+        })
+      : await service.reprocessPendingReviewInPlace(reviewId);
     outcome = result.changed ? "updated" : "current";
   } catch (error) {
     console.warn("[EvidenceReview] Pending review re-read failed.", {

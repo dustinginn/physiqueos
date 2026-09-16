@@ -7,10 +7,13 @@ import {
 import { resolveExecutionVariantHeading } from "../models/trainingSessionEvidence";
 import { remapTrainingExerciseRelationshipGroups } from "../models/trainingExerciseRelationship";
 import { resolveEvidenceReviewReprocessEligibility } from "./EvidenceReviewReprocessEligibility";
+import { reconcilePersistedNutritionPartialSubtotal } from "../models/nutritionDayEvidence";
 
 // Increment intentionally when a parser correction should make retained pending
 // evidence eligible for one new bounded interpretation.
-export const PENDING_REVIEW_REPROCESS_VERSION = "pending-review-parser-v5";
+export const PENDING_REVIEW_REPROCESS_VERSION = "pending-review-parser-v6";
+export const PENDING_NUTRITION_RECONCILIATION_VERSION =
+  "pending-nutrition-structural-reconciliation-v1";
 
 export class PendingEvidenceReviewReprocessError extends Error {
   constructor(code, message) {
@@ -28,6 +31,121 @@ export function createPendingEvidenceReviewReprocessingService({
   version = PENDING_REVIEW_REPROCESS_VERSION,
 } = {}) {
   return {
+    async reconcilePendingNutritionReviewInPlace(reviewId, { expectedVersion } = {}) {
+      const review = await repositories.evidenceReviews.getReviewById(reviewId);
+      assertExpectedVersion(review, expectedVersion);
+      const packageId = review?.interpretedEvidence?.package_id;
+      const evidencePackage = packageId
+        ? await repositories.evidencePackages.getEvidencePackageById(packageId)
+        : null;
+      const canonicalObjects = review && repositories.canonicalEvidence?.listCanonicalEvidenceObjects
+        ? await repositories.canonicalEvidence.listCanonicalEvidenceObjects(review.userId)
+        : [];
+      const eligibility = resolveEvidenceReviewReprocessEligibility({
+        review,
+        evidencePackage,
+        canonicalObjects,
+      });
+      if (!eligibility.eligible) fail(eligibility.code, eligibility.reason);
+
+      const evidenceObjects = review.interpretedEvidence?.evidence_objects ?? [];
+      if (
+        evidenceObjects.length === 0 ||
+        evidenceObjects.some((object) => object?.evidence_type !== "nutrition")
+      ) {
+        fail(
+          "NUTRITION_RECONCILIATION_UNAVAILABLE",
+          "Only a pending Nutrition review can use deterministic Nutrition reconciliation."
+        );
+      }
+
+      const reconciled = evidenceObjects.map((object) =>
+        reconcilePersistedNutritionPartialSubtotal(object)
+      );
+      if (!reconciled.some((result) => result.changed)) {
+        fail(
+          "NUTRITION_RECONCILIATION_NOT_APPLICABLE",
+          "The retained Nutrition review does not contain a proven partial-subtotal conflict."
+        );
+      }
+
+      const sourceArtifactFingerprint = fingerprint(
+        evidencePackage.provenance?.source_artifacts
+      );
+      const operationId =
+        `reconcile_pending_nutrition_review:${review.id}:${expectedVersion}`;
+      const claimedAt = now().toISOString();
+      const priorCandidateFingerprint = fingerprint(review.interpretedEvidence);
+      const proof = reconciled
+        .filter((result) => result.changed)
+        .map((result) => result.proof);
+      await repositories.evidenceReviews.claimPendingReviewReprocess(review.id, {
+        operation: "reconcilePendingNutritionReviewInPlace",
+        operationId,
+        status: "in_progress",
+        claimedAt,
+        expectedVersion: Number(expectedVersion),
+        sourcePackageId: packageId,
+        sourceArtifactFingerprint,
+        version: PENDING_NUTRITION_RECONCILIATION_VERSION,
+        priorCandidateFingerprint,
+        proof,
+      });
+
+      try {
+        const interpretedEvidence = {
+          ...structuredClone(review.interpretedEvidence),
+          evidence_objects: reconciled.map((result) =>
+            structuredClone(result.evidenceObject)
+          ),
+        };
+        const completedAt = now().toISOString();
+        const lifecycle = {
+          operation: "reconcilePendingNutritionReviewInPlace",
+          operationId,
+          status: "complete",
+          claimedAt,
+          completedAt,
+          expectedVersion: Number(expectedVersion),
+          sourcePackageId: packageId,
+          sourceArtifactFingerprint,
+          version: PENDING_NUTRITION_RECONCILIATION_VERSION,
+          priorCandidateFingerprint,
+          resultingCandidateFingerprint: fingerprint(interpretedEvidence),
+          proof,
+        };
+        const updated = await repositories.evidenceReviews.completePendingReviewReprocess(
+          review.id,
+          {
+            interpretedEvidence,
+            evidenceTypes: ["nutrition"],
+            lifecycle,
+          }
+        );
+        return { review: updated, idempotent: false, changed: true };
+      } catch (error) {
+        const failedAt = now().toISOString();
+        await repositories.evidenceReviews.failPendingReviewReprocess(review.id, {
+          operation: "reconcilePendingNutritionReviewInPlace",
+          operationId,
+          status: "failed",
+          claimedAt,
+          failedAt,
+          expectedVersion: Number(expectedVersion),
+          sourcePackageId: packageId,
+          sourceArtifactFingerprint,
+          version: PENDING_NUTRITION_RECONCILIATION_VERSION,
+          priorCandidateFingerprint,
+          proof,
+          error: {
+            code: error?.code ?? "REPROCESS_FAILED",
+            message: String(error?.message ?? error).slice(0, 300),
+          },
+        });
+        throw error;
+      }
+    },
+
     async reprocessPendingReviewInPlace(reviewId) {
       const review = await repositories.evidenceReviews.getReviewById(reviewId);
       const packageId = review?.interpretedEvidence?.package_id;
@@ -312,6 +430,23 @@ function resolveDedicatedDexaSourcePackage(review) {
 function assertReproducedCandidate(candidate) {
   if (!candidate || candidate.quality?.status === "failed" || !(candidate.evidence_objects ?? []).length) {
     fail("INTERPRETATION_INCOMPLETE", "The retained evidence could not reproduce a review candidate.");
+  }
+}
+
+function assertExpectedVersion(review, expectedVersion) {
+  const expected = Number(expectedVersion);
+  if (!Number.isInteger(expected) || expected < 1) {
+    fail(
+      "EXPECTED_VERSION_REQUIRED",
+      "An exact evidence review version is required for deterministic reconciliation."
+    );
+  }
+  if (!review) fail("REVIEW_NOT_FOUND", "Evidence review was not found.");
+  if (Number(review.version) !== expected) {
+    fail(
+      "EVIDENCE_REVIEW_VERSION_CONFLICT",
+      "This evidence review changed. Reload it before reconciling Nutrition totals."
+    );
   }
 }
 

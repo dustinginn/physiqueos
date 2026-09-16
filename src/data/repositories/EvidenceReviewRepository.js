@@ -138,6 +138,15 @@ export function createEvidenceReviewRepository(reviews = [], options = {}) {
     async claimPendingReviewReprocess(id, lifecycle) {
       const review = reviews.find((item) => item.id === id);
       if (!review) return null;
+      if (
+        lifecycle?.expectedVersion !== undefined &&
+        Number(review.version) !== Number(lifecycle.expectedVersion)
+      ) {
+        throw repositoryError(
+          "EVIDENCE_REVIEW_VERSION_CONFLICT",
+          "This evidence review changed. Reload it before reprocessing."
+        );
+      }
       if (review.status !== "pending") throw repositoryError("REVIEW_NOT_PENDING", "Only pending evidence reviews can be reprocessed.");
       if (review.reprocessing?.status === "in_progress") throw repositoryError("REPROCESS_IN_PROGRESS", "This evidence review is already being reprocessed.");
       review.reprocessing = structuredClone(lifecycle);

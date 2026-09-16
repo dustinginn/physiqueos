@@ -306,8 +306,18 @@ vi.mock("../../../../domain/services/CanonicalEvidenceConfirmationCommitService"
 vi.mock("../../../../domain/services/PendingEvidenceReviewReprocessingService", () => ({
   createPendingEvidenceReviewReprocessingService: () => ({
     async reprocessPendingReviewInPlace() {
+      mockState.value.providerReprocessCalls =
+        (mockState.value.providerReprocessCalls ?? 0) + 1;
       if (mockState.value.reprocessError) throw mockState.value.reprocessError;
       return mockState.value.reprocessResult ?? { changed: false, idempotent: true };
+    },
+    async reconcilePendingNutritionReviewInPlace(reviewId, options) {
+      mockState.value.nutritionReconciliationCalls = [
+        ...(mockState.value.nutritionReconciliationCalls ?? []),
+        { reviewId, options },
+      ];
+      if (mockState.value.reprocessError) throw mockState.value.reprocessError;
+      return mockState.value.reprocessResult ?? { changed: true, idempotent: false };
     },
   }),
 }));
@@ -1478,5 +1488,27 @@ describe("reprocessEvidenceReview", () => {
     expect(mockState.value.evidenceReviews[0]).toEqual(before);
     expect(revalidatePath).toHaveBeenCalledWith(`/evidence/review/${review.id}`);
     expect(redirect).toHaveBeenCalledWith(`/evidence/review/${review.id}?reprocess=failed`);
+  });
+
+  it("routes a pending Nutrition review through version-fenced deterministic reconciliation", async () => {
+    const review = mockState.value.evidenceReviews[0];
+    review.version = 7;
+    review.evidenceTypes = ["nutrition"];
+    review.interpretedEvidence.evidence_objects = [{ evidence_type: "nutrition" }];
+    const formData = {
+      get: (key) => ({
+        reviewId: review.id,
+        expectedVersion: "7",
+      })[key] ?? null,
+    };
+
+    await expect(reprocessEvidenceReview(formData)).resolves.toBeUndefined();
+
+    expect(mockState.value.nutritionReconciliationCalls).toEqual([{
+      reviewId: review.id,
+      options: { expectedVersion: 7 },
+    }]);
+    expect(mockState.value.providerReprocessCalls ?? 0).toBe(0);
+    expect(redirect).toHaveBeenCalledWith(`/evidence/review/${review.id}?reprocess=updated`);
   });
 });

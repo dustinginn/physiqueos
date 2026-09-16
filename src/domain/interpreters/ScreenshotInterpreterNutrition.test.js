@@ -169,6 +169,61 @@ describe("screenshot NutritionDay reconciliation", () => {
     }));
     expect(result.evidence_objects[0].meals).toHaveLength(4);
   });
+
+  it.each(["unknown", "full_day_summary"])(
+    "does not promote one split MyFitnessPal artifact subtotal when its scope is %s",
+    (scope) => {
+      const result = normalizeScreenshotEvidencePackageForTest({
+        evidence_objects: [
+          splitMealCandidate("breakfast-lunch", "photo-2", scope, [
+            ["Breakfast", 400, 61, 27, 6],
+            ["Lunch", 588, 61, 24, 23],
+          ]),
+          splitMealCandidate("dinner-snacks", "photo-1", scope, [
+            ["Dinner", 809, 47, 27, 57],
+            ["Snacks", 687, 12, 87, 34],
+          ]),
+        ],
+      }, {
+        expectedEvidenceType: "nutrition",
+        normalizedScreenshots: [
+          { fileName: "nutrition-dinner-snacks.jpg" },
+          { fileName: "nutrition-breakfast-lunch.jpg" },
+        ],
+      });
+
+      const nutritionDay = result.evidence_objects[0];
+      expect(nutritionDay.daily_totals).toEqual(expect.objectContaining({
+        calories: 2484,
+        protein_g: 181,
+        carbs_g: 165,
+        fat_g: 120,
+      }));
+      expect(nutritionDay.metadata.daily_totals_scope).toBe("partial_meal_subtotal");
+      expect(nutritionDay.metadata.daily_totals_reconciliation).toEqual(
+        expect.objectContaining({
+          status: "reconciled",
+          conflicting_fields: [],
+          meal_sums: expect.objectContaining({
+            calories: 2484,
+            protein_g: 181,
+            carbs_g: 165,
+            fat_g: 120,
+          }),
+        })
+      );
+      const sourceDailyTotals = Object.fromEntries(
+        ["calories", "protein_g", "carbs_g", "fat_g"].map((field) => [
+          field,
+          nutritionDay.metadata.daily_totals_reconciliation.source_daily_totals[field],
+        ])
+      );
+      expect([
+        { calories: 988, protein_g: 122, carbs_g: 51, fat_g: 29 },
+        { calories: 1496, protein_g: 59, carbs_g: 114, fat_g: 91 },
+      ]).toContainEqual(sourceDailyTotals);
+    }
+  );
 });
 
 function sep5MealCandidate(id, ref, mealRows) {
@@ -198,6 +253,19 @@ function sep5MealCandidate(id, ref, mealRows) {
     provenance: { source_artifact_refs: [ref] },
     source: { source_artifact_refs: [ref] },
     quality: { status: "complete", limitations: [] },
+  };
+}
+
+function splitMealCandidate(id, ref, scope, mealRows) {
+  const candidate = sep5MealCandidate(id, ref, mealRows);
+  return {
+    ...candidate,
+    observed_at: "2026-09-15",
+    metadata: {
+      ...candidate.metadata,
+      date: "2026-09-15",
+      daily_totals_scope: scope,
+    },
   };
 }
 

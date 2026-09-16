@@ -301,6 +301,71 @@ export function resolveNutritionDayReconciliation(evidenceObject = {}) {
   return applyNutritionDayMealAggregation(evidenceObject).metadata.daily_totals_reconciliation;
 }
 
+// Recover a retained, already-interpreted Nutrition review without asking the
+// external interpreter to read the artifacts again. This is deliberately
+// narrower than ordinary normalization: it changes authority only when the
+// persisted source-total artifact refs identify a strict subset of the
+// persisted meals and those source totals reconcile to that subset. A genuine
+// independent full-day summary therefore remains authoritative.
+export function reconcilePersistedNutritionPartialSubtotal(evidenceObject = {}) {
+  const meals = Array.isArray(evidenceObject.meals) ? evidenceObject.meals : [];
+  const sourceDailyTotals =
+    evidenceObject.metadata?.daily_totals_reconciliation?.source_daily_totals ??
+    evidenceObject.daily_totals ??
+    {};
+  const sourceArtifactRefs = new Set(
+    (evidenceObject.metadata?.daily_totals_source_artifact_refs ?? [])
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean)
+  );
+  if (meals.length < 2 || sourceArtifactRefs.size === 0) {
+    return Object.freeze({ changed: false, evidenceObject });
+  }
+
+  const sourceMeals = meals.filter((meal) =>
+    mealSourceArtifactRefs(meal).some((ref) => sourceArtifactRefs.has(ref))
+  );
+  if (sourceMeals.length === 0 || sourceMeals.length >= meals.length) {
+    return Object.freeze({ changed: false, evidenceObject });
+  }
+
+  const sourceSubsetReconciliation = reconcileNutritionDayEvidence({
+    dailyTotals: sourceDailyTotals,
+    meals: sourceMeals,
+  });
+  if (sourceSubsetReconciliation.status !== "reconciled") {
+    return Object.freeze({ changed: false, evidenceObject });
+  }
+
+  const corrected = applyNutritionDayMealAggregation({
+    ...evidenceObject,
+    metadata: {
+      ...(evidenceObject.metadata ?? {}),
+      daily_totals_scope: NutritionDailyTotalsScope.PARTIAL_MEAL_SUBTOTAL,
+    },
+  });
+  return Object.freeze({
+    changed: true,
+    evidenceObject: corrected,
+    proof: Object.freeze({
+      sourceArtifactRefs: [...sourceArtifactRefs].sort(),
+      sourceMealIds: sourceMeals.map((meal) => meal.id).filter(Boolean).sort(),
+      totalMealCount: meals.length,
+    }),
+  });
+}
+
+function mealSourceArtifactRefs(meal = {}) {
+  return [...new Set([
+    ...(meal.provenance?.source_artifact_refs ?? []),
+    meal.provenance_ref,
+    ...(meal.foods ?? []).flatMap((food) => [
+      ...(food.provenance?.source_artifact_refs ?? []),
+      food.provenance_ref,
+    ]),
+  ].map((value) => String(value ?? "").trim()).filter(Boolean))];
+}
+
 // Older pending reviews may contain a gap left by former name-based food
 // deduplication. Recover only when item sequence and meal calories independently
 // identify one exact duplicate.
