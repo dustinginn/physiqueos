@@ -1345,6 +1345,32 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertFalse(log.hasPendingEvidenceReviews)
     }
 
+    func testProductionLogSeparatesAcceptedProcessingFromActionableReviewsAndLoggedDurability() async throws {
+        let processingJSON = productionEnvelope(
+            resource: "evidence-review-queue",
+            data: #"{"localDate":"2026-09-16","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null,"processing":false},{"id":"nutrition","summary":"Nutrition processing","context":"Confirmation accepted · No action required","recordId":null,"processing":true},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null,"processing":false}]},"pendingEvidenceReviews":[],"processingEvidenceReviews":[{"id":"review-nutrition","localDate":"2026-09-16","domain":"nutrition","label":"Nutrition","status":"committing"}]}"#
+        )
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": processingJSON,
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+        XCTAssertTrue(log.pendingEvidenceReviews.isEmpty)
+        XCTAssertFalse(log.hasPendingEvidenceReviews)
+        let nutrition = try XCTUnwrap(log.loggedToday.first { $0.kind == .nutrition })
+        XCTAssertEqual(nutrition.summary, "Nutrition processing")
+        XCTAssertEqual(nutrition.context, "Confirmation accepted · No action required")
+        XCTAssertEqual(nutrition.processing, true)
+        XCTAssertNil(nutrition.destination, "Accepted processing is not fabricated as canonical logged data.")
+        XCTAssertEqual(log.processingEvidenceReviews?.map(\.id), ["review-nutrition"])
+    }
+
     /// The architectural defect was that `logAPI` could never have
     /// switched with authority no matter what either implementation
     /// returned — this confirms the property itself is now authority-

@@ -1,5 +1,42 @@
 import SwiftUI
 
+/// Presentation-only formatting over the server-owned notification action.
+/// This never derives a schedule or dose: it merely localizes the canonical
+/// `HH:mm` and displays the canonical completion payload's dose.
+enum PriorityExecutionContextPresentation {
+    static func context(for item: PriorityOccurrence, calendar: Calendar = .current) -> String? {
+        let time = item.notificationAction?.scheduledTime.flatMap {
+            localizedTime($0, calendar: calendar)
+        }
+        let dose = item.notificationAction?.completionCommand?.payload.dose?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let values = [time, dose?.isEmpty == false ? dose : nil].compactMap { $0 }
+        return values.isEmpty ? nil : values.joined(separator: " · ")
+    }
+
+    static func primaryLine(for item: PriorityOccurrence, calendar: Calendar = .current) -> String? {
+        context(for: item, calendar: calendar) ?? item.subtitle
+    }
+
+    private static func localizedTime(_ value: String, calendar: Calendar) -> String? {
+        let components = value.split(separator: ":").compactMap { Int($0) }
+        guard components.count == 2,
+              (0...23).contains(components[0]),
+              (0...59).contains(components[1]) else { return nil }
+        let calendar = calendar
+        var date = DateComponents()
+        date.calendar = calendar
+        date.timeZone = calendar.timeZone
+        date.year = 2001
+        date.month = 1
+        date.day = 1
+        date.hour = components[0]
+        date.minute = components[1]
+        guard let resolved = calendar.date(from: date) else { return nil }
+        return resolved.formatted(date: .omitted, time: .shortened)
+    }
+}
+
 private let iconMap: [HomeFocusIcon: String] = [
     .activity: "figure.strengthtraining.traditional",
     .camera: "camera.fill",
@@ -65,8 +102,8 @@ struct FocusTileView: View {
                 Text(item.title)
                     .physiqueOSFont(PhysiqueOSTypography.focusLabel)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if density != .compact, let subtitle = item.subtitle {
-                    Text(subtitle)
+                if let executionContext = PriorityExecutionContextPresentation.primaryLine(for: item) {
+                    Text(executionContext)
                         .physiqueOSFont(PhysiqueOSTypography.focusSubtitle)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
@@ -98,7 +135,7 @@ struct FocusTileView: View {
 
     private var accessibilityLabel: String {
         var parts = [item.title]
-        if density != .compact, let subtitle = item.subtitle { parts.append(subtitle) }
+        if let context = PriorityExecutionContextPresentation.primaryLine(for: item) { parts.append(context) }
         if let metadata = item.metadata { parts.append(metadata) }
         parts.append(item.actionLabel ?? (item.completed ? "Completed" : "Not completed"))
         return parts.joined(separator: ", ")

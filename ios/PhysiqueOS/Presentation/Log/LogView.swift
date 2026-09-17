@@ -56,10 +56,33 @@ struct LogView: View {
                     PendingEvidenceReviewsCardView(reviews: log.pendingEvidenceReviews, onTap: onNavigate)
                 }
 
+                if !log.genericProcessingEvidenceReviews.isEmpty {
+                    processingCard(log.genericProcessingEvidenceReviews)
+                }
+
                 TrainingLoggerCardView(onTap: onNavigate)
 
                 UploadCardView(localDate: log.localDate, onNavigate: onNavigate)
             }
+        }
+    }
+
+    private func processingCard(_ reviews: [ProcessingEvidenceReview]) -> some View {
+        CardContainer(padding: .sm) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    ProgressView().tint(PhysiqueOSTheme.accent)
+                    Text("Processing")
+                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                }
+                ForEach(reviews) { review in
+                    Text("\(review.label) confirmation accepted · No action required")
+                        .physiqueOSFont(PhysiqueOSTypography.body14Regular)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

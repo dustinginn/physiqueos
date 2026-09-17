@@ -86,7 +86,11 @@ struct EvidenceReviewDetailView: View {
     private func load() async {
         state = .loading
         do {
-            state = .loaded(try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId))
+            let review = try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId)
+            state = .loaded(review)
+            if let review, review.status == "committing" {
+                actionState = .accepted
+            }
         } catch {
             state = .failed("This Evidence Review could not be loaded.")
         }
@@ -508,6 +512,7 @@ struct EvidenceReviewDetailView: View {
                 // showing any accepted/success state.
                 guard await verifyImmediateCanonicalReadback(review: review, domain: domain) else {
                     actionState = .stillProcessing
+                    await invalidateAcceptedProcessingReads()
                     Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "durable_readback_pending")
                     return
                 }
@@ -550,6 +555,7 @@ struct EvidenceReviewDetailView: View {
                 // false Confirm failure. The outbox still owns finishing it.
             }
             actionState = .accepted
+            await invalidateAcceptedProcessingReads()
             Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "accepted_processing")
             return
         } catch {
@@ -572,13 +578,25 @@ struct EvidenceReviewDetailView: View {
             state = .loaded(refreshed)
             switch refreshed.status {
             case "confirmed": actionState = .confirmed
-            case "committing", "partially_committed": actionState = .accepted
+            case "committing":
+                actionState = .accepted
+                await invalidateAcceptedProcessingReads()
+            case "partially_committed":
+                actionState = .failed("This review needs another look — processing stopped after a partial commit. Reopen it to continue safely.")
             case "commit_failed": actionState = .failed("This review needs another look — the canonical commit failed. Reopen it to try again.")
             default: actionState = .stillProcessing
             }
         } catch {
             actionState = .stillProcessing
         }
+    }
+
+    @MainActor
+    private func invalidateAcceptedProcessingReads() async {
+        // The queue projection owns READY_FOR_REVIEW vs ACCEPTED_PROCESSING.
+        // Detach the pre-confirm cache immediately so returning to Log cannot
+        // continue offering a second Confirm for a server-owned operation.
+        await environment.productionNativeAPI.invalidateReadResources(["evidence-review-queue"])
     }
 
     @MainActor

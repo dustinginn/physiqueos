@@ -17,8 +17,15 @@ struct LogReadModel: Codable, Equatable {
     /// order — matching `composeLoggedTodaySummary`'s fixed row list.
     var loggedToday: [LoggedTodayRow]
     var pendingEvidenceReviews: [PendingEvidenceReview]
+    /// Server-owned confirmations that have crossed the durable acceptance
+    /// boundary but have not reached canonical read visibility yet. Optional
+    /// keeps older fixture/read payloads backward compatible.
+    var processingEvidenceReviews: [ProcessingEvidenceReview]? = nil
 
     var hasPendingEvidenceReviews: Bool { !pendingEvidenceReviews.isEmpty }
+    var genericProcessingEvidenceReviews: [ProcessingEvidenceReview] {
+        (processingEvidenceReviews ?? []).filter { !["nutrition", "activity", "training"].contains($0.domain) }
+    }
 }
 
 enum LoggedTodayRowKind: String, Codable {
@@ -57,8 +64,17 @@ struct LoggedTodayRow: Codable, Equatable, Identifiable {
     var summary: String
     var context: String?
     var destination: AppDestination?
+    var processing: Bool? = nil
 
     var id: String { kind.rawValue }
+}
+
+struct ProcessingEvidenceReview: Codable, Equatable, Identifiable {
+    var id: String
+    var localDate: String
+    var domain: String
+    var label: String
+    var status: String
 }
 
 struct PendingEvidenceReview: Codable, Equatable, Identifiable {

@@ -17,7 +17,8 @@ final class NotificationDiagnosticsTests: XCTestCase {
         XCTAssertEqual(request.identifier, "evidence.reviewReady.review-activity")
         XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.evidenceReviewReady)
         XCTAssertNil(request.trigger)
-        let destinationData = try XCTUnwrap(request.content.userInfo["destination"] as? Data)
+        let destinationJSON = try XCTUnwrap(request.content.userInfo["destinationJSON"] as? String)
+        let destinationData = try XCTUnwrap(destinationJSON.data(using: .utf8))
         XCTAssertEqual(
             try JSONDecoder().decode(AppDestination.self, from: destinationData),
             .evidenceReview(reviewId: "review-activity")

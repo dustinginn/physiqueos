@@ -323,8 +323,8 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
             return .rejected(identifier: "unexpected")
         }
         let priority = try Self.actionablePeptideRequest()
-        let destination = try XCTUnwrap(priority.content.userInfo["destination"] as? Data)
-        let openInfo: [AnyHashable: Any] = ["destination": destination]
+        let destination = try XCTUnwrap(priority.content.userInfo["destinationJSON"] as? String)
+        let openInfo: [AnyHashable: Any] = ["destinationJSON": destination]
         let actions = [
             PriorityNotificationDelegate.ResponseSnapshot(
                 actionIdentifier: PriorityNotificationActionIdentifier.complete,
@@ -345,10 +345,15 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
                 categoryIdentifier: PriorityNotificationCategory.evidenceReviewReady
             ),
         ]
-        for action in actions { await delegate.handle(snapshot: action) }
+        for (index, action) in actions.enumerated() {
+            let completion = expectation(description: "action-\(index)-completed")
+            delegate.dispatch(snapshot: action) { completion.fulfill() }
+            await fulfillment(of: [completion], timeout: 1)
+        }
 
         let briefingDestination = try JSONEncoder().encode(AppDestination.briefingDetail(briefingId: "midweek-1"))
-        await delegate.handle(snapshot: .init(
+        let briefingCompletion = expectation(description: "briefing-completed")
+        delegate.dispatch(snapshot: .init(
             actionIdentifier: UNNotificationDefaultActionIdentifier,
             requestIdentifier: "briefing.ready.midweek-1",
             userInfo: [
@@ -356,9 +361,41 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
                 "briefingArtifactId": "midweek-1",
             ],
             categoryIdentifier: PriorityNotificationCategory.briefingReady
-        ))
+        )) { briefingCompletion.fulfill() }
+        await fulfillment(of: [briefingCompletion], timeout: 1)
         XCTAssertEqual(environment.notificationDeepLinkCoordinator.pendingRequest?.destination,
                        .briefingDetail(briefingId: "midweek-1"))
+    }
+
+    @MainActor
+    func testDelegateBoundaryCompletesExactlyOnceForDuplicateSnoozeAndInvalidPayload() async throws {
+        let request = try Self.actionablePeptideRequest()
+        let payload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: request))
+        let probe = SnoozeProbe()
+        let delegate = PriorityNotificationDelegate(environment: nil) { await probe.handle($0) }
+        let valid = PriorityNotificationDelegate.ResponseSnapshot(
+            actionIdentifier: PriorityNotificationActionIdentifier.snooze,
+            requestIdentifier: request.identifier,
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier,
+            snooze: payload
+        )
+        let invalid = PriorityNotificationDelegate.ResponseSnapshot(
+            actionIdentifier: PriorityNotificationActionIdentifier.snooze,
+            requestIdentifier: "invalid.snooze",
+            userInfo: [:],
+            categoryIdentifier: request.content.categoryIdentifier,
+            snooze: nil
+        )
+        for (index, snapshot) in [valid, valid, invalid].enumerated() {
+            let completed = expectation(description: "delegate-completion-\(index)")
+            completed.expectedFulfillmentCount = 1
+            completed.assertForOverFulfill = true
+            delegate.dispatch(snapshot: snapshot) { completed.fulfill() }
+            await fulfillment(of: [completed], timeout: 1)
+        }
+        XCTAssertEqual(probe.payloads.count, 1)
+        XCTAssertEqual(probe.requests.count, 1)
     }
 
     // MARK: - reconciliationPlan: the schedule-change acceptance requirement.

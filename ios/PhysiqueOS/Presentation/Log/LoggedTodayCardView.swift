@@ -50,6 +50,11 @@ private struct LoggedTodayRowView: View {
                 }
             }
             Spacer(minLength: 4)
+            if row.processing == true {
+                ProgressView()
+                    .tint(PhysiqueOSTheme.accent)
+                    .accessibilityLabel("Processing")
+            }
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 64)

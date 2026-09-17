@@ -743,7 +743,8 @@ struct ProductionLogAPI: LogAPI {
                 kind: row.id,
                 summary: row.summary,
                 context: row.context,
-                destination: Self.destination(for: row, localDate: payload.localDate)
+                destination: Self.destination(for: row, localDate: payload.localDate),
+                processing: row.processing
             )
         }
         rows.append(Self.weightRow(weightPayload, localDate: payload.localDate))
@@ -757,7 +758,8 @@ struct ProductionLogAPI: LogAPI {
                     summary: review.summary, likelyDuplicate: review.likelyDuplicate,
                     destination: .evidenceReview(reviewId: review.id)
                 )
-            }
+            },
+            processingEvidenceReviews: payload.processingEvidenceReviews ?? []
         )
     }
 
@@ -803,6 +805,7 @@ struct ProductionLogAPI: LogAPI {
         var localDate: String
         var loggedToday: LoggedTodayPayload
         var pendingEvidenceReviews: [ReviewPayload]
+        var processingEvidenceReviews: [ProcessingEvidenceReview]?
     }
 
     private struct LoggedTodayPayload: Decodable {
@@ -814,6 +817,7 @@ struct ProductionLogAPI: LogAPI {
         var summary: String
         var context: String?
         var recordId: String?
+        var processing: Bool?
     }
 
     private struct ReviewPayload: Decodable {
@@ -823,6 +827,7 @@ struct ProductionLogAPI: LogAPI {
         var summary: String
         var likelyDuplicate: Bool
     }
+
 }
 
 // MARK: - Priority detail

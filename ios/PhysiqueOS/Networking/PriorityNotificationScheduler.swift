@@ -391,8 +391,9 @@ enum PriorityNotificationScheduler {
         if let scheduledTime = action.scheduledTime {
             info["canonicalScheduledTime"] = scheduledTime
         }
-        if let destinationData = try? JSONEncoder().encode(item.destination) {
-            info["destination"] = destinationData
+        if let destinationData = try? JSONEncoder().encode(item.destination),
+           let destinationJSON = String(data: destinationData, encoding: .utf8) {
+            info["destinationJSON"] = destinationJSON
         }
         if let command = action.completionCommand {
             info["commandType"] = command.commandType

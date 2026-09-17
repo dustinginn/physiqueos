@@ -1,5 +1,27 @@
 import UserNotifications
 
+/// Owns Apple's response completion closure without allowing the
+/// `UNNotificationResponse` itself to escape the delegate callback. The
+/// lock is deliberately tiny: it enforces exactly-once completion for every
+/// exit (success, invalid payload, missing environment, duplicate callback,
+/// or thrown task cancellation) while the actual action runs on MainActor.
+final class NotificationResponseCompletionGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var completion: (() -> Void)?
+
+    init(_ completion: @escaping () -> Void) {
+        self.completion = completion
+    }
+
+    func complete() {
+        lock.lock()
+        let callback = completion
+        completion = nil
+        lock.unlock()
+        callback?()
+    }
+}
+
 /// Main-thread handoff between notification response delivery and SwiftUI's
 /// navigation shell. A response may arrive before the root scene exists;
 /// retaining it here makes cold launch safe. Request-identifier fencing makes
@@ -170,13 +192,30 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        // Snapshot synchronously. This is deliberately before the first
-        // `await`: Apple's callback objects never cross concurrency/lifetime
-        // boundaries and are never mutated or reused for a replacement.
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        // Snapshot every needed primitive while Apple's callback owns the
+        // response. Neither response, request, nor mutable content survives
+        // this synchronous boundary.
         let snapshot = ResponseSnapshot(response: response)
-        await handle(snapshot: snapshot)
+        dispatch(snapshot: snapshot, completion: completionHandler)
+    }
+
+    /// Testable delegate boundary. This intentionally returns immediately;
+    /// the completion gate retains only Apple's callback, and calls it once
+    /// after the MainActor-owned command/navigation/scheduling path reaches a
+    /// safe terminal result.
+    func dispatch(snapshot: ResponseSnapshot, completion: @escaping () -> Void) {
+        let gate = NotificationResponseCompletionGate(completion)
+        Task { @MainActor [weak self] in
+            guard let self else {
+                gate.complete()
+                return
+            }
+            defer { gate.complete() }
+            await self.handle(snapshot: snapshot)
+        }
     }
 
     @MainActor

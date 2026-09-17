@@ -6,6 +6,36 @@ import XCTest
 /// native must decode and display server-owned values, never derive them.
 final class HomeReadModelTests: XCTestCase {
 
+    private static func context(title: String, time: String, dose: String? = nil) -> String {
+        PriorityExecutionContextPresentation.context(
+            for: executionContextItem(title: title, time: time, dose: dose)
+        ) ?? ""
+    }
+
+    private static func executionContextItem(title: String, time: String?, dose: String?) -> PriorityOccurrence {
+        PriorityOccurrence(
+            id: "priority-\(title)", executionItemId: "execution-\(title)", date: "2026-09-16",
+            title: title, subtitle: "Tonight", metadata: nil, changeLabel: nil,
+            icon: .target, color: .primary, urgency: .available, completed: false,
+            completable: true, expectedVersion: 1, actionLabel: nil,
+            completionContext: nil,
+            notificationAction: PriorityNotificationAction(
+                classification: .specializedWorkflowRequired,
+                workflow: dose == nil ? "priority_detail" : "peptide_protocol",
+                scheduledTime: time,
+                completionCommand: dose.map { value in
+                    PriorityNotificationCompletionCommand(
+                        commandType: "priority.complete.v1", expectedVersion: 1,
+                        payload: PriorityNotificationCompletionPayload(
+                            priorityId: "priority", occurrenceDate: "2026-09-16", dose: value,
+                            protocolId: "protocol"
+                        )
+                    )
+                }
+            )
+        )
+    }
+
     func testWebParityTokensKeepPhaseAndGuardrailGeometrySymmetrical() {
         XCTAssertEqual(HomeGoalWebParityTokens.cardHorizontalPadding, 16)
         XCTAssertEqual(HomeGoalWebParityTokens.cardVerticalPadding, 15)
@@ -210,6 +240,27 @@ final class HomeReadModelTests: XCTestCase {
 
         XCTAssertEqual(visible.map(\.id), [pending.id])
         XCTAssertFalse(visible.contains { $0.id == completed.id })
+    }
+
+    func testExactCanonicalTimesRemainVisibleForThreeCardCompactHomeLayout() {
+        XCTAssertTrue(Self.context(title: "Morning Weigh-In", time: "05:30").contains("5:30"))
+        XCTAssertTrue(Self.context(title: "Foam Rolling", time: "19:15").contains("7:15"))
+        XCTAssertTrue(Self.context(title: "Tesamorelin", time: "22:29", dose: "0.5 mg").contains("10:29"))
+    }
+
+    func testPeptideDoseComesFromCanonicalCompletionPayload() {
+        XCTAssertTrue(Self.context(title: "Tesamorelin", time: "22:29", dose: "0.5 mg").contains("0.5 mg"))
+    }
+
+    func testDaypartIsOnlyFallbackWhenCanonicalExactTimeIsAbsent() {
+        var item = Self.executionContextItem(title: "Untimed support", time: nil, dose: nil)
+        item.subtitle = "Tonight"
+        XCTAssertEqual(PriorityExecutionContextPresentation.primaryLine(for: item), "Tonight")
+        item.notificationAction?.scheduledTime = "21:00"
+        XCTAssertNotEqual(PriorityExecutionContextPresentation.primaryLine(for: item), "Tonight")
+        item.subtitle = nil
+        item.notificationAction?.scheduledTime = nil
+        XCTAssertNil(PriorityExecutionContextPresentation.primaryLine(for: item))
     }
 
     // MARK: - Natural prose capitalization

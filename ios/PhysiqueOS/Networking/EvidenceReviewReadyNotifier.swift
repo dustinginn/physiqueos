@@ -116,8 +116,13 @@ enum EvidenceReviewReadyNotifier {
         content.body = "Your \(Self.shortDate(effectiveDate)) \(domainLabel.lowercased()) is ready to confirm."
         content.sound = .default
         content.categoryIdentifier = PriorityNotificationCategory.evidenceReviewReady
-        if let destinationData = try? JSONEncoder().encode(AppDestination.evidenceReview(reviewId: reviewId)) {
-            content.userInfo = ["destination": destinationData]
+        if let destinationData = try? JSONEncoder().encode(AppDestination.evidenceReview(reviewId: reviewId)),
+           let destinationJSON = String(data: destinationData, encoding: .utf8) {
+            // A property-list String is safe for the notification daemon and
+            // the delegate's synchronous Sendable snapshot boundary. The
+            // decoder still accepts Build 36-38 Data payloads for already-
+            // scheduled notifications.
+            content.userInfo = ["destinationJSON": destinationJSON]
         }
         return UNNotificationRequest(
             identifier: "evidence.reviewReady.\(reviewId)", content: content, trigger: nil
