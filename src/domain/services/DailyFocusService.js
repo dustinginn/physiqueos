@@ -3,6 +3,7 @@ import {
   DEFAULT_LOCAL_TIME_ZONE,
   getLocalDateKey,
   getPreviousLocalDayWindow,
+  shiftLocalDateKey,
 } from "../utils/localDate";
 import { normalizeProtocolRecurrence } from "./ProtocolRecurrenceNormalizationService";
 import { isProtocolDateOnCycle } from "./ProtocolOccurrenceResolver";
@@ -77,6 +78,9 @@ const TERMINAL_RECONCILIATION_STATUSES = new Set([
   "skipped",
 ]);
 
+export const PRIORITY_NOTIFICATION_HORIZON_DAYS = 7;
+export const PRIORITY_NOTIFICATION_HORIZON_LIMIT = 48;
+
 export function createDailyFocusService() {
   return {
     getDailyFocus({
@@ -90,95 +94,76 @@ export function createDailyFocusService() {
       now = new Date(),
       timeZone = DEFAULT_LOCAL_TIME_ZONE,
     } = {}) {
-      const today = getLocalDateKey(now, timeZone);
-      const dayName = getDayName(today);
-      const todaysCheckIn = checkIns.find((checkIn) => checkIn.date === today);
-      const executionProtocolItems = getExecutionBackedProtocolItems({
-        dayName,
-        executionItems,
-        now,
-        protocols,
-        reminders,
-        timeZone,
-        today,
-      });
-      const executionBackedProtocolIds = new Set(
-        protocols
-          .filter((item) => ["peptide", "recovery", "supplement"].includes(item.category))
-          .map((item) => item.id)
-          .filter(Boolean)
-      );
-      const executionBackedReminderIds = new Set(
-        reminders
-          .filter(
-            (reminder) =>
-              executionBackedProtocolIds.has(reminder.linkedEntityId) &&
-              isExecutionBackedReminder(reminder)
-          )
-          .map((reminder) => reminder.id)
-      );
-      const doseChangeItem = getLegacyReminderOnlyDoseChangeItem({
-        excludedProtocolIds: executionBackedProtocolIds,
-        protocols,
-        today,
-        now,
-      });
-      const morningWeightItem = getMorningWeightItem({
-        checkIns,
-        executionItems,
-        latestWeight,
-        now,
-        protocols,
-        reminders,
-        timeZone,
-        today,
-        weightEntries,
-      });
-      const highPriorityItems = [
-        morningWeightItem,
-        ...getDexaAppointmentItems({ executionItems, now, timeZone }),
-        ...getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now }),
-        doseChangeItem,
-        ...executionProtocolItems,
-        ...getPersistentReminderItems({
-          reminders,
-          today,
-          dayName,
-          excludedReminderIds: new Set([
-            ...executionBackedReminderIds,
-            ...(morningWeightItem ? [MORNING_WEIGH_IN_REMINDER_ID] : []),
-          ]),
-        }),
-      ].filter(Boolean);
-      const sessions = getDailySessionsFromItems(highPriorityItems);
-      const sessionItemIds = new Set(
-        sessions.flatMap((session) => session.items.map((item) => item.id))
-      );
-      const sessionPriorities = sessions
-        .filter((session) => session.pendingCount > 0 || session.items.some((item) => item.satisfiedByEvidence))
-        .map((session) => mapSessionToPriority(session, today));
-      const primaryItems = highPriorityItems.filter(
-        (item) => !item.completed && !sessionItemIds.has(item.id)
-      );
-      const fallbackItems = shouldSurfaceFallbackHabits({
-        checkIns,
-        latestWeight,
-        weightEntries,
-        today,
-        now,
+      return buildDailyFocusCandidates({
+        checkIns, executionItems, latestWeight, now, progressPhotos,
+        protocols, reminders, timeZone, weightEntries,
       })
-        ? [
-            getProteinItem({ todaysCheckIn, today }),
-            getActivityItem({ todaysCheckIn, today }),
-            getSleepItem({ todaysCheckIn, today }),
-          ]
-        : [];
-      const candidates = [...sessionPriorities, ...primaryItems, ...fallbackItems].filter(Boolean);
-
-      return candidates
+        // Home is an action surface, not completion history. Apply this
+        // before the compact cap so a completed evidence-backed occurrence
+        // can never displace outstanding work later in canonical order.
+        .filter((item) => !item.completed)
         .sort((a, b) => a.priority - b.priority)
         .slice(0, 4)
         .map(({ priority, ...item }) => item);
+    },
+    getNotificationOccurrences({
+      checkIns = [],
+      executionItems = [],
+      horizonDays = PRIORITY_NOTIFICATION_HORIZON_DAYS,
+      latestWeight = null,
+      now = new Date(),
+      progressPhotos = [],
+      protocols = [],
+      reminders = [],
+      timeZone = DEFAULT_LOCAL_TIME_ZONE,
+      weightEntries = [],
+    } = {}) {
+      const boundedDays = Math.max(1, Math.min(PRIORITY_NOTIFICATION_HORIZON_DAYS, Number(horizonDays) || 1));
+      const firstDate = getLocalDateKey(now, timeZone);
+      const lastDate = shiftLocalDateKey(firstDate, boundedDays - 1);
+      const exactOccurrences = new Map();
+
+      for (let offset = 0; offset < boundedDays; offset += 1) {
+        const occurrenceDate = shiftLocalDateKey(firstDate, offset);
+        const candidates = buildDailyFocusCandidates({
+          checkIns,
+          executionItems,
+          latestWeight,
+          now,
+          occurrenceDate,
+          progressPhotos,
+          protocols,
+          reminders,
+          timeZone,
+          weightEntries,
+          includeFallback: false,
+        });
+        for (const candidate of candidates) {
+          const canonicalDate = candidate.occurrenceDate
+            ?? candidate.completionContext?.occurrenceDate
+            ?? candidate.executionContract?.occurrenceDate;
+          const canonicalPriorityId = candidate.executionContract?.priorityId
+            ?? candidate.completionId
+            ?? candidate.id;
+          if (
+            !canonicalDate || canonicalDate < firstDate || canonicalDate > lastDate ||
+            !candidate.notificationAction?.scheduledTime
+          ) continue;
+          const { priority, ...item } = candidate;
+          exactOccurrences.set(`${canonicalPriorityId}|${canonicalDate}`, {
+            ...item,
+            occurrenceDate: canonicalDate,
+          });
+        }
+      }
+
+      return [...exactOccurrences.values()]
+        .sort((left, right) =>
+          left.occurrenceDate.localeCompare(right.occurrenceDate) ||
+          String(left.executionContract?.priorityId ?? left.id)
+            .localeCompare(String(right.executionContract?.priorityId ?? right.id))
+        )
+        .slice(0, PRIORITY_NOTIFICATION_HORIZON_LIMIT);
     },
     getDailySessions({
       checkIns = [],
@@ -248,6 +233,85 @@ export function createDailyFocusService() {
       return getPreviousDayIncompletePrioritySelection(options);
     },
   };
+}
+
+function buildDailyFocusCandidates({
+  checkIns = [],
+  executionItems = [],
+  includeFallback = true,
+  latestWeight = null,
+  now = new Date(),
+  occurrenceDate = null,
+  progressPhotos = [],
+  protocols = [],
+  reminders = [],
+  timeZone = DEFAULT_LOCAL_TIME_ZONE,
+  weightEntries = [],
+} = {}) {
+  const today = occurrenceDate ?? getLocalDateKey(now, timeZone);
+  const dayName = getDayName(today);
+  const todaysCheckIn = checkIns.find((checkIn) => checkIn.date === today);
+  const executionProtocolItems = getExecutionBackedProtocolItems({
+    dayName, executionItems, now, protocols, reminders, timeZone, today,
+  });
+  const executionBackedProtocolIds = new Set(
+    protocols
+      .filter((item) => ["peptide", "recovery", "supplement"].includes(item.category))
+      .map((item) => item.id)
+      .filter(Boolean)
+  );
+  const executionBackedReminderIds = new Set(
+    reminders
+      .filter((reminder) =>
+        executionBackedProtocolIds.has(reminder.linkedEntityId) &&
+        isExecutionBackedReminder(reminder)
+      )
+      .map((reminder) => reminder.id)
+  );
+  const doseChangeItem = getLegacyReminderOnlyDoseChangeItem({
+    excludedProtocolIds: executionBackedProtocolIds, protocols, today, now,
+  });
+  const morningWeightItem = getMorningWeightItem({
+    checkIns, executionItems, latestWeight, now, protocols, reminders,
+    timeZone, today, weightEntries,
+  });
+  const highPriorityItems = [
+    morningWeightItem,
+    ...getDexaAppointmentItems({ executionItems, now, timeZone }),
+    ...getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now }),
+    doseChangeItem,
+    ...executionProtocolItems,
+    ...getPersistentReminderItems({
+      reminders,
+      today,
+      dayName,
+      excludedReminderIds: new Set([
+        ...executionBackedReminderIds,
+        ...(morningWeightItem ? [MORNING_WEIGH_IN_REMINDER_ID] : []),
+      ]),
+    }),
+  ].filter(Boolean);
+  const sessions = getDailySessionsFromItems(highPriorityItems);
+  const sessionItemIds = new Set(
+    sessions.flatMap((session) => session.items.map((item) => item.id))
+  );
+  const sessionPriorities = sessions
+    .filter((session) => session.pendingCount > 0 || session.items.some((item) => item.satisfiedByEvidence))
+    .map((session) => mapSessionToPriority(session, today));
+  const primaryItems = highPriorityItems.filter(
+    (item) => !item.completed && !sessionItemIds.has(item.id)
+  );
+  const fallbackItems = includeFallback && shouldSurfaceFallbackHabits({
+    checkIns, latestWeight, weightEntries, today, now,
+  })
+    ? [
+        getProteinItem({ todaysCheckIn, today }),
+        getActivityItem({ todaysCheckIn, today }),
+        getSleepItem({ todaysCheckIn, today }),
+      ]
+    : [];
+
+  return [...sessionPriorities, ...primaryItems, ...fallbackItems].filter(Boolean);
 }
 
 export const DailyFocusService = createDailyFocusService();
@@ -834,7 +898,7 @@ function getExecutionBackedProtocolItems({
         href: setupRequired
           ? projection.executionHref
           : `/priorities/${projection.historyAnchorId}`,
-        icon: recoverySupport ? "activity" : supplementSupport ? "utensils" : "syringe",
+        icon: recoverySupport ? "activity" : supplementSupport ? "pills" : "syringe",
         color: setupRequired ? "warning" : recoverySupport ? "success" : "effort",
         completed: false,
         completable: projection.completable,

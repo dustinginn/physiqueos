@@ -103,10 +103,12 @@ describe("Morning Weigh-In Tracking Support", () => {
     expect(item.id).not.toBe("morning-check-in");
   });
 
-  it("marks today's matching Weight as satisfied but not a prior-day Weight", () => {
+  it("removes a Weight-satisfied occurrence from Home but keeps a prior-day Weight actionable", () => {
     const data = fixture();
-    const completed = home(data, [{ measuredAt: "2026-08-07T14:00:00.000Z" }]);
-    expect(findMorning(completed)).toMatchObject({ completed: true, satisfiedByEvidence: true });
+    const todayWeight = { measuredAt: "2026-08-07T14:00:00.000Z" };
+    const completed = home(data, [todayWeight]);
+    expect(findMorning(completed)).toBeUndefined();
+    expect(todayWeight).toEqual({ measuredAt: "2026-08-07T14:00:00.000Z" });
     const prior = home(data, [{ measuredAt: "2026-08-06T14:00:00.000Z" }]);
     expect(findMorning(prior)).toMatchObject({ completed: false });
   });

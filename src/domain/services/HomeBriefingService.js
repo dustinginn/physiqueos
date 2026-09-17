@@ -181,6 +181,21 @@ export function createHomeBriefingService({
         now: now(),
         timeZone: homeTimeZone,
       });
+      // Home's visible list is intentionally current-day and capped for
+      // presentation. Local notifications need a separate, bounded,
+      // canonical occurrence horizon so an early-morning reminder already
+      // exists in iOS before its fire time without a same-morning app open.
+      const notificationOccurrences = DailyFocusService.getNotificationOccurrences({
+        checkIns,
+        executionItems,
+        latestWeight,
+        weightEntries,
+        protocols: activeProtocols,
+        progressPhotos,
+        reminders: homeReminders,
+        now: now(),
+        timeZone: homeTimeZone,
+      });
       const actionPlan = reconcileDailyBriefingAction(
         ActionEngineService.getActionPlan({
         latestWeight,
@@ -284,6 +299,8 @@ export function createHomeBriefingService({
         actionPlan,
         goals: activeChapter?.goals ?? goalIntelligence.goals.map(mapGoal),
         todaysFocus,
+        notificationOccurrences,
+        notificationTimeZone: homeTimeZone,
         bottomNavigation: navigation,
         activeEventBriefing: presentedEventBriefing,
         currentCadenceBriefing: presentedCadenceBriefing,
