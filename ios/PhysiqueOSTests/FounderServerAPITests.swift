@@ -3263,6 +3263,50 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(String(decoding: body, as: UTF8.self).contains("filename=\"activity.png\""))
     }
 
+    func testDismissedActivityReplacementRotatesIdentityOnceAndPreservesPredecessorLineage() async throws {
+        let accepted = #"{"intakeId":"replacement-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/replacement"}"#
+        let replayed = #"{"intakeId":"replacement-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/replacement"}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(409, productionProblemJSON(status: 409, code: "EVIDENCE_INTAKE_REPLACEMENT_REQUIRED")),
+            .json(202, accepted),
+            .json(202, replayed),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let defaults = Self.freshDefaults()
+        let pipeline = ProductionEvidenceIntakePipeline(
+            api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults)
+        )
+        let file = ("activity.png", "image/png", Data([8, 4, 1]))
+
+        _ = try await pipeline.submitIntake(
+            scope: "activity-intake.2026-09-16", effectiveDate: "2026-09-16",
+            expectedEvidenceType: "activity_day", clientExtractedText: "Move\n841 cal\nExercise\n111 min",
+            files: [file]
+        )
+        // Recreate the pipeline/store to model a process relaunch after the
+        // replacement receipt was accepted. The exact replacement key and
+        // predecessor lineage must both survive.
+        let relaunched = ProductionEvidenceIntakePipeline(
+            api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults)
+        )
+        _ = try await relaunched.submitIntake(
+            scope: "activity-intake.2026-09-16", effectiveDate: "2026-09-16",
+            expectedEvidenceType: "activity_day", clientExtractedText: "Move\n841 cal\nExercise\n111 min",
+            files: [file]
+        )
+
+        let requests = await transport.requests
+        let predecessor = try XCTUnwrap(requests[1].value(forHTTPHeaderField: "Idempotency-Key"))
+        let replacement = try XCTUnwrap(requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
+        XCTAssertNotEqual(predecessor, replacement)
+        XCTAssertEqual(multipartField(named: "submissionIdentity", from: try XCTUnwrap(requests[2].httpBody)), replacement)
+        XCTAssertEqual(multipartField(named: "replacementForSubmissionIdentity", from: try XCTUnwrap(requests[2].httpBody)), predecessor)
+        XCTAssertEqual(requests[3].value(forHTTPHeaderField: "Idempotency-Key"), replacement)
+        XCTAssertEqual(multipartField(named: "replacementForSubmissionIdentity", from: try XCTUnwrap(requests[3].httpBody)), predecessor)
+    }
+
     func testEvidenceConfirmationDecodesCanonicalDurabilityBoundary() throws {
         let value = try JSONDecoder().decode(
             ProductionEvidenceReviewConfirmation.self,

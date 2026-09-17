@@ -629,6 +629,7 @@ actor ProductionNativeAPI {
         clientExtractedText: String? = nil,
         targetTrainingDraftId: String? = nil,
         targetTrainingSessionCanonicalId: String? = nil,
+        replacementForSubmissionIdentity: String? = nil,
         files: [(filename: String, contentType: String, data: Data)],
         onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> ProductionEvidenceIntakeStatus {
@@ -654,6 +655,14 @@ actor ProductionNativeAPI {
                 name: "targetTrainingSessionCanonicalId",
                 value: Data(targetTrainingSessionCanonicalId.utf8),
                 boundary: boundary, contentType: "text/plain"
+            )
+        }
+        if let replacementForSubmissionIdentity, !replacementForSubmissionIdentity.isEmpty {
+            body.appendMultipartField(
+                name: "replacementForSubmissionIdentity",
+                value: Data(replacementForSubmissionIdentity.utf8),
+                boundary: boundary,
+                contentType: "text/plain"
             )
         }
         for file in files {

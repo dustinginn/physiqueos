@@ -249,29 +249,75 @@ enum ProductionIdempotentSubmission {
 /// instead of risking a duplicate canonical mutation.
 final class ProductionIdempotencyKeyStore: @unchecked Sendable {
     private let defaults: UserDefaults
+    private let lock = NSLock()
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
     func resolvedKey(scope: String, signature: String) -> String {
+        lock.lock()
+        defer { lock.unlock() }
         let signatureKey = "physiqueos.idempotency.\(scope).signature"
         let keyKey = "physiqueos.idempotency.\(scope).key"
+        let replacementKey = "physiqueos.idempotency.\(scope).replacement-predecessor"
+        let previousSignature = defaults.string(forKey: signatureKey)
         let key = ProductionIdempotentSubmission.resolvedKey(
             signature: signature,
-            previousSignature: defaults.string(forKey: signatureKey),
+            previousSignature: previousSignature,
             previousKey: defaults.string(forKey: keyKey)
         )
+        if previousSignature != signature {
+            defaults.removeObject(forKey: replacementKey)
+        }
         defaults.set(signature, forKey: signatureKey)
         defaults.set(key, forKey: keyKey)
         return key
+    }
+
+    /// Replaces one terminally ineligible intake identity while preserving
+    /// convergence across duplicate callbacks. If another callback already
+    /// rotated the same key, return that replacement instead of creating a
+    /// second intake.
+    func rotatedKey(scope: String, signature: String, replacing priorKey: String) -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        let signatureKey = "physiqueos.idempotency.\(scope).signature"
+        let keyKey = "physiqueos.idempotency.\(scope).key"
+        let replacementKey = "physiqueos.idempotency.\(scope).replacement-predecessor"
+        if defaults.string(forKey: signatureKey) == signature,
+           let current = defaults.string(forKey: keyKey), current != priorKey {
+            return current
+        }
+        let replacement = UUID().uuidString
+        defaults.set(signature, forKey: signatureKey)
+        defaults.set(replacement, forKey: keyKey)
+        defaults.set(priorKey, forKey: replacementKey)
+        return replacement
+    }
+
+    /// Returns the immutable dismissed/rejected predecessor associated with
+    /// the current replacement key. Persisting this beside the idempotency
+    /// key makes a retry or app relaunch reproduce the exact same request
+    /// context instead of conflicting with its own durable receipt.
+    func replacementPredecessor(scope: String, signature: String, currentKey: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard defaults.string(forKey: "physiqueos.idempotency.\(scope).signature") == signature,
+              defaults.string(forKey: "physiqueos.idempotency.\(scope).key") == currentKey else {
+            return nil
+        }
+        return defaults.string(forKey: "physiqueos.idempotency.\(scope).replacement-predecessor")
     }
 
     /// Clears bookkeeping for a scope once its write is durably confirmed
     /// and will never be retried again (e.g. after a terminal success) —
     /// optional hygiene, not required for correctness.
     func forget(scope: String) {
+        lock.lock()
+        defer { lock.unlock() }
         defaults.removeObject(forKey: "physiqueos.idempotency.\(scope).signature")
         defaults.removeObject(forKey: "physiqueos.idempotency.\(scope).key")
+        defaults.removeObject(forKey: "physiqueos.idempotency.\(scope).replacement-predecessor")
     }
 }

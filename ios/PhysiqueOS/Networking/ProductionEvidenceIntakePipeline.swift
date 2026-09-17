@@ -72,16 +72,43 @@ struct ProductionEvidenceIntakePipeline {
             targetTrainingSessionCanonicalId ?? "-",
         ])
         let submissionIdentity = idempotencyStore.resolvedKey(scope: scope, signature: signature)
-        return try await api.submitEvidenceIntake(
-            submissionIdentity: submissionIdentity,
-            effectiveDate: effectiveDate,
-            expectedEvidenceType: expectedEvidenceType,
-            clientExtractedText: clientExtractedText,
-            targetTrainingDraftId: targetTrainingDraftId,
-            targetTrainingSessionCanonicalId: targetTrainingSessionCanonicalId,
-            files: files,
-            onUploadProgress: onUploadProgress
+        let replacementPredecessor = idempotencyStore.replacementPredecessor(
+            scope: scope, signature: signature, currentKey: submissionIdentity
         )
+        do {
+            return try await api.submitEvidenceIntake(
+                submissionIdentity: submissionIdentity,
+                effectiveDate: effectiveDate,
+                expectedEvidenceType: expectedEvidenceType,
+                clientExtractedText: clientExtractedText,
+                targetTrainingDraftId: targetTrainingDraftId,
+                targetTrainingSessionCanonicalId: targetTrainingSessionCanonicalId,
+                replacementForSubmissionIdentity: replacementPredecessor,
+                files: files,
+                onUploadProgress: onUploadProgress
+            )
+        } catch ProductionNativeError.conflict(let problem)
+            where problem.code == "EVIDENCE_INTAKE_REPLACEMENT_REQUIRED" {
+            // A dismissed/rejected review remains immutable audit history.
+            // Rotate exactly once to a new persisted transport identity and
+            // explicitly link that replacement to its predecessor. Parallel
+            // callbacks converge on the same rotated key rather than minting
+            // sibling replacement intakes.
+            let replacementIdentity = idempotencyStore.rotatedKey(
+                scope: scope, signature: signature, replacing: submissionIdentity
+            )
+            return try await api.submitEvidenceIntake(
+                submissionIdentity: replacementIdentity,
+                effectiveDate: effectiveDate,
+                expectedEvidenceType: expectedEvidenceType,
+                clientExtractedText: clientExtractedText,
+                targetTrainingDraftId: targetTrainingDraftId,
+                targetTrainingSessionCanonicalId: targetTrainingSessionCanonicalId,
+                replacementForSubmissionIdentity: submissionIdentity,
+                files: files,
+                onUploadProgress: onUploadProgress
+            )
+        }
     }
 
     /// Step 2 — poll until interpretation finishes. `onProgress` fires
