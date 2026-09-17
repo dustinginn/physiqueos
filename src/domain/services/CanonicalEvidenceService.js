@@ -206,6 +206,20 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
       evidenceObject,
       evidencePackage,
     });
+    if (isExplicitNativeTrainingSupportBinding(evidenceObject)) {
+      if (!correctionTargetObject) {
+        throw new Error("The exact structured Training target is unavailable for supporting telemetry.");
+      }
+      const canonicalObject = createExplicitTrainingSupportCanonicalObject({
+        evidenceObject,
+        evidencePackage,
+        existingObject: correctionTargetObject,
+      });
+      supersededById.delete(correctionTargetObject.canonicalId);
+      canonicalById.set(correctionTargetObject.canonicalId, canonicalObject);
+      matchedCanonicalIds.add(correctionTargetObject.canonicalId);
+      return;
+    }
     const compatibleObjects = findCompatibleCanonicalObjects(
       canonicalById,
       evidenceObject
@@ -826,6 +840,113 @@ function getCorrectionTargetCanonicalObject({
   return isTrainingSession(target?.payload) ? target : null;
 }
 
+function isExplicitNativeTrainingSupportBinding(evidenceObject = {}) {
+  return isTrainingSession(evidenceObject) &&
+    evidenceObject.reconciliation?.match_basis ===
+      "explicit_native_training_support_binding" &&
+    Boolean(evidenceObject.reconciliation?.target_canonical_id);
+}
+
+function createExplicitTrainingSupportCanonicalObject({
+  evidenceObject,
+  evidencePackage,
+  existingObject,
+}) {
+  const structuredPayload = existingObject?.payload;
+  const telemetryPayload = normalizeCanonicalPayload(evidenceObject);
+  const payload = mergeExplicitTrainingSupportPayload({
+    structuredPayload,
+    telemetryPayload,
+  });
+  const observedAt = structuredPayload.observed_at ?? existingObject.lastObservedAt ?? null;
+
+  return {
+    ...existingObject,
+    evidence_type: "training",
+    firstObservedAt: existingObject.firstObservedAt ?? observedAt,
+    lastObservedAt: observedAt,
+    payload,
+    provenance: mergeCanonicalProvenance({
+      existingObject,
+      evidenceObject,
+      evidencePackage,
+    }),
+    quality: {
+      ...(existingObject.quality ?? {}),
+      status: "active",
+    },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+const TRAINING_SUPPORT_TELEMETRY_FIELDS = Object.freeze([
+  "start_time",
+  "end_time",
+  "duration_seconds",
+  "active_calories",
+  "total_calories",
+  "average_heart_rate",
+]);
+
+// Explicit Logger support is an enrichment operation, never survivor
+// discovery. The Logger payload owns identity, date, exercises, sets,
+// categories and relationships. The bound Apple strength observation may
+// contribute only trustworthy workout telemetry and provenance. In
+// particular, an unrelated canonical record with a reused screenshot name
+// can never enter this merge.
+export function mergeExplicitTrainingSupportPayload({
+  structuredPayload = {},
+  telemetryPayload = {},
+} = {}) {
+  if (!isOpenStructuredTrainingSession(structuredPayload) ||
+      !isOpenAppleStrengthTelemetry(telemetryPayload) ||
+      getDateKey(structuredPayload.observed_at) !==
+        getDateKey(telemetryPayload.observed_at)) {
+    throw new Error("Supporting Training telemetry does not match the exact structured target date and type.");
+  }
+
+  const telemetry = Object.fromEntries(
+    TRAINING_SUPPORT_TELEMETRY_FIELDS
+      .filter((field) => telemetryPayload.metadata?.[field] !== undefined &&
+        telemetryPayload.metadata?.[field] !== null &&
+        telemetryPayload.metadata?.[field] !== "")
+      .map((field) => [field, telemetryPayload.metadata[field]])
+  );
+  const applications = uniqueStrings([
+    structuredPayload.source?.application,
+    telemetryPayload.source?.application,
+  ].flatMap((value) => String(value ?? "").split(/\s+\+\s+/)));
+
+  return {
+    ...structuredPayload,
+    id: structuredPayload.id,
+    observed_at: structuredPayload.observed_at,
+    ...(structuredPayload.captured_at !== undefined
+      ? { captured_at: structuredPayload.captured_at }
+      : {}),
+    metadata: {
+      ...(structuredPayload.metadata ?? {}),
+      ...telemetry,
+    },
+    exercises: structuredPayload.exercises,
+    ...(structuredPayload.exerciseRelationshipGroups !== undefined
+      ? { exerciseRelationshipGroups: structuredPayload.exerciseRelationshipGroups }
+      : {}),
+    provenance: mergeObjectProvenance(
+      structuredPayload.provenance,
+      telemetryPayload.provenance
+    ),
+    source: {
+      ...mergeSource(structuredPayload.source, telemetryPayload.source),
+      ...(applications.length > 0
+        ? { application: applications.join(" + ") }
+        : {}),
+      modality: applications.length > 1 ? "mixed" :
+        structuredPayload.source?.modality ?? telemetryPayload.source?.modality,
+    },
+  };
+}
+
 function chooseCompatibleCanonicalObject(compatibleObjects = [], evidenceObject = {}) {
   if (compatibleObjects.length === 0) return null;
   if (compatibleObjects.length === 1) return compatibleObjects[0];
@@ -1038,13 +1159,12 @@ export function reconcileExplicitWorkoutLoggerAppleSupportPair({
   }
   const survivor = {
     ...structured,
-    payload: {
-      ...mergeTrainingPayload(structured.payload, telemetry.payload),
-      id: structured.payload.id,
-      exercises: structured.payload.exercises,
-      ...(structured.payload.exerciseRelationshipGroups !== undefined
-        ? { exerciseRelationshipGroups: structured.payload.exerciseRelationshipGroups } : {}),
-    },
+    payload: mergeExplicitTrainingSupportPayload({
+      structuredPayload: structured.payload,
+      telemetryPayload: telemetry.payload,
+    }),
+    firstObservedAt: structured.firstObservedAt ?? structured.payload.observed_at,
+    lastObservedAt: structured.payload.observed_at,
     provenance: mergeCanonicalProvenanceObjects(structured.provenance, telemetry.provenance),
   };
   const retired = createSupersededCanonicalObject({ object: telemetry,
@@ -1402,13 +1522,14 @@ function mergeSets(left = [], right = []) {
 }
 
 function mergeSource(left = {}, right = {}) {
+  const sourceArtifactRefs = uniqueStrings([
+    ...(left.source_artifact_refs ?? []),
+    ...(right.source_artifact_refs ?? []),
+  ]);
   return {
     ...left,
     ...right,
-    source_artifact_refs: uniqueStrings([
-      ...(left.source_artifact_refs ?? []),
-      ...(right.source_artifact_refs ?? []),
-    ]),
+    ...(sourceArtifactRefs.length > 0 ? { source_artifact_refs: sourceArtifactRefs } : {}),
   };
 }
 
