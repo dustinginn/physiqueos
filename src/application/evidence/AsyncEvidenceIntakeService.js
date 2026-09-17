@@ -13,12 +13,12 @@ export function createAsyncEvidenceIntakeService({ store, uploads, now = () => n
       return receipt ? responseFor(receipt) : null;
     },
     async accept({ submissionIdentity, effectiveDate, expectedEvidenceType = "auto", files = [],
-      artifactManifest, typedEvidence = null, recoveryContext = null }) {
+      artifactManifest, typedEvidence = null, clientExtractedText = null, recoveryContext = null }) {
       const intakeStartedAt = performanceClock();
       validateSubmissionIdentity(submissionIdentity);
       const source = effectiveDate < founderDate(now()) ? "historical_universal_intake" : "universal_intake";
       const begun = await store.beginUpload({ submissionIdentity, effectiveDate, expectedEvidenceType,
-        source, artifactManifest, typedEvidence, recoveryContext });
+        source, artifactManifest, typedEvidence, clientExtractedText, recoveryContext });
       if (begun.receipt.interpretationState === "completed") return responseFor(begun.receipt);
       if (begun.receipt.mediaState === "stored" || !begun.claimed) return responseFor(begun.receipt);
 

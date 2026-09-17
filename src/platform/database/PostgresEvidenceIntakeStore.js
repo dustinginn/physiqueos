@@ -27,19 +27,25 @@ export function createPostgresEvidenceIntakeStore({
         await claimAuthority(client, authorityStore, migrationOperationId, `evidence-intake:begin:${id}`);
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:intake:${ownerUserId}:${input.submissionIdentity}`]);
         const manifestSha256 = digest(input.artifactManifest);
-        const typedSha256 = input.typedEvidence ? digest(input.typedEvidence) : null;
+        if (input.typedEvidence && input.clientExtractedText) {
+          throw intakeError("EVIDENCE_INTAKE_TEXT_PROVENANCE_CONFLICT");
+        }
+        const evidenceText = input.typedEvidence ?? input.clientExtractedText ?? null;
+        const evidenceTextKind = input.clientExtractedText ? "client_extracted" :
+          (input.typedEvidence ? "founder_typed" : null);
+        const typedSha256 = evidenceText ? digest(evidenceText) : null;
         const inserted = await client.query(
           `INSERT INTO physiqueos.evidence_intake_receipts
             (id,submission_identity,owner_user_id,effective_date,expected_evidence_type,source,
-             artifact_manifest,manifest_sha256,typed_evidence,typed_evidence_sha256,recovery_context,
+             artifact_manifest,manifest_sha256,typed_evidence,typed_evidence_sha256,evidence_text_kind,recovery_context,
              media_state,upload_claimed_by,upload_claim_expires_at,interpretation_state)
-           VALUES ($1,$2,$3,$4::date,$5,$6,$7::jsonb,$8,$9,$10,$11::jsonb,
-             'receiving',$12,$13,'waiting_for_media')
+           VALUES ($1,$2,$3,$4::date,$5,$6,$7::jsonb,$8,$9,$10,$11,$12::jsonb,
+             'receiving',$13,$14,'waiting_for_media')
            ON CONFLICT (owner_user_id,submission_identity) DO NOTHING RETURNING *`,
           [id, input.submissionIdentity, ownerUserId, input.effectiveDate,
             input.expectedEvidenceType ?? "auto", input.source ?? "universal_intake",
-            JSON.stringify(input.artifactManifest), manifestSha256, input.typedEvidence ?? null,
-            typedSha256, JSON.stringify(input.recoveryContext ?? null), claimToken,
+            JSON.stringify(input.artifactManifest), manifestSha256, evidenceText,
+            typedSha256, evidenceTextKind, JSON.stringify(input.recoveryContext ?? null), claimToken,
             new Date(at.getTime() + UPLOAD_LEASE_MS)],
         );
         let row = inserted.rows[0];
@@ -50,7 +56,7 @@ export function createPostgresEvidenceIntakeStore({
               WHERE owner_user_id=$1 AND submission_identity=$2 FOR UPDATE`,
             [ownerUserId, input.submissionIdentity],
           )).rows[0];
-          assertSameSubmission(row, { input, manifestSha256, typedSha256 });
+          assertSameSubmission(row, { input, manifestSha256, typedSha256, evidenceTextKind });
           const leaseExpired = !row.upload_claim_expires_at || Date.parse(row.upload_claim_expires_at) <= at.getTime();
           if (row.media_state !== "stored" && (row.media_state === "failed" || leaseExpired)) {
             row = (await client.query(
@@ -214,7 +220,9 @@ export function mapReceipt(row) {
   return Object.freeze({
     id: row.id, submissionIdentity: row.submission_identity, ownerUserId: row.owner_user_id,
     effectiveDate: dateOnly(row.effective_date), expectedEvidenceType: row.expected_evidence_type,
-    source: row.source, artifactManifest: row.artifact_manifest, typedEvidence: row.typed_evidence,
+    source: row.source, artifactManifest: row.artifact_manifest,
+    typedEvidence: row.evidence_text_kind === "client_extracted" ? null : row.typed_evidence,
+    clientExtractedText: row.evidence_text_kind === "client_extracted" ? row.typed_evidence : null,
     recoveryContext: row.recovery_context, mediaState: row.media_state,
     storedArtifacts: Object.freeze([...(row.stored_artifacts ?? [])].sort((a, b) => a.ordinal - b.ordinal)),
     interpretationState: row.interpretation_state, packageId: row.package_id, reviewId: row.review_id,
@@ -245,9 +253,10 @@ async function reconcileCatalogArtifacts(client, row) {
   return { artifacts, changed: canonicalJson(artifacts) !== canonicalJson(row.stored_artifacts ?? []) };
 }
 
-function assertSameSubmission(row, { input, manifestSha256, typedSha256 }) {
+function assertSameSubmission(row, { input, manifestSha256, typedSha256, evidenceTextKind }) {
   if (!row || dateOnly(row.effective_date) !== input.effectiveDate ||
       row.manifest_sha256 !== manifestSha256 || row.typed_evidence_sha256 !== typedSha256 ||
+      (row.evidence_text_kind ?? null) !== evidenceTextKind ||
       row.expected_evidence_type !== (input.expectedEvidenceType ?? "auto")) {
     throw intakeError("EVIDENCE_INTAKE_IDENTITY_CONFLICT");
   }

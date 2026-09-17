@@ -80,6 +80,29 @@ describe("stored Apple Health evidence reinterpretation", () => {
     })).rejects.toMatchObject({ code: "WORKOUT_SCREENSHOT_CONTEXT_CONFLICT" });
   });
 
+  it("falls through to visual interpretation when Activity OCR is ambiguous", async () => {
+    mocks.interpretScreenshotsWithVision.mockResolvedValue({
+      provider: "openai", evidencePackage: {
+        package_id: "activity-ambiguous_images",
+        evidence_objects: [{ id: "activity-day", evidence_type: "activity_day", observed_at: "2026-09-16" }],
+        provenance: { source_artifacts: [] }, interpreter: { provider: "openai" },
+      },
+    });
+    const artifact = {
+      id: "activity-image", ordinal: 1, fileName: "activity.jpg", mimeType: "image/jpeg",
+      buffer: Buffer.alloc(1_100_000), uploadedAt: "2026-09-16T18:00:00.000Z",
+      observedDate: "2026-09-16", dataUrl: "data:image/jpeg;base64,c3ludGhldGlj",
+    };
+    await interpretEvidenceIntakeStoredArtifacts({
+      capturedAt: artifact.uploadedAt, evidenceDate: "2026-09-16",
+      expectedEvidenceType: "activity_day", submissionId: "activity-ambiguous", userId: "founder",
+      sourceArtifacts: [artifact], loadArtifact: async ({ artifact: value }) => value,
+      clientExtractedText: "Move 84 cal Total Calories 841 cal Exercise 11 min another 111 min Stand 15 hr",
+    });
+    expect(mocks.interpretScreenshotsWithVision).toHaveBeenCalledOnce();
+    expect(mocks.interpretScreenshotsWithVision.mock.calls[0][0].typedEvidence).toBeNull();
+  });
+
   it("keeps repeated distinct three-image submissions in Training despite changing attachment order", async () => {
     const artifacts = [1, 2, 3].map((ordinal) => ({
       id: `image-${ordinal}`, ordinal, fileName: `workout-${ordinal}.jpg`, mimeType: "image/jpeg",

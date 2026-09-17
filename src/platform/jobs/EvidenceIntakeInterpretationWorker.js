@@ -50,6 +50,7 @@ export function createEvidenceIntakeInterpretationWorkerHandler({
         sourceArtifacts: receipt.storedArtifacts,
         submissionId: `evidence_submission_${receipt.submissionIdentity.replaceAll("-", "")}`,
         typedEvidence: receipt.typedEvidence,
+        clientExtractedText: receipt.clientExtractedText,
         userId: receipt.ownerUserId,
         photoSessionContext: {
           goalRelationship: resolvePhotoSessionGoalRelationship({

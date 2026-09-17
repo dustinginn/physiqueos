@@ -22,4 +22,11 @@ describe("targeted provider Evidence intake storage", () => {
     expect(source).toContain("ON CONFLICT (topic,dedupe_key) DO NOTHING");
     expect(source).toContain("EVIDENCE_INTAKE_CANONICAL_IDENTITY_CONFLICT");
   });
+
+  it("persists the text provenance needed to keep device OCR out of typed evidence", () => {
+    expect(source).toContain('"client_extracted"');
+    expect(source).toContain('"founder_typed"');
+    expect(source).toContain("row.evidence_text_kind === \"client_extracted\"");
+    expect(source).toContain("EVIDENCE_INTAKE_TEXT_PROVENANCE_CONFLICT");
+  });
 });

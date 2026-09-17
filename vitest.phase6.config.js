@@ -48,6 +48,7 @@ export default defineConfig({
       "src/domain/services/EvidenceReviewPresentationService.test.js",
       "src/domain/services/EvidenceCanonicalCommitReadinessService.test.js",
       "src/domain/services/AppleActivityOCRFastPath.test.js",
+      "src/domain/services/EvidenceIntakeStoredReinterpretation.test.js",
       "src/domain/services/GoalEvaluationJsonSafety.test.js",
       "src/application/read-models/EvidenceConfirmationReadService.test.js",
       "src/app/evidence/review/[reviewId]/actions.test.js",

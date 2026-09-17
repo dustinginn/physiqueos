@@ -80,9 +80,9 @@ export async function parseNativeEvidenceIntakeRequest(request) {
     files,
     artifactManifest,
     // This is device Vision OCR from the uploaded Activity image, not a
-    // user-authored canonical claim. The interpreter owns strict parsing
-    // and falls back to visual interpretation when it is incomplete.
-    typedEvidence: clientExtractedText || null,
+    // user-authored canonical claim. Keep it on a separate contract so it
+    // can never become a typed-evidence artifact or presentation surface.
+    clientExtractedText: clientExtractedText || null,
     recoveryContext: targetTrainingSessionCanonicalId ? Object.freeze({
       kind: "training_logger_support",
       targetTrainingDraftId,

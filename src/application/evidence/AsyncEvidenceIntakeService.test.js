@@ -43,6 +43,19 @@ describe("asynchronous Evidence intake foreground", () => {
       .resolves.toMatchObject({ status: "ready", reviewId: "review-one", reviewUrl: "/evidence/review/review-one" });
   });
 
+  it("preserves Founder typed evidence separately from machine-extracted OCR", async () => {
+    const receipt = baseReceipt();
+    const beginUpload = vi.fn(async () => ({ receipt, claimed: false, claimToken: null }));
+    const service = createAsyncEvidenceIntakeService({
+      store: { ownerUserId: "owner", beginUpload }, uploads: { store: vi.fn() },
+    });
+    await service.accept({ submissionIdentity: ID, effectiveDate: "2026-08-31", files: [],
+      artifactManifest: manifest(), typedEvidence: "Founder note" });
+    expect(beginUpload).toHaveBeenCalledWith(expect.objectContaining({
+      typedEvidence: "Founder note", clientExtractedText: null,
+    }));
+  });
+
   it("reports a durable background failure without asking for another upload", async () => {
     const receipt = { ...baseReceipt(), mediaState: "stored", interpretationState: "failed" };
     const service = createAsyncEvidenceIntakeService({

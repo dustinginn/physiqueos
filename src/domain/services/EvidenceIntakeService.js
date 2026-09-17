@@ -302,6 +302,7 @@ async function createEvidencePackageFromStoredArtifacts({
   storedArtifacts,
   submissionId,
   typedEvidence,
+  clientExtractedText = null,
   userId,
   photoSessionContext = null,
   onStage = null,
@@ -319,6 +320,7 @@ async function createEvidencePackageFromStoredArtifacts({
         expectedEvidenceType,
         submissionId,
         typedEvidence,
+        clientExtractedText,
         onStage,
       })
     );
@@ -407,6 +409,7 @@ export async function interpretEvidenceIntakeStoredArtifacts({
   sourceArtifacts = [],
   submissionId,
   typedEvidence = null,
+  clientExtractedText = null,
   userId = "founder",
   photoSessionContext = null,
   onStage = null,
@@ -429,6 +432,7 @@ export async function interpretEvidenceIntakeStoredArtifacts({
     storedArtifacts,
     submissionId,
     typedEvidence,
+    clientExtractedText,
     userId,
     photoSessionContext,
     onStage,
@@ -443,11 +447,12 @@ async function createImageEvidencePackage({
   expectedEvidenceType,
   submissionId,
   typedEvidence,
+  clientExtractedText,
   onStage = null,
 }) {
   const fastActivity = createAppleActivityOCRPackage({
     artifacts, evidenceDate, expectedEvidenceType,
-    submissionId: `${submissionId}_images`, typedEvidence,
+    submissionId: `${submissionId}_images`, clientExtractedText,
   });
   if (fastActivity) {
     onStage?.({
@@ -471,16 +476,16 @@ async function createImageEvidencePackage({
 /// missing number. Anything less complete continues through the general
 /// screenshot interpreter unchanged.
 export function createAppleActivityOCRPackage({
-  artifacts = [], evidenceDate, expectedEvidenceType, submissionId, typedEvidence,
+  artifacts = [], evidenceDate, expectedEvidenceType, submissionId, clientExtractedText,
 } = {}) {
   if (expectedEvidenceType !== "activity_day" || artifacts.length !== 1) return null;
-  const text = normalizeText(typedEvidence);
+  const text = normalizeText(clientExtractedText);
   if (!text || !/\bmove\b/i.test(text) || !/\bexercise\b/i.test(text) || !/\bstand\b/i.test(text)) {
     return null;
   }
-  const move = activityRingPair(text, "move", "(?:cal|kcal|calories?)");
-  const exercise = activityRingPair(text, "exercise", "(?:min|minutes?)");
-  const stand = activityRingPair(text, "stand", "(?:hr|hrs|hours?)");
+  const move = activityRingMetric(text, "move", "(?:cal|kcal|calories?)");
+  const exercise = activityRingMetric(text, "exercise", "(?:min|minutes?)");
+  const stand = activityRingMetric(text, "stand", "(?:hr|hrs|hours?)");
   if (!move || !exercise || !stand) return null;
   const totalCalories = activityLabeledNumber(text, ["total calories", "total calories burned"], "(?:cal|kcal|calories?)");
   const artifactRefs = artifacts.map((artifact) => artifact.id);
@@ -546,12 +551,45 @@ export function createAppleActivityOCRPackage({
   };
 }
 
-function activityRingPair(text, label, unitPattern) {
-  const normalized = String(text).replace(/,/g, "").replace(/\s+/g, " ");
-  const direct = normalized.match(new RegExp(`\\b${label}\\b[^0-9]{0,40}(\\d+(?:\\.\\d+)?)\\s*\\/?\\s*(\\d+(?:\\.\\d+)?)\\s*${unitPattern}`, "i"));
-  if (direct) return { actual: Number(direct[1]), goal: Number(direct[2]) };
-  const reversed = normalized.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*\\/?\\s*(\\d+(?:\\.\\d+)?)\\s*${unitPattern}[^a-z0-9]{0,40}\\b${label}\\b`, "i"));
-  return reversed ? { actual: Number(reversed[1]), goal: Number(reversed[2]) } : null;
+function activityRingMetric(text, label, unitPattern) {
+  const normalized = String(text).replace(/\r/g, "\n");
+  const labels = [...normalized.matchAll(/\b(move|exercise|stand)\b/gi)];
+  const candidates = [];
+  for (let index = 0; index < labels.length; index += 1) {
+    if (labels[index][1].toLowerCase() !== label) continue;
+    const start = labels[index].index + labels[index][0].length;
+    const end = labels[index + 1]?.index ?? Math.min(normalized.length, start + 120);
+    const segment = normalized.slice(start, Math.min(end, start + 120));
+    const pairPattern = new RegExp(
+      `(?:^|[^0-9])([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*(?:${unitPattern})?\\s*(?:\\/|\\bof\\b)\\s*([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*${unitPattern}\\b`,
+      "gi"
+    );
+    const pairs = [...segment.matchAll(pairPattern)];
+    if (pairs.length === 1) {
+      candidates.push({ actual: activityNumber(pairs[0][1]), goal: activityNumber(pairs[0][2]) });
+      continue;
+    }
+    if (pairs.length > 1) continue;
+    const actualPattern = new RegExp(
+      `(?:^|[^0-9])([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*${unitPattern}\\b`,
+      "gi"
+    );
+    const actuals = [...segment.matchAll(actualPattern)];
+    if (actuals.length === 1) {
+      candidates.push({ actual: activityNumber(actuals[0][1]), goal: null });
+    }
+  }
+  const valid = candidates.filter((value) =>
+    Number.isFinite(value.actual) && value.actual >= 0 &&
+    (value.goal == null || (Number.isFinite(value.goal) && value.goal > 0))
+  );
+  // Multiple independently parseable label blocks are ambiguous, even if
+  // one happens to look more plausible. Fall back to visual interpretation.
+  return valid.length === 1 ? valid[0] : null;
+}
+
+function activityNumber(value) {
+  return Number(String(value).replaceAll(",", ""));
 }
 
 function activityLabeledNumber(text, labels, unitPattern) {
@@ -1578,10 +1616,12 @@ function getSourceModality(artifacts = []) {
 }
 
 export function classifyImageArtifacts(artifacts = [], { expectedEvidenceType = "auto" } = {}) {
-  // Explicit Workout Logger context is stronger than filename, encoding,
-  // or byte-size heuristics. A workout screenshot can be a large JPEG or
-  // HEIC; those properties must never reroute it into body-photo review.
-  if (expectedEvidenceType === "training") {
+  // Explicit Workout Logger or Activity context is stronger than filename,
+  // encoding, or byte-size heuristics. A workout/Health screenshot can be a
+  // large JPEG or HEIC; those properties must never reroute it into body-photo
+  // review. Explicit context still does not certify OCR values — Activity's
+  // parser independently fails closed to visual interpretation.
+  if (["training", "activity_day"].includes(expectedEvidenceType)) {
     return { progressPhotos: [], screenshots: [...artifacts] };
   }
   return artifacts.reduce(

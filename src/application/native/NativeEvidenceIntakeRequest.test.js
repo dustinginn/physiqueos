@@ -58,7 +58,7 @@ describe("Native production Evidence intake", () => {
     const activity = request("activity_day", file, ID, "Move 948/700 CAL Exercise 67/30 MIN Stand 13/12 HRS");
     await expect(parseNativeEvidenceIntakeRequest(activity)).resolves.toMatchObject({
       expectedEvidenceType: "activity_day",
-      typedEvidence: "Move 948/700 CAL Exercise 67/30 MIN Stand 13/12 HRS",
+      clientExtractedText: "Move 948/700 CAL Exercise 67/30 MIN Stand 13/12 HRS",
       files: [file],
     });
     const nutrition = request("nutrition", file, ID, "Move 948/700 CAL Exercise 67/30 MIN Stand 13/12 HRS");
