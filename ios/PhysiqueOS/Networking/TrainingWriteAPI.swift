@@ -14,10 +14,10 @@ protocol TrainingWriteAPI: Sendable {
     /// Reconciles any attached supporting-evidence screenshots onto the
     /// already-durable session named by `commit`'s result, entirely in the
     /// background. Confirms the screenshots' own evidence review through the
-    /// same `evidence-review.commit.v1` path every other evidence type uses
-    /// — its existing duplicate-detection already merges same-day training
-    /// evidence rather than creating a second copy, so this needs no
-    /// training-specific merge logic of its own. Best-effort: a failure here
+    /// same `evidence-review.commit.v1` path every other evidence type uses,
+    /// carrying the exact draft/canonical target captured at intake. The
+    /// server may enrich only that identity; same date is never merge
+    /// authority. Best-effort: a failure here
     /// (a screenshot that never finishes interpreting, a review that stays
     /// ambiguous) leaves the screenshot's evidence review exactly where the
     /// normal standalone Evidence Review flow would — reachable and
@@ -44,6 +44,8 @@ struct TrainingCommitResult: Decodable, Equatable, Sendable {
     var sessionId: String
     var intendedDate: String
     var exerciseIds: [String]
+
+    var isDurable: Bool { status == "durable" || status == "durable_readback" }
 }
 
 enum TrainingWriteError: Error, Equatable, LocalizedError {
@@ -172,22 +174,39 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                 )
                 return recovered
             }
-            guard let commandOutcome = outcome.commandOutcome else { throw TrainingWriteError.confirmationTimedOut }
-            guard commandOutcome.outcome != .pending, let result = commandOutcome.receipt.result,
-                  commandOutcome.confirmation?.state == "confirmed" || commandOutcome.confirmation?.trainingSessionDurable == true else {
-                throw TrainingWriteError.confirmationTimedOut
+            if let commandOutcome = outcome.commandOutcome {
+                let durable = commandOutcome.confirmation?.state == "confirmed" ||
+                    commandOutcome.confirmation?.trainingSessionDurable == true
+                if commandOutcome.outcome != .pending, durable,
+                   let result = commandOutcome.receipt.result {
+                    EvidenceLifecycleDiagnostics.recordConfirmation(
+                        milliseconds: Int(Date().timeIntervalSince(confirmationStartedAt) * 1_000),
+                        outcome: "training_durable_acknowledgement"
+                    )
+                    // Build 37 servers returned the staged result's older
+                    // status string even when the merged confirmation proved
+                    // canonical Training durability. Normalize that response
+                    // at this boundary so the view model never mistakes a
+                    // proven success for accepted-but-processing during a
+                    // rolling Native/server upgrade.
+                    var normalized = result
+                    normalized.status = "durable"
+                    return normalized
+                }
             }
             EvidenceLifecycleDiagnostics.recordConfirmation(
                 milliseconds: Int(Date().timeIntervalSince(confirmationStartedAt) * 1_000),
-                outcome: "training_durable_acknowledgement"
+                outcome: outcome.acceptanceEstablished
+                    ? "training_accepted_processing" : "training_result_unknown"
             )
-            // Explicit Training durability acknowledgement is the boundary,
-            // not the staged command receipt. Downstream work stays asynchronous;
-            // a fully completed evidence pipeline is not required.
-            // Any supporting-evidence binding is intentionally left in place here
-            // (not cleared) — reconciling it onto this now-durable session is a
-            // separate, later step; see `reconcileSupportingEvidenceAfterCommit`.
-            return result
+            return TrainingCommitResult(
+                status: outcome.acceptanceEstablished ? "accepted_processing" : "result_unknown",
+                reviewId: outcome.commandOutcome?.receipt.result?.reviewId,
+                reviewRevision: outcome.commandOutcome?.receipt.result?.reviewRevision,
+                sessionId: draft.id,
+                intendedDate: draft.workoutDate,
+                exerciseIds: exercises.compactMap(\.canonicalExerciseId)
+            )
         } catch {
             EvidenceLifecycleDiagnostics.recordConfirmation(
                 milliseconds: Int(Date().timeIntervalSince(confirmationStartedAt) * 1_000),
@@ -199,7 +218,8 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
 
     /// Training's server boundary deliberately does not acknowledge success
     /// until the canonical TrainingSession is durable. Production proved
-    /// that this can take ~19 seconds. Do not paper over that latency with a
+    /// that this reached ~39.78 seconds before the bounded server commit was
+    /// introduced. Do not paper over that latency with a
     /// longer transport deadline: wait briefly for the interactive path and,
     /// if acknowledgement is still ambiguous, replay the exact same payload with
     /// the exact same persisted idempotency key. The server can only return
@@ -215,7 +235,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         // that is genuinely still processing. We do not turn a server-side
         // continuation into a minute-long blocking spinner.
         let maximumAttempts = 2
-        var lastUncertainError: Swift.Error?
+        var acceptanceEstablished = false
         for attempt in 0..<maximumAttempts {
             do {
                 let outcome: ProductionCommandOutcome<TrainingCommitResult> = try await api.submitCommand(
@@ -226,26 +246,25 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                 )
                 let durable = outcome.confirmation?.state == "confirmed" || outcome.confirmation?.trainingSessionDurable == true
                 if outcome.outcome != .pending, durable {
-                    return .init(commandOutcome: outcome, recovered: nil)
+                    return .init(commandOutcome: outcome, recovered: nil, acceptanceEstablished: true)
                 }
+                acceptanceEstablished = true
             } catch {
                 guard ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) else { throw error }
-                lastUncertainError = error
             }
             if let recovered = try? await durableCanonicalReadback(
                 payload: payload, expectedExerciseIds: expectedExerciseIds
             ) {
-                return .init(commandOutcome: nil, recovered: recovered)
+                return .init(commandOutcome: nil, recovered: recovered, acceptanceEstablished: true)
             }
             if attempt + 1 < maximumAttempts {
                 try await Task.sleep(for: durabilityRetryDelay)
             }
         }
         if let recovered = try? await durableCanonicalReadback(payload: payload, expectedExerciseIds: expectedExerciseIds) {
-            return .init(commandOutcome: nil, recovered: recovered)
+            return .init(commandOutcome: nil, recovered: recovered, acceptanceEstablished: true)
         }
-        if let lastUncertainError { throw lastUncertainError }
-        throw TrainingWriteError.confirmationTimedOut
+        return .init(commandOutcome: nil, recovered: nil, acceptanceEstablished: acceptanceEstablished)
     }
 
     private func durableCanonicalReadback(
@@ -318,6 +337,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
     private struct DurableTrainingOutcome {
         var commandOutcome: ProductionCommandOutcome<TrainingCommitResult>?
         var recovered: TrainingCommitResult?
+        var acceptanceEstablished: Bool
     }
 
     func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async {
@@ -330,11 +350,12 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
     }
 
     func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async {
-        // Whatever `prepareSupportingEvidence` needs the attachment files
-        // for happens inside this call — safe to clean them up unconditionally
-        // once it returns, succeeding or not.
-        defer { attachmentStore.removeAll(draftId: draft.id) }
+        // Retain the exact draft's private bytes until intake has durably
+        // accepted them. A transport failure before acceptance must remain
+        // recoverable after navigation/relaunch and must not silently discard
+        // the supporting evidence.
         guard let binding = try? await prepareSupportingEvidence(for: draft) else { return }
+        defer { attachmentStore.removeAll(draftId: draft.id) }
         guard let review = try? await reviewAPI.fetchReview(reviewId: binding.reviewId),
               let version = review.version
         else { return }
@@ -366,6 +387,9 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             scope: "training-evidence.\(draft.id)",
             effectiveDate: draft.workoutDate,
             expectedEvidenceType: "training",
+            targetTrainingDraftId: draft.id,
+            targetTrainingSessionCanonicalId:
+                "training|authoritative|training_logger_draft_\(draft.id)",
             files: files
         )
         let reviewId = try await pipeline.awaitReadyIntake(intakeId: intake.intakeId)

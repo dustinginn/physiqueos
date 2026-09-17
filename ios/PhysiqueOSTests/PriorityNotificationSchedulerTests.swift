@@ -2,6 +2,24 @@ import XCTest
 @testable import PhysiqueOS
 
 final class PriorityNotificationSchedulerTests: XCTestCase {
+    @MainActor
+    private final class SnoozeProbe {
+        var payloads: [PriorityNotificationScheduler.SnoozePayload] = []
+        var requests: [UNNotificationRequest] = []
+        var shouldReject = false
+
+        func handle(_ payload: PriorityNotificationScheduler.SnoozePayload) async -> PriorityNotificationScheduler.SnoozeResult {
+            payloads.append(payload)
+            return await PriorityNotificationScheduler.scheduleSnooze(
+                payload: payload,
+                now: Date(timeIntervalSince1970: 1_789_500_000)
+            ) { request in
+                if self.shouldReject { throw URLError(.cannotConnectToHost) }
+                self.requests.append(request)
+            }
+        }
+    }
+
     func testBriefingNotificationRequiresCanonicalPublishedMidweekCardAndDeepLinksToExactArtifact() throws {
         let card = HomeBriefingCard(
             id: "midweek_briefing_2026-09-16",
@@ -218,6 +236,131 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertEqual(request.content.userInfo["payloadProtocolId"] as? String, "protocol_retatrutide")
     }
 
+    @MainActor
+    func testSnoozeDelegateRunningAppUsesValueSnapshotOnceAndPreservesActionContext() async throws {
+        let request = try Self.actionablePeptideRequest()
+        let payload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: request))
+        let probe = SnoozeProbe()
+        let delegate = PriorityNotificationDelegate(environment: nil) { await probe.handle($0) }
+        let snapshot = PriorityNotificationDelegate.ResponseSnapshot(
+            actionIdentifier: PriorityNotificationActionIdentifier.snooze,
+            requestIdentifier: request.identifier,
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier,
+            snooze: payload
+        )
+
+        await delegate.handle(snapshot: snapshot)
+        await delegate.handle(snapshot: snapshot) // duplicate callback
+
+        XCTAssertEqual(probe.payloads.count, 1)
+        let snoozed = try XCTUnwrap(probe.requests.first)
+        XCTAssertEqual(probe.requests.count, 1)
+        XCTAssertEqual(snoozed.identifier, "priority.snoozed.reminder_tesamorelin.2026-09-16")
+        XCTAssertEqual(snoozed.content.categoryIdentifier, PriorityNotificationCategory.specializedActionable)
+        XCTAssertEqual(snoozed.content.userInfo["priorityId"] as? String, "reminder_tesamorelin")
+        XCTAssertEqual(snoozed.content.userInfo["occurrenceDate"] as? String, "2026-09-16")
+        XCTAssertEqual(snoozed.content.userInfo["payloadDose"] as? String, "0.5 mg")
+        XCTAssertEqual(snoozed.content.userInfo["payloadProtocolId"] as? String, "protocol_tesamorelin")
+        XCTAssertEqual((snoozed.trigger as? UNTimeIntervalNotificationTrigger)?.timeInterval, 3_600)
+        XCTAssertFalse((snoozed.trigger as? UNTimeIntervalNotificationTrigger)?.repeats ?? true)
+    }
+
+    @MainActor
+    func testSnoozeColdLaunchAndBackgroundResumeUseTheSameSafeSnapshotBoundary() async throws {
+        let request = try Self.actionablePeptideRequest()
+        let payload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: request))
+        let snapshot = PriorityNotificationDelegate.ResponseSnapshot(
+            actionIdentifier: PriorityNotificationActionIdentifier.snooze,
+            requestIdentifier: request.identifier,
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier,
+            snooze: payload
+        )
+
+        for _ in 0..<2 { // newly-created delegate (cold launch), retained delegate (resume)
+            let probe = SnoozeProbe()
+            let delegate = PriorityNotificationDelegate(environment: nil) { await probe.handle($0) }
+            await delegate.handle(snapshot: snapshot)
+            XCTAssertEqual(probe.requests.count, 1)
+        }
+    }
+
+    @MainActor
+    func testSnoozeMissingPayloadAndNotificationCenterFailureFailSafeWithoutCanonicalMutation() async throws {
+        let request = try Self.actionablePeptideRequest()
+        let probe = SnoozeProbe()
+        probe.shouldReject = true
+        let delegate = PriorityNotificationDelegate(environment: nil) { await probe.handle($0) }
+        let invalid = PriorityNotificationDelegate.ResponseSnapshot(
+            actionIdentifier: PriorityNotificationActionIdentifier.snooze,
+            requestIdentifier: request.identifier,
+            userInfo: [:],
+            categoryIdentifier: request.content.categoryIdentifier,
+            snooze: nil
+        )
+        await delegate.handle(snapshot: invalid)
+        XCTAssertTrue(probe.payloads.isEmpty)
+
+        let payload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: request))
+        let valid = PriorityNotificationDelegate.ResponseSnapshot(
+            actionIdentifier: PriorityNotificationActionIdentifier.snooze,
+            requestIdentifier: request.identifier + ".failure",
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier,
+            snooze: payload
+        )
+        await delegate.handle(snapshot: valid)
+        XCTAssertEqual(probe.payloads.count, 1)
+        XCTAssertTrue(probe.requests.isEmpty)
+    }
+
+    @MainActor
+    func testAllRegisteredActionLifecycleKindsDecodeOrFailClosedWithoutCrash() async throws {
+        let environment = AppEnvironment(nativeAuthority: .sandbox)
+        let delegate = PriorityNotificationDelegate(environment: environment) { _ in
+            XCTFail("non-snooze actions must not schedule a snooze")
+            return .rejected(identifier: "unexpected")
+        }
+        let priority = try Self.actionablePeptideRequest()
+        let destination = try XCTUnwrap(priority.content.userInfo["destination"] as? Data)
+        let openInfo: [AnyHashable: Any] = ["destination": destination]
+        let actions = [
+            PriorityNotificationDelegate.ResponseSnapshot(
+                actionIdentifier: PriorityNotificationActionIdentifier.complete,
+                requestIdentifier: priority.identifier,
+                userInfo: priority.content.userInfo,
+                categoryIdentifier: priority.content.categoryIdentifier
+            ),
+            PriorityNotificationDelegate.ResponseSnapshot(
+                actionIdentifier: UNNotificationDefaultActionIdentifier,
+                requestIdentifier: "priority.open",
+                userInfo: openInfo,
+                categoryIdentifier: PriorityNotificationCategory.openOnly
+            ),
+            PriorityNotificationDelegate.ResponseSnapshot(
+                actionIdentifier: UNNotificationDefaultActionIdentifier,
+                requestIdentifier: "evidence.reviewReady.review-1",
+                userInfo: openInfo,
+                categoryIdentifier: PriorityNotificationCategory.evidenceReviewReady
+            ),
+        ]
+        for action in actions { await delegate.handle(snapshot: action) }
+
+        let briefingDestination = try JSONEncoder().encode(AppDestination.briefingDetail(briefingId: "midweek-1"))
+        await delegate.handle(snapshot: .init(
+            actionIdentifier: UNNotificationDefaultActionIdentifier,
+            requestIdentifier: "briefing.ready.midweek-1",
+            userInfo: [
+                "destinationJSON": String(decoding: briefingDestination, as: UTF8.self),
+                "briefingArtifactId": "midweek-1",
+            ],
+            categoryIdentifier: PriorityNotificationCategory.briefingReady
+        ))
+        XCTAssertEqual(environment.notificationDeepLinkCoordinator.pendingRequest?.destination,
+                       .briefingDetail(briefingId: "midweek-1"))
+    }
+
     // MARK: - reconciliationPlan: the schedule-change acceptance requirement.
     // `sync` needs a live, AUTHORIZED UNUserNotificationCenter — authorization
     // can't be granted programmatically in a test — so the actual decision
@@ -378,6 +521,24 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
     // MARK: - Fixtures
 
     private static let referenceNow = ISO8601DateFormatter().date(from: "2026-09-13T05:00:00Z")!
+
+    private static func actionablePeptideRequest() throws -> UNNotificationRequest {
+        let action = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(#"{"classification":"specialized_workflow_required","workflow":"peptide_protocol","scheduledTime":"17:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":7,"payload":{"priorityId":"reminder_tesamorelin","occurrenceDate":"2026-09-16","dose":"0.5 mg","protocolId":"protocol_tesamorelin"}}}"#.utf8))
+        var item = foamRolling(scheduledTime: "17:00")
+        item.id = "reminder_tesamorelin"
+        item.date = "2026-09-16"
+        item.notificationAction = action
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-16T00:00:00Z"))
+        return try XCTUnwrap(PriorityNotificationScheduler.reconciliationPlan(
+            items: [item], existingScheduledIdentifiers: [], now: now, calendar: utcCalendar
+        ).toAdd.first)
+    }
+
+    private static var utcCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
 
     private static func foamRolling(scheduledTime: String?, completed: Bool = false) -> PriorityOccurrence {
         PriorityOccurrence(

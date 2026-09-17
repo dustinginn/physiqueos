@@ -2674,6 +2674,8 @@ final class FounderServerAPITests: XCTestCase {
 
         let committed = try await writeAPI.commit(draft)
 
+        XCTAssertTrue(committed.isDurable)
+        XCTAssertEqual(committed.status, "durable")
         XCTAssertEqual(committed.exerciseIds, ["barbell_bench_press", "pull_up"])
         let requests = await transport.requests
         XCTAssertEqual(requests.count, 4)
@@ -2760,11 +2762,11 @@ final class FounderServerAPITests: XCTestCase {
             supportingWorkoutFailureAssetIds: nil
         )
 
-        await XCTAssertThrowsErrorAsync(try await writeAPI.commit(draft)) { error in
-            XCTAssertEqual(error as? TrainingWriteError, .confirmationTimedOut)
-            XCTAssertEqual((error as? LocalizedError)?.errorDescription,
-                           "The workout is still processing. Check Training history shortly.")
-        }
+        let outcomeResult = try await writeAPI.commit(draft)
+
+        XCTAssertEqual(outcomeResult.status, "accepted_processing")
+        XCTAssertFalse(outcomeResult.isDurable)
+        XCTAssertEqual(outcomeResult.sessionId, draft.id)
         let requests = await transport.requests
         XCTAssertEqual(requests.count, 6)
         XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"),
@@ -2830,9 +2832,9 @@ final class FounderServerAPITests: XCTestCase {
     /// The later, best-effort step that reconciles an attached screenshot
     /// onto the already-durable session: interprets it, then confirms its
     /// evidence review through the exact same `evidence-review.commit.v1`
-    /// path every other evidence type uses (no training-specific merge
-    /// command needed — that path's own duplicate-detection already merges
-    /// same-day training evidence). Cleans up the attachment file when done.
+    /// path every other evidence type uses. The intake carries the exact
+    /// Logger target; date alone is never reconciliation authority. Cleans
+    /// up the attachment file only after intake has accepted the bytes.
     func testReconcileSupportingEvidenceAfterCommitConfirmsScreenshotReview() async throws {
         let review = productionEnvelope(resource: "evidence-review", data: #"{"review":{"id":"review-training","status":"pending","createdAt":"2026-09-11T12:00:00.000Z","version":1,"interpretedEvidence":{"evidence_objects":[{"id":"training-object","evidence_type":"training","observed_at":"2026-09-11"}]}}}"#)
         let confirmResponse = #"{"outcome":"committed","receipt":{"status":"committed","result":null,"operationId":null,"commandId":"01911111-1111-7111-8111-111111111112"},"confirmation":{"state":"confirmed","reviewId":"review-training","continuationKey":null,"completedStep":"complete","publication":null}}"#
@@ -2871,6 +2873,11 @@ final class FounderServerAPITests: XCTestCase {
             "/api/v1/native/read/evidence-review",
             "/api/v1/native/commands",
         ], "Review concurrency is re-read before the supporting screenshot confirmation.")
+        let intakeBody = try XCTUnwrap(String(data: try XCTUnwrap(requests[1].httpBody), encoding: .utf8))
+        XCTAssertTrue(intakeBody.contains("name=\"targetTrainingDraftId\""))
+        XCTAssertTrue(intakeBody.contains("native-session-media"))
+        XCTAssertTrue(intakeBody.contains("name=\"targetTrainingSessionCanonicalId\""))
+        XCTAssertTrue(intakeBody.contains("training|authoritative|training_logger_draft_native-session-media"))
         XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "If-Match"), "\"2\"")
         let command = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests.last?.httpBody)) as? [String: Any])
         XCTAssertEqual(command["commandType"] as? String, ProductionCommandType.commitEvidenceReview)
@@ -2879,6 +2886,46 @@ final class FounderServerAPITests: XCTestCase {
             "targetTrainingSessionCanonicalId": "training|authoritative|training_logger_draft_native-session-media",
         ])
         XCTAssertThrowsError(try attachments.load(reference: reference), "the screenshot file is cleaned up once reconciliation finishes.")
+    }
+
+    func testSupportingEvidenceIntakeFailureRetainsExactDraftAttachmentForRecovery() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.networkConnectionLost)),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let attachments = MemoryTrainingLoggerAttachmentStore()
+        let reference = try attachments.save(
+            data: Data([1, 2, 3]), draftId: "native-session-recoverable", assetId: "asset-1", displayName: "Workout.png"
+        )
+        let defaults = Self.freshDefaults()
+        let writeAPI = ProductionTrainingWriteAPI(
+            api: native,
+            reviewAPI: ProductionEvidenceReviewAPI(api: native),
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults),
+            attachmentStore: attachments,
+            bindingStore: TrainingEvidenceBindingStore(defaults: defaults)
+        )
+        let draft = TrainingLoggerDraft(
+            id: "native-session-recoverable", mode: .live, workoutDate: "2026-09-16", selectedAreaIds: ["chest"],
+            exercises: [], relationships: [], step: .complete, exercisePickerReturnStep: nil,
+            exercisePickerExistingExerciseIds: nil,
+            supportingEvidence: [TrainingLoggerSupportingEvidence(
+                id: "asset-1", displayName: "Workout.png", source: .photos,
+                storageReference: reference, contentType: "image/png"
+            )],
+            supportingWorkouts: nil, supportingWorkoutFailureAssetIds: nil
+        )
+
+        await writeAPI.reconcileSupportingEvidenceAfterCommit(for: draft)
+
+        XCTAssertEqual(try attachments.load(reference: reference), Data([1, 2, 3]),
+                       "pre-acceptance transport ambiguity must retain the exact draft's private evidence bytes.")
+        let requestPaths = await transport.requests.map { $0.url?.path }
+        XCTAssertEqual(requestPaths, [
+            "/api/v1/native/auth/pair", "/api/v1/native/evidence/intakes",
+        ])
     }
 
     func testProductionTrainingCommitCreatesFounderNamedExerciseWithSelectedArea() async throws {

@@ -996,10 +996,15 @@ struct TrainingLoggerView: View {
                     .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
                     .foregroundStyle(PhysiqueOSTheme.destructive)
             }
-            PrimaryActionButton(title: viewModel.isSubmitting ? "Saving…" : "Finish Workout") {
+            if let message = viewModel.processingMessage {
+                Text(message)
+                    .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+            PrimaryActionButton(title: viewModel.isAwaitingDurability ? "Finishing workout…" : viewModel.isSubmitting ? "Saving…" : "Finish Workout") {
                 Task { await viewModel.submit() }
             }
-                .disabled(viewModel.isSubmitting)
+                .disabled(viewModel.isSubmitting || viewModel.isAwaitingDurability)
                 .accessibilityIdentifier("trainingLogger.completeLocal")
             secondaryButton("Back to Workout Review") { viewModel.go(to: .summary) }
         }

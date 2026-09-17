@@ -19,6 +19,102 @@ enum PriorityNotificationScheduler {
     static let snoozedPrefix = "priority.snoozed."
     static let snoozeInterval: TimeInterval = 3600
 
+    /// A value-only copy of the app-owned fields in a priority notification.
+    /// `UNNotificationRequest` and `UNNotificationContent` are Objective-C
+    /// framework objects whose callback lifetime and Sendable behavior are not
+    /// an application contract. Capture this snapshot synchronously inside the
+    /// notification delegate, before its first suspension, and only move these
+    /// immutable Swift values across the actor boundary.
+    struct SnoozePayload: Sendable, Equatable {
+        let originalRequestIdentifier: String
+        let priorityId: String
+        let occurrenceDate: String
+        let title: String
+        let subtitle: String
+        let body: String
+        let categoryIdentifier: String
+        let threadIdentifier: String
+        let targetContentIdentifier: String?
+        let canonicalScheduledTime: String?
+        let destination: Data?
+        let commandType: String?
+        let expectedVersion: Int?
+        let payloadPriorityId: String?
+        let payloadOccurrenceDate: String?
+        let payloadDose: String?
+        let payloadProtocolId: String?
+
+        init?(request: UNNotificationRequest) {
+            let content = request.content
+            guard let priorityId = content.userInfo["priorityId"] as? String,
+                  !priorityId.isEmpty,
+                  let occurrenceDate = content.userInfo["occurrenceDate"] as? String,
+                  !occurrenceDate.isEmpty
+            else { return nil }
+            originalRequestIdentifier = request.identifier
+            self.priorityId = priorityId
+            self.occurrenceDate = occurrenceDate
+            title = content.title
+            subtitle = content.subtitle
+            body = content.body
+            categoryIdentifier = content.categoryIdentifier
+            threadIdentifier = content.threadIdentifier
+            targetContentIdentifier = content.targetContentIdentifier
+            canonicalScheduledTime = content.userInfo["canonicalScheduledTime"] as? String
+            destination = content.userInfo["destination"] as? Data
+            commandType = content.userInfo["commandType"] as? String
+            expectedVersion = content.userInfo["expectedVersion"] as? Int
+            payloadPriorityId = content.userInfo["payloadPriorityId"] as? String
+            payloadOccurrenceDate = content.userInfo["payloadOccurrenceDate"] as? String
+            payloadDose = content.userInfo["payloadDose"] as? String
+            payloadProtocolId = content.userInfo["payloadProtocolId"] as? String
+        }
+
+        init(
+            originalRequestIdentifier: String,
+            priorityId: String,
+            occurrenceDate: String,
+            title: String,
+            subtitle: String = "",
+            body: String,
+            categoryIdentifier: String,
+            threadIdentifier: String = "",
+            targetContentIdentifier: String? = nil,
+            canonicalScheduledTime: String? = nil,
+            destination: Data? = nil,
+            commandType: String? = nil,
+            expectedVersion: Int? = nil,
+            payloadPriorityId: String? = nil,
+            payloadOccurrenceDate: String? = nil,
+            payloadDose: String? = nil,
+            payloadProtocolId: String? = nil
+        ) {
+            self.originalRequestIdentifier = originalRequestIdentifier
+            self.priorityId = priorityId
+            self.occurrenceDate = occurrenceDate
+            self.title = title
+            self.subtitle = subtitle
+            self.body = body
+            self.categoryIdentifier = categoryIdentifier
+            self.threadIdentifier = threadIdentifier
+            self.targetContentIdentifier = targetContentIdentifier
+            self.canonicalScheduledTime = canonicalScheduledTime
+            self.destination = destination
+            self.commandType = commandType
+            self.expectedVersion = expectedVersion
+            self.payloadPriorityId = payloadPriorityId
+            self.payloadOccurrenceDate = payloadOccurrenceDate
+            self.payloadDose = payloadDose
+            self.payloadProtocolId = payloadProtocolId
+        }
+
+    }
+
+    enum SnoozeResult: Sendable, Equatable {
+        case accepted(identifier: String)
+        case rejected(identifier: String)
+    }
+
     static func identifier(priorityId: String, occurrenceDate: String) -> String {
         "\(scheduledPrefix)\(priorityId).\(occurrenceDate)"
     }
@@ -165,24 +261,55 @@ enum PriorityNotificationScheduler {
     /// later, under a distinct identifier so it doesn't collide with (or
     /// get silently replaced by) the next regular `sync`. Never touches the
     /// canonical priority — no server call happens here at all.
-    static func scheduleSnooze(for originalRequest: UNNotificationRequest, center: UNUserNotificationCenter = .current()) async {
-        guard let priorityId = originalRequest.content.userInfo["priorityId"] as? String,
-              let occurrenceDate = originalRequest.content.userInfo["occurrenceDate"] as? String,
-              let content = originalRequest.content.mutableCopy() as? UNMutableNotificationContent
-        else { return }
-        let identifier = snoozeIdentifier(priorityId: priorityId, occurrenceDate: occurrenceDate)
+    @MainActor
+    static func scheduleSnooze(
+        payload: SnoozePayload,
+        now: Date = Date(),
+        add: @MainActor (UNNotificationRequest) async throws -> Void = { request in
+            try await UNUserNotificationCenter.current().add(request)
+        }
+    ) async -> SnoozeResult {
+        let identifier = snoozeIdentifier(priorityId: payload.priorityId, occurrenceDate: payload.occurrenceDate)
+        let content = UNMutableNotificationContent()
+        content.title = payload.title
+        content.subtitle = payload.subtitle
+        content.body = payload.body
+        content.sound = .default
+        content.categoryIdentifier = payload.categoryIdentifier
+        content.threadIdentifier = payload.threadIdentifier
+        content.targetContentIdentifier = payload.targetContentIdentifier
+        var userInfo: [AnyHashable: Any] = [
+            "priorityId": payload.priorityId,
+            "occurrenceDate": payload.occurrenceDate,
+        ]
+        if let value = payload.canonicalScheduledTime { userInfo["canonicalScheduledTime"] = value }
+        if let value = payload.destination { userInfo["destination"] = value }
+        if let value = payload.commandType { userInfo["commandType"] = value }
+        if let value = payload.expectedVersion { userInfo["expectedVersion"] = value }
+        if let value = payload.payloadPriorityId { userInfo["payloadPriorityId"] = value }
+        if let value = payload.payloadOccurrenceDate { userInfo["payloadOccurrenceDate"] = value }
+        if let value = payload.payloadDose { userInfo["payloadDose"] = value }
+        if let value = payload.payloadProtocolId { userInfo["payloadProtocolId"] = value }
+        content.userInfo = userInfo
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: snoozeInterval, repeats: false)
-        let now = Date()
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        NotificationDiagnostics.record(.init(capturedAt: now, identifier: identifier, operation: "snooze request constructed",
+            reason: "A value snapshot produced one device-only one-hour replacement request; canonical state is unchanged.",
+            fireDate: now.addingTimeInterval(snoozeInterval), timeZoneIdentifier: TimeZone.current.identifier,
+            categoryIdentifier: content.categoryIdentifier, triggerDescription: "interval(3600s repeats:false)"))
         do {
-            try await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
-            await NotificationDiagnostics.record(.init(capturedAt: now, identifier: identifier, operation: "snoozed",
+            try await add(request)
+            NotificationDiagnostics.record(.init(capturedAt: now, identifier: identifier, operation: "snooze request accepted",
                 reason: "iOS accepted the device-only one-hour snooze; canonical state is unchanged.",
                 fireDate: now.addingTimeInterval(snoozeInterval), timeZoneIdentifier: TimeZone.current.identifier,
                 categoryIdentifier: content.categoryIdentifier, triggerDescription: "interval(3600s repeats:false)"))
+            return .accepted(identifier: identifier)
         } catch {
-            await NotificationDiagnostics.record(.init(capturedAt: now, identifier: identifier, operation: "snooze rejected",
-                reason: error.localizedDescription, fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier,
+            NotificationDiagnostics.record(.init(capturedAt: now, identifier: identifier, operation: "snooze request rejected",
+                reason: "iOS rejected the device-only snooze request; canonical state remains unchanged.", fireDate: nil,
+                timeZoneIdentifier: TimeZone.current.identifier,
                 categoryIdentifier: content.categoryIdentifier, triggerDescription: "interval(3600s repeats:false)"))
+            return .rejected(identifier: identifier)
         }
     }
 

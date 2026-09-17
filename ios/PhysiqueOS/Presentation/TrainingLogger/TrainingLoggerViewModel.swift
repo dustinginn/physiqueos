@@ -35,6 +35,10 @@ final class TrainingLoggerViewModel {
     /// subsequent, non-authoritative refresh (e.g. `fetchConfiguration()`)
     /// failed. Never implies the workout itself needs to be resubmitted.
     var refreshWarning: String?
+    var processingMessage: String?
+    private var durabilityRecoveryTasks: [String: Task<Void, Never>] = [:]
+    private let durabilityRecoveryMaxAttempts: Int
+    private let durabilityRecoveryDelay: Duration
 
     /// Interprets attached supporting-evidence screenshots as soon as they
     /// are attached, so the wait `submit()` would otherwise hit at Finish is
@@ -50,7 +54,9 @@ final class TrainingLoggerViewModel {
         catalogWriteAPI: TrainingExerciseCatalogWriteAPI = NotAvailableTrainingExerciseCatalogWriteAPI(),
         draftStore: TrainingLoggerDraftStore,
         attachmentStore: TrainingLoggerAttachmentStore = FileTrainingLoggerAttachmentStore(),
-        authority: NativeAPIEnvironment = .sandbox
+        authority: NativeAPIEnvironment = .sandbox,
+        durabilityRecoveryMaxAttempts: Int = 30,
+        durabilityRecoveryDelay: Duration = .seconds(2)
     ) {
         self.api = api
         self.writeAPI = writeAPI
@@ -58,6 +64,8 @@ final class TrainingLoggerViewModel {
         self.draftStore = draftStore
         self.attachmentStore = attachmentStore
         self.authority = authority
+        self.durabilityRecoveryMaxAttempts = durabilityRecoveryMaxAttempts
+        self.durabilityRecoveryDelay = durabilityRecoveryDelay
     }
 
     func load() async {
@@ -71,11 +79,24 @@ final class TrainingLoggerViewModel {
                     if await writeAPI.isDraftAlreadyDurable(candidate) {
                         // Exact deterministic identity/fingerprint proof
                         // clears only this residue. Same-date/category sibling
-                        // drafts remain independent and untouched.
-                        attachmentStore.removeAll(draftId: candidate.id)
+                        // drafts remain independent and untouched. Attached
+                        // evidence still owns a separate exact-target
+                        // reconciliation, so never delete its bytes merely
+                        // because the structured session became durable while
+                        // the app was away.
+                        if candidate.supportingEvidenceAssets.isEmpty {
+                            attachmentStore.removeAll(draftId: candidate.id)
+                        } else {
+                            Task { [writeAPI] in
+                                await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
+                            }
+                        }
                         draftStore.discard(id: candidate.id)
                     } else {
                         remaining.append(candidate)
+                        if candidate.submissionState != nil {
+                            scheduleDurabilityRecovery(for: candidate)
+                        }
                     }
                 }
                 savedDrafts = Self.sortDrafts(remaining)
@@ -212,7 +233,17 @@ final class TrainingLoggerViewModel {
         refreshWarning = nil
         defer { isSubmitting = false }
         do {
-            _ = try await writeAPI.commit(draft)
+            let result = try await writeAPI.commit(draft)
+            guard result.isDurable else {
+                let state: TrainingLoggerSubmissionState = result.status == "accepted_processing"
+                    ? .acceptedProcessing : .resultUnknown
+                update { $0.submissionState = state }
+                processingMessage = state == .acceptedProcessing
+                    ? "Finishing workout… PhysiqueOS has accepted it. You can safely leave while it finishes."
+                    : "Checking workout… Keep this saved draft while PhysiqueOS verifies the result. You do not need to retry."
+                if let pending = self.draft { scheduleDurabilityRecovery(for: pending) }
+                return
+            }
         } catch {
             // The mutation itself did not reach canonical success — this is
             // the only branch allowed to report the submission as failed,
@@ -242,6 +273,51 @@ final class TrainingLoggerViewModel {
             // Non-destructive: the workout is already saved. A later screen
             // load will retry this same read.
             refreshWarning = "Workout saved. Some details may be out of date until you return to Training."
+        }
+    }
+
+    var isAwaitingDurability: Bool { draft?.submissionState != nil }
+
+    private func scheduleDurabilityRecovery(for candidate: TrainingLoggerDraft) {
+        guard durabilityRecoveryTasks[candidate.id] == nil else { return }
+        let maxAttempts = durabilityRecoveryMaxAttempts
+        let recoveryDelay = durabilityRecoveryDelay
+        durabilityRecoveryTasks[candidate.id] = Task { [weak self, writeAPI] in
+            defer { self?.durabilityRecoveryTasks[candidate.id] = nil }
+            for attempt in 0..<maxAttempts {
+                guard !Task.isCancelled else { return }
+                if await writeAPI.isDraftAlreadyDurable(candidate) {
+                    self?.resolveDurableDraft(candidate)
+                    return
+                }
+                // Reuse the exact persisted idempotency identity to resolve
+                // an ambiguous acknowledgement. This can only replay the
+                // original command; it cannot create a sibling session.
+                if attempt > 0, let result = try? await writeAPI.commit(candidate), result.isDurable {
+                    self?.resolveDurableDraft(candidate)
+                    return
+                }
+                do { try await Task.sleep(for: recoveryDelay) }
+                catch { return }
+            }
+        }
+    }
+
+    private func resolveDurableDraft(_ candidate: TrainingLoggerDraft) {
+        if candidate.supportingEvidenceAssets.isEmpty {
+            attachmentStore.removeAll(draftId: candidate.id)
+        }
+        draftStore.discard(id: candidate.id)
+        savedDrafts.removeAll { $0.id == candidate.id }
+        if draft?.id == candidate.id {
+            var completed = candidate
+            completed.step = .complete
+            completed.submissionState = nil
+            draft = completed
+            processingMessage = nil
+        }
+        Task { [writeAPI] in
+            await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
         }
     }
 

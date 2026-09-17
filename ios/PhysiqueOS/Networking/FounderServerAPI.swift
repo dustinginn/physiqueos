@@ -627,6 +627,8 @@ actor ProductionNativeAPI {
         effectiveDate: String,
         expectedEvidenceType: String,
         clientExtractedText: String? = nil,
+        targetTrainingDraftId: String? = nil,
+        targetTrainingSessionCanonicalId: String? = nil,
         files: [(filename: String, contentType: String, data: Data)],
         onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> ProductionEvidenceIntakeStatus {
@@ -638,6 +640,19 @@ actor ProductionNativeAPI {
         if let clientExtractedText, !clientExtractedText.isEmpty {
             body.appendMultipartField(
                 name: "clientExtractedText", value: Data(clientExtractedText.utf8),
+                boundary: boundary, contentType: "text/plain"
+            )
+        }
+        if let targetTrainingDraftId, !targetTrainingDraftId.isEmpty {
+            body.appendMultipartField(
+                name: "targetTrainingDraftId", value: Data(targetTrainingDraftId.utf8),
+                boundary: boundary, contentType: "text/plain"
+            )
+        }
+        if let targetTrainingSessionCanonicalId, !targetTrainingSessionCanonicalId.isEmpty {
+            body.appendMultipartField(
+                name: "targetTrainingSessionCanonicalId",
+                value: Data(targetTrainingSessionCanonicalId.utf8),
                 boundary: boundary, contentType: "text/plain"
             )
         }

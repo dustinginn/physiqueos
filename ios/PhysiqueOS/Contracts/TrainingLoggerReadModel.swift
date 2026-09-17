@@ -135,6 +135,10 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// Exact live-workout start instant when Native observed one. Legacy
     /// drafts and date-only past workouts intentionally remain nil.
     var startedAt: String? = nil
+    /// Persisted exact-draft command lifecycle. Missing on legacy drafts.
+    /// This is presentation/recovery state only; the draft id and the
+    /// persisted idempotency key remain the mutation identity.
+    var submissionState: TrainingLoggerSubmissionState? = nil
 
     static func fresh(mode: TrainingLoggerMode, workoutDate: String, startedAt: String? = nil) -> Self {
         .init(
@@ -197,6 +201,11 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
             }
         }
     }
+}
+
+enum TrainingLoggerSubmissionState: String, Codable, Equatable {
+    case acceptedProcessing
+    case resultUnknown
 }
 
 struct TrainingLoggerSupportingEvidence: Codable, Equatable, Identifiable {

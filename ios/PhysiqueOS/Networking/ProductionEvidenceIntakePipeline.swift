@@ -44,6 +44,8 @@ struct ProductionEvidenceIntakePipeline {
         effectiveDate: String,
         expectedEvidenceType: String,
         clientExtractedText: String? = nil,
+        targetTrainingDraftId: String? = nil,
+        targetTrainingSessionCanonicalId: String? = nil,
         files: [(filename: String, contentType: String, data: Data)],
         onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> ProductionEvidenceIntakeStatus {
@@ -66,6 +68,8 @@ struct ProductionEvidenceIntakePipeline {
             clientExtractedText.map {
                 SHA256.hash(data: Data($0.utf8)).map { String(format: "%02x", $0) }.joined()
             } ?? "-",
+            targetTrainingDraftId ?? "-",
+            targetTrainingSessionCanonicalId ?? "-",
         ])
         let submissionIdentity = idempotencyStore.resolvedKey(scope: scope, signature: signature)
         return try await api.submitEvidenceIntake(
@@ -73,6 +77,8 @@ struct ProductionEvidenceIntakePipeline {
             effectiveDate: effectiveDate,
             expectedEvidenceType: expectedEvidenceType,
             clientExtractedText: clientExtractedText,
+            targetTrainingDraftId: targetTrainingDraftId,
+            targetTrainingSessionCanonicalId: targetTrainingSessionCanonicalId,
             files: files,
             onUploadProgress: onUploadProgress
         )

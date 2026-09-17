@@ -839,7 +839,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     private struct StubSucceedingTrainingWriteAPI: TrainingWriteAPI {
         func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
-            TrainingCommitResult(status: "confirmed", reviewId: "review-1", reviewRevision: 1, sessionId: draft.id, intendedDate: draft.workoutDate, exerciseIds: draft.exercises.map(\.id))
+            TrainingCommitResult(status: "durable", reviewId: "review-1", reviewRevision: 1, sessionId: draft.id, intendedDate: draft.workoutDate, exerciseIds: draft.exercises.map(\.id))
         }
     }
 
@@ -862,6 +862,45 @@ final class TrainingLoggerTests: XCTestCase {
             throw StubFailingTrainingWriteAPI.Failure()
         }
         func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { durableIDs.contains(draft.id) }
+    }
+
+    private actor AcceptedTrainingWriteAPI: TrainingWriteAPI {
+        let becomesDurable: Bool
+        let durableIDs: Set<String>?
+        private(set) var commitCalls = 0
+
+        init(becomesDurable: Bool, durableIDs: Set<String>? = nil) {
+            self.becomesDurable = becomesDurable
+            self.durableIDs = durableIDs
+        }
+
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
+            commitCalls += 1
+            return TrainingCommitResult(
+                status: "accepted_processing", reviewId: nil, reviewRevision: nil,
+                sessionId: draft.id, intendedDate: draft.workoutDate,
+                exerciseIds: draft.exercises.map(\.id)
+            )
+        }
+
+        func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool {
+            durableIDs?.contains(draft.id) ?? becomesDurable
+        }
+    }
+
+    private actor DurableSupportingEvidenceProbe: TrainingWriteAPI {
+        let durableIDs: Set<String>
+        private(set) var reconciledIDs: [String] = []
+
+        init(durableIDs: Set<String>) { self.durableIDs = durableIDs }
+
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
+            throw StubFailingTrainingWriteAPI.Failure()
+        }
+        func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { durableIDs.contains(draft.id) }
+        func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async {
+            reconciledIDs.append(draft.id)
+        }
     }
 
     @MainActor
@@ -922,6 +961,35 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(viewModel.savedDrafts.map(\.id), [sibling.id])
     }
 
+    @MainActor
+    func testRelaunchContinuesExactTargetSupportingEvidenceAfterStructuredDraftBecomesDurable() async throws {
+        var durable = draft(date: "2026-09-16", areas: ["biceps", "triceps"])
+        durable.id = "durable-with-support"
+        durable.supportingEvidence = [
+            TrainingLoggerSupportingEvidence(
+                id: "strength", displayName: "Strength.png", source: .photos,
+                storageReference: "drafts/durable-with-support/strength", contentType: "image/png"
+            ),
+        ]
+        var sibling = draft(date: "2026-09-16", areas: ["biceps", "triceps"])
+        sibling.id = "same-date-sibling"
+        let store = MemoryTrainingLoggerDraftStore(drafts: [durable, sibling])
+        let writeAPI = DurableSupportingEvidenceProbe(durableIDs: [durable.id])
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, draftStore: store, authority: .founderProduction
+        )
+
+        await viewModel.load()
+        for _ in 0..<100 {
+            if !(await writeAPI.reconciledIDs).isEmpty { break }
+            await Task.yield()
+        }
+
+        XCTAssertEqual(store.loadAll().map(\.id), [sibling.id])
+        let reconciledIDs = await writeAPI.reconciledIDs
+        XCTAssertEqual(reconciledIDs, [durable.id])
+    }
+
     /// A successful canonical submission must clear the device-only draft —
     /// there is nothing left to resume once the server holds the canonical
     /// session. This exercises the exact `submit()` → `completeLocalCapture()`
@@ -958,6 +1026,72 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(store.load(), beforeSubmit, "A failed submission must preserve the exact draft, not just some draft.")
         XCTAssertEqual(viewModel.draft, beforeSubmit)
         XCTAssertNotNil(viewModel.validationMessage)
+    }
+
+    @MainActor
+    func testAcceptedProcessingSubmissionShowsHonestStateAndRetainsExactDraft() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let writeAPI = AcceptedTrainingWriteAPI(becomesDurable: false)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, draftStore: store, authority: .founderProduction
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        let submittedID = try XCTUnwrap(viewModel.draft?.id)
+
+        await viewModel.submit()
+
+        XCTAssertEqual(store.loadAll().map(\.id), [submittedID])
+        XCTAssertEqual(store.loadAll().first?.submissionState, .acceptedProcessing)
+        XCTAssertTrue(viewModel.isAwaitingDurability)
+        XCTAssertEqual(
+            viewModel.processingMessage,
+            "Finishing workout… PhysiqueOS has accepted it. You can safely leave while it finishes."
+        )
+        XCTAssertNil(viewModel.validationMessage)
+    }
+
+    @MainActor
+    func testAcceptedSubmissionAutoClearsOnlyAfterExactDurabilityWithoutSecondCommit() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let writeAPI = AcceptedTrainingWriteAPI(becomesDurable: true)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, draftStore: store, authority: .founderProduction
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live)
+
+        await viewModel.submit()
+        for _ in 0..<100 where store.load() != nil {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertNil(store.load())
+        let commitCalls = await writeAPI.commitCalls
+        XCTAssertEqual(commitCalls, 1, "Readback proof must resolve the accepted command without resubmitting it.")
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+        XCTAssertNil(viewModel.processingMessage)
+        XCTAssertNil(viewModel.validationMessage)
+    }
+
+    @MainActor
+    func testRelaunchResolvesPersistedAcceptedDraftByExactIdentityWithoutReplay() async throws {
+        var pending = draft(date: "2026-09-16", areas: ["biceps", "triceps"])
+        pending.id = "accepted-persisted-draft"
+        pending.submissionState = .acceptedProcessing
+        let sibling = draft(date: "2026-09-16", areas: ["biceps", "triceps"])
+        let store = MemoryTrainingLoggerDraftStore(drafts: [pending, sibling])
+        let writeAPI = AcceptedTrainingWriteAPI(becomesDurable: true, durableIDs: [pending.id])
+        let reopened = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, draftStore: store, authority: .founderProduction
+        )
+
+        await reopened.load()
+
+        XCTAssertEqual(store.loadAll().map(\.id), [sibling.id])
+        XCTAssertEqual(reopened.savedDrafts.map(\.id), [sibling.id])
+        let commitCalls = await writeAPI.commitCalls
+        XCTAssertEqual(commitCalls, 0)
     }
 
     // MARK: - Build 25: canonical commit success must be final regardless of a later refresh
