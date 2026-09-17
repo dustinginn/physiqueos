@@ -22,6 +22,47 @@ final class NotificationResponseCompletionGate: @unchecked Sendable {
     }
 }
 
+/// Owns notification action continuations after Apple's callback lifetime
+/// ends. `Task` itself retains its operation, but keeping the handles here
+/// makes that ownership explicit, bounded, and independently cancellable at
+/// app teardown. No Apple notification framework object or completion block
+/// is captured by these tasks.
+final class NotificationActionContinuationCoordinator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = Set<UUID>()
+    private var tasks: [UUID: Task<Void, Never>] = [:]
+
+    func submit(_ operation: @escaping @Sendable () async -> Void) {
+        let id = UUID()
+        lock.lock()
+        active.insert(id)
+        lock.unlock()
+        let task = Task { [weak self] in
+            await operation()
+            self?.finish(id)
+        }
+        lock.lock()
+        if active.contains(id) { tasks[id] = task }
+        lock.unlock()
+    }
+
+    private func finish(_ id: UUID) {
+        lock.lock()
+        active.remove(id)
+        tasks.removeValue(forKey: id)
+        lock.unlock()
+    }
+
+    deinit {
+        lock.lock()
+        let owned = Array(tasks.values)
+        tasks.removeAll()
+        active.removeAll()
+        lock.unlock()
+        owned.forEach { $0.cancel() }
+    }
+}
+
 /// Main-thread handoff between notification response delivery and SwiftUI's
 /// navigation shell. A response may arrive before the root scene exists;
 /// retaining it here makes cold launch safe. Request-identifier fencing makes
@@ -98,6 +139,18 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             dose = userInfo["payloadDose"] as? String
             protocolId = userInfo["payloadProtocolId"] as? String
         }
+
+        init(
+            commandType: String?, expectedVersion: Int?, priorityId: String?,
+            occurrenceDate: String?, dose: String?, protocolId: String?
+        ) {
+            self.commandType = commandType
+            self.expectedVersion = expectedVersion
+            self.priorityId = priorityId
+            self.occurrenceDate = occurrenceDate
+            self.dose = dose
+            self.protocolId = protocolId
+        }
     }
 
     struct OpenActionPayload: Sendable {
@@ -171,6 +224,10 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     private let completeActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)?
     private let completionCleanup: @MainActor @Sendable (String, String) async -> Void
     private let snoozeHandler: @MainActor @Sendable (PriorityNotificationScheduler.SnoozePayload) async -> PriorityNotificationScheduler.SnoozeResult
+    private let postActionReconciliation: (@MainActor @Sendable () async -> Void)?
+    private let openActionHandler: (@MainActor @Sendable (String, AppDestination) async -> Bool)?
+    private let staleCompletionResolver: (@MainActor @Sendable (CompleteActionPayload) async -> CompleteActionPayload?)?
+    private let continuationCoordinator: NotificationActionContinuationCoordinator
     @MainActor private var consumedActionIdentities = Set<String>()
     @MainActor private var consumedActionOrder: [String] = []
 
@@ -180,6 +237,10 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             await PriorityNotificationScheduler.scheduleSnooze(payload: $0)
         },
         completeActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)? = nil,
+        openActionHandler: (@MainActor @Sendable (String, AppDestination) async -> Bool)? = nil,
+        staleCompletionResolver: (@MainActor @Sendable (CompleteActionPayload) async -> CompleteActionPayload?)? = nil,
+        postActionReconciliation: (@MainActor @Sendable () async -> Void)? = nil,
+        continuationCoordinator: NotificationActionContinuationCoordinator = .init(),
         completionCleanup: @escaping @MainActor @Sendable (String, String) async -> Void = { priorityId, occurrenceDate in
             await PriorityNotificationScheduler.cleanupCompletedOccurrence(
                 priorityId: priorityId, occurrenceDate: occurrenceDate
@@ -188,8 +249,12 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     ) {
         self.environment = environment
         self.completeActionHandler = completeActionHandler
+        self.openActionHandler = openActionHandler
         self.completionCleanup = completionCleanup
         self.snoozeHandler = snoozeHandler
+        self.continuationCoordinator = continuationCoordinator
+        self.postActionReconciliation = postActionReconciliation
+        self.staleCompletionResolver = staleCompletionResolver
         super.init()
     }
 
@@ -212,20 +277,18 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         dispatch(snapshot: snapshot, completion: completionHandler)
     }
 
-    /// Testable delegate boundary. This intentionally returns immediately;
-    /// the completion gate retains only Apple's callback, and calls it once
-    /// after the MainActor-owned command/navigation/scheduling path reaches a
-    /// safe terminal result.
+    /// Testable delegate boundary. Ownership of the primitive snapshot is
+    /// established in the app continuation coordinator first; Apple's
+    /// completion is then invoked promptly and exactly once. Network writes,
+    /// navigation readiness, cleanup, Home fetches, and horizon reconciliation
+    /// continue independently and can never extend the system callback.
     func dispatch(snapshot: ResponseSnapshot, completion: @escaping () -> Void) {
         let gate = NotificationResponseCompletionGate(completion)
-        Task { @MainActor [weak self] in
-            guard let self else {
-                gate.complete()
-                return
-            }
-            defer { gate.complete() }
+        continuationCoordinator.submit { @MainActor [weak self] in
+            guard let self else { return }
             await self.handle(snapshot: snapshot)
         }
+        gate.complete()
     }
 
     @MainActor
@@ -261,7 +324,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 // local replacement is accepted. This never turns Snooze into
                 // a server mutation; it only keeps every other exact future
                 // occurrence covered while leaving this snooze request intact.
-                await environment?.reconcileCanonicalPriorityNotifications()
+                await reconcileAfterAction()
             }
             recordActionStage(snapshot: snapshot, operation: "action completed safely",
                               reason: "Snooze handling returned without canonical mutation.")
@@ -329,20 +392,10 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             return
         }
         do {
-            if let completeActionHandler {
-                try await completeActionHandler(payload)
-            } else if let environment {
-                try await environment.priorityCompletionWriteAPI.complete(
-                    priorityId: priorityId,
-                    occurrenceDate: occurrenceDate,
-                    context: PriorityCompletionContext(
-                        occurrenceDate: occurrenceDate,
-                        dose: payload.dose,
-                        protocolId: payload.protocolId
-                    ),
-                    expectedVersion: expectedVersion
-                )
-            }
+            try await performComplete(
+                payload: payload, priorityId: priorityId,
+                occurrenceDate: occurrenceDate, expectedVersion: expectedVersion
+            )
             NotificationDiagnostics.record(.init(
                 capturedAt: Date(), identifier: "action.complete.\(priorityId).\(occurrenceDate)",
                 operation: "completion accepted",
@@ -350,8 +403,29 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
             ))
             await completionCleanup(priorityId, occurrenceDate)
-            await environment?.reconcileCanonicalPriorityNotifications()
+            await reconcileAfterAction()
         } catch {
+            if Self.isStaleVersion(error),
+               let refreshed = await resolveStaleCompletion(payload),
+               let refreshedPriorityId = refreshed.priorityId,
+               let refreshedOccurrenceDate = refreshed.occurrenceDate,
+               let refreshedVersion = refreshed.expectedVersion {
+                do {
+                    try await performComplete(
+                        payload: refreshed, priorityId: refreshedPriorityId,
+                        occurrenceDate: refreshedOccurrenceDate, expectedVersion: refreshedVersion
+                    )
+                    NotificationDiagnostics.record(.init(
+                        capturedAt: Date(), identifier: "action.complete.\(refreshedPriorityId).\(refreshedOccurrenceDate)",
+                        operation: "completion accepted after exact occurrence refresh",
+                        reason: "The future request carried a stale version; the unchanged exact occurrence was re-read and completed once.",
+                        fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
+                    ))
+                    await completionCleanup(refreshedPriorityId, refreshedOccurrenceDate)
+                    await reconcileAfterAction()
+                    return
+                } catch { /* bounded retry exhausted; record the safe rejection below */ }
+            }
             NotificationDiagnostics.record(.init(
                 capturedAt: Date(), identifier: "action.complete.\(priorityId).\(occurrenceDate)",
                 operation: "completion rejected",
@@ -362,8 +436,81 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     }
 
     @MainActor
+    private func performComplete(
+        payload: CompleteActionPayload,
+        priorityId: String,
+        occurrenceDate: String,
+        expectedVersion: Int
+    ) async throws {
+        if let completeActionHandler {
+            try await completeActionHandler(payload)
+        } else if let environment {
+            try await environment.priorityCompletionWriteAPI.complete(
+                priorityId: priorityId,
+                occurrenceDate: occurrenceDate,
+                context: PriorityCompletionContext(
+                    occurrenceDate: occurrenceDate,
+                    dose: payload.dose,
+                    protocolId: payload.protocolId
+                ),
+                expectedVersion: expectedVersion
+            )
+        }
+    }
+
+    private static func isStaleVersion(_ error: Error) -> Bool {
+        guard case .failedPrecondition(let problem) = error as? ProductionNativeError else { return false }
+        return problem.code == "STALE_VERSION"
+    }
+
+    @MainActor
+    private func reconcileAfterAction() async {
+        if let postActionReconciliation {
+            await postActionReconciliation()
+        } else {
+            await environment?.reconcileCanonicalPriorityNotifications()
+        }
+    }
+
+    /// A future-horizon notification may outlive a harmless resource-version
+    /// advance. Retry is permitted only after an exact Home re-read proves
+    /// that the same occurrence and specialized completion context are still
+    /// current. Any identity/context drift fails closed.
+    @MainActor
+    private func resolveStaleCompletion(_ stale: CompleteActionPayload) async -> CompleteActionPayload? {
+        if let staleCompletionResolver {
+            return await staleCompletionResolver(stale)
+        }
+        guard let environment,
+              let priorityId = stale.priorityId,
+              let occurrenceDate = stale.occurrenceDate
+        else { return nil }
+        await environment.productionNativeAPI.invalidateReadResources(["home"])
+        guard let home = try? await ProductionHomeAPI(api: environment.productionNativeAPI).fetchHome(),
+              let occurrence = home.notificationScheduleItems.first(where: {
+                  ($0.routePriorityId ?? $0.id) == priorityId && $0.date == occurrenceDate
+              }),
+              occurrence.completed == false,
+              let command = occurrence.notificationAction?.completionCommand,
+              command.commandType == ProductionCommandType.completePriority,
+              command.payload.priorityId == priorityId,
+              command.payload.occurrenceDate == occurrenceDate,
+              command.payload.dose == stale.dose,
+              command.payload.protocolId == stale.protocolId
+        else { return nil }
+        return CompleteActionPayload(
+            commandType: command.commandType,
+            expectedVersion: command.expectedVersion,
+            priorityId: command.payload.priorityId,
+            occurrenceDate: command.payload.occurrenceDate,
+            dose: command.payload.dose,
+            protocolId: command.payload.protocolId
+        )
+    }
+
+    @MainActor
     private func openDestination(payload: OpenActionPayload) async {
-        guard let environment else {
+        guard environment != nil || openActionHandler != nil else {
             recordOpenResult(
                 identifier: payload.requestIdentifier,
                 operation: "deep link deferred safely",
@@ -377,10 +524,17 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 briefingArtifactId: payload.briefingArtifactId,
                 categoryIdentifier: payload.categoryIdentifier
             )
-            let accepted = environment.notificationDeepLinkCoordinator.enqueue(
-                identifier: payload.requestIdentifier,
-                destination: destination
-            )
+            let accepted: Bool
+            if let openActionHandler {
+                accepted = await openActionHandler(payload.requestIdentifier, destination)
+            } else if let environment {
+                accepted = environment.notificationDeepLinkCoordinator.enqueue(
+                    identifier: payload.requestIdentifier,
+                    destination: destination
+                )
+            } else {
+                accepted = false
+            }
             recordOpenResult(
                 identifier: payload.requestIdentifier,
                 operation: accepted ? "deep link queued" : "deep link ignored",

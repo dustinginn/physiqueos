@@ -118,6 +118,29 @@ final class HomeReadModelTests: XCTestCase {
         XCTAssertEqual(decoded, .pills)
     }
 
+    func testFutureServerIconsDegradeNeutrallyWithoutDroppingHomeOrPriority() throws {
+        let json = Data(#"""
+        {
+          "header":{"greeting":"Good morning","name":"Founder"},
+          "hero":{"mode":"active","goalLabel":"Goal","headline":"On track","supportLine":"Continue","confidence":null,"confidenceDetail":null,"projectedFinish":null,"daysRemaining":null,"actionLabel":null,"actionDestination":null},
+          "nextBestAction":{"title":"Future action","icon":"future_domain_icon","destination":{"id":"briefing.list","parameters":{}}},
+          "briefingCards":[],
+          "goals":[{"id":"goal","title":"Goal","current":"1","target":"2","unit":"lb","icon":"future_goal_icon","color":"future_color","presentationMode":"primary","progress":50,"destination":null}],
+          "todaysFocus":[
+            {"id":"future-priority","executionItemId":"execution-future","date":"2026-09-18","title":"Future priority","subtitle":null,"metadata":null,"changeLabel":null,"icon":"future_focus_icon","color":"future_color","urgency":"available","completed":false,"completable":false,"expectedVersion":null,"actionLabel":null,"completionContext":null},
+            {"id":"known-priority","executionItemId":"execution-known","date":"2026-09-18","title":"Known priority","subtitle":null,"metadata":null,"changeLabel":null,"icon":"pills","color":"effort","urgency":"available","completed":false,"completable":false,"expectedVersion":null,"actionLabel":null,"completionContext":null}
+          ]
+        }
+        """#.utf8)
+        let model = try JSONDecoder().decode(HomeReadModel.self, from: json)
+        XCTAssertEqual(model.nextBestAction.icon, .unknown)
+        XCTAssertEqual(model.goals.first?.icon, .unknown)
+        XCTAssertEqual(model.goals.first?.color, .muted)
+        XCTAssertEqual(model.todaysFocus.map(\.icon), [.unknown, .pills])
+        XCTAssertEqual(HomeFocusIconPresentation.systemImage(for: model.todaysFocus[0].icon), "circle.dashed")
+        XCTAssertEqual(model.todaysFocus.map(\.title), ["Future priority", "Known priority"])
+    }
+
     // MARK: - Typed, bounded route intent
 
     func testDestinationRoundTripsThroughTheServerWireShape() throws {

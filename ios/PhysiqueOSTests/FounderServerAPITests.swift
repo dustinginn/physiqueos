@@ -681,6 +681,11 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(Array(homePaths.suffix(2)), [
             "/api/v1/native/read/home", "/api/v1/native/read/home",
         ])
+        let homePresentationVersions = await transport.requests.suffix(2).map { request in
+            URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "presentationVersion" })?.value
+        }
+        XCTAssertEqual(homePresentationVersions, ["2", "2"])
     }
 
     func testCompletedMorningCheckInHomeCardKeepsExactCanonicalRouteAndOccurrenceDate() async throws {

@@ -130,6 +130,17 @@ struct ConfidenceDetail: Codable, Equatable {
 
 enum HomeActionIcon: String, Codable {
     case activity, analysis, camera, check, moon, pills, scale, syringe, target, utensils
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .unknown
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 struct HomeNextBestAction: Codable, Equatable {
@@ -152,6 +163,17 @@ struct HomeBriefingCard: Codable, Equatable, Identifiable {
 
 enum HomeGoalIcon: String, Codable {
     case activity, compass, dumbbell, shield, target
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .unknown
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Mirrors the `GoalRow.jsx` presentation modes this slice exercises:
@@ -300,4 +322,18 @@ extension HomeGoal {
 
 enum HomeFocusIcon: String, Codable {
     case activity, camera, moon, pills, scale, syringe, target, utensils
+    /// A future server icon must never make the enclosing priority—or the
+    /// entire Home payload—undecodable on an older client. Presentation maps
+    /// this only to a neutral symbol; it never guesses a domain.
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .unknown
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }

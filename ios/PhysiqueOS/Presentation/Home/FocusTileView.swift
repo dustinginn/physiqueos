@@ -48,6 +48,7 @@ enum HomeFocusIconPresentation {
         case .syringe: "syringe.fill"
         case .target: "target"
         case .utensils: "fork.knife"
+        case .unknown: "circle.dashed"
         }
     }
 }

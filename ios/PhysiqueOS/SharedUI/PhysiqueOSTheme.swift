@@ -79,6 +79,16 @@ enum PhysiqueOSTheme {
 enum HomeColorToken: String, Codable {
     case primary, success, evidence, effort, warning, danger, muted, surface, plain
 
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .muted
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
     var foreground: Color {
         switch self {
         case .primary: PhysiqueOSTheme.accent

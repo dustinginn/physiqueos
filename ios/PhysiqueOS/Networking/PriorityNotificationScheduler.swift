@@ -18,6 +18,11 @@ enum PriorityNotificationScheduler {
     static let scheduledPrefix = "priority.scheduled."
     static let snoozedPrefix = "priority.snoozed."
     static let snoozeInterval: TimeInterval = 3600
+    /// iOS permits 64 pending local notifications per app. Priority coverage
+    /// is capped below that so briefing-ready, review-ready, and an immediate
+    /// snooze retain deterministic headroom instead of being evicted by a
+    /// full canonical horizon.
+    static let maximumPriorityRequests = 40
 
     /// A value-only copy of the app-owned fields in a priority notification.
     /// `UNNotificationRequest` and `UNNotificationContent` are Objective-C
@@ -135,8 +140,10 @@ enum PriorityNotificationScheduler {
         "\(scheduledPrefix)\(priorityId).\(occurrenceDate)"
     }
 
-    static func snoozeIdentifier(priorityId: String, occurrenceDate: String) -> String {
-        "\(snoozedPrefix)\(priorityId).\(occurrenceDate)"
+    static func snoozeIdentifier(priorityId: String, occurrenceDate: String, attempt: Int? = nil) -> String {
+        let base = "\(snoozedPrefix)\(priorityId).\(occurrenceDate)"
+        guard let attempt else { return base }
+        return "\(base).attempt.\(max(1, attempt))"
     }
 
     static func occurrenceIdentifiers(priorityId: String, occurrenceDate: String) -> Set<String> {
@@ -144,6 +151,21 @@ enum PriorityNotificationScheduler {
             identifier(priorityId: priorityId, occurrenceDate: occurrenceDate),
             snoozeIdentifier(priorityId: priorityId, occurrenceDate: occurrenceDate),
         ]
+    }
+
+    static func isOccurrenceIdentifier(_ identifier: String, priorityId: String, occurrenceDate: String) -> Bool {
+        if identifier == Self.identifier(priorityId: priorityId, occurrenceDate: occurrenceDate) { return true }
+        let snoozeBase = snoozeIdentifier(priorityId: priorityId, occurrenceDate: occurrenceDate)
+        return identifier == snoozeBase || identifier.hasPrefix("\(snoozeBase).attempt.")
+    }
+
+    static func nextSnoozeAttempt(originalRequestIdentifier: String, priorityId: String, occurrenceDate: String) -> Int {
+        let base = snoozeIdentifier(priorityId: priorityId, occurrenceDate: occurrenceDate)
+        guard originalRequestIdentifier.hasPrefix("\(base).attempt.") else {
+            return originalRequestIdentifier == base ? 2 : 1
+        }
+        let suffix = originalRequestIdentifier.dropFirst("\(base).attempt.".count)
+        return (Int(suffix) ?? 0) + 1
     }
 
     /// Pure authorization gate, extracted so "authorization denied means no
@@ -278,10 +300,11 @@ enum PriorityNotificationScheduler {
             guard let action = item.notificationAction,
                   let scheduledTime = action.scheduledTime,
                   let fireDate = fireDate(scheduledTime, occurrenceDate: item.date, calendar: calendar),
-                  fireDate > now,
-                  desiredIdentifiers.insert(scheduledId).inserted
+                  fireDate > now
             else { continue }
 
+            guard desired.count < maximumPriorityRequests else { continue }
+            guard desiredIdentifiers.insert(scheduledId).inserted else { continue }
             desired.append(request(identifier: scheduledId, item: item, action: action, fireDate: fireDate, calendar: calendar))
         }
 
@@ -295,15 +318,18 @@ enum PriorityNotificationScheduler {
         pendingIdentifiers: Set<String>,
         deliveredIdentifiers: Set<String>
     ) -> CompletionCleanupPlan {
-        let completed = items.filter(\.completed).reduce(into: Set<String>()) { result, item in
-            result.formUnion(occurrenceIdentifiers(
-                priorityId: item.routePriorityId ?? item.id,
-                occurrenceDate: item.date
-            ))
-        }
+        let completed = items.filter(\.completed)
         return CompletionCleanupPlan(
-            pendingIdentifiers: Array(pendingIdentifiers.intersection(completed)).sorted(),
-            deliveredIdentifiers: Array(deliveredIdentifiers.intersection(completed)).sorted()
+            pendingIdentifiers: pendingIdentifiers.filter { identifier in
+                completed.contains { item in
+                    isOccurrenceIdentifier(identifier, priorityId: item.routePriorityId ?? item.id, occurrenceDate: item.date)
+                }
+            }.sorted(),
+            deliveredIdentifiers: deliveredIdentifiers.filter { identifier in
+                completed.contains { item in
+                    isOccurrenceIdentifier(identifier, priorityId: item.routePriorityId ?? item.id, occurrenceDate: item.date)
+                }
+            }.sorted()
         )
     }
 
@@ -316,10 +342,13 @@ enum PriorityNotificationScheduler {
     ) async {
         let pending = await center.pendingNotificationRequests()
         let delivered = await center.deliveredNotifications()
-        let targets = occurrenceIdentifiers(priorityId: priorityId, occurrenceDate: occurrenceDate)
         let plan = CompletionCleanupPlan(
-            pendingIdentifiers: Array(Set(pending.map(\.identifier)).intersection(targets)).sorted(),
-            deliveredIdentifiers: Array(Set(delivered.map { $0.request.identifier }).intersection(targets)).sorted()
+            pendingIdentifiers: pending.map(\.identifier).filter {
+                isOccurrenceIdentifier($0, priorityId: priorityId, occurrenceDate: occurrenceDate)
+            }.sorted(),
+            deliveredIdentifiers: delivered.map { $0.request.identifier }.filter {
+                isOccurrenceIdentifier($0, priorityId: priorityId, occurrenceDate: occurrenceDate)
+            }.sorted()
         )
         _ = await executeCompletionCleanup(
             plan: plan,
@@ -417,7 +446,16 @@ enum PriorityNotificationScheduler {
             try await UNUserNotificationCenter.current().add(request)
         }
     ) async -> SnoozeResult {
-        let identifier = snoozeIdentifier(priorityId: payload.priorityId, occurrenceDate: payload.occurrenceDate)
+        let attempt = nextSnoozeAttempt(
+            originalRequestIdentifier: payload.originalRequestIdentifier,
+            priorityId: payload.priorityId,
+            occurrenceDate: payload.occurrenceDate
+        )
+        let identifier = snoozeIdentifier(
+            priorityId: payload.priorityId,
+            occurrenceDate: payload.occurrenceDate,
+            attempt: attempt
+        )
         let content = UNMutableNotificationContent()
         content.title = payload.title
         content.subtitle = payload.subtitle

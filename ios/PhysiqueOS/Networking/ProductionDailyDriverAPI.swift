@@ -89,7 +89,13 @@ struct ProductionHomeAPI: HomeAPI {
     let api: ProductionNativeAPI
 
     func fetchHome() async throws -> HomeReadModel {
-        let envelope = try await api.readResource("home", as: Payload.self)
+        // Presentation capability v2 advertises forward-compatible Home
+        // enums. During a server-first rollout, Build 38 sends no capability
+        // and receives the server's neutral v1 icon fallback; corrected
+        // clients receive canonical domain icons such as `pills`.
+        let envelope = try await api.readResource(
+            "home", query: ["presentationVersion": "2"], as: Payload.self
+        )
         let priorities = envelope.data.todaysFocus.map { $0.readOnlyOccurrence }
         let notificationOccurrences = (envelope.data.notificationOccurrences ?? envelope.data.todaysFocus)
             .map { $0.readOnlyOccurrence }

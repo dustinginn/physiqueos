@@ -11,6 +11,7 @@ private let iconMap: [HomeActionIcon: String] = [
     .syringe: "syringe.fill",
     .target: "list.clipboard.fill",
     .utensils: "fork.knife",
+    .unknown: "circle.dashed",
 ]
 
 /// Mirrors `NextBestAction.jsx`/`ActionButton.jsx`: the single full-width

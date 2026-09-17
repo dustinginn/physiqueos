@@ -6,6 +6,7 @@ private let iconMap: [HomeGoalIcon: String] = [
     .dumbbell: "figure.strengthtraining.traditional",
     .shield: "checkmark.shield.fill",
     .target: "target",
+    .unknown: "circle.dashed",
 ]
 
 /// Stable Native adaptations of the live Web Home card relationships.

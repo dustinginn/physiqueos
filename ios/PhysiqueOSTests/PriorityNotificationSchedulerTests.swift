@@ -3,6 +3,20 @@ import XCTest
 
 final class PriorityNotificationSchedulerTests: XCTestCase {
     @MainActor
+    private final class AsyncGate {
+        private var isOpen = false
+        private var continuation: CheckedContinuation<Void, Never>?
+        func wait() async {
+            if isOpen { return }
+            await withCheckedContinuation { continuation = $0 }
+        }
+        func open() {
+            isOpen = true
+            continuation?.resume()
+            continuation = nil
+        }
+    }
+    @MainActor
     private final class SnoozeProbe {
         var payloads: [PriorityNotificationScheduler.SnoozePayload] = []
         var requests: [UNNotificationRequest] = []
@@ -299,6 +313,82 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
     }
 
     @MainActor
+    func testFutureNotificationRetriesOneStaleVersionOnlyAfterExactOccurrenceRefresh() async throws {
+        let request = try Self.actionablePeptideRequest()
+        var submittedVersions: [Int] = []
+        var resolverCalls = 0
+        var cleanupCalls: [String] = []
+        let stale = ProductionProblemDetails(
+            problemVersion: "1", type: nil, title: "Stale version", status: 412,
+            code: "STALE_VERSION", detail: nil, instance: nil, requestId: nil,
+            fieldErrors: [], recovery: nil
+        )
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            completeActionHandler: { payload in
+                submittedVersions.append(try XCTUnwrap(payload.expectedVersion))
+                if submittedVersions.count == 1 {
+                    throw ProductionNativeError.failedPrecondition(stale)
+                }
+            },
+            staleCompletionResolver: { original in
+                resolverCalls += 1
+                XCTAssertEqual(original.priorityId, "reminder_tesamorelin")
+                XCTAssertEqual(original.occurrenceDate, "2026-09-16")
+                XCTAssertEqual(original.dose, "0.5 mg")
+                XCTAssertEqual(original.protocolId, "protocol_tesamorelin")
+                return .init(
+                    commandType: original.commandType, expectedVersion: 12,
+                    priorityId: original.priorityId, occurrenceDate: original.occurrenceDate,
+                    dose: original.dose, protocolId: original.protocolId
+                )
+            },
+            postActionReconciliation: {},
+            completionCleanup: { priorityId, occurrenceDate in
+                cleanupCalls.append("\(priorityId)|\(occurrenceDate)")
+            }
+        )
+
+        await delegate.handle(snapshot: .init(
+            actionIdentifier: PriorityNotificationActionIdentifier.complete,
+            requestIdentifier: request.identifier,
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier
+        ))
+
+        XCTAssertEqual(submittedVersions, [7, 12])
+        XCTAssertEqual(resolverCalls, 1)
+        XCTAssertEqual(cleanupCalls, ["reminder_tesamorelin|2026-09-16"])
+    }
+
+    @MainActor
+    func testFutureNotificationDoesNotRetryNonStaleFailure() async throws {
+        let request = try Self.actionablePeptideRequest()
+        var attempts = 0
+        var resolverCalls = 0
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            completeActionHandler: { _ in
+                attempts += 1
+                throw URLError(.cannotConnectToHost)
+            },
+            staleCompletionResolver: { _ in
+                resolverCalls += 1
+                return nil
+            },
+            completionCleanup: { _, _ in XCTFail("rejected completion must not clean notifications") }
+        )
+        await delegate.handle(snapshot: .init(
+            actionIdentifier: PriorityNotificationActionIdentifier.complete,
+            requestIdentifier: request.identifier,
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier
+        ))
+        XCTAssertEqual(attempts, 1)
+        XCTAssertEqual(resolverCalls, 0)
+    }
+
+    @MainActor
     func testSnoozeDelegateRunningAppUsesValueSnapshotOnceAndPreservesActionContext() async throws {
         let request = try Self.actionablePeptideRequest()
         let payload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: request))
@@ -318,7 +408,7 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertEqual(probe.payloads.count, 1)
         let snoozed = try XCTUnwrap(probe.requests.first)
         XCTAssertEqual(probe.requests.count, 1)
-        XCTAssertEqual(snoozed.identifier, "priority.snoozed.reminder_tesamorelin.2026-09-16")
+        XCTAssertEqual(snoozed.identifier, "priority.snoozed.reminder_tesamorelin.2026-09-16.attempt.1")
         XCTAssertEqual(snoozed.content.categoryIdentifier, PriorityNotificationCategory.specializedActionable)
         XCTAssertEqual(snoozed.content.userInfo["priorityId"] as? String, "reminder_tesamorelin")
         XCTAssertEqual(snoozed.content.userInfo["occurrenceDate"] as? String, "2026-09-16")
@@ -380,10 +470,25 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
     @MainActor
     func testAllRegisteredActionLifecycleKindsDecodeOrFailClosedWithoutCrash() async throws {
         let environment = AppEnvironment(nativeAuthority: .sandbox)
-        let delegate = PriorityNotificationDelegate(environment: environment) { _ in
-            XCTFail("non-snooze actions must not schedule a snooze")
-            return .rejected(identifier: "unexpected")
-        }
+        let completeHandled = expectation(description: "complete-owned-work")
+        let openHandled = expectation(description: "open-owned-work")
+        openHandled.expectedFulfillmentCount = 3
+        let delegate = PriorityNotificationDelegate(
+            environment: environment,
+            snoozeHandler: { _ in
+                XCTFail("non-snooze actions must not schedule a snooze")
+                return .rejected(identifier: "unexpected")
+            },
+            completeActionHandler: { _ in completeHandled.fulfill() },
+            openActionHandler: { identifier, destination in
+                openHandled.fulfill()
+                return environment.notificationDeepLinkCoordinator.enqueue(
+                    identifier: identifier, destination: destination
+                )
+            },
+            postActionReconciliation: {},
+            completionCleanup: { _, _ in }
+        )
         let priority = try Self.actionablePeptideRequest()
         let destination = try XCTUnwrap(priority.content.userInfo["destinationJSON"] as? String)
         let openInfo: [AnyHashable: Any] = ["destinationJSON": destination]
@@ -425,6 +530,7 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
             categoryIdentifier: PriorityNotificationCategory.briefingReady
         )) { briefingCompletion.fulfill() }
         await fulfillment(of: [briefingCompletion], timeout: 1)
+        await fulfillment(of: [completeHandled, openHandled], timeout: 1)
         XCTAssertEqual(environment.notificationDeepLinkCoordinator.pendingRequest?.destination,
                        .briefingDetail(briefingId: "midweek-1"))
     }
@@ -434,7 +540,12 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         let request = try Self.actionablePeptideRequest()
         let payload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: request))
         let probe = SnoozeProbe()
-        let delegate = PriorityNotificationDelegate(environment: nil) { await probe.handle($0) }
+        let snoozeHandled = expectation(description: "snooze-owned-work")
+        let delegate = PriorityNotificationDelegate(environment: nil) {
+            let result = await probe.handle($0)
+            snoozeHandled.fulfill()
+            return result
+        }
         let valid = PriorityNotificationDelegate.ResponseSnapshot(
             actionIdentifier: PriorityNotificationActionIdentifier.snooze,
             requestIdentifier: request.identifier,
@@ -456,8 +567,170 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
             delegate.dispatch(snapshot: snapshot) { completed.fulfill() }
             await fulfillment(of: [completed], timeout: 1)
         }
+        await fulfillment(of: [snoozeHandled], timeout: 1)
         XCTAssertEqual(probe.payloads.count, 1)
         XCTAssertEqual(probe.requests.count, 1)
+    }
+
+    @MainActor
+    func testAppleCompletionIsPromptWhileLiveShapedCompleteAndReconciliationRemainPending() async throws {
+        for (label, request) in [
+            ("direct", try Self.directCompletionRequest()),
+            ("peptide", try Self.actionablePeptideRequest()),
+        ] {
+            let commandGate = AsyncGate()
+            let homeFetchGate = AsyncGate()
+            let notificationSyncGate = AsyncGate()
+            let commandStarted = expectation(description: "\(label)-command-started")
+            let homeFetchStarted = expectation(description: "\(label)-home-fetch-started")
+            let notificationSyncStarted = expectation(description: "\(label)-notification-sync-started")
+            let workFinished = expectation(description: "\(label)-work-finished")
+            let environment = AppEnvironment(nativeAuthority: .sandbox)
+            let delegate = PriorityNotificationDelegate(
+                environment: environment,
+                completeActionHandler: { _ in
+                    commandStarted.fulfill()
+                    await commandGate.wait()
+                },
+                postActionReconciliation: {
+                    // Live-shaped reconciliation: the canonical Home reread
+                    // and notification-center horizon sync are independently
+                    // slow, but neither owns Apple's callback lifetime.
+                    homeFetchStarted.fulfill()
+                    await homeFetchGate.wait()
+                    notificationSyncStarted.fulfill()
+                    await notificationSyncGate.wait()
+                    workFinished.fulfill()
+                },
+                completionCleanup: { _, _ in }
+            )
+            let appleCompleted = expectation(description: "\(label)-apple-completed")
+            appleCompleted.assertForOverFulfill = true
+            delegate.dispatch(snapshot: .init(
+                actionIdentifier: PriorityNotificationActionIdentifier.complete,
+                requestIdentifier: request.identifier,
+                userInfo: request.content.userInfo,
+                categoryIdentifier: request.content.categoryIdentifier
+            )) { appleCompleted.fulfill() }
+
+            await fulfillment(of: [appleCompleted], timeout: 0.25)
+            await fulfillment(of: [commandStarted], timeout: 1)
+            commandGate.open()
+            await fulfillment(of: [homeFetchStarted], timeout: 1)
+            homeFetchGate.open()
+            await fulfillment(of: [notificationSyncStarted], timeout: 1)
+            notificationSyncGate.open()
+            await fulfillment(of: [workFinished], timeout: 1)
+        }
+    }
+
+    @MainActor
+    func testAppleCompletionIsPromptForDelayedSnoozeReviewAndBriefingRoutes() async throws {
+        let priority = try Self.actionablePeptideRequest()
+        let snoozePayload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: priority))
+        let reviewDestination = try JSONEncoder().encode(AppDestination.evidenceReview(reviewId: "review-1"))
+        let briefingDestination = try JSONEncoder().encode(AppDestination.briefingDetail(briefingId: "midweek-1"))
+        let cases: [(String, PriorityNotificationDelegate.ResponseSnapshot)] = [
+            ("snooze", .init(
+                actionIdentifier: PriorityNotificationActionIdentifier.snooze,
+                requestIdentifier: priority.identifier,
+                userInfo: priority.content.userInfo,
+                categoryIdentifier: priority.content.categoryIdentifier,
+                snooze: snoozePayload
+            )),
+            ("review", .init(
+                actionIdentifier: UNNotificationDefaultActionIdentifier,
+                requestIdentifier: "evidence.reviewReady.review-1",
+                userInfo: ["destinationJSON": String(decoding: reviewDestination, as: UTF8.self)],
+                categoryIdentifier: PriorityNotificationCategory.evidenceReviewReady
+            )),
+            ("briefing", .init(
+                actionIdentifier: UNNotificationDefaultActionIdentifier,
+                requestIdentifier: "briefing.ready.midweek-1",
+                userInfo: [
+                    "destinationJSON": String(decoding: briefingDestination, as: UTF8.self),
+                    "briefingArtifactId": "midweek-1",
+                ],
+                categoryIdentifier: PriorityNotificationCategory.briefingReady
+            )),
+        ]
+        for (label, snapshot) in cases {
+            let gate = AsyncGate()
+            let workStarted = expectation(description: "\(label)-work-started")
+            let workFinished = expectation(description: "\(label)-work-finished")
+            let environment = AppEnvironment(nativeAuthority: .sandbox)
+            let delegate = PriorityNotificationDelegate(
+                environment: environment,
+                snoozeHandler: { payload in
+                    workStarted.fulfill()
+                    await gate.wait()
+                    workFinished.fulfill()
+                    return .accepted(identifier: payload.originalRequestIdentifier + ".snoozed")
+                },
+                openActionHandler: { _, _ in
+                    workStarted.fulfill()
+                    await gate.wait()
+                    workFinished.fulfill()
+                    return true
+                },
+                postActionReconciliation: {}
+            )
+            let appleCompleted = expectation(description: "\(label)-apple-completed")
+            appleCompleted.assertForOverFulfill = true
+            delegate.dispatch(snapshot: snapshot) { appleCompleted.fulfill() }
+            await fulfillment(of: [appleCompleted], timeout: 0.25)
+            await fulfillment(of: [workStarted], timeout: 1)
+            gate.open()
+            await fulfillment(of: [workFinished], timeout: 1)
+        }
+    }
+
+    @MainActor
+    func testRepeatedSnoozeAttemptsUseDistinctIdentifiersAndCompletionCleansAllAttempts() async throws {
+        let firstRequest = try Self.actionablePeptideRequest()
+        let firstPayload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: firstRequest))
+        var requests: [UNNotificationRequest] = []
+        let first = await PriorityNotificationScheduler.scheduleSnooze(payload: firstPayload) { requests.append($0) }
+        guard case .accepted(let firstID) = first else { return XCTFail("first snooze rejected") }
+        let secondPayload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: requests[0]))
+        let second = await PriorityNotificationScheduler.scheduleSnooze(payload: secondPayload) { requests.append($0) }
+        guard case .accepted(let secondID) = second else { return XCTFail("second snooze rejected") }
+        XCTAssertNotEqual(firstID, secondID)
+        XCTAssertTrue(firstID.hasSuffix(".attempt.1"))
+        XCTAssertTrue(secondID.hasSuffix(".attempt.2"))
+
+        let plan = PriorityNotificationScheduler.completionCleanupPlan(
+            items: [Self.scheduledOccurrence(id: "reminder_tesamorelin", date: "2026-09-16", time: "17:00", completed: true)],
+            pendingIdentifiers: [firstID, secondID],
+            deliveredIdentifiers: [firstID, secondID]
+        )
+        XCTAssertEqual(Set(plan.pendingIdentifiers), Set([firstID, secondID]))
+        XCTAssertEqual(Set(plan.deliveredIdentifiers), Set([firstID, secondID]))
+    }
+
+    func testPriorityRequestBudgetLeavesHeadroomForReviewBriefingAndSnoozeRequests() {
+        let items = (0..<60).map { index in
+            Self.scheduledOccurrence(id: "priority-\(index)", date: "2026-09-18", time: "17:00")
+        }
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: items,
+            existingScheduledIdentifiers: [],
+            now: ISO8601DateFormatter().date(from: "2026-09-17T00:00:00Z")!,
+            calendar: utc
+        )
+        XCTAssertEqual(plan.toAdd.count, PriorityNotificationScheduler.maximumPriorityRequests)
+        XCTAssertLessThanOrEqual(plan.toAdd.count, 40)
+
+        let previouslyOverBudget = Set(items.map {
+            PriorityNotificationScheduler.identifier(priorityId: $0.id, occurrenceDate: $0.date)
+        })
+        let trimmed = PriorityNotificationScheduler.reconciliationPlan(
+            items: items,
+            existingScheduledIdentifiers: previouslyOverBudget,
+            now: ISO8601DateFormatter().date(from: "2026-09-17T00:00:00Z")!,
+            calendar: utc
+        )
+        XCTAssertEqual(trimmed.toRemove.count, 20)
     }
 
     // MARK: - reconciliationPlan: the schedule-change acceptance requirement.
@@ -779,6 +1052,26 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-16T00:00:00Z"))
         return try XCTUnwrap(PriorityNotificationScheduler.reconciliationPlan(
             items: [item], existingScheduledIdentifiers: [], now: now, calendar: utcCalendar
+        ).toAdd.first)
+    }
+
+    private static func directCompletionRequest() throws -> UNNotificationRequest {
+        let item = scheduledOccurrence(id: "reminder_foam_roll", date: "2026-09-16", time: "17:00")
+        var direct = item
+        direct.completable = true
+        direct.expectedVersion = 7
+        direct.notificationAction = PriorityNotificationAction(
+            classification: .directCompletionAllowed,
+            scheduledTime: "17:00",
+            completionCommand: PriorityNotificationCompletionCommand(
+                commandType: ProductionCommandType.completePriority,
+                expectedVersion: 7,
+                payload: .init(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-16")
+            )
+        )
+        return try XCTUnwrap(PriorityNotificationScheduler.reconciliationPlan(
+            items: [direct], existingScheduledIdentifiers: [],
+            now: ISO8601DateFormatter().date(from: "2026-09-16T00:00:00Z")!, calendar: utcCalendar
         ).toAdd.first)
     }
 
