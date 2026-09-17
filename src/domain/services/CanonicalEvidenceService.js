@@ -886,6 +886,7 @@ const TRAINING_SUPPORT_TELEMETRY_FIELDS = Object.freeze([
   "active_calories",
   "total_calories",
   "average_heart_rate",
+  "effort_level",
 ]);
 
 // Explicit Logger support is an enrichment operation, never survivor

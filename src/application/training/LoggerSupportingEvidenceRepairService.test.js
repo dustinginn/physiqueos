@@ -43,7 +43,8 @@ function fixture() {
     evidence_type: "training",
     observed_at: "2026-09-17",
     metadata: { activity_type: "Traditional Strength Training", start_time: "07:38:00", end_time: "08:37:00",
-      duration_seconds: 3533, active_calories: 373, total_calories: 469, average_heart_rate: 113 },
+      duration_seconds: 3533, active_calories: 373, total_calories: 469, average_heart_rate: 113,
+      effort_level: "Moderate" },
     exercises: [],
     provenance: { source_artifact_refs: ["Apple Health Screenshot 2.jpg"] },
     source: { application: "Apple Fitness", modality: "screenshot" },
@@ -154,10 +155,26 @@ describe("exact Logger supporting-evidence repair", () => {
     });
     expect(result.proposedCanonical).toMatchObject({
       canonicalId: TARGET, lastObservedAt: "2026-09-17",
-      payload: { id: `training_logger_session_${SESSION}`, observed_at: "2026-09-17", metadata: { start_time: "07:38:00", end_time: "08:37:00" } },
+      payload: { id: `training_logger_session_${SESSION}`, observed_at: "2026-09-17", metadata: {
+        start_time: "07:38:00", end_time: "08:37:00", duration_seconds: 3533,
+        active_calories: 373, total_calories: 469, average_heart_rate: 113,
+        effort_level: "Moderate",
+      } },
     });
-    expect(result.proposedCanonical.payload.exercises).toHaveLength(4);
-    expect(result.proposedCanonical.payload.exercises.flatMap((item) => item.sets)).toHaveLength(15);
+    const repaired = result.proposedCanonical.payload;
+    const sets = repaired.exercises.flatMap((item) => item.sets);
+    expect(repaired.exercises).toHaveLength(4);
+    expect(sets).toHaveLength(15);
+    expect(sets.every((set) => set.reps != null)).toBe(true);
+    expect(sets.every((set) => set.weight != null)).toBe(true);
+    expect(repaired.metadata).not.toHaveProperty("effort");
+    expect(repaired.metadata).not.toHaveProperty("effort_rating");
+    expect(repaired).not.toHaveProperty("categories");
+    expect(repaired).not.toHaveProperty("exerciseRelationshipGroups");
+    expect(result.proposedCanonical.provenance.contributing_evidence_object_ids).toEqual([
+      `training_logger_session_${SESSION}`,
+      "training_2026-09-17_0738_traditional_strength_training",
+    ]);
   });
 
   it("requires an intact, authorized, version-sealed preview and updates only the exact canonical target", async () => {
