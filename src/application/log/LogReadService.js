@@ -23,16 +23,23 @@ export function createLogReadService({ repositories, now = () => new Date() } = 
           timeZone: resolvedTimeZone,
         }),
       ]);
+      const localDate = getLocalDateKey(now(), resolvedTimeZone);
+      const processingEvidenceReviews = projectProcessingReviews(reviews);
       return Object.freeze({
-        localDate: getLocalDateKey(now(), resolvedTimeZone),
-        loggedToday,
+        localDate,
+        loggedToday: overlayAcceptedProcessing(loggedToday, processingEvidenceReviews, localDate),
         pendingEvidenceReviews: Object.freeze(projectPendingReviews(reviews)),
+        processingEvidenceReviews: Object.freeze(processingEvidenceReviews),
       });
     },
   }) });
 }
 
 export function projectPendingReviews(reviews = []) {
+  // Only reviews that require Founder action belong in this queue. Once a
+  // version-protected confirmation is accepted, an actively committing
+  // review is server-owned processing rather than an actionable upload.
+  // Terminal commit failures remain actionable.
   const pending = reviews.filter((review) => ["pending", "commit_failed", "partially_committed"].includes(review.status))
     .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
   const fingerprints = new Set();
@@ -55,6 +62,56 @@ export function projectPendingReviews(reviews = []) {
       version: String(review.version ?? review.updatedAt ?? "1"),
     });
   });
+}
+
+export function projectProcessingReviews(reviews = []) {
+  return reviews
+    // `partially_committed` is a terminal failed continuation and remains
+    // actionable; only an active `committing` claim is accepted processing.
+    .filter((review) => review.status === "committing")
+    .map((review) => {
+      const objects = review.interpretedEvidence?.evidence_objects ?? [];
+      const date = String(review.interpretedEvidence?.observed_at ?? objects[0]?.observed_at ?? review.createdAt).slice(0, 10);
+      const domain = processingDomain(objects);
+      return Object.freeze({
+        id: review.id,
+        localDate: date,
+        domain,
+        label: processingLabel(domain),
+        status: "accepted_processing",
+      });
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+export function overlayAcceptedProcessing(loggedToday, processingReviews, localDate) {
+  const processingDomains = new Set(processingReviews
+    .filter((review) => review.localDate === localDate)
+    .map((review) => review.domain));
+  return Object.freeze({
+    ...loggedToday,
+    rows: Object.freeze(loggedToday.rows.map((row) => {
+      if (!processingDomains.has(row.id) || row.recordId) return row;
+      return Object.freeze({
+        ...row,
+        summary: `${processingLabel(row.id)} processing`,
+        context: "Confirmation accepted · No action required",
+        processing: true,
+      });
+    })),
+  });
+}
+
+function processingDomain(objects) {
+  const types = new Set(objects.map((item) => item.evidence_type));
+  if (types.has("nutrition")) return "nutrition";
+  if (types.has("activity_day")) return "activity";
+  if (types.has("training")) return "training";
+  return "evidence";
+}
+
+function processingLabel(domain) {
+  return ({ nutrition: "Nutrition", activity: "Activity", training: "Training" })[domain] ?? "Evidence";
 }
 
 function formatPendingReviewDate(value) {

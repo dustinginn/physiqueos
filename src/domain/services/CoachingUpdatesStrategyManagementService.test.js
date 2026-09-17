@@ -45,6 +45,29 @@ describe("Coaching Updates cross-owner strategy save", () => {
     });
   });
 
+  it("produces the same semantic fences for read JSON and command-store persistence representations", () => {
+    const readShape = store();
+    const commandShape = structuredClone(readShape);
+    for (const collection of ["protocols", "protocolVersions", "executionItems", "reminders"]) {
+      for (const record of commandShape[collection]) {
+        // PostgreSQL bigint row versions are normalized to Number by the
+        // command store. The editor read returns the JSON payload unchanged.
+        // This storage-only decoration must never look like a Coaching edit.
+        record.version = Number(record.version ?? 1);
+        record.updatedAt = "2026-09-17T04:06:18.000Z";
+        record.sourceOrdinal = 99;
+      }
+    }
+    for (const collection of ["protocols", "protocolVersions", "executionItems", "reminders"]) {
+      for (const record of readShape[collection]) record.version = String(record.version ?? 1);
+    }
+
+    expect(createCoachingUpdatesSemanticDigest(commandShape))
+      .toBe(createCoachingUpdatesSemanticDigest(readShape));
+    expect(createProgressPhotosScheduleSemanticDigest(commandShape))
+      .toBe(createProgressPhotosScheduleSemanticDigest(readShape));
+  });
+
   it.each([
     ["Evidence Review", (live) => live.evidenceReviews.push({ id: "review-new", status: "confirmed" })],
     ["Nutrition", (live) => live.canonicalEvidenceObjects.push({ canonicalId: "nutrition|2026-09-16|nutrition-day", evidence_type: "nutrition" })],
