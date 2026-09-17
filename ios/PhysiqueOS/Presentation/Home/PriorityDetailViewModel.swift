@@ -23,8 +23,9 @@ final class PriorityDetailViewModel {
     private let authority: NativeAPIEnvironment
     private let priorityId: String
     private let occurrenceDate: String?
+    private let notificationCleanup: @MainActor (String, String) async -> Void
 
-    init(api: PriorityAPI, writeAPI: PriorityCompletionWriteAPI = NotAvailablePriorityCompletionWriteAPI(), morningCheckInAPI: MorningCheckInAPI, store: LoggingSandboxStore, authority: NativeAPIEnvironment, priorityId: String, occurrenceDate: String? = nil) {
+    init(api: PriorityAPI, writeAPI: PriorityCompletionWriteAPI = NotAvailablePriorityCompletionWriteAPI(), morningCheckInAPI: MorningCheckInAPI, store: LoggingSandboxStore, authority: NativeAPIEnvironment, priorityId: String, occurrenceDate: String? = nil, notificationCleanup: @escaping @MainActor (String, String) async -> Void = { _, _ in }) {
         self.api = api
         self.writeAPI = writeAPI
         self.morningCheckInAPI = morningCheckInAPI
@@ -32,6 +33,7 @@ final class PriorityDetailViewModel {
         self.authority = authority
         self.priorityId = priorityId
         self.occurrenceDate = occurrenceDate
+        self.notificationCleanup = notificationCleanup
     }
 
     func load() async {
@@ -68,6 +70,10 @@ final class PriorityDetailViewModel {
                 occurrenceDate: occurrence.date,
                 context: occurrence.completionContext,
                 expectedVersion: version
+            )
+            await notificationCleanup(
+                occurrence.routePriorityId ?? occurrence.id,
+                occurrence.date
             )
             var acknowledged = occurrence
             acknowledged.completed = true

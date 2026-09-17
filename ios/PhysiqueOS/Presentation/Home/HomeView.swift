@@ -202,6 +202,10 @@ struct HomeView: View {
                                     context: occurrence.completionContext,
                                     expectedVersion: version
                                 )
+                                await PriorityNotificationScheduler.cleanupCompletedOccurrence(
+                                    priorityId: occurrence.routePriorityId ?? occurrence.id,
+                                    occurrenceDate: occurrence.date
+                                )
                                 await settlePriorityCompletion(occurrence.id) {
                                     await viewModel?.reconcileAfterConfirmedPriorityCompletion(occurrenceID: occurrence.id)
                                 }

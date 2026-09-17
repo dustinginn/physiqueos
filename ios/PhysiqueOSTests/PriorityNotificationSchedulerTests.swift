@@ -20,6 +20,22 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         }
     }
 
+    @MainActor
+    private final class CompletionProbe {
+        var payloads: [PriorityNotificationDelegate.CompleteActionPayload] = []
+        var cleaned: [String] = []
+        var shouldReject = false
+
+        func complete(_ payload: PriorityNotificationDelegate.CompleteActionPayload) throws {
+            if shouldReject { throw URLError(.badServerResponse) }
+            payloads.append(payload)
+        }
+
+        func cleanup(priorityId: String, occurrenceDate: String) {
+            cleaned.append("\(priorityId)|\(occurrenceDate)")
+        }
+    }
+
     func testBriefingNotificationRequiresCanonicalPublishedMidweekCardAndDeepLinksToExactArtifact() throws {
         let card = HomeBriefingCard(
             id: "midweek_briefing_2026-09-16",
@@ -237,6 +253,52 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
     }
 
     @MainActor
+    func testNotificationCompleteCleansTheExactOccurrenceOnlyAfterCanonicalSuccess() async throws {
+        let request = try Self.actionablePeptideRequest()
+        let probe = CompletionProbe()
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            completeActionHandler: { try probe.complete($0) },
+            completionCleanup: { priorityId, occurrenceDate in
+                probe.cleanup(priorityId: priorityId, occurrenceDate: occurrenceDate)
+            }
+        )
+        let snapshot = PriorityNotificationDelegate.ResponseSnapshot(
+            actionIdentifier: PriorityNotificationActionIdentifier.complete,
+            requestIdentifier: request.identifier,
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier
+        )
+
+        await delegate.handle(snapshot: snapshot)
+
+        XCTAssertEqual(probe.payloads.count, 1)
+        XCTAssertEqual(probe.payloads[0].dose, "0.5 mg")
+        XCTAssertEqual(probe.cleaned, ["reminder_tesamorelin|2026-09-16"])
+    }
+
+    @MainActor
+    func testRejectedNotificationCompleteNeverClearsItsNotification() async throws {
+        let request = try Self.actionablePeptideRequest()
+        let probe = CompletionProbe()
+        probe.shouldReject = true
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            completeActionHandler: { try probe.complete($0) },
+            completionCleanup: { priorityId, occurrenceDate in
+                probe.cleanup(priorityId: priorityId, occurrenceDate: occurrenceDate)
+            }
+        )
+        await delegate.handle(snapshot: .init(
+            actionIdentifier: PriorityNotificationActionIdentifier.complete,
+            requestIdentifier: request.identifier,
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier
+        ))
+        XCTAssertTrue(probe.cleaned.isEmpty)
+    }
+
+    @MainActor
     func testSnoozeDelegateRunningAppUsesValueSnapshotOnceAndPreservesActionContext() async throws {
         let request = try Self.actionablePeptideRequest()
         let payload = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: request))
@@ -448,6 +510,77 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertTrue(plan.toAdd.isEmpty)
         XCTAssertTrue(plan.toRemove.contains(identifier))
         XCTAssertTrue(plan.toRemove.contains(snoozeIdentifier))
+    }
+
+    func testCompletedOccurrenceTargetsExactPendingDeliveredAndSnoozedNotificationsOnly() {
+        let completed = Self.foamRolling(scheduledTime: "07:00", completed: true)
+        let scheduled = PriorityNotificationScheduler.identifier(
+            priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13"
+        )
+        let snoozed = PriorityNotificationScheduler.snoozeIdentifier(
+            priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13"
+        )
+        let future = PriorityNotificationScheduler.identifier(
+            priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-14"
+        )
+        let unrelated = PriorityNotificationScheduler.identifier(
+            priorityId: "reminder_tesamorelin", occurrenceDate: "2026-09-13"
+        )
+        let reviewReady = "evidence.reviewReady.review-1"
+
+        let plan = PriorityNotificationScheduler.completionCleanupPlan(
+            items: [completed],
+            pendingIdentifiers: [scheduled, snoozed, future, unrelated, reviewReady],
+            deliveredIdentifiers: [scheduled, snoozed, future, unrelated, reviewReady]
+        )
+
+        XCTAssertEqual(plan.pendingIdentifiers, [scheduled, snoozed].sorted())
+        XCTAssertEqual(plan.deliveredIdentifiers, [scheduled, snoozed].sorted())
+        XCTAssertFalse(plan.pendingIdentifiers.contains(future))
+        XCTAssertFalse(plan.deliveredIdentifiers.contains(unrelated))
+        XCTAssertFalse(plan.deliveredIdentifiers.contains(reviewReady))
+    }
+
+    @MainActor
+    func testCompletionCleanupIsIdempotentAndFailureNeverBecomesCanonicalFailure() async {
+        let scheduled = PriorityNotificationScheduler.identifier(
+            priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13"
+        )
+        let plan = PriorityNotificationScheduler.CompletionCleanupPlan(
+            pendingIdentifiers: [scheduled], deliveredIdentifiers: [scheduled]
+        )
+        var pendingCalls: [[String]] = []
+        var deliveredCalls: [[String]] = []
+        let first = await PriorityNotificationScheduler.executeCompletionCleanup(
+            plan: plan,
+            removePending: { pendingCalls.append($0) },
+            removeDelivered: { deliveredCalls.append($0) }
+        )
+        let second = await PriorityNotificationScheduler.executeCompletionCleanup(
+            plan: .init(pendingIdentifiers: [], deliveredIdentifiers: []),
+            removePending: { pendingCalls.append($0) },
+            removeDelivered: { deliveredCalls.append($0) }
+        )
+        XCTAssertEqual(first, .init(pendingRemoved: true, deliveredRemoved: true))
+        XCTAssertEqual(second, .init(pendingRemoved: true, deliveredRemoved: true))
+        XCTAssertEqual(pendingCalls, [[scheduled]])
+        XCTAssertEqual(deliveredCalls, [[scheduled]])
+
+        let failed = await PriorityNotificationScheduler.executeCompletionCleanup(
+            plan: plan,
+            removePending: { _ in throw URLError(.cannotRemoveFile) },
+            removeDelivered: { _ in throw URLError(.cannotRemoveFile) }
+        )
+        XCTAssertEqual(failed, .init(pendingRemoved: false, deliveredRemoved: false))
+    }
+
+    func testMissingCompletedNotificationIsSafe() {
+        let plan = PriorityNotificationScheduler.completionCleanupPlan(
+            items: [Self.foamRolling(scheduledTime: "07:00", completed: true)],
+            pendingIdentifiers: [], deliveredIdentifiers: []
+        )
+        XCTAssertTrue(plan.pendingIdentifiers.isEmpty)
+        XCTAssertTrue(plan.deliveredIdentifiers.isEmpty)
     }
 
     func testAPriorityNoLongerPresentIsTreatedAsStaleAndCancelled() {

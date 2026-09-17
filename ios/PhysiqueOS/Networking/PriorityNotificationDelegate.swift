@@ -168,6 +168,8 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     /// are reduced to Sendable values before this environment is touched on
     /// the main actor.
     private let environment: AppEnvironment?
+    private let completeActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)?
+    private let completionCleanup: @MainActor @Sendable (String, String) async -> Void
     private let snoozeHandler: @MainActor @Sendable (PriorityNotificationScheduler.SnoozePayload) async -> PriorityNotificationScheduler.SnoozeResult
     @MainActor private var consumedActionIdentities = Set<String>()
     @MainActor private var consumedActionOrder: [String] = []
@@ -176,9 +178,17 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         environment: AppEnvironment?,
         snoozeHandler: @escaping @MainActor @Sendable (PriorityNotificationScheduler.SnoozePayload) async -> PriorityNotificationScheduler.SnoozeResult = {
             await PriorityNotificationScheduler.scheduleSnooze(payload: $0)
+        },
+        completeActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)? = nil,
+        completionCleanup: @escaping @MainActor @Sendable (String, String) async -> Void = { priorityId, occurrenceDate in
+            await PriorityNotificationScheduler.cleanupCompletedOccurrence(
+                priorityId: priorityId, occurrenceDate: occurrenceDate
+            )
         }
     ) {
         self.environment = environment
+        self.completeActionHandler = completeActionHandler
+        self.completionCleanup = completionCleanup
         self.snoozeHandler = snoozeHandler
         super.init()
     }
@@ -302,7 +312,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         // in-app, where a real failure path exists. Never fabricate
         // success by suppressing the notification locally without this
         // command actually succeeding.
-        guard let environment else {
+        guard completeActionHandler != nil || environment != nil else {
             NotificationDiagnostics.record(.init(
                 capturedAt: Date(), identifier: "action.complete.environment-unavailable",
                 operation: "completion not dispatched",
@@ -312,22 +322,27 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             return
         }
         do {
-            try await environment.priorityCompletionWriteAPI.complete(
-                priorityId: priorityId,
-                occurrenceDate: occurrenceDate,
-                context: PriorityCompletionContext(
+            if let completeActionHandler {
+                try await completeActionHandler(payload)
+            } else if let environment {
+                try await environment.priorityCompletionWriteAPI.complete(
+                    priorityId: priorityId,
                     occurrenceDate: occurrenceDate,
-                    dose: payload.dose,
-                    protocolId: payload.protocolId
-                ),
-                expectedVersion: expectedVersion
-            )
+                    context: PriorityCompletionContext(
+                        occurrenceDate: occurrenceDate,
+                        dose: payload.dose,
+                        protocolId: payload.protocolId
+                    ),
+                    expectedVersion: expectedVersion
+                )
+            }
             NotificationDiagnostics.record(.init(
                 capturedAt: Date(), identifier: "action.complete.\(priorityId).\(occurrenceDate)",
                 operation: "completion accepted",
                 reason: "The canonical specialized completion command succeeded.",
                 fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
             ))
+            await completionCleanup(priorityId, occurrenceDate)
         } catch {
             NotificationDiagnostics.record(.init(
                 capturedAt: Date(), identifier: "action.complete.\(priorityId).\(occurrenceDate)",

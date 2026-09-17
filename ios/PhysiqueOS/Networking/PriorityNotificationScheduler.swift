@@ -36,7 +36,7 @@ enum PriorityNotificationScheduler {
         let threadIdentifier: String
         let targetContentIdentifier: String?
         let canonicalScheduledTime: String?
-        let destination: Data?
+        let destinationJSON: String?
         let commandType: String?
         let expectedVersion: Int?
         let payloadPriorityId: String?
@@ -61,7 +61,13 @@ enum PriorityNotificationScheduler {
             threadIdentifier = content.threadIdentifier
             targetContentIdentifier = content.targetContentIdentifier
             canonicalScheduledTime = content.userInfo["canonicalScheduledTime"] as? String
-            destination = content.userInfo["destination"] as? Data
+            if let value = content.userInfo["destinationJSON"] as? String {
+                destinationJSON = value
+            } else if let value = content.userInfo["destination"] as? Data {
+                destinationJSON = String(data: value, encoding: .utf8)
+            } else {
+                destinationJSON = nil
+            }
             commandType = content.userInfo["commandType"] as? String
             expectedVersion = content.userInfo["expectedVersion"] as? Int
             payloadPriorityId = content.userInfo["payloadPriorityId"] as? String
@@ -81,7 +87,7 @@ enum PriorityNotificationScheduler {
             threadIdentifier: String = "",
             targetContentIdentifier: String? = nil,
             canonicalScheduledTime: String? = nil,
-            destination: Data? = nil,
+            destinationJSON: String? = nil,
             commandType: String? = nil,
             expectedVersion: Int? = nil,
             payloadPriorityId: String? = nil,
@@ -99,7 +105,7 @@ enum PriorityNotificationScheduler {
             self.threadIdentifier = threadIdentifier
             self.targetContentIdentifier = targetContentIdentifier
             self.canonicalScheduledTime = canonicalScheduledTime
-            self.destination = destination
+            self.destinationJSON = destinationJSON
             self.commandType = commandType
             self.expectedVersion = expectedVersion
             self.payloadPriorityId = payloadPriorityId
@@ -115,12 +121,29 @@ enum PriorityNotificationScheduler {
         case rejected(identifier: String)
     }
 
+    struct CompletionCleanupPlan: Sendable, Equatable {
+        let pendingIdentifiers: [String]
+        let deliveredIdentifiers: [String]
+    }
+
+    struct CompletionCleanupResult: Sendable, Equatable {
+        let pendingRemoved: Bool
+        let deliveredRemoved: Bool
+    }
+
     static func identifier(priorityId: String, occurrenceDate: String) -> String {
         "\(scheduledPrefix)\(priorityId).\(occurrenceDate)"
     }
 
     static func snoozeIdentifier(priorityId: String, occurrenceDate: String) -> String {
         "\(snoozedPrefix)\(priorityId).\(occurrenceDate)"
+    }
+
+    static func occurrenceIdentifiers(priorityId: String, occurrenceDate: String) -> Set<String> {
+        [
+            identifier(priorityId: priorityId, occurrenceDate: occurrenceDate),
+            snoozeIdentifier(priorityId: priorityId, occurrenceDate: occurrenceDate),
+        ]
     }
 
     /// Pure authorization gate, extracted so "authorization denied means no
@@ -146,6 +169,15 @@ enum PriorityNotificationScheduler {
         center: UNUserNotificationCenter = .current()
     ) async -> UNAuthorizationStatus {
         let settings = await center.notificationSettings()
+        let pending = await center.pendingNotificationRequests()
+        let delivered = await center.deliveredNotifications()
+        await cleanupCompletedNotifications(
+            items: items,
+            pendingIdentifiers: Set(pending.map(\.identifier)),
+            deliveredIdentifiers: Set(delivered.map { $0.request.identifier }),
+            center: center,
+            now: now
+        )
         guard canSchedule(authorizationStatus: settings.authorizationStatus) else {
             for item in items {
                 NotificationDiagnostics.record(.init(
@@ -157,7 +189,6 @@ enum PriorityNotificationScheduler {
             return settings.authorizationStatus
         }
 
-        let pending = await center.pendingNotificationRequests()
         let existingScheduledIds = Set(pending.map(\.identifier).filter { $0.hasPrefix(scheduledPrefix) })
         let plan = reconciliationPlan(items: items, existingScheduledIdentifiers: existingScheduledIds, now: now, calendar: calendar)
 
@@ -257,6 +288,121 @@ enum PriorityNotificationScheduler {
         return (toAdd: desired, toRemove: Array(staleIds) + completedIdentifiersToCancel)
     }
 
+    static func completionCleanupPlan(
+        items: [PriorityOccurrence],
+        pendingIdentifiers: Set<String>,
+        deliveredIdentifiers: Set<String>
+    ) -> CompletionCleanupPlan {
+        let completed = items.filter(\.completed).reduce(into: Set<String>()) { result, item in
+            result.formUnion(occurrenceIdentifiers(
+                priorityId: item.routePriorityId ?? item.id,
+                occurrenceDate: item.date
+            ))
+        }
+        return CompletionCleanupPlan(
+            pendingIdentifiers: Array(pendingIdentifiers.intersection(completed)).sorted(),
+            deliveredIdentifiers: Array(deliveredIdentifiers.intersection(completed)).sorted()
+        )
+    }
+
+    @MainActor
+    static func cleanupCompletedOccurrence(
+        priorityId: String,
+        occurrenceDate: String,
+        center: UNUserNotificationCenter = .current(),
+        now: Date = Date()
+    ) async {
+        let pending = await center.pendingNotificationRequests()
+        let delivered = await center.deliveredNotifications()
+        let targets = occurrenceIdentifiers(priorityId: priorityId, occurrenceDate: occurrenceDate)
+        let plan = CompletionCleanupPlan(
+            pendingIdentifiers: Array(Set(pending.map(\.identifier)).intersection(targets)).sorted(),
+            deliveredIdentifiers: Array(Set(delivered.map { $0.request.identifier }).intersection(targets)).sorted()
+        )
+        _ = await executeCompletionCleanup(
+            plan: plan,
+            removePending: { center.removePendingNotificationRequests(withIdentifiers: $0) },
+            removeDelivered: { center.removeDeliveredNotifications(withIdentifiers: $0) },
+            now: now
+        )
+    }
+
+    @MainActor
+    private static func cleanupCompletedNotifications(
+        items: [PriorityOccurrence],
+        pendingIdentifiers: Set<String>,
+        deliveredIdentifiers: Set<String>,
+        center: UNUserNotificationCenter,
+        now: Date
+    ) async {
+        let plan = completionCleanupPlan(
+            items: items,
+            pendingIdentifiers: pendingIdentifiers,
+            deliveredIdentifiers: deliveredIdentifiers
+        )
+        _ = await executeCompletionCleanup(
+            plan: plan,
+            removePending: { center.removePendingNotificationRequests(withIdentifiers: $0) },
+            removeDelivered: { center.removeDeliveredNotifications(withIdentifiers: $0) },
+            now: now
+        )
+    }
+
+    /// Best-effort by design: canonical completion has already succeeded or
+    /// been observed before this runs. An iOS cleanup failure is diagnostic
+    /// state to retry on the next reconciliation, never grounds to undo the
+    /// canonical mutation or crash the app.
+    @MainActor
+    static func executeCompletionCleanup(
+        plan: CompletionCleanupPlan,
+        removePending: @MainActor ([String]) async throws -> Void,
+        removeDelivered: @MainActor ([String]) async throws -> Void,
+        now: Date = Date()
+    ) async -> CompletionCleanupResult {
+        var pendingRemoved = plan.pendingIdentifiers.isEmpty
+        var deliveredRemoved = plan.deliveredIdentifiers.isEmpty
+        if !plan.pendingIdentifiers.isEmpty {
+            do {
+                try await removePending(plan.pendingIdentifiers)
+                pendingRemoved = true
+                recordCompletionCleanup(plan.pendingIdentifiers, kind: "pending", succeeded: true, now: now)
+            } catch {
+                recordCompletionCleanup(plan.pendingIdentifiers, kind: "pending", succeeded: false, now: now)
+            }
+        }
+        if !plan.deliveredIdentifiers.isEmpty {
+            do {
+                try await removeDelivered(plan.deliveredIdentifiers)
+                deliveredRemoved = true
+                recordCompletionCleanup(plan.deliveredIdentifiers, kind: "delivered", succeeded: true, now: now)
+            } catch {
+                recordCompletionCleanup(plan.deliveredIdentifiers, kind: "delivered", succeeded: false, now: now)
+            }
+        }
+        return CompletionCleanupResult(
+            pendingRemoved: pendingRemoved,
+            deliveredRemoved: deliveredRemoved
+        )
+    }
+
+    @MainActor
+    private static func recordCompletionCleanup(
+        _ identifiers: [String], kind: String, succeeded: Bool, now: Date
+    ) {
+        for identifier in identifiers {
+            NotificationDiagnostics.record(.init(
+                capturedAt: now,
+                identifier: identifier,
+                operation: succeeded ? "completed \(kind) notification removal requested" : "completed \(kind) notification removal deferred",
+                reason: succeeded
+                    ? "Canonical completion requested removal of the exact occurrence-scoped iOS notification; reconciliation verifies and retries."
+                    : "Canonical completion remains durable; notification cleanup will retry on reconciliation.",
+                fireDate: nil,
+                timeZoneIdentifier: TimeZone.current.identifier
+            ))
+        }
+    }
+
     /// Device-only: reschedules the same notification content one hour
     /// later, under a distinct identifier so it doesn't collide with (or
     /// get silently replaced by) the next regular `sync`. Never touches the
@@ -283,7 +429,7 @@ enum PriorityNotificationScheduler {
             "occurrenceDate": payload.occurrenceDate,
         ]
         if let value = payload.canonicalScheduledTime { userInfo["canonicalScheduledTime"] = value }
-        if let value = payload.destination { userInfo["destination"] = value }
+        if let value = payload.destinationJSON { userInfo["destinationJSON"] = value }
         if let value = payload.commandType { userInfo["commandType"] = value }
         if let value = payload.expectedVersion { userInfo["expectedVersion"] = value }
         if let value = payload.payloadPriorityId { userInfo["payloadPriorityId"] = value }

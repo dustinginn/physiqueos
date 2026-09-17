@@ -54,7 +54,13 @@ struct PriorityDetailView: View {
                 store: environment.loggingSandboxStore,
                 authority: environment.nativeAuthority,
                 priorityId: priorityId,
-                occurrenceDate: occurrenceDate
+                occurrenceDate: occurrenceDate,
+                notificationCleanup: { priorityId, occurrenceDate in
+                    await PriorityNotificationScheduler.cleanupCompletedOccurrence(
+                        priorityId: priorityId,
+                        occurrenceDate: occurrenceDate
+                    )
+                }
             )
             await viewModel?.load()
         }

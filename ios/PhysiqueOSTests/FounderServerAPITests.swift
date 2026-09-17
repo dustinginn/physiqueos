@@ -1219,10 +1219,14 @@ final class FounderServerAPITests: XCTestCase {
         )
         let priorityAPI = FirstPriorityThenFailureAPI(occurrence: occurrence)
         let writer = RecordingPriorityCompletionAPI()
+        var cleanedOccurrences: [String] = []
         let viewModel = PriorityDetailViewModel(
             api: priorityAPI, writeAPI: writer, morningCheckInAPI: NotAvailableMorningCheckInAPI(),
             store: LoggingSandboxStore(), authority: .founderProduction,
-            priorityId: "reminder-foam", occurrenceDate: "2026-09-13"
+            priorityId: "reminder-foam", occurrenceDate: "2026-09-13",
+            notificationCleanup: { priorityId, occurrenceDate in
+                cleanedOccurrences.append("\(priorityId)|\(occurrenceDate)")
+            }
         )
 
         await viewModel.load()
@@ -1235,6 +1239,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertFalse(acknowledged.completable)
         let submissionCount = await writer.submissionCount
         XCTAssertEqual(submissionCount, 1)
+        XCTAssertEqual(cleanedOccurrences, ["reminder-foam|2026-09-13"])
     }
 
     @MainActor
