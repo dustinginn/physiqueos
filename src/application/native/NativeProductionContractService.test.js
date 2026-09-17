@@ -157,6 +157,28 @@ describe("Native production contract boundary", () => {
     });
   });
 
+  it("keeps Build 38 Home decodable during the server-first pills rollout", async () => {
+    const current = fixture();
+    const focus = Object.freeze({ id: "fadogia", icon: "pills", title: "Fadogia Agrestis" });
+    current.readers.core.getHome.mockResolvedValue({
+      nextBestAction: { title: "Fadogia Agrestis", icon: "pills" },
+      todaysFocus: [focus], notificationOccurrences: [focus],
+    });
+
+    const legacy = await current.service.read({ request: request(), resource: "home", input: {} });
+    expect(legacy.data.todaysFocus[0].icon).toBe("target");
+    expect(legacy.data.notificationOccurrences[0].icon).toBe("target");
+    expect(legacy.data.nextBestAction.icon).toBe("target");
+
+    const modern = await current.service.read({
+      request: request(), resource: "home", input: { presentationVersion: "2" },
+    });
+    expect(modern.data.todaysFocus[0].icon).toBe("pills");
+    expect(modern.data.notificationOccurrences[0].icon).toBe("pills");
+    expect(modern.data.nextBestAction.icon).toBe("pills");
+    expect(focus.icon).toBe("pills");
+  });
+
   it("keeps Founder and Sandbox owner authorities fail-closed", async () => {
     const authenticate = vi.fn(async () => ({ ...principal, userId: "user_native_sandbox_alpha" }));
     await expect(fixture({ authenticate }).service.read({ request: request(), resource: "home" }))

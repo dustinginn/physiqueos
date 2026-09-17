@@ -68,6 +68,12 @@ export async function getProviderProductReadiness({
       if (database.ownerPresent !== true) return fail("PROVIDER_OWNER_IDENTITY_UNAVAILABLE");
       checks.push(check(activeStage, true, "PROVIDER_OWNER_IDENTITY_READY"));
 
+      activeStage = "schema";
+      if (database.migration000014Applied !== true) {
+        return fail("PROVIDER_MIGRATION_000014_REQUIRED");
+      }
+      checks.push(check(activeStage, true, "PROVIDER_MIGRATION_000014_APPLIED"));
+
       activeStage = "runtime_authority";
       const state = (await composition.authorityStore.read({ queryTimeoutMs: DEPENDENCY_TIMEOUT_MS }))?.state;
       if (completed) return readiness(checks, buildIdentity);
@@ -131,6 +137,7 @@ function fallbackCode(stage) {
     database: "PROVIDER_DATABASE_UNAVAILABLE",
     database_identity: "PROVIDER_DATABASE_IDENTITY_MISMATCH",
     product_owner: "PROVIDER_OWNER_IDENTITY_UNAVAILABLE",
+    schema: "PROVIDER_MIGRATION_000014_REQUIRED",
     runtime_authority: "PROVIDER_RUNTIME_AUTHORITY_UNAVAILABLE",
     object_storage: "PROVIDER_OBJECT_STORAGE_UNAVAILABLE",
   })[stage] ?? "PROVIDER_PRODUCT_READINESS_FAILED";

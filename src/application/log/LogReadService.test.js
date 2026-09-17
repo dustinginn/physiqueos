@@ -80,4 +80,32 @@ describe("Log accepted-processing evidence semantics", () => {
       { id: "review-generic", domain: "evidence", status: "accepted_processing" },
     ]);
   });
+
+  it("uses the Founder timezone when UTC has already crossed into the next day", () => {
+    const review = {
+      ...nutritionReview("committing"),
+      createdAt: "2026-09-17T00:30:00.000Z",
+      interpretedEvidence: {
+        evidence_objects: [{ evidence_type: "nutrition", observed_at: "2026-09-17T00:30:00.000Z" }],
+      },
+    };
+    const projected = projectProcessingReviews([review], "America/Los_Angeles");
+    expect(projected[0].localDate).toBe("2026-09-16");
+    const loggedToday = {
+      rows: [{ id: "nutrition", summary: "Nothing logged yet", context: null, href: null, recordId: null }],
+    };
+    expect(overlayAcceptedProcessing(loggedToday, projected, "2026-09-16").rows[0].processing).toBe(true);
+  });
+
+  it("does not hide populated multi-session Training when its singular recordId is null", () => {
+    const loggedToday = {
+      rows: [{
+        id: "training", summary: "Traditional Strength Training · Outdoor Walk",
+        context: null, href: "/progress/training", recordId: null,
+      }],
+    };
+    const processing = [{ id: "review", localDate: "2026-09-16", domain: "training" }];
+    expect(overlayAcceptedProcessing(loggedToday, processing, "2026-09-16").rows[0])
+      .toEqual(loggedToday.rows[0]);
+  });
 });

@@ -24,7 +24,7 @@ export function createLogReadService({ repositories, now = () => new Date() } = 
         }),
       ]);
       const localDate = getLocalDateKey(now(), resolvedTimeZone);
-      const processingEvidenceReviews = projectProcessingReviews(reviews);
+      const processingEvidenceReviews = projectProcessingReviews(reviews, resolvedTimeZone);
       return Object.freeze({
         localDate,
         loggedToday: overlayAcceptedProcessing(loggedToday, processingEvidenceReviews, localDate),
@@ -64,14 +64,17 @@ export function projectPendingReviews(reviews = []) {
   });
 }
 
-export function projectProcessingReviews(reviews = []) {
+export function projectProcessingReviews(reviews = [], timeZone) {
   return reviews
     // `partially_committed` is a terminal failed continuation and remains
     // actionable; only an active `committing` claim is accepted processing.
     .filter((review) => review.status === "committing")
     .map((review) => {
       const objects = review.interpretedEvidence?.evidence_objects ?? [];
-      const date = String(review.interpretedEvidence?.observed_at ?? objects[0]?.observed_at ?? review.createdAt).slice(0, 10);
+      const date = getLocalDateKey(
+        review.interpretedEvidence?.observed_at ?? objects[0]?.observed_at ?? review.createdAt,
+        resolveLocalTimeZone(timeZone),
+      );
       const domain = processingDomain(objects);
       return Object.freeze({
         id: review.id,
@@ -91,7 +94,11 @@ export function overlayAcceptedProcessing(loggedToday, processingReviews, localD
   return Object.freeze({
     ...loggedToday,
     rows: Object.freeze(loggedToday.rows.map((row) => {
-      if (!processingDomains.has(row.id) || row.recordId) return row;
+      // A multi-session Training row intentionally has no singular recordId,
+      // but it is still populated canonical history. Processing may only
+      // replace the genuinely empty placeholder, never real combined data.
+      const genuinelyEmpty = row.recordId == null && row.href == null && row.summary === "Nothing logged yet";
+      if (!processingDomains.has(row.id) || !genuinelyEmpty) return row;
       return Object.freeze({
         ...row,
         summary: `${processingLabel(row.id)} processing`,

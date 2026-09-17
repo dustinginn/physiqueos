@@ -12,7 +12,17 @@ export function createPostgresProviderReadinessProbe({ pool, ownerUserId } = {})
           EXISTS (
             SELECT 1 FROM physiqueos.canonical_user_records
              WHERE owner_user_id=$1 AND collection_name='user' AND payload->>'id'=$1
-          ) AS owner_present`,
+          ) AS owner_present,
+          EXISTS (
+            SELECT 1 FROM physiqueos.physiqueos_schema_migrations
+             WHERE name='000014_evidence_intake_text_provenance'
+          ) AS migration_000014_recorded,
+          EXISTS (
+            SELECT 1 FROM information_schema.columns
+             WHERE table_schema='physiqueos'
+               AND table_name='evidence_intake_receipts'
+               AND column_name='evidence_text_kind'
+          ) AS evidence_text_kind_present`,
         values: [ownerUserId],
         query_timeout: timeout,
       });
@@ -20,6 +30,9 @@ export function createPostgresProviderReadinessProbe({ pool, ownerUserId } = {})
         reachable: true,
         databaseName: String(result.rows[0]?.database ?? ""),
         ownerPresent: result.rows[0]?.owner_present === true,
+        migration000014Applied:
+          result.rows[0]?.migration_000014_recorded === true &&
+          result.rows[0]?.evidence_text_kind_present === true,
       });
     },
   });

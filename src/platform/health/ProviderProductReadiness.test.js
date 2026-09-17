@@ -34,7 +34,7 @@ function composition(overrides = {}) {
   return {
     compatibilityMode: true,
     expectedDatabaseName: DATABASE,
-    databaseProbe: { healthCheck: vi.fn().mockResolvedValue({ reachable: true, databaseName: DATABASE, ownerPresent: true }) },
+    databaseProbe: { healthCheck: vi.fn().mockResolvedValue({ reachable: true, databaseName: DATABASE, ownerPresent: true, migration000014Applied: true }) },
     authorityStore: { read: vi.fn().mockResolvedValue({ state: compatibilityState() }) },
     objectProvider: { healthCheck: vi.fn().mockResolvedValue({ reachable: true }) },
     ...overrides,
@@ -79,6 +79,7 @@ describe("provider product readiness", () => {
         { name: "database", ready: true, code: "PROVIDER_DATABASE_REACHABLE" },
         { name: "database_identity", ready: true, code: "PROVIDER_DATABASE_IDENTITY_MATCHED" },
         { name: "product_owner", ready: true, code: "PROVIDER_OWNER_IDENTITY_READY" },
+        { name: "schema", ready: true, code: "PROVIDER_MIGRATION_000014_APPLIED" },
         { name: "runtime_authority", ready: true, code: "COMPATIBILITY_AUTHORITY_NONAUTHORITATIVE" },
         { name: "object_storage", ready: true, code: "PROVIDER_OBJECT_STORAGE_REACHABLE" },
         { name: "deadline", ready: true, code: "PROVIDER_READINESS_COMPLETED_IN_BUDGET" },
@@ -142,6 +143,19 @@ describe("provider product readiness", () => {
 
     expect(failedCheck(result)).toEqual({ name: "product_owner", ready: false, code: "PROVIDER_OWNER_IDENTITY_UNAVAILABLE" });
     expect(providerComposition.authorityStore.read).not.toHaveBeenCalled();
+  });
+
+  it("fails readiness before authority and object storage when migration 000014 is absent", async () => {
+    const providerComposition = composition({
+      databaseProbe: { healthCheck: vi.fn().mockResolvedValue({
+        reachable: true, databaseName: DATABASE, ownerPresent: true, migration000014Applied: false,
+      }) },
+    });
+    const { run } = harness({ composition: providerComposition });
+    const result = await run();
+    expect(failedCheck(result)).toEqual({ name: "schema", ready: false, code: "PROVIDER_MIGRATION_000014_REQUIRED" });
+    expect(providerComposition.authorityStore.read).not.toHaveBeenCalled();
+    expect(providerComposition.objectProvider.healthCheck).not.toHaveBeenCalled();
   });
 
   it("fails safely when the authority read rejects", async () => {

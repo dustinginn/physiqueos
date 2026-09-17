@@ -3,13 +3,14 @@ import { createPostgresProviderReadinessProbe } from "./ProviderReadinessProbe.j
 
 describe("Postgres provider readiness probe", () => {
   it("uses one bounded read-only query for database and canonical-owner identity", async () => {
-    const query = vi.fn().mockResolvedValue({ rows: [{ database: "compatibility_db", owner_present: true }] });
+    const query = vi.fn().mockResolvedValue({ rows: [{ database: "compatibility_db", owner_present: true, migration_000014_recorded: true, evidence_text_kind_present: true }] });
     const probe = createPostgresProviderReadinessProbe({ pool: { query }, ownerUserId: "synthetic-owner" });
 
     await expect(probe.healthCheck({ queryTimeoutMs: 1200 })).resolves.toEqual({
       reachable: true,
       databaseName: "compatibility_db",
       ownerPresent: true,
+      migration000014Applied: true,
     });
 
     expect(query).toHaveBeenCalledTimes(1);
@@ -18,7 +19,22 @@ describe("Postgres provider readiness probe", () => {
     expect(call.values).toEqual(["synthetic-owner"]);
     expect(call.text).toMatch(/^SELECT current_database\(\)/);
     expect(call.text).toContain("canonical_user_records");
+    expect(call.text).toContain("000014_evidence_intake_text_provenance");
+    expect(call.text).toContain("evidence_text_kind");
     expect(call.text).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|MERGE|CALL)\b/i);
+  });
+
+  it("fails the release schema proof unless both migration metadata and the column exist", async () => {
+    for (const row of [
+      { database: "db", owner_present: true, migration_000014_recorded: false, evidence_text_kind_present: true },
+      { database: "db", owner_present: true, migration_000014_recorded: true, evidence_text_kind_present: false },
+    ]) {
+      const probe = createPostgresProviderReadinessProbe({
+        pool: { query: vi.fn().mockResolvedValue({ rows: [row] }) },
+        ownerUserId: "synthetic-owner",
+      });
+      await expect(probe.healthCheck()).resolves.toMatchObject({ migration000014Applied: false });
+    }
   });
 
   it("rejects an invalid query deadline before touching PostgreSQL", async () => {

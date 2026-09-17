@@ -68,6 +68,29 @@ describe("Coaching Updates cross-owner strategy save", () => {
       .toBe(createProgressPhotosScheduleSemanticDigest(readShape));
   });
 
+  it("normalizes equivalent calendar-date representations without shifting or failing open", () => {
+    const dateOnly = store();
+    const represented = structuredClone(dateOnly);
+    represented.protocolVersions.find((item) => item.id === "photos-v1").recurrence.anchorDate =
+      "2026-07-25T23:30:00-07:00";
+    represented.protocolVersions.find((item) => item.id === "photos-v1").recurrence.effectiveAt =
+      new Date("2026-07-25T00:00:00.000Z");
+    expect(createCoachingUpdatesSemanticDigest(represented))
+      .toBe(createCoachingUpdatesSemanticDigest(dateOnly));
+
+    const changed = structuredClone(dateOnly);
+    changed.protocolVersions.find((item) => item.id === "photos-v1").recurrence.anchorDate = "2026-07-26";
+    expect(createCoachingUpdatesSemanticDigest(changed))
+      .not.toBe(createCoachingUpdatesSemanticDigest(dateOnly));
+
+    const invalidA = structuredClone(dateOnly);
+    const invalidB = structuredClone(dateOnly);
+    invalidA.protocolVersions.find((item) => item.id === "photos-v1").recurrence.anchorDate = "invalid-alpha";
+    invalidB.protocolVersions.find((item) => item.id === "photos-v1").recurrence.anchorDate = "invalid-beta";
+    expect(createCoachingUpdatesSemanticDigest(invalidA))
+      .not.toBe(createCoachingUpdatesSemanticDigest(invalidB));
+  });
+
   it.each([
     ["Evidence Review", (live) => live.evidenceReviews.push({ id: "review-new", status: "confirmed" })],
     ["Nutrition", (live) => live.canonicalEvidenceObjects.push({ canonicalId: "nutrition|2026-09-16|nutrition-day", evidence_type: "nutrition" })],

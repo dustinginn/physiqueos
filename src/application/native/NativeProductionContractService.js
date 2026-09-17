@@ -87,7 +87,9 @@ export function createNativeProductionContractService({
       const currentDate = input.currentDate ? validDate(input.currentDate, "currentDate") : now();
       let data;
       switch (resource) {
-        case "home": data = await readers.core.getHome(); break;
+        case "home": data = projectHomePresentation(
+          await readers.core.getHome(), input.presentationVersion,
+        ); break;
         case "goals": data = await readers.core.getGoals(); break;
         case "active-goal": data = await readers.activeGoal.getPreview({ currentDate }); break;
         case "completed-goal": data = await readers.completedGoal.getVisibleAbs(); break;
@@ -345,6 +347,33 @@ export function createNativeProductionContractService({
       }),
     });
   }
+}
+
+// Build 38's non-optional Home icon enums predate the canonical `pills`
+// identity. Keep the server-first rollout safe by projecting a neutral icon
+// for clients that do not explicitly advertise the forward-compatible v2
+// decoder. V2 and later receive the canonical icon unchanged; this is a
+// transport compatibility boundary, not a second source of domain meaning.
+function projectHomePresentation(home, presentationVersion) {
+  if (String(presentationVersion ?? "") === "2") return home;
+  const legacyFocus = (home?.todaysFocus ?? []).map(projectLegacyFocusIcon);
+  const legacyNotifications = Array.isArray(home?.notificationOccurrences)
+    ? home.notificationOccurrences.map(projectLegacyFocusIcon)
+    : home?.notificationOccurrences;
+  return Object.freeze({
+    ...home,
+    ...(home?.nextBestAction?.icon === "pills"
+      ? { nextBestAction: Object.freeze({ ...home.nextBestAction, icon: "target" }) }
+      : {}),
+    ...(Array.isArray(home?.todaysFocus) ? { todaysFocus: Object.freeze(legacyFocus) } : {}),
+    ...(Array.isArray(home?.notificationOccurrences)
+      ? { notificationOccurrences: Object.freeze(legacyNotifications) }
+      : {}),
+  });
+}
+
+function projectLegacyFocusIcon(item) {
+  return item?.icon === "pills" ? Object.freeze({ ...item, icon: "target" }) : item;
 }
 
 function safeIdentityFingerprint(value) {

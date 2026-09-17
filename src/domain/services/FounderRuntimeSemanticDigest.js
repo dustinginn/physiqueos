@@ -216,7 +216,29 @@ function sortById(values) { return [...values].sort(compareId); }
 function compareId(left, right) { return String(left?.id ?? "").localeCompare(String(right?.id ?? "")); }
 function normalizedStrings(values) { return [...new Set(values ?? [])].map(String).sort(); }
 function nullable(value) { return value == null || value === "" ? null : String(value); }
-function calendarDate(value) { const text = nullable(value); return /^\d{4}-\d{2}-\d{2}$/.test(text ?? "") ? text : null; }
+function calendarDate(value) {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "invalid:Date" : value.toISOString().slice(0, 10);
+  }
+  const text = String(value).trim();
+  if (!text) return null;
+  // Schedule fields are calendar dates, not instants. An ISO timestamp with
+  // an explicit offset retains the written calendar component rather than
+  // being shifted through the machine's timezone.
+  const leadingDate = text.match(/^(\d{4}-\d{2}-\d{2})(?:$|T|\s)/)?.[1];
+  if (leadingDate && isValidCalendarDate(leadingDate)) return leadingDate;
+  const parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  // Invalid values remain part of the digest. Collapsing them to null would
+  // make distinct corrupt/concurrent states compare equal and fail open.
+  return `invalid:${text}`;
+}
+function isValidCalendarDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10) === value;
+}
 function positiveNumber(value) { const number = Number(value); return Number.isFinite(number) && number > 0 ? number : null; }
 
 export function createFounderRuntimeFileHash(raw) {
