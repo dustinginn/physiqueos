@@ -1,9 +1,14 @@
 import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
-import { auditHistoricalWorkoutLoggerApplePairs, reconcileHistoricalWorkoutLoggerApplePair } from "../../domain/services/CanonicalEvidenceService.js";
+import {
+  auditHistoricalWorkoutLoggerApplePairs,
+  reconcileExplicitWorkoutLoggerAppleSupportPair,
+  reconcileHistoricalWorkoutLoggerApplePair,
+} from "../../domain/services/CanonicalEvidenceService.js";
 import { createActivitySemanticFingerprint } from "../../domain/services/CanonicalActivityDayService.js";
 
 export const HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION = "EXECUTE_APPROVED_HISTORICAL_TRAINING_PREVIEW";
 const PREVIEW_SCHEMA = "historical-training-preview-v2";
+const EXPLICIT_SUPPORT_PREVIEW_SCHEMA = "explicit-training-support-preview-v1";
 
 // Database identity is caller-supplied, never inferred from a canonical ID or
 // regenerated ordinal. Legacy repository/import keys legitimately use @index:*.
@@ -98,6 +103,63 @@ export function previewHistoricalTrainingReconciliation({ ownerUserId, records }
   return { ...body, digest: createPayloadHash(body) };
 }
 
+// Read-only, one-pair preview for already-created residue whose explicit
+// Logger-support intent has been established outside automatic matching.
+// The preview seals persisted storage identity, canonical identity, version,
+// and payload digest. It is deliberately not reachable from an endpoint or
+// scheduler and cannot discover candidates from date/category similarity.
+export function previewExplicitTrainingSupportReconciliation({
+  ownerUserId, records, structuredCanonicalId, telemetryCanonicalId,
+}) {
+  if (!ownerUserId) throw new Error("An explicit historical Training owner is required.");
+  const snapshot = snapshotIdentities(ownerUserId, records);
+  const identityByCanonicalId = new Map(snapshot.map((identity) => [identity.canonicalId, identity]));
+  const survivorRecord = identityByCanonicalId.get(structuredCanonicalId);
+  const retiredRecord = identityByCanonicalId.get(telemetryCanonicalId);
+  if (!survivorRecord || !retiredRecord) throw new Error("Explicit Training support identities are unavailable.");
+  const objects = records.map((row) => row.payload);
+  const changes = reconcileExplicitWorkoutLoggerAppleSupportPair({
+    canonicalObjects: objects, userId: ownerUserId, structuredCanonicalId, telemetryCanonicalId,
+  });
+  const byId = new Map(changes.map((record) => [record.canonicalId, record]));
+  const next = objects.map((record) => byId.get(record.canonicalId) ?? record);
+  const survivor = byId.get(structuredCanonicalId);
+  const date = survivor.payload.observed_at.slice(0, 10);
+  const pair = {
+    date, survivorId: structuredCanonicalId, retiredId: telemetryCanonicalId,
+    survivorRecord, retiredRecord,
+    exerciseIds: survivor.payload.exercises.map((exercise) => exercise.canonicalExerciseId),
+    setCount: survivor.payload.exercises.reduce((sum, exercise) => sum + (exercise.sets ?? []).length, 0),
+    telemetry: survivor.payload.metadata,
+    selectionBasis: "founder_reviewed_explicit_logger_support_intent",
+    frozenAttributionPreserved: true, structuredHistoryIdentityPreserved: true,
+    performanceRecordsMutation: "none", evidenceReviewMutation: "none",
+    activityCaloriePolicy: "recompute existing active Activity record on the exact pair date using canonical semantics",
+  };
+  const activityChanges = next.filter((record) => record.payload.evidence_type === "activity_day" &&
+    createPayloadHash(record) !== createPayloadHash(objects.find((prior) => prior.canonicalId === record.canonicalId)))
+    .map((record) => {
+      const prior = objects.find((item) => item.canonicalId === record.canonicalId);
+      const before = activityProjection(prior), after = activityProjection(record);
+      if (createPayloadHash(before.dailyActivity) !== createPayloadHash(after.dailyActivity) ||
+          before.semanticFingerprint !== after.semanticFingerprint) {
+        throw new Error("Explicit Training support repair cannot change Activity observations.");
+      }
+      return { identity: identityByCanonicalId.get(record.canonicalId), date, before, after,
+        consequence: "refresh persisted derived fields and canonical session references; daily observation and semantic revision unchanged" };
+    });
+  const activeCount = (items) => items.filter((record) => record.payload.evidence_type === "training" && record.quality?.status !== "superseded").length;
+  const body = {
+    schema: EXPLICIT_SUPPORT_PREVIEW_SCHEMA, ownerUserId,
+    explicitSelection: { structuredCanonicalId, telemetryCanonicalId },
+    pairs: [pair], excluded: [], activityChanges,
+    totalTrainingRecordCount: objects.filter((record) => record.payload.evidence_type === "training").length,
+    candidateCount: 1, beforeActiveTrainingCount: activeCount(objects), afterActiveTrainingCount: activeCount(next),
+    snapshot,
+  };
+  return { ...body, digest: createPayloadHash(body) };
+}
+
 export function createPostgresHistoricalTrainingReconciler({ pool, ownerUserId }) {
   if (!pool?.connect || !ownerUserId) throw new Error("An existing PostgreSQL pool and explicit owner are required.");
   const load = async (client, lock = false) => (await client.query(
@@ -123,7 +185,8 @@ export function createPostgresHistoricalTrainingReconciler({ pool, ownerUserId }
     },
     async execute({ approvedPreview, authorization } = {}) {
       const { digest, ...body } = approvedPreview ?? {};
-      if (authorization !== HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION || body.schema !== PREVIEW_SCHEMA || body.ownerUserId !== ownerUserId ||
+      if (authorization !== HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION ||
+          ![PREVIEW_SCHEMA, EXPLICIT_SUPPORT_PREVIEW_SCHEMA].includes(body.schema) || body.ownerUserId !== ownerUserId ||
           !body.pairs?.length || digest !== createPayloadHash(body)) throw new Error("Explicit authorization of an intact preview is required.");
       const client = await pool.connect();
       try {
@@ -141,12 +204,21 @@ export function createPostgresHistoricalTrainingReconciler({ pool, ownerUserId }
             retired.quality.historicalTrainingReconciliation?.retiredStorageId === pair.retiredRecord.recordId;
         });
         if (completed) { await client.query("ROLLBACK"); return { outcome: "replayed", previewDigest: digest, pairs: body.pairs }; }
-        const current = previewHistoricalTrainingReconciliation({ ownerUserId, records });
+        const current = body.schema === EXPLICIT_SUPPORT_PREVIEW_SCHEMA
+          ? previewExplicitTrainingSupportReconciliation({
+              ownerUserId, records,
+              structuredCanonicalId: body.explicitSelection?.structuredCanonicalId,
+              telemetryCanonicalId: body.explicitSelection?.telemetryCanonicalId,
+            })
+          : previewHistoricalTrainingReconciliation({ ownerUserId, records });
         if (current.digest !== digest) throw new Error("Historical Training preview is stale; obtain a new read-only preview.");
         let objects = records.map((row) => row.payload);
         for (const pair of body.pairs) {
-          const changes = reconcileHistoricalWorkoutLoggerApplePair({ canonicalObjects: objects, userId: ownerUserId,
-            structuredCanonicalId: pair.survivorId, telemetryCanonicalId: pair.retiredId });
+          const changes = body.schema === EXPLICIT_SUPPORT_PREVIEW_SCHEMA
+            ? reconcileExplicitWorkoutLoggerAppleSupportPair({ canonicalObjects: objects, userId: ownerUserId,
+                structuredCanonicalId: pair.survivorId, telemetryCanonicalId: pair.retiredId })
+            : reconcileHistoricalWorkoutLoggerApplePair({ canonicalObjects: objects, userId: ownerUserId,
+                structuredCanonicalId: pair.survivorId, telemetryCanonicalId: pair.retiredId });
           changes[1] = { ...changes[1], quality: { ...changes[1].quality,
             historicalTrainingReconciliation: { previewDigest: digest, survivorId: pair.survivorId,
               survivorStorageId: pair.survivorRecord.recordId, retiredStorageId: pair.retiredRecord.recordId } } };

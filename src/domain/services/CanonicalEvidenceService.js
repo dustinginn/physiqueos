@@ -1005,8 +1005,31 @@ export function reconcileHistoricalWorkoutLoggerApplePair({ canonicalObjects, us
   const eligible = audit.candidates.find((pair) => pair.structuredCanonicalId === structuredCanonicalId &&
     pair.telemetryCanonicalIds.length === 1 && pair.telemetryCanonicalIds[0] === telemetryCanonicalId);
   if (!eligible) throw new Error("Historical Training pair is not uniquely compatible.");
+  return reconcileExplicitWorkoutLoggerAppleSupportPair({
+    canonicalObjects, userId, structuredCanonicalId, telemetryCanonicalId,
+  });
+}
+
+// Explicit repair boundary for a Founder-reviewed Logger/support pair whose
+// intent was lost before Build 38. This function performs no discovery: both
+// canonical identities must be supplied, owner-scoped, active, same-date,
+// and type-compatible. A caller must seal storage keys, versions, and payload
+// digests separately before execution (HistoricalTrainingReconciliationService
+// does so). Date/category similarity can never enter this path by itself.
+export function reconcileExplicitWorkoutLoggerAppleSupportPair({
+  canonicalObjects, userId, structuredCanonicalId, telemetryCanonicalId,
+}) {
+  if (!userId || !structuredCanonicalId || !telemetryCanonicalId || structuredCanonicalId === telemetryCanonicalId) {
+    throw new Error("Explicit Training support repair requires two exact canonical identities.");
+  }
   const structured = canonicalObjects.find((record) => record.canonicalId === structuredCanonicalId);
   const telemetry = canonicalObjects.find((record) => record.canonicalId === telemetryCanonicalId);
+  if (!structured || !telemetry || structured.userId !== userId || telemetry.userId !== userId ||
+      isSupersededCanonicalObject(structured) || isSupersededCanonicalObject(telemetry) ||
+      !isOpenStructuredTrainingSession(structured.payload) || !isOpenAppleStrengthTelemetry(telemetry.payload) ||
+      getDateKey(structured.payload.observed_at) !== getDateKey(telemetry.payload.observed_at)) {
+    throw new Error("Explicit Training support pair is not compatible.");
+  }
   for (const field of ["goalId", "phaseId"]) {
     if ((structured[field] ?? structured.goalPhaseAttribution?.[field] ?? null) !==
         (telemetry[field] ?? telemetry.goalPhaseAttribution?.[field] ?? null)) {

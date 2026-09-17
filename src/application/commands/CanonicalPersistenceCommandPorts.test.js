@@ -100,7 +100,7 @@ describe("Phase 4 canonical command persistence ports", () => {
     expect(repeated.outbox).toEqual([]);
   });
 
-  it("commits Native Nutrition and manual Activity canonically and stages Training for the exact review lifecycle", async () => {
+  it("commits Native Nutrition, Activity, and the minimum durable TrainingSession canonically", async () => {
     const records = fixture();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });
     const nutrition = await ports.upsertNutritionDay(commandContext({
@@ -116,13 +116,23 @@ describe("Phase 4 canonical command persistence ports", () => {
     }, null, "training"));
     expect(nutrition.result).toMatchObject({ canonicalId: "nutrition|2026-08-11|nutrition-day", revision: 1, goalId: "goal-one", phaseId: "phase-one" });
     expect(activity.result).toMatchObject({ canonicalId: "activity_day|2026-08-11", revision: 1, goalId: "goal-one", phaseId: "phase-one" });
-    expect(training.result).toMatchObject({ status: "confirmation_requested", intendedDate: "2026-08-11", sessionId: "native-session-one" });
-    expect(training.result.exerciseIds).toEqual(["bench_press"]);
-    const snapshot = records.snapshot();
-    expect(snapshot.canonicalEvidenceObjects.map((item) => item.evidence_type).sort()).toEqual(["activity_day", "nutrition"]);
-    expect(snapshot.evidenceReviews.find((item) => item.id === training.result.reviewId)).toMatchObject({
-      source: "training_logger", status: "pending", evidenceTypes: ["training"],
+    expect(training.result).toMatchObject({
+      status: "durable", intendedDate: "2026-08-11", sessionId: "native-session-one",
+      canonicalId: "training|authoritative|training_logger_draft_native-session-one",
+      trainingSessionDurable: true,
     });
+    expect(training.result.exerciseIds).toEqual(["bench_press"]);
+    expect(training.result.durationMs).toBeGreaterThanOrEqual(0);
+    expect(training.result.durationMs).toBeLessThan(3_000);
+    expect(training.result.stageDurations).toEqual({
+      validationAndPackageMs: expect.any(Number),
+      boundedCanonicalCommitMs: expect.any(Number),
+      durableReadbackMs: expect.any(Number),
+    });
+    expect(Object.values(training.result.stageDurations).every((value) => value >= 0)).toBe(true);
+    const snapshot = records.snapshot();
+    expect(snapshot.canonicalEvidenceObjects.map((item) => item.evidence_type).sort()).toEqual(["activity_day", "nutrition", "training"]);
+    expect(snapshot.evidenceReviews.filter((item) => item.source === "training_logger")).toEqual([]);
     expect(snapshot.piEnergyConfidenceWorkItems.length).toBeGreaterThan(0);
   });
 
@@ -143,13 +153,12 @@ describe("Phase 4 canonical command persistence ports", () => {
         ],
       }],
     }, null, "training-bodyweight-loading"));
-    const review = records.snapshot().evidenceReviews.find((item) => item.id === result.result.reviewId);
-    const sets = review.interpretedEvidence.evidence_objects
-      .find((item) => item.evidence_type === "training").exercises[0].sets;
+    const session = records.snapshot().canonicalEvidenceObjects
+      .find((item) => item.canonicalId === result.result.canonicalId).payload;
+    const sets = session.exercises[0].sets;
     expect(sets[0]).toMatchObject({ reps: 8, weight: null, weight_unit: "bodyweight", load_type: "bodyweight" });
     expect(sets[1]).toMatchObject({ reps: 6, weight: 25, weight_unit: "lb", load_type: "external_load" });
-    const durationSet = review.interpretedEvidence.evidence_objects
-      .find((item) => item.evidence_type === "training").exercises[1].sets[0];
+    const durationSet = session.exercises[1].sets[0];
     expect(durationSet).toMatchObject({
       reps: null,
       duration_seconds: 60,
@@ -171,9 +180,8 @@ describe("Phase 4 canonical command persistence ports", () => {
       }],
     }, null, "new-exercise"));
     expect(first.result.exerciseIds).toEqual(["zercher_squat"]);
-    const staged = records.snapshot().evidenceReviews.find((item) => item.id === first.result.reviewId)
-      .interpretedEvidence.evidence_objects.find((item) => item.evidence_type === "training")
-      .exercises[0];
+    const staged = records.snapshot().canonicalEvidenceObjects
+      .find((item) => item.canonicalId === first.result.canonicalId).payload.exercises[0];
     expect(staged).toMatchObject({
       canonicalExerciseId: "zercher_squat",
       resolutionStatus: "resolved_new_canonical",
@@ -198,9 +206,8 @@ describe("Phase 4 canonical command persistence ports", () => {
       }],
     }, null, "existing-exercise"));
     expect(duplicate.result.exerciseIds).toEqual(["zercher_squat"]);
-    const resolved = records.snapshot().evidenceReviews.find((item) => item.id === duplicate.result.reviewId)
-      .interpretedEvidence.evidence_objects.find((item) => item.evidence_type === "training")
-      .exercises[0];
+    const resolved = records.snapshot().canonicalEvidenceObjects
+      .find((item) => item.canonicalId === duplicate.result.canonicalId).payload.exercises[0];
     expect(resolved).toMatchObject({ canonicalExerciseId: "zercher_squat", resolutionStatus: "resolved_existing_canonical" });
     expect(resolved.provisionalExercise).toBeNull();
   });
@@ -656,12 +663,12 @@ describe("Phase 4 canonical command persistence ports", () => {
     };
     const result = await ports.commitTrainingSession(commandContext(payload, null, "training-media"));
     expect(result.result).toMatchObject({
-      status: "confirmation_requested", reviewId: "review-training-support",
+      status: "durable", reviewId: "review-training-support",
       reviewRevision: 2, sessionId: "native-session-media",
     });
     const review = records.snapshot().evidenceReviews.find((item) => item.id === "review-training-support");
     expect(review).toMatchObject({
-      status: "pending",
+      status: "confirmed",
       interpretedEvidence: {
         review_metadata: {
           nativeTrainingSessionId: "native-session-media",
@@ -772,6 +779,85 @@ describe("Phase 4 canonical command persistence ports", () => {
     expect(review.interpretedEvidence.evidence_objects[0].reconciliation).toMatchObject({
       target_canonical_id: targetCanonicalId,
       match_basis: "explicit_native_training_support_binding",
+    });
+  });
+
+  it("preserves an evidence-first target until Logger durability and binds only strength, never sibling walks", async () => {
+    const records = fixture();
+    const targetCanonicalId = "training|authoritative|training_logger_draft_evidence-first";
+    const original = records.snapshot().evidenceReviews.find((item) => item.id === "review-training-support");
+    const walks = ["walk-one", "walk-two"].map((id, index) => ({
+      id, evidence_type: "training", observed_at: "2026-08-11",
+      source: { application: "Apple Fitness" }, exercises: [],
+      metadata: {
+        activity_type: "Outdoor Walk",
+        start_time: `2026-08-11T0${9 + index}:00:00Z`,
+        end_time: `2026-08-11T0${9 + index}:20:00Z`,
+      },
+    }));
+    const persisted = await records.put({
+      ownerUserId, collection: "evidenceReviews", recordId: original.id,
+      expectedVersion: 1, payload: {
+        ...original,
+        interpretedEvidence: {
+          ...original.interpretedEvidence,
+          review_metadata: { targetTrainingSessionCanonicalId: targetCanonicalId },
+          evidence_objects: [...original.interpretedEvidence.evidence_objects, ...walks],
+        },
+      },
+    });
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+
+    await expect(ports.requestEvidenceReviewConfirmation(commandContext({
+      reviewId: original.id,
+    }, persisted.version, "evidence-first-before-logger"))).rejects.toMatchObject({
+      code: "TRAINING_SUPPORTING_EVIDENCE_TARGET_UNAVAILABLE",
+    });
+    expect(records.snapshot().evidenceReviews.find((item) => item.id === original.id).version).toBe(persisted.version);
+
+    await records.put({
+      ownerUserId, collection: "canonicalEvidenceObjects", recordId: "@index:evidence-first",
+      payload: {
+        canonicalId: targetCanonicalId, userId: ownerUserId, evidence_type: "training",
+        quality: { status: "active" },
+        payload: {
+          id: "training_logger_draft_evidence-first", evidence_type: "training", observed_at: "2026-08-11",
+          source: { application: "Training Logger", modality: "manual" },
+          metadata: { activity_type: "Traditional Strength Training" },
+          exercises: [{ id: "press", canonicalExerciseId: "bench_press", name: "Bench Press", sets: [{ reps: 8, weight: 185 }] }],
+        },
+      },
+    });
+    const result = await ports.requestEvidenceReviewConfirmation(commandContext({
+      reviewId: original.id,
+    }, persisted.version, "evidence-first-after-logger"));
+    expect(result.result.revision).toBe(persisted.version + 1);
+    const updated = records.snapshot().evidenceReviews.find((item) => item.id === original.id);
+    expect(updated.interpretedEvidence.evidence_objects[0].reconciliation.target_canonical_id).toBe(targetCanonicalId);
+    expect(updated.interpretedEvidence.evidence_objects.slice(1).every((item) => item.reconciliation?.target_canonical_id == null)).toBe(true);
+  });
+
+  it("rejects a Native target that conflicts with the exact target persisted at intake", async () => {
+    const records = fixture();
+    const original = records.snapshot().evidenceReviews.find((item) => item.id === "review-training-support");
+    const persisted = await records.put({
+      ownerUserId, collection: "evidenceReviews", recordId: original.id,
+      expectedVersion: 1, payload: {
+        ...original,
+        interpretedEvidence: {
+          ...original.interpretedEvidence,
+          review_metadata: {
+            targetTrainingSessionCanonicalId: "training|authoritative|training_logger_draft_expected",
+          },
+        },
+      },
+    });
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.requestEvidenceReviewConfirmation(commandContext({
+      reviewId: original.id,
+      targetTrainingSessionCanonicalId: "training|authoritative|training_logger_draft_wrong",
+    }, persisted.version, "wrong-explicit-target"))).rejects.toMatchObject({
+      code: "TRAINING_SUPPORTING_EVIDENCE_TARGET_MISMATCH",
     });
   });
 });

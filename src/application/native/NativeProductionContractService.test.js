@@ -444,20 +444,25 @@ describe("Native production contract boundary", () => {
     })).rejects.toMatchObject({ status: 400, code: "NATIVE_EVIDENCE_REVIEW_UNAVAILABLE" });
   });
 
-  it("routes a structured Training log through its staged Evidence Review lifecycle", async () => {
+  it("acknowledges a structured Training log at its direct durable canonical boundary", async () => {
     const current = fixture();
-    current.confirmEvidenceReview.mockResolvedValue({ state: "processing", reviewId: "review-training", trainingSessionDurable: true });
     current.executeCommand.mockResolvedValue({
       outcome: "committed",
-      receipt: { commandId: "command-training", result: { reviewId: "review-training", status: "confirmation_requested" } },
+      receipt: { commandId: "command-training", result: {
+        status: "durable", canonicalId: "training|authoritative|training_logger_draft_session-one",
+        trainingSessionDurable: true,
+        stageDurations: { validationAndPackageMs: 1, boundedCanonicalCommitMs: 2, durableReadbackMs: 0.2 },
+      } },
     });
-    await current.service.command({
+    const result = await current.service.command({
       request: request(), commandType: "training-session.commit.v1",
       metadata: { idempotencyKey: "training-one" },
       payload: { sessionId: "session-one", localDate: "2026-09-09", exercises: [{ canonicalExerciseId: "bench_press", sets: [{ reps: 8, load: 185 }] }] },
     });
-    expect(current.confirmEvidenceReview).toHaveBeenCalledWith({
-      principal, reviewId: "review-training", commandId: "command-training",
+    expect(current.confirmEvidenceReview).not.toHaveBeenCalled();
+    expect(result.confirmation).toEqual({
+      state: "confirmed", accepted: true, trainingSessionDurable: true,
+      canonicalId: "training|authoritative|training_logger_draft_session-one",
     });
   });
 

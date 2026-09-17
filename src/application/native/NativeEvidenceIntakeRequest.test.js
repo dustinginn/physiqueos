@@ -19,6 +19,33 @@ describe("Native production Evidence intake", () => {
       .resolves.toMatchObject({ expectedEvidenceType: type, files: [file] });
   });
 
+  it("persists an exact Logger target only for Training supporting evidence", async () => {
+    const file = new File([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])], "screen.png", { type: "image/png" });
+    const draftId = "draft-123";
+    const target = `training|authoritative|training_logger_draft_${draftId}`;
+    const training = request("training", file);
+    const body = await training.formData();
+    body.set("targetTrainingDraftId", draftId);
+    body.set("targetTrainingSessionCanonicalId", target);
+    const targeted = new Request(training.url, { method: "POST", headers: {
+      authorization: `Bearer ${"x".repeat(43)}`, "idempotency-key": ID,
+    }, body });
+    await expect(parseNativeEvidenceIntakeRequest(targeted)).resolves.toMatchObject({
+      recoveryContext: {
+        kind: "training_logger_support", targetTrainingDraftId: draftId,
+        targetTrainingSessionCanonicalId: target,
+      },
+    });
+
+    const activity = request("activity_day", file);
+    const wrongBody = await activity.formData();
+    wrongBody.set("targetTrainingDraftId", draftId);
+    wrongBody.set("targetTrainingSessionCanonicalId", target);
+    await expect(parseNativeEvidenceIntakeRequest(new Request(activity.url, {
+      method: "POST", headers: { authorization: `Bearer ${"x".repeat(43)}`, "idempotency-key": ID }, body: wrongBody,
+    }))).rejects.toMatchObject({ code: "TRAINING_TARGET_CONTEXT_INVALID" });
+  });
+
   it("rejects mismatched idempotency identity and disguised screenshots", async () => {
     const badIdentity = request("nutrition", new File(["not png"], "screen.png", { type: "image/png" }), "different");
     await expect(parseNativeEvidenceIntakeRequest(badIdentity)).rejects.toMatchObject({ code: "IDEMPOTENCY_IDENTITY_MISMATCH" });

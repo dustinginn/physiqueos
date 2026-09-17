@@ -57,6 +57,20 @@ export async function parseNativeEvidenceIntakeRequest(request) {
   if (clientExtractedText && expectedEvidenceType !== "activity_day") {
     throw problem(400, "CLIENT_EXTRACTION_CONTEXT_INVALID", "Local extraction is accepted only for explicit Activity evidence.");
   }
+  const targetTrainingSessionCanonicalId = String(
+    formData.get("targetTrainingSessionCanonicalId") ?? ""
+  ).trim();
+  const targetTrainingDraftId = String(formData.get("targetTrainingDraftId") ?? "").trim();
+  if ((targetTrainingSessionCanonicalId || targetTrainingDraftId) && expectedEvidenceType !== "training") {
+    throw problem(400, "TRAINING_TARGET_CONTEXT_INVALID", "A Training target is accepted only for explicit Training evidence.");
+  }
+  if (expectedEvidenceType === "training" && Boolean(targetTrainingSessionCanonicalId) !== Boolean(targetTrainingDraftId)) {
+    throw problem(400, "TRAINING_TARGET_CONTEXT_INCOMPLETE", "Training supporting evidence requires both target identities.");
+  }
+  if (targetTrainingSessionCanonicalId &&
+      targetTrainingSessionCanonicalId !== `training|authoritative|training_logger_draft_${targetTrainingDraftId}`) {
+    throw problem(400, "TRAINING_TARGET_CONTEXT_MISMATCH", "Training supporting evidence target identities do not agree.");
+  }
   const artifactManifest = createEvidenceUploadArtifactManifest(files);
   assertEvidenceUploadReceiptMatchesManifest({ manifest: artifactManifest, receivedFiles: files });
   return Object.freeze({
@@ -69,7 +83,11 @@ export async function parseNativeEvidenceIntakeRequest(request) {
     // user-authored canonical claim. The interpreter owns strict parsing
     // and falls back to visual interpretation when it is incomplete.
     typedEvidence: clientExtractedText || null,
-    recoveryContext: null,
+    recoveryContext: targetTrainingSessionCanonicalId ? Object.freeze({
+      kind: "training_logger_support",
+      targetTrainingDraftId,
+      targetTrainingSessionCanonicalId,
+    }) : null,
   });
 }
 

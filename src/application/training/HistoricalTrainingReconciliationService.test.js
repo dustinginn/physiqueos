@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createPostgresHistoricalTrainingReconciler, HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION, previewHistoricalTrainingReconciliation } from "./HistoricalTrainingReconciliationService.js";
+import {
+  createPostgresHistoricalTrainingReconciler,
+  HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION,
+  previewExplicitTrainingSupportReconciliation,
+  previewHistoricalTrainingReconciliation,
+} from "./HistoricalTrainingReconciliationService.js";
 import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
 
 const OWNER = "synthetic-owner";
@@ -32,7 +37,8 @@ function fixture() {
       source: { application: "Training Logger", modality: "manual" }, provenance: { source_artifact_refs: ["logger"] } }),
     record("telemetry", { evidence_type: "training", exercises: [], source: { application: "Apple Fitness" },
       provenance: { source_artifact_refs: ["apple"] }, metadata: { activity_type: "Traditional Strength Training",
-        start_time: `${DATE}T07:45:00`, end_time: `${DATE}T08:44:00`, duration_seconds: 3518, active_calories: 438, average_heart_rate: 121 } }),
+        start_time: `${DATE}T07:45:00`, end_time: `${DATE}T08:44:00`, duration_seconds: 3518, active_calories: 438, average_heart_rate: 121 },
+      reconciliation: { target_canonical_id: "structured" } }),
     ...[84, 105].map((cal, i) => record(`walk-${i}`, { evidence_type: "training", exercises: [], source: { application: "Apple Fitness" },
       metadata: { activity_type: "Outdoor Walk", start_time: `${DATE}T09:${i}0:00`, active_calories: cal } })),
     record("activity", { evidence_type: "activity_day", daily_activity: { move_calories: 800 },
@@ -75,6 +81,36 @@ function database(initial = fixture(), { failWrite = -1, readOnly = "on" } = {})
 }
 
 describe("historical Training owner-fenced preview and authorized transition", () => {
+  it("seals a Founder-reviewed explicit Logger/support repair without date-based discovery", async () => {
+    const records = fixture();
+    delete records[1].payload.payload.reconciliation;
+    expect(previewHistoricalTrainingReconciliation({ ownerUserId: OWNER, records }).candidateCount).toBe(0);
+
+    const preview = previewExplicitTrainingSupportReconciliation({
+      ownerUserId: OWNER, records,
+      structuredCanonicalId: "structured", telemetryCanonicalId: "telemetry",
+    });
+    expect(preview).toMatchObject({
+      schema: "explicit-training-support-preview-v1", candidateCount: 1,
+      explicitSelection: { structuredCanonicalId: "structured", telemetryCanonicalId: "telemetry" },
+      pairs: [{
+        survivorId: "structured", retiredId: "telemetry", setCount: 16,
+        selectionBasis: "founder_reviewed_explicit_logger_support_intent",
+        survivorRecord: { recordId: "structured", version: 2 },
+        retiredRecord: { recordId: "telemetry", version: 2 },
+      }],
+    });
+    const db = database(records);
+    const result = await db.service.execute({
+      approvedPreview: preview,
+      authorization: HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION,
+    });
+    expect(result).toMatchObject({ outcome: "committed", changedCanonicalIds: ["structured", "telemetry", "activity"] });
+    expect(db.snapshot()[0].payload.payload.metadata).toMatchObject({ active_calories: 438, average_heart_rate: 121 });
+    expect(db.snapshot()[1].payload.quality).toMatchObject({ status: "superseded", supersededBy: "structured" });
+    expect(db.snapshot().slice(2, 4)).toEqual(records.slice(2, 4));
+  });
+
   it("seals independent persisted and canonical identities; legacy keys never migrate", async () => {
     const db = database(legacyFixture()), before = db.snapshot(), preview = await db.service.preview();
     expect(preview.schema).toBe("historical-training-preview-v2");
@@ -220,10 +256,10 @@ describe("historical Training owner-fenced preview and authorized transition", (
     await expect(db.service.execute({ approvedPreview, authorization: HISTORICAL_TRAINING_EXECUTION_AUTHORIZATION })).rejects.toThrow("authorization");
     expect(db.statements.some(sql => sql.startsWith("UPDATE"))).toBe(false);
   });
-  it("excludes ambiguous open sessions and mismatched frozen Goal/Phase", () => {
+  it("keeps an explicit target deterministic while excluding other open sessions and mismatched attribution", () => {
     const records = fixture(); records.push({ ...structuredClone(records[0]), recordId: "competing", payload: { ...structuredClone(records[0].payload), canonicalId: "competing" } });
     const ambiguous = previewHistoricalTrainingReconciliation({ ownerUserId: OWNER, records });
-    expect(ambiguous.candidateCount).toBe(0); expect(ambiguous.excluded).toHaveLength(2);
+    expect(ambiguous.candidateCount).toBe(1); expect(ambiguous.excluded).toHaveLength(1);
     const mismatch = fixture(); mismatch[1].payload.phaseId = "another-phase";
     const rejected = previewHistoricalTrainingReconciliation({ ownerUserId: OWNER, records: mismatch });
     expect(rejected.candidateCount).toBe(0); expect(rejected.excluded[0].reason).toBe("attribution-mismatch");

@@ -67,7 +67,16 @@ export function createEvidenceIntakeInterpretationWorkerHandler({
       const evidencePackage = {
         ...result.evidencePackage,
         provenance: { ...(result.evidencePackage.provenance ?? {}), intake_receipt_id: receipt.id },
-        review_metadata: { ...(result.evidencePackage.review_metadata ?? {}), recoveryContext: receipt.recoveryContext, intakeReceiptId: receipt.id },
+        review_metadata: {
+          ...(result.evidencePackage.review_metadata ?? {}),
+          recoveryContext: receipt.recoveryContext,
+          intakeReceiptId: receipt.id,
+          ...(receipt.recoveryContext?.kind === "training_logger_support" ? {
+            targetTrainingDraftId: receipt.recoveryContext.targetTrainingDraftId,
+            targetTrainingSessionCanonicalId:
+              receipt.recoveryContext.targetTrainingSessionCanonicalId,
+          } : {}),
+        },
       };
       let review;
       const repositories = { evidenceReviews: { async createReview(value) { review = value; return value; } } };

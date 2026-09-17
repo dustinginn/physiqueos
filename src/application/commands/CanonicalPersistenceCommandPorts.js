@@ -1086,113 +1086,97 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
   }
 
   async function commitTrainingSession(context) {
+    const startedAt = performance.now();
+    const packageStartedAt = performance.now();
     const prepared = await createNativeTrainingPackage(context);
+    const packageDurationMs = roundedDuration(packageStartedAt);
     const packageAndObject = prepared.evidencePackage;
     const supportingReview = prepared.supportingReview;
-    const existingCanonicalObjects = await records.list({
-      ownerUserId: context.ownerUserId,
-      collection: "canonicalEvidenceObjects",
-    });
-    const goals = await records.list({ ownerUserId: context.ownerUserId, collection: "goals" });
-    let preview;
-    try {
-      preview = reconcileConfirmedEvidencePackage({
-        evidencePackage: packageAndObject,
-        existingCanonicalObjects,
-        goals,
-        userId: context.ownerUserId,
-        mutationReason: "native_training_session_commit",
-      });
-    } catch (error) {
-      throw canonicalValidationProblem(error);
-    }
-    const existingById = new Map(existingCanonicalObjects.map((item) => [item.canonicalId, item]));
-    for (const changed of preview.changedObjects) {
-      const existing = existingById.get(changed.canonicalId);
-      if (existing) requireExpectedVersion(context, existing, `training-session:${changed.canonicalId}`);
-    }
-    const reviewId = supportingReview?.id ?? `native_training_review_${context.metadata.commandId}`;
-    const existingReview = await records.get({
-      ownerUserId: context.ownerUserId,
-      collection: "evidenceReviews",
-      recordId: reviewId,
-    });
-    let reviewRevision = existingReview?.version ?? 1;
-    if (!existingReview || supportingReview) {
-      const packageId = `${packageAndObject.package_id}_${context.metadata.commandId}`;
-      const evidencePackage = {
-        ...packageAndObject,
-        package_id: packageId,
-        review_metadata: {
-          ...(packageAndObject.review_metadata ?? {}),
-          sourceReviewId: reviewId,
-        },
-      };
-      await records.put({
+    // A Logger command is already a reviewed, structured write. Sending it
+    // through the generic nine-step Evidence Review orchestrator made the
+    // HTTP request wait behind compatibility, analysis, Goal, Event,
+    // Briefing, and Home work before it could truthfully acknowledge the
+    // TrainingSession. Commit the minimum canonical package directly inside
+    // the idempotent command transaction instead. The bounded canonical
+    // commit retains duplicate/reconciliation fences and required Activity
+    // consistency while downstream work remains represented by its durable
+    // work items.
+    const canonicalCommitStartedAt = performance.now();
+    const commit = await commitCanonicalEvidencePackage(context, packageAndObject);
+    const canonicalCommitDurationMs = roundedDuration(canonicalCommitStartedAt);
+    const canonicalId = `training|authoritative|training_logger_draft_${context.payload.sessionId}`;
+    const durableReadbackStartedAt = performance.now();
+    const record = commit.canonicalEvidenceObjects.find((item) => item.canonicalId === canonicalId) ??
+      (await records.list({
         ownerUserId: context.ownerUserId,
-        collection: "evidencePackages",
-        recordId: packageId,
+        collection: "canonicalEvidenceObjects",
+      })).find((item) => item.canonicalId === canonicalId) ?? null;
+    const durableReadbackDurationMs = roundedDuration(durableReadbackStartedAt);
+    if (!record || record.quality?.status === "superseded") {
+      throw problem(500, "TRAINING_SESSION_NOT_DURABLE", "The canonical Training session was not durable after commit.");
+    }
+
+    // A legacy caller may still supply an already-interpreted supporting
+    // review in the same command. Preserve it as an auditable confirmed
+    // source after the exact canonical package commits; modern Native uses
+    // the independent target-bound intake path and does not enter here.
+    let reviewRevision = supportingReview?.version ?? null;
+    if (supportingReview) {
+      const updated = await records.put({
+        ownerUserId: context.ownerUserId,
+        collection: "evidenceReviews",
+        recordId: supportingReview.id,
+        expectedVersion: supportingReview.version,
         sourceIdentity: context.metadata.idempotencyKey,
-        payload: evidencePackage,
+        payload: {
+          ...supportingReview,
+          status: "confirmed",
+          updatedAt: now().toISOString(),
+          interpretedEvidence: packageAndObject,
+          confirmation: {
+            confirmedAt: now().toISOString(),
+            confirmedBy: context.ownerUserId,
+            targetTrainingSessionCanonicalId: canonicalId,
+          },
+          commitProgress: {
+            ...(supportingReview.commitProgress ?? {}),
+            canonical_commit: {
+              status: "completed",
+              completedAt: now().toISOString(),
+              result: { canonicalEvidenceIds: [canonicalId], status: "completed" },
+            },
+          },
+          provenance: commandProvenance(context),
+        },
       });
-      if (!existingReview) {
-        await records.put({
-          ownerUserId: context.ownerUserId,
-          collection: "evidenceReviews",
-          recordId: reviewId,
-          sourceIdentity: context.metadata.idempotencyKey,
-          payload: {
-            id: reviewId,
-            userId: context.ownerUserId,
-            source: "training_logger",
-            status: "pending",
-            createdAt: now().toISOString(),
-            updatedAt: now().toISOString(),
-            interpretedEvidence: evidencePackage,
-            evidenceTypes: ["training"],
-            confirmation: null,
-            commitProgress: {},
-            itemDecisions: {},
-            provenance: commandProvenance(context),
-          },
-        });
-      } else {
-        const updated = await records.put({
-          ownerUserId: context.ownerUserId,
-          collection: "evidenceReviews",
-          recordId: reviewId,
-          expectedVersion: existingReview.version,
-          sourceIdentity: context.metadata.idempotencyKey,
-          payload: {
-            ...existingReview,
-            source: "training_logger",
-            status: "pending",
-            updatedAt: now().toISOString(),
-            interpretedEvidence: evidencePackage,
-            evidenceTypes: ["training"],
-            confirmation: null,
-            commitProgress: {},
-            itemDecisions: {},
-            provenance: commandProvenance(context),
-          },
-        });
-        reviewRevision = updated.version;
-      }
+      reviewRevision = updated.version;
     }
     return {
       status: "committed",
       result: {
-        status: supportingReview ? "confirmation_requested" : existingReview ? "confirmation_resumed" : "confirmation_requested",
-        reviewId,
+        status: "durable",
+        reviewId: supportingReview?.id ?? null,
         reviewRevision,
         sessionId: context.payload.sessionId,
         intendedDate: context.payload.localDate,
-        exerciseIds: packageAndObject.evidence_objects
-          .find((item) => item.evidence_type === "training")?.exercises
-          ?.map((item) => item.canonicalExerciseId) ?? [],
+        canonicalId,
+        trainingSessionDurable: true,
+        durationMs: roundedDuration(startedAt),
+        stageDurations: {
+          validationAndPackageMs: packageDurationMs,
+          boundedCanonicalCommitMs: canonicalCommitDurationMs,
+          durableReadbackMs: durableReadbackDurationMs,
+        },
+        exerciseIds: record.payload?.exercises?.map((item) => item.canonicalExerciseId).filter(Boolean) ?? [],
+        continuationWorkItemIds: commit.briefingReconciliation?.workItemIds ?? [],
+        lowerLevelWorkItemIds: (commit.lowerLevelWork ?? []).map((item) => item.workId).filter(Boolean),
       },
       outbox: [],
     };
+  }
+
+  function roundedDuration(startedAt) {
+    return Math.max(0, Math.round((performance.now() - startedAt) * 100) / 100);
   }
 
   async function commitDailyEvidence(context, { evidenceType, payload }) {
@@ -1274,7 +1258,13 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     if (!["pending", "commit_failed", "partially_committed", "committing"].includes(review.status)) {
       throw problem(409, "EVIDENCE_REVIEW_NOT_COMMITTABLE", "This evidence review cannot be committed.");
     }
-    const targetCanonicalId = context.payload.targetTrainingSessionCanonicalId ?? null;
+    const persistedTargetCanonicalId =
+      review.interpretedEvidence?.review_metadata?.targetTrainingSessionCanonicalId ?? null;
+    const targetCanonicalId = context.payload.targetTrainingSessionCanonicalId ?? persistedTargetCanonicalId;
+    if (context.payload.targetTrainingSessionCanonicalId && persistedTargetCanonicalId &&
+        context.payload.targetTrainingSessionCanonicalId !== persistedTargetCanonicalId) {
+      throw problem(409, "TRAINING_SUPPORTING_EVIDENCE_TARGET_MISMATCH", "The submitted Training target does not match the persisted intake target.");
+    }
     if (targetCanonicalId) {
       // Canonical domain identity is intentionally independent of the
       // persistence record key (legacy production rows may still use
@@ -1535,6 +1525,13 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         evidence_objects: evidencePackage.evidence_objects.map((item) => ({
           ...item,
           captured_at: capturedAt,
+          ...(item.evidence_type === "training" && (item.exercises ?? []).length > 0 ? {
+            reconciliation: {
+              ...(item.reconciliation ?? {}),
+              canonical_id:
+                `training|authoritative|training_logger_draft_${context.payload.sessionId}`,
+            },
+          } : {}),
         })),
       },
     };

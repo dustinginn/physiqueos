@@ -45,6 +45,45 @@ describe("Coaching Updates cross-owner strategy save", () => {
     });
   });
 
+  it.each([
+    ["Evidence Review", (live) => live.evidenceReviews.push({ id: "review-new", status: "confirmed" })],
+    ["Nutrition", (live) => live.canonicalEvidenceObjects.push({ canonicalId: "nutrition|2026-09-16|nutrition-day", evidence_type: "nutrition" })],
+    ["Activity", (live) => live.canonicalEvidenceObjects.push({ canonicalId: "activity_day|2026-09-16", evidence_type: "activity_day" })],
+    ["Training", (live) => live.canonicalEvidenceObjects.push({ canonicalId: "training|authoritative|other", evidence_type: "training" })],
+    ["Home priority", (live) => {
+      live.executionItems.push({ id: "execution_unrelated", executionRevision: 2 });
+      live.reminders.push({ id: "reminder_unrelated", version: 3, completionHistory: [{ evidenceDate: "2026-09-16" }] });
+    }],
+    ["Goal", (live) => live.goals.push({ id: "unrelated-goal", status: "completed" })],
+    ["Protocol", (live) => live.protocols.push({ id: "unrelated-protocol", protocolType: "recovery", status: "active" })],
+  ])("does not let an unrelated %s write invalidate Coaching", async (_label, mutate) => {
+    const fixture = setup();
+    const request = command(fixture.live);
+    const beforeDigest = request.expectedSemanticDigest;
+    mutate(fixture.live);
+    fixture.live.revision += 1;
+    fs.writeFileSync(fixture.file, `${JSON.stringify(fixture.live)}\n`);
+    expect(createCoachingUpdatesSemanticDigest(fixture.live)).toBe(beforeDigest);
+    expect(await fixture.service.save(request)).toMatchObject({ outcome: "success", committed: true });
+  });
+
+  it.each([
+    ["Midweek", (live) => { live.protocolVersions.find((item) => item.id === "coaching-v1").coachingUpdates = { ...legacy(), midweek: { enabled: true, day: "thursday", localTime: "05:30" } }; }],
+    ["Weekly", (live) => { live.protocolVersions.find((item) => item.id === "coaching-v1").coachingUpdates = { ...legacy(), weekly: { enabled: true, day: "saturday", localTime: "07:00" } }; }],
+    ["Monthly", (live) => { live.protocolVersions.find((item) => item.id === "coaching-v1").coachingUpdates = { ...legacy(), monthly: { enabled: true, dayOfMonth: 2, localTime: "08:00" } }; }],
+    ["Progress Photos", (live) => { live.protocolVersions.find((item) => item.id === "photos-v1").recurrence.timeOfDay = "morning"; }],
+    ["DEXA", (live) => { live.executionItems.find((item) => item.id === "execution_next_dexa").preferredSchedule.date = "2026-09-01"; }],
+  ])("rejects a real concurrent %s editor-resource change without partial mutation", async (_label, mutate) => {
+    const fixture = setup();
+    const request = command(fixture.live);
+    mutate(fixture.live);
+    fixture.live.revision += 1;
+    fs.writeFileSync(fixture.file, `${JSON.stringify(fixture.live)}\n`);
+    const concurrentState = JSON.stringify(fixture.live);
+    expect(await fixture.service.save(request)).toMatchObject({ outcome: "concurrency_conflict", committed: false });
+    expect(JSON.stringify(fixture.live)).toBe(concurrentState);
+  });
+
   it("still rejects a real scoped Coaching change even when the global revision is current", async () => {
     const fixture = setup();
     const request = command(fixture.live);

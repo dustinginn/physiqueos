@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { requireScope } from "../auth/principal.js";
 import { projectClientSafeValue } from "../read-models/readModel.js";
 import { ApplicationProblem } from "../../contracts/v1/problem.js";
@@ -251,8 +252,30 @@ export function createNativeProductionContractService({
       logger?.info?.("native.command.receipt_committed", {
         commandType,
         durationMs: elapsed(performanceClock, commandStartedAt),
+        commandState: result?.outcome ?? "committed",
+        durable: result?.receipt?.result?.trainingSessionDurable === true || undefined,
+        idempotencyFingerprint: safeIdentityFingerprint(metadata.idempotencyKey),
       });
       if (![Phase3Command.COMMIT_EVIDENCE_REVIEW, Phase3Command.COMMIT_TRAINING_SESSION].includes(commandType)) return result;
+      if (commandType === Phase3Command.COMMIT_TRAINING_SESSION &&
+          result?.receipt?.result?.trainingSessionDurable === true) {
+        const confirmation = Object.freeze({
+          state: "confirmed",
+          accepted: true,
+          trainingSessionDurable: true,
+          canonicalId: result.receipt.result.canonicalId ?? null,
+        });
+        logger?.info?.("native.command.durable_acknowledgement", {
+          commandType,
+          durationMs: elapsed(performanceClock, commandStartedAt),
+          confirmationDurationMs: 0,
+          durable: true,
+          finalOutcome: "durable",
+          idempotencyFingerprint: safeIdentityFingerprint(metadata.idempotencyKey),
+          stages: result.receipt.result.stageDurations ?? undefined,
+        });
+        return Object.freeze({ ...result, confirmation });
+      }
       if (typeof confirmEvidenceReview !== "function") throw unavailableResource();
       const reviewId = payload.reviewId ?? result.receipt?.result?.reviewId;
       let confirmation;
@@ -322,6 +345,10 @@ export function createNativeProductionContractService({
       }),
     });
   }
+}
+
+function safeIdentityFingerprint(value) {
+  return createHash("sha256").update(String(value ?? "")).digest("hex").slice(0, 16);
 }
 
 function elapsed(clock, startedAt) {

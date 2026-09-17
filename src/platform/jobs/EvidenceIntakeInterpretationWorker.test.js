@@ -25,6 +25,26 @@ describe("Evidence intake background interpretation", () => {
     expect(input.review.intakeReceiptId).toBe("intake-one");
   });
 
+  it("carries the exact Logger target through interpretation into the durable review", async () => {
+    const completed = vi.fn(async (input) => input);
+    const target = "training|authoritative|training_logger_draft_draft-123";
+    const handler = createEvidenceIntakeInterpretationWorkerHandler({
+      store: fixtureStore({
+        claimInterpretation: async () => ({ outcome: "claimed", receipt: receipt({
+          expectedEvidenceType: "training",
+          recoveryContext: { kind: "training_logger_support", targetTrainingDraftId: "draft-123", targetTrainingSessionCanonicalId: target },
+        }) }),
+        completeInterpretation: completed,
+      }),
+      loadArtifact: vi.fn(async () => ({})),
+    });
+    await handler(message());
+    expect(completed.mock.calls[0][0].review.interpretedEvidence.review_metadata).toMatchObject({
+      targetTrainingDraftId: "draft-123",
+      targetTrainingSessionCanonicalId: target,
+    });
+  });
+
   it("post-completion replay performs no interpretation or staging", async () => {
     const completeInterpretation = vi.fn();
     const loadArtifact = vi.fn();
@@ -95,4 +115,4 @@ describe("Evidence intake background interpretation", () => {
 
 function message() { return { messageId: "worker-message", workerId: "worker-one", payloadVersion: "1", payload: { intakeReceiptId: "intake-one" }, assertLease: vi.fn() }; }
 function fixtureStore(overrides = {}) { return { claimInterpretation: async () => ({ outcome: "claimed", receipt: receipt() }), loadPhotoSessionContext: async () => ({ goals: [], executionItems: [] }), completeInterpretation: vi.fn(), failInterpretation: vi.fn(), ...overrides }; }
-function receipt() { return { id: "intake-one", submissionIdentity: "01999999-9999-7999-8999-999999999999", ownerUserId: "owner", effectiveDate: "2026-08-31", expectedEvidenceType: "auto", source: "universal_intake", storedArtifacts: [{ ordinal: 1 }], typedEvidence: null, recoveryContext: null, createdAt: "2026-09-01T05:43:24.105Z" }; }
+function receipt(overrides = {}) { return { id: "intake-one", submissionIdentity: "01999999-9999-7999-8999-999999999999", ownerUserId: "owner", effectiveDate: "2026-08-31", expectedEvidenceType: "auto", source: "universal_intake", storedArtifacts: [{ ordinal: 1 }], typedEvidence: null, recoveryContext: null, createdAt: "2026-09-01T05:43:24.105Z", ...overrides }; }
