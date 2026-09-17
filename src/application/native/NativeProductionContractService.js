@@ -356,15 +356,21 @@ export function createNativeProductionContractService({
 // transport compatibility boundary, not a second source of domain meaning.
 function projectHomePresentation(home, presentationVersion) {
   if (String(presentationVersion ?? "") === "2") return home;
-  const legacyFocus = (home?.todaysFocus ?? []).map(projectLegacyFocusIcon);
+  const legacyFocus = (home?.todaysFocus ?? []).map((item) =>
+    projectLegacyPresentationItem(item, LEGACY_HOME_FOCUS_ICONS));
   const legacyNotifications = Array.isArray(home?.notificationOccurrences)
-    ? home.notificationOccurrences.map(projectLegacyFocusIcon)
+    ? home.notificationOccurrences.map((item) =>
+        projectLegacyPresentationItem(item, LEGACY_HOME_FOCUS_ICONS))
     : home?.notificationOccurrences;
+  const legacyGoals = Array.isArray(home?.goals)
+    ? home.goals.map((item) => projectLegacyPresentationItem(item, LEGACY_HOME_GOAL_ICONS))
+    : home?.goals;
   return Object.freeze({
     ...home,
-    ...(home?.nextBestAction?.icon === "pills"
-      ? { nextBestAction: Object.freeze({ ...home.nextBestAction, icon: "target" }) }
+    ...(home?.nextBestAction
+      ? { nextBestAction: projectLegacyPresentationItem(home.nextBestAction, LEGACY_HOME_ACTION_ICONS) }
       : {}),
+    ...(Array.isArray(home?.goals) ? { goals: Object.freeze(legacyGoals) } : {}),
     ...(Array.isArray(home?.todaysFocus) ? { todaysFocus: Object.freeze(legacyFocus) } : {}),
     ...(Array.isArray(home?.notificationOccurrences)
       ? { notificationOccurrences: Object.freeze(legacyNotifications) }
@@ -372,8 +378,23 @@ function projectHomePresentation(home, presentationVersion) {
   });
 }
 
-function projectLegacyFocusIcon(item) {
-  return item?.icon === "pills" ? Object.freeze({ ...item, icon: "target" }) : item;
+const LEGACY_HOME_ACTION_ICONS = new Set([
+  "activity", "analysis", "camera", "check", "moon", "scale", "syringe", "target", "utensils",
+]);
+const LEGACY_HOME_FOCUS_ICONS = new Set([
+  "activity", "camera", "moon", "scale", "syringe", "target", "utensils",
+]);
+const LEGACY_HOME_GOAL_ICONS = new Set(["activity", "compass", "dumbbell", "shield", "target"]);
+const LEGACY_HOME_COLORS = new Set([
+  "primary", "success", "evidence", "effort", "warning", "danger", "muted", "surface", "plain",
+]);
+
+function projectLegacyPresentationItem(item, allowedIcons) {
+  if (!item || typeof item !== "object") return item;
+  const icon = allowedIcons.has(item.icon) ? item.icon : "target";
+  const color = item.color == null || LEGACY_HOME_COLORS.has(item.color) ? item.color : "muted";
+  if (icon === item.icon && color === item.color) return item;
+  return Object.freeze({ ...item, icon, ...(item.color == null ? {} : { color }) });
 }
 
 function safeIdentityFingerprint(value) {

@@ -157,26 +157,34 @@ describe("Native production contract boundary", () => {
     });
   });
 
-  it("keeps Build 38 Home decodable during the server-first pills rollout", async () => {
+  it("keeps Build 38 Home decodable during server-first future presentation additions", async () => {
     const current = fixture();
-    const focus = Object.freeze({ id: "fadogia", icon: "pills", title: "Fadogia Agrestis" });
+    const focus = Object.freeze({
+      id: "fadogia", icon: "future-supplement-icon", color: "future-supplement-color",
+      title: "Fadogia Agrestis",
+    });
     current.readers.core.getHome.mockResolvedValue({
       nextBestAction: { title: "Fadogia Agrestis", icon: "pills" },
+      goals: [{ id: "goal-1", title: "Build Lean Mass", icon: "future-goal-icon", color: "future-goal-color" }],
       todaysFocus: [focus], notificationOccurrences: [focus],
     });
 
     const legacy = await current.service.read({ request: request(), resource: "home", input: {} });
     expect(legacy.data.todaysFocus[0].icon).toBe("target");
+    expect(legacy.data.todaysFocus[0].color).toBe("muted");
     expect(legacy.data.notificationOccurrences[0].icon).toBe("target");
     expect(legacy.data.nextBestAction.icon).toBe("target");
+    expect(legacy.data.goals[0]).toMatchObject({ icon: "target", color: "muted" });
 
     const modern = await current.service.read({
       request: request(), resource: "home", input: { presentationVersion: "2" },
     });
-    expect(modern.data.todaysFocus[0].icon).toBe("pills");
-    expect(modern.data.notificationOccurrences[0].icon).toBe("pills");
+    expect(modern.data.todaysFocus[0].icon).toBe("future-supplement-icon");
+    expect(modern.data.todaysFocus[0].color).toBe("future-supplement-color");
+    expect(modern.data.notificationOccurrences[0].icon).toBe("future-supplement-icon");
     expect(modern.data.nextBestAction.icon).toBe("pills");
-    expect(focus.icon).toBe("pills");
+    expect(modern.data.goals[0]).toMatchObject({ icon: "future-goal-icon", color: "future-goal-color" });
+    expect(focus.icon).toBe("future-supplement-icon");
   });
 
   it("keeps Founder and Sandbox owner authorities fail-closed", async () => {
