@@ -148,6 +148,7 @@ struct OperatingPlanSupplementSupportView: View {
                     )
                     errorMessage = nil
                     isEditing = false
+                    await environment.reconcileCanonicalPriorityNotifications()
                     await loadProductionIfNeeded()
                 } catch {
                     errorMessage = "This Supplement Support plan was not saved. Refresh before retrying."

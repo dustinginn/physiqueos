@@ -6,6 +6,7 @@ private let iconMap: [HomeActionIcon: String] = [
     .camera: "camera.fill",
     .check: "checkmark.circle.fill",
     .moon: "moon.fill",
+    .pills: "pills.fill",
     .scale: "scalemass.fill",
     .syringe: "syringe.fill",
     .target: "list.clipboard.fill",

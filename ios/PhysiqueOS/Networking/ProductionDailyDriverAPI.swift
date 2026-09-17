@@ -91,6 +91,8 @@ struct ProductionHomeAPI: HomeAPI {
     func fetchHome() async throws -> HomeReadModel {
         let envelope = try await api.readResource("home", as: Payload.self)
         let priorities = envelope.data.todaysFocus.map { $0.readOnlyOccurrence }
+        let notificationOccurrences = (envelope.data.notificationOccurrences ?? envelope.data.todaysFocus)
+            .map { $0.readOnlyOccurrence }
         if let invalid = priorities.first(where: { $0.date.isEmpty }) {
             throw ProductionDailyDriverError.missingPriorityOccurrenceDate(invalid.id)
         }
@@ -109,7 +111,9 @@ struct ProductionHomeAPI: HomeAPI {
             nextBestAction: envelope.data.nextBestAction,
             briefingCards: briefingCards,
             goals: try envelope.data.goals.map { try $0.readModel() },
-            todaysFocus: priorities
+            todaysFocus: priorities,
+            notificationOccurrences: notificationOccurrences,
+            notificationTimeZone: envelope.data.notificationTimeZone
         )
     }
 
@@ -120,6 +124,8 @@ struct ProductionHomeAPI: HomeAPI {
         var briefingCards: [HomeBriefingCard]
         var goals: [Goal]
         var todaysFocus: [Priority]
+        var notificationOccurrences: [Priority]?
+        var notificationTimeZone: String?
     }
 
     private struct Hero: Decodable {

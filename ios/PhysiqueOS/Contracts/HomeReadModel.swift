@@ -23,9 +23,27 @@ struct HomeReadModel: Codable, Equatable {
     /// `ExecutionItemFixture` catalog, never a Home-only projection. See
     /// `PriorityReadModel.swift`'s type-level doc comment.
     var todaysFocus: [PriorityOccurrence]
+    /// A bounded server-owned occurrence horizon used only for local
+    /// notification scheduling. It is separate from `todaysFocus` because
+    /// Home presentation is intentionally current-day and capped, while an
+    /// early-morning request must already exist before the app is opened on
+    /// that day. `nil` keeps older fixtures/server responses compatible.
+    var notificationOccurrences: [PriorityOccurrence]? = nil
+    /// Effective canonical schedule time zone used by the server when it
+    /// projected the occurrence dates. Named-zone calendar construction is
+    /// DST-safe and avoids substituting the device's current zone.
+    var notificationTimeZone: String? = nil
 
     var hasBriefingCards: Bool { !briefingCards.isEmpty }
     var hasTodaysFocus: Bool { !todaysFocus.isEmpty }
+    var notificationScheduleItems: [PriorityOccurrence] {
+        notificationOccurrences ?? todaysFocus
+    }
+    var notificationCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = notificationTimeZone.flatMap(TimeZone.init(identifier:)) ?? .current
+        return calendar
+    }
 }
 
 struct HomeHeader: Codable, Equatable {
@@ -111,7 +129,7 @@ struct ConfidenceDetail: Codable, Equatable {
 }
 
 enum HomeActionIcon: String, Codable {
-    case activity, analysis, camera, check, moon, scale, syringe, target, utensils
+    case activity, analysis, camera, check, moon, pills, scale, syringe, target, utensils
 }
 
 struct HomeNextBestAction: Codable, Equatable {
@@ -281,5 +299,5 @@ extension HomeGoal {
 }
 
 enum HomeFocusIcon: String, Codable {
-    case activity, camera, moon, scale, syringe, target, utensils
+    case activity, camera, moon, pills, scale, syringe, target, utensils
 }

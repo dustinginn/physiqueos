@@ -169,6 +169,7 @@ struct OperatingPlanRecoverySupportView: View {
                     )
                     errorMessage = nil
                     isEditing = false
+                    await environment.reconcileCanonicalPriorityNotifications()
                     await loadProductionIfNeeded()
                 } catch {
                     errorMessage = "The support schedule was not saved. Refresh before retrying."

@@ -103,6 +103,21 @@ final class HomeReadModelTests: XCTestCase {
         XCTAssertFalse(model.hasTodaysFocus)
     }
 
+    func testCanonicalSupplementIconDecodesAsPillsWithoutChangingPeptideOrRecoverySemantics() throws {
+        XCTAssertEqual(HomeFocusIconPresentation.systemImage(for: .pills), "pills.fill")
+        XCTAssertEqual(HomeFocusIconPresentation.systemImage(for: .syringe), "syringe.fill")
+        XCTAssertEqual(
+            HomeFocusIconPresentation.systemImage(for: .activity),
+            "figure.strengthtraining.traditional"
+        )
+
+        let decoded = try JSONDecoder().decode(
+            HomeFocusIcon.self,
+            from: Data(#""pills""#.utf8)
+        )
+        XCTAssertEqual(decoded, .pills)
+    }
+
     // MARK: - Typed, bounded route intent
 
     func testDestinationRoundTripsThroughTheServerWireShape() throws {

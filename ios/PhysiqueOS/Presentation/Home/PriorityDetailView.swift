@@ -60,6 +60,7 @@ struct PriorityDetailView: View {
                         priorityId: priorityId,
                         occurrenceDate: occurrenceDate
                     )
+                    await environment.reconcileCanonicalPriorityNotifications()
                 }
             )
             await viewModel?.load()

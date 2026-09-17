@@ -630,6 +630,68 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertTrue(plan.toAdd.isEmpty)
     }
 
+    func testCompletedTodayRemovesOnlyTodayAndPreservesTomorrowInTheForwardHorizon() {
+        let today = Self.scheduledOccurrence(
+            id: "reminder_morning_weight", date: "2026-09-17", time: "05:30", completed: true
+        )
+        let tomorrow = Self.scheduledOccurrence(
+            id: "reminder_morning_weight", date: "2026-09-18", time: "05:30"
+        )
+        let todayID = PriorityNotificationScheduler.identifier(
+            priorityId: today.id, occurrenceDate: today.date
+        )
+        let tomorrowID = PriorityNotificationScheduler.identifier(
+            priorityId: tomorrow.id, occurrenceDate: tomorrow.date
+        )
+        let now = ISO8601DateFormatter().date(from: "2026-09-17T01:00:00Z")!
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [today, tomorrow],
+            existingScheduledIdentifiers: [todayID, tomorrowID],
+            now: now,
+            calendar: utc
+        )
+
+        XCTAssertTrue(plan.toRemove.contains(todayID))
+        XCTAssertFalse(plan.toRemove.contains(tomorrowID))
+        XCTAssertEqual(plan.toAdd.map(\.identifier), [tomorrowID])
+    }
+
+    func testEditedFutureScheduleReplacesTheExactOccurrenceWithoutDuplication() throws {
+        let original = Self.scheduledOccurrence(
+            id: "reminder_fadogia", date: "2026-09-18", time: "05:45"
+        )
+        let edited = Self.scheduledOccurrence(
+            id: "reminder_fadogia", date: "2026-09-18", time: "06:15"
+        )
+        let identifier = PriorityNotificationScheduler.identifier(
+            priorityId: original.id, occurrenceDate: original.date
+        )
+        let now = ISO8601DateFormatter().date(from: "2026-09-17T01:00:00Z")!
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [edited, edited],
+            existingScheduledIdentifiers: [identifier],
+            now: now,
+            calendar: utc
+        )
+
+        XCTAssertEqual(plan.toAdd.map(\.identifier), [identifier])
+        XCTAssertTrue(plan.toRemove.isEmpty)
+        XCTAssertEqual(try Self.fireHourMinute(plan.toAdd[0], calendar: utc), [6, 15])
+    }
+
+    func testDisablingReminderRemovesItsExactFutureRequestsWithoutRetroactiveReplacement() {
+        let future = PriorityNotificationScheduler.identifier(
+            priorityId: "reminder_fadogia", occurrenceDate: "2026-09-18"
+        )
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: [], existingScheduledIdentifiers: [future],
+            now: Self.referenceNow, calendar: utc
+        )
+
+        XCTAssertEqual(plan.toRemove, [future])
+        XCTAssertTrue(plan.toAdd.isEmpty)
+    }
+
     func testAuthorizationDeniedOrNotDeterminedPreventsScheduling() {
         XCTAssertFalse(PriorityNotificationScheduler.canSchedule(authorizationStatus: .denied))
         XCTAssertFalse(PriorityNotificationScheduler.canSchedule(authorizationStatus: .notDetermined))
@@ -641,9 +703,8 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
     }
 
     /// Snooze and canonical requests must never be confused by cleanup: a
-    /// snoozed identifier for an occurrence that's no longer in `items` at
-    /// all (the common "past occurrence" case, since only TODAY's
-    /// occurrences ever appear in `items`) is untouched by reconciliation —
+    /// snoozed identifier for an occurrence that's no longer in the bounded
+    /// canonical horizon is untouched by ordinary stale-request cleanup —
     /// `toRemove` only ever targets the `scheduledPrefix` set it was given.
     func testReconciliationNeverTargetsASnoozeIdentifierItWasNotToldAbout() {
         let snoozeIdentifier = PriorityNotificationScheduler.snoozeIdentifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-12")
@@ -686,6 +747,23 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         // (Pacific is behind UTC) — proving the fire instant is genuinely
         // anchored to the Pacific interpretation, not incidentally correct.
         XCTAssertNotEqual(utc.component(.hour, from: date), 8)
+    }
+
+    func testFutureOccurrenceFireDatePreservesLocalClockAcrossDSTBoundary() throws {
+        var pacific = Calendar(identifier: .gregorian)
+        pacific.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+
+        let beforeFallback = try XCTUnwrap(PriorityNotificationScheduler.fireDate(
+            "05:30", occurrenceDate: "2026-10-31", calendar: pacific
+        ))
+        let afterFallback = try XCTUnwrap(PriorityNotificationScheduler.fireDate(
+            "05:30", occurrenceDate: "2026-11-02", calendar: pacific
+        ))
+
+        XCTAssertEqual(ISO8601DateFormatter().string(from: beforeFallback), "2026-10-31T12:30:00Z")
+        XCTAssertEqual(ISO8601DateFormatter().string(from: afterFallback), "2026-11-02T13:30:00Z")
+        XCTAssertEqual(pacific.component(.hour, from: beforeFallback), 5)
+        XCTAssertEqual(pacific.component(.hour, from: afterFallback), 5)
     }
 
     // MARK: - Fixtures
@@ -735,6 +813,34 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
                     expectedVersion: 3,
                     payload: PriorityNotificationCompletionPayload(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13")
                 )
+            )
+        )
+    }
+
+    private static func scheduledOccurrence(
+        id: String, date: String, time: String, completed: Bool = false
+    ) -> PriorityOccurrence {
+        PriorityOccurrence(
+            id: id,
+            routePriorityId: id,
+            executionItemId: id,
+            date: date,
+            title: id,
+            subtitle: nil,
+            metadata: nil,
+            changeLabel: nil,
+            icon: .target,
+            color: .primary,
+            urgency: .upcoming,
+            completed: completed,
+            completable: false,
+            expectedVersion: nil,
+            actionLabel: nil,
+            completionContext: nil,
+            notificationAction: PriorityNotificationAction(
+                classification: .openOnly,
+                scheduledTime: time,
+                completionCommand: nil
             )
         )
     }

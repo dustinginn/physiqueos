@@ -85,6 +85,50 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(plan.toAdd.first?.content.categoryIdentifier, PriorityNotificationCategory.specializedWorkflow)
     }
 
+    func testProductionHomeDecodesCanonicalFutureNotificationHorizonIndependentOfVisibleFocus() async throws {
+        let data = #"{"header":{"greeting":"Good evening","name":"Founder"},"hero":{"mode":"active","goalLabel":"Current Goal","headline":"On track","supportLine":"Canonical state"},"nextBestAction":{"title":"Review today","icon":"target","destination":{"id":"goal.detail","parameters":{"goalId":"goal-canonical"}}},"briefingCards":[],"goals":[],"todaysFocus":[],"notificationTimeZone":"America/Los_Angeles","notificationOccurrences":[{"id":"reminder_morning_weight","occurrenceDate":"2026-09-17","label":"Morning Weigh-In","subtitle":"Morning","icon":"scale","color":"evidence","state":"upcoming","completed":false,"completable":false,"executionContract":{"priorityId":"reminder_morning_weight","occurrenceDate":"2026-09-17"},"notificationAction":{"classification":"specialized_workflow_required","workflow":"morning_check_in","scheduledTime":"05:30","completionCommand":null}},{"id":"reminder_fadogia","occurrenceDate":"2026-09-17","label":"Fadogia Agrestis","subtitle":"Morning","icon":"pills","color":"effort","state":"upcoming","completed":false,"completable":true,"executionContract":{"priorityId":"reminder_fadogia","occurrenceDate":"2026-09-17","expectedVersion":8},"notificationAction":{"classification":"direct_completion_allowed","workflow":"priority_detail","scheduledTime":"05:45","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":8,"payload":{"priorityId":"reminder_fadogia","occurrenceDate":"2026-09-17"}}}}]}"#
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["home": productionEnvelope(resource: "home", data: data)]
+        )
+        let native = ProductionNativeAPI(
+            baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport
+        )
+        _ = try await native.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Isolated fixture"
+        )
+
+        let home = try await ProductionHomeAPI(api: native).fetchHome()
+        XCTAssertTrue(home.todaysFocus.isEmpty)
+        XCTAssertEqual(home.notificationCalendar.timeZone.identifier, "America/Los_Angeles")
+        XCTAssertEqual(home.notificationScheduleItems.map(\.date), ["2026-09-17", "2026-09-17"])
+        XCTAssertEqual(home.notificationScheduleItems.last?.icon, .pills)
+
+        var pacific = Calendar(identifier: .gregorian)
+        pacific.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let previousEvening = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-09-17T01:00:00Z")
+        )
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: home.notificationScheduleItems,
+            existingScheduledIdentifiers: [],
+            now: previousEvening,
+            calendar: pacific
+        )
+        XCTAssertEqual(Set(plan.toAdd.map(\.identifier)), [
+            "priority.scheduled.reminder_morning_weight.2026-09-17",
+            "priority.scheduled.reminder_fadogia.2026-09-17",
+        ])
+        let fires = try plan.toAdd.map { request in
+            let trigger = try XCTUnwrap(request.trigger as? UNCalendarNotificationTrigger)
+            return try XCTUnwrap(pacific.date(from: trigger.dateComponents))
+        }.sorted()
+        XCTAssertEqual(fires, [
+            try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-17T12:30:00Z")),
+            try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-17T12:45:00Z")),
+        ])
+    }
+
     func testProductionHomeKeepsMorningWeighInCanonicalIdentityAnd0530Trigger() async throws {
         let homeJSON = productionEnvelope(resource: "home", data: #"{"header":{"greeting":"Good morning","name":"Founder"},"hero":{"mode":"active","goalLabel":"Current Goal","headline":"On track","supportLine":"Canonical state"},"nextBestAction":{"title":"Morning Weigh-In","icon":"scale","destination":{"id":"check-in","parameters":{"checkInType":"morning"}}},"briefingCards":[],"goals":[],"timezone":"America/Los_Angeles","todaysFocus":[{"id":"reminder_morning_weight","executionItemId":"execution_morning_weigh_in","occurrenceDate":"2026-09-16","label":"Morning Weigh-In","subtitle":"Overdue","metadata":"Daily · 5:30 AM","icon":"scale","color":"evidence","state":"overdue","completed":false,"completable":false,"executionContract":{"priorityId":"reminder_morning_weight","occurrenceDate":"2026-09-16","occurrenceKey":"reminder_morning_weight:2026-09-16","workflow":"morning_check_in","destination":"/check-in/morning"},"notificationAction":{"classification":"specialized_workflow_required","workflow":"morning_check_in","scheduledTime":"05:30","completionCommand":null}}]}"#)
         let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["home": homeJSON])

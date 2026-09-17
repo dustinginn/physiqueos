@@ -61,7 +61,7 @@ struct NotificationDiagnosticsView: View {
                             }
                         }
 
-                        section("Reconciliation, per today's-focus item") {
+                        section("Reconciliation, per canonical occurrence") {
                             ForEach(Array(report.itemOutcomes.enumerated()), id: \.offset) { _, outcome in
                                 outcomeRow(outcome)
                             }
@@ -114,18 +114,21 @@ struct NotificationDiagnosticsView: View {
 
     @MainActor private func capture() async {
         var items: [PriorityOccurrence] = []
+        var calendar = Calendar.current
         // Device evidence must not be hidden behind network/session latency.
         // Show the local capture first, then enrich with fresh canonical reads.
         canonicalReadNotice = "Loading current production priorities…"
         report = await NotificationDiagnostics.makeReport(items: [])
         do {
             await environment.productionNativeAPI.invalidateReadResources(["home"])
-            items = try await ProductionHomeAPI(api: environment.productionNativeAPI).fetchHome().todaysFocus
+            let home = try await ProductionHomeAPI(api: environment.productionNativeAPI).fetchHome()
+            items = home.notificationScheduleItems
+            calendar = home.notificationCalendar
             canonicalReadNotice = nil
         } catch {
             canonicalReadNotice = "Current production priorities could not be loaded. Device notification state is still shown below."
         }
-        report = await NotificationDiagnostics.makeReport(items: items)
+        report = await NotificationDiagnostics.makeReport(items: items, calendar: calendar)
     }
 
     private func deliverySettingRow(_ label: String, _ setting: UNNotificationSetting) -> some View {

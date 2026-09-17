@@ -259,6 +259,7 @@ enum PriorityNotificationScheduler {
         calendar: Calendar = .current
     ) -> (toAdd: [UNNotificationRequest], toRemove: [String]) {
         var desired: [UNNotificationRequest] = []
+        var desiredIdentifiers = Set<String>()
         var completedIdentifiersToCancel: [String] = []
 
         for item in items {
@@ -277,7 +278,8 @@ enum PriorityNotificationScheduler {
             guard let action = item.notificationAction,
                   let scheduledTime = action.scheduledTime,
                   let fireDate = fireDate(scheduledTime, occurrenceDate: item.date, calendar: calendar),
-                  fireDate > now
+                  fireDate > now,
+                  desiredIdentifiers.insert(scheduledId).inserted
             else { continue }
 
             desired.append(request(identifier: scheduledId, item: item, action: action, fireDate: fireDate, calendar: calendar))

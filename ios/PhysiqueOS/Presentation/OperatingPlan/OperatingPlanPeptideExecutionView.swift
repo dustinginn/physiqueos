@@ -335,6 +335,7 @@ struct OperatingPlanPeptideExecutionView: View {
                     )
                     errorMessage = nil
                     isEditing = false
+                    await environment.reconcileCanonicalPriorityNotifications()
                     await loadProductionIfNeeded()
                 } catch {
                     errorMessage = "The peptide Support plan was not saved. Refresh before retrying."

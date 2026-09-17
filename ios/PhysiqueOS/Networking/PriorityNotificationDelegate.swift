@@ -255,7 +255,14 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             }
             recordActionStage(snapshot: snapshot, operation: "action decoded",
                               reason: "Snooze was decoded from immutable values and dispatched on the main actor.")
-            _ = await snoozeHandler(payload)
+            let result = await snoozeHandler(payload)
+            if case .accepted = result {
+                // Re-read the bounded canonical occurrence horizon after the
+                // local replacement is accepted. This never turns Snooze into
+                // a server mutation; it only keeps every other exact future
+                // occurrence covered while leaving this snooze request intact.
+                await environment?.reconcileCanonicalPriorityNotifications()
+            }
             recordActionStage(snapshot: snapshot, operation: "action completed safely",
                               reason: "Snooze handling returned without canonical mutation.")
         case UNNotificationDefaultActionIdentifier:
@@ -343,6 +350,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
             ))
             await completionCleanup(priorityId, occurrenceDate)
+            await environment?.reconcileCanonicalPriorityNotifications()
         } catch {
             NotificationDiagnostics.record(.init(
                 capturedAt: Date(), identifier: "action.complete.\(priorityId).\(occurrenceDate)",

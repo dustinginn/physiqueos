@@ -204,6 +204,7 @@ struct OperatingPlanTrackingSupportView: View {
                         expectedRevision: detail.hydration.executionRevision,
                         supportSchedule: model.supportSchedule, reminderPreference: model.reminderPreference, notes: model.notes
                     )
+                    await environment.reconcileCanonicalPriorityNotifications()
                     dismiss()
                 } catch {
                     errorMessage = "The support schedule was not saved. Refresh before retrying."

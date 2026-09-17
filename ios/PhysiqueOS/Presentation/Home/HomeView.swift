@@ -62,9 +62,9 @@ struct HomeView: View {
             )
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
+            guard phase == .active || phase == .inactive else { return }
             Task {
-                await viewModel?.load()
+                if phase == .active { await viewModel?.load() }
                 await syncPriorityNotifications()
             }
         }
@@ -103,7 +103,11 @@ struct HomeView: View {
         // below, and is published to `environment` so Home can show a
         // visible notice on denial instead of silently scheduling nothing.
         _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-        environment.notificationAuthorizationStatus = await PriorityNotificationScheduler.sync(items: home.todaysFocus, center: center)
+        environment.notificationAuthorizationStatus = await PriorityNotificationScheduler.sync(
+            items: home.notificationScheduleItems,
+            calendar: home.notificationCalendar,
+            center: center
+        )
         await BriefingReadyNotifier.reconcile(cards: home.briefingCards, center: center)
     }
 
@@ -112,13 +116,18 @@ struct HomeView: View {
     /// same eligibility `PriorityNotificationScheduler.reconciliationPlan`
     /// applies, so the denial notice only appears when denial is actually
     /// costing the Founder a reminder, never as unconditional noise.
-    private func hasScheduleableFocusItem(_ items: [PriorityOccurrence]) -> Bool {
+    private func hasScheduleableFocusItem(
+        _ items: [PriorityOccurrence],
+        calendar: Calendar
+    ) -> Bool {
         let now = Date()
         return items.contains { item in
             guard !item.completed,
                   let action = item.notificationAction,
                   let scheduledTime = action.scheduledTime,
-                  let fireDate = PriorityNotificationScheduler.fireDate(scheduledTime, occurrenceDate: item.date, calendar: .current)
+                  let fireDate = PriorityNotificationScheduler.fireDate(
+                    scheduledTime, occurrenceDate: item.date, calendar: calendar
+                  )
             else { return false }
             return fireDate > now
         }
@@ -178,7 +187,11 @@ struct HomeView: View {
                 GoalsCardView(goals: home.goals, onTap: onNavigate)
 
                 if home.hasTodaysFocus {
-                    if environment.notificationAuthorizationStatus == .denied, hasScheduleableFocusItem(home.todaysFocus) {
+                    if environment.notificationAuthorizationStatus == .denied,
+                       hasScheduleableFocusItem(
+                        home.notificationScheduleItems,
+                        calendar: home.notificationCalendar
+                       ) {
                         NotificationsDisabledNotice()
                     }
                     TodaysFocusCardView(items: home.todaysFocus, completingIDs: completingPriorityIDs, onTap: onNavigate) { occurrence in
@@ -209,6 +222,7 @@ struct HomeView: View {
                                 await settlePriorityCompletion(occurrence.id) {
                                     await viewModel?.reconcileAfterConfirmedPriorityCompletion(occurrenceID: occurrence.id)
                                 }
+                                await syncPriorityNotifications()
                             } catch {
                                 completionError = "The priority was not marked complete. Refresh before retrying."
                                 completingPriorityIDs.remove(occurrence.id)

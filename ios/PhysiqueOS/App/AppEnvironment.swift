@@ -577,3 +577,32 @@ final class AppEnvironment {
         return founderPhotoMediaStore.source(viewIdentity: view.id)
     }
 }
+
+extension AppEnvironment {
+    /// Refreshes the server-owned bounded occurrence horizon after a
+    /// canonical schedule/reminder edit. This deliberately performs no
+    /// recurrence math in Swift: the server projects exact occurrence dates
+    /// and times, while Native only reconciles those identities with iOS.
+    @MainActor
+    func reconcileCanonicalPriorityNotifications() async {
+        guard nativeAuthority == .founderProduction else { return }
+        await productionNativeAPI.invalidateReadResources(["home"])
+        do {
+            let home = try await ProductionHomeAPI(api: productionNativeAPI).fetchHome()
+            notificationAuthorizationStatus = await PriorityNotificationScheduler.sync(
+                items: home.notificationScheduleItems,
+                calendar: home.notificationCalendar,
+                center: .current()
+            )
+        } catch {
+            NotificationDiagnostics.record(.init(
+                capturedAt: Date(),
+                identifier: "canonical-horizon.refresh",
+                operation: "future notification reconciliation deferred",
+                reason: "The canonical occurrence horizon could not be refreshed; the next launch or foreground read will retry.",
+                fireDate: nil,
+                timeZoneIdentifier: TimeZone.current.identifier
+            ))
+        }
+    }
+}

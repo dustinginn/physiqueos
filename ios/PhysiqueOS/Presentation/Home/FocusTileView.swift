@@ -37,15 +37,20 @@ enum PriorityExecutionContextPresentation {
     }
 }
 
-private let iconMap: [HomeFocusIcon: String] = [
-    .activity: "figure.strengthtraining.traditional",
-    .camera: "camera.fill",
-    .moon: "moon.fill",
-    .scale: "scalemass.fill",
-    .syringe: "syringe.fill",
-    .target: "target",
-    .utensils: "fork.knife",
-]
+enum HomeFocusIconPresentation {
+    static func systemImage(for icon: HomeFocusIcon) -> String {
+        switch icon {
+        case .activity: "figure.strengthtraining.traditional"
+        case .camera: "camera.fill"
+        case .moon: "moon.fill"
+        case .pills: "pills.fill"
+        case .scale: "scalemass.fill"
+        case .syringe: "syringe.fill"
+        case .target: "target"
+        case .utensils: "fork.knife"
+        }
+    }
+}
 
 /// Mirrors `FocusTile.jsx` exactly, including its two independent
 /// affordances (verified directly against source for this task): the row
@@ -97,7 +102,12 @@ struct FocusTileView: View {
 
     private var rowBody: some View {
         HStack(spacing: 10) {
-            IconBadge(systemImage: iconMap[item.icon] ?? "target", color: item.color, size: .xs, isCircular: true)
+            IconBadge(
+                systemImage: HomeFocusIconPresentation.systemImage(for: item.icon),
+                color: item.color,
+                size: .xs,
+                isCircular: true
+            )
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .physiqueOSFont(PhysiqueOSTypography.focusLabel)
