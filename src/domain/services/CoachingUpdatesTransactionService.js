@@ -6,7 +6,6 @@ import {
   ActiveProtocolSuccessorOutcome,
   applyPreparedActiveProtocolSuccessor,
   prepareActiveProtocolSuccessorTransition,
-  verifyActiveProtocolSuccessorState,
 } from "./ActiveProtocolSuccessorService.js";
 import {
   COACHING_UPDATES_SCHEMA_VERSION,
@@ -15,6 +14,7 @@ import {
 } from "./CoachingUpdatesReadService.js";
 import { resolveCoachingUpdatesGoalCadencePolicy } from "./CoachingUpdatesGoalCadencePolicyService.js";
 import { selectScheduledBriefingCadence } from "./BriefingEvidenceWindowService.js";
+import { getLocalDateKey, resolveLocalTimeZone } from "../utils/localDate.js";
 
 export const CoachingUpdatesTransactionOutcome = Object.freeze({
   SUCCESS: "success",
@@ -61,8 +61,9 @@ export function createCoachingUpdatesTransactionService({
           applyPreparedCoachingUpdatesTransaction(store, prepared, faults);
           return {
             protocolId: prepared.protocol.id,
-            previousVersionId: prepared.successor.current.id,
-            successorVersionId: prepared.successor.successor.id,
+            previousVersionId: prepared.currentVersionId,
+            successorVersionId: prepared.resultVersionId,
+            transitionKind: prepared.transitionKind,
           };
         });
         const committed = await transaction.commit({
@@ -134,6 +135,32 @@ export function prepareCoachingUpdatesTransaction(store, command, timestamp) {
     sameConfiguration(version.coachingUpdates, configuration))) {
     return rejected(CoachingUpdatesTransactionOutcome.DUPLICATE_CONFIGURATION, "Equivalent configuration already exists.");
   }
+  const currentEffectiveDate = String(current.effectiveAt).slice(0, 10);
+  const currentLocalDate = getLocalDateKey(
+    timestamp, resolveLocalTimeZone(configuration.timeZone)
+  );
+  // The editor owns one calendar-effective configuration. A second save for
+  // that same current/future effective date amends that version with audited
+  // provenance instead of inventing an impossible equal-date successor.
+  // Historical versions remain immutable: an old effective date still enters
+  // the successor validator and fails closed.
+  if (currentEffectiveDate === command.effectiveDate &&
+      command.effectiveDate >= currentLocalDate) {
+    const amendment = prepareSameDateCoachingAmendment({
+      store, protocol, current, command, configuration, timestamp,
+    });
+    if (!amendment.ok) return amendment;
+    return {
+      ok: true,
+      protocol,
+      goal,
+      configuration,
+      amendment,
+      transitionKind: "same_day_amendment",
+      currentVersionId: current.id,
+      resultVersionId: current.id,
+    };
+  }
   const successor = prepareActiveProtocolSuccessorTransition(store, {
     ...command,
     successorVersion: {
@@ -148,17 +175,31 @@ export function prepareCoachingUpdatesTransaction(store, command, timestamp) {
     },
   }, timestamp);
   if (!successor.ok) return rejected(mapSuccessorOutcome(successor.outcome), successor.reason);
-  return { ok: true, protocol, goal, configuration, successor };
+  return {
+    ok: true,
+    protocol,
+    goal,
+    configuration,
+    successor,
+    transitionKind: "successor",
+    currentVersionId: successor.current.id,
+    resultVersionId: successor.successor.id,
+  };
 }
 
 export function applyPreparedCoachingUpdatesTransaction(store, prepared, faults = {}) {
-  applyPreparedActiveProtocolSuccessor(store, prepared.successor);
+  if (prepared.transitionKind === "same_day_amendment") {
+    Object.assign(prepared.amendment.current, prepared.amendment.amended);
+    Object.assign(prepared.protocol, { updatedAt: prepared.amendment.timestamp });
+  } else {
+    applyPreparedActiveProtocolSuccessor(store, prepared.successor);
+  }
   try {
     faults.schedulerApplication?.(store, prepared);
   } catch {
     throw new TransactionFailure(CoachingUpdatesTransactionOutcome.SCHEDULER_APPLICATION_FAILURE, "Future schedule application failed.");
   }
-  verifySchedulerApplication(store, prepared.successor.successor.id);
+  verifySchedulerApplication(store, prepared.resultVersionId);
   try {
     faults.homeResolution?.(store, prepared);
   } catch {
@@ -169,6 +210,52 @@ export function applyPreparedCoachingUpdatesTransaction(store, prepared, faults 
 
 export function verifyPreparedCoachingUpdatesTransaction(store, command, successorId) {
   return verifyTransaction(store, command, successorId);
+}
+
+function prepareSameDateCoachingAmendment({ store, protocol, current, command, configuration, timestamp }) {
+  if (current.status !== "active" || current.endedAt) {
+    return rejected(CoachingUpdatesTransactionOutcome.CURRENT_VERSION_MISSING, "The current version is not active.");
+  }
+  const active = store.protocolVersions.filter((item) =>
+    item.protocolId === protocol.id && item.status === "active" && !item.endedAt);
+  if (active.length !== 1 || active[0].id !== current.id) {
+    return rejected(CoachingUpdatesTransactionOutcome.CURRENT_VERSION_MISSING,
+      "The protocol does not have exactly one active version.");
+  }
+  const ownedGoals = new Set([...(protocol.currentGoalIds ?? []), ...(protocol.relatedGoalIds ?? [])]);
+  if (!command.goalAssociation?.goalId || !command.goalAssociation?.relationship ||
+      !ownedGoals.has(command.goalAssociation.goalId) ||
+      !command.provenance?.author?.id || !command.provenance.author.displayName ||
+      !command.provenance?.reason || command.provenance?.confirmation?.confirmedByUser !== true) {
+    return rejected(CoachingUpdatesTransactionOutcome.INVALID_GOAL_POLICY,
+      "Goal association and explicit author provenance are required.");
+  }
+  const amendedAt = timestamp.toISOString();
+  const amendments = [
+    ...(current.change?.sameDayAmendments ?? []),
+    {
+      amendedAt,
+      reason: command.provenance.reason,
+      author: structuredClone(command.provenance.author),
+      provenance: structuredClone(command.provenance.details ?? {}),
+    },
+  ];
+  return {
+    ok: true,
+    current,
+    timestamp: amendedAt,
+    amended: {
+      ...structuredClone(current),
+      coachingUpdates: configuration,
+      change: {
+        ...(current.change ?? {}),
+        reason: command.provenance.reason,
+        sameDayAmendments: amendments,
+      },
+      confirmation: structuredClone(command.provenance.confirmation),
+      updatedAt: amendedAt,
+    },
+  };
 }
 
 function canonicalConfiguration(command) {
@@ -207,11 +294,19 @@ function verifyHomeResolution(store, prepared) {
 function verifyTransaction(store, command, successorId) {
   const model = currentModel(store, command.protocolId, command.goalAssociation?.goalId);
   return Boolean(
-    verifyActiveProtocolSuccessorState(store, command.protocolId, successorId) &&
+    verifyCurrentProtocolVersionState(store, command.protocolId, successorId) &&
     model &&
     sameConfiguration(model, canonicalConfiguration(command)) &&
     schedulerCanResolve(model),
   );
+}
+
+function verifyCurrentProtocolVersionState(store, protocolId, versionId) {
+  const protocol = store.protocols.find((item) => item.id === protocolId);
+  const versions = store.protocolVersions.filter((item) => item.protocolId === protocolId);
+  const active = versions.filter((item) => item.status === "active" && !item.endedAt);
+  return protocol?.status === "active" && protocol.currentVersionId === versionId &&
+    active.length === 1 && active[0].id === versionId;
 }
 
 function currentModel(store, protocolId, goalId) {

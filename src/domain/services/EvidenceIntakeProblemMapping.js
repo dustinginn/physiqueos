@@ -17,6 +17,7 @@ const VALIDATION_PROBLEMS = new Map([
   ["DEXA_PDF_TOO_LARGE", { status: 413, title: "The DEXA PDF is larger than 50 MB." }],
   ["DEXA_PDF_INVALID", { status: 400, title: "Choose a valid PDF exported by BodySpec." }],
   ["EVIDENCE_INTAKE_SUBMISSION_ID_INVALID", { status: 400, title: "The evidence submission identity is invalid." }],
+  ["EVIDENCE_REPLACEMENT_IDENTITY_INVALID", { status: 400, title: "The evidence replacement identity is invalid." }],
   ["MULTIPART_BOUNDARY_MISSING", { status: 400, title: "The upload request is missing its multipart boundary." }],
   ["MULTIPART_REQUEST_TOO_LARGE", { status: 413, title: "The upload is larger than PhysiqueOS accepts." }],
   ["PROVIDER_UPLOAD_CONTENT_TYPE_INVALID", { status: 400, title: "The uploaded file's declared type is invalid." }],
@@ -35,6 +36,9 @@ const INTERNAL_DIAGNOSTIC_PROBLEMS = new Set(["MULTIPART_PARSE_FAILED"]);
 // artifacts, or upload lease no longer match) — a client/stale-state
 // condition, not an internal failure.
 const CONFLICT_PROBLEMS = new Map([
+  ["EVIDENCE_INTAKE_REPLACEMENT_REQUIRED", "This dismissed evidence can be replaced with a new submission."],
+  ["EVIDENCE_INTAKE_REPLACEMENT_PREDECESSOR_INVALID", "The dismissed evidence is no longer eligible for replacement."],
+  ["EVIDENCE_INTAKE_REPLACEMENT_ALREADY_EXISTS", "Replacement evidence is already being processed."],
   ["EVIDENCE_INTAKE_IDENTITY_CONFLICT", "This evidence was already submitted with different files."],
   ["EVIDENCE_UPLOAD_STORAGE_MISMATCH", "The stored evidence files no longer match what was declared."],
   ["EVIDENCE_INTAKE_UPLOAD_CLAIM_LOST", "The upload session expired or was claimed by another request."],

@@ -165,7 +165,7 @@ export function applyPreparedCoachingUpdatesStrategyTransition(store, prepared) 
 export function verifyPreparedCoachingUpdatesStrategyTransition(store, command, prepared) {
   if (!prepared?.ok || !same(prepared.protectedBefore, protectedState(store))) return false;
   if (prepared.coachingChanged && !verifyPreparedCoachingUpdatesTransaction(
-    store, command.coaching, prepared.coaching.successor.successor.id)) return false;
+    store, command.coaching, prepared.coaching.resultVersionId)) return false;
   if (prepared.photosChanged && !verifyPreparedProgressPhotosScheduleSuccessor(store, prepared.photos)) return false;
   if (prepared.photoReminderChanged &&
       !verifyPreparedProgressPhotosReminderEnablement(store, prepared.photoReminder)) return false;

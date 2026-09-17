@@ -46,6 +46,35 @@ describe("Native production Evidence intake", () => {
     }))).rejects.toMatchObject({ code: "TRAINING_TARGET_CONTEXT_INVALID" });
   });
 
+  it("preserves a dismissed predecessor as explicit replacement lineage", async () => {
+    const file = new File([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])], "screen.png", { type: "image/png" });
+    const predecessor = "02999999-9999-7999-8999-999999999999";
+    const replacement = request("activity_day", file);
+    const body = await replacement.formData();
+    body.set("replacementForSubmissionIdentity", predecessor);
+    await expect(parseNativeEvidenceIntakeRequest(new Request(replacement.url, {
+      method: "POST", headers: { authorization: `Bearer ${"x".repeat(43)}`, "idempotency-key": ID }, body,
+    }))).resolves.toMatchObject({
+      submissionIdentity: ID,
+      recoveryContext: {
+        kind: "dismissed_evidence_replacement",
+        predecessorSubmissionIdentity: predecessor,
+      },
+    });
+  });
+
+  it("rejects malformed or self-referential replacement lineage", async () => {
+    const file = new File([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])], "screen.png", { type: "image/png" });
+    for (const predecessor of ["not-a-submission-identity", ID]) {
+      const replacement = request("activity_day", file);
+      const body = await replacement.formData();
+      body.set("replacementForSubmissionIdentity", predecessor);
+      await expect(parseNativeEvidenceIntakeRequest(new Request(replacement.url, {
+        method: "POST", headers: { authorization: `Bearer ${"x".repeat(43)}`, "idempotency-key": ID }, body,
+      }))).rejects.toMatchObject({ code: "EVIDENCE_REPLACEMENT_IDENTITY_INVALID", status: 400 });
+    }
+  });
+
   it("rejects mismatched idempotency identity and disguised screenshots", async () => {
     const badIdentity = request("nutrition", new File(["not png"], "screen.png", { type: "image/png" }), "different");
     await expect(parseNativeEvidenceIntakeRequest(badIdentity)).rejects.toMatchObject({ code: "IDEMPOTENCY_IDENTITY_MISMATCH" });

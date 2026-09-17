@@ -31,6 +31,7 @@ export default defineConfig({
       "src/domain/services/DailyFocusActionability.test.js",
       "src/domain/services/CoachingUpdatesStrategyManagementService.test.js",
       "src/domain/services/Build38LoggerSupportingEvidenceRegression.test.js",
+      "src/domain/services/DismissedEvidenceReplacementRegression.test.js",
       "src/domain/services/WorkoutLoggerAppleHealthReconciliation.test.js",
       "src/domain/services/LoggedTodayService.test.js",
       "src/screens/ProgressHubScreen.test.js",

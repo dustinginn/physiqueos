@@ -290,6 +290,61 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     expect(readback.editor.weekly.localTime).toBe("08:15");
   });
 
+  it("persists Midweek, Weekly, and Monthly edits independently on one local day without equal-date successors", async () => {
+    const fixture = setup();
+    const initial = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    const midweek = structuredClone(initial.editor);
+    midweek.midweek.localTime = "05:30";
+    const midweekPayload = { protocolId: initial.protocolId, ...initial.context, draft: midweek };
+    delete midweekPayload.expectedRevision;
+    await fixture.ports.saveCoachingUpdates(context(midweekPayload, initial.context.expectedRevision));
+
+    const afterMidweek = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    const effectiveVersionId = afterMidweek.context.expectedCurrentVersionId;
+    const weekly = structuredClone(afterMidweek.editor);
+    weekly.weekly.localTime = "06:45";
+    const weeklyPayload = { protocolId: afterMidweek.protocolId, ...afterMidweek.context, draft: weekly };
+    delete weeklyPayload.expectedRevision;
+    await fixture.ports.saveCoachingUpdates(context(weeklyPayload, afterMidweek.context.expectedRevision));
+
+    const afterWeekly = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    expect(afterWeekly.context.expectedCurrentVersionId).toBe(effectiveVersionId);
+    expect(afterWeekly.editor).toMatchObject({
+      midweek: { day: "wednesday", localTime: "05:30" },
+      weekly: { day: "sunday", localTime: "06:45" },
+      monthly: { dayOfMonth: 1 },
+    });
+
+    const monthly = structuredClone(afterWeekly.editor);
+    monthly.monthly.localTime = "07:15";
+    const monthlyPayload = { protocolId: afterWeekly.protocolId, ...afterWeekly.context, draft: monthly };
+    delete monthlyPayload.expectedRevision;
+    await fixture.ports.saveCoachingUpdates(context(monthlyPayload, afterWeekly.context.expectedRevision));
+
+    const final = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    expect(final.context.expectedCurrentVersionId).toBe(effectiveVersionId);
+    expect(final.editor).toMatchObject({
+      midweek: { enabled: true, day: "wednesday", localTime: "05:30" },
+      weekly: { enabled: true, day: "sunday", localTime: "06:45" },
+      monthly: { enabled: true, dayOfMonth: 1, localTime: "07:15" },
+    });
+    const runtime = fixture.snapshot();
+    const coachingVersions = runtime.protocolVersions.filter((item) => item.protocolId === "coaching");
+    expect(coachingVersions.filter((item) => item.status === "active" && !item.endedAt)).toHaveLength(1);
+    expect(coachingVersions.find((item) => item.id === effectiveVersionId)?.change?.sameDayAmendments)
+      .toHaveLength(2);
+
+    // A second editor loaded before the Weekly save is still rejected after
+    // the same-record amendment because its semantic digest is stale.
+    const staleMonthly = structuredClone(afterMidweek.editor);
+    staleMonthly.monthly.localTime = "09:00";
+    const stalePayload = { protocolId: afterMidweek.protocolId, ...afterMidweek.context, draft: staleMonthly };
+    delete stalePayload.expectedRevision;
+    await expect(fixture.ports.saveCoachingUpdates(
+      context(stalePayload, afterMidweek.context.expectedRevision)
+    )).rejects.toMatchObject({ code: "STALE_VERSION" });
+  });
+
   it("rolls back a mid-persistence composite failure and replays one durable save without duplicate versions", async () => {
     const initial = setup();
     const detail = await initial.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });

@@ -61,6 +61,9 @@ export async function parseNativeEvidenceIntakeRequest(request) {
     formData.get("targetTrainingSessionCanonicalId") ?? ""
   ).trim();
   const targetTrainingDraftId = String(formData.get("targetTrainingDraftId") ?? "").trim();
+  const replacementForSubmissionIdentity = String(
+    formData.get("replacementForSubmissionIdentity") ?? ""
+  ).trim();
   if ((targetTrainingSessionCanonicalId || targetTrainingDraftId) && expectedEvidenceType !== "training") {
     throw problem(400, "TRAINING_TARGET_CONTEXT_INVALID", "A Training target is accepted only for explicit Training evidence.");
   }
@@ -70,6 +73,13 @@ export async function parseNativeEvidenceIntakeRequest(request) {
   if (targetTrainingSessionCanonicalId &&
       targetTrainingSessionCanonicalId !== `training|authoritative|training_logger_draft_${targetTrainingDraftId}`) {
     throw problem(400, "TRAINING_TARGET_CONTEXT_MISMATCH", "Training supporting evidence target identities do not agree.");
+  }
+  if (replacementForSubmissionIdentity &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(replacementForSubmissionIdentity)) {
+    throw problem(400, "EVIDENCE_REPLACEMENT_IDENTITY_INVALID", "The replacement predecessor identity is invalid.");
+  }
+  if (replacementForSubmissionIdentity === submissionIdentity) {
+    throw problem(400, "EVIDENCE_REPLACEMENT_IDENTITY_INVALID", "Replacement evidence requires a new submission identity.");
   }
   const artifactManifest = createEvidenceUploadArtifactManifest(files);
   assertEvidenceUploadReceiptMatchesManifest({ manifest: artifactManifest, receivedFiles: files });
@@ -87,6 +97,9 @@ export async function parseNativeEvidenceIntakeRequest(request) {
       kind: "training_logger_support",
       targetTrainingDraftId,
       targetTrainingSessionCanonicalId,
+    }) : replacementForSubmissionIdentity ? Object.freeze({
+      kind: "dismissed_evidence_replacement",
+      predecessorSubmissionIdentity: replacementForSubmissionIdentity,
     }) : null,
   });
 }

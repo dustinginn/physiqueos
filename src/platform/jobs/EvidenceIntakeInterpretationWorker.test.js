@@ -45,6 +45,31 @@ describe("Evidence intake background interpretation", () => {
     });
   });
 
+  it("carries dismissed-predecessor lineage into the immutable replacement package and review", async () => {
+    const completed = vi.fn(async (input) => input);
+    const recoveryContext = {
+      kind: "dismissed_evidence_replacement",
+      predecessorSubmissionIdentity: "01999999-9999-7999-8999-999999999998",
+    };
+    const handler = createEvidenceIntakeInterpretationWorkerHandler({
+      store: fixtureStore({
+        claimInterpretation: async () => ({ outcome: "claimed", receipt: receipt({
+          expectedEvidenceType: "activity_day",
+          recoveryContext,
+        }) }),
+        completeInterpretation: completed,
+      }),
+      loadArtifact: vi.fn(async () => ({})),
+    });
+
+    await handler(message());
+
+    const persisted = completed.mock.calls[0][0];
+    expect(persisted.evidencePackage.review_metadata).toMatchObject({ recoveryContext });
+    expect(persisted.review.interpretedEvidence.review_metadata).toMatchObject({ recoveryContext });
+    expect(persisted.review.status).toBe("pending");
+  });
+
   it("post-completion replay performs no interpretation or staging", async () => {
     const completeInterpretation = vi.fn();
     const loadArtifact = vi.fn();

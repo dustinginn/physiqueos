@@ -26,6 +26,7 @@ export function createPostgresEvidenceIntakeStore({
         const claimToken = createId();
         await claimAuthority(client, authorityStore, migrationOperationId, `evidence-intake:begin:${id}`);
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:intake:${ownerUserId}:${input.submissionIdentity}`]);
+        await validateReplacementLineage(client, { ownerUserId, input });
         const manifestSha256 = digest(input.artifactManifest);
         if (input.typedEvidence && input.clientExtractedText) {
           throw intakeError("EVIDENCE_INTAKE_TEXT_PROVENANCE_CONFLICT");
@@ -56,6 +57,9 @@ export function createPostgresEvidenceIntakeStore({
               WHERE owner_user_id=$1 AND submission_identity=$2 FOR UPDATE`,
             [ownerUserId, input.submissionIdentity],
           )).rows[0];
+          if (await receiptHasReplaceableReview(client, { ownerUserId, row })) {
+            throw intakeError("EVIDENCE_INTAKE_REPLACEMENT_REQUIRED");
+          }
           assertSameSubmission(row, { input, manifestSha256, typedSha256, evidenceTextKind });
           const leaseExpired = !row.upload_claim_expires_at || Date.parse(row.upload_claim_expires_at) <= at.getTime();
           if (row.media_state !== "stored" && (row.media_state === "failed" || leaseExpired)) {
@@ -257,8 +261,50 @@ function assertSameSubmission(row, { input, manifestSha256, typedSha256, evidenc
   if (!row || dateOnly(row.effective_date) !== input.effectiveDate ||
       row.manifest_sha256 !== manifestSha256 || row.typed_evidence_sha256 !== typedSha256 ||
       (row.evidence_text_kind ?? null) !== evidenceTextKind ||
+      canonicalJson(row.recovery_context ?? null) !== canonicalJson(input.recoveryContext ?? null) ||
       row.expected_evidence_type !== (input.expectedEvidenceType ?? "auto")) {
     throw intakeError("EVIDENCE_INTAKE_IDENTITY_CONFLICT");
+  }
+}
+
+async function receiptHasReplaceableReview(client, { ownerUserId, row }) {
+  if (!row?.review_id || row.interpretation_state !== "completed") return false;
+  const review = (await client.query(
+    `SELECT payload->>'status' AS status
+       FROM physiqueos.canonical_evidence_records
+      WHERE owner_user_id=$1 AND collection_name='evidenceReviews' AND record_id=$2`,
+    [ownerUserId, row.review_id],
+  )).rows[0];
+  return ["discarded", "rejected"].includes(review?.status);
+}
+
+async function validateReplacementLineage(client, { ownerUserId, input }) {
+  const context = input.recoveryContext;
+  if (context?.kind !== "dismissed_evidence_replacement") return;
+  const predecessorIdentity = String(context.predecessorSubmissionIdentity ?? "");
+  await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+    `physiqueos:intake-replacement:${ownerUserId}:${predecessorIdentity}`,
+  ]);
+  const predecessor = (await client.query(
+    `SELECT * FROM physiqueos.evidence_intake_receipts
+      WHERE owner_user_id=$1 AND submission_identity=$2 FOR UPDATE`,
+    [ownerUserId, predecessorIdentity],
+  )).rows[0];
+  if (!predecessor || dateOnly(predecessor.effective_date) !== input.effectiveDate ||
+      predecessor.expected_evidence_type !== (input.expectedEvidenceType ?? "auto") ||
+      !(await receiptHasReplaceableReview(client, { ownerUserId, row: predecessor }))) {
+    throw intakeError("EVIDENCE_INTAKE_REPLACEMENT_PREDECESSOR_INVALID");
+  }
+  const existing = (await client.query(
+    `SELECT submission_identity FROM physiqueos.evidence_intake_receipts
+      WHERE owner_user_id=$1
+        AND recovery_context->>'kind'='dismissed_evidence_replacement'
+        AND recovery_context->>'predecessorSubmissionIdentity'=$2
+      ORDER BY created_at LIMIT 2`,
+    [ownerUserId, predecessorIdentity],
+  )).rows;
+  if (existing.some((row) => row.submission_identity !== input.submissionIdentity)) {
+    throw intakeError("EVIDENCE_INTAKE_REPLACEMENT_ALREADY_EXISTS");
   }
 }
 

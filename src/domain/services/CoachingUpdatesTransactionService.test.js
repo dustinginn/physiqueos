@@ -109,6 +109,34 @@ describe("Coaching Updates canonical transaction", () => {
     expect(snapshot(duplicate)).toBe(duplicateBefore);
   });
 
+  it("keeps a true successor ordering violation fail-closed", async () => {
+    const fixture = createFixture();
+    fixture.liveStore.protocolVersions[0].effectiveAt = "2026-09-17";
+    fs.writeFileSync(fixture.filePath, `${JSON.stringify(fixture.liveStore)}\n`);
+    const before = snapshot(fixture);
+    const result = await fixture.service.update(command({ effectiveDate: "2026-09-16" }));
+    expect(result).toMatchObject({
+      outcome: O.VERIFICATION_FAILURE,
+      committed: false,
+      reason: "Successor effective date must follow the current version.",
+    });
+    expect(snapshot(fixture)).toBe(before);
+  });
+
+  it("does not rewrite a historical current version through same-date amendment semantics", async () => {
+    const fixture = createFixture();
+    fixture.liveStore.protocolVersions[0].effectiveAt = "2026-07-25";
+    fs.writeFileSync(fixture.filePath, `${JSON.stringify(fixture.liveStore)}\n`);
+    const before = snapshot(fixture);
+    const result = await fixture.service.update(command({ effectiveDate: "2026-07-25" }));
+    expect(result).toMatchObject({
+      outcome: O.VERIFICATION_FAILURE,
+      committed: false,
+      reason: "Successor effective date must follow the current version.",
+    });
+    expect(snapshot(fixture)).toBe(before);
+  });
+
   it.each([
     ["scheduler", O.SCHEDULER_APPLICATION_FAILURE, { schedulerApplication: () => { throw new Error("scheduler"); } }],
     ["Home", O.HOME_RESOLUTION_FAILURE, { homeResolution: () => { throw new Error("home"); } }],
