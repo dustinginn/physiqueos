@@ -413,7 +413,6 @@ function projectMonthlyFromIntelligence(context, intelligence) {
   const energy = rows.get("energy");
   const weight = rows.get("weight");
   const outcomeFacts = outcome?.facts ?? {};
-  const outcomeName = outcomeFacts.evidenceName ?? "outcome check";
   const configuredObjective = objectiveName(context);
   const periodName = monthName(intelligence.window.endDate);
   const trainingHighlights = intelligence.selectedHighlights.filter((item) =>
@@ -432,7 +431,6 @@ function projectMonthlyFromIntelligence(context, intelligence) {
   const nextEvidence = result.narrativePlan.nextEvidence.displayName;
   const trainingSummary = compactSentences([
     secondaryTraining?.headline,
-    shortBreak?.returnedAt ? `Training paused for ${shortBreak.days} days and was back on schedule by ${shortDate(shortBreak.returnedAt)}.` : null,
   ]);
   const energySegments = energy?.facts?.segments ?? [];
   const earlyEnergy = energySegments.find((item) =>
@@ -444,6 +442,8 @@ function projectMonthlyFromIntelligence(context, intelligence) {
   });
   const phaseName = goalContract.vocabulary?.phase?.displayName ??
     goalContract.phase.label;
+  const phaseContext = goalContract.vocabulary?.phase?.contextName ??
+    "this phase";
   const outcomeTitle = Number.isFinite(outcomeFacts.objectiveChange)
     ? `${number(outcomeFacts.objectiveChange, 1)} ${outcomeFacts.objectiveUnit ??
       context.objective?.unit ?? ""} of ${configuredObjective} made ${periodName} a major step forward.`
@@ -461,7 +461,7 @@ function projectMonthlyFromIntelligence(context, intelligence) {
       label: "Training",
       title: `${training?.facts?.sessionCount ?? "The month"} resistance-training sessions kept the plan moving.`,
       body: shortBreak?.returnedAt
-        ? `Training took a ${shortBreak.days}-day pause, then returned to the normal rhythm.`
+        ? splitDeviationStory(split, shortBreak)
         : "The month stayed close to the established personal training rhythm.",
       tone: "training",
     } : null,
@@ -470,14 +470,14 @@ function projectMonthlyFromIntelligence(context, intelligence) {
       title: Number.isFinite(nutrition.facts?.average)
         ? `Protein averaged ${number(nutrition.facts.average, 1)} g/day across ${nutrition.facts.usableDays} logged days.`
         : "Nutrition coverage was strong enough to inform the month.",
-      body: "The uneven Energy pattern adds context, but it is not strong enough to override the outcomes or justify a change by itself.",
+      body: "The logging was consistent enough to be useful, even though the Energy picture moved around during the month.",
       tone: "energy",
     } : null,
   ].filter(Boolean);
   const weightContext = Number.isFinite(weight?.facts?.first) &&
     Number.isFinite(weight?.facts?.last)
     ? `Morning weight moved from ${number(weight.facts.first, 1)} to ${number(
-      weight.facts.last, 1)} lb, useful context that agrees with the direction of the DEXA without identifying the tissue change by itself.` : null;
+      weight.facts.last, 1)} lb, another useful sign that the month moved in the right direction.` : null;
   return {
     density: NARRATIVE_V3_DENSITY.FULL,
     cadence: { calendarDay: 1, recurringPrecedence: true },
@@ -492,8 +492,8 @@ function projectMonthlyFromIntelligence(context, intelligence) {
         delta: intelligence.confidenceConsequence.delta,
         movementDirection: presentationMovement(
           intelligence.confidenceConsequence.movement),
-        primaryReason: "Confidence holds because the major result remains intact and the newer evidence supports continuing the plan without proving another outcome change.",
-        presentationExplanation: `The ${outcomeName} established major progress. Training kept advancing, the guardrail stayed controlled, and no later evidence overturned that result.`,
+        primaryReason: `Confidence is steady because ${periodName} delivered major Goal progress and the rest of the month stayed on track.`,
+        presentationExplanation: "Training continued to advance, the guardrail stayed controlled, and no new concern changed the outlook.",
         assessmentId: confidence.id,
         assessmentDate: result.narrativePlan.publicationContext?.publishedAt,
         evidenceCutoff: intelligence.window.cutoff,
@@ -505,10 +505,11 @@ function projectMonthlyFromIntelligence(context, intelligence) {
       },
       title: `${periodName} moved the Goal forward, and the current plan still fits.`,
       thesis: compactSentences([
-        progress ? `The ${outcomeName} moved the Goal to ${progress} complete.` :
-          outcome?.statement,
-        primaryTraining ? "Training kept progressing around that result." : null,
-        "Nothing else in the month creates a reason to change course.",
+        "The body-composition result was the headline, but it was not the whole month:",
+        primaryTraining ? "training set several personal bests," : null,
+        nutrition ? "nutrition stayed consistent," : null,
+        shortBreak?.returnedAt ? "and a brief training pause resolved quickly." :
+          "and execution stayed steady.",
       ]),
       highlights: [
         progress ? { label: "Goal progress", value: progress,
@@ -524,41 +525,40 @@ function projectMonthlyFromIntelligence(context, intelligence) {
       eyebrow: "Training Progress",
       title: primaryTraining.headline,
       summary: trainingSummary,
-      interpretation: `Those personal bests are useful signs that the productive training environment is continuing; they are not a substitute for the next ${nextEvidence}.`,
-      next: "Keep the current progression moving and work every major area back into its normal rhythm after any short break.",
+      interpretation: "That is a strong month of training: several movements advanced, and the brief interruption did not become a pattern.",
+      next: "Keep progressing the major movements and carry the normal training rhythm into next month.",
     } : null,
     energy: energy ? {
       eyebrow: "Nutrition and Energy",
-      title: "The numbers were uneven, but the practical answer is still clear.",
+      title: "Energy was a little hard to read this month.",
       summary: energySummary,
-      interpretation: "Keep the current intake and activity setup while progress remains strong and body fat stays controlled. Reconsider it if those outcomes or training begin to turn.",
+      interpretation: "Keep intake and activity where they are for now. Revisit them if training stalls, body-composition progress slows, or body fat begins pressing the guardrail.",
     } : null,
     changes: {
       eyebrow: "What Changed",
-      title: "The month added a major Goal result and several useful signs that the setup is still working.",
+      title: `${periodName}'s highlights went well beyond one result.`,
       themes: changeThemes,
-      context: weightContext?.replace("the DEXA", `the ${outcomeName}`),
+      context: weightContext,
     },
     monthAhead: {
       eyebrow: "Month Ahead",
       title: `${upperFirst(goalContract.vocabulary?.strategy?.continueAction ??
         `Keep ${phaseContext} steady`)} and protect what is working.`,
-      thesis: "Carry the current training and nutrition rhythm forward without chasing day-to-day noise.",
+      thesis: "Carry the training and nutrition rhythm forward without chasing day-to-day noise.",
       guidance: [
-        { label: "Keep", value: "Continue the current plan.",
+        { label: "Continue", value: "Keep the current plan in place.",
           detail: primaryTraining
-            ? "Keep applying the same progression while the major movements continue to advance."
-            : "Training remains productive." },
-        { label: "Tighten", value: "Keep every major training area in the rotation.",
-          detail: shortBreak ? "The short break resolved once training resumed; the useful test is whether the normal rhythm now holds." : "No persistent split drift was found." },
-        guardrail ? { label: "Protect", value: `Keep ${guardrail.label} inside the ${guardrail.range} guardrail.`,
-          detail: "That protects the Goal while the current strategy continues." } : null,
-        { label: "Next evidence", value: `Use the next ${nextEvidence} to see whether this rate of progress continues.`,
-          detail: "No current evidence calls for changing the plan before then." },
+            ? "Keep progressing the major movements and maintain the protein consistency you established this month."
+            : "Keep the current execution rhythm." },
+        guardrail ? { label: "Watch", value: `Keep ${guardrail.label} inside the ${guardrail.range} range.`,
+          detail: "It is controlled now; the goal is to keep it that way as the build continues." } : null,
+        { label: "Next", value: `Let the next ${nextEvidence} show whether this pace continues.`,
+          detail: "Until then, consistency matters more than reacting to daily fluctuations." },
       ].filter(Boolean),
+      improvement: null,
       coachTake: primaryTraining
-        ? "The best part of the month is that the big Goal result was not isolated—training kept giving you reasons to trust the setup. Keep that rhythm going."
-        : "The month moved in the right direction. Keep the plan steady and let the next result earn the next decision.",
+        ? "This was exactly the kind of month you want from a build—clear Goal progress, better training, and the guardrail still intact. Enjoy the win, then keep the same rhythm."
+        : "This was a strong month. Enjoy the win, then keep the same rhythm.",
     },
   };
 }
@@ -567,12 +567,37 @@ function monthlyCalibratedEnergyCopy({ energy, earlyEnergy, laterEnergy,
   objectiveName: configuredObjective }) {
   if (!energy) return null;
   if (earlyEnergy && laterEnergy) {
-    return `Energy looked higher earlier in the month and lower across the latest five days. The actual ${configuredObjective} result and productive training do not support changing intake just to make those estimates look smoother.`;
+    return `The numbers looked higher early in the month and lower across the latest five days, but your ${configuredObjective} progress and training stayed strong. There is no reason to change the setup just to make the daily math look cleaner.`;
   }
   if (energy.facts?.historicalCalibration === "poor_literal_alignment") {
-    return `The Energy numbers did not line up cleanly with the realized ${configuredObjective} result, so they remain useful context rather than a reason to change the plan by themselves.`;
+    return `The Energy numbers did not line up neatly with your ${configuredObjective} progress. Keep using them as a guide, but do not change the plan just to make the daily math look cleaner.`;
   }
   return "The available Energy pattern supports keeping the current setup while outcomes and guardrails remain favorable.";
+}
+
+function splitDeviationStory(split, shortBreak) {
+  const extras = split?.facts?.extraExposures ?? [];
+  const misses = split?.facts?.isolatedMisses ?? [];
+  const extraNames = naturalList(extras.map((item) => titleCase(item.category)));
+  const missedNames = naturalList(misses.map((item) => titleCase(item.category)));
+  const pattern = extraNames && missedNames
+    ? `${extraNames} got extra work in one full week while ${missedNames} did not appear; the split returned to normal the following week.`
+    : extraNames ? `${extraNames} got some extra work without becoming a persistent schedule change.`
+      : missedNames ? `${missedNames} missed one full week, then returned to the schedule.`
+        : "The overall split returned to its normal rhythm.";
+  return `${pattern} Training also took a ${shortBreak.days}-day pause, then resumed on ${shortDate(shortBreak.returnedAt)}.`;
+}
+
+function naturalList(values) {
+  const uniqueValues = [...new Set(values.filter(Boolean))];
+  if (uniqueValues.length < 2) return uniqueValues[0] ?? "";
+  if (uniqueValues.length === 2) return `${uniqueValues[0]} and ${uniqueValues[1]}`;
+  return `${uniqueValues.slice(0, -1).join(", ")}, and ${uniqueValues.at(-1)}`;
+}
+
+function titleCase(value) {
+  return String(value ?? "").split(/[_\s-]+/u).filter(Boolean)
+    .map((part) => upperFirst(part)).join(" ");
 }
 
 function compactSentences(values) {

@@ -189,20 +189,51 @@ describe("Narrative V3 remaining surface shadow projections", () => {
     ]));
     expect(monthly.training.title).toContain("Leg press set a new session-volume best");
     expect(monthly.training.summary).toContain("Pull-ups set a new session-volume best");
-    expect(monthly.training.summary).toContain("paused for 3 days");
-    expect(monthly.energy.summary).toContain("higher earlier in the month");
+    expect(monthly.training.interpretation).toContain("strong month of training");
+    expect(monthly.energy.title).toBe("Energy was a little hard to read this month.");
+    expect(monthly.energy.summary).toContain("higher early in the month");
     expect(monthly.energy.summary).not.toMatch(/paired|derived estimate|calibration|wearable/iu);
     expect(monthly.changes.themes.map((item) => item.label))
       .toEqual(["Goal progress", "Training", "Nutrition and Energy"]);
+    expect(monthly.changes.themes[1].body).toContain("Arms got extra work");
+    expect(monthly.changes.themes[1].body).toContain("Back and Core did not appear");
+    expect(monthly.changes.themes[1].body).toContain("3-day pause");
     const copy = JSON.stringify(monthly);
-    expect(copy).not.toMatch(/paired evidence|operating evidence|estimate-vs-outcome|predictive calibration|measurement uncertainty|support index|evidence authority|persistence state/iu);
+    expect(copy).not.toMatch(/paired evidence|operating evidence|estimate-vs-outcome|predictive calibration|measurement uncertainty|support index|evidence authority|persistence state|without proving|productive training environment|not a substitute|override the outcomes/iu);
     expect(intelligence.sourceMatrix.filter((item) =>
       item.narrativeConsequence !== "omit").length).toBeGreaterThan(4);
     expect(monthly.changes.themes).toHaveLength(3);
     expect(copy.match(/Leg press set a new session-volume best/gu)).toHaveLength(1);
-    expect(copy.match(/Energy looked higher earlier in the month/gu)).toHaveLength(1);
+    expect(copy.match(/5\.8 of 10 lb/gu)).toHaveLength(1);
+    expect(copy.match(/58% complete/gu)).toHaveLength(1);
+    expect(copy.match(/5\.0 lb of lean mass/gu)).toHaveLength(1);
+    expect(copy.match(/79%/gu)).toHaveLength(1);
+    expect(copy.match(/3-day pause/gu)).toHaveLength(1);
+    expect(copy.match(/next DEXA/gu)).toHaveLength(1);
+    expect(monthly.monthAhead.guidance.map((item) => item.label))
+      .toEqual(["Continue", "Watch", "Next"]);
+    expect(monthly.monthAhead.improvement).toBeNull();
+    expect(monthly.monthAhead.coachTake).not.toContain("Leg press set");
+    expect(monthly.monthAhead.coachTake).not.toContain("5.0 lb");
     expect(result.confidence.currentPercentage).toBe(79);
     expect(JSON.stringify(result)).toBe(before);
+  });
+
+  it("keeps non-Monthly decision-support projections unchanged during Monthly polish", () => {
+    const { goalContract, result } = currentResult();
+    const baseline = createNarrativeV3RemainingSurfaceShadowPreviews({
+      goalContract, result,
+    });
+    const polished = createNarrativeV3RemainingSurfaceShadowPreviews({
+      goalContract, result,
+      monthlyIntelligence: createMonthlyEvidenceIntelligenceV3(
+        createSeptemberMonthlyV3StressTestFixture()),
+    });
+    expect(polished.phaseReview).toEqual(baseline.phaseReview);
+    expect(polished.goalTransitionReview).toEqual(
+      baseline.goalTransitionReview);
+    expect(polished.photo).toEqual(baseline.photo);
+    expect(polished.publication).toEqual(baseline.publication);
   });
 
   it("keeps Monthly broader than recurring check-ins without a domain laundry list", () => {
