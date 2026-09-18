@@ -15,6 +15,14 @@ const VALUE_KINDS = ["scalar", "duration", "ratio", "percentage", "count", "ordi
 const OBJECTIVE_MODES = ["increase", "decrease", "minimum", "maximum", "target_value", "target_range", "maintain_range", "stability", "custom_declarative"];
 const GUARDRAIL_MODES = ["minimum", "maximum", "allowed_range", "maximum_change", "minimum_change", "custom_declarative"];
 const AUTHORITY_ROLES = ["decisive", "material", "supporting", "contextual"];
+export const EvidenceSemanticClassV3 = Object.freeze({
+  OUTCOME_EVIDENCE: "OUTCOME_EVIDENCE",
+  LEADING_INDICATOR: "LEADING_INDICATOR",
+  EXECUTION_SUPPORT: "EXECUTION_SUPPORT",
+  DERIVED_ESTIMATE: "DERIVED_ESTIMATE",
+  GUARDRAIL: "GUARDRAIL",
+  CONTEXTUAL_EVIDENCE: "CONTEXTUAL_EVIDENCE",
+});
 const QUESTION_KINDS = ["feasibility", "persistence", "contradiction", "guardrail", "attribution", "data_quality", "phase_readiness"];
 const EVIDENCE_PURPOSES = ["establish_feasibility", "confirm_persistence", "resolve_contradiction", "assess_guardrail", "improve_measurement_quality", "improve_attribution", "update_forecast", "establish_phase_readiness"];
 
@@ -194,6 +202,7 @@ function normalizeQuestion(input, index) {
 
 function normalizeEvidencePolicy(input, index) {
   const usableFor = [...(input.usableFor ?? [])];
+  const semanticClass = input.semanticClass ?? inferEvidenceSemanticClass(input);
   return {
     policyId: requiredText(input.policyId, `evidencePolicies[${index}].policyId`),
     subjectType: assertOneOf(input.subjectType, ["objective", "guardrail", "strategy", "achievement", "attribution", "execution"], "evidence policy subjectType"),
@@ -209,6 +218,13 @@ function normalizeEvidencePolicy(input, index) {
       Object.values(EvidenceParticipationV3),
       "evidence policy participation",
     ),
+    semanticClass: assertOneOf(
+      semanticClass,
+      Object.values(EvidenceSemanticClassV3),
+      "evidence policy semanticClass",
+    ),
+    vocabularyKey: input.vocabularyKey ?? null,
+    reconciliationGroup: input.reconciliationGroup ?? null,
     usableFor,
     signalRules: input.signalRules ? {
       supportsWhen: input.signalRules.supportsWhen ? normalizePredicate(input.signalRules.supportsWhen) : null,
@@ -216,6 +232,16 @@ function normalizeEvidencePolicy(input, index) {
       significance: assertOneOf(input.signalRules.significance ?? "minor", ["none", "minor", "meaningful", "major"], "evidence policy signal significance"),
     } : null,
   };
+}
+
+function inferEvidenceSemanticClass(input = {}) {
+  if (input.subjectType === "guardrail") return EvidenceSemanticClassV3.GUARDRAIL;
+  if (input.subjectType === "objective" || input.subjectType === "achievement") {
+    return EvidenceSemanticClassV3.OUTCOME_EVIDENCE;
+  }
+  if (input.subjectType === "execution") return EvidenceSemanticClassV3.EXECUTION_SUPPORT;
+  if (input.role === "contextual") return EvidenceSemanticClassV3.CONTEXTUAL_EVIDENCE;
+  return EvidenceSemanticClassV3.LEADING_INDICATOR;
 }
 
 function normalizeDecisionPolicy(input = {}) {

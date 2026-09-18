@@ -266,6 +266,16 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
           evidenceWindow: { startDate: "2026-09-06", endDate: "2026-09-12" },
           confidence: { level: "moderate" },
           supportingEvidenceIds: ["training_event"],
+        }, {
+          id: "energy_estimate",
+          domain: "energy",
+          kind: "energy_balance",
+          status: "supportive",
+          direction: "positive",
+          factualSummary: "Reported intake and estimated expenditure were close across the reviewed window.",
+          evidenceWindow: { startDate: "2026-09-06", endDate: "2026-09-12" },
+          confidence: { level: "moderate" },
+          supportingEvidenceIds: ["nutrition_days", "activity_days"],
         }] } } } },
       }],
     };
@@ -302,17 +312,126 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
     expect(adaptLatestCanonicalCadenceObservationsV3({
       goalContract: input.goalContract,
       phase: { id: phaseId }, store, cutoff: "2026-09-18T00:00:00.000Z",
-    })).toHaveLength(1);
+    })).toHaveLength(2);
     expect(input.observations.find((item) => item.sourceType ===
       "canonical_training_observation")).toMatchObject({
       capabilities: [{ capabilityId: "performance.training_support_index", value: 1 }],
     });
+    expect(input.observations.find((item) => item.sourceType ===
+      "canonical_energy_observation")).toMatchObject({
+      capabilities: [{ capabilityId: "strategy.energy_balance_estimate" }],
+    });
+    expect(input.goalContract.evidencePolicies).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capabilityPattern: "performance.training_support_index", semanticClass: "LEADING_INDICATOR" }),
+      expect.objectContaining({ capabilityPattern: "strategy.energy_balance_estimate", semanticClass: "DERIVED_ESTIMATE" }),
+      expect.objectContaining({ capabilityPattern: "body_mass.level", semanticClass: "CONTEXTUAL_EVIDENCE" }),
+    ]));
     expect(adaptLatestCanonicalCadenceObservationsV3({
       goalContract: input.goalContract,
       phase: { id: phaseId },
       store: { dailyBriefings: store.dailyBriefings, goalConfidenceHistory: [] },
       cutoff: "2026-09-18T00:00:00.000Z",
     })).toEqual([]);
+  });
+
+  it("adapts canonical Midweek domain sections into Goal-relative V3 observations", () => {
+    const paired = createPairedCalibrationFixtures();
+    const fixture = paired.weekly;
+    const goalId = fixture.goalContract.goalId;
+    const phaseId = fixture.goalContract.phase.phaseId;
+    const assessmentId = "confidence_assessment_v2|midweek";
+    const evidenceWindow = {
+      startDate: "2026-09-13", endDate: "2026-09-15",
+      cutoff: "2026-09-16T06:59:59.999Z",
+    };
+    const store = {
+      goalConfidenceHistory: [{ assessmentId, assessment: { id: assessmentId,
+        goalId, phaseId } }],
+      dailyBriefings: [{
+        id: "midweek_briefing_user_20260913_20260915",
+        evidenceWindow,
+        confidencePublication: { assessmentId },
+        briefing: {
+          activeGoal: { id: goalId }, activePhase: { id: phaseId },
+          evidenceWindow,
+          training: {
+            performanceTrend: "improving", sessionsCompleted: 4,
+            performanceHeadline: "This window produced measurable training progress",
+            interpretation: "Current performance supports the productive environment.",
+          },
+          energyBalance: {
+            comparableDays: 2, estimatedAverageDailyBalance: -454.5,
+            balanceDirection: "probably_below", reliability: "limited",
+            warnings: ["Nutrition coverage is incomplete."],
+          },
+          weightContext: {
+            observations: 3, averageWeight: 171.6,
+            changeFromPriorComparable: 0.4,
+          },
+          evidenceCompleteness: {
+            nutrition: { completeDays: 1, expectedDays: 3 },
+            activity: { completeDays: 3, expectedDays: 3 },
+            recovery: { completeDays: 0, expectedDays: 3 },
+          },
+        },
+      }],
+    };
+    const observations = adaptLatestCanonicalCadenceObservationsV3({
+      goalContract: fixture.goalContract, phase: { id: phaseId }, store,
+      cutoff: evidenceWindow.cutoff,
+    });
+    expect(observations.map((item) => item.sourceType)).toEqual([
+      "canonical_training_observation", "canonical_energy_observation",
+      "canonical_nutrition_observation", "canonical_activity_observation",
+      "canonical_weight_observation", "canonical_recovery_observation",
+    ]);
+    expect(observations.find((item) => item.sourceType ===
+      "canonical_training_observation")).toMatchObject({
+      quality: { status: "adequate" },
+      capabilities: [{ capabilityId: "performance.training_support_index",
+        value: 1 }],
+    });
+    expect(observations.find((item) => item.sourceType ===
+      "canonical_energy_observation")).toMatchObject({
+      quality: { status: "limited" },
+      capabilities: [{ capabilityId: "strategy.energy_balance_estimate",
+        value: -454.5 }],
+    });
+    expect(observations.find((item) => item.sourceType ===
+      "canonical_weight_observation")).toMatchObject({
+      capabilities: [{ capabilityId: "body_mass.level", value: 171.6 }],
+    });
+    const event = runConfidenceNarrativeV3(paired.dexa);
+    const weekly = runConfidenceNarrativeV3({
+      ...paired.weekly,
+      priorInterpretation: event.strategicInterpretation,
+      priorCoachingState: event.coachingState,
+      priorConfidence: event.confidence,
+      priorNarrativePlan: event.narrativePlan,
+    });
+    const midweek = runConfidenceNarrativeV3({
+      goalContract: fixture.goalContract, observations,
+      priorInterpretation: weekly.strategicInterpretation,
+      priorCoachingState: weekly.coachingState,
+      priorConfidence: weekly.confidence,
+      priorNarrativePlan: weekly.narrativePlan,
+      evaluationContext: {
+        type: "closed_cadence_boundary", evidenceWindow,
+        evidenceCutoff: evidenceWindow.cutoff,
+        evaluatedAt: "2026-09-16T07:04:38.549Z",
+      },
+      surface: "midweek_briefing",
+    });
+    expect(midweek.confidence).toMatchObject({ currentPercentage: 79, delta: 0 });
+    expect(midweek.strategicInterpretation.crossDomainSynthesis.tensions)
+      .toContainEqual(expect.objectContaining({
+        type: "ESTIMATE_VS_OUTCOME_TENSION",
+      }));
+    expect(midweek.strategicInterpretation.recommendation.action)
+      .toBe("continue_current_strategy");
+    expect(midweek.narrativePlan.composition.finalNarrative)
+      .toMatch(/measurable training progress.*estimate alone is not enough to change the plan/isu);
+    expect(midweek.narrativePlan.composition.finalNarrative).not.toContain("5.0 lb");
   });
 
   it("distinguishes later confirmation, contradiction, no-new-proof, and guardrail breach", () => {

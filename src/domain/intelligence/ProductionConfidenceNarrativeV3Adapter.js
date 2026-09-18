@@ -46,7 +46,9 @@ export function buildGoalContractV3FromCanonical({
     if (configured.phase?.phaseId && configured.phase.phaseId !== phase.id) {
       throw new Error("Configured Goal Contract V3 belongs to a different Phase.");
     }
-    return configured;
+    // Re-normalize stored contracts through the current additive schema so
+    // older V3 contracts safely receive newly introduced semantic defaults.
+    return createGoalContractV3(configured);
   }
   if (configured) {
     return createGoalContractV3({
@@ -113,6 +115,9 @@ export function buildGoalContractV3FromCanonical({
       subjectId: objectiveId,
       capabilityPattern: capability,
       role: "decisive",
+      semanticClass: "OUTCOME_EVIDENCE",
+      vocabularyKey: inferredEvidenceBinding?.vocabularyKey ?? "primary_outcome",
+      reconciliationGroup: `outcome|${objectiveId}`,
       minimumQuality: "adequate",
       participation: "DIRECT_CONFIDENCE_INPUT",
       usableFor: ["objective", "trajectory", "feasibility"],
@@ -123,6 +128,9 @@ export function buildGoalContractV3FromCanonical({
       subjectId: strategyRevisionId,
       capabilityPattern: capability,
       role: "decisive",
+      semanticClass: "OUTCOME_EVIDENCE",
+      vocabularyKey: inferredEvidenceBinding?.vocabularyKey ?? "primary_outcome",
+      reconciliationGroup: `outcome|${objectiveId}`,
       minimumQuality: "adequate",
       participation: "PERSISTENCE_CONFIRMATION_INPUT",
       usableFor: ["feasibility", "persistence"],
@@ -134,6 +142,8 @@ export function buildGoalContractV3FromCanonical({
       capabilityPattern: guardrail.metricCapability.id ??
         guardrail.metricCapability,
       role: "material",
+      semanticClass: "GUARDRAIL",
+      vocabularyKey: guardrail.vocabularyKey,
       minimumQuality: "adequate",
       participation: "GUARDRAIL",
       usableFor: ["guardrail"],
@@ -587,7 +597,9 @@ export function adaptLatestCanonicalCadenceObservationsV3({
     .filter((item) => item?.assessmentId && item?.assessment)
     .map((item) => [item.assessmentId, item.assessment]));
   const candidates = (store?.dailyBriefings ?? []).flatMap((artifact) => {
-    const piEnvelope = artifact?.briefing?.weeklyNarrative?.context?.pi ?? null;
+    const piEnvelope = artifact?.briefing?.weeklyNarrative?.context?.pi ??
+      artifact?.briefing?.context?.pi ??
+      { observations: deriveBriefingCadenceObservationsV3(artifact?.briefing) };
     if (!Array.isArray(piEnvelope?.observations) || !piEnvelope.observations.length) {
       return [];
     }
@@ -615,6 +627,138 @@ export function adaptLatestCanonicalCadenceObservationsV3({
     piEnvelope: latest.piEnvelope,
     evidenceCutoff: latest.artifactCutoff,
   });
+}
+
+function deriveBriefingCadenceObservationsV3(briefing = {}) {
+  const window = briefing.evidenceWindow ?? null;
+  const observations = [];
+  const training = briefing.training;
+  if (training && (training.performanceTrend || training.performanceHeadline ||
+      training.interpretation)) {
+    const direction = directionFromStateV3(training.performanceTrend);
+    observations.push({
+      id: "performance|overall|resistance",
+      displayLabel: "Training performance",
+      domain: "training",
+      kind: "training_performance",
+      subject: { type: "overall" },
+      status: training.performanceTrend ?? "available",
+      direction,
+      factualSummary: joinNaturalSentencesV3([
+        training.performanceHeadline,
+        training.interpretation,
+      ]),
+      evidenceWindow: window,
+      confidence: {
+        level: Number(training.sessionsCompleted) >= 2 ? "moderate" : "low",
+      },
+      supportingEvidenceIds: (training.highlights ?? [])
+        .map((item) => item.id).filter(Boolean),
+    });
+  }
+
+  const energy = briefing.energyBalance;
+  if (energy && Number(energy.comparableDays) > 0) {
+    const balance = number(energy.estimatedAverageDailyBalance ??
+      energy.estimatedDailyBalanceMidpoint ?? energy.averageBalance);
+    const direction = energy.balanceDirection === "probably_below" ||
+      (balance != null && balance < 0) ? "negative" :
+      energy.balanceDirection === "probably_above" ||
+        (balance != null && balance > 0) ? "positive" : "neutral";
+    observations.push({
+      id: "energy|derived_balance_estimate",
+      displayLabel: "Energy estimate",
+      domain: "energy",
+      kind: "energy_balance",
+      status: "available",
+      direction,
+      value: balance,
+      factualSummary: balance == null ? "The energy estimate is available, but its direction is unclear." :
+        `Reported intake minus estimated expenditure averaged ${formatSignedNumberV3(balance)} kcal/day across ${energy.comparableDays} comparable ${Number(energy.comparableDays) === 1 ? "day" : "days"}${energy.reliability === "limited" ? ", with limited coverage" : ""}.`,
+      evidenceWindow: window,
+      confidence: {
+        level: energy.reliability === "high" ? "high" :
+          energy.reliability === "moderate" ? "moderate" : "low",
+        coverageRatio: number(energy.comparableDays) && number(briefing.evidenceCompleteness?.activity?.expectedDays)
+          ? Math.min(1, Number(energy.comparableDays) /
+            Number(briefing.evidenceCompleteness.activity.expectedDays)) : null,
+        limitations: [
+          ...(energy.warnings ?? []),
+          "expenditure_is_estimated",
+        ],
+      },
+      supportingEvidenceIds: [],
+    });
+  }
+
+  const weight = briefing.weightContext;
+  if (weight && number(weight.averageWeight) != null) {
+    observations.push({
+      id: "weight|average_change",
+      displayLabel: "Weight context",
+      domain: "weight",
+      kind: "weight_average_change",
+      status: "available",
+      direction: "neutral",
+      value: number(weight.averageWeight),
+      factualSummary: number(weight.changeFromPriorComparable) == null
+        ? `Average scale weight was ${weight.averageWeight} lb.`
+        : `Average scale weight was ${weight.averageWeight} lb, ${Math.abs(Number(weight.changeFromPriorComparable))} lb ${Number(weight.changeFromPriorComparable) >= 0 ? "higher" : "lower"} than the prior comparable average.`,
+      evidenceWindow: window,
+      confidence: { level: Number(weight.observations) >= 3 ? "moderate" : "low" },
+      supportingEvidenceIds: [],
+    });
+  }
+
+  const completeness = briefing.evidenceCompleteness ?? {};
+  for (const domain of ["nutrition", "activity", "recovery"]) {
+    const evidence = completeness[domain];
+    if (!evidence || number(evidence.expectedDays) == null) continue;
+    const complete = number(evidence.completeDays) ?? 0;
+    const expected = number(evidence.expectedDays) ?? 0;
+    observations.push({
+      id: `${domain}|coverage`,
+      displayLabel: `${humanize(domain)} coverage`,
+      domain,
+      kind: domain === "nutrition" ? "nutrition_summary" :
+        domain === "activity" ? "activity_summary" :
+          complete > 0 ? "recovery_state" : "recovery_insufficient_evidence",
+      status: complete > 0 ? "available" : "insufficient_data",
+      direction: "neutral",
+      value: expected > 0 ? complete / expected : 0,
+      factualSummary: `${humanize(domain).replace(/^./u, (character) => character.toLocaleUpperCase("en-US"))} evidence covered ${complete} of ${expected} days in the briefing window.`,
+      evidenceWindow: window,
+      confidence: {
+        level: complete === expected && expected > 0 ? "moderate" : "low",
+        coverageRatio: expected > 0 ? complete / expected : 0,
+        limitations: complete < expected ? [`${domain}_coverage_incomplete`] : [],
+      },
+      supportingEvidenceIds: [],
+    });
+  }
+  return observations;
+}
+
+function directionFromStateV3(value) {
+  if (["improving", "supportive", "positive", "complete"].includes(value)) {
+    return "positive";
+  }
+  if (["regressing", "deteriorating", "negative", "missed"].includes(value)) {
+    return "negative";
+  }
+  return "neutral";
+}
+
+function joinNaturalSentencesV3(values) {
+  return values.filter(Boolean).map((value) => {
+    const text = String(value).trim();
+    return /[.!?]$/u.test(text) ? text : `${text}.`;
+  }).join(" ");
+}
+
+function formatSignedNumberV3(value) {
+  const rounded = Number(Number(value).toFixed(1));
+  return rounded > 0 ? `+${rounded}` : String(rounded);
 }
 
 export function adaptCanonicalDexaScans({
@@ -1029,6 +1173,9 @@ function supportingEvidencePoliciesV3({ strategyRevisionId, guardrails }) {
     subjectId: strategyRevisionId,
     capabilityPattern: "performance.training_support_index",
     role: "supporting",
+    semanticClass: "LEADING_INDICATOR",
+    vocabularyKey: "training_performance",
+    reconciliationGroup: "productive_stimulus",
     minimumQuality: "adequate",
     participation: "PERSISTENCE_CONFIRMATION_INPUT",
     usableFor: ["feasibility", "persistence", "attribution", "execution"],
@@ -1042,28 +1189,91 @@ function supportingEvidencePoliciesV3({ strategyRevisionId, guardrails }) {
     subjectType: "execution",
     subjectId: strategyRevisionId,
     capabilityPattern: "execution.nutrition",
-    role: "contextual",
+    role: "supporting",
+    semanticClass: "EXECUTION_SUPPORT",
+    vocabularyKey: "nutrition_execution",
+    reconciliationGroup: "strategy_execution",
     minimumQuality: "limited",
     participation: "NARRATIVE_CONTEXT_ONLY",
     usableFor: ["narrative", "attribution", "execution"],
+    signalRules: directionSignalRules("minor"),
+  }, {
+    policyId: `strategy_energy_estimate|${strategyRevisionId}`,
+    subjectType: "attribution",
+    subjectId: strategyRevisionId,
+    capabilityPattern: "strategy.energy_balance_estimate",
+    role: "contextual",
+    semanticClass: "DERIVED_ESTIMATE",
+    vocabularyKey: "energy_estimate",
+    reconciliationGroup: "energy_availability",
+    minimumQuality: "limited",
+    participation: "NARRATIVE_CONTEXT_ONLY",
+    usableFor: ["narrative", "attribution"],
+    signalRules: directionSignalRules("minor"),
   }, {
     policyId: `strategy_activity_context|${strategyRevisionId}`,
     subjectType: "execution",
     subjectId: strategyRevisionId,
     capabilityPattern: "execution.activity",
     role: "contextual",
+    semanticClass: "CONTEXTUAL_EVIDENCE",
+    vocabularyKey: "activity_context",
+    reconciliationGroup: "energy_availability",
     minimumQuality: "limited",
     participation: "NARRATIVE_CONTEXT_ONLY",
     usableFor: ["narrative", "attribution", "execution"],
+    signalRules: directionSignalRules("minor"),
   }, {
     policyId: `strategy_recovery_context|${strategyRevisionId}`,
     subjectType: "execution",
     subjectId: strategyRevisionId,
     capabilityPattern: "execution.recovery",
-    role: "contextual",
+    role: "supporting",
+    semanticClass: "EXECUTION_SUPPORT",
+    vocabularyKey: "recovery_support",
+    reconciliationGroup: "strategy_execution",
     minimumQuality: "limited",
     participation: "NARRATIVE_CONTEXT_ONLY",
     usableFor: ["narrative", "execution"],
+    signalRules: directionSignalRules("minor"),
+  }, {
+    policyId: `strategy_weight_context|${strategyRevisionId}`,
+    subjectType: "attribution",
+    subjectId: strategyRevisionId,
+    capabilityPattern: "body_mass.level",
+    role: "contextual",
+    semanticClass: "CONTEXTUAL_EVIDENCE",
+    vocabularyKey: "weight_context",
+    reconciliationGroup: "outcome_context",
+    minimumQuality: "limited",
+    participation: "NARRATIVE_CONTEXT_ONLY",
+    usableFor: ["narrative", "attribution"],
+  }, {
+    policyId: `strategy_photo_context|${strategyRevisionId}`,
+    subjectType: "attribution",
+    subjectId: strategyRevisionId,
+    capabilityPattern: "visual.*",
+    role: "contextual",
+    semanticClass: "CONTEXTUAL_EVIDENCE",
+    vocabularyKey: "visual_context",
+    reconciliationGroup: "outcome_context",
+    minimumQuality: "adequate",
+    participation: "NARRATIVE_CONTEXT_ONLY",
+    usableFor: ["narrative", "attribution"],
+    signalRules: directionSignalRules("minor"),
+  }, {
+    policyId: `strategy_priority_execution|${strategyRevisionId}`,
+    subjectType: "execution",
+    subjectId: strategyRevisionId,
+    capabilityPattern: "execution.priorities",
+    role: "supporting",
+    semanticClass: "EXECUTION_SUPPORT",
+    vocabularyKey: "priority_execution",
+    reconciliationGroup: "strategy_execution",
+    minimumQuality: "limited",
+    participation: "PERSISTENCE_CONFIRMATION_INPUT",
+    usableFor: ["narrative", "execution", "attribution"],
+    signalRules: directionSignalRules("minor"),
   }];
   for (const guardrail of guardrails) {
     const capability = typeof guardrail.metricCapability === "string"
@@ -1077,12 +1287,22 @@ function supportingEvidencePoliciesV3({ strategyRevisionId, guardrails }) {
       subjectId: guardrail.guardrailId,
       capabilityPattern: capability,
       role: "material",
+      semanticClass: "GUARDRAIL",
+      vocabularyKey: guardrail.vocabularyKey,
       minimumQuality: "adequate",
       participation: "GUARDRAIL",
       usableFor: ["guardrail"],
     });
   }
   return policies;
+}
+
+function directionSignalRules(significance) {
+  return {
+    supportsWhen: predicate("measurement.metadata.signalDirection", "eq", "supports"),
+    contradictsWhen: predicate("measurement.metadata.signalDirection", "eq", "contradicts"),
+    significance,
+  };
 }
 
 function parseNumericRange(value) {
@@ -1191,7 +1411,7 @@ function cadenceCapabilityV3(item) {
   return ({
     training: "performance.training_support_index",
     nutrition: "execution.nutrition",
-    energy: "execution.nutrition",
+    energy: "strategy.energy_balance_estimate",
     activity: "execution.activity",
     recovery: "execution.recovery",
     weight: "body_mass.level",

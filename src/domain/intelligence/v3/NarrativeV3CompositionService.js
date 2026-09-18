@@ -14,6 +14,7 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
     interpretation.objectiveFindings[0] ?? null;
   const context = narrativeContext(goalContract, interpretation, primaryObjective);
   context.confidence = confidence;
+  context.surface = surface;
   const publicationContext = {
     kind: interpretation.evaluationContext.type === "event_evidence_boundary" ? "event" : "recurring",
     publishedAt: evaluatedAt,
@@ -32,6 +33,18 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
     interpretation.strategyEffectiveness.feasibility === "demonstrated");
   context.priorEventName = priorNarrativePlan?.publicationContext?.eventName ?? "recent check";
   context.priorConfidenceMovement = priorNarrativePlan?.primaryConfidenceSnapshot?.delta ?? 0;
+  const currentAuthoritativeEvidenceIds = interpretation.objectiveFindings
+    .filter((item) => ["decisive", "material"].includes(item.authority) &&
+      ["adequate", "robust"].includes(item.quality))
+    .flatMap((item) => item.evidenceIds ?? []);
+  context.communicatedEvidenceIds = [...new Set([
+    ...(priorNarrativePlan?.communicatedEvidenceIds ?? []),
+    ...(publicationContext.kind === "event" ? currentAuthoritativeEvidenceIds : []),
+  ])];
+  context.anchorPreviouslyCommunicated = currentAuthoritativeEvidenceIds.length > 0 &&
+    currentAuthoritativeEvidenceIds.every((id) => context.communicatedEvidenceIds.includes(id));
+  context.operatingSignals = interpretation.crossDomainSynthesis?.selectedNarrativeSignals ?? [];
+  context.reconciliationTensions = interpretation.crossDomainSynthesis?.tensions ?? [];
   const primaryConfidenceSnapshot = { percentage: confidence.currentPercentage, delta: confidence.delta, movement: confidence.movement };
   const confidenceBriefing = { ...composeConfidenceBriefing(context), ...primaryConfidenceSnapshot };
   const confidenceDeepExplanation = composeConfidenceDeepExplanation(context);
@@ -60,8 +73,25 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
     publicationContext,
     authoritativeFindingCommunicated: interpretation.objectiveFindings.some((item) =>
       item.changedThisEvaluation && ["decisive", "material"].includes(item.authority) &&
-      item.quality === "robust" && item.significance === "major"),
-    continuityPolicy: { mode: context.recentEventFollowup ? "recent_event_followup" : "full_briefing", recencyHours, priorNarrativePlanId: priorNarrativePlan?.id ?? null },
+      item.quality === "robust" && item.significance === "major") ||
+      Boolean(priorNarrativePlan?.authoritativeFindingCommunicated),
+    communicatedEvidenceIds: context.communicatedEvidenceIds,
+    narrativeSalience: {
+      outcomeAnchor: publicationContext.kind === "event" ? "new_finding" :
+        context.recentEventFollowup ? "recently_communicated_finding" :
+          context.anchorPreviouslyCommunicated ? "background_anchor" : "active_anchor",
+      selectedDomainContributions: context.operatingSignals.map((item) => ({
+        observationId: item.observationId,
+        vocabularyKey: item.vocabularyKey,
+        semanticClass: item.semanticClass,
+        direction: item.direction,
+        salience: item.salience,
+      })),
+    },
+    continuityPolicy: { mode: context.recentEventFollowup ? "recent_event_followup" :
+      publicationContext.kind === "recurring" && context.anchorPreviouslyCommunicated &&
+        !interpretation.crossDomainSynthesis?.signals?.some((item) => item.novel && item.direction === "contradicts")
+        ? "operating_update" : "full_briefing", recencyHours, priorNarrativePlanId: priorNarrativePlan?.id ?? null },
     confidenceBriefing,
     confidenceDeepExplanation,
     biggestTakeaway: { ...interpretation.biggestTakeaway, text: headline },
@@ -176,19 +206,21 @@ function composeResult(context) {
   const guardrail = context.primaryGuardrail;
   const guardrailCopy = guardrail ? describeGuardrail(context, guardrail) : null;
   if (context.recentEventFollowup) {
-    const signal = interpretation.evidenceSignals.find((item) => item.direction === "supports");
     return [
-      `The ${context.priorEventName} already gave a clear answer on ${strategyLabel(context)}: it is working.`,
-      signal?.factualSummary ? sentence(signal.factualSummary) : null,
+      `The ${context.priorEventName} already established that ${strategyLabel(context)} is working.`,
+      composeOperatingEvidence(context),
+      composeEvidenceTension(context),
       "Nothing here calls for a change.",
     ].filter(Boolean).join(" ");
   }
   if (objective.freshness === "carried_forward") {
-    const currentSignal = interpretation.evidenceSignals.find((item) => item.direction === "supports");
-    const signalCopy = currentSignal?.factualSummary ? sentence(currentSignal.factualSummary) : null;
+    const operatingEvidence = composeOperatingEvidence(context);
     return [
-      `The latest direct result still stands: ${lowerFirst(movement)}`,
-      signalCopy ? `The supporting evidence remains encouraging: ${lowerFirst(signalCopy)}` : null,
+      operatingEvidence,
+      composeEvidenceTension(context),
+      context.anchorPreviouslyCommunicated
+        ? `The last direct result remains the anchor: ${strategyLabel(context)} is working.`
+        : `The latest direct result still stands: ${lowerFirst(movement)}`,
     ].filter(Boolean).join(" ");
   }
 
@@ -243,6 +275,63 @@ function composeMeaning(context) {
     strategyMeaning = `Holding the target range is the win for ${goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel}. ${upperFirst(strategy)} is doing its job.`;
   }
   return [progress, strategyMeaning].filter(Boolean).join(" ");
+}
+
+function composeOperatingEvidence(context) {
+  const signals = context.operatingSignals.filter((item) => item.factualSummary);
+  if (!signals.length) return null;
+  const summaries = signals.map((item) => stripPeriod(sentence(item.factualSummary)));
+  if (summaries.length === 1) return `${summaries[0]}.`;
+  const [first, second] = summaries;
+  const relationship = signals[0].direction === signals[1].direction
+    ? signals[0].direction === "contradicts" ? "At the same time" : "Alongside that"
+    : "At the same time";
+  return `${first}. ${relationship}, ${lowerFirst(second)}.`;
+}
+
+function composeEvidenceTension(context) {
+  const tension = context.reconciliationTensions[0];
+  if (!tension) return null;
+  const lowerSignal = context.interpretation.crossDomainSynthesis?.signals.find((item) =>
+    tension.lowerAuthorityObservationIds.includes(item.observationId));
+  const label = lowerSignal?.displayLabel ?? "One current measure";
+  if (tension.type === "ESTIMATE_VS_OUTCOME_TENSION") {
+    return `${upperFirst(label)} points the other way on paper, but the realized result carries more weight; that estimate alone is not enough to change the plan.`;
+  }
+  if (tension.type === "LEADING_VS_LAGGING_TENSION") {
+    return `${upperFirst(label)} has weakened, but one leading signal does not erase the last direct result. It is worth watching closely.`;
+  }
+  if (tension.type === "TRANSIENT_NOISE") {
+    return `${upperFirst(label)} is a weak isolated signal, so it does not change the broader conclusion yet.`;
+  }
+  if (tension.type === "PEER_CONTRADICTION") {
+    return "Two similarly strong signals disagree. Hold the conclusion lightly until the conflict is resolved.";
+  }
+  if (tension.type === "CONFIRMED_REVERSAL") {
+    return "Several current signals now point to a real change. The earlier result still counts, but it no longer supports staying on autopilot.";
+  }
+  return null;
+}
+
+function composeCoachTension(context) {
+  const tension = context.reconciliationTensions[0];
+  if (!tension) return null;
+  const lowerSignal = context.interpretation.crossDomainSynthesis?.signals.find((item) =>
+    tension.lowerAuthorityObservationIds.includes(item.observationId));
+  const label = lowerFirst(lowerSignal?.displayLabel ?? "weaker signal");
+  if (tension.type === "ESTIMATE_VS_OUTCOME_TENSION") {
+    return `The ${label} is worth watching, but it is not enough by itself to outweigh the stronger realized result.`;
+  }
+  if (tension.type === "LEADING_VS_LAGGING_TENSION") {
+    return `The ${label} deserves attention, but it has not overturned the last direct result.`;
+  }
+  if (tension.type === "TRANSIENT_NOISE") {
+    return `The ${label} is too weak and isolated to change the plan yet.`;
+  }
+  if (tension.type === "CONFIRMED_REVERSAL") {
+    return "The current evidence has genuinely turned. Review the plan instead of relying on the earlier result.";
+  }
+  return composeEvidenceTension(context);
 }
 
 function composeAction(context) {
@@ -304,7 +393,9 @@ function composeCoachTake(context) {
     return "Hold the plan steady for now. The next useful result needs to be clean enough to guide a decision.";
   }
   if (context.recentEventFollowup) {
-    return `The plan is doing its job. Keep the focus on consistent execution; ${nextEvidenceName(context)} ${nextEvidenceVerb(context)} about continued progress.`;
+    const support = context.interpretation.crossDomainSynthesis?.operatingSupport === "supportive"
+      ? "The current operating evidence supports staying the course. " : "";
+    return `The direct result still anchors the plan, and the plan is doing its job. ${support}Keep the focus on consistent execution; ${nextEvidenceName(context)} ${nextEvidenceVerb(context)} about continued progress.`;
   }
   if (interpretation.recommendation.action === "transition_goal") {
     return "The goal has been reached. Protect the result and choose the next target rather than keep extending the current plan.";
@@ -333,8 +424,13 @@ function composeCoachTake(context) {
   }
   if (interpretation.strategyEffectiveness.feasibility === "demonstrated") {
     const acceptedResult = objective.freshness === "carried_forward" ?
-      `The direct result still stands: ${lowerFirst(stripPeriod(objectiveMovement(context)))}.` : `${upperFirst(result)}.`;
-    return [progress, `${acceptedResult} The plan is working.`, `Stay consistent. ${execute}`, watch].filter(Boolean).join(" ");
+      context.anchorPreviouslyCommunicated ? "The last direct result still supports the plan." :
+        `The direct result still stands: ${lowerFirst(stripPeriod(objectiveMovement(context)))}.` : `${upperFirst(result)}.`;
+    const operatingConclusion = context.interpretation.crossDomainSynthesis?.operatingSupport === "supportive"
+      ? "The current operating evidence supports staying the course." : null;
+    return [operatingConclusion, composeCoachTension(context), progress,
+      `${acceptedResult} The plan is working.`, `Stay consistent. ${execute}`, watch]
+      .filter(Boolean).join(" ");
   }
   return [result, composeAction(context), watch].filter(Boolean).join(" ");
 }
@@ -463,11 +559,13 @@ function composeConfidenceDeepExplanation(context) {
   const time = trajectory?.deadlineContributionApplicable && trajectory.scheduleState === "ahead_with_reserve" ?
     `There is enough time to finish ahead of schedule if ${continuationPhrase(context)} continues.` :
       trajectory?.deadlineContributionApplicable && trajectory.scheduleState === "at_risk" ? "The remaining work is becoming harder to fit into the available time." : null;
-  const support = interpretation.evidenceSignals.find((item) => item.direction === "supports");
+  const currentSupport = context.operatingSignals
+    .filter((item) => item.direction === "supports" && item.factualSummary)
+    .map((item) => sentence(item.factualSummary));
   return {
     why: [goalProgressSentence(context), `${upperFirst(strategyLabel(context))} ${demonstrated ? "is clearly working" : "still needs a useful outcome check"}.`, time].filter(Boolean).join(" "),
     whatIncreasedIt: context.objective?.state === "progressed" ? [objectiveMovement(context), ...(primaryGuardrail?.status === "clear" ? [describeGuardrail(context, primaryGuardrail)] : [])] : [],
-    whatSupportsItNow: [remaining, confidence.execution.state === "supportive" && support?.factualSummary ? sentence(support.factualSummary) : null].filter(Boolean),
+    whatSupportsItNow: [remaining, ...currentSupport].filter(Boolean),
     whatIsHoldingItBack: [
       ...(interpretation.strategyEffectiveness.persistence === "emerging" ? [describeRepeatabilityHorizon(context)] : []),
       ...(confidence.execution.state === "deteriorating" ? ["Recent execution is not matching the plan."] : []),

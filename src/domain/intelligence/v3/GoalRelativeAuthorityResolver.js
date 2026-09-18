@@ -25,7 +25,11 @@ export function resolveGoalRelativeAuthority({ goalContract, observations }) {
           capabilityId: measurement.capabilityId,
           role: policy.role,
           participation: policy.participation,
+          semanticClass: policy.semanticClass,
+          vocabularyKey: policy.vocabularyKey,
+          reconciliationGroup: policy.reconciliationGroup,
           directness: observation.directness,
+          highSalienceEvent: observation.highSalienceEvent,
           quality: observation.quality,
           exposureDays: observation.exposureDays,
           usableFor: observation.strategyScopeEligible === false
@@ -51,7 +55,10 @@ export function resolveGoalRelativeAuthority({ goalContract, observations }) {
 }
 
 function resolveSignalDirection(rules, measurement, observation) {
-  if (!rules) return "indeterminate";
+  if (!rules) {
+    return ["supports", "contradicts"].includes(measurement.metadata?.signalDirection)
+      ? measurement.metadata.signalDirection : "indeterminate";
+  }
   const context = { measurement, observation: { exposureDays: observation.exposureDays, quality: observation.quality } };
   if (rules.contradictsWhen && evaluateDeclarativePredicate(context, rules.contradictsWhen)) return "contradicts";
   if (rules.supportsWhen && evaluateDeclarativePredicate(context, rules.supportsWhen)) return "supports";

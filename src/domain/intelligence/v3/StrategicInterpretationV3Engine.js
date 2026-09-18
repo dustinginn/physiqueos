@@ -1,6 +1,7 @@
 import { reduceCoachingStateV3 } from "./CoachingStateV3.js";
 import { evaluateGoalContract, findingMeetsCriterion } from "./DeclarativeGoalEvaluator.js";
 import { resolveGoalRelativeAuthority } from "./GoalRelativeAuthorityResolver.js";
+import { synthesizeCrossDomainEvidenceV3 } from "./CrossDomainEvidenceSynthesisV3.js";
 import {
   AUTHORITY_ORDER,
   QUALITY_ORDER,
@@ -33,7 +34,13 @@ export function createStrategicInterpretationV3({
     goalAchievement: evaluatedGoal.goalAchievement,
     guardrail: { aggregateStatus: evaluatedGoal.aggregateGuardrailState },
   }, goalContract.phase.transitionCriteria);
-  const evidenceSignals = createEvidenceSignals(authorityBindings);
+  const crossDomainSynthesis = synthesizeCrossDomainEvidenceV3({
+    authorityBindings,
+    evaluatedGoal,
+    strategyEffectiveness,
+    priorInterpretation,
+  });
+  const evidenceSignals = crossDomainSynthesis.signals;
   const uncertaintyProfile = createUncertaintyProfile({
     goalContract,
     observations,
@@ -65,6 +72,7 @@ export function createStrategicInterpretationV3({
     strategyEffectiveness,
     phaseTransitionReady,
     coachingState,
+    crossDomainSynthesis,
   });
   const biggestTakeaway = rankTakeaways({
     evaluatedGoal,
@@ -72,6 +80,7 @@ export function createStrategicInterpretationV3({
     coachingState,
     uncertaintyProfile,
     evidenceSignals,
+    crossDomainSynthesis,
     phaseTransitionReady,
   })[0];
   const coachingAffect = deriveCoachingAffect({
@@ -79,6 +88,7 @@ export function createStrategicInterpretationV3({
     strategyEffectiveness,
     uncertaintyProfile,
     evidenceSignals,
+    crossDomainSynthesis,
   });
 
   const semantic = {
@@ -101,6 +111,7 @@ export function createStrategicInterpretationV3({
     phaseTransitionReady,
     uncertaintyProfile,
     evidenceSignals,
+    crossDomainSynthesis,
     coachingStateId: coachingState.id,
     questionTransitions: coachingState.transitions,
     nextCoachingQuestion: coachingState.questions.find((item) =>
@@ -249,26 +260,6 @@ function evaluateStrategy({ goalContract, authorityBindings, evaluatedGoal, prio
   };
 }
 
-function createEvidenceSignals(bindings) {
-  const seen = new Set();
-  return bindings.filter((item) => item.subjectType === "strategy").flatMap((binding) => {
-    if (seen.has(binding.observationId)) return [];
-    seen.add(binding.observationId);
-    return [{
-      signalId: `evidence_signal|${binding.observationId}`,
-      observationId: binding.observationId,
-      capabilityId: binding.capabilityId,
-      role: binding.role,
-      quality: binding.quality.status,
-      directness: binding.directness,
-      direction: binding.signalDirection,
-      significance: binding.signalSignificance,
-      factualSummary: binding.measurement.factualSummary,
-      limitations: binding.limitations,
-    }];
-  });
-}
-
 function createUncertaintyProfile({ goalContract, observations, evaluatedGoal, strategyEffectiveness, authorityBindings }) {
   const uncertainties = [];
   const limited = observations.filter((item) => ["limited", "insufficient"].includes(item.quality.status));
@@ -295,7 +286,7 @@ function uncertainty(type, materiality, reasons, evidenceIds) {
   };
 }
 
-function resolveRecommendation({ goalContract, evaluatedGoal, strategyEffectiveness, phaseTransitionReady, coachingState }) {
+function resolveRecommendation({ goalContract, evaluatedGoal, strategyEffectiveness, phaseTransitionReady, coachingState, crossDomainSynthesis }) {
   const nextEvidencePurpose = coachingState.nextEvidencePurpose;
   if (evaluatedGoal.aggregateGuardrailState === "breached") return recommendation("pause_and_investigate", "guardrail_breach", "urgent", nextEvidencePurpose);
   if (["achieved", "exceeded"].includes(evaluatedGoal.goalAchievement) && goalContract.achievementPolicy.onAchieved === "transition_goal") {
@@ -303,6 +294,9 @@ function resolveRecommendation({ goalContract, evaluatedGoal, strategyEffectiven
   }
   if (phaseTransitionReady) return recommendation("transition_phase", "phase_criteria_achieved", "routine", nextEvidencePurpose);
   if (["challenged", "refuted"].includes(strategyEffectiveness.feasibility)) return recommendation("review_strategy", "authoritative_contradiction", "attention", nextEvidencePurpose);
+  if (crossDomainSynthesis?.recommendationStability?.reason === "new_evidence_confirms_outlook_reversal") {
+    return recommendation("review_strategy", "confirmed_leading_reversal", "attention", nextEvidencePurpose);
+  }
   if (["watch", "pressured"].includes(evaluatedGoal.aggregateGuardrailState)) return recommendation("continue_with_guardrail_monitoring", strategyEffectiveness.feasibility === "testing" ? "strategy_testing_with_guardrail_watch" : "guardrail_monitoring", "attention", nextEvidencePurpose);
   if (strategyEffectiveness.feasibility === "testing") return recommendation("continue_current_strategy", "strategy_testing", "routine", nextEvidencePurpose);
   if (strategyEffectiveness.feasibility === "unknown") return recommendation("continue_current_strategy", "strategy_unassessed", "routine", nextEvidencePurpose);
@@ -313,7 +307,7 @@ function recommendation(action, reason, urgency, nextEvidencePurpose) {
   return { action, reason, urgency, nextEvidencePurpose };
 }
 
-function rankTakeaways({ evaluatedGoal, strategyEffectiveness, coachingState, uncertaintyProfile, evidenceSignals, phaseTransitionReady }) {
+function rankTakeaways({ evaluatedGoal, strategyEffectiveness, coachingState, uncertaintyProfile, evidenceSignals, phaseTransitionReady, crossDomainSynthesis }) {
   const candidates = [];
   for (const item of evaluatedGoal.guardrailFindings.filter((finding) => finding.changedThisEvaluation)) {
     const priority = item.status === "breached" ? 100 : item.status === "pressured" ? 90 : item.status === "watch" ? 72 : 35;
@@ -330,14 +324,16 @@ function rankTakeaways({ evaluatedGoal, strategyEffectiveness, coachingState, un
   if (phaseTransitionReady) candidates.push({ type: "phase_transition", referenceId: "phase_transition_ready", priority: 86, reason: "phase_criteria_achieved" });
   if (strategyEffectiveness.revisionChanged) candidates.push({ type: "strategy_revision", referenceId: strategyEffectiveness.strategyRevisionId, priority: 82, reason: "new_strategy_scope" });
   if (strategyEffectiveness.continuity?.inherited) candidates.push({ type: "strategy_continuity", referenceId: strategyEffectiveness.strategyRevisionId, priority: 80, reason: "prior_strategy_state_retained" });
-  for (const signal of evidenceSignals) candidates.push({ type: "evidence_signal", referenceId: signal.signalId, priority: signal.direction === "supports" ? 58 : 45, reason: `${signal.direction}_${signal.quality}` });
+  for (const signal of evidenceSignals) candidates.push({ type: "evidence_signal", referenceId: signal.signalId, priority: signal.novel ? signal.direction === "contradicts" ? 78 : signal.direction === "supports" ? 70 : 52 : 38, reason: `${signal.direction}_${signal.quality}` });
+  if (crossDomainSynthesis?.tensions?.length) candidates.push({ type: "evidence_reconciliation", referenceId: crossDomainSynthesis.tensions[0].type, priority: 76, reason: crossDomainSynthesis.tensions[0].type.toLocaleLowerCase("en-US") });
   for (const item of uncertaintyProfile.filter((uncertaintyItem) => uncertaintyItem.materiality === "high")) candidates.push({ type: "uncertainty", referenceId: item.uncertaintyId, priority: 60, reason: item.type });
   return candidates.sort((a, b) => b.priority - a.priority || a.referenceId.localeCompare(b.referenceId));
 }
 
-function deriveCoachingAffect({ evaluatedGoal, strategyEffectiveness, uncertaintyProfile, evidenceSignals }) {
+function deriveCoachingAffect({ evaluatedGoal, strategyEffectiveness, uncertaintyProfile, evidenceSignals, crossDomainSynthesis }) {
   if (evaluatedGoal.aggregateGuardrailState === "breached") return { valence: "corrective", intensity: "strong", urgency: "urgent", celebrationCeiling: "none", directness: "direct" };
   if (["challenged", "refuted"].includes(strategyEffectiveness.feasibility)) return { valence: "corrective", intensity: "measured", urgency: "attention", celebrationCeiling: "restrained", directness: "direct" };
+  if (crossDomainSynthesis?.recommendationStability?.reason === "new_evidence_confirms_outlook_reversal") return { valence: "corrective", intensity: "measured", urgency: "attention", celebrationCeiling: "restrained", directness: "direct" };
   const positiveObjective = evaluatedGoal.objectiveFindings.some((item) => item.changedThisEvaluation && ["progressed", "satisfied", "stable_success"].includes(item.state));
   const strongestPositiveSignificance = evaluatedGoal.objectiveFindings
     .filter((item) => item.changedThisEvaluation && ["progressed", "satisfied", "stable_success"].includes(item.state))

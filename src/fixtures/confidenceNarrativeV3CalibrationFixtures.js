@@ -353,22 +353,26 @@ function buildFeasibilityQuestion() {
 
 function dexaEvidencePolicies() {
   return [
-    policy("dexa_lean_objective", "objective", OBJECTIVE_ID, "body_composition.lean_mass", "decisive", "robust", ["objective", "feasibility"]),
-    policy("dexa_body_fat_guardrail", "guardrail", "guardrail_body_fat_range", "body_composition.body_fat_percentage", "decisive", "robust", ["guardrail"]),
-    policy("dexa_weight_rate_guardrail", "guardrail", "guardrail_gradual_weight_gain", "body_mass.weekly_change_rate", "material", "robust", ["guardrail"]),
-    policy("training_strength_guardrail", "guardrail", "guardrail_strength_regression", "performance.training_support_index", "material", "adequate", ["guardrail"]),
-    policy("training_strategy_support", "strategy", CALIBRATION_STRATEGY, "performance.training_support_index", "material", "adequate", ["feasibility", "attribution"], supportiveSignal()),
+    policy("dexa_lean_objective", "objective", OBJECTIVE_ID, "body_composition.lean_mass", "decisive", "robust", ["objective", "feasibility"], null, { semanticClass: "OUTCOME_EVIDENCE", vocabularyKey: "composition_comparison", reconciliationGroup: "body_composition_outcome" }),
+    policy("dexa_body_fat_guardrail", "guardrail", "guardrail_body_fat_range", "body_composition.body_fat_percentage", "decisive", "robust", ["guardrail"], null, { semanticClass: "GUARDRAIL" }),
+    policy("dexa_weight_rate_guardrail", "guardrail", "guardrail_gradual_weight_gain", "body_mass.weekly_change_rate", "material", "robust", ["guardrail"], null, { semanticClass: "GUARDRAIL" }),
+    policy("training_strength_guardrail", "guardrail", "guardrail_strength_regression", "performance.training_support_index", "material", "adequate", ["guardrail"], null, { semanticClass: "GUARDRAIL" }),
+    policy("training_strategy_support", "strategy", CALIBRATION_STRATEGY, "performance.training_support_index", "material", "adequate", ["feasibility", "attribution"], supportiveSignal(), { semanticClass: "LEADING_INDICATOR", vocabularyKey: "training_performance", reconciliationGroup: "productive_stimulus" }),
   ];
 }
 
 function weeklyEvidencePolicies() {
   return [
-    policy("objective_direct", "objective", OBJECTIVE_ID, "body_composition.lean_mass", "decisive", "robust", ["objective", "feasibility"]),
-    policy("body_fat_guardrail", "guardrail", "guardrail_body_fat_range", "body_composition.body_fat_percentage", "decisive", "robust", ["guardrail"]),
-    policy("weight_rate_guardrail", "guardrail", "guardrail_gradual_weight_gain", "body_mass.weekly_change_rate", "material", "adequate", ["guardrail"]),
-    policy("training_strength_guardrail", "guardrail", "guardrail_strength_regression", "performance.training_support_index", "material", "adequate", ["guardrail"]),
-    policy("training_strategy_support", "strategy", BUILD_STRATEGY, "performance.training_support_index", "supporting", "adequate", ["feasibility", "attribution", "execution"], supportiveSignal()),
-    policy("energy_attribution_context", "attribution", BUILD_STRATEGY, "data.energy_coverage_ratio", "contextual", "limited", ["attribution"]),
+    policy("objective_direct", "objective", OBJECTIVE_ID, "body_composition.lean_mass", "decisive", "robust", ["objective", "feasibility"], null, { semanticClass: "OUTCOME_EVIDENCE", vocabularyKey: "composition_comparison", reconciliationGroup: "body_composition_outcome" }),
+    policy("body_fat_guardrail", "guardrail", "guardrail_body_fat_range", "body_composition.body_fat_percentage", "decisive", "robust", ["guardrail"], null, { semanticClass: "GUARDRAIL" }),
+    policy("weight_rate_guardrail", "guardrail", "guardrail_gradual_weight_gain", "body_mass.weekly_change_rate", "material", "adequate", ["guardrail"], null, { semanticClass: "GUARDRAIL" }),
+    policy("training_strength_guardrail", "guardrail", "guardrail_strength_regression", "performance.training_support_index", "material", "adequate", ["guardrail"], null, { semanticClass: "GUARDRAIL" }),
+    policy("training_strategy_support", "strategy", BUILD_STRATEGY, "performance.training_support_index", "supporting", "adequate", ["feasibility", "attribution", "execution", "narrative"], supportiveSignal(), { semanticClass: "LEADING_INDICATOR", vocabularyKey: "training_performance", reconciliationGroup: "productive_stimulus" }),
+    policy("energy_attribution_context", "attribution", BUILD_STRATEGY, "strategy.energy_balance_estimate", "contextual", "limited", ["attribution", "narrative"], {
+      supportsWhen: predicate("measurement.value", "gte", { value: 0 }),
+      contradictsWhen: predicate("measurement.value", "lte", { value: -0.001 }),
+      significance: "minor",
+    }, { semanticClass: "DERIVED_ESTIMATE", vocabularyKey: "energy_estimate", reconciliationGroup: "energy_availability" }),
   ];
 }
 
@@ -479,6 +483,11 @@ function septemberWeeklyObservations() {
       quality: { status: "limited", provenance: "canonical_weekly_energy_assessment", completeness: "six_paired_days_one_missing_day", comparability: "partial", coverageRatio: 6 / 7 },
       exposureDays: 6,
       capabilities: [{
+        capabilityId: "strategy.energy_balance_estimate",
+        value: 171,
+        unit: "kcal/day",
+        factualSummary: "Six displayed days had paired energy evidence, averaging 2,686 kcal intake and 2,561 kcal estimated expenditure with a reported +171 kcal/day balance.",
+      }, {
         capabilityId: "data.energy_coverage_ratio",
         value: 6 / 7,
         unit: "ratio",
@@ -650,8 +659,8 @@ function predicate(path, operator, values) {
   return { version: "declarative_predicate_v1", path, operator, ...values };
 }
 
-function policy(policyId, subjectType, subjectId, capabilityPattern, role, minimumQuality, usableFor, signalRules = null) {
-  return { policyId, subjectType, subjectId, capabilityPattern, role, minimumQuality, usableFor, signalRules };
+function policy(policyId, subjectType, subjectId, capabilityPattern, role, minimumQuality, usableFor, signalRules = null, options = {}) {
+  return { policyId, subjectType, subjectId, capabilityPattern, role, minimumQuality, usableFor, signalRules, ...options };
 }
 
 function supportiveSignal() {
