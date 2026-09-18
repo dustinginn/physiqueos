@@ -89,6 +89,113 @@ export function auditNarrativeObjectLanguage({
   };
 }
 
+const ORDINARY_NARRATIVE_OBJECT_TERMS = Object.freeze([
+  "Goal", "Phase", "Guardrail", "Evidence", "Strategy", "Confidence",
+  "Training", "Nutrition", "Energy", "Activity", "Weight", "Recovery",
+  "Photos", "Forecast", "Review", "Baseline", "Trajectory", "Protocol",
+]);
+
+const DEFAULT_INTENTIONAL_CAPITALIZATION = Object.freeze([
+  "Goal Confidence", "Operating Plan", "Current Goal Phase",
+]);
+
+const PRESENTATION_LABEL_KEYS = new Set([
+  "eyebrow", "heading", "label", "recommendationLabel", "displayName",
+  "exactLabel", "name",
+]);
+
+// This boundary is deliberately presentation-only. It never changes canonical
+// object names or engine state; it prevents TitleCase backend concepts from
+// becoming ordinary English nouns merely because their source type was named
+// Goal, Phase, Energy, and so on.
+export function naturalizeUserFacingNarrativeText(value, {
+  preserveTerms = [],
+} = {}) {
+  const text = String(value ?? "");
+  if (!text) return text;
+  const protectedRanges = exactTermRanges(text, [
+    ...DEFAULT_INTENTIONAL_CAPITALIZATION,
+    ...preserveTerms,
+  ]);
+  const pattern = new RegExp(`\\b(?:${ORDINARY_NARRATIVE_OBJECT_TERMS.join("|")})\\b`, "gu");
+  return text.replace(pattern, (term, offset) => {
+    if (rangeContains(protectedRanges, offset) || isSentenceInitial(text, offset)) {
+      return term;
+    }
+    return term.toLocaleLowerCase("en-US");
+  });
+}
+
+export function naturalizeUserFacingNarrativeProjection(value, options = {},
+  key = null) {
+  if (typeof value === "string") {
+    return PRESENTATION_LABEL_KEYS.has(key)
+      ? value
+      : naturalizeUserFacingNarrativeText(value, options);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => naturalizeUserFacingNarrativeProjection(
+      item, options, key));
+  }
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([childKey, child]) => [
+    childKey,
+    naturalizeUserFacingNarrativeProjection(child, options, childKey),
+  ]));
+}
+
+export function findBackendObjectCasingLeaks(value, options = {}, key = null) {
+  if (typeof value === "string") {
+    if (PRESENTATION_LABEL_KEYS.has(key)) return [];
+    const normalized = naturalizeUserFacingNarrativeText(value, options);
+    return normalized === value ? [] : [{ key, text: value, normalized }];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => findBackendObjectCasingLeaks(
+      item, options, key));
+  }
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value).flatMap(([childKey, child]) =>
+    findBackendObjectCasingLeaks(child, options, childKey));
+}
+
+export function configuredNarrativeCapitalizationTerms(goalContract = {}) {
+  return [...new Set([
+    goalContract.goalLabel,
+    goalContract.phase?.label,
+    goalContract.phase?.nextPhaseLabel,
+    goalContract.strategy?.label,
+    goalContract.vocabulary?.goal?.displayName,
+    goalContract.vocabulary?.phase?.displayName,
+    goalContract.vocabulary?.strategy?.displayName,
+    ...Object.values(goalContract.vocabulary?.evidence?.requests ?? {})
+      .map((item) => item?.displayName),
+  ].map(clean).filter(Boolean))];
+}
+
+function exactTermRanges(text, terms) {
+  const ranges = [];
+  for (const term of [...new Set(terms.map(clean).filter(Boolean))]) {
+    let offset = text.indexOf(term);
+    while (offset >= 0) {
+      ranges.push([offset, offset + term.length]);
+      offset = text.indexOf(term, offset + term.length);
+    }
+  }
+  return ranges;
+}
+
+function rangeContains(ranges, offset) {
+  return ranges.some(([start, end]) => offset >= start && offset < end);
+}
+
+function isSentenceInitial(text, offset) {
+  const before = text.slice(0, offset);
+  const line = before.slice(before.lastIndexOf("\n") + 1);
+  if (!/[\p{L}\p{N}]/u.test(line)) return true;
+  return /[.!?][\s"'’”)}\]]*$/u.test(before);
+}
+
 function normalizeExercise({ exactLabel, aggregateHint }) {
   const known = new Map([
     ["lateral raises machine", "machine lateral raises"],

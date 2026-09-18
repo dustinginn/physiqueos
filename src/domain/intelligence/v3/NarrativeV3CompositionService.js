@@ -1,4 +1,9 @@
 import { V3_SCHEMA, deepFreeze, round, semanticFingerprint } from "./V3Runtime.js";
+import {
+  configuredNarrativeCapitalizationTerms,
+  naturalizeUserFacingNarrativeProjection,
+  naturalizeUserFacingNarrativeText,
+} from "../../services/UserFacingObjectLanguageService.js";
 
 const FIRST_PERSON_SINGULAR = new Set(["i", "me", "my", "mine", "myself", "i'm", "i’m", "i’ve", "i've", "i’d", "i'd", "i’ll", "i'll"]);
 const RAW_ENGINE_LANGUAGE = [
@@ -63,18 +68,29 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   context.reconciliationTensions = interpretation.crossDomainSynthesis?.tensions ?? [];
   context.sectionPlan = allocateNarrativeSections(context);
   const primaryConfidenceSnapshot = { percentage: confidence.currentPercentage, delta: confidence.delta, movement: confidence.movement };
-  const confidenceBriefing = { ...composeConfidenceBriefing(context), ...primaryConfidenceSnapshot };
-  const confidenceDeepExplanation = composeConfidenceDeepExplanation(context);
+  const casingOptions = {
+    preserveTerms: configuredNarrativeCapitalizationTerms(goalContract),
+  };
+  const confidenceBriefing = naturalizeUserFacingNarrativeProjection({
+    ...composeConfidenceBriefing(context), ...primaryConfidenceSnapshot,
+  }, casingOptions);
+  const confidenceDeepExplanation = naturalizeUserFacingNarrativeProjection(
+    composeConfidenceDeepExplanation(context), casingOptions);
   const sections = {
-    result: composeResult(context),
-    meaning: composeMeaning(context),
-    action: composeAction(context),
-    watch: composeWatch(context),
+    result: naturalizeUserFacingNarrativeText(composeResult(context),
+      casingOptions),
+    meaning: naturalizeUserFacingNarrativeText(composeMeaning(context),
+      casingOptions),
+    action: naturalizeUserFacingNarrativeText(composeAction(context),
+      casingOptions),
+    watch: naturalizeUserFacingNarrativeText(composeWatch(context),
+      casingOptions),
     confidence: `${confidenceBriefing.heading}\n${confidenceBriefing.body}`,
   };
   const paragraphs = Object.values(sections).filter(Boolean);
   const headline = firstSentence(sections.result ?? sections.meaning ?? sections.action);
-  const coachTake = composeCoachTake(context);
+  const coachTake = naturalizeUserFacingNarrativeText(
+    composeCoachTake(context), casingOptions);
   const finalNarrative = paragraphs.join("\n\n");
   assertDistinctSectionComposition({ context, sections, coachTake });
   assertNarrativeV3Voice(`${finalNarrative}\n${coachTake}\n${JSON.stringify(confidenceDeepExplanation)}`);

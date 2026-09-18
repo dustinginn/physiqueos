@@ -13,6 +13,10 @@ import { composeOperatingPlanStrategyDetail } from
 import { createMonthlyEvidenceIntelligenceV3 } from
   "../intelligence/v3/MonthlyEvidenceIntelligenceV3.js";
 import {
+  configuredNarrativeCapitalizationTerms,
+  findBackendObjectCasingLeaks,
+} from "../services/UserFacingObjectLanguageService.js";
+import {
   BRIEFING_V3_DENSITY_CONTRACTS,
   createNarrativeV3CrossSurfaceShadowPreviews,
   createNarrativeV3RemainingSurfaceShadowPreviews,
@@ -94,7 +98,8 @@ describe("Narrative V3 cross-surface shadow projections", () => {
     });
     expect(preview.operatingPlanTraining.purpose).toBe(details.training.purpose);
     expect(preview.operatingPlanTraining.sections).toEqual(details.training.sections);
-    expect(preview.operatingPlanEnergy.purpose).toBe(details.energy.purpose);
+    expect(preview.operatingPlanEnergy.purpose).toBe(
+      "Follow the current intake and activity targets for this phase while watching how the body responds and keeping the guardrail in view.");
     expect(preview.operatingPlanEnergy.sections).toEqual(details.energy.sections);
     const copy = JSON.stringify(preview);
     expect(copy).not.toMatch(/ISO-Lateral|120 lb|numbers look lower than expected|paired.?day|estimate-vs-outcome|support index|evidence authority|persistence state|Apple Watch|nutrition logging/iu);
@@ -146,7 +151,7 @@ describe("Narrative V3 remaining surface shadow projections", () => {
           primaryReason: expect.stringContaining("Confidence holds") },
       },
     });
-    expect(preview.monthly.hero.title).toContain("58% of the Goal");
+    expect(preview.monthly.hero.title).toContain("58% of the goal");
     expect(preview.monthly.hero.highlights).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: "Goal progress", value: "5.8 of 10 lb" }),
       expect.objectContaining({ label: "Guardrail", value: "8.1% body fat",
@@ -280,8 +285,8 @@ describe("Narrative V3 remaining surface shadow projections", () => {
       recommendationLabel: "Keep the 10 lb lean-mass goal active",
       decisionOptions: [{ label: "Continue current Goal", recommended: true }],
     });
-    expect(review.explanation).toContain("No Goal transition is warranted");
-    expect(review.nextStructuralAction).toContain("Revisit transition when the Goal is achieved");
+    expect(review.explanation).toContain("No goal transition is warranted");
+    expect(review.nextStructuralAction).toContain("Revisit transition when the goal is achieved");
     expect(review.founderAuthority).toContain("does not complete, replace, or transition");
     expect(review).not.toHaveProperty("command");
     expect(review).not.toHaveProperty("actionRequest");
@@ -303,6 +308,28 @@ describe("Narrative V3 remaining surface shadow projections", () => {
     expect(result.confidence).toMatchObject({ currentPercentage: 79, delta: 0,
       strategyConfidence: { percentage: 90 } });
     expect(JSON.stringify(result)).toBe(before);
+  });
+
+  it("keeps backend object casing out of every generated Founder-facing projection", () => {
+    const { goalContract, result } = currentResult();
+    const options = {
+      preserveTerms: configuredNarrativeCapitalizationTerms(goalContract),
+    };
+    const crossSurface = createNarrativeV3CrossSurfaceShadowPreviews({
+      goalContract, operatingPlanDetails: operatingPlanDetails(), result,
+      priority: proteinPriority(),
+    });
+    const remaining = createNarrativeV3RemainingSurfaceShadowPreviews({
+      goalContract, result,
+      monthlyIntelligence: createMonthlyEvidenceIntelligenceV3(
+        createSeptemberMonthlyV3StressTestFixture()),
+    });
+    expect(findBackendObjectCasingLeaks(crossSurface, options)).toEqual([]);
+    expect(findBackendObjectCasingLeaks(remaining, options)).toEqual([]);
+    expect(findBackendObjectCasingLeaks(result.narrativePlan.composition,
+      options)).toEqual([]);
+    expect(findBackendObjectCasingLeaks(result.narrativePlan
+      .confidenceDeepExplanation, options)).toEqual([]);
   });
 });
 

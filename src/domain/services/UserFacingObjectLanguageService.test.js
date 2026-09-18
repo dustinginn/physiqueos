@@ -2,6 +2,10 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   auditNarrativeObjectLanguage,
+  configuredNarrativeCapitalizationTerms,
+  findBackendObjectCasingLeaks,
+  naturalizeUserFacingNarrativeProjection,
+  naturalizeUserFacingNarrativeText,
   resolveUserFacingObjectLanguage,
   USER_FACING_OBJECT_MODES,
 } from "./UserFacingObjectLanguageService";
@@ -158,5 +162,56 @@ describe("canonical user-facing object language", () => {
     expect(midweek).not.toMatch(/message:[^\n]*`\$\{item\.exercise\.name\}/);
     expect(daily).toContain("resolveUserFacingObjectLanguage");
     expect(weekly).toContain("exerciseNarrativeReference");
+  });
+
+  it("uses natural casing for ordinary backend concepts without flattening intentional names", () => {
+    const preserveTerms = ["Build Lean Mass", "DEXA", "ISO-Lateral High Rows"];
+    const input = "The Goal remains in progress in the current Phase. The Guardrail stayed controlled. The Energy picture changed. Goal Confidence remains 79%. Build Lean Mass still uses DEXA, and ISO-Lateral High Rows improved.";
+    expect(naturalizeUserFacingNarrativeText(input, { preserveTerms }))
+      .toBe("The goal remains in progress in the current phase. The guardrail stayed controlled. The energy picture changed. Goal Confidence remains 79%. Build Lean Mass still uses DEXA, and ISO-Lateral High Rows improved.");
+  });
+
+  it("preserves sentence-initial casing, labels, acronyms, named goals and configured evidence", () => {
+    const goalContract = {
+      goalLabel: "Build Lean Mass",
+      phase: { label: "Lean Mass Build" },
+      vocabulary: {
+        goal: { displayName: "10 lb lean-mass goal" },
+        evidence: { requests: { scan: { displayName: "DEXA" } } },
+      },
+    };
+    const output = naturalizeUserFacingNarrativeProjection({
+      heading: "Goal Confidence",
+      label: "Current Goal Phase",
+      prose: "Goal progress is clear. The current Phase remains productive, and the next DEXA matters. ISO-Lateral High Rows improved. Keep body fat inside the 8–9% guardrail.",
+      product: "Use the Operating Plan without exposing the Evidence object.",
+    }, { preserveTerms: [
+      ...configuredNarrativeCapitalizationTerms(goalContract),
+      "ISO-Lateral High Rows",
+    ] });
+    expect(output).toEqual({
+      heading: "Goal Confidence",
+      label: "Current Goal Phase",
+      prose: "Goal progress is clear. The current phase remains productive, and the next DEXA matters. ISO-Lateral High Rows improved. Keep body fat inside the 8–9% guardrail.",
+      product: "Use the Operating Plan without exposing the evidence object.",
+    });
+    expect(findBackendObjectCasingLeaks(output, { preserveTerms: [
+      ...configuredNarrativeCapitalizationTerms(goalContract),
+      "ISO-Lateral High Rows",
+    ] })).toEqual([]);
+  });
+
+  it.each([
+    ["Build Strength", "The Goal is improving while Training stays consistent.",
+      "The goal is improving while training stays consistent."],
+    ["Improve Cardio", "The current Phase remains useful because Activity supports the Goal.",
+      "The current phase remains useful because activity supports the goal."],
+    ["Maintain Weight", "The Guardrail is clear and Weight remains in range.",
+      "The guardrail is clear and weight remains in range."],
+  ])("normalizes ordinary concepts across Goal type %s", (goalName, input,
+    expected) => {
+    expect(naturalizeUserFacingNarrativeText(input, {
+      preserveTerms: [goalName],
+    })).toBe(expected);
   });
 });

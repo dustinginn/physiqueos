@@ -1,5 +1,9 @@
 import { deepFreeze, round, semanticFingerprint } from
   "../intelligence/v3/V3Runtime.js";
+import {
+  configuredNarrativeCapitalizationTerms,
+  naturalizeUserFacingNarrativeProjection,
+} from "../services/UserFacingObjectLanguageService.js";
 
 export const NARRATIVE_V3_DENSITY = deepFreeze({
   GLANCE: "GLANCE",
@@ -93,10 +97,13 @@ export function createNarrativeV3CrossSurfaceShadowPreviews({
       clientWiring: false,
     },
   };
+  const presentation = naturalizeUserFacingNarrativeProjection(semantic, {
+    preserveTerms: configuredNarrativeCapitalizationTerms(goalContract),
+  });
   return deepFreeze({
-    ...semantic,
+    ...presentation,
     id: `narrative_v3_cross_surface_shadow|${semanticFingerprint(
-      semantic).slice(7)}`,
+      presentation).slice(7)}`,
   });
 }
 
@@ -132,10 +139,13 @@ export function createNarrativeV3RemainingSurfaceShadowPreviews({
       structuralCommands: 0,
     },
   };
+  const presentation = naturalizeUserFacingNarrativeProjection(semantic, {
+    preserveTerms: configuredNarrativeCapitalizationTerms(goalContract),
+  });
   return deepFreeze({
-    ...semantic,
+    ...presentation,
     id: `narrative_v3_remaining_surface_shadow|${semanticFingerprint(
-      semantic).slice(7)}`,
+      presentation).slice(7)}`,
   });
 }
 
