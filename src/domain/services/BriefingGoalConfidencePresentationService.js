@@ -114,12 +114,85 @@ export function createBriefingGoalConfidenceBlockFromV2({
   };
 }
 
+export function createBriefingGoalConfidenceBlockFromV3({
+  assessment,
+  narrativePlan = assessment?.narrativePlan,
+  capturedAt = null,
+  captureSemantics = "canonical_v3_assessment_at_atomic_publication",
+} = {}) {
+  if (assessment?.schemaVersion !== "canonical_confidence_assessment_v3") {
+    return null;
+  }
+  const movementDirection = ({ increase: "increased", decrease: "decreased",
+    no_meaningful_change: "held" })[assessment.movement];
+  const movementLabel = ({ increased: "Confidence increased",
+    decreased: "Confidence decreased", held: "No meaningful change" })[
+      movementDirection];
+  const supportingReasons = (assessment.narrativeSupportingFactors ?? [])
+    .map((item) => item.text ?? item).filter(Boolean).slice(0, 3);
+  const limitingReasons = (assessment.narrativeLimitingFactors ?? [])
+    .map((item) => item.text ?? item).filter(Boolean).slice(0, 3);
+  const primaryReason = assessment.narrativeExplanation?.text ??
+    assessment.narrativeSummary ?? null;
+  return {
+    score: assessment.currentPercentage,
+    band: assessment.confidenceBand,
+    priorScore: assessment.priorPercentage,
+    delta: assessment.confidenceDelta,
+    movementDirection,
+    movementMagnitude: assessment.movementMagnitude,
+    primaryReason,
+    presentationExplanation: primaryReason,
+    movementLabel,
+    presentationMovementLabel: movementLabel,
+    supportingReasons,
+    limitingReasons,
+    unresolvedUncertainty: (assessment.remainingUncertainty?.items ?? []).slice(0, 3),
+    assessmentId: assessment.id,
+    assessmentContext: {
+      goalId: assessment.goalId,
+      phaseId: assessment.phaseId,
+      goalContractId: assessment.goalContract?.id ?? null,
+      goalAchievement: assessment.goalAchievementState,
+      strategyRevisionId: assessment.strategyEffectiveness?.strategyRevisionId ?? null,
+    },
+    evidenceCutoff: assessment.sourceCutoff,
+    temporalCutoff: assessment.sourceCutoff,
+    assessmentTimestamp: assessment.publicationTimestamp,
+    assessmentDate: assessment.publicationTimestamp,
+    capturedAt,
+    captureSemantics,
+    source: "canonical_confidence_v3_snapshot",
+    modelVersion: assessment.schemaVersion,
+    piVersion: "confidence_v3",
+    originatingPublisher: assessment.publisherType,
+    originatingArtifactId: assessment.briefingArtifactId,
+    goalId: assessment.goalId,
+    phaseId: assessment.phaseId,
+    explanationModel: {
+      summary: primaryReason,
+      movementLabel,
+      supportingFactors: supportingReasons,
+      limitingFactors: limitingReasons,
+      nextDecisiveEvidence: assessment.nextConfidenceBuildingEvidence
+        ? [assessment.nextConfidenceBuildingEvidence] : [],
+    },
+    narrativeSummary: assessment.narrativeSummary ?? null,
+    narrativeDetail: assessment.narrativeDetail ?? null,
+    narrativeSections: structuredClone(narrativePlan?.composition?.sections ??
+      assessment.narrativeSections ?? null),
+  };
+}
+
 export function createMonthlyBriefingGoalConfidenceBlockFromAssessment(
   assessment,
   options = {}
 ) {
   const legacy = createBriefingGoalConfidenceBlockFromAssessment(assessment, options);
   if (legacy) return legacy;
+  if (assessment?.schemaVersion === "canonical_confidence_assessment_v3") {
+    return createBriefingGoalConfidenceBlockFromV3({ assessment, ...options });
+  }
   if (assessment?.schemaVersion !== "canonical_confidence_assessment_v2") return null;
   const movementDirection = ({ increase: "increased", decrease: "decreased",
     no_meaningful_change: "held" })[assessment.movement];
@@ -161,6 +234,75 @@ export function createMidweekConfidencePresentation(
   _options = {}
 ) {
   return confidence ?? null;
+}
+
+export function applyNarrativeV3ToBriefingArtifact({
+  artifact,
+  publicationType,
+  narrativePlan,
+  strategicInterpretation,
+} = {}) {
+  const candidate = structuredClone(artifact);
+  const sections = narrativePlan?.composition?.sections ?? {};
+  const canonical = {
+    summary: narrativePlan?.composition?.headline ?? null,
+    detail: narrativePlan?.composition?.finalNarrative ?? null,
+    sections: structuredClone(sections),
+    strategicInterpretationId: strategicInterpretation?.id ?? null,
+  };
+  candidate.briefing ??= {};
+  candidate.briefing.narrativeV3 = canonical;
+
+  if (publicationType === "midweek") {
+    candidate.briefing.hero = {
+      ...(candidate.briefing.hero ?? {}),
+      verdict: canonical.summary,
+      summary: sections.meaning ?? sections.result ?? canonical.summary,
+    };
+    candidate.briefing.coachTake = sections.action ?? canonical.summary;
+    candidate.briefing.prioritiesThroughSunday = [sections.action, sections.watch]
+      .filter(Boolean);
+  } else if (publicationType === "weekly") {
+    const weekly = candidate.briefing.weeklyNarrative ?? {};
+    weekly.summary = canonical.summary;
+    weekly.primaryStory = sections.result ?? canonical.summary;
+    weekly.goalMeaning = sections.meaning ?? null;
+    weekly.coachDirection = sections.action ?? null;
+    weekly.nextWeekFocus = sections.watch ?? null;
+    if (weekly.cards?.hero) {
+      weekly.cards.hero.title = canonical.summary;
+      weekly.cards.hero.body = sections.meaning ?? sections.result ?? canonical.summary;
+    }
+    if (weekly.cards?.coachInsight) {
+      weekly.cards.coachInsight.explanation = sections.action ?? null;
+      weekly.cards.coachInsight.preparation = sections.watch ?? null;
+    }
+    candidate.briefing.weeklyNarrative = weekly;
+  } else if (publicationType === "monthly") {
+    const monthly = candidate.briefing.monthlyNarrative ?? {};
+    monthly.title = canonical.summary;
+    monthly.thesis = sections.meaning ?? sections.result ?? canonical.summary;
+    monthly.strategicSummaryV3 = canonical;
+    candidate.briefing.monthlyNarrative = monthly;
+    if (candidate.briefing.monthlyPresentation?.hero) {
+      candidate.briefing.monthlyPresentation.hero.title = canonical.summary;
+      candidate.briefing.monthlyPresentation.hero.thesis = monthly.thesis;
+    }
+  } else if (["dexa", "photo"].includes(publicationType)) {
+    const key = publicationType === "dexa"
+      ? "dexaEventNarrative" : "photoEventNarrative";
+    const event = candidate.briefing[key] ?? {};
+    event.hero = { ...(event.hero ?? {}), title: canonical.summary,
+      body: sections.result ?? canonical.summary };
+    event.strategicMeaningV3 = {
+      meaning: sections.meaning ?? null,
+      action: sections.action ?? null,
+      watch: sections.watch ?? null,
+      confidence: sections.confidence ?? null,
+    };
+    candidate.briefing[key] = event;
+  }
+  return candidate;
 }
 
 function boundedReasons(contributors = []) {

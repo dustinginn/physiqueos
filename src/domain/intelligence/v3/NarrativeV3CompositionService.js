@@ -408,7 +408,8 @@ function composeConfidenceBriefing(context) {
   const heading = `confidence · ${confidence.currentPercentage}% ${arrow}`;
   if (context.recentEventFollowup) {
     const executionName = context.goalContract.vocabulary?.evidence?.executionName;
-    const previousMove = context.priorConfidenceMovement >= 10 ? " after the recent jump" : context.priorConfidenceMovement > 0 ? " after the recent increase" : "";
+    const previousMove = context.priorConfidenceMovement > 0
+      ? " after the recent repricing" : "";
     return { heading, body: `Confidence holds${previousMove}. ${executionName && confidence.execution.state === "supportive" ? `${executionName} still supports the plan, and nothing here changes the outlook.` : "Nothing here changes the outlook."}` };
   }
   if (confidence.delta < 0) {
@@ -427,7 +428,8 @@ function composeConfidenceBriefing(context) {
   }
   const trajectory = confidenceTrajectory(context);
   const strong = context.objective?.significance === "major" && context.objective?.quality === "robust";
-  const opening = confidence.delta >= 10 ? "Confidence jumped" : "Confidence moved up";
+  const opening = confidence.delta >= 10
+    ? "Confidence increased sharply" : "Confidence increased";
   const result = context.objective?.state !== "not_assessed" ? stripPeriod(objectiveMovement(context)) : null;
   const guardrail = primaryGuardrail?.status === "clear" ? compactGuardrail(context, primaryGuardrail) : null;
   const progress = goalProgressSentence(context);

@@ -149,12 +149,42 @@ export function createCanonicalConfidenceAssessmentV3(input = {}) {
     throw new Error("Assessment publisher is invalid.");
   }
   if (!V3_MOVEMENTS.has(input.projection?.movement)) throw new Error("Assessment movement is invalid.");
-  const priorPercentage = input.projection.previousPercentage ?? null;
+  const interpretation = input.interpretation ?? {};
+  const projection = input.projection ?? {};
+  const narrative = input.narrative ?? {};
+  const eligibility = input.eligibility ?? {};
+  const priorPercentage = projection.priorPercentage ??
+    projection.previousPercentage ?? null;
   const currentPercentage = input.projection.currentPercentage;
   if (priorPercentage != null && !validPercentage(priorPercentage) ||
       !validPercentage(currentPercentage)) {
     throw new Error("Assessment percentage is invalid.");
   }
+  const interpretationFingerprint = interpretation.semanticFingerprint ??
+    interpretation.provenance?.inputFingerprint ?? null;
+  const narrativeFingerprint = narrative.semanticFingerprint ??
+    narrative.provenance?.inputFingerprint ?? null;
+  const narrativeSummary = narrative.summary ?? narrative.composition?.headline ??
+    narrative.confidenceBriefing?.body ?? narrative.composition?.coachTake ?? null;
+  const confidenceExplanation = narrative.confidenceBriefing?.body ??
+    narrativeSummary;
+  const narrativeDetail = narrative.detail ?? narrative.composition?.finalNarrative ??
+    narrativeSummary;
+  const uncertaintyItems = interpretation.uncertaintyProfile ??
+    (interpretation.uncertaintyReason ?? []).map((reason) => ({ reason }));
+  const strategyEffectiveness = interpretation.strategyEffectiveness ?? null;
+  const supportingFactors = narrative.confidenceDeepExplanation
+    ? [
+        ...(narrative.confidenceDeepExplanation.whatIncreasedIt ?? []),
+        ...(narrative.confidenceDeepExplanation.whatSupportsItNow ?? []),
+      ].map(textItem)
+    : [...(narrative.supportingFactors ?? [])];
+  const limitingFactors = narrative.confidenceDeepExplanation
+    ? [
+        ...(narrative.confidenceDeepExplanation.whatIsHoldingItBack ?? []),
+        ...(narrative.confidenceDeepExplanation.whatCouldLowerIt ?? []),
+      ].map(textItem)
+    : [...(narrative.limitingFactors ?? [])];
   const canonical = {
     schemaVersion: CANONICAL_CONFIDENCE_ASSESSMENT_V3_VERSION,
     goalId: required(input.goalId, "goalId"),
@@ -170,24 +200,27 @@ export function createCanonicalConfidenceAssessmentV3(input = {}) {
     priorAssessmentId: input.priorAssessmentId ?? null,
     priorPercentage,
     currentPercentage,
-    confidenceBand: required(input.confidenceBand, "confidenceBand"),
+    confidenceBand: required(input.confidenceBand ?? projection.confidenceBand,
+      "confidenceBand"),
     movement: input.projection.movement,
     movementMagnitude: magnitudeOf(input.projection.delta),
     narrativeExplanation: {
-      text: required(input.narrative?.summary, "narrative.summary"),
-      movementRationaleCode: input.interpretation?.confidenceMovementReason ?? null,
+      text: required(confidenceExplanation, "narrative.confidenceBriefing.body"),
+      movementRationaleCode: projection.movementReason ??
+        interpretation.confidenceMovementReason ?? null,
       uncertaintyReduction: null,
     },
     remainingUncertainty: {
-      status: (input.interpretation?.uncertaintyReason?.length ?? 0) > 0 ? "material" : "none",
-      items: [...(input.interpretation?.uncertaintyReason ?? [])],
+      status: uncertaintyItems.length > 0 ? "material" : "none",
+      items: structuredClone(uncertaintyItems),
     },
-    nextConfidenceBuildingEvidence: input.interpretation?.nextDecisiveEvidence ?? null,
-    structuredInterpretationId: required(input.interpretation?.id ?? interpretationId(input.interpretation),
+    nextConfidenceBuildingEvidence: narrative.nextEvidence ??
+      interpretation.nextCoachingQuestion ?? interpretation.nextDecisiveEvidence ?? null,
+    structuredInterpretationId: required(interpretation.id ?? interpretationId(interpretation),
       "structuredInterpretationId"),
     forecastAssessmentId: null,
     narrativeAssessmentId: required(narrativeId(input.narrative), "narrativeAssessmentId"),
-    semanticContinuityFingerprint: required(input.interpretation?.provenance?.inputFingerprint,
+    semanticContinuityFingerprint: required(interpretationFingerprint,
       "semanticContinuityFingerprint"),
     publicationTimestamp: timestamp(input.publicationTimestamp),
     sourceCutoff: timestamp(input.sourceCutoff),
@@ -199,40 +232,68 @@ export function createCanonicalConfidenceAssessmentV3(input = {}) {
     idempotencyKey: required(input.idempotencyKey, "idempotencyKey"),
     sourceLineage: structuredClone(input.sourceLineage ?? {}),
     reproducibility: {
-      numericProjectionVersion: required(input.projection?.schemaVersion, "numericProjectionVersion"),
-      numericProjectionId: projectionId(input.projection),
+      numericProjectionVersion: required(projection.schemaVersion, "numericProjectionVersion"),
+      numericProjectionId: projectionId(projection),
       goalContractFingerprint: input.goalContractFingerprint ?? null,
-      interpretationFingerprint: required(input.interpretation?.provenance?.inputFingerprint,
+      interpretationFingerprint: required(interpretationFingerprint,
         "interpretationFingerprint"),
       forecastFingerprint: null,
-      narrativeFingerprint: required(input.narrative?.provenance?.inputFingerprint, "narrativeFingerprint"),
-      semanticContinuityFingerprint: required(input.interpretation?.provenance?.inputFingerprint,
+      narrativeFingerprint: required(narrativeFingerprint, "narrativeFingerprint"),
+      semanticContinuityFingerprint: required(interpretationFingerprint,
         "semanticContinuityFingerprint"),
       engineVersions: {
-        interpretation: input.interpretation.provenance.engineVersion,
+        interpretation: interpretation.provenance?.engineVersion ??
+          interpretation.schemaVersion,
         forecast: null,
-        narrative: input.narrative.provenance.engineVersion,
-        projection: input.projection.schemaVersion,
+        narrative: narrative.provenance?.engineVersion ?? narrative.schemaVersion,
+        projection: projection.schemaVersion,
       },
     },
     // V3-native fields — additive, never required by the V2 read path, and
     // never consumed by client presentation directly (Web/Native still only
     // ever read the shared outer fields above). Kept for auditability,
     // future presentation, and the Native contract handoff.
-    evidenceDomainsConsidered: [...(input.eligibility?.evidenceDomainsConsidered ?? [])],
-    eligibleEvidenceRefs: [...(input.eligibility?.eligibleEvidenceRefs ?? [])],
-    freshnessState: input.eligibility?.perDomain
-      ? summarizeFreshness(input.eligibility.perDomain) : null,
-    completenessState: input.eligibility?.overallCompleteness ?? null,
-    contradictions: [...(input.eligibility?.contradictions ?? [])],
-    feasibilityState: input.interpretation?.feasibilityState ?? null,
-    persistenceState: input.interpretation?.persistenceState ?? null,
-    missingEvidence: [...(input.eligibility?.missingEvidence ?? [])],
-    staleEvidence: [...(input.eligibility?.staleEvidence ?? [])],
-    narrativeSections: input.narrative?.sections ?? null,
-    narrativeSupportingFactors: [...(input.narrative?.supportingFactors ?? [])],
-    narrativeLimitingFactors: [...(input.narrative?.limitingFactors ?? [])],
-    operatingPlanImplications: input.narrative?.sections?.operatingPlanImplications ?? [],
+    evidenceDomainsConsidered: [...new Set([
+      ...(eligibility.evidenceDomainsConsidered ?? []),
+      ...(eligibility.eligibleObservations ?? []).map((item) => item.sourceType),
+    ])],
+    eligibleEvidenceRefs: [...(eligibility.eligibleEvidenceRefs ??
+      eligibility.eligibleObservationIds ?? [])],
+    freshnessState: eligibility.perDomain
+      ? summarizeFreshness(eligibility.perDomain)
+      : summarizeEligibilityFreshness(eligibility.freshness),
+    completenessState: eligibility.overallCompleteness ??
+      eligibility.completeness ?? null,
+    contradictions: [...(eligibility.contradictions ?? [])],
+    feasibilityState: interpretation.feasibilityState ??
+      strategyEffectiveness?.feasibility ?? null,
+    persistenceState: interpretation.persistenceState ??
+      strategyEffectiveness?.persistence ?? null,
+    attributionState: strategyEffectiveness?.attribution ?? null,
+    goalAchievementState: interpretation.goalAchievement ?? null,
+    strategyConfidence: structuredClone(projection.strategyConfidence ?? null),
+    strategyEffectiveness: structuredClone(strategyEffectiveness),
+    guardrailState: interpretation.aggregateGuardrailState ?? null,
+    coachingStateId: interpretation.coachingStateId ?? null,
+    confidenceDelta: projection.delta ?? (priorPercentage == null
+      ? null : currentPercentage - priorPercentage),
+    missingEvidence: [...(eligibility.missingEvidence ??
+      eligibility.missingSubjects ?? [])],
+    staleEvidence: [...(eligibility.staleEvidence ??
+      (eligibility.freshness ?? []).filter((item) => item.state === "stale"))],
+    narrativeSummary,
+    narrativeDetail,
+    narrativeSections: narrative.sections ?? narrative.composition?.sections ?? null,
+    narrativeSupportingFactors: supportingFactors,
+    narrativeLimitingFactors: limitingFactors,
+    operatingPlanImplications: narrative.sections?.operatingPlanImplications ??
+      (narrative.composition?.sections?.action
+        ? [narrative.composition.sections.action] : []),
+    strategicInterpretation: structuredClone(interpretation),
+    coachingState: structuredClone(input.coachingState ?? null),
+    confidenceProjection: structuredClone(projection),
+    narrativePlan: structuredClone(narrative),
+    evidenceEligibility: structuredClone(eligibility),
   };
   const id = assessmentIdentityV3(canonical);
   if (input.id && input.id !== id) throw new Error("Assessment identity mismatch.");
@@ -271,13 +332,21 @@ function assessmentIdentityV3(value) {
   })}`;
 }
 function interpretationId(interpretation) {
-  return interpretation ? `strategic_interpretation|${interpretation.provenance?.inputFingerprint}` : null;
+  return interpretation?.id ?? (interpretation
+    ? `strategic_interpretation|${interpretation.semanticFingerprint ??
+        interpretation.provenance?.inputFingerprint}`
+    : null);
 }
 function narrativeId(narrative) {
-  return narrative ? `narrative_v3|${narrative.provenance?.inputFingerprint}` : null;
+  return narrative?.id ?? (narrative
+    ? `narrative_v3|${narrative.semanticFingerprint ??
+        narrative.provenance?.inputFingerprint}`
+    : null);
 }
 function projectionId(projection) {
-  return projection ? `strategic_confidence_projection|${projection.interpretationInputFingerprint}|${projection.currentPercentage}` : null;
+  return projection?.id ?? (projection
+    ? `strategic_confidence_projection|${projection.interpretationInputFingerprint ?? projection.semanticFingerprint}|${projection.currentPercentage}`
+    : null);
 }
 function summarizeFreshness(perDomain) {
   if (perDomain.some((item) => item.freshnessState === "stale")) return "stale";
@@ -291,6 +360,15 @@ function magnitudeOf(delta) {
   if (value <= 2) return "small";
   if (value <= 5) return "moderate";
   return "material";
+}
+function summarizeEligibilityFreshness(items = []) {
+  if (items.some((item) => item.state === "stale")) return "stale";
+  if (items.some((item) => item.state === "aging")) return "aging";
+  if (items.some((item) => item.state === "current")) return "current";
+  return items.length ? "unknown" : null;
+}
+function textItem(value) {
+  return typeof value === "string" ? { text: value } : structuredClone(value);
 }
 
 function assessmentIdentity(value) {

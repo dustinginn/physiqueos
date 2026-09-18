@@ -5,14 +5,17 @@ import path from "node:path";
 import { createCanonicalConfidenceAssessment } from "../confidence/CanonicalConfidenceAssessmentModel";
 import { createCanonicalBriefingConfidencePublicationService } from "../services/CanonicalBriefingConfidencePublicationService";
 import { createStrategicActivationService } from "./StrategicActivationService";
+import { createPairedCalibrationFixtures } from
+  "../../fixtures/confidenceNarrativeV3CalibrationFixtures";
 
 const directories = [];
 afterEach(() => {
   directories.splice(0).forEach((directory) => fs.rmSync(directory, { recursive: true, force: true }));
 });
 
-const GOAL_ID = "goal_build_lean_mass";
-const PHASE_ID = "phase_current";
+const CALIBRATION = createPairedCalibrationFixtures().dexa;
+const GOAL_ID = CALIBRATION.goalContract.goalId;
+const PHASE_ID = CALIBRATION.goalContract.phase.phaseId;
 
 function priorV2Assessment() {
   return createCanonicalConfidenceAssessment({
@@ -97,20 +100,8 @@ function setup() {
     publicationService,
     now: () => new Date("2026-09-17T12:00:00.000Z"),
     buildInterpretationInput: async () => ({
-      interpretation: {
-        goalProgress: { status: "available", direction: "increase", requiredProgress: 10, remainingGap: 5, cumulativeProgress: 5 },
-        observedInterval: { priorValue: 148.3, priorObservedOn: "2026-08-15", currentValue: 153.3, currentObservedOn: "2026-09-12" },
-        deadline: { remainingDays: 49 },
-        guardrails: [],
-        evidence: { domain: "dexa", goalOutcomeMetric: "lean_mass" },
-        evidenceQuality: { hasValidComparableReference: true },
-        persistenceContext: { priorConfirmingIntervalCount: 0, contradicted: false },
-      },
-      eligibilityInput: {
-        evidenceRefs: [{ id: "dexa-1", domain: "dexa", observedOn: "2026-09-12", status: "active" }],
-        primaryDomains: ["dexa"],
-      },
-      baseCeiling: 8,
+      goalContract: CALIBRATION.goalContract,
+      observations: CALIBRATION.observations,
     }),
   });
   return { filePath, activationService, prior, store };

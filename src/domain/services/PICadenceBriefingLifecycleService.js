@@ -1,24 +1,24 @@
-import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
 import { createCanonicalConfidenceReadService } from
   "../confidence/CanonicalConfidenceReadService";
 import {
-  adaptBriefingArtifactToExecutionContext,
-  adaptBriefingArtifactToEvidenceDescriptors,
-  adaptProductionGoalToCanonicalContract,
-} from "../confidence/ProductionConfidenceContextAdapter";
-import { createCadenceEvidenceDurabilityContext } from
-  "../confidence/CadenceEvidenceDurabilityContextService";
-import { createBriefingGoalConfidenceBlockFromV2 } from
+  adaptCadenceEvidenceObservationsV3,
+} from "../intelligence/ProductionConfidenceNarrativeV3Adapter";
+import { applyNarrativeV3ToBriefingArtifact,
+  createBriefingGoalConfidenceBlockFromV3 } from
   "./BriefingGoalConfidencePresentationService";
 import { resolveIntelligenceEvidenceCutoff } from
   "./IntelligenceLifecycleIdentityService";
+import { createStrategicInterpretationPublicationServiceV3 } from
+  "./StrategicInterpretationPublicationServiceV3";
 
 export function createPICadenceBriefingLifecycleService({
   publicationService,
   now = () => new Date(),
 } = {}) {
   if (!publicationService) throw new Error("Cadence publication service is required.");
-  const finalizer = createBriefingForecastFinalizer({ publicationService, now });
+  const finalizer = createStrategicInterpretationPublicationServiceV3({
+    publicationService, now,
+  });
   return Object.freeze({
     async publish({ cadence, operation, artifact, activeGoal, activePhase,
       operatingState, piEnvelope = null, reason,
@@ -40,43 +40,29 @@ export function createPICadenceBriefingLifecycleService({
           artifact.evidenceWindow.endDate,
         timeZone: artifact.evidenceWindow.timeZone ?? "America/Los_Angeles",
       });
-      const goalContract = adaptProductionGoalToCanonicalContract(activeGoal, {
-        activePhase, canonicalStore: baseline.store, asOf: cutoff,
-      });
-      const evidenceDescriptors = adaptBriefingArtifactToEvidenceDescriptors({
-        artifact, piEnvelope,
-      });
-      const durabilityContext = createCadenceEvidenceDurabilityContext({
-        store: baseline.store,
-        artifact,
-        cadence,
-        goalContract,
-        previousCanonicalAssessment: current.assessment,
-      });
       const result = await finalizer.finalize({
         publisherType: `${cadence}_briefing`,
         userId: artifact.userId,
         occurrenceId: artifact.id,
         artifactId: artifact.id,
         cadenceOrEventType: cadence,
-        goalContract,
-        phaseId: activePhase.id,
-        evidenceWindow: { id: artifact.evidenceWindow.id,
-          start: artifact.evidenceWindow.startDate ?? null,
-          cutoff, closed: artifact.evidenceWindow.closed !== false },
-        strategyContext: goalContract.strategyHypothesis,
-        executionContext: adaptBriefingArtifactToExecutionContext({
-          artifact, piEnvelope, cadence, operatingState,
-        }),
-        evidenceDescriptors,
-        durabilityContext,
+        goal: activeGoal,
+        phase: activePhase,
+        store: baseline.store,
+        evidenceWindowId: artifact.evidenceWindow.id,
+        evidenceWindowClosed: artifact.evidenceWindow.closed !== false,
+        buildAdditionalObservations: ({ goalContract }) =>
+          adaptCadenceEvidenceObservationsV3({
+            goalContract, phase: activePhase, artifact, piEnvelope,
+            evidenceCutoff: cutoff,
+          }),
         previousCanonicalAssessment: current.assessment,
-        publicationCutoff: cutoff,
+        evidenceCutoff: cutoff,
         finalizedAt: now().toISOString(),
         idempotencyKey: operation === "regenerate"
-          ? `confidence_v2|${cadence}|${artifact.id}|revision|${
+          ? `confidence_v3|${cadence}|${artifact.id}|revision|${
             artifact.dependencyManifest?.fingerprint ?? artifact.generatedAt}`
-          : `confidence_v2|${cadence}|${artifact.id}`,
+          : `confidence_v3|${cadence}|${artifact.id}`,
         expectedPriorAssessmentId: current.assessment.id,
         expectedPriorArtifactId: current.assessment.briefingArtifactId,
         expectedRevision: baseline.revision,
@@ -86,7 +72,8 @@ export function createPICadenceBriefingLifecycleService({
         replacesAssessmentId:
           replacementTarget?.confidencePublication?.assessmentId ?? null,
         sourceLineage: createCadenceSourceLineage({ reason, artifact }),
-        elapsedTimeAdequacy: cadence === "midweek" ? "partial" : "adequate",
+        evaluationType: "closed_cadence_boundary",
+        surface: `${cadence}_briefing`,
         phaseReviewContext: {
           activeGoal, activePhase,
           reviewMilestone: activePhase.reviewMilestone ?? null,
@@ -100,11 +87,14 @@ export function createPICadenceBriefingLifecycleService({
           expectedStoreRevision: baseline.revision,
         },
         composeArtifact: (outputs) => {
-          const candidate = structuredClone(artifact);
-          const block = createBriefingGoalConfidenceBlockFromV2({
+          const candidate = applyNarrativeV3ToBriefingArtifact({
+            artifact, publicationType: cadence,
+            narrativePlan: outputs.narrativePlan,
+            strategicInterpretation: outputs.strategicInterpretation,
+          });
+          const block = createBriefingGoalConfidenceBlockFromV3({
             assessment: outputs.confidenceAssessment,
-            projection: outputs.numericConfidenceProjection,
-            narrativeAssessment: outputs.narrativeAssessment,
+            narrativePlan: outputs.narrativePlan,
             capturedAt: now().toISOString(),
           });
           if (cadence === "midweek") candidate.briefing.goalConfidence = block;

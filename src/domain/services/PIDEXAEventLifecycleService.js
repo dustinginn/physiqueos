@@ -1,19 +1,21 @@
-import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
 import { createCanonicalConfidenceReadService } from
   "../confidence/CanonicalConfidenceReadService";
-import {
-  adaptDEXAEventToEvidenceDescriptors,
-  adaptProductionGoalToCanonicalContract,
-} from "../confidence/ProductionConfidenceContextAdapter";
-import { createBriefingGoalConfidenceBlockFromV2 } from
+import { adaptCanonicalDexaScans } from
+  "../intelligence/ProductionConfidenceNarrativeV3Adapter";
+import { applyNarrativeV3ToBriefingArtifact,
+  createBriefingGoalConfidenceBlockFromV3 } from
   "./BriefingGoalConfidencePresentationService";
 import { resolveIntelligenceEvidenceCutoff } from
   "./IntelligenceLifecycleIdentityService";
+import { createStrategicInterpretationPublicationServiceV3 } from
+  "./StrategicInterpretationPublicationServiceV3";
 
 export function createPIDEXAEventLifecycleService({ publicationService,
   now = () => new Date() } = {}) {
   if (!publicationService) throw new Error("DEXA Event publication service is required.");
-  const finalizer = createBriefingForecastFinalizer({ publicationService, now });
+  const finalizer = createStrategicInterpretationPublicationServiceV3({
+    publicationService, now,
+  });
   return Object.freeze({
     async publish({ operation = "create", artifact, scan, priorScan, context, reason,
       replacementAuthorized = false } = {}) {
@@ -34,23 +36,18 @@ export function createPIDEXAEventLifecycleService({ publicationService,
         timeZone: context?.timeZone ?? artifact?.timeZone ??
           "America/Los_Angeles",
       });
-      const goalContract = adaptProductionGoalToCanonicalContract(goal, {
-        activePhase: phase, canonicalStore: baseline.store, asOf: cutoff,
-      });
       const result = await finalizer.finalize({
         publisherType: "dexa_event_briefing", userId: artifact.userId,
         occurrenceId: artifact.id, artifactId: artifact.id,
-        cadenceOrEventType: "dexa", goalContract, phaseId: phase.id,
-        evidenceWindow: { id: `dexa_event|${scan.id}`,
-          start: priorScan?.measuredAt ?? priorScan?.date ?? cutoff,
-          cutoff, closed: true },
-        strategyContext: goalContract.strategyHypothesis,
-        executionContext: { adequacy: "adequate",
-          elapsedTimeAdequacy: priorScan ? "adequate" : "unknown", refs: [] },
-        evidenceDescriptors: adaptDEXAEventToEvidenceDescriptors({ scan, priorScan }),
+        cadenceOrEventType: "dexa", goal, phase, store: baseline.store,
+        evidenceWindowId: `dexa_event|${scan.id}`,
+        evidenceWindowClosed: true,
+        buildAdditionalObservations: ({ goalContract }) =>
+          adaptCanonicalDexaScans({ goalContract, phase,
+            scans: [priorScan, scan].filter(Boolean), cutoff }),
         previousCanonicalAssessment: current.assessment,
-        publicationCutoff: cutoff, finalizedAt: now().toISOString(),
-        idempotencyKey: `confidence_v2|dexa|${artifact.id}`,
+        evidenceCutoff: cutoff, finalizedAt: now().toISOString(),
+        idempotencyKey: `confidence_v3|dexa|${artifact.id}`,
         expectedPriorAssessmentId: current.assessment.id,
         expectedPriorArtifactId: current.assessment.briefingArtifactId,
         expectedRevision: baseline.revision,
@@ -61,12 +58,14 @@ export function createPIDEXAEventLifecycleService({ publicationService,
           replacementTarget?.confidencePublication?.assessmentId ?? null,
         sourceLineage: { reason, canonicalDEXAId: scan.id,
           priorDEXAId: priorScan?.id ?? null },
-        elapsedTimeAdequacy: priorScan ? "adequate" : "unknown",
+        evaluationType: "event_evidence_boundary",
+        surface: "dexa_event_briefing",
         phaseReviewContext: {
           activeGoal: goal, activePhase: phase,
           reviewMilestone: phase.reviewMilestone ?? null,
           currentArtifact: { id: artifact.id, evidenceTypes: ["dexa_event"],
             evidenceIdentities: [scan.id] },
+          currentEvidence: scan,
           artifactType: "dexa_event", eventIdentity: artifact.id,
           evidenceIdentity: scan.id, artifactTimestamp: cutoff,
           publicationTimestamp: now().toISOString(), currentDate: cutoff,
@@ -75,12 +74,15 @@ export function createPIDEXAEventLifecycleService({ publicationService,
           expectedStoreRevision: baseline.revision,
         },
         composeArtifact: (outputs) => {
-          const candidate = structuredClone(artifact);
+          const candidate = applyNarrativeV3ToBriefingArtifact({
+            artifact, publicationType: "dexa",
+            narrativePlan: outputs.narrativePlan,
+            strategicInterpretation: outputs.strategicInterpretation,
+          });
           candidate.briefing.dexaEventNarrative.goalConfidence = {
-            ...createBriefingGoalConfidenceBlockFromV2({
+            ...createBriefingGoalConfidenceBlockFromV3({
               assessment: outputs.confidenceAssessment,
-              projection: outputs.numericConfidenceProjection,
-              narrativeAssessment: outputs.narrativeAssessment,
+              narrativePlan: outputs.narrativePlan,
               capturedAt: now().toISOString(),
             }),
             canonicalDEXAId: scan.id,

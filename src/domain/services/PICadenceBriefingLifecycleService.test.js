@@ -54,18 +54,15 @@ describe("PI cadence Confidence lifecycle", () => {
     });
     expect(result).toMatchObject({ status: "published_successor", committed: true });
     const assessment = publish.mock.calls[0][0].assessment;
-    expect(assessment.evidenceDurability).toMatchObject({
-      persistence: "emerging",
-      independentPeriodCount: 0,
-      currentPeriod: {
-        id: "confidence_week|2026-08-02|2026-08-08|America/Los_Angeles",
-        state: "preliminary",
-      },
-      signals: [expect.objectContaining({ capability: "training_progression" })],
-    });
-    expect(assessment.movement).toBe("no_meaningful_change");
+    expect(assessment.schemaVersion).toBe("canonical_confidence_assessment_v3");
+    expect(assessment.evidenceEligibility.eligibleObservationIds)
+      .toContain("cadence_v3|midweek-two|performance|overall|resistance");
+    expect(assessment.confidenceProjection.execution.state).toBe("supportive");
+    expect(assessment.movement).toBe("increase");
+    expect(assessment.confidenceDelta).toBeGreaterThan(0);
+    expect(assessment.confidenceDelta).toBeLessThanOrEqual(3);
     expect(assessment.sourceCutoff).toBe("2026-08-05T06:59:59.999Z");
-    expect(assessment.narrativeExplanation.text).toMatch(/still preliminary/i);
+    expect(assessment.narrativeExplanation.text).toBeTruthy();
   });
 
   it("normalizes an absent optional artifact version for strict provider JSON", () => {
@@ -135,6 +132,23 @@ function goal() {
         role: "predictive", accepted: true }],
       explanatorySignals: [],
     },
+    evidencePoliciesV3: [{
+      policyId: "execution_training",
+      subjectType: "execution",
+      subjectId: null,
+      capabilityPattern: "performance.training_support_index",
+      role: "supporting",
+      minimumQuality: "adequate",
+      participation: "PERSISTENCE_CONFIRMATION_INPUT",
+      usableFor: ["execution"],
+      signalRules: {
+        supportsWhen: { version: "declarative_predicate_v1",
+          path: "measurement.value", operator: "gte", value: 1 },
+        contradictsWhen: { version: "declarative_predicate_v1",
+          path: "measurement.value", operator: "lte", value: -1 },
+        significance: "meaningful",
+      },
+    }],
   };
 }
 

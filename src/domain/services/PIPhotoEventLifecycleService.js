@@ -1,22 +1,27 @@
-import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
 import { createCanonicalConfidenceReadService } from
   "../confidence/CanonicalConfidenceReadService";
 import {
-  adaptPhotoEventToEvidenceDescriptors,
-  adaptProductionGoalToCanonicalContract,
   isQualifyingPhotoEventInterpretation,
 } from "../confidence/ProductionConfidenceContextAdapter";
-import { createBriefingGoalConfidenceBlockFromV2 } from
+import { adaptCanonicalPhotoObservations } from
+  "../intelligence/ProductionConfidenceNarrativeV3Adapter";
+import { applyNarrativeV3ToBriefingArtifact,
+  createMonthlyBriefingGoalConfidenceBlockFromAssessment,
+  createBriefingGoalConfidenceBlockFromV3 } from
   "./BriefingGoalConfidencePresentationService";
 import { ConfidencePublisherRegistry } from
   "../confidence/ConfidencePublisherRegistry";
 import { resolveIntelligenceEvidenceCutoff } from
   "./IntelligenceLifecycleIdentityService";
+import { createStrategicInterpretationPublicationServiceV3 } from
+  "./StrategicInterpretationPublicationServiceV3";
 
 export function createPIPhotoEventLifecycleService({ publicationService,
   now = () => new Date() } = {}) {
   if (!publicationService) throw new Error("Photo Event publication service is required.");
-  const finalizer = createBriefingForecastFinalizer({ publicationService, now });
+  const finalizer = createStrategicInterpretationPublicationServiceV3({
+    publicationService, now,
+  });
   return Object.freeze({
     async publish({ operation = "create", confidenceMode = "publish-successor",
       artifact, session, context, reason,
@@ -66,22 +71,19 @@ export function createPIPhotoEventLifecycleService({ publicationService,
           authorization, artifact: carriedArtifact,
           matchedAssessmentId: historical.assessment.id });
       }
-      const goalContract = adaptProductionGoalToCanonicalContract(goal, {
-        activePhase: phase, canonicalStore: baseline.store, asOf: cutoff,
-      });
       const result = await finalizer.finalize({
         publisherType: "photo_event_briefing", userId: artifact.userId,
         occurrenceId: artifact.id, artifactId: artifact.id,
-        cadenceOrEventType: "photo", goalContract, phaseId: phase.id,
-        evidenceWindow: { id: `photo_event|${session.id}`, start: cutoff,
-          cutoff, closed: true },
-        strategyContext: goalContract.strategyHypothesis,
-        executionContext: { adequacy: "unknown", elapsedTimeAdequacy: "unknown",
-          refs: [] },
-        evidenceDescriptors: adaptPhotoEventToEvidenceDescriptors({ session, narrative }),
+        cadenceOrEventType: "photo", goal, phase, store: baseline.store,
+        evidenceWindowId: `photo_event|${session.id}`,
+        evidenceWindowClosed: true,
+        buildAdditionalObservations: ({ goalContract }) =>
+          adaptCanonicalPhotoObservations({ goalContract, phase,
+            store: { photoAnalyses: [{ ...session, interpretation: narrative }] },
+            cutoff }),
         previousCanonicalAssessment: current.assessment,
-        publicationCutoff: cutoff, finalizedAt: now().toISOString(),
-        idempotencyKey: `confidence_v2|photo|${artifact.id}`,
+        evidenceCutoff: cutoff, finalizedAt: now().toISOString(),
+        idempotencyKey: `confidence_v3|photo|${artifact.id}`,
         expectedPriorAssessmentId: current.assessment.id,
         expectedPriorArtifactId: current.assessment.briefingArtifactId,
         expectedRevision: baseline.revision,
@@ -92,12 +94,14 @@ export function createPIPhotoEventLifecycleService({ publicationService,
           replacementTarget?.confidencePublication?.assessmentId ?? null,
         qualifyingPhotoEvent: true,
         sourceLineage: { reason, canonicalPhotoSessionId: session.id },
-        elapsedTimeAdequacy: "unknown",
+        evaluationType: "event_evidence_boundary",
+        surface: "photo_event_briefing",
         phaseReviewContext: {
           activeGoal: goal, activePhase: phase,
           reviewMilestone: phase.reviewMilestone ?? null,
           currentArtifact: { id: artifact.id, evidenceTypes: ["photo_event"],
             evidenceIdentities: [session.id] },
+          currentEvidence: session,
           artifactType: "photo_event", eventIdentity: artifact.id,
           evidenceIdentity: session.id, artifactTimestamp: cutoff,
           publicationTimestamp: now().toISOString(), currentDate: cutoff,
@@ -106,12 +110,15 @@ export function createPIPhotoEventLifecycleService({ publicationService,
           expectedStoreRevision: baseline.revision,
         },
         composeArtifact: (outputs) => {
-          const candidate = structuredClone(artifact);
+          const candidate = applyNarrativeV3ToBriefingArtifact({
+            artifact, publicationType: "photo",
+            narrativePlan: outputs.narrativePlan,
+            strategicInterpretation: outputs.strategicInterpretation,
+          });
           candidate.briefing.photoEventNarrative.goalConfidence = {
-            ...createBriefingGoalConfidenceBlockFromV2({
+            ...createBriefingGoalConfidenceBlockFromV3({
               assessment: outputs.confidenceAssessment,
-              projection: outputs.numericConfidenceProjection,
-              narrativeAssessment: outputs.narrativeAssessment,
+              narrativePlan: outputs.narrativePlan,
               capturedAt: now().toISOString(),
             }),
             canonicalPhotoSessionId: session.id,
@@ -132,8 +139,7 @@ function historicalAssessmentAtOrBefore({ store, goalId, phaseId, cutoff }) {
 function bindHistoricalConfidence({ artifact, assessment, cutoff, now }) {
   const candidate = structuredClone(artifact);
   candidate.briefing.photoEventNarrative.goalConfidence = {
-    ...createBriefingGoalConfidenceBlockFromV2({ assessment,
-      projection: { currentPercentage: assessment.currentPercentage },
+    ...createMonthlyBriefingGoalConfidenceBlockFromAssessment(assessment, {
       capturedAt: now().toISOString(),
       captureSemantics: "historical_matched_assessment_at_event_publication" }),
     canonicalPhotoSessionId: artifact.trigger.evidenceId,

@@ -234,6 +234,62 @@ export function createCanonicalEvidenceObservationsV3({
     left.observationId.localeCompare(right.observationId)));
 }
 
+export function adaptCadenceEvidenceObservationsV3({
+  goalContract,
+  phase,
+  artifact,
+  piEnvelope = null,
+  evidenceCutoff,
+} = {}) {
+  const values = piEnvelope?.observations ?? piEnvelope?.shadow?.observations ??
+    artifact?.briefing?.weeklyNarrative?.context?.pi?.observations ?? [];
+  const cutoff = timestamp(evidenceCutoff, "evidenceCutoff");
+  return values.filter((item) => item?.id && item?.domain).flatMap((item) => {
+    const capability = cadenceCapabilityV3(item);
+    if (!capability) return [];
+    const observed = timestamp(item.evidenceWindow?.endDate ?? cutoff,
+      "cadence observation observedAt");
+    const direction = item.direction === "negative" ||
+      ["regressing", "deteriorating", "missed"].includes(item.status)
+      ? "contradicts" : item.direction === "positive" ||
+        ["improving", "supportive", "complete"].includes(item.status)
+        ? "supports" : "neutral";
+    const references = item.supportingEvidenceIds ?? [];
+    return [createEvidenceObservationV3({
+      observationId: `cadence_v3|${artifact?.id ?? cutoff}|${item.id}`,
+      canonicalRecordId: item.canonicalRecordId ?? item.id,
+      sourceType: `canonical_${item.domain}_observation`,
+      displayLabel: item.displayLabel ?? humanize(item.domain),
+      observedAt: observed,
+      status: "active",
+      relatedGoalIds: [goalContract.goalId],
+      phaseId: phase?.id ?? goalContract.phase.phaseId,
+      strategyRevisionId: goalContract.strategy.strategyRevisionId,
+      highSalienceEvent: false,
+      evidenceWindow: item.evidenceWindow ?? artifact?.evidenceWindow ?? null,
+      directness: item.domain === "weight" ? "direct" : "behavioral",
+      quality: {
+        status: item.status === "insufficient_data" ? "insufficient" :
+          ["high", "very_high"].includes(item.confidence?.level) ? "robust" :
+            item.confidence?.level === "moderate" ? "adequate" : "limited",
+        provenance: item.provenance?.producer ?? "canonical_cadence_observation",
+        precision: "derived",
+        completeness: item.status === "insufficient_data" ? "insufficient" : "reported",
+        comparability: item.evidenceWindow?.comparisonStartDate ? "comparable" : "unknown",
+        coverageRatio: item.confidence?.coverageRatio ?? null,
+      },
+      capabilities: [{
+        capabilityId: capability,
+        value: cadenceValueV3(item),
+        factualSummary: item.factualSummary ?? item.explanationData?.summary?.text ?? null,
+        metadata: { signalDirection: direction },
+      }],
+      limitations: item.confidence?.limitations ?? [],
+      sourceReferences: references,
+    })];
+  });
+}
+
 export function adaptCanonicalDexaScans({
   goalContract,
   phase,
@@ -577,4 +633,25 @@ function machine(value) {
 
 function humanize(value) {
   return machine(value).replaceAll("_", " ") || "Goal result";
+}
+
+function cadenceCapabilityV3(item) {
+  return ({
+    training: "performance.training_support_index",
+    nutrition: "execution.nutrition",
+    energy: "execution.nutrition",
+    activity: "execution.activity",
+    recovery: "execution.recovery",
+    weight: "body_mass.level",
+    photos: "appearance.qualitative_progress",
+  })[item.domain] ?? null;
+}
+
+function cadenceValueV3(item) {
+  const numeric = [item.value, item.currentValue,
+    item.explanationData?.value].map(Number).find(Number.isFinite);
+  if (numeric != null) return numeric;
+  if (item.direction === "positive" || item.status === "improving") return 1;
+  if (item.direction === "negative" || item.status === "regressing") return -1;
+  return 0;
 }
