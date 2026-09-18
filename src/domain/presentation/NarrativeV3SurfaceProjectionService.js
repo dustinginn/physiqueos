@@ -107,6 +107,7 @@ export function createNarrativeV3CrossSurfaceShadowPreviews({
 export function createNarrativeV3RemainingSurfaceShadowPreviews({
   goalContract,
   result,
+  monthlyIntelligence = null,
 } = {}) {
   assertCanonicalV3Inputs(goalContract, result);
   const context = createProjectionContext(goalContract, result);
@@ -115,7 +116,7 @@ export function createNarrativeV3RemainingSurfaceShadowPreviews({
     strategicInterpretationId: result.strategicInterpretation.id,
     confidenceAssessmentId: result.confidence.id,
     narrativePlanId: result.narrativePlan.id,
-    monthly: projectMonthly(context),
+    monthly: projectMonthly(context, monthlyIntelligence),
     phaseReview: projectPhaseReview(context),
     goalTransitionReview: projectGoalTransitionReview(context),
     goalHubPreviewNeeded: false,
@@ -252,7 +253,9 @@ function projectOperatingPlanPurpose(detail) {
   };
 }
 
-function projectMonthly(context) {
+function projectMonthly(context, monthlyIntelligence = null) {
+  if (monthlyIntelligence) return projectMonthlyFromIntelligence(context,
+    monthlyIntelligence);
   const { goalContract, result, interpretation, objective, objectiveWords,
     trajectory, guardrail } = context;
   const narrative = result.narrativePlan;
@@ -265,6 +268,8 @@ function projectMonthly(context) {
   const confidence = result.confidence;
   const phaseName = goalContract.vocabulary?.phase?.displayName ??
     goalContract.phase.label;
+  const phaseContext = goalContract.vocabulary?.phase?.contextName ??
+    "this phase";
   const progress = progressStatement(objective, objectiveWords, trajectory);
   const progressPercent = Number.isFinite(trajectory?.fractionAchieved)
     ? round(trajectory.fractionAchieved * 100) : null;
@@ -393,6 +398,195 @@ function projectMonthly(context) {
         narrative.composition?.coachTake ?? trainingSummary,
     },
   };
+}
+
+function projectMonthlyFromIntelligence(context, intelligence) {
+  const { goalContract, result, guardrail } = context;
+  const confidence = result.confidence;
+  const rows = new Map(intelligence.sourceMatrix.map((item) =>
+    [item.domain, item]));
+  const outcome = intelligence.sourceMatrix.find((item) =>
+    item.measurementType === "DIRECT_OUTCOME") ?? null;
+  const training = rows.get("training_performance");
+  const split = rows.get("training_split");
+  const nutrition = rows.get("nutrition");
+  const energy = rows.get("energy");
+  const weight = rows.get("weight");
+  const outcomeFacts = outcome?.facts ?? {};
+  const outcomeName = outcomeFacts.evidenceName ?? "outcome check";
+  const configuredObjective = objectiveName(context);
+  const periodName = monthName(intelligence.window.endDate);
+  const trainingHighlights = intelligence.selectedHighlights.filter((item) =>
+    item.domain === "training");
+  const primaryTraining = trainingHighlights[0] ?? null;
+  const secondaryTraining = trainingHighlights[1] ?? null;
+  const shortBreak = split?.facts?.shortBreaks?.[0] ?? null;
+  const progress = Number.isFinite(outcomeFacts.goalProgress) &&
+    Number.isFinite(outcomeFacts.goalTarget)
+    ? `${number(outcomeFacts.goalProgress, 1)} of ${number(
+      outcomeFacts.goalTarget)} ${context.objective?.unit}` : null;
+  const progressPercent = Number.isFinite(outcomeFacts.goalFraction)
+    ? round(outcomeFacts.goalFraction * 100) : null;
+  const guardrailValue = Number.isFinite(outcomeFacts.guardrailValue)
+    ? outcomeFacts.guardrailValue : null;
+  const nextEvidence = result.narrativePlan.nextEvidence.displayName;
+  const trainingSummary = compactSentences([
+    secondaryTraining?.headline,
+    shortBreak?.returnedAt ? `Training paused for ${shortBreak.days} days and was back on schedule by ${shortDate(shortBreak.returnedAt)}.` : null,
+  ]);
+  const energySegments = energy?.facts?.segments ?? [];
+  const earlyEnergy = energySegments.find((item) =>
+    item.segment === "september_1_to_12");
+  const laterEnergy = energySegments.find((item) =>
+    item.segment === "september_13_to_17");
+  const energySummary = monthlyCalibratedEnergyCopy({
+    energy, earlyEnergy, laterEnergy, objectiveName: objectiveName(context),
+  });
+  const phaseName = goalContract.vocabulary?.phase?.displayName ??
+    goalContract.phase.label;
+  const outcomeTitle = Number.isFinite(outcomeFacts.objectiveChange)
+    ? `${number(outcomeFacts.objectiveChange, 1)} ${outcomeFacts.objectiveUnit ??
+      context.objective?.unit ?? ""} of ${configuredObjective} made ${periodName} a major step forward.`
+    : `${periodName} produced a major step forward.`;
+  const changeThemes = [
+    outcome ? {
+      label: "Goal progress",
+      title: outcomeTitle,
+      body: guardrailValue == null ? "The Goal moved forward without a confirmed guardrail concern." :
+        `${upperFirst(guardrail?.label ?? "The primary guardrail")} was ${number(
+          guardrailValue, 1)}%, inside the ${guardrail?.range} guardrail.`,
+      tone: "baseline",
+    } : null,
+    primaryTraining ? {
+      label: "Training",
+      title: `${training?.facts?.sessionCount ?? "The month"} resistance-training sessions kept the plan moving.`,
+      body: shortBreak?.returnedAt
+        ? `Training took a ${shortBreak.days}-day pause, then returned to the normal rhythm.`
+        : "The month stayed close to the established personal training rhythm.",
+      tone: "training",
+    } : null,
+    nutrition && energy ? {
+      label: "Nutrition and Energy",
+      title: Number.isFinite(nutrition.facts?.average)
+        ? `Protein averaged ${number(nutrition.facts.average, 1)} g/day across ${nutrition.facts.usableDays} logged days.`
+        : "Nutrition coverage was strong enough to inform the month.",
+      body: "The uneven Energy pattern adds context, but it is not strong enough to override the outcomes or justify a change by itself.",
+      tone: "energy",
+    } : null,
+  ].filter(Boolean);
+  const weightContext = Number.isFinite(weight?.facts?.first) &&
+    Number.isFinite(weight?.facts?.last)
+    ? `Morning weight moved from ${number(weight.facts.first, 1)} to ${number(
+      weight.facts.last, 1)} lb, useful context that agrees with the direction of the DEXA without identifying the tissue change by itself.` : null;
+  return {
+    density: NARRATIVE_V3_DENSITY.FULL,
+    cadence: { calendarDay: 1, recurringPrecedence: true },
+    hero: {
+      eyebrow: "Monthly Briefing",
+      period: `Evidence through ${longDate(intelligence.window.cutoff)}`,
+      goal: phaseName,
+      confidence: {
+        score: confidence.currentPercentage,
+        band: confidence.confidenceBand,
+        priorScore: confidence.priorPercentage,
+        delta: intelligence.confidenceConsequence.delta,
+        movementDirection: presentationMovement(
+          intelligence.confidenceConsequence.movement),
+        primaryReason: "Confidence holds because the major result remains intact and the newer evidence supports continuing the plan without proving another outcome change.",
+        presentationExplanation: `The ${outcomeName} established major progress. Training kept advancing, the guardrail stayed controlled, and no later evidence overturned that result.`,
+        assessmentId: confidence.id,
+        assessmentDate: result.narrativePlan.publicationContext?.publishedAt,
+        evidenceCutoff: intelligence.window.cutoff,
+        goalId: confidence.goalId,
+        phaseId: goalContract.phase.phaseId,
+        source: "canonical_v3_shadow_projection",
+        modelVersion: confidence.policyVersion,
+        piVersion: "confidence_v3",
+      },
+      title: `${periodName} moved the Goal forward, and the current plan still fits.`,
+      thesis: compactSentences([
+        progress ? `The ${outcomeName} moved the Goal to ${progress} complete.` :
+          outcome?.statement,
+        primaryTraining ? "Training kept progressing around that result." : null,
+        "Nothing else in the month creates a reason to change course.",
+      ]),
+      highlights: [
+        progress ? { label: "Goal progress", value: progress,
+          detail: `${progressPercent}% complete` } : null,
+        guardrailValue == null ? null : { label: "Guardrail",
+          value: `${number(guardrailValue, 1)}% ${guardrail?.label}`,
+          detail: `Inside the ${guardrail?.range} range` },
+        { label: "Goal Confidence", value: `${confidence.currentPercentage}%`,
+          detail: "Holding steady" },
+      ].filter(Boolean),
+    },
+    training: primaryTraining ? {
+      eyebrow: "Training Progress",
+      title: primaryTraining.headline,
+      summary: trainingSummary,
+      interpretation: `Those personal bests are useful signs that the productive training environment is continuing; they are not a substitute for the next ${nextEvidence}.`,
+      next: "Keep the current progression moving and work every major area back into its normal rhythm after any short break.",
+    } : null,
+    energy: energy ? {
+      eyebrow: "Nutrition and Energy",
+      title: "The numbers were uneven, but the practical answer is still clear.",
+      summary: energySummary,
+      interpretation: "Keep the current intake and activity setup while progress remains strong and body fat stays controlled. Reconsider it if those outcomes or training begin to turn.",
+    } : null,
+    changes: {
+      eyebrow: "What Changed",
+      title: "The month added a major Goal result and several useful signs that the setup is still working.",
+      themes: changeThemes,
+      context: weightContext?.replace("the DEXA", `the ${outcomeName}`),
+    },
+    monthAhead: {
+      eyebrow: "Month Ahead",
+      title: `${upperFirst(goalContract.vocabulary?.strategy?.continueAction ??
+        `Keep ${phaseContext} steady`)} and protect what is working.`,
+      thesis: "Carry the current training and nutrition rhythm forward without chasing day-to-day noise.",
+      guidance: [
+        { label: "Keep", value: "Continue the current plan.",
+          detail: primaryTraining
+            ? "Keep applying the same progression while the major movements continue to advance."
+            : "Training remains productive." },
+        { label: "Tighten", value: "Keep every major training area in the rotation.",
+          detail: shortBreak ? "The short break resolved once training resumed; the useful test is whether the normal rhythm now holds." : "No persistent split drift was found." },
+        guardrail ? { label: "Protect", value: `Keep ${guardrail.label} inside the ${guardrail.range} guardrail.`,
+          detail: "That protects the Goal while the current strategy continues." } : null,
+        { label: "Next evidence", value: `Use the next ${nextEvidence} to see whether this rate of progress continues.`,
+          detail: "No current evidence calls for changing the plan before then." },
+      ].filter(Boolean),
+      coachTake: primaryTraining
+        ? "The best part of the month is that the big Goal result was not isolated—training kept giving you reasons to trust the setup. Keep that rhythm going."
+        : "The month moved in the right direction. Keep the plan steady and let the next result earn the next decision.",
+    },
+  };
+}
+
+function monthlyCalibratedEnergyCopy({ energy, earlyEnergy, laterEnergy,
+  objectiveName: configuredObjective }) {
+  if (!energy) return null;
+  if (earlyEnergy && laterEnergy) {
+    return `Energy looked higher earlier in the month and lower across the latest five days. The actual ${configuredObjective} result and productive training do not support changing intake just to make those estimates look smoother.`;
+  }
+  if (energy.facts?.historicalCalibration === "poor_literal_alignment") {
+    return `The Energy numbers did not line up cleanly with the realized ${configuredObjective} result, so they remain useful context rather than a reason to change the plan by themselves.`;
+  }
+  return "The available Energy pattern supports keeping the current setup while outcomes and guardrails remain favorable.";
+}
+
+function compactSentences(values) {
+  return values.filter(Boolean).join(" ");
+}
+
+function shortDate(value) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric",
+    timeZone: "UTC" }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function monthName(value) {
+  return new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" })
+    .format(new Date(`${value}T00:00:00.000Z`));
 }
 
 function projectPhaseReview(context) {

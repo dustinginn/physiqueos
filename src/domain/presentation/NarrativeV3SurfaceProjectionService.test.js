@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import { createPairedCalibrationFixtures } from
   "../../fixtures/confidenceNarrativeV3CalibrationFixtures.js";
+import { createSeptemberMonthlyV3StressTestFixture } from
+  "../../fixtures/septemberMonthlyV3StressTestFixture.js";
 import { runConfidenceNarrativeV3 } from
   "../intelligence/v3/ConfidenceNarrativeV3Pipeline.js";
 import { adaptLatestCanonicalCadenceObservationsV3 } from
   "../intelligence/ProductionConfidenceNarrativeV3Adapter.js";
 import { composeOperatingPlanStrategyDetail } from
   "../services/OperatingPlanStrategyDetailService.js";
+import { createMonthlyEvidenceIntelligenceV3 } from
+  "../intelligence/v3/MonthlyEvidenceIntelligenceV3.js";
 import {
   BRIEFING_V3_DENSITY_CONTRACTS,
   createNarrativeV3CrossSurfaceShadowPreviews,
@@ -163,6 +167,42 @@ describe("Narrative V3 remaining surface shadow projections", () => {
       preview.monthly.changes.themes[1].title,
       preview.monthly.monthAhead.coachTake,
     ]).size).toBe(4);
+  });
+
+  it("projects the bounded September cross-source stress test without changing Confidence", () => {
+    const { goalContract, result } = currentResult();
+    const intelligence = createMonthlyEvidenceIntelligenceV3(
+      createSeptemberMonthlyV3StressTestFixture());
+    const before = JSON.stringify(result);
+    const monthly = createNarrativeV3RemainingSurfaceShadowPreviews({
+      goalContract, result, monthlyIntelligence: intelligence,
+    }).monthly;
+    expect(monthly).toMatchObject({
+      density: NARRATIVE_V3_DENSITY.FULL,
+      hero: { confidence: { score: 79, delta: 0,
+        evidenceCutoff: "2026-09-18T17:20:06.000Z" } },
+    });
+    expect(monthly.hero.highlights).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Goal progress", value: "5.8 of 10 lb" }),
+      expect.objectContaining({ label: "Guardrail", value: "8.1% body fat",
+        detail: "Inside the 8–9% range" }),
+    ]));
+    expect(monthly.training.title).toContain("Leg press set a new session-volume best");
+    expect(monthly.training.summary).toContain("Pull-ups set a new session-volume best");
+    expect(monthly.training.summary).toContain("paused for 3 days");
+    expect(monthly.energy.summary).toContain("higher earlier in the month");
+    expect(monthly.energy.summary).not.toMatch(/paired|derived estimate|calibration|wearable/iu);
+    expect(monthly.changes.themes.map((item) => item.label))
+      .toEqual(["Goal progress", "Training", "Nutrition and Energy"]);
+    const copy = JSON.stringify(monthly);
+    expect(copy).not.toMatch(/paired evidence|operating evidence|estimate-vs-outcome|predictive calibration|measurement uncertainty|support index|evidence authority|persistence state/iu);
+    expect(intelligence.sourceMatrix.filter((item) =>
+      item.narrativeConsequence !== "omit").length).toBeGreaterThan(4);
+    expect(monthly.changes.themes).toHaveLength(3);
+    expect(copy.match(/Leg press set a new session-volume best/gu)).toHaveLength(1);
+    expect(copy.match(/Energy looked higher earlier in the month/gu)).toHaveLength(1);
+    expect(result.confidence.currentPercentage).toBe(79);
+    expect(JSON.stringify(result)).toBe(before);
   });
 
   it("keeps Monthly broader than recurring check-ins without a domain laundry list", () => {
