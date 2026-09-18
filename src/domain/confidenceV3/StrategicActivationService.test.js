@@ -63,7 +63,7 @@ function priorV2Assessment() {
   });
 }
 
-function setup() {
+function setup({ buildInterpretationInput } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "confidence-v3-activation-"));
   directories.push(directory);
   const filePath = path.join(directory, "store.json");
@@ -99,10 +99,10 @@ function setup() {
   const activationService = createStrategicActivationService({
     publicationService,
     now: () => new Date("2026-09-17T12:00:00.000Z"),
-    buildInterpretationInput: async () => ({
+    buildInterpretationInput: buildInterpretationInput ?? (async () => ({
       goalContract: CALIBRATION.goalContract,
       observations: CALIBRATION.observations,
-    }),
+    })),
   });
   return { filePath, activationService, prior, store };
 }
@@ -154,6 +154,45 @@ describe("StrategicActivationService", () => {
     expect(second.status).toBe("matched");
     expect(second.committed).toBe(false);
     expect(second.assessmentId).toBe(first.assessmentId);
+    const persisted = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    expect(persisted.goalConfidenceHistory).toHaveLength(2);
+    expect(persisted.confidenceActivationArtifacts).toHaveLength(1);
+  });
+
+  it("fails closed when the same activation identity is recomputed with different semantics", async () => {
+    let conflict = false;
+    const { filePath, activationService } = setup({
+      buildInterpretationInput: async () => ({
+        goalContract: CALIBRATION.goalContract,
+        observations: CALIBRATION.observations.map((observation, index) => {
+          if (index !== 0 || !conflict) return observation;
+          const changed = structuredClone(observation);
+          const leanMass = changed.capabilities.find((item) =>
+            item.capabilityId === "body_composition.lean_mass");
+          leanMass.value = 149;
+          leanMass.change = 0.7;
+          leanMass.factualSummary = "The comparison measured only 0.7 lb of progress.";
+          changed.semanticFingerprint = `sha256_${"c".repeat(64)}`;
+          return changed;
+        }),
+      }),
+    });
+    const first = await activationService.activate({
+      goal: { id: GOAL_ID, title: "Build Lean Mass" }, phase: { id: PHASE_ID },
+      store: JSON.parse(fs.readFileSync(filePath, "utf8")),
+      evidenceCutoff: "2026-09-17T00:00:00.000Z",
+    });
+    expect(first.committed).toBe(true);
+    conflict = true;
+    const second = await activationService.activate({
+      goal: { id: GOAL_ID, title: "Build Lean Mass" }, phase: { id: PHASE_ID },
+      store: JSON.parse(fs.readFileSync(filePath, "utf8")),
+      evidenceCutoff: "2026-09-17T00:00:00.000Z",
+    });
+    expect(second).toMatchObject({
+      status: "publication_identity_conflict",
+      committed: false,
+    });
     const persisted = JSON.parse(fs.readFileSync(filePath, "utf8"));
     expect(persisted.goalConfidenceHistory).toHaveLength(2);
     expect(persisted.confidenceActivationArtifacts).toHaveLength(1);

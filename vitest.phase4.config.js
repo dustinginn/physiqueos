@@ -18,6 +18,7 @@ export default defineConfig({
       "src/platform/database/PostgresCoreNavigationReadStore.test.js",
       "src/platform/database/PostgresPhotoEventReadStore.test.js",
       "src/platform/database/PostgresEvidenceTimelineReadStore.test.js",
+      "src/domain/confidenceV3/StrategicActivationPostgresPersistence.test.js",
     ],
     fileParallelism: false,
     maxWorkers: 1,

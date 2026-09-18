@@ -74,6 +74,12 @@ export function createPhase5SyntheticRuntime({ recordsPerCollection = 3 } = {}) 
     dailyBriefings: many("dailyBriefings", { type: "weekly", cadence: "weekly", title: "Synthetic weekly briefing", publishedAt: "2026-08-10T12:00:00.000Z", status: "published", content: { summary: "Synthetic provider validation briefing." } }),
     briefingReconciliationWorkItems: many("briefingReconciliationWorkItems", { briefingId: "phase5-dailyBriefings-001", state: "completed" }),
     confidenceInitializationArtifacts: many("confidenceInitializationArtifacts", { goalId: "phase5-goals-001", value: 70, band: "medium" }),
+    confidenceActivationArtifacts: many("confidenceActivationArtifacts", {
+      goalId: "phase5-goals-001",
+      phaseId: "phase5-goal-phase-active",
+      schemaVersion: "strategic_activation_v2",
+      confidencePublication: { assessmentId: "phase5-goalConfidenceHistory-001" },
+    }),
     analyses: many("analyses", { analysisType: "progress", observedAt: "2026-08-11T18:00:00.000Z", result: { direction: "on_track" } }),
     evidencePackages: many("evidencePackages", { package_id: "phase5-evidence-package-001", sourceIdentity: "phase5-evidence-source-001", observed_at: "2026-08-11T17:00:00.000Z", artifactPath: "synthetic-note.txt", evidence_objects: [{ evidence_type: "nutrition", observed_at: "2026-08-11", calories: 2300 }] }),
     evidenceReviews: many("evidenceReviews", { review_id: "phase5-evidence-review-001", packageId: "phase5-evidence-package-001", status: "pending", interpretedEvidence: { observed_at: "2026-08-11", evidence_objects: [{ evidence_type: "nutrition", observed_at: "2026-08-11", calories: 2300 }] }, itemDecisions: [] }),

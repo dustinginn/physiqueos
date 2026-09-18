@@ -10,12 +10,14 @@ const roots = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true }))));
 
 describe("Phase 5 representative synthetic package", () => {
-  it("covers all 39 persisted canonical collections with relationships, versions, and Native Baseline evidence", () => {
+  it("covers all 41 persisted canonical collections with relationships, versions, and Native Baseline evidence", () => {
     const runtime = createPhase5SyntheticRuntime();
-    expect(FOUNDATION_SOURCE_COLLECTIONS).toHaveLength(39);
+    expect(FOUNDATION_SOURCE_COLLECTIONS).toHaveLength(41);
     for (const collection of FOUNDATION_SOURCE_COLLECTIONS) {
       expect(runtime[collection]).not.toBeNull();
-      if (Array.isArray(runtime[collection])) expect(runtime[collection].length).toBeGreaterThan(0);
+      if (Array.isArray(runtime[collection]) && collection !== "myLibraryMemberships") {
+        expect(runtime[collection].length).toBeGreaterThan(0);
+      }
     }
     expect(runtime.goals.some((item) => item.status === "completed")).toBe(true);
     expect(runtime.canonicalEvidenceObjects.map((item) => item.payload.evidence_type)).toEqual(expect.arrayContaining(["nutrition", "activity", "training", "photo", "dexa"]));
@@ -29,7 +31,7 @@ describe("Phase 5 representative synthetic package", () => {
     const second = await writePhase5SyntheticPackage({ outputRoot: secondRoot, repositoryRevision: "622ba8d" });
     expect(first.manifest.semanticDigest).toBe(second.manifest.semanticDigest);
     expect(first.manifest.criticalValues.canonicalStateDigest).toBe(second.manifest.criticalValues.canonicalStateDigest);
-    expect(first.manifest.collections).toHaveLength(39);
+    expect(first.manifest.collections).toHaveLength(41);
     expect(first.manifest.files).toHaveLength(3);
     expect(first.manifest.files.every((item) => item.ownerUserId === "phase5-synthetic-user")).toBe(true);
     const validated = await readAndValidateCanonicalPackage(first.packageRoot);

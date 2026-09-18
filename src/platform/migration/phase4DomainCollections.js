@@ -31,6 +31,7 @@ export const PHASE4_DOMAIN_TABLES = Object.freeze({
   dailyBriefings: "canonical_briefing_records",
   briefingReconciliationWorkItems: "canonical_briefing_records",
   confidenceInitializationArtifacts: "canonical_confidence_records",
+  confidenceActivationArtifacts: "canonical_confidence_records",
   analyses: "canonical_confidence_records",
   piEnergyConfidenceWorkItems: "canonical_confidence_records",
   piEnergyFinalizationReceipts: "canonical_confidence_records",

@@ -26,20 +26,16 @@ export function createStrategicActivationService({ publicationService,
     const identity = activationIdentity(goal.id, phase.id, cutoff);
     const existing = (store?.goalConfidenceHistory ?? []).find((item) =>
       item.assessment?.idempotencyKey === identity.idempotencyKey);
-    if (existing && publish) {
-      return Object.freeze({ status: "matched", committed: false,
-        assessmentId: existing.assessmentId,
-        currentPercentage: existing.assessment?.currentPercentage ?? null,
-        previousPercentage: existing.assessment?.priorPercentage ?? null,
-        movement: existing.assessment?.movement ?? null });
-    }
-    const current = createCanonicalConfidenceReadService({ store }).getCurrent({
-      goalId: goal.id, phaseId: phase.id,
-    });
-    if (!current.assessment) {
+    const current = existing
+      ? activationPredecessor(store, existing)
+      : createCanonicalConfidenceReadService({ store }).getCurrent({
+        goalId: goal.id, phaseId: phase.id,
+      }).assessment;
+    if (!current) {
       return Object.freeze({ status: "refused_no_prior_assessment",
         committed: false,
-        reason: current.reason ?? "canonical_series_unavailable" });
+        reason: existing ? "activation_predecessor_unavailable" :
+          "canonical_series_unavailable" });
     }
     const request = {
       publisherType: "v3_strategic_activation",
@@ -49,7 +45,7 @@ export function createStrategicActivationService({ publicationService,
       evidenceWindowId: identity.evidenceWindowId,
       idempotencyKey: identity.idempotencyKey,
       goal, phase, store,
-      previousCanonicalAssessment: current.assessment,
+      previousCanonicalAssessment: current,
       evidenceCutoff: cutoff,
       finalizedAt: now().toISOString(),
       evaluationType: "v3_activation_baseline",
@@ -91,6 +87,14 @@ export function createStrategicActivationService({ publicationService,
     activate: (request) => execute(request, true),
     preview: (request) => execute(request, false),
   });
+}
+
+function activationPredecessor(store, existing) {
+  const predecessorId = existing?.assessment?.priorAssessmentId;
+  if (!predecessorId) return null;
+  const matches = (store?.goalConfidenceHistory ?? []).filter((item) =>
+    item.assessmentId === predecessorId && item.assessment?.id === predecessorId);
+  return matches.length === 1 ? matches[0].assessment : null;
 }
 
 function activationIdentity(goalId, phaseId, cutoff) {
