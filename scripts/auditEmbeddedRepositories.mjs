@@ -4,10 +4,17 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export function auditEmbeddedRepositories({ repositoryRoot, policyPath }) {
-  const root = path.resolve(repositoryRoot);
+  // macOS exposes the temporary directory through both /var and /private/var.
+  // Git reports the physical path, while Node callers commonly retain the
+  // symlinked spelling. Compare physical paths so a valid root is not rejected
+  // solely because the two tools chose different aliases.
+  const root = fs.realpathSync.native(path.resolve(repositoryRoot));
   const policy = JSON.parse(fs.readFileSync(policyPath, "utf8"));
   const topLevel = git(root, ["rev-parse", "--show-toplevel"]).stdout.trim();
-  if (!topLevel || path.resolve(topLevel) !== root) {
+  const physicalTopLevel = topLevel
+    ? fs.realpathSync.native(path.resolve(topLevel))
+    : null;
+  if (!physicalTopLevel || physicalTopLevel !== root) {
     throw new Error(`Embedded-repository audit requires the root worktree: ${root}`);
   }
 

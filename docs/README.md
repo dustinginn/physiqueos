@@ -1,3 +1,11 @@
+# PhysiqueOS documentation
+
+Start with [CURRENT_OPERATIONS.md](CURRENT_OPERATIONS.md) for the canonical Mac
+workspace, production/Native authorities, operational context separation,
+migration ownership, release process, and known test-environment limitations.
+Historical design records and build handoffs remain evidence but do not
+override that current authority file.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started

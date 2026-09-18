@@ -94,6 +94,7 @@ node_modules/
 /log-evidence-cleanup*.log
 /pending-review-reprocess*.log
 /tmp-*.log
+/tmp-*.err
 /debug.log
 /storybook.log
 /.clean-dev*.log
