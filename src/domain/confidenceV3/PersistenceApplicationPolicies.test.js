@@ -1,5 +1,4 @@
-import { test, describe } from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, test } from "vitest";
 import { deriveStrategicInterpretation } from "./StrategicInterpretationService.js";
 import {
   resolveFeasibilityTarget, resolveSafetyCeiling,
@@ -88,8 +87,8 @@ describe("comparison matrix — all four models resolve without throwing for eve
     test(name, () => {
       const result = runAllModels({ interpretationInput: fixture });
       for (const model of ["A", "B", "C", "D"]) {
-        assert.ok(Number.isInteger(result[model].currentPercentage));
-        assert.ok(result[model].currentPercentage >= 1 && result[model].currentPercentage <= 99);
+        expect(Number.isInteger(result[model].currentPercentage)).toBeTruthy();
+        expect(result[model].currentPercentage >= 1 && result[model].currentPercentage <= 99).toBeTruthy();
       }
     });
   }
@@ -106,7 +105,7 @@ describe("required relationship: strong feasibility + single observation > unpro
     test(`Model ${model}`, () => {
       const strong = runAllModels({ interpretationInput: sep12Fixture() })[model];
       const unproven = runAllModels({ interpretationInput: sep12Fixture({ evidence: { domain: "training", goalOutcomeMetric: "lean_mass" } }) })[model];
-      assert.ok(strong.currentPercentage > unproven.currentPercentage, `Model ${model}: ${strong.currentPercentage} not > ${unproven.currentPercentage}`);
+      expect(strong.currentPercentage > unproven.currentPercentage).toBeTruthy();
     });
   }
 });
@@ -124,7 +123,7 @@ describe("required relationship: repeated favorable > single favorable", () => {
     test(`Model ${model}`, () => {
       const single = runAllModels({ interpretationInput: sep12Fixture() })[model];
       const repeated = runAllModels({ interpretationInput: sep12Fixture({ persistenceContext: { priorConfirmingIntervalCount: 1 } }) })[model];
-      assert.ok(repeated.currentPercentage > single.currentPercentage, `Model ${model}: repeated ${repeated.currentPercentage} not > single ${single.currentPercentage}`);
+      expect(repeated.currentPercentage > single.currentPercentage).toBeTruthy();
     });
   }
 });
@@ -134,7 +133,7 @@ describe("required relationship: sustained favorable >= repeated favorable", () 
     test(`Model ${model}`, () => {
       const repeated = runAllModels({ interpretationInput: sep12Fixture({ persistenceContext: { priorConfirmingIntervalCount: 1 } }) })[model];
       const sustained = runAllModels({ interpretationInput: sep12Fixture({ persistenceContext: { priorConfirmingIntervalCount: 3 } }) })[model];
-      assert.ok(sustained.currentPercentage >= repeated.currentPercentage, `Model ${model}: sustained ${sustained.currentPercentage} not >= repeated ${repeated.currentPercentage}`);
+      expect(sustained.currentPercentage >= repeated.currentPercentage).toBeTruthy();
     });
   }
 });
@@ -144,7 +143,7 @@ describe("required relationship: small favorable < material favorable", () => {
     test(`Model ${model}`, () => {
       const small = runAllModels({ interpretationInput: SCENARIOS["2_small_favorable"] })[model];
       const material = runAllModels({ interpretationInput: sep12Fixture() })[model];
-      assert.ok(small.currentPercentage < material.currentPercentage, `Model ${model}: small ${small.currentPercentage} not < material ${material.currentPercentage}`);
+      expect(small.currentPercentage < material.currentPercentage).toBeTruthy();
     });
   }
 });
@@ -153,7 +152,7 @@ describe("required relationship: Guardrail breach dominates favorable progress",
   for (const model of ["A", "B", "C", "D"]) {
     test(`Model ${model}`, () => {
       const breach = runAllModels({ interpretationInput: SCENARIOS["3_strong_favorable_guardrail_breach"] })[model];
-      assert.ok(breach.currentPercentage <= 62, `Model ${model}: guardrail breach still increased Confidence to ${breach.currentPercentage}`);
+      expect(breach.currentPercentage <= 62).toBeTruthy();
     });
   }
 });
@@ -168,8 +167,7 @@ describe("required relationship: contradicting direct outcome materially reduces
         previousPercentage: first.currentPercentage,
         interpretationInput: SCENARIOS["6_contradicting"],
       })[model];
-      assert.ok(second.currentPercentage < first.currentPercentage - 4,
-        `Model ${model}: contradiction only moved ${first.currentPercentage} -> ${second.currentPercentage}, expected a material (>4pt) drop`);
+      expect(second.currentPercentage < first.currentPercentage - 4).toBeTruthy();
     });
   }
 });
@@ -179,7 +177,7 @@ describe("required relationship: behind pace scores below equivalent ahead-pace 
     test(`Model ${model}`, () => {
       const ahead = runAllModels({ interpretationInput: sep12Fixture() })[model];
       const behind = runAllModels({ interpretationInput: SCENARIOS["7_behind_pace"] })[model];
-      assert.ok(behind.currentPercentage < ahead.currentPercentage, `Model ${model}: behind ${behind.currentPercentage} not < ahead ${ahead.currentPercentage}`);
+      expect(behind.currentPercentage < ahead.currentPercentage).toBeTruthy();
     });
   }
 });
@@ -189,8 +187,7 @@ describe("required relationship: no valid comparable reference must not receive 
     test(`Model ${model}`, () => {
       const validReference = runAllModels({ interpretationInput: sep12Fixture() })[model];
       const noReference = runAllModels({ interpretationInput: SCENARIOS["8_no_valid_reference"] })[model];
-      assert.ok(noReference.currentPercentage <= validReference.currentPercentage,
-        `Model ${model}: no-reference (${noReference.currentPercentage}) exceeded valid-reference (${validReference.currentPercentage})`);
+      expect(noReference.currentPercentage <= validReference.currentPercentage).toBeTruthy();
     });
   }
 });
@@ -199,8 +196,7 @@ describe("required relationship: persistence must leave room for future confirma
   for (const model of ["A", "B", "C", "D"]) {
     test(`Model ${model}`, () => {
       const result = runAllModels({ interpretationInput: sep12Fixture() });
-      assert.ok(result[model].currentPercentage < result.target,
-        `Model ${model}: single observation reached the full target (${result.target}) with no room for confirmation`);
+      expect(result[model].currentPercentage < result.target).toBeTruthy();
     });
   }
 });
@@ -209,7 +205,7 @@ describe("required relationship: persistence must not erase demonstrated feasibi
   for (const model of ["A", "B", "C", "D"]) {
     test(`Model ${model}`, () => {
       const result = runAllModels({ interpretationInput: sep12Fixture() })[model];
-      assert.ok(result.delta >= 8, `Model ${model}: delta was only ${result.delta}, at or below V2's old fixed ceiling`);
+      expect(result.delta >= 8).toBeTruthy();
     });
   }
 });
@@ -226,7 +222,7 @@ describe("required relationship: adverse direct evidence is not softened merely 
           observedInterval: { priorValue: 153.3, priorObservedOn: "2026-08-15", currentValue: 148.3, currentObservedOn: "2026-09-12" },
         }),
       })[model];
-      assert.equal(adverse.movement, "decrease", `Model ${model} did not decrease on a first-ever adverse reading`);
+      expect(adverse.movement).toBe("decrease");
     });
   }
 });
@@ -236,7 +232,7 @@ describe("required relationship: no-phase and renamed-Goal fixtures produce equi
     test(`Model ${model}`, () => {
       const a = runAllModels({ interpretationInput: sep12Fixture({ evidence: { domain: "dexa", goalOutcomeMetric: "lean_mass" } }) })[model];
       const b = runAllModels({ interpretationInput: { ...sep12Fixture(), provenance: { goalContractFingerprint: "totally_different_goal_id" } } })[model];
-      assert.equal(a.currentPercentage, b.currentPercentage, `Model ${model} depends on identifiers, not just semantics`);
+      expect(a.currentPercentage).toBe(b.currentPercentage);
     });
   }
 });
@@ -254,11 +250,11 @@ describe("first -> second -> sustained confirming interval progression", () => {
       const firstStep = first.delta;
       const secondStep = second.delta;
       const thirdStep = third.delta;
-      assert.ok(firstStep > 0, `Model ${model}: first step was not an increase`);
+      expect(firstStep > 0).toBeTruthy();
       // Diminishing shape: later steps should not exceed the first step
       // (they are approaching an already-substantially-reached target).
-      assert.ok(secondStep <= firstStep + 1, `Model ${model}: second step (${secondStep}) blew past the first step (${firstStep}) — not a staged progression`);
-      assert.ok(thirdStep <= secondStep + 1, `Model ${model}: third step (${thirdStep}) exceeded the second (${secondStep})`);
+      expect(secondStep <= firstStep + 1).toBeTruthy();
+      expect(thirdStep <= secondStep + 1).toBeTruthy();
     });
   }
 });
@@ -272,13 +268,12 @@ describe("adverse follow-up after a strong favorable first interval — no perma
     test(`Model ${model}: a fully contradicting second interval retracts most or all of the first gain`, () => {
       const first = runAllModels({ previousPercentage: 62, interpretationInput: sep12Fixture() })[model];
       const contradicted = runAllModels({ previousPercentage: first.currentPercentage, interpretationInput: SCENARIOS["6_contradicting"] })[model];
-      assert.ok(contradicted.currentPercentage < 62 + (first.delta / 2),
-        `Model ${model}: contradiction left Confidence at ${contradicted.currentPercentage}, barely below the post-gain level ${first.currentPercentage} — looks like a permanent floor`);
+      expect(contradicted.currentPercentage < 62 + (first.delta / 2)).toBeTruthy();
     });
     test(`Model ${model}: a merely poor (not contradicting) second interval still fails to add further confidence`, () => {
       const first = runAllModels({ previousPercentage: 62, interpretationInput: sep12Fixture() })[model];
       const poor = runAllModels({ previousPercentage: first.currentPercentage, interpretationInput: SCENARIOS["7_behind_pace"] })[model];
-      assert.ok(poor.currentPercentage <= first.currentPercentage, `Model ${model}: a weak follow-up still increased Confidence further`);
+      expect(poor.currentPercentage <= first.currentPercentage).toBeTruthy();
     });
   }
 });
@@ -293,7 +288,7 @@ describe("safety cap binding is observable per model", () => {
     test(`Model ${model}: capBound flag reflects whether |preCapDelta| exceeded the ceiling`, () => {
       const result = runAllModels({ interpretationInput: sep12Fixture() })[model];
       const expected = Math.abs(result.preCapDelta) > result.ceiling + 1e-9;
-      assert.equal(result.capBound, expected);
+      expect(result.capBound).toBe(expected);
     });
   }
 });
@@ -316,9 +311,8 @@ describe("Model C — DISQUALIFIED: absolute regime anchoring lets the safety ce
     // result regardless of which persistence tier is plugged in. This is
     // the old band-target-dominance failure mode recreated one layer down,
     // exactly what this pass was instructed to reject explicitly if found.
-    assert.equal(repeated.currentPercentage, single.currentPercentage,
-      "expected this defect to reproduce: if it no longer does, Model C may be reconsidered");
-    assert.ok(single.capBound, "expected the ceiling to already be the binding constraint on the FIRST reading");
+    expect(repeated.currentPercentage).toBe(single.currentPercentage);
+    expect(single.capBound).toBeTruthy();
   });
 });
 
@@ -326,14 +320,12 @@ describe("Model D — DISQUALIFIED: no target/asymptote means confirmation steps
   test("a second confirming step can exceed the first — the opposite of the required diminishing shape", () => {
     const first = runAllModels({ previousPercentage: 62, interpretationInput: sep12Fixture() }).D;
     const second = runAllModels({ previousPercentage: first.currentPercentage, interpretationInput: sep12Fixture({ persistenceContext: { priorConfirmingIntervalCount: 1 } }) }).D;
-    assert.ok(second.delta > first.delta,
-      "expected this defect to reproduce: flat additive contributions have no asymptote to diminish toward");
+    expect(second.delta > first.delta).toBeTruthy();
   });
   test("a merely weak (not adverse) follow-up still adds further Confidence on top of an already-elevated prior", () => {
     const first = runAllModels({ previousPercentage: 62, interpretationInput: sep12Fixture() }).D;
     const poor = runAllModels({ previousPercentage: first.currentPercentage, interpretationInput: SCENARIOS["7_behind_pace"] }).D;
-    assert.ok(poor.currentPercentage > first.currentPercentage,
-      "expected this defect to reproduce: any non-negative feasibility state keeps contributing regardless of how much Confidence already reflects it");
+    expect(poor.currentPercentage > first.currentPercentage).toBeTruthy();
   });
 });
 
@@ -341,8 +333,8 @@ describe("genericity", () => {
   test("no Goal/Phase-specific literal or domain-string scoring branch in the policy module", async () => {
     const fs = await import("node:fs");
     const source = fs.readFileSync(new URL("./PersistenceApplicationPolicies.js", import.meta.url), "utf8");
-    assert.doesNotMatch(source, /["'`]build_lean_mass["'`]/i);
-    assert.doesNotMatch(source, /["'`]establish_maintenance["'`]/i);
-    assert.doesNotMatch(source, /===\s*["'`]dexa["'`]/i);
+    expect(source).not.toMatch(/["'`]build_lean_mass["'`]/i);
+    expect(source).not.toMatch(/["'`]establish_maintenance["'`]/i);
+    expect(source).not.toMatch(/===\s*["'`]dexa["'`]/i);
   });
 });

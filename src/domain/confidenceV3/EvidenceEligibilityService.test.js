@@ -1,5 +1,4 @@
-import { test, describe } from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, test } from "vitest";
 import { evaluateEvidenceEligibility, FreshnessState, CompletenessState } from "./EvidenceEligibilityService.js";
 
 describe("evaluateEvidenceEligibility", () => {
@@ -11,10 +10,10 @@ describe("evaluateEvidenceEligibility", () => {
       asOf: "2026-09-17",
     });
     const weight = result.perDomain.find((item) => item.domain === "weight");
-    assert.equal(weight.freshnessState, FreshnessState.CURRENT);
-    assert.equal(weight.completenessState, CompletenessState.COMPLETE);
-    assert.equal(result.overallCompleteness, CompletenessState.COMPLETE);
-    assert.deepEqual(result.missingEvidence, []);
+    expect(weight.freshnessState).toBe(FreshnessState.CURRENT);
+    expect(weight.completenessState).toBe(CompletenessState.COMPLETE);
+    expect(result.overallCompleteness).toBe(CompletenessState.COMPLETE);
+    expect(result.missingEvidence).toEqual([]);
   });
 
   test("a primary domain with zero observations is missing, not silently ignored", () => {
@@ -23,9 +22,9 @@ describe("evaluateEvidenceEligibility", () => {
       primaryDomains: ["dexa"],
       asOf: "2026-09-17",
     });
-    assert.equal(result.overallCompleteness, CompletenessState.MISSING);
-    assert.equal(result.missingEvidence.length, 1);
-    assert.equal(result.missingEvidence[0].domain, "dexa");
+    expect(result.overallCompleteness).toBe(CompletenessState.MISSING);
+    expect(result.missingEvidence.length).toBe(1);
+    expect(result.missingEvidence[0].domain).toBe("dexa");
   });
 
   test("an observation far older than expected cadence is classified stale", () => {
@@ -36,8 +35,8 @@ describe("evaluateEvidenceEligibility", () => {
       asOf: "2026-09-17",
     });
     const weight = result.perDomain.find((item) => item.domain === "weight");
-    assert.equal(weight.freshnessState, FreshnessState.STALE);
-    assert.equal(result.staleEvidence.length, 1);
+    expect(weight.freshnessState).toBe(FreshnessState.STALE);
+    expect(result.staleEvidence.length).toBe(1);
   });
 
   test("superseded/retracted observations are excluded from eligibility", () => {
@@ -49,7 +48,7 @@ describe("evaluateEvidenceEligibility", () => {
       primaryDomains: ["weight"],
       asOf: "2026-09-17",
     });
-    assert.deepEqual(result.eligibleEvidenceRefs, ["w2"]);
+    expect(result.eligibleEvidenceRefs).toEqual(["w2"]);
   });
 
   test("future-dated observations past the cutoff are not eligible", () => {
@@ -59,7 +58,7 @@ describe("evaluateEvidenceEligibility", () => {
       asOf: "2026-09-17",
     });
     const weight = result.perDomain.find((item) => item.domain === "weight");
-    assert.equal(weight.eligibleObservationCount, 0);
+    expect(weight.eligibleObservationCount).toBe(0);
   });
 
   test("two same-domain readings disagreeing on direction are flagged as a contradiction", () => {
@@ -71,12 +70,12 @@ describe("evaluateEvidenceEligibility", () => {
       primaryDomains: ["weight"],
       asOf: "2026-09-17",
     });
-    assert.equal(result.contradictions.length, 1);
-    assert.equal(result.contradictions[0].earlierEvidenceRef, "w1");
-    assert.equal(result.contradictions[0].laterEvidenceRef, "w2");
+    expect(result.contradictions.length).toBe(1);
+    expect(result.contradictions[0].earlierEvidenceRef).toBe("w1");
+    expect(result.contradictions[0].laterEvidenceRef).toBe("w2");
   });
 
   test("throws rather than silently defaulting when the cutoff is missing", () => {
-    assert.throws(() => evaluateEvidenceEligibility({ evidenceRefs: [] }));
+    expect(() => evaluateEvidenceEligibility({ evidenceRefs: [] })).toThrow();
   });
 });

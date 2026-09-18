@@ -21,6 +21,11 @@
 
 import { deriveCanonicalGoalProgress } from "../confidence/GoalProgressContextService";
 import { classifyEvidenceAuthority } from "./EvidenceAuthorityService";
+export {
+  buildProductionConfidenceNarrativeV3Input,
+  buildGoalContractV3FromCanonical,
+  createCanonicalEvidenceObservationsV3,
+} from "../intelligence/ProductionConfidenceNarrativeV3Adapter.js";
 
 const DEFAULT_GOAL_OUTCOME_METRIC_BY_DOMAIN = Object.freeze({
   weight: "weight",

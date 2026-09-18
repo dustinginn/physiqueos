@@ -12,8 +12,7 @@
 // production run of StrategicActivationService against real evidence is
 // running the same math the Founder already validated, not a
 // reimplementation that happens to look similar.
-import { test, describe } from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, test } from "vitest";
 import { deriveStrategicInterpretation } from "./StrategicInterpretationService.js";
 import { projectStrategicConfidence } from "./StrategicConfidenceProjectionService.js";
 
@@ -48,13 +47,13 @@ describe("Confidence V3 promoted Model B — Sep 12 regression", () => {
       interpretation,
       baseCeiling: 8,
     });
-    assert.equal(interpretation.feasibilityState, "strongly_demonstrated");
-    assert.equal(interpretation.persistenceState, "single_observation");
-    assert.equal(projection.previousPercentage, 62);
-    assert.equal(projection.currentPercentage, 79);
-    assert.equal(projection.delta, 17);
-    assert.equal(projection.movement, "increase");
-    assert.equal(projection.persistenceApplicationModel, "confidence_reserve_model_b");
+    expect(interpretation.feasibilityState).toBe("strongly_demonstrated");
+    expect(interpretation.persistenceState).toBe("single_observation");
+    expect(projection.previousPercentage).toBe(62);
+    expect(projection.currentPercentage).toBe(79);
+    expect(projection.delta).toBe(17);
+    expect(projection.movement).toBe("increase");
+    expect(projection.persistenceApplicationModel).toBe("confidence_reserve_model_b");
   });
 
   test("repeated favorable evidence moves further than a single observation, from the same starting band", () => {
@@ -78,9 +77,8 @@ describe("Confidence V3 promoted Model B — Sep 12 regression", () => {
       interpretation: deriveStrategicInterpretation(
         sep12InterpretationInput({ persistenceContext: { priorConfirmingIntervalCount: 1 } })),
     });
-    assert.equal(single.currentPercentage, 79);
-    assert.ok(repeated.currentPercentage > single.currentPercentage,
-      "confirmed_repeat must unlock more of the reserve than single_observation");
+    expect(single.currentPercentage).toBe(79);
+    expect(repeated.currentPercentage > single.currentPercentage).toBeTruthy();
   });
 
   test("an adverse follow-up reading reverses the increase at full strength", () => {
@@ -88,14 +86,14 @@ describe("Confidence V3 promoted Model B — Sep 12 regression", () => {
       observedInterval: { priorValue: 153.3, priorObservedOn: "2026-09-12", currentValue: 151.3, currentObservedOn: "2026-10-10" },
       persistenceContext: { priorConfirmingIntervalCount: 1, contradicted: true },
     }));
-    assert.equal(interpretation.feasibilityState, "contradicted");
+    expect(interpretation.feasibilityState).toBe("contradicted");
     const projection = projectStrategicConfidence({
       previousPercentage: 79,
       confidenceBand: "high",
       interpretation,
       baseCeiling: 8,
     });
-    assert.equal(projection.movement, "decrease");
-    assert.ok(projection.currentPercentage < 79, "a contradicting reading must move Confidence down, not hold or increase it");
+    expect(projection.movement).toBe("decrease");
+    expect(projection.currentPercentage < 79).toBeTruthy();
   });
 });
