@@ -172,7 +172,8 @@ describe("Goal Confidence V3 focused declarative coverage", () => {
     const prior = initial(config);
     const recurring = run(config, [], prior, "2026-09-13T07:02:00.000Z", "closed_cadence_boundary");
     expect(recurring.narrativePlan.continuityPolicy.mode).toBe("recent_event_followup");
-    expect(recurring.narrativePlan.composition.sections.meaning).toBeNull();
+    expect(recurring.narrativePlan.composition.sections.meaning)
+      .toContain("Performance Check already answered the big question");
     expect(recurring.narrativePlan.composition.finalNarrative).not.toContain("112.0");
     expect(recurring.narrativePlan.composition.finalNarrative).toContain("Performance Check");
     const changed = run(config, [executionObservation(-1, "execution_new", "2026-09-13T06:45:00.000Z")], prior, "2026-09-13T07:02:00.000Z", "closed_cadence_boundary");

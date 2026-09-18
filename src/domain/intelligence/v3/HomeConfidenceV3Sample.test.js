@@ -45,7 +45,8 @@ describe("Unwired Home Confidence and canonical evidence vocabulary", () => {
     expect(weekly.narrativePlan.confidenceBriefing).toMatchObject({ percentage: 79, delta: 0, movement: "no_meaningful_change" });
     expect(homeAfterWeekly.collapsed).toMatchObject(weekly.narrativePlan.primaryConfidenceSnapshot);
     expect(homeAfterWeekly.expanded).toMatchObject(weekly.narrativePlan.primaryConfidenceSnapshot);
-    expect(weekly.narrativePlan.composition.sections.meaning).toBeNull();
+    expect(weekly.narrativePlan.composition.sections.meaning)
+      .toContain("Training is still moving");
     expect(weekly.narrativePlan.composition.finalNarrative).not.toContain("5.0 lb");
     expect(homeAfterWeekly.latestMeaningfulConfidenceChange).toMatchObject({ percentage: 79, delta: 17, movement: "increase" });
   });

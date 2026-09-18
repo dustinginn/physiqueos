@@ -69,8 +69,10 @@ describe("Confidence + Narrative V3 paired calibration", () => {
       reason: "prior_strategy_state_retained",
     });
     expect(weekly.narrativePlan.continuityPolicy.mode).toBe("recent_event_followup");
-    expect(weekly.narrativePlan.composition.finalNarrative).toContain("Nothing here calls for a change");
-    expect(weekly.narrativePlan.composition.sections.meaning).toBeNull();
+    expect(weekly.narrativePlan.composition.sections.result)
+      .toContain("Seven of nine reviewed training areas improved");
+    expect(weekly.narrativePlan.composition.sections.meaning)
+      .toContain("Training is still moving");
     expect(weekly.narrativePlan.composition.finalNarrative).not.toContain("5.0 lb");
   });
 

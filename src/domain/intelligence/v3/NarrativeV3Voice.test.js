@@ -86,7 +86,9 @@ describe("Narrative V3 positive coaching requirements", () => {
     expect(weekly.narrativePlan.composition.finalNarrative)
       .not.toMatch(/repric|scoring|authority|persistence/iu);
     expect(weekly.narrativePlan.composition.coachTake)
-      .toMatch(/plan is doing its job.*consistent execution/iu);
+      .toMatch(/triceps.*one area to watch/iu);
+    expect(weekly.narrativePlan.composition.coachTake)
+      .not.toContain(weekly.narrativePlan.composition.sections.result);
   });
 });
 

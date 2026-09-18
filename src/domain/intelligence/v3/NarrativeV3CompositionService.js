@@ -7,7 +7,18 @@ const RAW_ENGINE_LANGUAGE = [
   /\bno conclusion was manufactured\b/iu,
   /\bRecommendation:\s*/u,
   /\bReason:\s*/u,
+  /\b(?:direct result|paired (?:energy )?evidence|current operating evidence|estimate-vs-outcome tension|leading-vs-lagging tension|support index|evidence authority|persistence state)\b/iu,
+  /\breported intake minus estimated expenditure\b/iu,
 ];
+
+export const NARRATIVE_V3_SECTION_PURPOSES = deepFreeze({
+  result: "recent_change_worth_knowing",
+  meaning: "goal_relative_implication",
+  action: "current_coaching_action",
+  watch: "specific_bounded_attention",
+  confidence: "goal_outlook_movement",
+  coachTake: "highest_value_remaining_coaching_point",
+});
 
 export function composeNarrativeV3({ goalContract, interpretation, confidence, surface, priorNarrativePlan = null, evaluatedAt }) {
   const primaryObjective = interpretation.objectiveFindings.find((item) => item.priority === "primary") ??
@@ -44,9 +55,13 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   context.anchorPreviouslyCommunicated = currentAuthoritativeEvidenceIds.length > 0 &&
     currentAuthoritativeEvidenceIds.every((id) => context.communicatedEvidenceIds.includes(id));
   context.operatingSignals = interpretation.crossDomainSynthesis?.selectedNarrativeSignals ?? [];
+  context.publicationKind = publicationContext.kind;
+  context.useRecurringSectionPlan = ["closed_cadence_boundary", "weekly",
+    "midweek", "monthly"].includes(interpretation.evaluationContext.type);
   context.specificCoachingObservations =
     interpretation.coachingObservationSelection?.selected ?? [];
   context.reconciliationTensions = interpretation.crossDomainSynthesis?.tensions ?? [];
+  context.sectionPlan = allocateNarrativeSections(context);
   const primaryConfidenceSnapshot = { percentage: confidence.currentPercentage, delta: confidence.delta, movement: confidence.movement };
   const confidenceBriefing = { ...composeConfidenceBriefing(context), ...primaryConfidenceSnapshot };
   const confidenceDeepExplanation = composeConfidenceDeepExplanation(context);
@@ -61,6 +76,7 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   const headline = firstSentence(sections.result ?? sections.meaning ?? sections.action);
   const coachTake = composeCoachTake(context);
   const finalNarrative = paragraphs.join("\n\n");
+  assertDistinctSectionComposition({ context, sections, coachTake });
   assertNarrativeV3Voice(`${finalNarrative}\n${coachTake}\n${JSON.stringify(confidenceDeepExplanation)}`);
 
   const semantic = {
@@ -129,7 +145,11 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
     nextEvidencePurpose: interpretation.nextCoachingQuestion?.evidencePurpose ?? null,
     coachingAffect: interpretation.coachingAffect,
     vocabularyBindings: structuredClone(goalContract.vocabulary),
-    composition: { headline, sections, paragraphs, finalNarrative, coachTake },
+    composition: {
+      headline, sections, paragraphs, finalNarrative, coachTake,
+      sectionPurposes: NARRATIVE_V3_SECTION_PURPOSES,
+      sectionAllocations: context.sectionPlan.allocations,
+    },
   };
   return deepFreeze({
     ...semantic,
@@ -156,6 +176,55 @@ export function findNarrativeV3VoiceViolations(value) {
 function assertNarrativeV3Voice(value) {
   const violations = findNarrativeV3VoiceViolations(value);
   if (violations.length) throw new Error(`Narrative V3 voice invariant failed: ${violations.join(", ")}`);
+}
+
+function assertDistinctSectionComposition({ context, sections, coachTake }) {
+  if (!context.useRecurringSectionPlan) return;
+  const values = { ...sections, coachTake };
+  const entries = Object.entries(values).filter(([, value]) => value);
+  for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < entries.length;
+      rightIndex += 1) {
+      const [leftName, left] = entries[leftIndex];
+      const [rightName, right] = entries[rightIndex];
+      const exact = normalizeCoachingText(left) === normalizeCoachingText(right);
+      const overlap = coachingTokenOverlap(left, right);
+      if (exact || overlap >= 0.9) {
+        throw new Error(`Narrative V3 section redundancy: ${leftName} and ${rightName}`);
+      }
+    }
+  }
+  const usedTopics = new Map();
+  for (const [section, allocationValue] of Object.entries(
+    context.sectionPlan.allocations)) {
+    for (const topic of allocationValue.topicKeys ?? []) {
+      if (!topic || ["goal_implication", "recommendation", "next_assessment",
+        "confidence_movement", "coach_emphasis", "no_material_change"].includes(topic)) {
+        continue;
+      }
+      if (usedTopics.has(topic)) {
+        throw new Error(`Narrative V3 topic reused by ${usedTopics.get(topic)} and ${section}: ${topic}`);
+      }
+      usedTopics.set(topic, section);
+    }
+  }
+}
+
+function normalizeCoachingText(value) {
+  return String(value ?? "").toLocaleLowerCase("en-US")
+    .replaceAll(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function coachingTokenOverlap(left, right) {
+  const ignored = new Set(["the", "a", "an", "and", "or", "to", "of",
+    "in", "is", "it", "that", "this", "for", "with", "your"]);
+  const tokens = (value) => new Set(normalizeCoachingText(value).split(" ")
+    .filter((item) => item && !ignored.has(item)));
+  const leftTokens = tokens(left);
+  const rightTokens = tokens(right);
+  if (leftTokens.size < 5 || rightTokens.size < 5) return 0;
+  const shared = [...leftTokens].filter((item) => rightTokens.has(item)).length;
+  return shared / Math.min(leftTokens.size, rightTokens.size);
 }
 
 function narrativeContext(goalContract, interpretation, objective) {
@@ -208,10 +277,228 @@ function nextEvidenceName(context) { return `the next ${context.nextEvidence.dis
 function nextEvidenceVerb(context) { return context.nextEvidence.grammaticalNumber === "plural" ? "are" : "is"; }
 function continuationPhrase(context) { return context.objectiveWords.continuationPhrase ?? (isMaintenanceObjective(context.objectiveDefinition) ? "this stability" : "this level of progress"); }
 
+function allocateNarrativeSections(context) {
+  if (!context.useRecurringSectionPlan) {
+    return { mode: "event_focused", content: {}, allocations: eventAllocations() };
+  }
+  const [resultObservation, coachObservation] =
+    distinctObservationSubjects(context.specificCoachingObservations);
+  const energySignal = context.operatingSignals.find((item) =>
+    item.semanticClass === "DERIVED_ESTIMATE" &&
+    /energy/iu.test(`${item.capabilityId} ${item.vocabularyKey}`));
+  const operatingSignal = context.operatingSignals.find((item) =>
+    item !== energySignal && item.factualSummary);
+  const signalClauses = coachingClauses(operatingSignal?.factualSummary);
+  const resultText = resultObservation
+    ? realizeCoachingObservation(resultObservation, "result")
+    : signalClauses[0] ? sentence(signalClauses[0])
+      : context.interpretation.recommendation.action === "continue_current_strategy"
+        ? "Nothing here calls for a change."
+        : null;
+  const meaningText = recurringMeaning(context, {
+    resultObservation,
+    operatingSignal,
+  });
+  const actionText = recurringAction(context);
+  const energyText = translateEnergyForCoaching(context, energySignal);
+  const watchText = energyText ?? recurringNextCheck(context);
+  const coachText = coachObservation
+    ? realizeCoachingObservation(coachObservation, "coach_take")
+    : signalClauses[1]
+      ? `${upperFirst(sentence(signalClauses[1]))} That is the one area to watch over the next few sessions, not a reason to change the whole plan.`
+      : recurringCoachTake(context, { resultObservation, operatingSignal });
+  const allocations = {
+    result: allocation("recent_change_worth_knowing",
+      resultObservation?.topicKey ?? operatingSignal?.signalId ?? "no_material_change"),
+    meaning: allocation("goal_relative_implication", "goal_implication"),
+    action: allocation("current_coaching_action", "recommendation"),
+    watch: allocation("specific_bounded_attention",
+      energyText ? energySignal?.signalId : "next_assessment"),
+    confidence: allocation("goal_outlook_movement", "confidence_movement"),
+    coachTake: allocation("highest_value_remaining_coaching_point",
+      coachObservation?.topicKey ?? (signalClauses[1]
+        ? `${operatingSignal?.signalId}|secondary_angle` : "coach_emphasis")),
+  };
+  return {
+    mode: "recurring_distinct_sections",
+    content: { result: resultText, meaning: meaningText, action: actionText,
+      watch: watchText, coachTake: coachText },
+    allocations,
+  };
+}
+
+function eventAllocations() {
+  return {
+    result: allocation("recent_change_worth_knowing", "new_outcome"),
+    meaning: allocation("goal_relative_implication", "goal_progress"),
+    action: allocation("current_coaching_action", "recommendation"),
+    watch: allocation("specific_bounded_attention", "next_assessment"),
+    confidence: allocation("goal_outlook_movement", "confidence_movement"),
+    coachTake: allocation("highest_value_remaining_coaching_point",
+      "event_synthesis", { intentionalEventSynthesis: true }),
+  };
+}
+
+function allocation(purpose, topicKey, extra = {}) {
+  return { purpose, topicKeys: [topicKey].filter(Boolean), ...extra };
+}
+
+function distinctObservationSubjects(observations) {
+  const result = [];
+  const subjects = new Set();
+  for (const item of observations) {
+    if (subjects.has(item.subjectId)) continue;
+    subjects.add(item.subjectId);
+    result.push(item);
+    if (result.length === 2) break;
+  }
+  return result;
+}
+
+function coachingClauses(value) {
+  return String(value ?? "").split(/;\s*/u).map((item) =>
+    stripPeriod(item.trim())).filter(Boolean);
+}
+
+function recurringMeaning(context, { resultObservation, operatingSignal }) {
+  const trainingSignal = /training/iu.test(`${operatingSignal?.capabilityId ?? ""} ${operatingSignal?.vocabularyKey ?? ""} ${operatingSignal?.sourceType ?? ""}`);
+  if (resultObservation?.domain === "training" || trainingSignal) {
+    const phase = context.goalContract.vocabulary?.phase?.contextName ??
+      "this phase";
+    const check = context.nextEvidence.namedFromBinding
+      ? `${context.nextEvidence.displayName} checks` : "outcome checks";
+    return `Training is still moving in the direction ${phase} needs between ${check}.`;
+  }
+  if (operatingSignal?.semanticClass === "EXECUTION_SUPPORT") {
+    return "The work supporting the goal is staying consistent enough to keep the current approach in place.";
+  }
+  if (operatingSignal?.semanticClass === "LEADING_INDICATOR") {
+    return `${upperFirst(operatingSignal.displayLabel ?? "The latest update")} is moving in the direction the goal needs.`;
+  }
+  if (context.interpretation.strategyEffectiveness.feasibility === "demonstrated") {
+    return context.recentEventFollowup
+      ? `${upperFirst(context.priorEventName)} already answered the big question; this update is about keeping the productive conditions in place.`
+      : "The goal remains on course, and this check-in does not change that.";
+  }
+  return null;
+}
+
+function recurringAction(context) {
+  const action = context.interpretation.recommendation.action;
+  if (action !== "continue_current_strategy") return null;
+  const safe = safeCoachingActions(context)[0] ?? "Keep executing consistently";
+  return `${sentence(safe)} Keep the current setup in place.`;
+}
+
+function recurringNextCheck(context) {
+  const purpose = context.interpretation.nextCoachingQuestion?.evidencePurpose ??
+    context.interpretation.recommendation.nextEvidencePurpose;
+  if (purpose === "confirm_persistence") {
+    const objectivePhrase = context.objectiveWords.ongoingPhrase ??
+      `${objectiveLabel(context)} keeps moving in the right direction`;
+    const guardrail = context.primaryGuardrail?.status === "clear"
+      ? ` while ${guardrailLabel(context.goalContract,
+        context.primaryGuardrail)} stays in a good place` : "";
+    return `${upperFirst(nextEvidenceName(context))} will show whether ${objectivePhrase} continues${guardrail}.`;
+  }
+  return composeWatchFallback(context);
+}
+
+function recurringCoachTake(context, { resultObservation, operatingSignal }) {
+  if (resultObservation) {
+    const milestone = resultObservation.domain === "training"
+      ? "training milestone" : "milestone";
+    return `That is useful progress—the kind of ${milestone} worth recognizing.`;
+  }
+  if (operatingSignal?.direction === "supports") {
+    return "This was a useful check-in. Keep stacking work like this and save adjustments for evidence that would actually change the decision.";
+  }
+  if (context.interpretation.recommendation.action === "continue_current_strategy") {
+    return "Nothing needs fixing right now. Keep the next few days clean and consistent.";
+  }
+  return recurringAction(context);
+}
+
+function realizeCoachingObservation(candidate, purpose) {
+  const label = coachingSubject(candidate.subjectLabel);
+  const basis = candidate.evidenceBasis ?? {};
+  if (candidate.type === "volume_milestone") {
+    if (purpose === "coach_take") {
+      return `${label} hit another session-volume best. That is a real training milestone.`;
+    }
+    return basis.percentChange != null
+      ? `${label} set another session-volume best, ${formatCompactPercent(
+        basis.percentChange)} above the previous one.`
+      : sentence(candidate.narrativeText);
+  }
+  if (candidate.type === "longitudinal_progression" &&
+      Number(basis.percentChange) > 0) {
+    if (purpose === "coach_take") {
+      return Number(basis.percentChange) >= 25
+        ? `${label} took a nice jump from the previous comparable session. That is worth recognizing.`
+        : `${label} moved forward again. That is useful progress to keep building on.`;
+    }
+    return `${label} improved ${formatCompactPercent(basis.percentChange)} from the previous comparable session.`;
+  }
+  if (candidate.type === "first_weighted_work") {
+    return purpose === "coach_take"
+      ? `${label} moved into weighted work for the first time in this phase. That is a big personal milestone.`
+      : sentence(candidate.narrativeText);
+  }
+  if (candidate.type === "related_movement_contrast") {
+    return sentence(candidate.narrativeText);
+  }
+  if (candidate.type === "sustained_plateau") {
+    return purpose === "coach_take"
+      ? `${label} has been flat long enough to deserve attention, but it does not justify changing the whole plan.`
+      : sentence(candidate.narrativeText);
+  }
+  return sentence(candidate.narrativeText);
+}
+
+function translateEnergyForCoaching(context, signal) {
+  if (!signal) return null;
+  const tension = context.reconciliationTensions.some((item) =>
+    item.lowerAuthorityObservationIds.includes(signal.observationId));
+  if (tension && context.interpretation.recommendation.action ===
+      "continue_current_strategy") return null;
+  const guardrail = context.guardrails.find((item) =>
+    item.status === "clear" && /fat|composition/iu.test(
+      `${item.metricCapability?.id ?? ""} ${guardrailLabel(
+        context.goalContract, item)}`));
+  if (signal.direction === "supports") {
+    const magnitude = signal.significance === "minor"
+      ? "a little above the estimate" : "above the estimate";
+    return `Energy intake ran ${magnitude} this week. That fits the current goal${guardrail
+      ? `; keep an eye on ${guardrailLabel(context.goalContract, guardrail)} as ${phaseReference(context)} continues`
+      : ", so no adjustment is needed"}.`;
+  }
+  if (signal.direction === "contradicts") {
+    return "The energy trend is running low enough to watch. If progress or training starts to stall, revisit the current intake setup.";
+  }
+  return null;
+}
+
+function phaseReference(context) {
+  return context.goalContract.vocabulary?.phase?.contextName ?? "this phase";
+}
+
+function coachingSubject(value) {
+  const text = String(value ?? "This movement");
+  return `${text.charAt(0).toLocaleUpperCase("en-US")}${text.slice(1)}`;
+}
+
+function formatCompactPercent(value) {
+  return `${round(Number(value), 1).toFixed(Number.isInteger(Number(value)) ? 0 : 1)}%`;
+}
+
 function composeResult(context) {
   const { interpretation, objective } = context;
   if (!objective || objective.state === "not_assessed") {
     return "There is not enough reliable evidence yet to judge the result.";
+  }
+  if (context.useRecurringSectionPlan) {
+    return context.sectionPlan.content.result;
   }
 
   const movement = objectiveMovement(context);
@@ -234,8 +521,8 @@ function composeResult(context) {
         : null),
       composeEvidenceTension(context),
       context.anchorPreviouslyCommunicated
-        ? `The last direct result remains the anchor: ${strategyLabel(context)} is working.`
-        : `The latest direct result still stands: ${lowerFirst(movement)}`,
+        ? `${upperFirst(nextEvidenceName(context))} already established that ${strategyLabel(context)} is working.`
+        : `The latest outcome still stands: ${lowerFirst(movement)}`,
     ].filter(Boolean).join(" ");
   }
 
@@ -266,6 +553,9 @@ function composeResult(context) {
 
 function composeMeaning(context) {
   const { goalContract, interpretation, objective } = context;
+  if (context.useRecurringSectionPlan) {
+    return context.sectionPlan.content.meaning;
+  }
   const strategy = strategyLabel(context);
   const progress = goalProgressSentence(context);
   const inherited = interpretation.strategyEffectiveness.continuity?.inherited;
@@ -322,7 +612,7 @@ function composeEvidenceTension(context) {
     return `${upperFirst(label)} points the other way on paper, but the realized result carries more weight; that estimate alone is not enough to change the plan.`;
   }
   if (tension.type === "LEADING_VS_LAGGING_TENSION") {
-    return `${upperFirst(label)} has weakened, but one leading signal does not erase the last direct result. It is worth watching closely.`;
+    return `${upperFirst(label)} has weakened, but one early signal does not erase the progress already established. It is worth watching closely.`;
   }
   if (tension.type === "TRANSIENT_NOISE") {
     return `${upperFirst(label)} is a weak isolated signal, so it does not change the broader conclusion yet.`;
@@ -350,7 +640,7 @@ function composeCoachTension(context) {
     return `The ${label} is worth watching, but it is not enough by itself to outweigh the stronger realized result.`;
   }
   if (tension.type === "LEADING_VS_LAGGING_TENSION") {
-    return `The ${label} deserves attention, but it has not overturned the last direct result.`;
+    return `The ${label} deserves attention, but it has not overturned the progress already established.`;
   }
   if (tension.type === "TRANSIENT_NOISE") {
     return `The ${label} is too weak and isolated to change the plan yet.`;
@@ -364,6 +654,10 @@ function composeCoachTension(context) {
 function composeAction(context) {
   const { goalContract, interpretation, consequentialGuardrails, strategyWords } = context;
   const action = interpretation.recommendation.action;
+  if (context.useRecurringSectionPlan &&
+      context.sectionPlan.content.action) {
+    return context.sectionPlan.content.action;
+  }
   const continueAction = sentence(safeCoachingActions(context).join(". ") || "Keep executing consistently");
   const reconsideration = strategyWords.reconsiderationTrigger ?
     ` Reconsider only ${lowerFirst(stripPeriod(strategyWords.reconsiderationTrigger))}.` : "";
@@ -387,6 +681,13 @@ function composeAction(context) {
 }
 
 function composeWatch(context) {
+  if (context.useRecurringSectionPlan) {
+    return context.sectionPlan.content.watch;
+  }
+  return composeWatchFallback(context);
+}
+
+function composeWatchFallback(context) {
   const { interpretation, objectiveWords, primaryGuardrail } = context;
   const purpose = interpretation.nextCoachingQuestion?.evidencePurpose ?? interpretation.recommendation.nextEvidencePurpose;
   const objectivePhrase = objectiveWords.ongoingPhrase ?? `${objectiveLabel(context)} keeps moving in the right direction`;
@@ -419,6 +720,9 @@ function composeCoachTake(context) {
   if (!objective || objective.state === "not_assessed") {
     return "Hold the plan steady for now. The next useful result needs to be clean enough to guide a decision.";
   }
+  if (context.useRecurringSectionPlan) {
+    return context.sectionPlan.content.coachTake;
+  }
   if (context.recentEventFollowup) {
     const specific = context.specificCoachingObservations[0];
     const observation = specific
@@ -427,7 +731,7 @@ function composeCoachTake(context) {
       ? `${sentence(specific.recommendationCapability.text)} ` : "";
     const support = context.interpretation.crossDomainSynthesis?.operatingSupport === "supportive"
       ? "The current work supports staying the course. " : "";
-    return `${observation}${suggestion}The direct result still anchors the plan, and the plan is doing its job. ${support}Keep the focus on consistent execution; ${nextEvidenceName(context)} ${nextEvidenceVerb(context)} about continued progress.`;
+    return `${observation}${suggestion}The last ${context.nextEvidence.displayName} still supports the plan, and the plan is doing its job. ${support}Keep the focus on consistent execution; ${nextEvidenceName(context)} ${nextEvidenceVerb(context)} about continued progress.`;
   }
   if (interpretation.recommendation.action === "transition_goal") {
     return "The goal has been reached. Protect the result and choose the next target rather than keep extending the current plan.";
@@ -456,10 +760,10 @@ function composeCoachTake(context) {
   }
   if (interpretation.strategyEffectiveness.feasibility === "demonstrated") {
     const acceptedResult = objective.freshness === "carried_forward" ?
-      context.anchorPreviouslyCommunicated ? "The last direct result still supports the plan." :
-        `The direct result still stands: ${lowerFirst(stripPeriod(objectiveMovement(context)))}.` : `${upperFirst(result)}.`;
+      context.anchorPreviouslyCommunicated ? `The last ${context.nextEvidence.displayName} still supports the plan.` :
+        `The latest outcome still stands: ${lowerFirst(stripPeriod(objectiveMovement(context)))}.` : `${upperFirst(result)}.`;
     const operatingConclusion = context.interpretation.crossDomainSynthesis?.operatingSupport === "supportive"
-      ? "The current operating evidence supports staying the course." : null;
+      ? "The current work supports staying the course." : null;
     const specific = context.specificCoachingObservations[0];
     const specificTake = specific ? sentence(specific.narrativeText) : null;
     const suggestion = specific?.recommendationCapability?.capable
@@ -548,10 +852,13 @@ function composeConfidenceBriefing(context) {
   const arrow = confidence.delta > 0 ? "↑" : confidence.delta < 0 ? "↓" : "—";
   const heading = `Confidence · ${confidence.currentPercentage}% ${arrow}`;
   if (context.recentEventFollowup) {
-    const executionName = context.goalContract.vocabulary?.evidence?.executionName;
     const previousMove = context.priorConfidenceMovement > 0
       ? " after the recent jump" : "";
-    return { heading, body: `Confidence holds${previousMove}. ${executionName && confidence.execution.state === "supportive" ? `${executionName} still supports the plan, and nothing here changes the outlook.` : "Nothing here changes the outlook."}` };
+    const training = context.operatingSignals.find((item) =>
+      item.semanticClass === "LEADING_INDICATOR" && item.direction === "supports");
+    return { heading, body: `Confidence holds${previousMove}. ${training
+      ? "Training continued to move in the right direction, so the outlook is unchanged."
+      : "Nothing in this update changes the outlook."}` };
   }
   if (confidence.delta < 0) {
     const reason = interpretation.aggregateGuardrailState === "breached" ? lowerFirst(stripPeriod(describeGuardrail(context, context.consequentialGuardrails[0]))) :
@@ -560,9 +867,12 @@ function composeConfidenceBriefing(context) {
     return { heading, body: `Confidence fell because ${reason}. ${interpretation.recommendation.action === "pause_and_investigate" ? "Address that first before pushing ahead." : "The next useful check needs to show that the outlook is improving."}` };
   }
   if (confidence.delta === 0) {
-    return { heading, body: confidence.projectionPolicy.mode === "continuity_hold" ?
-      "Confidence holds. Nothing new changes the accepted outlook for the goal." :
-      "Confidence holds. The latest context does not materially change the outlook for reaching the goal." };
+    const specific = context.specificCoachingObservations[0];
+    return { heading, body: specific
+      ? "Confidence holds. This progress supports the current approach, but one update does not change the overall goal outlook."
+      : confidence.projectionPolicy.mode === "continuity_hold" ?
+        "Confidence holds. Nothing new changes the outlook for the goal." :
+        "Confidence holds. This check-in does not change the outlook for reaching the goal." };
   }
   if (confidence.projectionPolicy.mode === "execution_update") {
     return { heading, body: `Confidence moved up because consistent execution is supporting the goal. ${interpretation.strategyEffectiveness.feasibility === "demonstrated" ? `The plan is working; ${nextEvidenceName(context)} still needs to confirm that progress continued.` : "The next useful result still needs to show that the effort is delivering."}` };
@@ -598,7 +908,10 @@ function composeConfidenceDeepExplanation(context) {
       trajectory?.deadlineContributionApplicable && trajectory.scheduleState === "at_risk" ? "The remaining work is becoming harder to fit into the available time." : null;
   const currentSupport = context.operatingSignals
     .filter((item) => item.direction === "supports" && item.factualSummary)
-    .map((item) => sentence(item.factualSummary));
+    .map((item) => item.semanticClass === "DERIVED_ESTIMATE"
+      ? translateEnergyForCoaching(context, item)
+      : coachingClauses(item.factualSummary)[0])
+    .filter(Boolean).map(sentence);
   return {
     why: [goalProgressSentence(context), `${upperFirst(strategyLabel(context))} ${demonstrated ? "is clearly working" : "still needs a useful outcome check"}.`, time].filter(Boolean).join(" "),
     whatIncreasedIt: context.objective?.state === "progressed" ? [objectiveMovement(context), ...(primaryGuardrail?.status === "clear" ? [describeGuardrail(context, primaryGuardrail)] : [])] : [],
@@ -625,7 +938,7 @@ function composeConfidenceDeepExplanation(context) {
     assumptions: [
       "The outlook depends on appropriate continued execution.",
       ...(trajectory?.observedRate != null ? ["The forecast uses a reduced recent rate, not an assumption that the latest result repeats exactly."] : []),
-      ...(trajectory?.conditionalUnmeasuredProgress > 0 ? ["Consistent execution supports the outlook, but any progress since the last direct check is still unconfirmed."] : []),
+      ...(trajectory?.conditionalUnmeasuredProgress > 0 ? ["Consistent execution supports the outlook, but any progress since the last outcome check is still unconfirmed."] : []),
       "This is a coaching outlook, not a measured statistical probability.",
     ],
   };

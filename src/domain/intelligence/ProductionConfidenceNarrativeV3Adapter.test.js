@@ -453,9 +453,11 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
     expect(midweek.strategicInterpretation.recommendation.action)
       .toBe("continue_current_strategy");
     expect(midweek.narrativePlan.composition.finalNarrative)
-      .toMatch(/Iso-lateral high rows.*last direct result remains the anchor/isu);
+      .toMatch(/Iso-lateral high rows.*Training is still moving/isu);
     expect(midweek.narrativePlan.composition.finalNarrative)
-      .not.toMatch(/energy|calorie|estimate alone/iu);
+      .not.toMatch(/energy|calorie|estimate alone|direct result|operating evidence/iu);
+    expect(midweek.narrativePlan.composition.coachTake)
+      .not.toContain(midweek.narrativePlan.composition.sections.result);
     expect(midweek.narrativePlan.composition.finalNarrative).not.toContain("5.0 lb");
   });
 
