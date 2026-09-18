@@ -15,7 +15,7 @@ describe("Unwired Home Confidence and canonical evidence vocabulary", () => {
     const goalContract = createGoalContractV3({ ...fixture.goalContract, evidenceRequests: fixture.goalContract.evidenceRequests.map((request) => ({ ...request, timing: { cadenceDays } })) });
     const result = runConfidenceNarrativeV3({ ...fixture, goalContract });
     expect(createHomeConfidenceV3Sample(result).expanded.explanation.whatIsHoldingItBack.join(" ")).toContain(phrase);
-    expect(result.narrativePlan.confidenceBriefing.heading).toContain("confidence ·");
+    expect(result.narrativePlan.confidenceBriefing.heading).toContain("Confidence ·");
   });
   it("shares one assessment snapshot and explanation across briefing, collapsed and expanded Home", () => {
     const result = runConfidenceNarrativeV3(createPairedCalibrationFixtures().dexa);

@@ -405,7 +405,7 @@ function confidenceTrajectory(context) {
 function composeConfidenceBriefing(context) {
   const { confidence, interpretation, primaryGuardrail } = context;
   const arrow = confidence.delta > 0 ? "↑" : confidence.delta < 0 ? "↓" : "—";
-  const heading = `confidence · ${confidence.currentPercentage}% ${arrow}`;
+  const heading = `Confidence · ${confidence.currentPercentage}% ${arrow}`;
   if (context.recentEventFollowup) {
     const executionName = context.goalContract.vocabulary?.evidence?.executionName;
     const previousMove = context.priorConfidenceMovement > 0

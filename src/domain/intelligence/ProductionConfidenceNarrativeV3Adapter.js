@@ -91,7 +91,7 @@ export function buildGoalContractV3FromCanonical({
   const forecast = createForecast({
     target, goal, baseline, targetValue, direction, maintenanceRange,
   });
-  const configuredGuardrails = goal.v3Guardrails ?? goal.guardrailsV3 ?? [];
+  const configuredGuardrails = resolveGoalGuardrailsV3(goal);
   const guardrails = configuredGuardrails.map((guardrail, index) =>
     normalizeConfiguredGuardrail(guardrail, index));
   const policies = [
@@ -113,7 +113,7 @@ export function buildGoalContractV3FromCanonical({
       role: "decisive",
       minimumQuality: "adequate",
       participation: "PERSISTENCE_CONFIRMATION_INPUT",
-      usableFor: ["feasibility", "persistence", "attribution"],
+      usableFor: ["feasibility", "persistence"],
     },
     ...guardrails.map((guardrail) => ({
       policyId: `guardrail|${guardrail.guardrailId}`,
@@ -126,6 +126,10 @@ export function buildGoalContractV3FromCanonical({
       participation: "GUARDRAIL",
       usableFor: ["guardrail"],
     })),
+    ...supportingEvidencePoliciesV3({
+      strategyRevisionId,
+      guardrails,
+    }),
     ...(goal.evidencePoliciesV3 ?? []),
   ];
   return createGoalContractV3({
@@ -219,6 +223,9 @@ export function createCanonicalEvidenceObservationsV3({
     ...adaptCanonicalDexaScans({ goalContract, phase, scans: store?.dexaScans, cutoff }),
     ...adaptCanonicalWeightEntries({ goalContract, phase, entries: store?.weightEntries, cutoff }),
     ...adaptCanonicalPhotoObservations({ goalContract, phase, store, cutoff }),
+    ...adaptLatestCanonicalCadenceObservationsV3({
+      goalContract, phase, store, cutoff,
+    }),
     ...(store?.v3EvidenceObservations ?? []),
   ];
   const byId = new Map();
@@ -241,8 +248,9 @@ export function adaptCadenceEvidenceObservationsV3({
   piEnvelope = null,
   evidenceCutoff,
 } = {}) {
-  const values = piEnvelope?.observations ?? piEnvelope?.shadow?.observations ??
+  const rawValues = piEnvelope?.observations ?? piEnvelope?.shadow?.observations ??
     artifact?.briefing?.weeklyNarrative?.context?.pi?.observations ?? [];
+  const values = selectRepresentativeCadenceObservationsV3(rawValues);
   const cutoff = timestamp(evidenceCutoff, "evidenceCutoff");
   return values.filter((item) => item?.id && item?.domain).flatMap((item) => {
     const capability = cadenceCapabilityV3(item);
@@ -290,6 +298,86 @@ export function adaptCadenceEvidenceObservationsV3({
   });
 }
 
+function selectRepresentativeCadenceObservationsV3(values) {
+  if (!Array.isArray(values)) return [];
+  const selected = [
+    selectCadenceObservationV3(values, "training", [
+      (item) => item.id === "performance|overall|resistance",
+      (item) => item.kind === "training_performance" &&
+        item.subject?.type === "overall",
+    ]),
+    selectCadenceObservationV3(values, "energy", [
+      (item) => item.kind === "energy_balance",
+    ]),
+    selectCadenceObservationV3(values, "nutrition", [
+      (item) => item.kind === "nutrition_summary",
+    ]),
+    selectCadenceObservationV3(values, "activity", [
+      (item) => item.kind === "activity_summary",
+    ]),
+    selectCadenceObservationV3(values, "weight", [
+      (item) => item.kind === "weight_average_change" &&
+        item.status !== "insufficient_data",
+      (item) => item.kind === "weight_short_window_change" &&
+        item.status !== "insufficient_data",
+    ]),
+    selectCadenceObservationV3(values, "recovery", [
+      (item) => item.kind === "recovery_state",
+      (item) => item.kind === "recovery_insufficient_evidence",
+    ]),
+  ].filter(Boolean);
+  return selected;
+}
+
+function selectCadenceObservationV3(values, domain, preferences) {
+  const candidates = values.filter((item) => item?.domain === domain);
+  for (const preference of preferences) {
+    const selected = candidates.find(preference);
+    if (selected) return selected;
+  }
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+export function adaptLatestCanonicalCadenceObservationsV3({
+  goalContract,
+  phase,
+  store,
+  cutoff,
+} = {}) {
+  const historyByAssessmentId = new Map((store?.goalConfidenceHistory ?? [])
+    .filter((item) => item?.assessmentId && item?.assessment)
+    .map((item) => [item.assessmentId, item.assessment]));
+  const candidates = (store?.dailyBriefings ?? []).flatMap((artifact) => {
+    const piEnvelope = artifact?.briefing?.weeklyNarrative?.context?.pi ?? null;
+    if (!Array.isArray(piEnvelope?.observations) || !piEnvelope.observations.length) {
+      return [];
+    }
+    const assessmentId = artifact?.confidencePublication?.assessmentId ??
+      artifact?.briefing?.confidencePublication?.assessmentId ?? null;
+    const assessment = historyByAssessmentId.get(assessmentId) ?? null;
+    const artifactGoalId = artifact?.goalId ?? artifact?.sourceRevisions?.goalId ??
+      artifact?.briefing?.activeGoal?.id ?? null;
+    const artifactPhaseId = artifact?.phaseId ?? artifact?.sourceRevisions?.phaseId ??
+      artifact?.briefing?.activePhase?.id ?? null;
+    const artifactCutoff = observedArtifactCutoff(artifact);
+    if (!artifactCutoff || Date.parse(artifactCutoff) > Date.parse(cutoff)) return [];
+    const boundGoalId = assessment?.goalId ?? artifactGoalId;
+    const boundPhaseId = assessment?.phaseId ?? artifactPhaseId;
+    if (boundGoalId !== goalContract.goalId ||
+      boundPhaseId !== goalContract.phase.phaseId) return [];
+    return [{ artifact, piEnvelope, artifactCutoff }];
+  }).sort((left, right) => right.artifactCutoff.localeCompare(left.artifactCutoff));
+  const latest = candidates[0];
+  if (!latest) return [];
+  return adaptCadenceEvidenceObservationsV3({
+    goalContract,
+    phase,
+    artifact: latest.artifact,
+    piEnvelope: latest.piEnvelope,
+    evidenceCutoff: latest.artifactCutoff,
+  });
+}
+
 export function adaptCanonicalDexaScans({
   goalContract,
   phase,
@@ -297,7 +385,8 @@ export function adaptCanonicalDexaScans({
   cutoff,
 } = {}) {
   const active = scans.filter((scan) => isActive(scan) &&
-    observedAt(scan) && Date.parse(observedAt(scan)) <= Date.parse(cutoff))
+    observedAt(scan) && Date.parse(observedAt(scan)) <= Date.parse(cutoff) &&
+    hasDexaMeasurement(scan))
     .sort((left, right) => observedAt(left).localeCompare(observedAt(right)));
   return active.map((scan, index) => {
     const prior = active[index - 1] ?? null;
@@ -451,8 +540,18 @@ function adaptCanonicalWeightEntries({ goalContract, entries = [], cutoff }) {
 
 function resolveStrategyRevisionId(goal, phase) {
   return goal.currentStrategyRevision?.id ?? goal.strategyRevisionId ??
+    goal.timeline?.activePhaseStrategyId ?? phase.activePhaseStrategyId ??
     phase.strategyRevisionId ?? phase.currentStrategyRevision?.id ??
     `phase_strategy|${phase.id}|v1`;
+}
+
+function hasDexaMeasurement(scan) {
+  return [
+    mass(scan?.totalMass),
+    mass(scan?.leanMass),
+    mass(scan?.fatMass),
+    number(scan?.bodyFatPercentage),
+  ].some((value) => value != null);
 }
 
 function revisionForObservation(goalContract, at) {
@@ -550,6 +649,152 @@ function normalizeConfiguredGuardrail(input, index) {
     metricCapability: input.metricCapability ?? input.capability,
     evaluation: input.evaluation,
   };
+}
+
+function resolveGoalGuardrailsV3(goal) {
+  const configured = goal.v3Guardrails ?? goal.guardrailsV3;
+  if (Array.isArray(configured)) return configured;
+  return (goal.guardrails ?? [])
+    .filter((item) => item?.accepted !== false)
+    .map(adaptLegacyGuardrailV3)
+    .filter(Boolean);
+}
+
+function adaptLegacyGuardrailV3(input) {
+  const text = String(input.text ?? input.description ?? "");
+  const bodyFatRange = /body[\s-]*fat/i.test(text) ? parseNumericRange(text) : null;
+  if (bodyFatRange) {
+    const span = bodyFatRange.max - bodyFatRange.min;
+    return {
+      guardrailId: input.id,
+      metricCapability: "body_composition.body_fat_percentage",
+      evaluation: {
+        mode: "allowed_range",
+        allowedRange: { ...bodyFatRange, approximate: /approximately|about/i.test(text) },
+      },
+      severityBands: [
+        { status: "breached", minimumDeviation: span * 1.5 },
+        { status: "pressured", minimumDeviation: span * 0.5 },
+        { status: "watch", minimumDeviation: 0 },
+      ],
+      consequencePolicy: {
+        confidenceImpact: -1,
+        recommendationConstraint: "monitor",
+        celebrationCeiling: "measured",
+        escalationLevel: "attention",
+      },
+      vocabularyKey: input.id,
+    };
+  }
+  if (/strength|training performance/i.test(text) &&
+      /avoid|maintain|preserve|no\s+(?:sustained\s+)?regression/i.test(text)) {
+    return minimumIndexGuardrail(input, "performance.training_support_index",
+      -2);
+  }
+  if (/recovery/i.test(text) && /maintain|preserve|avoid/i.test(text)) {
+    return minimumIndexGuardrail(input, "execution.recovery", -1);
+  }
+  return null;
+}
+
+function minimumIndexGuardrail(input, capabilityId, confidenceImpact) {
+  return {
+    guardrailId: input.id,
+    metricCapability: capabilityId,
+    evaluation: { mode: "minimum", threshold: 0 },
+    severityBands: [
+      { status: "breached", minimumDeviation: 1 },
+      { status: "watch", minimumDeviation: 0 },
+    ],
+    consequencePolicy: {
+      confidenceImpact,
+      recommendationConstraint: confidenceImpact <= -2 ? "review" : "monitor",
+      celebrationCeiling: confidenceImpact <= -2 ? "restrained" : "measured",
+    },
+    vocabularyKey: input.id,
+  };
+}
+
+function supportingEvidencePoliciesV3({ strategyRevisionId, guardrails }) {
+  const policies = [{
+    policyId: `strategy_training_support|${strategyRevisionId}`,
+    subjectType: "strategy",
+    subjectId: strategyRevisionId,
+    capabilityPattern: "performance.training_support_index",
+    role: "supporting",
+    minimumQuality: "adequate",
+    participation: "PERSISTENCE_CONFIRMATION_INPUT",
+    usableFor: ["feasibility", "persistence", "attribution", "execution"],
+    signalRules: {
+      supportsWhen: predicate("measurement.value", "gte", 1),
+      contradictsWhen: predicate("measurement.value", "lte", -1),
+      significance: "meaningful",
+    },
+  }, {
+    policyId: `strategy_nutrition_context|${strategyRevisionId}`,
+    subjectType: "execution",
+    subjectId: strategyRevisionId,
+    capabilityPattern: "execution.nutrition",
+    role: "contextual",
+    minimumQuality: "limited",
+    participation: "NARRATIVE_CONTEXT_ONLY",
+    usableFor: ["narrative", "attribution", "execution"],
+  }, {
+    policyId: `strategy_activity_context|${strategyRevisionId}`,
+    subjectType: "execution",
+    subjectId: strategyRevisionId,
+    capabilityPattern: "execution.activity",
+    role: "contextual",
+    minimumQuality: "limited",
+    participation: "NARRATIVE_CONTEXT_ONLY",
+    usableFor: ["narrative", "attribution", "execution"],
+  }, {
+    policyId: `strategy_recovery_context|${strategyRevisionId}`,
+    subjectType: "execution",
+    subjectId: strategyRevisionId,
+    capabilityPattern: "execution.recovery",
+    role: "contextual",
+    minimumQuality: "limited",
+    participation: "NARRATIVE_CONTEXT_ONLY",
+    usableFor: ["narrative", "execution"],
+  }];
+  for (const guardrail of guardrails) {
+    const capability = typeof guardrail.metricCapability === "string"
+      ? guardrail.metricCapability : guardrail.metricCapability.id ??
+        `${guardrail.metricCapability.namespace}.${guardrail.metricCapability.key}`;
+    if (!["performance.training_support_index", "execution.recovery"].includes(
+      capability)) continue;
+    policies.push({
+      policyId: `support_guardrail|${guardrail.guardrailId}`,
+      subjectType: "guardrail",
+      subjectId: guardrail.guardrailId,
+      capabilityPattern: capability,
+      role: "material",
+      minimumQuality: "adequate",
+      participation: "GUARDRAIL",
+      usableFor: ["guardrail"],
+    });
+  }
+  return policies;
+}
+
+function parseNumericRange(value) {
+  const match = String(value).match(/(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)/u);
+  if (!match) return null;
+  const min = Number(match[1]);
+  const max = Number(match[2]);
+  return Number.isFinite(min) && Number.isFinite(max) && min <= max
+    ? { min, max } : null;
+}
+
+function observedArtifactCutoff(artifact) {
+  const value = artifact?.evidenceCutoff ?? artifact?.evidenceWindow?.cutoff ??
+    artifact?.evidenceWindow?.endDate ?? null;
+  if (!value) return null;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? `${value}T23:59:59.999Z` : value;
+  return Number.isFinite(Date.parse(normalized))
+    ? new Date(normalized).toISOString() : null;
 }
 
 function predicate(path, operator, valuesOrValue) {

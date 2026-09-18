@@ -63,6 +63,7 @@ describe("provider DEXA Event narrative composition", () => {
         "goalConfidenceSnapshots",
         "goalConfidenceHistory",
         "confidenceInitializationArtifacts",
+        "confidenceActivationArtifacts",
       ],
       readApplicationContext: false,
       readImportMetadata: false,

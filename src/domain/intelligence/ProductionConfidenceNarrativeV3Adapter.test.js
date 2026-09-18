@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createPairedCalibrationFixtures } from "../../fixtures/confidenceNarrativeV3CalibrationFixtures.js";
 import {
+  adaptLatestCanonicalCadenceObservationsV3,
   adaptCanonicalPhotoObservations,
   buildProductionConfidenceNarrativeV3Input,
   createCanonicalEvidenceObservationsV3,
@@ -62,6 +63,128 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
     ]);
     expect(latest.sourceReferences).toEqual(["dexa_sep12"]);
     expect(JSON.stringify(latest)).not.toMatch(/rawPdf|raw_report|pdf_interpretation/i);
+  });
+
+  it("ignores canonical DEXA placeholders that contain no measurements", () => {
+    const fixture = createPairedCalibrationFixtures().dexa;
+    const observations = createCanonicalEvidenceObservationsV3({
+      goalContract: fixture.goalContract,
+      goal: { id: fixture.goalContract.goalId },
+      phase: { id: fixture.goalContract.phase.phaseId },
+      store: {
+        dexaScans: [
+          { id: "empty_placeholder", measuredAt: "2026-06-20" },
+          ...scans(),
+        ],
+      },
+      evidenceCutoff: fixture.evaluationContext.evidenceCutoff,
+    });
+    expect(observations.filter((item) => item.sourceType === "canonical_dexa")
+      .map((item) => item.observationId)).toEqual(["dexa_aug15", "dexa_sep12"]);
+  });
+
+  it("uses the accepted canonical Phase strategy revision from the Goal timeline", () => {
+    const fixture = createPairedCalibrationFixtures().dexa;
+    const input = buildProductionConfidenceNarrativeV3Input({
+      goal: {
+        id: fixture.goalContract.goalId,
+        target: {
+          metric: "lean_mass", direction: "increase", unit: "lb",
+          baselineValue: 147.5, amount: 10,
+        },
+        timeline: {
+          startDate: "2026-07-18", targetDate: "2026-10-31",
+          activePhaseStrategyId: "phase_strategy|accepted|v1",
+        },
+      },
+      phase: {
+        id: fixture.goalContract.phase.phaseId,
+        startedAt: "2026-08-15",
+      },
+      store: { dexaScans: scans() },
+      evidenceCutoff: fixture.evaluationContext.evidenceCutoff,
+    });
+    expect(input.goalContract.strategy.strategyRevisionId)
+      .toBe("phase_strategy|accepted|v1");
+    expect(input.observations.at(-1).strategyRevisionId)
+      .toBe("phase_strategy|accepted|v1");
+  });
+
+  it("adapts safe legacy guardrails and the latest bound canonical cadence evidence", () => {
+    const fixture = createPairedCalibrationFixtures().dexa;
+    const goalId = fixture.goalContract.goalId;
+    const phaseId = fixture.goalContract.phase.phaseId;
+    const assessmentId = "confidence_assessment_v2|weekly";
+    const store = {
+      dexaScans: scans(),
+      goalConfidenceHistory: [{
+        assessmentId,
+        assessment: { id: assessmentId, goalId, phaseId },
+      }],
+      dailyBriefings: [{
+        id: "weekly_briefing",
+        evidenceWindow: { endDate: "2026-09-12" },
+        confidencePublication: { assessmentId },
+        briefing: { weeklyNarrative: { context: { pi: { observations: [{
+          id: "training_exercise_regression",
+          domain: "training",
+          kind: "training_performance",
+          subject: { type: "exercise" },
+          status: "regressing",
+          direction: "negative",
+          evidenceWindow: { startDate: "2026-09-06", endDate: "2026-09-12" },
+          confidence: { level: "high" },
+          supportingEvidenceIds: ["training_event_regression"],
+        }, {
+          id: "training_support",
+          domain: "training",
+          kind: "training_performance",
+          subject: { type: "overall" },
+          status: "improving",
+          direction: "positive",
+          evidenceWindow: { startDate: "2026-09-06", endDate: "2026-09-12" },
+          confidence: { level: "moderate" },
+          supportingEvidenceIds: ["training_event"],
+        }] } } } },
+      }],
+    };
+    const input = buildProductionConfidenceNarrativeV3Input({
+      goal: {
+        id: goalId,
+        title: "Configured objective",
+        target: { metric: "lean_mass", direction: "increase", unit: "lb",
+          baselineValue: 147.5, amount: 10 },
+        timeline: { startDate: "2026-07-18", targetDate: "2026-10-31",
+          activePhaseStrategyId: "phase_strategy|accepted|v1" },
+        guardrails: [{ id: "body_fat", accepted: true,
+          text: "Maintain approximately 8–9% body fat." }, {
+          id: "strength", accepted: true,
+          text: "Avoid sustained strength regression." }, {
+          id: "unsupported_text", accepted: true,
+          text: "Use judgment about an unstructured constraint." }],
+      },
+      phase: { id: phaseId, startedAt: "2026-08-15" },
+      store,
+      evidenceCutoff: "2026-09-18T00:00:00.000Z",
+    });
+    expect(input.goalContract.guardrails.map((item) => item.guardrailId))
+      .toEqual(["body_fat", "strength"]);
+    expect(input.goalContract.guardrails[0].evaluation.allowedRange)
+      .toMatchObject({ min: 8, max: 9, approximate: true });
+    expect(adaptLatestCanonicalCadenceObservationsV3({
+      goalContract: input.goalContract,
+      phase: { id: phaseId }, store, cutoff: "2026-09-18T00:00:00.000Z",
+    })).toHaveLength(1);
+    expect(input.observations.find((item) => item.sourceType ===
+      "canonical_training_observation")).toMatchObject({
+      capabilities: [{ capabilityId: "performance.training_support_index", value: 1 }],
+    });
+    expect(adaptLatestCanonicalCadenceObservationsV3({
+      goalContract: input.goalContract,
+      phase: { id: phaseId },
+      store: { dailyBriefings: store.dailyBriefings, goalConfidenceHistory: [] },
+      cutoff: "2026-09-18T00:00:00.000Z",
+    })).toEqual([]);
   });
 
   it("distinguishes later confirmation, contradiction, no-new-proof, and guardrail breach", () => {
