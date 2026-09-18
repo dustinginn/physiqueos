@@ -46,6 +46,10 @@ export function createEvidenceObservationV3(input = {}) {
     },
     exposureDays: Math.max(0, Number(input.exposureDays ?? 0)),
     capabilities,
+    // Structured, source-backed detail that may be useful for coaching without
+    // changing evidence authority or Confidence. This remains downstream of
+    // the canonical observation and is never interpreted as another metric.
+    coachingDetails: structuredClone(input.coachingDetails ?? null),
     limitations: uniqueStrings(input.limitations ?? []),
     sourceReferences: uniqueStrings(input.sourceReferences ?? []),
   };

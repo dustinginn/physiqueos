@@ -287,6 +287,10 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
           baselineValue: 147.5, amount: 10 },
         timeline: { startDate: "2026-07-18", targetDate: "2026-10-31",
           activePhaseStrategyId: "phase_strategy|accepted|v1" },
+        coachingObservationPolicyV3: { training: {
+          allowBoundedPlateauSuggestions: true,
+          minimumPlateauExposuresForSuggestion: 5,
+        } },
         guardrails: [{ id: "body_fat", accepted: true,
           text: "Maintain approximately 8–9% body fat." }, {
           id: "strength", accepted: true,
@@ -326,6 +330,10 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
       expect.objectContaining({ capabilityPattern: "strategy.energy_balance_estimate", semanticClass: "DERIVED_ESTIMATE" }),
       expect.objectContaining({ capabilityPattern: "body_mass.level", semanticClass: "CONTEXTUAL_EVIDENCE" }),
     ]));
+    expect(input.goalContract.coachingObservationPolicy.training).toEqual({
+      allowBoundedPlateauSuggestions: true,
+      minimumPlateauExposuresForSuggestion: 5,
+    });
     expect(adaptLatestCanonicalCadenceObservationsV3({
       goalContract: input.goalContract,
       phase: { id: phaseId },
@@ -345,6 +353,14 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
       cutoff: "2026-09-16T06:59:59.999Z",
     };
     const store = {
+      canonicalEvidenceObjects: [
+        trainingSession("training_sep13", "2026-09-13", "iso_lateral_high_row",
+          "Iso-Lateral High Rows", "Back", 90),
+        trainingSession("training_sep14", "2026-09-14", "iso_lateral_high_row",
+          "Iso-Lateral High Rows", "Back", 100),
+        trainingSession("training_sep15", "2026-09-15", "iso_lateral_high_row",
+          "Iso-Lateral High Rows", "Back", 120),
+      ],
       goalConfidenceHistory: [{ assessmentId, assessment: { id: assessmentId,
         goalId, phaseId } }],
       dailyBriefings: [{
@@ -390,6 +406,13 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
       quality: { status: "adequate" },
       capabilities: [{ capabilityId: "performance.training_support_index",
         value: 1 }],
+      coachingDetails: {
+        schemaVersion: "coaching_evidence_detail_v3",
+        candidates: expect.arrayContaining([
+          expect.objectContaining({ subjectId: "iso_lateral_high_row",
+            type: expect.stringMatching(/milestone|progression/u) }),
+        ]),
+      },
     });
     expect(observations.find((item) => item.sourceType ===
       "canonical_energy_observation")).toMatchObject({
@@ -430,7 +453,9 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
     expect(midweek.strategicInterpretation.recommendation.action)
       .toBe("continue_current_strategy");
     expect(midweek.narrativePlan.composition.finalNarrative)
-      .toMatch(/measurable training progress.*estimate alone is not enough to change the plan/isu);
+      .toMatch(/Iso-lateral high rows.*last direct result remains the anchor/isu);
+    expect(midweek.narrativePlan.composition.finalNarrative)
+      .not.toMatch(/energy|calorie|estimate alone/iu);
     expect(midweek.narrativePlan.composition.finalNarrative).not.toContain("5.0 lb");
   });
 
@@ -715,5 +740,23 @@ function scan(id, date, total, lean, fat, bodyFat) {
     fatMass: { value: fat, unit: "lb" },
     bodyFatPercentage: bodyFat,
     status: "active",
+  };
+}
+
+function trainingSession(id, date, exerciseId, name, category, load) {
+  return {
+    id,
+    evidence_type: "training",
+    observed_at: `${date}T18:00:00.000Z`,
+    metadata: { activity_type: "Traditional Strength Training" },
+    exercises: [{
+      exercise_id: exerciseId,
+      name,
+      category,
+      sets: [
+        { set_number: 1, reps: 10, weight: load, weight_unit: "lb" },
+        { set_number: 2, reps: 10, weight: load, weight_unit: "lb" },
+      ],
+    }],
   };
 }

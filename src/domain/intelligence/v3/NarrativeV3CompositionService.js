@@ -44,6 +44,8 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   context.anchorPreviouslyCommunicated = currentAuthoritativeEvidenceIds.length > 0 &&
     currentAuthoritativeEvidenceIds.every((id) => context.communicatedEvidenceIds.includes(id));
   context.operatingSignals = interpretation.crossDomainSynthesis?.selectedNarrativeSignals ?? [];
+  context.specificCoachingObservations =
+    interpretation.coachingObservationSelection?.selected ?? [];
   context.reconciliationTensions = interpretation.crossDomainSynthesis?.tensions ?? [];
   const primaryConfidenceSnapshot = { percentage: confidence.currentPercentage, delta: confidence.delta, movement: confidence.movement };
   const confidenceBriefing = { ...composeConfidenceBriefing(context), ...primaryConfidenceSnapshot };
@@ -87,6 +89,16 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
         direction: item.direction,
         salience: item.salience,
       })),
+      selectedCoachingObservations: context.specificCoachingObservations.map(
+        (item) => ({
+          candidateId: item.candidateId,
+          topicKey: item.topicKey,
+          materialStateKey: item.materialStateKey,
+          domain: item.domain,
+          type: item.type,
+          recommendationMode: item.recommendationCapability.mode,
+        }),
+      ),
     },
     continuityPolicy: { mode: context.recentEventFollowup ? "recent_event_followup" :
       publicationContext.kind === "recurring" && context.anchorPreviouslyCommunicated &&
@@ -216,7 +228,10 @@ function composeResult(context) {
   if (objective.freshness === "carried_forward") {
     const operatingEvidence = composeOperatingEvidence(context);
     return [
-      operatingEvidence,
+      operatingEvidence ?? (interpretation.recommendation.action ===
+        "continue_current_strategy"
+        ? "Nothing in the current evidence calls for a change."
+        : null),
       composeEvidenceTension(context),
       context.anchorPreviouslyCommunicated
         ? `The last direct result remains the anchor: ${strategyLabel(context)} is working.`
@@ -278,6 +293,10 @@ function composeMeaning(context) {
 }
 
 function composeOperatingEvidence(context) {
+  if (context.specificCoachingObservations.length) {
+    return context.specificCoachingObservations
+      .map((item) => sentence(item.narrativeText)).join(" ");
+  }
   const signals = context.operatingSignals.filter((item) => item.factualSummary);
   if (!signals.length) return null;
   const summaries = signals.map((item) => stripPeriod(sentence(item.factualSummary)));
@@ -292,6 +311,10 @@ function composeOperatingEvidence(context) {
 function composeEvidenceTension(context) {
   const tension = context.reconciliationTensions[0];
   if (!tension) return null;
+  if (tension.type === "ESTIMATE_VS_OUTCOME_TENSION" &&
+      context.interpretation.recommendation.action ===
+        "continue_current_strategy" &&
+      context.specificCoachingObservations.length) return null;
   const lowerSignal = context.interpretation.crossDomainSynthesis?.signals.find((item) =>
     tension.lowerAuthorityObservationIds.includes(item.observationId));
   const label = lowerSignal?.displayLabel ?? "One current measure";
@@ -316,6 +339,10 @@ function composeEvidenceTension(context) {
 function composeCoachTension(context) {
   const tension = context.reconciliationTensions[0];
   if (!tension) return null;
+  if (tension.type === "ESTIMATE_VS_OUTCOME_TENSION" &&
+      context.interpretation.recommendation.action ===
+        "continue_current_strategy" &&
+      context.specificCoachingObservations.length) return null;
   const lowerSignal = context.interpretation.crossDomainSynthesis?.signals.find((item) =>
     tension.lowerAuthorityObservationIds.includes(item.observationId));
   const label = lowerFirst(lowerSignal?.displayLabel ?? "weaker signal");
@@ -393,9 +420,14 @@ function composeCoachTake(context) {
     return "Hold the plan steady for now. The next useful result needs to be clean enough to guide a decision.";
   }
   if (context.recentEventFollowup) {
+    const specific = context.specificCoachingObservations[0];
+    const observation = specific
+      ? `${sentence(specific.narrativeText)} ` : "";
+    const suggestion = specific?.recommendationCapability?.capable
+      ? `${sentence(specific.recommendationCapability.text)} ` : "";
     const support = context.interpretation.crossDomainSynthesis?.operatingSupport === "supportive"
-      ? "The current operating evidence supports staying the course. " : "";
-    return `The direct result still anchors the plan, and the plan is doing its job. ${support}Keep the focus on consistent execution; ${nextEvidenceName(context)} ${nextEvidenceVerb(context)} about continued progress.`;
+      ? "The current work supports staying the course. " : "";
+    return `${observation}${suggestion}The direct result still anchors the plan, and the plan is doing its job. ${support}Keep the focus on consistent execution; ${nextEvidenceName(context)} ${nextEvidenceVerb(context)} about continued progress.`;
   }
   if (interpretation.recommendation.action === "transition_goal") {
     return "The goal has been reached. Protect the result and choose the next target rather than keep extending the current plan.";
@@ -428,7 +460,12 @@ function composeCoachTake(context) {
         `The direct result still stands: ${lowerFirst(stripPeriod(objectiveMovement(context)))}.` : `${upperFirst(result)}.`;
     const operatingConclusion = context.interpretation.crossDomainSynthesis?.operatingSupport === "supportive"
       ? "The current operating evidence supports staying the course." : null;
-    return [operatingConclusion, composeCoachTension(context), progress,
+    const specific = context.specificCoachingObservations[0];
+    const specificTake = specific ? sentence(specific.narrativeText) : null;
+    const suggestion = specific?.recommendationCapability?.capable
+      ? sentence(specific.recommendationCapability.text) : null;
+    return [specificTake, suggestion, operatingConclusion,
+      composeCoachTension(context), progress,
       `${acceptedResult} The plan is working.`, `Stay consistent. ${execute}`, watch]
       .filter(Boolean).join(" ");
   }

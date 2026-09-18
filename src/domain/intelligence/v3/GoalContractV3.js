@@ -66,6 +66,9 @@ export function createGoalContractV3(input = {}) {
     narrativePolicy: {
       recentEventHours: Math.max(0, finiteOr(input.narrativePolicy?.recentEventHours, 24)),
     },
+    coachingObservationPolicy: normalizeCoachingObservationPolicy(
+      input.coachingObservationPolicy,
+    ),
     vocabulary: structuredClone(input.vocabulary ?? {}),
   };
   return deepFreeze({
@@ -73,6 +76,19 @@ export function createGoalContractV3(input = {}) {
     id: `goal_contract_v3|${semanticFingerprint(semantic).slice(7)}`,
     semanticFingerprint: semanticFingerprint(semantic),
   });
+}
+
+function normalizeCoachingObservationPolicy(input = {}) {
+  return {
+    training: {
+      allowBoundedPlateauSuggestions:
+        input.training?.allowBoundedPlateauSuggestions === true,
+      minimumPlateauExposuresForSuggestion: Math.max(3, finiteOr(
+        input.training?.minimumPlateauExposuresForSuggestion,
+        4,
+      )),
+    },
+  };
 }
 
 function normalizeCapability(input, field) {

@@ -1,6 +1,12 @@
 import { deriveCanonicalGoalProgress } from "../confidence/GoalProgressContextService.js";
+import { createTrainingPerformanceIntelligenceReport } from
+  "../services/TrainingPerformanceIntelligenceService.js";
+import { adaptTrainingPerformanceReportToPIObservations } from
+  "../services/TrainingPIObservationAdapter.js";
 import { createEvidenceObservationV3 } from "./v3/EvidenceObservationV3.js";
 import { createGoalContractV3 } from "./v3/GoalContractV3.js";
+import { deriveCadenceCoachingDetailsV3 } from
+  "./v3/SpecificCoachingObservationV3.js";
 
 const METRIC_CAPABILITIES = Object.freeze({
   lean_mass: "body_composition.lean_mass",
@@ -226,6 +232,8 @@ export function buildGoalContractV3FromCanonical({
     achievementPolicy: goal.achievementPolicyV3 ??
       { onAchieved: "transition_goal" },
     narrativePolicy: goal.narrativePolicyV3 ?? { recentEventHours: 24 },
+    coachingObservationPolicy: goal.coachingObservationPolicyV3 ??
+      phase.coachingObservationPolicyV3 ?? {},
     vocabulary,
   });
 }
@@ -496,6 +504,7 @@ export function adaptCadenceEvidenceObservationsV3({
   artifact,
   piEnvelope = null,
   evidenceCutoff,
+  canonicalTrainingEvidence = [],
 } = {}) {
   const rawValues = piEnvelope?.observations ?? piEnvelope?.shadow?.observations ??
     artifact?.briefing?.weeklyNarrative?.context?.pi?.observations ?? [];
@@ -541,6 +550,12 @@ export function adaptCadenceEvidenceObservationsV3({
         factualSummary: item.factualSummary ?? item.explanationData?.summary?.text ?? null,
         metadata: { signalDirection: direction },
       }],
+      coachingDetails: deriveCadenceCoachingDetailsV3({
+        domain: item.domain,
+        rawObservations: rawValues,
+        canonicalTrainingEvidence,
+        evidenceWindow: item.evidenceWindow ?? artifact?.evidenceWindow ?? null,
+      }),
       limitations: item.confidence?.limitations ?? [],
       sourceReferences: references,
     })];
@@ -620,12 +635,49 @@ export function adaptLatestCanonicalCadenceObservationsV3({
   }).sort((left, right) => right.artifactCutoff.localeCompare(left.artifactCutoff));
   const latest = candidates[0];
   if (!latest) return [];
+  const canonicalTrainingEvidence = canonicalTrainingEvidenceThroughV3({
+    store,
+    cutoff: latest.artifactCutoff,
+    phaseStart: goalContract.phase.startedAt,
+  });
+  const detailedTrainingObservations = canonicalTrainingEvidence.length
+    ? adaptTrainingPerformanceReportToPIObservations(
+        createTrainingPerformanceIntelligenceReport({
+          canonicalObjects: canonicalTrainingEvidence,
+          now: new Date(latest.artifactCutoff),
+          generatedAt: latest.artifactCutoff,
+        }),
+      )
+    : [];
+  const sourceObservations = latest.piEnvelope.observations ??
+    latest.piEnvelope.shadow?.observations ?? [];
+  const sourceIds = new Set(sourceObservations.map((item) => item.id));
+  const piEnvelope = {
+    ...latest.piEnvelope,
+    observations: [
+      ...sourceObservations,
+      ...detailedTrainingObservations.filter((item) => !sourceIds.has(item.id)),
+    ],
+  };
   return adaptCadenceEvidenceObservationsV3({
     goalContract,
     phase,
     artifact: latest.artifact,
-    piEnvelope: latest.piEnvelope,
+    piEnvelope,
     evidenceCutoff: latest.artifactCutoff,
+    canonicalTrainingEvidence,
+  });
+}
+
+function canonicalTrainingEvidenceThroughV3({ store, cutoff, phaseStart }) {
+  return (store?.canonicalEvidenceObjects ?? []).filter((candidate) => {
+    const payload = candidate?.payload ?? candidate;
+    const observed = String(payload?.observed_at ?? payload?.date ?? "").slice(0, 10);
+    if (payload?.evidence_type !== "training" || !observed) return false;
+    if (Date.parse(`${observed}T23:59:59.999Z`) > Date.parse(cutoff)) return false;
+    if (phaseStart && observed < String(phaseStart).slice(0, 10)) return false;
+    return candidate?.quality?.status !== "superseded" &&
+      payload?.quality?.status !== "superseded";
   });
 }
 

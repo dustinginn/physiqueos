@@ -2,6 +2,8 @@ import { reduceCoachingStateV3 } from "./CoachingStateV3.js";
 import { evaluateGoalContract, findingMeetsCriterion } from "./DeclarativeGoalEvaluator.js";
 import { resolveGoalRelativeAuthority } from "./GoalRelativeAuthorityResolver.js";
 import { synthesizeCrossDomainEvidenceV3 } from "./CrossDomainEvidenceSynthesisV3.js";
+import { selectSpecificCoachingObservationsV3 } from
+  "./SpecificCoachingObservationV3.js";
 import {
   AUTHORITY_ORDER,
   QUALITY_ORDER,
@@ -74,6 +76,14 @@ export function createStrategicInterpretationV3({
     coachingState,
     crossDomainSynthesis,
   });
+  const coachingObservationSelection = selectSpecificCoachingObservationsV3({
+    goalContract,
+    observations,
+    crossDomainSynthesis,
+    priorInterpretation,
+    evaluationContext: { ...evaluationContext, evaluatedAt },
+    recommendation,
+  });
   const biggestTakeaway = rankTakeaways({
     evaluatedGoal,
     strategyEffectiveness,
@@ -112,6 +122,7 @@ export function createStrategicInterpretationV3({
     uncertaintyProfile,
     evidenceSignals,
     crossDomainSynthesis,
+    coachingObservationSelection,
     coachingStateId: coachingState.id,
     questionTransitions: coachingState.transitions,
     nextCoachingQuestion: coachingState.questions.find((item) =>

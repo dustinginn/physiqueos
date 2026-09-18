@@ -55,6 +55,7 @@ function getTrainingSubject(observation) {
       type: "exercise",
       id: observation.exercise?.key,
       label: observation.exercise?.name,
+      category: observation.exercise?.primaryNavigationCategory ?? null,
     };
   }
   if (observation.scope === "category") {
