@@ -3,6 +3,28 @@ import { nutritionStrategy } from "./StrategyEditorService";
 import { resolveCoachingUpdatesReadModel } from "./CoachingUpdatesReadService";
 import { describeEnergyStrategyIdentity } from "../presentation/strategyIdentityPresentation";
 
+// Operating Plan strategy pages describe the configured strategy. Their purpose
+// copy can change when that structure changes, but it is not a live coaching
+// projection and must never be recomposed merely because new evidence or a new
+// Confidence publication arrived.
+export const OPERATING_PLAN_STRATEGY_PURPOSE_OWNERSHIP = Object.freeze({
+  classification: "STATIC_GOAL_PHASE_PURPOSE",
+  dynamicEvidenceReactive: false,
+  updateTriggers: Object.freeze([
+    "goal_change",
+    "phase_change",
+    "strategy_configuration_change",
+    "strategy_revision",
+  ]),
+  nonTriggers: Object.freeze([
+    "new_evidence",
+    "confidence_publication",
+    "briefing_publication",
+    "training_performance",
+    "dexa_publication",
+  ]),
+});
+
 export function createOperatingPlanStrategyDetailService({ repositories }) {
   return {
     async getDetail({ strategyId, strategyType, userId }) {

@@ -68,20 +68,24 @@ export const BRIEFING_V3_DENSITY_CONTRACTS = deepFreeze({
 // publish, persist or wire any application surface.
 export function createNarrativeV3CrossSurfaceShadowPreviews({
   goalContract,
+  operatingPlanDetails,
   result,
   priority,
 } = {}) {
   assertCanonicalV3Inputs(goalContract, result);
+  assertOperatingPlanDetails(operatingPlanDetails);
   const context = createProjectionContext(goalContract, result);
   const semantic = {
-    schemaVersion: "narrative_v3_cross_surface_shadow_preview_v1",
+    schemaVersion: "narrative_v3_cross_surface_shadow_preview_v2",
     strategicInterpretationId: result.strategicInterpretation.id,
     confidenceAssessmentId: result.confidence.id,
     narrativePlanId: result.narrativePlan.id,
     activeGoal: projectActiveGoal(context),
-    priority: projectPriority(context, priority),
-    operatingPlanTraining: projectTrainingRationale(context),
-    operatingPlanEnergy: projectEnergyRationale(context),
+    priority: projectPriority(goalContract, priority),
+    operatingPlanTraining: projectOperatingPlanPurpose(
+      operatingPlanDetails.training),
+    operatingPlanEnergy: projectOperatingPlanPurpose(
+      operatingPlanDetails.energy),
     publication: {
       mode: "shadow_only",
       persistenceWrites: 0,
@@ -94,6 +98,15 @@ export function createNarrativeV3CrossSurfaceShadowPreviews({
     id: `narrative_v3_cross_surface_shadow|${semanticFingerprint(
       semantic).slice(7)}`,
   });
+}
+
+function assertOperatingPlanDetails(details) {
+  for (const type of ["training", "energy"]) {
+    const detail = details?.[type];
+    if (!detail?.title || !detail?.purpose || !Array.isArray(detail.sections)) {
+      throw new Error(`Cross-surface preview requires canonical ${type} Operating Plan detail.`);
+    }
+  }
 }
 
 function assertCanonicalV3Inputs(goalContract, result) {
@@ -129,23 +142,8 @@ function createProjectionContext(goalContract, result) {
       : {}),
   };
   const guardrail = selectPrimaryGuardrail(goalContract, interpretation);
-  const trainingObservation =
-    interpretation.coachingObservationSelection?.selected?.find((item) =>
-      item.domain === "training") ?? null;
-  const trainingSignal = interpretation.crossDomainSynthesis?.signals?.find(
-    (item) => item.semanticClass === "LEADING_INDICATOR" &&
-      /training/iu.test(`${item.capabilityId} ${item.vocabularyKey} ${
-        item.sourceType}`)) ?? null;
-  const energySignal = interpretation.crossDomainSynthesis?.signals?.find(
-    (item) => item.semanticClass === "DERIVED_ESTIMATE" &&
-      /energy/iu.test(`${item.capabilityId} ${item.vocabularyKey} ${
-        item.sourceType}`)) ?? null;
-  const energyTension = interpretation.crossDomainSynthesis?.tensions?.find(
-    (item) => item.lowerAuthorityObservationIds?.includes(
-      energySignal?.observationId)) ?? null;
   return { goalContract, result, interpretation, objective,
-    objectiveDefinition, objectiveWords, trajectory, guardrail,
-    trainingObservation, trainingSignal, energySignal, energyTension };
+    objectiveDefinition, objectiveWords, trajectory, guardrail };
 }
 
 function projectActiveGoal(context) {
@@ -175,23 +173,26 @@ function projectActiveGoal(context) {
   };
 }
 
-function projectPriority(context, priority) {
+function projectPriority(goalContract, priority) {
   if (!priority?.name || !priority?.factualInstruction ||
       !priority?.strategicCapability) {
     throw new Error("Priority preview requires a canonical name, instruction and strategic capability.");
   }
   let coaching;
+  const objective = configuredObjectiveName(goalContract);
   if (priority.strategicCapability === "nutrition.protein_execution") {
     coaching = `Consistent protein supports the training and recovery behind the current ${
-      objectiveName(context)} progress.`;
+      objective} goal.`;
   } else if (priority.strategicCapability === "training.execution") {
     coaching = `Completing this work helps preserve the training conditions behind the current ${
-      objectiveName(context)} progress.`;
+      objective} goal.`;
   } else {
     coaching = `This action supports the conditions needed to keep the current ${
-      objectiveName(context)} goal moving.`;
+      objective} goal moving.`;
   }
   return {
+    ownership: "STATIC_GOAL_PHASE_PURPOSE",
+    dynamicEvidenceReactive: false,
     density: NARRATIVE_V3_DENSITY.ONE_LINE,
     name: priority.name,
     factualInstruction: sentence(priority.factualInstruction),
@@ -199,43 +200,29 @@ function projectPriority(context, priority) {
   };
 }
 
-function projectTrainingRationale(context) {
-  const specific = context.trainingObservation?.narrativeText;
-  const support = specific ? sentence(specific) :
-    context.trainingSignal?.direction === "supports"
-      ? "Comparable training performance is still moving in the right direction."
-      : "The current training setup remains appropriate while performance holds.";
-  const rationale = `${support} Keep the current training structure while that continues; reconsider it if comparable performance flattens or declines across several sessions.`;
+function projectOperatingPlanPurpose(detail) {
   return {
+    ownership: "STATIC_GOAL_PHASE_PURPOSE",
+    dynamicEvidenceReactive: false,
     density: NARRATIVE_V3_DENSITY.SHORT,
-    heading: "Training rationale",
-    rationale,
+    title: detail.title,
+    purpose: detail.purpose,
+    goal: detail.goal,
+    startedDate: detail.startedDate,
+    status: detail.status,
+    sections: detail.sections,
   };
 }
 
-function projectEnergyRationale(context) {
-  const objective = objectiveName(context);
-  const guardrailCondition = context.guardrail
-    ? `${context.guardrail.label} moves outside ${context.guardrail.range}`
-    : "a Goal guardrail deteriorates";
-  let rationale;
-  if (context.energyTension?.type === "ESTIMATE_VS_OUTCOME_TENSION" &&
-      context.interpretation.recommendation.action ===
-        "continue_current_strategy") {
-    rationale = `Keep the current Energy strategy in place: the numbers look lower than expected on paper, but the realized ${objective} progress and productive training do not support changing intake from that estimate alone. Reconsider if progress stalls, training deteriorates, or ${guardrailCondition}.`;
-  } else if (context.energySignal?.direction === "supports") {
-    rationale = `The current Energy strategy fits the Goal while ${
-      context.guardrail?.label ?? "the important limits"} remains controlled. Reconsider if ${guardrailCondition} or training and progress stop moving together.`;
-  } else if (context.energySignal?.direction === "contradicts") {
-    rationale = `The current Energy strategy deserves attention because progress and training are no longer clearly supported. Reconsider the setup if that pattern continues across enough reliable evidence.`;
-  } else {
-    rationale = `Keep the current Energy strategy steady while realized ${objective} progress and training remain productive. Reconsider if progress stalls, training deteriorates, or ${guardrailCondition}.`;
-  }
-  return {
-    density: NARRATIVE_V3_DENSITY.SHORT,
-    heading: "Energy rationale",
-    rationale,
-  };
+function configuredObjectiveName(goalContract) {
+  const primary = goalContract.objectives.find((item) =>
+    item.priority === "primary") ?? goalContract.objectives[0];
+  const configured = primary?.vocabularyKey
+    ? goalContract.vocabulary?.objectives?.[primary.vocabularyKey]
+    : null;
+  return configured?.displayName ??
+    goalContract.vocabulary?.objective?.displayName ??
+    primary?.metricCapability?.displayName ?? "Goal";
 }
 
 function progressStatement(objective, words, trajectory) {

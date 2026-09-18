@@ -2,12 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   composeOperatingPlanStrategyDetail,
   getOperatingPlanStrategyHref,
+  OPERATING_PLAN_STRATEGY_PURPOSE_OWNERSHIP,
 } from "./OperatingPlanStrategyDetailService";
 
 const goal = { id: "goal", title: "Build Lean Mass", timeline: { startDate: "2026-07-20" } };
 const base = { id: "strategy", status: "active", currentGoalIds: ["goal"], activatedAt: "2026-07-23" };
 
 describe("Operating Plan strategy detail", () => {
+  it("declares structural purpose ownership and excludes evidence publications as triggers", () => {
+    expect(OPERATING_PLAN_STRATEGY_PURPOSE_OWNERSHIP).toEqual({
+      classification: "STATIC_GOAL_PHASE_PURPOSE",
+      dynamicEvidenceReactive: false,
+      updateTriggers: ["goal_change", "phase_change",
+        "strategy_configuration_change", "strategy_revision"],
+      nonTriggers: ["new_evidence", "confidence_publication",
+        "briefing_publication", "training_performance", "dexa_publication"],
+    });
+  });
+
   it("presents authoritative Energy fields", () => {
     const result = composeOperatingPlanStrategyDetail({
       goals: [goal], strategyType: "energy",
@@ -126,6 +138,45 @@ describe("Operating Plan strategy detail", () => {
     // never a rename of the underlying Strategy identity.
     expect(protocol.effectiveStrategy.mode).toBe("Phase Execution");
   });
+
+  it("changes with Goal, Phase and strategy structure but not evidence-only inputs", () => {
+    const version = { effectiveAt: "2026-08-15", goalLinks: [{ goalId: "goal" }],
+      trainingStrategy: { weeklyFrequencies: { back: 2 },
+        physiquePriorities: ["back"], progression: { pace: "moderate" } } };
+    const buildGoal = { ...goal, currentPhaseId: "p1",
+      phases: [{ id: "p1", name: "Foundation", status: "active" }] };
+    const baseline = composeOperatingPlanStrategyDetail({ goals: [buildGoal],
+      strategyType: "training", protocol: base, version });
+    const evidenceOnly = composeOperatingPlanStrategyDetail({
+      goals: [buildGoal], strategyType: "training", protocol: base, version,
+      canonicalEvidence: [{ id: "training-new" }], confidence: { value: 91 },
+      dexaScans: [{ id: "dexa-new" }],
+    });
+    expect(evidenceOnly).toEqual(baseline);
+
+    const changedGoal = composeOperatingPlanStrategyDetail({
+      goals: [{ ...buildGoal, title: "Improve Strength" }],
+      strategyType: "training", protocol: base, version });
+    expect(changedGoal.purpose).not.toBe(baseline.purpose);
+
+    const changedPhase = composeOperatingPlanStrategyDetail({
+      goals: [{ ...buildGoal, currentPhaseId: "p2", phases: [
+        ...buildGoal.phases,
+        { id: "p2", name: "Performance Phase", status: "active" },
+      ] }], strategyType: "training", protocol: base, version });
+    expect(changedPhase.sections).not.toEqual(baseline.sections);
+
+    const revisedStrategy = composeOperatingPlanStrategyDetail({
+      goals: [buildGoal], strategyType: "training", protocol: base,
+      version: { ...version, effectiveAt: "2026-09-01", trainingStrategy: {
+        ...version.trainingStrategy, weeklyFrequencies: { back: 3, legs: 2 },
+        progression: { pace: "aggressive" },
+      } },
+    });
+    expect(revisedStrategy.sections).not.toEqual(baseline.sections);
+    expect(revisedStrategy.startedDate).not.toBe(baseline.startedDate);
+  });
+
   it("uses stable IDs and returns no fabricated detail when unavailable", () => {
     expect(getOperatingPlanStrategyHref("energy", "protocol_energy")).toBe("/profile/operating-plan/strategy/energy/protocol_energy");
     expect(getOperatingPlanStrategyHref("nutrition", null)).toBeNull();

@@ -4,6 +4,8 @@ import { createPairedCalibrationFixtures } from
   "../../fixtures/confidenceNarrativeV3CalibrationFixtures.js";
 import { runConfidenceNarrativeV3 } from
   "../intelligence/v3/ConfidenceNarrativeV3Pipeline.js";
+import { composeOperatingPlanStrategyDetail } from
+  "../services/OperatingPlanStrategyDetailService.js";
 import {
   BRIEFING_V3_DENSITY_CONTRACTS,
   createNarrativeV3CrossSurfaceShadowPreviews,
@@ -39,6 +41,7 @@ describe("Narrative V3 cross-surface shadow projections", () => {
     const { goalContract, result } = currentResult();
     const preview = createNarrativeV3CrossSurfaceShadowPreviews({
       goalContract,
+      operatingPlanDetails: operatingPlanDetails(),
       result,
       priority: proteinPriority(),
     });
@@ -46,9 +49,14 @@ describe("Narrative V3 cross-surface shadow projections", () => {
       activeGoal: { density: NARRATIVE_V3_DENSITY.MEDIUM,
         status: "In progress · 58% complete" },
       priority: { density: NARRATIVE_V3_DENSITY.ONE_LINE,
-        name: "Protein Goal" },
-      operatingPlanTraining: { density: NARRATIVE_V3_DENSITY.SHORT },
-      operatingPlanEnergy: { density: NARRATIVE_V3_DENSITY.SHORT },
+        name: "Protein Goal", ownership: "STATIC_GOAL_PHASE_PURPOSE",
+        dynamicEvidenceReactive: false },
+      operatingPlanTraining: { density: NARRATIVE_V3_DENSITY.SHORT,
+        ownership: "STATIC_GOAL_PHASE_PURPOSE",
+        dynamicEvidenceReactive: false },
+      operatingPlanEnergy: { density: NARRATIVE_V3_DENSITY.SHORT,
+        ownership: "STATIC_GOAL_PHASE_PURPOSE",
+        dynamicEvidenceReactive: false },
       publication: { mode: "shadow_only", persistenceWrites: 0,
         artifactWrites: 0, clientWiring: false },
     });
@@ -60,37 +68,56 @@ describe("Narrative V3 cross-surface shadow projections", () => {
   it("keeps Priority coaching to one Goal-relative line", () => {
     const { goalContract, result } = currentResult();
     const priority = createNarrativeV3CrossSurfaceShadowPreviews({
-      goalContract, result, priority: proteinPriority(),
+      goalContract, operatingPlanDetails: operatingPlanDetails(), result,
+      priority: proteinPriority(),
     }).priority;
     expect(priority.factualInstruction).toBe("Hit today's protein target.");
     expect(priority.goalRelativeCoaching)
-      .toBe("Consistent protein supports the training and recovery behind the current lean mass progress.");
+      .toBe("Consistent protein supports the training and recovery behind the current lean mass goal.");
     expect(priority.goalRelativeCoaching.match(/[.!?]/gu)).toHaveLength(1);
     expect(priority.goalRelativeCoaching.split(/\s+/u).length).toBeLessThan(20);
   });
 
-  it("keeps Operating Plan rationales concise, specific and free of engine jargon", () => {
+  it("uses canonical static Operating Plan purpose instead of live evidence coaching", () => {
     const { goalContract, result } = currentResult();
+    const details = operatingPlanDetails();
     const preview = createNarrativeV3CrossSurfaceShadowPreviews({
-      goalContract, result, priority: proteinPriority(),
+      goalContract, operatingPlanDetails: details, result,
+      priority: proteinPriority(),
     });
-    expect(preview.operatingPlanTraining.rationale)
-      .toMatch(/ISO-Lateral High Rows.*120 lb.*comparable performance/isu);
-    expect(preview.operatingPlanEnergy.rationale)
-      .toMatch(/numbers look lower than expected on paper.*lean mass progress.*do not support changing intake/isu);
+    expect(preview.operatingPlanTraining.purpose).toBe(details.training.purpose);
+    expect(preview.operatingPlanTraining.sections).toEqual(details.training.sections);
+    expect(preview.operatingPlanEnergy.purpose).toBe(details.energy.purpose);
+    expect(preview.operatingPlanEnergy.sections).toEqual(details.energy.sections);
     const copy = JSON.stringify(preview);
-    expect(copy).not.toMatch(/paired.?day|estimate-vs-outcome|support index|evidence authority|persistence state|Apple Watch|nutrition logging/iu);
-    for (const surface of [preview.operatingPlanTraining,
-      preview.operatingPlanEnergy]) {
-      expect(surface.rationale.split(/\s+/u).length).toBeLessThan(55);
-    }
+    expect(copy).not.toMatch(/ISO-Lateral|120 lb|numbers look lower than expected|paired.?day|estimate-vs-outcome|support index|evidence authority|persistence state|Apple Watch|nutrition logging/iu);
+  });
+
+  it("keeps Priority and Operating Plan purpose invariant when only evidence changes", () => {
+    const { goalContract, result } = currentResult();
+    const details = operatingPlanDetails();
+    const input = { goalContract, operatingPlanDetails: details,
+      priority: proteinPriority() };
+    const first = createNarrativeV3CrossSurfaceShadowPreviews({
+      ...input, result,
+    });
+    const changedEvidence = structuredClone(result);
+    changedEvidence.strategicInterpretation.coachingObservationSelection.selected = [];
+    changedEvidence.strategicInterpretation.crossDomainSynthesis.tensions = [];
+    const second = createNarrativeV3CrossSurfaceShadowPreviews({
+      ...input, result: changedEvidence,
+    });
+    expect(second.priority).toEqual(first.priority);
+    expect(second.operatingPlanTraining).toEqual(first.operatingPlanTraining);
+    expect(second.operatingPlanEnergy).toEqual(first.operatingPlanEnergy);
   });
 
   it("does not change Confidence or canonical interpretation", () => {
     const { goalContract, result } = currentResult();
     const before = JSON.stringify(result);
     createNarrativeV3CrossSurfaceShadowPreviews({
-      goalContract, result, priority: proteinPriority(),
+      goalContract, operatingPlanDetails: operatingPlanDetails(), result,
+      priority: proteinPriority(),
     });
     expect(result.confidence).toMatchObject({ currentPercentage: 79, delta: 0 });
     expect(JSON.stringify(result)).toBe(before);
@@ -128,6 +155,33 @@ function currentResult() {
       text: null },
   }];
   return { goalContract: fixtures.weekly.goalContract, result };
+}
+
+function operatingPlanDetails() {
+  const goal = { id: "goal-build", title: "Build Lean Mass",
+    currentPhaseId: "phase-build", phases: [
+      { id: "phase-build", name: "Lean Mass Build", status: "active" },
+    ] };
+  const base = { id: "strategy", status: "active",
+    currentGoalIds: [goal.id], activatedAt: "2026-08-15" };
+  return {
+    training: composeOperatingPlanStrategyDetail({ goals: [goal],
+      strategyType: "training", protocol: { ...base,
+        name: "Build Lean Mass Training" }, version: {
+        effectiveAt: "2026-08-15", goalLinks: [{ goalId: goal.id }],
+        trainingStrategy: { weeklyFrequencies: { back: 2, legs: 1 },
+          physiquePriorities: ["back", "legs"],
+          progression: { pace: "moderate" } },
+      } }),
+    energy: composeOperatingPlanStrategyDetail({ goals: [goal],
+      strategyType: "energy", protocol: { ...base,
+        effectiveStrategy: { mode: "Phase Execution",
+          caloricIntakeTarget: { value: 2500, unit: "kcal/day" },
+          activityExpenditureTarget: { value: 800, unit: "kcal/day" },
+          monitoringCadence: "weekly", strategicReviewCadence: "monthly",
+          strategicReviewAnchor: "dexa_body_composition" } },
+      version: { effectiveAt: "2026-08-15" } }),
+  };
 }
 
 function proteinPriority() {
