@@ -1,0 +1,1341 @@
+{
+  "schemaVersion": "goal_generic_v3_acceptance_report_v1",
+  "syntheticDeterministicFixtures": true,
+  "productionWrites": 0,
+  "passed": true,
+  "rows": [
+    {
+      "id": 1,
+      "name": "Lean-mass gain; strong direct progress",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "composition.lean",
+            "label": "lean tissue",
+            "baseline": 147.5,
+            "comparison": 148.3,
+            "current": 153.3,
+            "target": 157.5,
+            "direction": "increase",
+            "unit": "lb"
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "fat",
+            "label": "body fat",
+            "value": 8.1,
+            "mode": "allowed_range",
+            "allowedRange": {
+              "min": 8,
+              "max": 9
+            },
+            "unit": "%"
+          }
+        ],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_1"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [
+        {
+          "name": "body fat",
+          "state": "clear"
+        }
+      ],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 77,
+      "priorConfidence": 55,
+      "movement": 22,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "strong",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 2,
+      "name": "Lean-mass gain; body-fat breach",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "composition.lean",
+            "label": "lean tissue",
+            "baseline": 147.5,
+            "comparison": 148.3,
+            "current": 153.3,
+            "target": 157.5,
+            "direction": "increase",
+            "unit": "lb"
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "fat",
+            "label": "body fat",
+            "value": 11,
+            "mode": "allowed_range",
+            "allowedRange": {
+              "min": 8,
+              "max": 9
+            },
+            "unit": "%"
+          }
+        ],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_2"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [
+        {
+          "name": "body fat",
+          "state": "breached"
+        }
+      ],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 45,
+      "priorConfidence": 55,
+      "movement": -10,
+      "recommendation": {
+        "action": "pause_and_investigate",
+        "reason": "guardrail_breach",
+        "urgency": "urgent",
+        "nextEvidencePurpose": "assess_guardrail"
+      },
+      "affect": {
+        "valence": "corrective",
+        "intensity": "strong",
+        "urgency": "urgent",
+        "celebrationCeiling": "none",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "assess_guardrail",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 3,
+      "name": "Fat loss; lean tissue preserved",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "composition.fat",
+            "label": "fat mass",
+            "baseline": 25,
+            "comparison": 24,
+            "current": 19,
+            "target": 15,
+            "direction": "decrease",
+            "unit": "lb",
+            "words": {
+              "subject": "You",
+              "progressVerb": "lost"
+            }
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "lean",
+            "label": "lean tissue",
+            "value": 151,
+            "mode": "minimum",
+            "threshold": 149,
+            "unit": "lb"
+          }
+        ],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_3"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [
+        {
+          "name": "lean tissue",
+          "state": "clear"
+        }
+      ],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 78,
+      "priorConfidence": 55,
+      "movement": 23,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "strong",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true,
+      "representativeCopy": {
+        "sections": {
+          "result": "This is a huge win. You lost 5.0 lb of fat mass since August 15, while lean tissue stayed in a good place at 151 lb.",
+          "meaning": "You are more than halfway to the goal. The current plan is clearly working. There is no reason to second-guess the approach.",
+          "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+          "watch": "The next composition assessment is about whether this progress continues while lean tissue stays in a good place—not whether the plan works. That question has been answered.",
+          "confidence": "confidence · 78% ↑\nConfidence jumped because the plan delivered a standout result: you lost 5.0 lb of fat mass since August 15, with lean tissue still in a good place at 151 lb. You are more than halfway to the goal. There is still uncertainty about finishing within the remaining time if progress slows."
+        },
+        "coachTake": "This is exactly what this phase needed: you lost 5.0 lb of fat mass, with lean tissue still in a good place at 151 lb. The goal is more than halfway there, and the plan is clearly working. Don't change it. Keep executing and use the next composition assessment to see whether this level of progress continues."
+      }
+    },
+    {
+      "id": 4,
+      "name": "Fat loss; unacceptable lean-tissue loss",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "composition.fat",
+            "label": "fat mass",
+            "baseline": 25,
+            "comparison": 24,
+            "current": 19,
+            "target": 15,
+            "direction": "decrease",
+            "unit": "lb",
+            "words": {
+              "subject": "You",
+              "progressVerb": "lost"
+            }
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "lean",
+            "label": "lean tissue",
+            "value": 146,
+            "mode": "minimum",
+            "threshold": 149,
+            "unit": "lb"
+          }
+        ],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_4"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [
+        {
+          "name": "lean tissue",
+          "state": "breached"
+        }
+      ],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 45,
+      "priorConfidence": 55,
+      "movement": -10,
+      "recommendation": {
+        "action": "pause_and_investigate",
+        "reason": "guardrail_breach",
+        "urgency": "urgent",
+        "nextEvidencePurpose": "assess_guardrail"
+      },
+      "affect": {
+        "valence": "corrective",
+        "intensity": "strong",
+        "urgency": "urgent",
+        "celebrationCeiling": "none",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "assess_guardrail",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true,
+      "representativeCopy": {
+        "sections": {
+          "result": "The objective moved forward, but the limit takes priority. You lost 5.0 lb of fat mass since August 15. Lean tissue moved outside the acceptable range at 146 lb.",
+          "meaning": "You are more than halfway to the goal. The current plan is producing progress, but lean tissue still needs attention.",
+          "action": "Stop pushing the current plan and address lean tissue first.",
+          "watch": "The next composition assessment should show whether lean tissue is back where it needs to be.",
+          "confidence": "confidence · 45% ↓\nConfidence fell because lean tissue moved outside the acceptable range at 146 lb. Address that first before pushing ahead."
+        },
+        "coachTake": "You lost 5.0 lb of fat mass since August 15. But lean tissue moved outside the acceptable range at 146 lb. Stop pushing and fix that first."
+      }
+    },
+    {
+      "id": 5,
+      "name": "Maintenance; stable in range",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "body_mass.value",
+            "label": "body weight",
+            "baseline": 170,
+            "comparison": 170,
+            "current": 170,
+            "range": {
+              "min": 168,
+              "max": 172
+            },
+            "unit": "lb"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_5"
+      ],
+      "objectiveState": [
+        "stable_success"
+      ],
+      "goalAchievement": "achieved",
+      "guardrails": [],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 98,
+      "priorConfidence": 55,
+      "movement": 43,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "restrained",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true,
+      "representativeCopy": {
+        "sections": {
+          "result": "This is exactly what success looks like here. Body weight held where it needs to be at 170.0 lb.",
+          "meaning": "Holding the target range is the win for the goal. The current plan is doing its job.",
+          "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+          "watch": "The next weight check-in is about whether this stability continues—not whether the plan works. That question has been answered.",
+          "confidence": "confidence · 98% ↑\nConfidence jumped because the outlook improved: body weight held where it needs to be at 170.0 lb."
+        },
+        "coachTake": "Body weight held where it needs to be at 170.0 lb. The plan is working. Stay consistent. Keep executing. The next weight check-in is about whether this stability continues—not whether the plan works. That question has been answered."
+      }
+    },
+    {
+      "id": 6,
+      "name": "Maintenance; drift outside range",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "body_mass.value",
+            "label": "body weight",
+            "baseline": 170,
+            "comparison": 170,
+            "current": 175,
+            "range": {
+              "min": 168,
+              "max": 172
+            },
+            "unit": "lb"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_6"
+      ],
+      "objectiveState": [
+        "outside_target"
+      ],
+      "goalAchievement": "regressed",
+      "guardrails": [],
+      "feasibility": "challenged",
+      "persistence": "disrupted",
+      "goalConfidence": 54,
+      "priorConfidence": 98,
+      "movement": -44,
+      "recommendation": {
+        "action": "review_strategy",
+        "reason": "authoritative_contradiction",
+        "urgency": "attention",
+        "nextEvidencePurpose": "resolve_contradiction"
+      },
+      "affect": {
+        "valence": "corrective",
+        "intensity": "measured",
+        "urgency": "attention",
+        "celebrationCeiling": "restrained",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "resolve_contradiction",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 7,
+      "name": "Pure strength; direct performance success",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "performance.load",
+            "label": "top lift",
+            "baseline": 100,
+            "comparison": 104,
+            "current": 112,
+            "target": 120,
+            "direction": "increase",
+            "unit": "kg"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_7"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 77,
+      "priorConfidence": 55,
+      "movement": 22,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "strong",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true,
+      "representativeCopy": {
+        "sections": {
+          "result": "This is a huge win. Top lift improved by 8.0 kg since August 15, reaching 112.0 kg.",
+          "meaning": "You are more than halfway to the goal. The current plan is clearly working. There is no reason to second-guess the approach.",
+          "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+          "watch": "The next strength assessment is about whether this progress continues—not whether the plan works. That question has been answered.",
+          "confidence": "confidence · 77% ↑\nConfidence jumped because the plan delivered a standout result: top lift improved by 8.0 kg since August 15, reaching 112.0 kg. You are more than halfway to the goal. There is still uncertainty about finishing within the remaining time if progress slows."
+        },
+        "coachTake": "This is exactly what this phase needed: top lift improved by 8.0 kg, reaching 112.0 kg. The goal is more than halfway there, and the plan is clearly working. Don't change it. Keep executing and use the next strength assessment to see whether this level of progress continues."
+      }
+    },
+    {
+      "id": 8,
+      "name": "Strength; insufficient exposure",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "performance.load",
+            "label": "top lift",
+            "baseline": 100,
+            "comparison": 104,
+            "current": 112,
+            "target": 120,
+            "direction": "increase",
+            "unit": "kg"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_8"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "testing",
+      "persistence": "not_assessed",
+      "goalConfidence": 58,
+      "priorConfidence": 55,
+      "movement": 3,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_testing",
+        "urgency": "routine",
+        "nextEvidencePurpose": "establish_feasibility"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "strong",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "establish_feasibility",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 9,
+      "name": "Cardio; direct performance improvement",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "performance.time",
+            "label": "time-trial time",
+            "baseline": 300,
+            "comparison": 290,
+            "current": 270,
+            "target": 250,
+            "direction": "decrease",
+            "unit": "seconds"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_9"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 77,
+      "priorConfidence": 55,
+      "movement": 22,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "strong",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true,
+      "representativeCopy": {
+        "sections": {
+          "result": "This is a huge win. Time-trial time improved by 20.0 seconds since August 15, reaching 270.0 seconds.",
+          "meaning": "You are more than halfway to the goal. The current plan is clearly working. There is no reason to second-guess the approach.",
+          "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+          "watch": "The next time trial is about whether this progress continues—not whether the plan works. That question has been answered.",
+          "confidence": "confidence · 77% ↑\nConfidence jumped because the plan delivered a standout result: time-trial time improved by 20.0 seconds since August 15, reaching 270.0 seconds. You are more than halfway to the goal. There is still uncertainty about finishing within the remaining time if progress slows."
+        },
+        "coachTake": "This is exactly what this phase needed: time-trial time improved by 20.0 seconds, reaching 270.0 seconds. The goal is more than halfway there, and the plan is clearly working. Don't change it. Keep executing and use the next time trial to see whether this level of progress continues."
+      }
+    },
+    {
+      "id": 10,
+      "name": "Cardio; authoritative contradiction",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "performance.time",
+            "label": "time-trial time",
+            "baseline": 300,
+            "comparison": 270,
+            "current": 285,
+            "target": 250,
+            "direction": "decrease",
+            "unit": "seconds"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_10"
+      ],
+      "objectiveState": [
+        "regressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "challenged",
+      "persistence": "disrupted",
+      "goalConfidence": 40,
+      "priorConfidence": 77,
+      "movement": -37,
+      "recommendation": {
+        "action": "review_strategy",
+        "reason": "authoritative_contradiction",
+        "urgency": "attention",
+        "nextEvidencePurpose": "resolve_contradiction"
+      },
+      "affect": {
+        "valence": "corrective",
+        "intensity": "measured",
+        "urgency": "attention",
+        "celebrationCeiling": "restrained",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "resolve_contradiction",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true,
+      "representativeCopy": {
+        "sections": {
+          "result": "This needs attention. Time-trial time moved away from the target by 15.0 seconds since September 12, landing at 285.0 seconds.",
+          "meaning": "The latest evidence is strong enough to question the current plan. The earlier result still belongs in the record, but the plan should not continue unchanged.",
+          "action": "Review the plan before continuing unchanged. The new result is meaningful enough to require a real adjustment.",
+          "watch": "The next time trial should resolve whether the latest setback is a real change or a one-off result.",
+          "confidence": "confidence · 40% ↓\nConfidence fell because the latest result calls the plan into question. The next useful check needs to show that the outlook is improving."
+        },
+        "coachTake": "Time-trial time moved away from the target by 15.0 seconds since September 12, landing at 285.0 seconds. That is enough to question the current plan. Review it before the next block."
+      }
+    },
+    {
+      "id": 11,
+      "name": "Goal with no guardrails",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "composition.lean",
+            "label": "lean tissue",
+            "baseline": 147.5,
+            "comparison": 148.3,
+            "current": 153.3,
+            "target": 157.5,
+            "direction": "increase",
+            "unit": "lb"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_11"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 77,
+      "priorConfidence": 55,
+      "movement": 22,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "strong",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 12,
+      "name": "Goal with multiple guardrails",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "performance.load",
+            "label": "top lift",
+            "baseline": 100,
+            "comparison": 104,
+            "current": 112,
+            "target": 120,
+            "direction": "increase",
+            "unit": "kg"
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "load",
+            "label": "fatigue load",
+            "value": 11,
+            "mode": "allowed_range",
+            "allowedRange": {
+              "min": 0,
+              "max": 10
+            },
+            "unit": "points"
+          },
+          {
+            "id": "sleep",
+            "label": "sleep duration",
+            "value": 4,
+            "mode": "minimum",
+            "threshold": 7,
+            "unit": "hours"
+          }
+        ],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_12"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [
+        {
+          "name": "fatigue load",
+          "state": "watch"
+        },
+        {
+          "name": "sleep duration",
+          "state": "breached"
+        }
+      ],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 45,
+      "priorConfidence": 55,
+      "movement": -10,
+      "recommendation": {
+        "action": "pause_and_investigate",
+        "reason": "guardrail_breach",
+        "urgency": "urgent",
+        "nextEvidencePurpose": "assess_guardrail"
+      },
+      "affect": {
+        "valence": "corrective",
+        "intensity": "strong",
+        "urgency": "urgent",
+        "celebrationCeiling": "none",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "assess_guardrail",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 13,
+      "name": "Multi-objective performance Goal",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "performance.load",
+            "label": "top lift",
+            "baseline": 100,
+            "comparison": 104,
+            "current": 112,
+            "target": 120,
+            "direction": "increase",
+            "unit": "kg"
+          },
+          {
+            "capability": "performance.time",
+            "label": "time-trial time",
+            "baseline": 300,
+            "comparison": 290,
+            "current": 270,
+            "target": 250,
+            "direction": "decrease",
+            "unit": "seconds"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_13"
+      ],
+      "objectiveState": [
+        "progressed",
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 77,
+      "priorConfidence": 55,
+      "movement": 22,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "strong",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 14,
+      "name": "Goal with no DEXA evidence",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "measurement.waist",
+            "label": "waist measurement",
+            "baseline": 80,
+            "comparison": 79,
+            "current": 76,
+            "target": 72,
+            "direction": "decrease",
+            "unit": "cm"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_14"
+      ],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 74,
+      "priorConfidence": 55,
+      "movement": 19,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "strong",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 15,
+      "name": "Future/custom declarative metric",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "future.launch_index",
+            "label": "launch index",
+            "baseline": 0,
+            "comparison": 1,
+            "current": 6,
+            "target": 10,
+            "direction": "increase",
+            "unit": "points",
+            "custom": true
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_15"
+      ],
+      "objectiveState": [
+        "satisfied"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 78,
+      "priorConfidence": 55,
+      "movement": 23,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "strong",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true,
+      "representativeCopy": {
+        "sections": {
+          "result": "This is a huge win. Launch index improved by 5.0 points since August 15, reaching 6.0 points.",
+          "meaning": "You are more than halfway to the goal. The current plan is clearly working. There is no reason to second-guess the approach.",
+          "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+          "watch": "The next launch assessment is about whether this progress continues—not whether the plan works. That question has been answered.",
+          "confidence": "confidence · 78% ↑\nConfidence jumped because the plan delivered a standout result: launch index improved by 5.0 points since August 15, reaching 6.0 points. You are more than halfway to the goal. There is still uncertainty about finishing within the remaining time if progress slows."
+        },
+        "coachTake": "This is exactly what this phase needed: launch index improved by 5.0 points, reaching 6.0 points. The goal is more than halfway there, and the plan is clearly working. Don't change it. Keep executing and use the next launch assessment to see whether this level of progress continues."
+      }
+    },
+    {
+      "id": 16,
+      "name": "Strategy revision; new feasibility scope",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "composition.lean",
+            "label": "lean tissue",
+            "baseline": 147.5,
+            "comparison": 148.3,
+            "current": 153.3,
+            "target": 157.5,
+            "direction": "increase",
+            "unit": "lb"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "unknown",
+      "persistence": "not_assessed",
+      "goalConfidence": 65,
+      "priorConfidence": 77,
+      "movement": -12,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_unassessed",
+        "urgency": "routine",
+        "nextEvidencePurpose": "establish_feasibility"
+      },
+      "affect": {
+        "valence": "neutral",
+        "intensity": "restrained",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "measured"
+      },
+      "nextEvidencePurpose": "establish_feasibility",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 17,
+      "name": "Demonstrated feasibility; persistence open",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "composition.lean",
+            "label": "lean tissue",
+            "baseline": 147.5,
+            "comparison": 148.3,
+            "current": 153.3,
+            "target": 157.5,
+            "direction": "increase",
+            "unit": "lb"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [],
+      "objectiveState": [
+        "progressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "demonstrated",
+      "persistence": "emerging",
+      "goalConfidence": 77,
+      "priorConfidence": 77,
+      "movement": 0,
+      "recommendation": {
+        "action": "continue_current_strategy",
+        "reason": "strategy_supported",
+        "urgency": "routine",
+        "nextEvidencePurpose": "confirm_persistence"
+      },
+      "affect": {
+        "valence": "positive",
+        "intensity": "measured",
+        "urgency": "routine",
+        "celebrationCeiling": "strong",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "confirm_persistence",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    },
+    {
+      "id": 18,
+      "name": "Demonstrated strategy later challenged",
+      "contract": {
+        "objectives": [
+          {
+            "capability": "composition.lean",
+            "label": "lean tissue",
+            "baseline": 147.5,
+            "comparison": 153.3,
+            "current": 151,
+            "target": 157.5,
+            "direction": "increase",
+            "unit": "lb"
+          }
+        ],
+        "guardrails": [],
+        "decisionPolicy": "all_required"
+      },
+      "evidence": [
+        "acceptance_outcome_18"
+      ],
+      "objectiveState": [
+        "regressed"
+      ],
+      "goalAchievement": "in_progress",
+      "guardrails": [],
+      "feasibility": "challenged",
+      "persistence": "disrupted",
+      "goalConfidence": 41,
+      "priorConfidence": 77,
+      "movement": -36,
+      "recommendation": {
+        "action": "review_strategy",
+        "reason": "authoritative_contradiction",
+        "urgency": "attention",
+        "nextEvidencePurpose": "resolve_contradiction"
+      },
+      "affect": {
+        "valence": "corrective",
+        "intensity": "measured",
+        "urgency": "attention",
+        "celebrationCeiling": "restrained",
+        "directness": "direct"
+      },
+      "nextEvidencePurpose": "resolve_contradiction",
+      "checks": {
+        "objective": true,
+        "achievement": true,
+        "guardrails": true,
+        "feasibility": true,
+        "persistence": true,
+        "recommendation": true,
+        "confidence": true,
+        "uncertainty": true,
+        "questions": true,
+        "takeaway": true,
+        "affect": true,
+        "narrativePlan": true,
+        "history": true,
+        "voicePass": true
+      },
+      "pass": true
+    }
+  ]
+}

@@ -1,0 +1,4279 @@
+{
+  "schemaVersion": "narrative_v3_source_audit_v1",
+  "scope": "repository server contracts and Web/client presentation source; Native Swift implementation not present",
+  "sourceInventoryCount": 2127,
+  "productionSourceFilesScanned": 1242,
+  "candidateFiles": 587,
+  "scanCandidatesAreNotConfirmedFindings": true,
+  "classificationCountingUnit": "reviewed content families, not mutually exclusive whole pages",
+  "totals": {
+    "A": 13,
+    "B": 13,
+    "C": 18,
+    "D": 46,
+    "E": 8,
+    "F": 2
+  },
+  "verified": true,
+  "confirmedLeakageSinks": 5,
+  "nativeSwiftSourceFiles": [],
+  "sourceCandidateInventory": [
+    {
+      "file": "src/app/actions.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/app/api/lab/narrative-engine/route.js",
+      "hitCount": 176
+    },
+    {
+      "file": "src/app/api/lab/photo-interpretation/route.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/app/api/photo-simulator/route.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/app/api/v1/operations/nutrition-day-aggregate-repairs/route.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/app/briefing/daily/page.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/app/briefings/dexa/[scanId]/actions.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/app/briefings/dexa/[scanId]/page.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/app/briefings/monthly/[artifactId]/page.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/app/briefings/review/[artifactId]/page.js",
+      "hitCount": 19
+    },
+    {
+      "file": "src/app/briefings/weekly/page.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/app/check-in/morning/actions.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/app/evidence/photos/actions.js",
+      "hitCount": 27
+    },
+    {
+      "file": "src/app/evidence/review/[reviewId]/actions.js",
+      "hitCount": 52
+    },
+    {
+      "file": "src/app/goals/transition/protocols/edit/[category]/page.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/app/goals/transition/review/ProductionGoalTransitionFinalReview.jsx",
+      "hitCount": 3
+    },
+    {
+      "file": "src/app/goals/[goalId]/edit/actions.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/app/goals/[goalId]/edit/page.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/app/lab/photo-completion/page.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/app/log/actions.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/app/log/upload/route.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/app/preview/goals/transition/protocols/edit/[category]/page.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/app/preview/training-logger/TrainingLoggerAppleHealthReconciliation.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/app/preview/training-logger/TrainingLoggerPreviewState.js",
+      "hitCount": 51
+    },
+    {
+      "file": "src/app/priorities/[priorityId]/actions.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/app/priorities/[priorityId]/page.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/app/profile/operating-plan/actions.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/app/profile/operating-plan/energy/new/actions.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/app/profile/operating-plan/energy/new/page.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/app/profile/operating-plan/execution/peptides/[protocolId]/actions.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/app/profile/operating-plan/execution/[executionId]/actions.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/app/profile/operating-plan/strategy/[strategyType]/[strategyId]/edit/actions.js",
+      "hitCount": 41
+    },
+    {
+      "file": "src/app/profile/operating-plan/strategy/[strategyType]/[strategyId]/edit/page.js",
+      "hitCount": 24
+    },
+    {
+      "file": "src/app/profile/operating-plan/strategy/[strategyType]/[strategyId]/page.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/app/profile/operating-plan/supplements/new/actions.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/app/profile/operating-plan/supplements/new/page.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/app/profile/operating-plan/supplements/[protocolId]/edit/actions.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/app/profile/operating-plan/supplements/[protocolId]/edit/page.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/app/profile/operating-plan/tracking/page.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/app/profile/operating-plan/training/new/actions.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/app/profile/protocols/[protocolId]/page.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/app/profile/protocols/[protocolId]/supplementActions.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/app/progress/training/session/[sessionId]/actions.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/application/briefings/BriefingNavigationReadService.js",
+      "hitCount": 32
+    },
+    {
+      "file": "src/application/briefings/PhotoEventBriefingReadService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/application/commands/CanonicalPersistenceCommandPorts.js",
+      "hitCount": 26
+    },
+    {
+      "file": "src/application/commands/Phase3CommandService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/application/composition/productionApplicationComposition.js",
+      "hitCount": 13
+    },
+    {
+      "file": "src/application/composition/productionDEXAEventNarrativeComposition.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/application/composition/productionPhotoEventNarrativeComposition.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/application/composition/providerBriefingCadenceComposition.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/application/composition/providerBriefingReconciliationComposition.js",
+      "hitCount": 20
+    },
+    {
+      "file": "src/application/core/CoreNavigationReadService.js",
+      "hitCount": 18
+    },
+    {
+      "file": "src/application/evidence/AsyncEvidenceIntakeService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/application/evidence/NativeSandboxManualWeightService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/application/evidence/NativeSandboxWeightCandidateService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/application/goals/GoalsHubReadService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/application/media/ProviderCanonicalUploadService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/application/native/nativeProductionContractManifest.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/application/native/NativeProductionContractService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/application/native/NativeReadProjectionService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/application/plan/OperatingPlanReadService.js",
+      "hitCount": 22
+    },
+    {
+      "file": "src/application/priorities/PriorityCompletionService.js",
+      "hitCount": 20
+    },
+    {
+      "file": "src/application/priorities/PriorityNavigationReadService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/application/read-models/EvidenceConfirmationReadService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/application/read-models/LegacyFounderReadLoaders.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/application/read-models/Phase3ReadModelService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/application/runtime/ApplicationCanonicalRuntime.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/components/briefings/BriefingConfidenceAnchor.jsx",
+      "hitCount": 29
+    },
+    {
+      "file": "src/components/briefings/CadenceBriefingPrimitives.jsx",
+      "hitCount": 2
+    },
+    {
+      "file": "src/components/cards/GoalCard.jsx",
+      "hitCount": 6
+    },
+    {
+      "file": "src/components/cards/HomeConfidenceDetail.jsx",
+      "hitCount": 13
+    },
+    {
+      "file": "src/components/cards/HomeHeroCard.jsx",
+      "hitCount": 9
+    },
+    {
+      "file": "src/components/cards/RecommendationCard.jsx",
+      "hitCount": 4
+    },
+    {
+      "file": "src/components/cards/TodayChecklistCard.jsx",
+      "hitCount": 1
+    },
+    {
+      "file": "src/components/cards/TodaysFocusCard.jsx",
+      "hitCount": 7
+    },
+    {
+      "file": "src/components/cards/TrajectoryCard.jsx",
+      "hitCount": 8
+    },
+    {
+      "file": "src/components/focus/FocusTile.jsx",
+      "hitCount": 4
+    },
+    {
+      "file": "src/components/focus/PriorityCompletionForm.jsx",
+      "hitCount": 10
+    },
+    {
+      "file": "src/components/goals/GoalRow.jsx",
+      "hitCount": 4
+    },
+    {
+      "file": "src/components/goals/PhaseReviewCard.jsx",
+      "hitCount": 16
+    },
+    {
+      "file": "src/components/navigation/BottomNav.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/components/navigation/BottomNavItem.jsx",
+      "hitCount": 1
+    },
+    {
+      "file": "src/components/progress/ProgressPhotoGallery.jsx",
+      "hitCount": 2
+    },
+    {
+      "file": "src/components/training/TrainingLoggerClient.jsx",
+      "hitCount": 21
+    },
+    {
+      "file": "src/components/ui/ConfidenceRing.jsx",
+      "hitCount": 3
+    },
+    {
+      "file": "src/components/ui/ProgressRing.jsx",
+      "hitCount": 5
+    },
+    {
+      "file": "src/contracts/v1/destination.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/data/founderSeed/adaptiveTrustProfile.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/data/founderSeed/dexaScans.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/data/founderSeed/executionItems.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/data/founderSeed/goals.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/data/founderSeed/index.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/data/founderSeed/nutritionContext.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/data/founderSeed/operatingPlan.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/data/founderSeed/operatingRhythm.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/data/founderSeed/progressPhotos.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/data/founderSeed/protocols.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/data/founderSeed/reminders.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/data/founderSeed/user.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/data/founderSeed/weights.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/data/repositories/ActivationStagedRepositoryFactory.js",
+      "hitCount": 17
+    },
+    {
+      "file": "src/data/repositories/createSeedRepositories.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/data/repositories/DailyBriefingRepository.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/data/repositories/EnergyStrategyLinkRepository.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/data/repositories/founderRuntimeStore.js",
+      "hitCount": 41
+    },
+    {
+      "file": "src/data/repositories/FounderStoreDryRunUnitOfWork.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/data/repositories/FounderStoreUnitOfWork.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/data/repositories/GoalConfidenceRepository.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/data/repositories/productionGoalTransitionRepositories.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/data/repositories/providerRuntimeStoreForbidden.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/data/repositories/ReminderRepository.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/data/seed/goals.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/confidence/AuthorizedBriefingForecastAdapters.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/confidence/BriefingForecastFinalizer.js",
+      "hitCount": 43
+    },
+    {
+      "file": "src/domain/confidence/CadenceEvidenceDurabilityContextService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/confidence/CanonicalConfidenceAssessmentModel.js",
+      "hitCount": 23
+    },
+    {
+      "file": "src/domain/confidence/CanonicalConfidenceReadService.js",
+      "hitCount": 33
+    },
+    {
+      "file": "src/domain/confidence/ConfidencePublisherRegistry.js",
+      "hitCount": 24
+    },
+    {
+      "file": "src/domain/confidence/ConfidenceV1CompatibilityAdapter.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/confidence/index.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/confidence/NumericConfidenceProjectionService.js",
+      "hitCount": 24
+    },
+    {
+      "file": "src/domain/confidence/ProductionConfidenceContextAdapter.js",
+      "hitCount": 47
+    },
+    {
+      "file": "src/domain/confidence/StartingForecastService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/forecast/ForecastAssessmentModel.js",
+      "hitCount": 29
+    },
+    {
+      "file": "src/domain/forecast/ForecastEngine.js",
+      "hitCount": 74
+    },
+    {
+      "file": "src/domain/forecast/ForecastEvaluationService.js",
+      "hitCount": 86
+    },
+    {
+      "file": "src/domain/forecast/ForecastMilestoneService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/forecast/ForecastMovementService.js",
+      "hitCount": 28
+    },
+    {
+      "file": "src/domain/forecast/ForecastRuntimeContract.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/forecast/ForecastShadowService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/forecast/ForecastTimelineService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/forecast/GoalAttainabilityService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/forecast/PIV1ForecastCompatibilityAdapter.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/interpretation/EvidenceDurabilityService.js",
+      "hitCount": 30
+    },
+    {
+      "file": "src/domain/interpretation/EvidenceReconciliationService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/interpretation/GoalEvaluationService.js",
+      "hitCount": 29
+    },
+    {
+      "file": "src/domain/interpretation/index.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/interpretation/InterpretationEngine.js",
+      "hitCount": 43
+    },
+    {
+      "file": "src/domain/interpretation/InterpretationRuntimeContract.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/interpretation/InterpretationShadowService.js",
+      "hitCount": 27
+    },
+    {
+      "file": "src/domain/interpretation/InterpretationUncertaintyService.js",
+      "hitCount": 17
+    },
+    {
+      "file": "src/domain/interpretation/PIV1InterpretationCompatibilityAdapter.js",
+      "hitCount": 30
+    },
+    {
+      "file": "src/domain/interpretation/StrategyValidationService.js",
+      "hitCount": 21
+    },
+    {
+      "file": "src/domain/interpretation/StructuredInterpretationModel.js",
+      "hitCount": 41
+    },
+    {
+      "file": "src/domain/interpreters/PdfInterpreter.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/interpreters/PhotoInterpreter.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/interpreters/PhotoInterpreterService.js",
+      "hitCount": 252
+    },
+    {
+      "file": "src/domain/interpreters/PhotoObservationModel.js",
+      "hitCount": 50
+    },
+    {
+      "file": "src/domain/interpreters/ScreenshotInterpreterService.js",
+      "hitCount": 81
+    },
+    {
+      "file": "src/domain/interpreters/TextInterpreter.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/interpreters/VisualEvidence.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/interpreters/VoiceInterpreter.js",
+      "hitCount": 42
+    },
+    {
+      "file": "src/domain/lab/goldenScenarios/founder-visible-abs-photo-led.json",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/lab/labSimulation.js",
+      "hitCount": 59
+    },
+    {
+      "file": "src/domain/lab/narrativeEngine.js",
+      "hitCount": 40
+    },
+    {
+      "file": "src/domain/lab/voiceWorkoutContextFixtures.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/activityDayEvidence.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/models/adaptiveTrustProfile.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/models/analysis.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/models/authoredGoalPhase.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/models/dexaScan.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/executionItem.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/goal.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/goalPhase.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/models/goalPlanningInput.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/models/morningWeightEvidence.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/models/nutritionContext.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/nutritionDayEvidence.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/models/operatingPlan.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/models/operatingRhythm.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/PeptideDosingStrategyModel.js",
+      "hitCount": 38
+    },
+    {
+      "file": "src/domain/models/phaseExpectedTrajectory.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/models/phaseReviewDecision.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/models/phaseReviewMilestone.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/models/phaseStrategy.js",
+      "hitCount": 21
+    },
+    {
+      "file": "src/domain/models/photoSession.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/progressPhoto.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/protocolVersion.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/recordMetadata.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/RecoveryEvidenceModel.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/models/reminder.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/models/trainingExerciseIdentity.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/models/trainingMuscleGroupIdentity.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/trainingSessionEvidence.js",
+      "hitCount": 25
+    },
+    {
+      "file": "src/domain/models/user.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/models/weightEntry.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/narrative/ForecastNarrativeCompatibilityAdapter.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/narrative/NarrativeEngine.js",
+      "hitCount": 49
+    },
+    {
+      "file": "src/domain/narrative/NarrativeModel.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/domain/narrative/NarrativeRuntimeContract.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/narrative/NarrativeShadowService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/narrative/NarrativeTemplates.js",
+      "hitCount": 26
+    },
+    {
+      "file": "src/domain/presentation/coachingLanguageBoundary.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/presentation/confidenceExplanationPresentation.js",
+      "hitCount": 146
+    },
+    {
+      "file": "src/domain/presentation/evidenceInterpretationPresentation.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/presentation/milestoneStoryPresentation.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/presentation/phasePresentationTokens.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/presentation/productLanguagePresentation.js",
+      "hitCount": 15
+    },
+    {
+      "file": "src/domain/presentation/proseCapitalization.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/presentation/strategyIdentityPresentation.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/ActionEngineService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/services/ActiveGoalConfidencePresentationReadService.js",
+      "hitCount": 25
+    },
+    {
+      "file": "src/domain/services/ActiveProtocolSuccessorService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/ActivityEvidenceSummaryService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/ActivityProtocolBuilderService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/AnalysisService.js",
+      "hitCount": 13
+    },
+    {
+      "file": "src/domain/services/August10FalseTrainingRetractionService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/August6NutritionCanonicalRepairService.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/domain/services/BodyCompositionEstimateService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/BriefingCadenceRegistryService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/BriefingDependencyManifestService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/BriefingEvidenceWindowService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/BriefingGoalConfidencePresentationService.js",
+      "hitCount": 41
+    },
+    {
+      "file": "src/domain/services/BriefingReconciliationEnqueueService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/BriefingReconciliationPersistenceService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/BriefingRevisionExecutionService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/BuildLeanMassGoalPresentationService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/CadenceEnergyAssessmentService.js",
+      "hitCount": 15
+    },
+    {
+      "file": "src/domain/services/CadencePIEvidenceEnvelopeService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/CanonicalActivityDayService.js",
+      "hitCount": 25
+    },
+    {
+      "file": "src/domain/services/CanonicalBriefingConfidencePublicationService.js",
+      "hitCount": 67
+    },
+    {
+      "file": "src/domain/services/CanonicalConfidencePresentationInvariant.js",
+      "hitCount": 27
+    },
+    {
+      "file": "src/domain/services/CanonicalDexaScanService.js",
+      "hitCount": 22
+    },
+    {
+      "file": "src/domain/services/CanonicalEvidenceGoalPhaseAttributionService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/CanonicalEvidenceService.js",
+      "hitCount": 16
+    },
+    {
+      "file": "src/domain/services/CanonicalGoalPhaseChronologyService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/CanonicalNutritionDayService.js",
+      "hitCount": 31
+    },
+    {
+      "file": "src/domain/services/CanonicalPhaseReviewArtifactIdentityService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/services/CanonicalPhaseReviewMutationBaselineService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/CanonicalPhotoSessionIdentityService.js",
+      "hitCount": 15
+    },
+    {
+      "file": "src/domain/services/CanonicalPhotoSessionReadService.js",
+      "hitCount": 18
+    },
+    {
+      "file": "src/domain/services/CanonicalReadModel.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/CanonicalTrainingIdentityRepairService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/CoachingUpdatesEditorService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/CoachingUpdatesGoalCadencePolicyService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/CoachingUpdatesProtocolStateRepairService.js",
+      "hitCount": 38
+    },
+    {
+      "file": "src/domain/services/CoachingUpdatesReadService.js",
+      "hitCount": 18
+    },
+    {
+      "file": "src/domain/services/CoachingUpdatesStrategyManagementService.js",
+      "hitCount": 31
+    },
+    {
+      "file": "src/domain/services/CoachingUpdatesTransactionService.js",
+      "hitCount": 57
+    },
+    {
+      "file": "src/domain/services/ConfirmedDexaEventRecoveryService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/CurrentPublishedBriefingService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/CutEnergyStrategyService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/DailyBriefingFreshnessService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/DailyBriefingPIShadowService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/DailyBriefingService.js",
+      "hitCount": 204
+    },
+    {
+      "file": "src/domain/services/DailyEventService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/DailyFocusService.js",
+      "hitCount": 83
+    },
+    {
+      "file": "src/domain/services/DailyNarrativeEngineService.js",
+      "hitCount": 19
+    },
+    {
+      "file": "src/domain/services/DailyPINarrativeCandidateService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/DexaAppointmentLifecycleService.js",
+      "hitCount": 30
+    },
+    {
+      "file": "src/domain/services/DexaAppointmentManagementService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/DEXAEventContextService.js",
+      "hitCount": 18
+    },
+    {
+      "file": "src/domain/services/DEXAEventNarrativePresentationService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/DEXAEventNarrativeService.js",
+      "hitCount": 71
+    },
+    {
+      "file": "src/domain/services/DEXAInterpretationService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/DexaPdfIntakeService.js",
+      "hitCount": 14
+    },
+    {
+      "file": "src/domain/services/DEXAPIObservationService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/DEXAReadModelAdapter.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/EnergyPIObservationService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/EvidenceCanonicalCommitReadinessService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/EvidenceCorrectionService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/EvidenceDiagnosticsService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/EvidenceIngestionRecoveryService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/services/EvidenceIntakeBackgroundWork.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/EvidenceIntakeService.js",
+      "hitCount": 39
+    },
+    {
+      "file": "src/domain/services/EvidenceReviewReprocessEligibility.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/EvidenceTimelineService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/ExecutionPriorityProjectionService.js",
+      "hitCount": 24
+    },
+    {
+      "file": "src/domain/services/ExecutionSupportLabelService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/FounderActivityProtocolResetService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/FounderBriefingReconciliationService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/FounderPhase2ActivationPackageService.js",
+      "hitCount": 57
+    },
+    {
+      "file": "src/domain/services/FounderPhaseCorrectionService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/FounderProductionCutoverRunbookService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/FounderProductionCutoverService.js",
+      "hitCount": 32
+    },
+    {
+      "file": "src/domain/services/FounderRuntimeSemanticDigest.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/FounderTrainingProtocolResetService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/FutureProtocolProvenanceService.js",
+      "hitCount": 17
+    },
+    {
+      "file": "src/domain/services/GalleryInterpretationService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/GoalAwarePhaseReviewRecommendationService.js",
+      "hitCount": 22
+    },
+    {
+      "file": "src/domain/services/GoalConfidenceArchitectureDiagnosticService.js",
+      "hitCount": 28
+    },
+    {
+      "file": "src/domain/services/GoalConfidenceService.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/domain/services/GoalEditCriticalStateFingerprintService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/GoalEditDraftService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/GoalEditPhaseDraftService.js",
+      "hitCount": 22
+    },
+    {
+      "file": "src/domain/services/GoalEvaluationService.js",
+      "hitCount": 78
+    },
+    {
+      "file": "src/domain/services/GoalInitializationForecastService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/GoalIntelligenceService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/GoalPhaseDiffService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/GoalPhaseIntentInterpretationService.js",
+      "hitCount": 14
+    },
+    {
+      "file": "src/domain/services/GoalPhasePersistenceService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/GoalPhaseRecommendationService.js",
+      "hitCount": 45
+    },
+    {
+      "file": "src/domain/services/GoalPlanDiffService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/GoalPlanUpdateService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/GoalProtocolTransitionRecommendationService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/GoalProtocolTransitionService.js",
+      "hitCount": 22
+    },
+    {
+      "file": "src/domain/services/GoalTrainingProgressService.js",
+      "hitCount": 18
+    },
+    {
+      "file": "src/domain/services/GoalTransitionActivationCoordinator.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/GoalTransitionActivationCoordinatorContract.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/GoalTransitionActivationProductionBaselineReconciliation.js",
+      "hitCount": 14
+    },
+    {
+      "file": "src/domain/services/GoalTransitionActivationReadinessAudit.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/GoalTransitionActivationSourceSnapshot.js",
+      "hitCount": 59
+    },
+    {
+      "file": "src/domain/services/GoalTransitionActivationTransactionPlanBuilder.js",
+      "hitCount": 29
+    },
+    {
+      "file": "src/domain/services/GoalTransitionActivationValidator.js",
+      "hitCount": 17
+    },
+    {
+      "file": "src/domain/services/GoalTransitionService.js",
+      "hitCount": 21
+    },
+    {
+      "file": "src/domain/services/HomeActiveChapterPresentationService.js",
+      "hitCount": 32
+    },
+    {
+      "file": "src/domain/services/HomeBriefingRoutingService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/HomeBriefingService.js",
+      "hitCount": 31
+    },
+    {
+      "file": "src/domain/services/HomeGoalTrajectoryService.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/domain/services/July25PhotoEventV34ReconciliationService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/July25TrainingPerformanceReconciliationService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/July27StrengthTypedReferenceCanonicalRepairService.js",
+      "hitCount": 15
+    },
+    {
+      "file": "src/domain/services/MidweekBriefingEditorialService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/MidweekBriefingPIShadowService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/MidweekBriefingPresentationService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/MidweekBriefingPreviewService.js",
+      "hitCount": 14
+    },
+    {
+      "file": "src/domain/services/MidweekBriefingService.js",
+      "hitCount": 45
+    },
+    {
+      "file": "src/domain/services/MidweekPINarrativeCandidateService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/MonthlyBaselineRoleResolver.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/MonthlyBriefingPresentationService.js",
+      "hitCount": 46
+    },
+    {
+      "file": "src/domain/services/MonthlyBriefingPreviewService.js",
+      "hitCount": 116
+    },
+    {
+      "file": "src/domain/services/MonthlyBriefingService.js",
+      "hitCount": 51
+    },
+    {
+      "file": "src/domain/services/MonthlyNarrativeCompositionService.js",
+      "hitCount": 40
+    },
+    {
+      "file": "src/domain/services/MonthlyPersistedArtifactCompatibilityService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/MonthlySectionRoleInventoryService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/MorningBriefingFinalizationService.js",
+      "hitCount": 14
+    },
+    {
+      "file": "src/domain/services/MorningCheckInPersistenceService.js",
+      "hitCount": 23
+    },
+    {
+      "file": "src/domain/services/MorningEvidenceRecoveryService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/MorningPriorityReconciliationService.js",
+      "hitCount": 42
+    },
+    {
+      "file": "src/domain/services/NarrativeComposerService.js",
+      "hitCount": 65
+    },
+    {
+      "file": "src/domain/services/NarrativeEditorialPolicy.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/NarrativeEvidenceCoverageService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/NarrativeGoalPreviewService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/NutritionDayAggregateRepairService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/NutritionProtocolStateRepairService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/NutritionSupportAssessmentService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/NutritionTrainingClaimService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/services/OperatingPlanEnergyStrategyService.js",
+      "hitCount": 27
+    },
+    {
+      "file": "src/domain/services/OperatingPlanStrategyDetailService.js",
+      "hitCount": 77
+    },
+    {
+      "file": "src/domain/services/OverallGoalConfidenceReadService.js",
+      "hitCount": 14
+    },
+    {
+      "file": "src/domain/services/PendingEvidenceReviewReprocessingService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/PeptideExecutionManagementService.js",
+      "hitCount": 26
+    },
+    {
+      "file": "src/domain/services/Phase2StartingForecastInputPackageService.js",
+      "hitCount": 21
+    },
+    {
+      "file": "src/domain/services/PhaseActivationPackageAcceptanceService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/PhaseAwareActiveGoalPreviewService.js",
+      "hitCount": 37
+    },
+    {
+      "file": "src/domain/services/PhaseEstablishmentService.js",
+      "hitCount": 25
+    },
+    {
+      "file": "src/domain/services/PhaseReviewApplicationBoundary.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/PhaseReviewArtifactReadService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/PhaseReviewArtifactService.js",
+      "hitCount": 20
+    },
+    {
+      "file": "src/domain/services/PhaseReviewAuthorizationService.js",
+      "hitCount": 33
+    },
+    {
+      "file": "src/domain/services/PhaseReviewCommitCoordinator.js",
+      "hitCount": 15
+    },
+    {
+      "file": "src/domain/services/PhaseReviewCommitParticipants.js",
+      "hitCount": 65
+    },
+    {
+      "file": "src/domain/services/PhaseReviewEligibilityService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/services/PhaseReviewPostCommitVerificationService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/PhaseReviewPresentationService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/PhaseReviewPreviewService.js",
+      "hitCount": 16
+    },
+    {
+      "file": "src/domain/services/PhotoEventContextService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/PhotoEventNarrativeService.js",
+      "hitCount": 37
+    },
+    {
+      "file": "src/domain/services/PhotoEventReinterpretationService.js",
+      "hitCount": 18
+    },
+    {
+      "file": "src/domain/services/PhotoGoalConfirmationService.js",
+      "hitCount": 14
+    },
+    {
+      "file": "src/domain/services/PhotoPIObservationService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/PhotoPoseMatchingService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/PhotoPrioritySatisfactionService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/PhotoSessionService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/PIBodyCompositionClaimService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/PIBodyFatGuardrailService.js",
+      "hitCount": 23
+    },
+    {
+      "file": "src/domain/services/PIBriefingMemoryService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/PICadenceBriefingLifecycleService.js",
+      "hitCount": 19
+    },
+    {
+      "file": "src/domain/services/PICadenceBriefingPublicationService.js",
+      "hitCount": 43
+    },
+    {
+      "file": "src/domain/services/PICadenceConfidenceReasoningService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/PICadenceGoalConfidencePreparationService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/PICalibrationEnergyStateResolver.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/PIClaimLifecycleService.js",
+      "hitCount": 22
+    },
+    {
+      "file": "src/domain/services/PIClaimRankingService.js",
+      "hitCount": 49
+    },
+    {
+      "file": "src/domain/services/PICrossDomainClaimService.js",
+      "hitCount": 49
+    },
+    {
+      "file": "src/domain/services/PIDecisionAssessmentModel.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/PIDecisionCadenceContextService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/PIDecisionCadenceShadowService.js",
+      "hitCount": 15
+    },
+    {
+      "file": "src/domain/services/PIDecisionIntelligenceService.js",
+      "hitCount": 40
+    },
+    {
+      "file": "src/domain/services/PIDecisionLifecycleService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/PIDecisionPresentationReadinessService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/PIDecisionRenderingAdapter.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/PIDecisionSemanticContract.js",
+      "hitCount": 21
+    },
+    {
+      "file": "src/domain/services/PIDecisionShadowService.js",
+      "hitCount": 15
+    },
+    {
+      "file": "src/domain/services/PIDEXAConfidenceReasoningService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/PIDEXAEventLifecycleService.js",
+      "hitCount": 16
+    },
+    {
+      "file": "src/domain/services/PIDEXAEventPublicationService.js",
+      "hitCount": 44
+    },
+    {
+      "file": "src/domain/services/PIDEXAGoalConfidencePreparationService.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/domain/services/PIEditorialTranslationService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/PIEnergyConfidenceFinalizationService.js",
+      "hitCount": 94
+    },
+    {
+      "file": "src/domain/services/PIGoalConfidenceAssessmentModel.js",
+      "hitCount": 73
+    },
+    {
+      "file": "src/domain/services/PIGoalConfidenceAssessmentService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/PIGoalConfidenceContributorMapper.js",
+      "hitCount": 27
+    },
+    {
+      "file": "src/domain/services/PIGoalConfidencePersistenceService.js",
+      "hitCount": 84
+    },
+    {
+      "file": "src/domain/services/PIGoalConfidenceReadService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/PIGoalConfidenceRefreshService.js",
+      "hitCount": 52
+    },
+    {
+      "file": "src/domain/services/PIGoalConfidenceScoringService.js",
+      "hitCount": 39
+    },
+    {
+      "file": "src/domain/services/PILowerLevelCanonicalEvidenceCommitService.js",
+      "hitCount": 23
+    },
+    {
+      "file": "src/domain/services/PILowerLevelConfidenceContracts.js",
+      "hitCount": 33
+    },
+    {
+      "file": "src/domain/services/PILowerLevelConfidenceRecoveryWorker.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/services/PILowerLevelConfidenceSemanticChangeService.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/domain/services/PILowerLevelConfidenceWorkEnqueueService.js",
+      "hitCount": 35
+    },
+    {
+      "file": "src/domain/services/PILowerLevelConfidenceWorkStatusReadService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/PINarrativeAssessmentService.js",
+      "hitCount": 23
+    },
+    {
+      "file": "src/domain/services/PINarrativeCandidateService.js",
+      "hitCount": 26
+    },
+    {
+      "file": "src/domain/services/PIObservationGoalContextService.js",
+      "hitCount": 33
+    },
+    {
+      "file": "src/domain/services/PIObservationService.js",
+      "hitCount": 24
+    },
+    {
+      "file": "src/domain/services/PIPhotoConfidenceReasoningService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/PIPhotoEventLifecycleService.js",
+      "hitCount": 35
+    },
+    {
+      "file": "src/domain/services/PIPhotoEventPublicationService.js",
+      "hitCount": 30
+    },
+    {
+      "file": "src/domain/services/PIPhotoGoalConfidencePreparationService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/PISemanticOverlapService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/PITrainingConfidenceFinalizationService.js",
+      "hitCount": 97
+    },
+    {
+      "file": "src/domain/services/PITrainingEnergyReadinessService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/PITrainingGoalConfidenceStateResolver.js",
+      "hitCount": 17
+    },
+    {
+      "file": "src/domain/services/PIV3TrainingSupportSemanticMap.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/PIV3TrainingSupportShadowService.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/PostPhase2CoreReconciliationScopeResolver.js",
+      "hitCount": 17
+    },
+    {
+      "file": "src/domain/services/PostPhase2CoreReconciliationService.js",
+      "hitCount": 42
+    },
+    {
+      "file": "src/domain/services/PriorityDetailService.js",
+      "hitCount": 110
+    },
+    {
+      "file": "src/domain/services/ProductionGoalTransitionActivationService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/ProductionGoalTransitionDraftService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/ProductionPhaseReviewCoordinatorFactory.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/ProgressPhotosExecutionScheduleService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/services/ProgressReportingService.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/domain/services/ProteinTargetContextService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/ProtocolReconciliationMigrationService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/ProtocolStateDiagnosticService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/ProtocolTransitionReconciliationService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/RecoveryCheckInIngestionService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/RecoveryEnergyClaimService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/services/RecoveryEvidenceAssessmentService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/RecoveryEvidenceContextService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/RecoveryPICompositionService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/RecoveryPIObservationService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/RecoveryPISemanticContract.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/RecoveryTrainingClaimService.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/domain/services/RecurringSupportManagementService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/ReminderOccurrenceCompletion.js",
+      "hitCount": 23
+    },
+    {
+      "file": "src/domain/services/RetatrutideOccurrenceDiagnosticService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/SeatedHipIdentityMigrationService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/StrategyEditorService.js",
+      "hitCount": 68
+    },
+    {
+      "file": "src/domain/services/SupplementExecutionManagementService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/SupplementProtocolStateRepairService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/SupplementStrategyFormService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/SupplementStrategyManagementService.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/domain/services/SupplementSupportManagementService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/SupportingNarrativeGoalPreviewService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/SyntheticDEXAV2ConfidenceProjectionService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/SyntheticDEXAV2PreviewService.js",
+      "hitCount": 33
+    },
+    {
+      "file": "src/domain/services/TrainingEnergyClaimService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/TrainingLoggerAppleHealthService.js",
+      "hitCount": 7
+    },
+    {
+      "file": "src/domain/services/TrainingLoggerProgressionService.js",
+      "hitCount": 24
+    },
+    {
+      "file": "src/domain/services/TrainingPerformanceEventPersistenceService.js",
+      "hitCount": 26
+    },
+    {
+      "file": "src/domain/services/TrainingPerformanceIntelligenceService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/TrainingPIObservationAdapter.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/domain/services/TrainingProtocolBuilderService.js",
+      "hitCount": 17
+    },
+    {
+      "file": "src/domain/services/TrainingReportingPresentationService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/TransitionProtocolLineageMigrationService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/domain/services/UserFacingObjectLanguageService.js",
+      "hitCount": 19
+    },
+    {
+      "file": "src/domain/services/VoiceClarificationService.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/domain/services/VoiceEntityResolutionService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/VoiceIntentService.js",
+      "hitCount": 27
+    },
+    {
+      "file": "src/domain/services/WeeklyBriefingContextService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/WeeklyBriefingPersistenceService.js",
+      "hitCount": 21
+    },
+    {
+      "file": "src/domain/services/WeeklyBriefingPIService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/WeeklyBriefingPresentationService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/WeeklyBriefingScreenPresentationService.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/domain/services/WeeklyBriefingV4PreviewService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/WeeklyNarrativePresentationSelector.js",
+      "hitCount": 33
+    },
+    {
+      "file": "src/domain/services/WeeklyNarrativeService.js",
+      "hitCount": 55
+    },
+    {
+      "file": "src/domain/services/WeeklyPINarrativeCandidateService.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/domain/services/WeeklyTrainingPresentationService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/domain/services/WeightPIObservationService.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/domain/services/WorkoutContextAttachmentService.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/domain/services/WorkoutDuplicateIdentityService.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/domain/services/YouProfileService.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/features/dashboard/Home.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/lib/goalEngine.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/middleware.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/models/goal.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/navigation/trainingNavigationMapping.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/platform/accessGate/accessGateConfig.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/accessGate/publicRoutes.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/auth/nativeProductionContractRuntime.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/platform/cutover/CanonicalApplicationCompositionSelector.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/platform/cutover/canonicalWriteSurfaceInventory.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/platform/cutover/CombinedAppPlatformCutoverOrchestrator.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/CombinedCutoverAuthorityInitializer.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/platform/cutover/combinedCutoverCompatibilityOwnerGuard.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/CombinedRuntimeAuthorityState.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/platform/cutover/coordinator/combinedCutoverAPMap.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/handoff/ProductionAuthorityHandoffService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/PostgresProviderMigrationDryRunStore.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/preparation/combinedCutoverPreparationComposition.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/platform/cutover/preparation/combinedCutoverPreparationEvidence.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/preparation/WindowsCombinedCutoverPreparationClient.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/ProviderMigrationDryRunContract.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/platform/cutover/ProviderMigrationDryRunController.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/ProviderMigrationDryRunProductComposition.js",
+      "hitCount": 4
+    },
+    {
+      "file": "src/platform/cutover/ProviderMigrationDryRunWorker.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/ProviderProductionMigrationDryRunEnvironment.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/platform/cutover/recovery/ProductionPostHandoffVerificationService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/routing/combinedCutoverRoutingControl.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/routing/ProductionDigitalOceanRoutingControl.js",
+      "hitCount": 11
+    },
+    {
+      "file": "src/platform/cutover/simplified/SimplifiedProviderMigrationExecution.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/simplified/SimplifiedProviderMigrationProductComposition.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/platform/cutover/syntheticCombinedCutoverRehearsal.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/platform/cutover/transfer/combinedCutoverTransferContract.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/transfer/combinedCutoverTransferStaging.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/transfer/WindowsCombinedCutoverTransferClient.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/worker/combinedCutoverWorkerControl.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/cutover/worker/ProductionWorkerHandoffService.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/database/foundationPostgresComposition.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/platform/database/phase4PostgresComposition.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/platform/database/PostgresActiveGoalReadStore.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/platform/database/PostgresBriefingNavigationReadStore.js",
+      "hitCount": 32
+    },
+    {
+      "file": "src/platform/database/PostgresEvidenceIntakeStore.js",
+      "hitCount": 27
+    },
+    {
+      "file": "src/platform/database/PostgresEvidenceTimelineReadStore.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/database/PostgresNativeSandboxWeightStore.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/platform/database/PostgresObjectStore.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/database/PostgresPhotoEventBriefingReadStore.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/platform/database/PostgresPhotoEventReadStore.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/platform/database/PostgresPriorityNavigationReadStore.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/platform/jobs/EvidenceIntakeInterpretationWorker.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/platform/migration/foundationSourceCollections.js",
+      "hitCount": 8
+    },
+    {
+      "file": "src/platform/migration/phase4CanonicalImport.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/platform/migration/phase4DomainCollections.js",
+      "hitCount": 12
+    },
+    {
+      "file": "src/platform/migration/phase4LocalMediaMigration.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/platform/migration/phase5SyntheticPackage.js",
+      "hitCount": 10
+    },
+    {
+      "file": "src/platform/migration/readModelParityComparison.js",
+      "hitCount": 3
+    },
+    {
+      "file": "src/platform/provider/digitalocean/DigitalOceanApiClient.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/platform/provider/digitalocean/DigitalOceanMutationReconciler.js",
+      "hitCount": 6
+    },
+    {
+      "file": "src/platform/sandbox/InMemoryNativeSandboxWeightStore.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/platform/sandbox/NativeSandboxWorkerComposition.js",
+      "hitCount": 1
+    },
+    {
+      "file": "src/presentation/goalTransitionPreviewNavigation.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/presentation/goalTransitionProtocolReviewHandoff.js",
+      "hitCount": 2
+    },
+    {
+      "file": "src/presentation/protocolCadencePresentation.js",
+      "hitCount": 5
+    },
+    {
+      "file": "src/presentation/protocolReviewGroups.js",
+      "hitCount": 9
+    },
+    {
+      "file": "src/presentation/protocolTransitionReviewPresentation.js",
+      "hitCount": 14
+    },
+    {
+      "file": "src/screens/ActivityProtocolBuilderScreen.jsx",
+      "hitCount": 15
+    },
+    {
+      "file": "src/screens/AnalysisScreen.jsx",
+      "hitCount": 14
+    },
+    {
+      "file": "src/screens/CutEnergyStrategyBuilderScreen.jsx",
+      "hitCount": 3
+    },
+    {
+      "file": "src/screens/DailyBriefingScreen.jsx",
+      "hitCount": 27
+    },
+    {
+      "file": "src/screens/DEXAEventBriefingScreen.jsx",
+      "hitCount": 9
+    },
+    {
+      "file": "src/screens/EvidenceReviewScreen.jsx",
+      "hitCount": 3
+    },
+    {
+      "file": "src/screens/ExecutionItemBuilderScreen.jsx",
+      "hitCount": 1
+    },
+    {
+      "file": "src/screens/FounderAlphaLabScreen.jsx",
+      "hitCount": 58
+    },
+    {
+      "file": "src/screens/GoalEditWizardScreen.jsx",
+      "hitCount": 15
+    },
+    {
+      "file": "src/screens/GoalsHubScreen.jsx",
+      "hitCount": 9
+    },
+    {
+      "file": "src/screens/GoalTransitionPreviewScreen.jsx",
+      "hitCount": 14
+    },
+    {
+      "file": "src/screens/HomeScreen.jsx",
+      "hitCount": 2
+    },
+    {
+      "file": "src/screens/MidweekBriefingScreen.jsx",
+      "hitCount": 11
+    },
+    {
+      "file": "src/screens/MonthlyBriefingScreen.jsx",
+      "hitCount": 3
+    },
+    {
+      "file": "src/screens/MorningCheckInScreen.jsx",
+      "hitCount": 2
+    },
+    {
+      "file": "src/screens/NarrativeEngineLabScreen.jsx",
+      "hitCount": 78
+    },
+    {
+      "file": "src/screens/NarrativeGoalPreviewScreen.jsx",
+      "hitCount": 4
+    },
+    {
+      "file": "src/screens/OperatingPlanScreen.jsx",
+      "hitCount": 18
+    },
+    {
+      "file": "src/screens/OperatingPlanStrategyDetailScreen.jsx",
+      "hitCount": 4
+    },
+    {
+      "file": "src/screens/PeptideExecutionScreen.jsx",
+      "hitCount": 3
+    },
+    {
+      "file": "src/screens/PeptideSupportEditorScreen.jsx",
+      "hitCount": 17
+    },
+    {
+      "file": "src/screens/PhaseAwareActiveGoalPreviewScreen.jsx",
+      "hitCount": 8
+    },
+    {
+      "file": "src/screens/PhotoEventBriefingScreen.jsx",
+      "hitCount": 5
+    },
+    {
+      "file": "src/screens/PhotoSimulatorScreen.jsx",
+      "hitCount": 40
+    },
+    {
+      "file": "src/screens/PriorityCompletionButton.jsx",
+      "hitCount": 1
+    },
+    {
+      "file": "src/screens/PriorityDetailScreen.jsx",
+      "hitCount": 16
+    },
+    {
+      "file": "src/screens/ProgressPhotoUploadScreen.jsx",
+      "hitCount": 2
+    },
+    {
+      "file": "src/screens/ProgressPlaceholderScreen.jsx",
+      "hitCount": 3
+    },
+    {
+      "file": "src/screens/ProtocolDetailScreen.jsx",
+      "hitCount": 20
+    },
+    {
+      "file": "src/screens/ProtocolsHubScreen.jsx",
+      "hitCount": 1
+    },
+    {
+      "file": "src/screens/ProtocolTransitionBuilderScreen.jsx",
+      "hitCount": 18
+    },
+    {
+      "file": "src/screens/ProtocolTransitionPreviewScreen.jsx",
+      "hitCount": 10
+    },
+    {
+      "file": "src/screens/RecurringSupportEditorScreen.jsx",
+      "hitCount": 1
+    },
+    {
+      "file": "src/screens/StrategyDomainScreen.jsx",
+      "hitCount": 14
+    },
+    {
+      "file": "src/screens/StrategyEditorScreen.jsx",
+      "hitCount": 14
+    },
+    {
+      "file": "src/screens/SupplementExecutionDetailScreen.jsx",
+      "hitCount": 1
+    },
+    {
+      "file": "src/screens/SupplementExecutionEditorScreen.jsx",
+      "hitCount": 3
+    },
+    {
+      "file": "src/screens/SupplementStrategyEditorScreen.jsx",
+      "hitCount": 4
+    },
+    {
+      "file": "src/screens/SupplementSupportEditorScreen.jsx",
+      "hitCount": 2
+    },
+    {
+      "file": "src/screens/SupportingGoalScreen.jsx",
+      "hitCount": 11
+    },
+    {
+      "file": "src/screens/TrackingScreen.jsx",
+      "hitCount": 3
+    },
+    {
+      "file": "src/screens/TrainingKnowledgeScreen.jsx",
+      "hitCount": 1
+    },
+    {
+      "file": "src/screens/TrainingProtocolBuilderScreen.jsx",
+      "hitCount": 25
+    },
+    {
+      "file": "src/screens/VisibleAbsGoalScreen.jsx",
+      "hitCount": 18
+    },
+    {
+      "file": "src/screens/WeeklyBriefingScreen.jsx",
+      "hitCount": 23
+    },
+    {
+      "file": "src/services/recommendationEngine.js",
+      "hitCount": 7
+    }
+  ],
+  "exclusions": [
+    "opaque IDs used as React keys, routes, hidden form fields or lineage metadata are not visible leakage",
+    "restricted debug/lab output is not normal-user leakage",
+    "normal labels completed/active and safe source names Connected/Suggested are not automatically raw enums"
+  ],
+  "productionMutations": 0,
+  "nativeWebChanges": 0,
+  "rows": [
+    {
+      "id": 1,
+      "surface": "Home",
+      "component": "wheel/detail",
+      "classification": "D",
+      "owner": "server + client fallback",
+      "file": "src/components/cards/HomeConfidenceDetail.jsx",
+      "anchor": "export default",
+      "action": "Bind percentage, movement and all explanatory blocks to the same canonical assessment; clients only render.",
+      "sourceVerified": true,
+      "line": 8,
+      "exampleSource": "export default function HomeConfidenceDetail({ confidence, detail }) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 2,
+      "surface": "Home",
+      "component": "confidence read contract",
+      "classification": "D",
+      "owner": "server V2",
+      "file": "src/domain/services/ActiveGoalConfidencePresentationReadService.js",
+      "anchor": "export",
+      "action": "Replace live V2 projection with approved V3 assessment projection; retain historical/as-of reads.",
+      "sourceVerified": true,
+      "line": 13,
+      "exampleSource": "export const ACTIVE_GOAL_CONFIDENCE_PRESENTATION_VERSION =",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 3,
+      "surface": "Home",
+      "component": "phase/strategy/guardrail meaning",
+      "classification": "D",
+      "owner": "server Goal-specific",
+      "file": "src/domain/services/HomeActiveChapterPresentationService.js",
+      "anchor": "BUILD_LEAN_MASS_TYPE",
+      "action": "Remove independent Goal-name trajectory reasoning; project shared strategic state.",
+      "sourceVerified": true,
+      "line": 4,
+      "exampleSource": "const BUILD_LEAN_MASS_TYPE = \"build_lean_mass\";",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 4,
+      "surface": "Home",
+      "component": "hero trajectory headline/support",
+      "classification": "D",
+      "owner": "server + presentation fallback",
+      "file": "src/components/cards/HomeHeroCard.jsx",
+      "anchor": "trajectorySummary",
+      "action": "Consume canonical outlook/phase/coaching blocks; do not infer from tone or score.",
+      "sourceVerified": true,
+      "line": 14,
+      "exampleSource": "const trajectorySummary = mode === \"phase_trajectory\"",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 5,
+      "surface": "Home",
+      "component": "priority selection and why now",
+      "classification": "D",
+      "owner": "server legacy engines",
+      "file": "src/domain/services/HomeBriefingService.js",
+      "anchor": "export",
+      "action": "Keep execution scheduling factual; canonical V3 owns Goal-relative importance and coaching reasons.",
+      "sourceVerified": true,
+      "line": 38,
+      "exampleSource": "export function createHomeBriefingService({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 6,
+      "surface": "Home",
+      "component": "attention and recommendation selection",
+      "classification": "D",
+      "owner": "server legacy engines",
+      "file": "src/domain/services/HomeBriefingService.js",
+      "anchor": "export",
+      "action": "Canonical recommendation and attention semantics; one assessment, not another evaluator.",
+      "sourceVerified": true,
+      "line": 38,
+      "exampleSource": "export function createHomeBriefingService({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 7,
+      "surface": "Home",
+      "component": "briefing card excerpts",
+      "classification": "D",
+      "owner": "server published + client rendering",
+      "file": "src/components/cards/HomeBriefingCardStack.jsx",
+      "anchor": "export",
+      "action": "Use canonical published excerpts with recency/lineage; never rewrite an accepted event.",
+      "sourceVerified": true,
+      "line": 3,
+      "exampleSource": "export default function HomeBriefingCardStack({ cards = [] }) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 8,
+      "surface": "Home",
+      "component": "goal names/dates/timeline values",
+      "classification": "A",
+      "owner": "typed server + client formatter",
+      "file": "src/components/cards/HomeHeroCard.jsx",
+      "anchor": "HeroMetric",
+      "action": "Retain factual names and scheduled dates; projected finish belongs to the strategic row, not this factual row.",
+      "sourceVerified": true,
+      "line": 56,
+      "exampleSource": "<HeroMetric",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 9,
+      "surface": "Home",
+      "component": "session priority completion counts",
+      "classification": "A",
+      "owner": "server records + client arithmetic",
+      "file": "src/components/cards/TodaysFocusCard.jsx",
+      "anchor": "completedCount",
+      "action": "Keep count formatting, factual completion and navigation outside Narrative.",
+      "sourceVerified": true,
+      "line": 54,
+      "exampleSource": "const completedCount = item.sessionItems.filter((sessionItem) => sessionItem.completed).length;",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 10,
+      "surface": "Home",
+      "component": "navigation and log action labels",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/components/cards/NextBestAction.jsx",
+      "anchor": "Log Morning Weight",
+      "action": "Retain neutral action labels; Goal-relative reason for the chosen action is a separate V3 block.",
+      "sourceVerified": true,
+      "line": 17,
+      "exampleSource": "title = \"Log Morning Weight\",",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 11,
+      "surface": "Active Goal",
+      "component": "required live Goal consumer",
+      "classification": "D",
+      "owner": "server separate preview",
+      "file": "src/application/goals/ActiveGoalReadService.js",
+      "anchor": "export",
+      "action": "Require same interpretation, achievement, confidence, coaching state and recommendation IDs as Home/Briefings.",
+      "sourceVerified": true,
+      "line": 3,
+      "exampleSource": "export function createActiveGoalReadService({ store } = {}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 12,
+      "surface": "Active Goal",
+      "component": "phase strategy and next evidence",
+      "classification": "D",
+      "owner": "server Goal-specific",
+      "file": "src/domain/services/PhaseAwareActiveGoalPreviewService.js",
+      "anchor": "export",
+      "action": "Replace Founder-specific phase projection/DEXA hierarchy with Goal Contract semantics and evidence requests.",
+      "sourceVerified": true,
+      "line": 14,
+      "exampleSource": "export async function getPhaseAwareActiveGoalPreview({ repositories = FounderRepositories, currentDate = new Date() } = {}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 13,
+      "surface": "Active Goal",
+      "component": "trajectory and achievement/status language",
+      "classification": "D",
+      "owner": "server preview",
+      "file": "src/screens/PhaseAwareActiveGoalPreviewScreen.jsx",
+      "anchor": "export",
+      "action": "Render canonical Goal outlook, success criteria, strategy status and what matters next; no local interpretation.",
+      "sourceVerified": true,
+      "line": 6,
+      "exampleSource": "export default function PhaseAwareActiveGoalPreviewScreen({ preview }) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 14,
+      "surface": "Active Goal",
+      "component": "legacy visible-abs status/coaching",
+      "classification": "D",
+      "owner": "mixed server + client inference",
+      "file": "src/screens/VisibleAbsGoalScreen.jsx",
+      "anchor": "export",
+      "action": "Remove fallback On-track and preservation inference for live goals; freeze historical meaning.",
+      "sourceVerified": true,
+      "line": 18,
+      "exampleSource": "export async function getVisibleAbsDossier() {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 15,
+      "surface": "Active Goal",
+      "component": "supporting objectives/Goal-level coaching",
+      "classification": "D",
+      "owner": "mixed Goal-specific config + server",
+      "file": "src/screens/SupportingGoalScreen.jsx",
+      "anchor": "statusFallback",
+      "action": "Replace live hardcoded preservation/cut conclusions with configured secondary-objective semantics.",
+      "sourceVerified": true,
+      "line": 21,
+      "exampleSource": "statusFallback: \"Entering Target Range\",",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 16,
+      "surface": "Active Goal",
+      "component": "goal-row strategic progress",
+      "classification": "D",
+      "owner": "server + client fallback",
+      "file": "src/components/goals/GoalRow.jsx",
+      "anchor": "export",
+      "action": "Canonical achievement and next-evidence blocks; no universal DEXA progress anchor.",
+      "sourceVerified": true,
+      "line": 9,
+      "exampleSource": "export default function GoalRow({ title, current, target, unit = \"\", progress = 0, primary = false, icon = \"target\", color = \"success\", progressColor = \"#3BC35B\", presentation = { mode: \"primary_goal\" }, href, className = \"\" }) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 17,
+      "surface": "Active Goal",
+      "component": "completed/historical dossier",
+      "classification": "C",
+      "owner": "server archived interpretation",
+      "file": "src/application/goals/CompletedGoalReadService.js",
+      "anchor": "export",
+      "action": "Separate immutable historical snapshot from current V3; no recomputation or historical rewrite.",
+      "sourceVerified": true,
+      "line": 6,
+      "exampleSource": "export function createCompletedGoalReadService({ store } = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 18,
+      "surface": "Active Goal",
+      "component": "canonical target/date values",
+      "classification": "A",
+      "owner": "server records",
+      "file": "src/screens/PhaseAwareActiveGoalPreviewScreen.jsx",
+      "anchor": "export",
+      "action": "Keep factual target, progress quantities and dates typed; any ahead/on-track claim is strategic.",
+      "sourceVerified": true,
+      "line": 6,
+      "exampleSource": "export default function PhaseAwareActiveGoalPreviewScreen({ preview }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 19,
+      "surface": "Active Goal",
+      "component": "editor fields/neutral instructions",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/screens/GoalEditWizardScreen.jsx",
+      "anchor": "Goal name",
+      "action": "Keep user-authored planning UI copy; first-person user quotes are not system personification.",
+      "sourceVerified": true,
+      "line": 28,
+      "exampleSource": "function SectionEditor({step,draft,setDraft,setError,onPatch,review,pending,onSave,commit,goalHref}){switch(step){case GoalEditSection.GOAL_AND_PURPOSE:return <section data-editor-type=\"goal_and_purpose_editor\"><Fields fields={[[\"name\",\"Goal name\"],[\"purpose\",",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 20,
+      "surface": "Active Goal",
+      "component": "phase review current recommendation",
+      "classification": "D",
+      "owner": "server evaluator + client selection",
+      "file": "src/components/goals/PhaseReviewCard.jsx",
+      "anchor": "review.explanation",
+      "action": "Canonical V3 owns current evidence/Goal judgment; user decision preview and transactional phase-edit validation remain separate.",
+      "sourceVerified": true,
+      "line": 59,
+      "exampleSource": "<p className=\"mt-2 text-sm font-semibold leading-6 text-slate-600\">{review.explanation}</p>",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 21,
+      "surface": "Active Goal",
+      "component": "phase review enum-title explanation",
+      "classification": "E",
+      "owner": "client generic enum humanizer",
+      "file": "src/components/goals/PhaseReviewCard.jsx",
+      "anchor": "Evidence conclusion:",
+      "action": "Confirmed backend-oriented normal explanation: generic humanizer renders evidence/guardrail/deviation enums as title words. Replace with approved coaching blocks, not underscore replacement.",
+      "sourceVerified": true,
+      "line": 61,
+      "exampleSource": "{review.currentRecommendation&&<div className=\"mt-4 rounded-2xl bg-white/70 p-3 text-xs font-semibold leading-5 text-slate-600 dark:bg-white/[.05]\" data-testid=\"phase-review-goal-context\"><p><b>Evidence conclusion:</b> {human(review.currentRecommendation.evide",
+      "v3ShouldOwn": "approved display-safe domain/strategic boundary as applicable",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "confirmed source sink",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "display-safe presentation adapter and text/a11y contract tests"
+    },
+    {
+      "id": 22,
+      "surface": "Active Goal",
+      "component": "phase capability reason leakage",
+      "classification": "E",
+      "owner": "server codes rendered by client",
+      "file": "src/screens/GoalEditWizardScreen.jsx",
+      "anchor": "blockingReasons",
+      "action": "Confirmed visible raw blocking reason codes; translate via safe domain presentation, not Strategic Interpretation.",
+      "sourceVerified": true,
+      "line": 23,
+      "exampleSource": "{step===\"choose_sections\"&&<div className=\"space-y-3\">{CHOICES.map(([id,label])=>id!==\"phases\"||phaseAvailable?<Choice key={id} id={id} label={label} selected={selected} setSelected={setSelected}/>:<div className=\"rounded-xl bg-[var(--surface-muted)] p-3\" key=",
+      "v3ShouldOwn": "approved display-safe domain/strategic boundary as applicable",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "confirmed source sink",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "display-safe presentation adapter and text/a11y contract tests"
+    },
+    {
+      "id": 23,
+      "surface": "Active Goal",
+      "component": "exception message passthrough",
+      "classification": "E",
+      "owner": "client raw exception",
+      "file": "src/screens/GoalEditWizardScreen.jsx",
+      "anchor": "setError(e.message)",
+      "action": "Confirmed unfiltered error message sink; map approved validation messages, keep diagnostics private.",
+      "sourceVerified": true,
+      "line": 15,
+      "exampleSource": "const run=fn=>{try{setDraft(fn());setError(\"\");setReview(null);setCommit(null)}catch(e){setError(e.message)}};",
+      "v3ShouldOwn": "approved display-safe domain/strategic boundary as applicable",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "confirmed source sink",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "display-safe presentation adapter and text/a11y contract tests"
+    },
+    {
+      "id": 24,
+      "surface": "Briefings/Events",
+      "component": "Weekly publisher/intelligence",
+      "classification": "D",
+      "owner": "server separate PI + legacy",
+      "file": "src/domain/services/WeeklyBriefingPIService.js",
+      "anchor": "export",
+      "action": "Shared canonical interpretation and confidence; recurring emphasis, evidence dedup and event recency.",
+      "sourceVerified": true,
+      "line": 23,
+      "exampleSource": "export function createWeeklyBriefingPIResult(input = {}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 25,
+      "surface": "Briefings/Events",
+      "component": "Weekly screen model/composition",
+      "classification": "D",
+      "owner": "server + client rendering",
+      "file": "src/domain/services/WeeklyBriefingScreenPresentationService.js",
+      "anchor": "export",
+      "action": "Project canonical Narrative plan; remove strategic fallback copy from clients.",
+      "sourceVerified": true,
+      "line": 1,
+      "exampleSource": "export function createWeeklyBriefingScreenPresentation(narrative) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 26,
+      "surface": "Briefings/Events",
+      "component": "Midweek publisher",
+      "classification": "D",
+      "owner": "server separate evaluator",
+      "file": "src/domain/services/MidweekBriefingService.js",
+      "anchor": "export",
+      "action": "Same state and evidence chronology; incremental execution coaching rather than re-proving outcomes.",
+      "sourceVerified": true,
+      "line": 30,
+      "exampleSource": "export function createMidweekBriefingPIShadowDiagnostic(input) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 27,
+      "surface": "Briefings/Events",
+      "component": "Monthly publisher",
+      "classification": "D",
+      "owner": "server separate evaluator",
+      "file": "src/domain/services/MonthlyBriefingService.js",
+      "anchor": "export",
+      "action": "Shared state; duration/persistence emphasis and historical milestones, no independent confidence.",
+      "sourceVerified": true,
+      "line": 29,
+      "exampleSource": "export const MONTHLY_BRIEFING_VERSION = \"monthly_briefing_v1\";",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 28,
+      "surface": "Briefings/Events",
+      "component": "Daily/initial/morning finalization",
+      "classification": "D",
+      "owner": "server legacy",
+      "file": "src/domain/services/DailyBriefingService.js",
+      "anchor": "export",
+      "action": "Applicable enabled Daily and initial briefing paths consume canonical V3; retain cadence eligibility and finalization infrastructure.",
+      "sourceVerified": true,
+      "line": 40,
+      "exampleSource": "export function createDailyBriefingPIShadowDiagnostic(input) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 29,
+      "surface": "Briefings/Events",
+      "component": "DEXA Event publisher/narrative",
+      "classification": "D",
+      "owner": "server separate evaluator",
+      "file": "src/domain/services/DEXAEventNarrativeService.js",
+      "anchor": "export",
+      "action": "DEXA adapter supplies observations/capabilities; Goal-relative resolver and canonical V3 own meaning.",
+      "sourceVerified": true,
+      "line": 14,
+      "exampleSource": "export const DEXA_EVENT_VERSION = \"dexa_event_v1_6_0\";",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 30,
+      "surface": "Briefings/Events",
+      "component": "Photo Event publisher/narrative",
+      "classification": "D",
+      "owner": "server + vision-generated input",
+      "file": "src/domain/services/PhotoEventNarrativeService.js",
+      "anchor": "export",
+      "action": "Split visual observation/comparability from shared Goal-relative interpretation; migrate strategy handoff only after approval.",
+      "sourceVerified": true,
+      "line": 20,
+      "exampleSource": "export function classifyPhotoAnalysis(view = {}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 31,
+      "surface": "Briefings/Events",
+      "component": "Photo Briefing read family",
+      "classification": "D",
+      "owner": "server artifact + client fallback",
+      "file": "src/application/briefings/PhotoEventBriefingReadService.js",
+      "anchor": "export",
+      "action": "Photo Event/Photo Briefing server intelligence is explicitly in plumbing scope; retain canonical publication identity.",
+      "sourceVerified": true,
+      "line": 15,
+      "exampleSource": "export function createPhotoEventBriefingReadService({ store } = {}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 32,
+      "surface": "Briefings/Events",
+      "component": "publication lineage/atomic confidence",
+      "classification": "C",
+      "owner": "server infrastructure",
+      "file": "src/domain/services/CanonicalBriefingConfidencePublicationService.js",
+      "anchor": "export",
+      "action": "Reuse V2 reproducibility, fingerprints, as-of lineage and atomic publication; no replacement just to rename V3.",
+      "sourceVerified": true,
+      "line": 24,
+      "exampleSource": "export const CANONICAL_BRIEFING_CONFIDENCE_PUBLICATION_VERSION =",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 33,
+      "surface": "Briefings/Events",
+      "component": "published dates/evidence window",
+      "classification": "A",
+      "owner": "server artifact",
+      "file": "src/application/briefings/BriefingReadService.js",
+      "anchor": "export",
+      "action": "Retain canonical artifact metadata and human date formatting; IDs remain opaque navigation metadata.",
+      "sourceVerified": true,
+      "line": 4,
+      "exampleSource": "export function createBriefingReadService({ repositories } = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 34,
+      "surface": "Briefings/Events",
+      "component": "Weekly accessibility raw status",
+      "classification": "E",
+      "owner": "client enum passthrough",
+      "file": "src/screens/WeeklyBriefingScreen.jsx",
+      "anchor": "aria-label={category.status}",
+      "action": "Confirmed normal accessibility enum sink; use approved human statusLabel for assistive text too.",
+      "sourceVerified": true,
+      "line": 179,
+      "exampleSource": "aria-label={category.status}",
+      "v3ShouldOwn": "approved display-safe domain/strategic boundary as applicable",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "confirmed source sink",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "display-safe presentation adapter and text/a11y contract tests"
+    },
+    {
+      "id": 35,
+      "surface": "Briefings/Events",
+      "component": "Midweek accessibility raw status",
+      "classification": "E",
+      "owner": "client enum passthrough",
+      "file": "src/screens/MidweekBriefingScreen.jsx",
+      "anchor": "aria-label={category.status}",
+      "action": "Confirmed accessibility enum sink; translate through same domain/strategic label contract.",
+      "sourceVerified": true,
+      "line": 26,
+      "exampleSource": "function PriorityCategory({category}) { return <div className=\"rounded-xl bg-[var(--surface-muted)] p-3\"><p className=\"flex items-center gap-2 text-xs font-black text-[var(--text-primary)]\"><span aria-label={category.status} className={statusIndicatorClass(cat",
+      "v3ShouldOwn": "approved display-safe domain/strategic boundary as applicable",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "confirmed source sink",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "display-safe presentation adapter and text/a11y contract tests"
+    },
+    {
+      "id": 36,
+      "surface": "Priorities",
+      "component": "card execution facts/title",
+      "classification": "A",
+      "owner": "server projection",
+      "file": "src/domain/services/ExecutionPriorityProjectionService.js",
+      "anchor": "export",
+      "action": "Keep scheduled action, exercise, dose and completion typed; do not dynamically narrate simple labels.",
+      "sourceVerified": true,
+      "line": 9,
+      "exampleSource": "export const ExecutionPriorityOperationalState = Object.freeze({",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 37,
+      "surface": "Priorities",
+      "component": "card subtitles/why now",
+      "classification": "D",
+      "owner": "server legacy projection",
+      "file": "src/domain/services/ExecutionPriorityProjectionService.js",
+      "anchor": "export",
+      "action": "Attach canonical Goal-relative priority reason and coaching emphasis without changing scheduling ownership.",
+      "sourceVerified": true,
+      "line": 9,
+      "exampleSource": "export const ExecutionPriorityOperationalState = Object.freeze({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 38,
+      "surface": "Priorities",
+      "component": "detail why this matters",
+      "classification": "D",
+      "owner": "server legacy",
+      "file": "src/domain/services/PriorityDetailService.js",
+      "anchor": "export",
+      "action": "Use shared current recommendation/Goal semantics for reasons, not hardcoded current-goal rationale.",
+      "sourceVerified": true,
+      "line": 40,
+      "exampleSource": "export function createPriorityDetailService({ repositories, now = () => new Date() }) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 39,
+      "surface": "Priorities",
+      "component": "static completion instructions",
+      "classification": "B",
+      "owner": "server/client neutral copy",
+      "file": "src/screens/PriorityDetailScreen.jsx",
+      "anchor": "export",
+      "action": "Retain factual how-to execution instructions; conditional advice must be separately canonical.",
+      "sourceVerified": true,
+      "line": 8,
+      "exampleSource": "export default function PriorityDetailScreen({ completeAction, priority }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 40,
+      "surface": "Priorities",
+      "component": "DEXA evidence purpose guidance",
+      "classification": "D",
+      "owner": "server domain-specific",
+      "file": "src/domain/services/PriorityDetailService.js",
+      "anchor": "export",
+      "action": "Translate next evidence request/purpose, not universal DEXA strategic authority.",
+      "sourceVerified": true,
+      "line": 40,
+      "exampleSource": "export function createPriorityDetailService({ repositories, now = () => new Date() }) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 41,
+      "surface": "Operating Plan",
+      "component": "Energy Strategy explanatory purpose",
+      "classification": "D",
+      "owner": "server legacy",
+      "file": "src/domain/services/OperatingPlanStrategyDetailService.js",
+      "anchor": "Evidence Monitoring",
+      "action": "Current phase-response/Guardrail language needs canonical Goal-relative reason and safe optional-guardrail semantics.",
+      "sourceVerified": true,
+      "line": 75,
+      "exampleSource": "field(\"Evidence Monitoring\", monitoringCadence(strategy)),",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 42,
+      "surface": "Operating Plan",
+      "component": "Nutrition strategy purpose",
+      "classification": "D",
+      "owner": "server legacy",
+      "file": "src/domain/services/OperatingPlanStrategyDetailService.js",
+      "anchor": "Macro Strategy",
+      "action": "Project Goal-relative why/continue/change; factual macro formula stays domain data.",
+      "sourceVerified": true,
+      "line": 85,
+      "exampleSource": "title: \"Macro Strategy\",",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 43,
+      "surface": "Operating Plan",
+      "component": "Training strategy purpose/effectiveness",
+      "classification": "D",
+      "owner": "server + legacy client",
+      "file": "src/screens/OperatingPlanScreen.jsx",
+      "anchor": "export",
+      "action": "Remove client strategy-support/cut meaning; keep configured strategy identity and schedule factual.",
+      "sourceVerified": true,
+      "line": 20,
+      "exampleSource": "export default function OperatingPlanScreen({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 44,
+      "surface": "Operating Plan",
+      "component": "Recovery explanatory purpose",
+      "classification": "D",
+      "owner": "client mixed static + derived",
+      "file": "src/screens/StrategyDomainScreen.jsx",
+      "anchor": "export",
+      "action": "Generic static domain instruction may remain; Goal-relative preserve/change recommendation requires assessed canonical state.",
+      "sourceVerified": true,
+      "line": 33,
+      "exampleSource": "export default function StrategyDomainScreen({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 45,
+      "surface": "Operating Plan",
+      "component": "Peptides explanatory purpose",
+      "classification": "D",
+      "owner": "client mixed static + derived",
+      "file": "src/screens/StrategyDomainScreen.jsx",
+      "anchor": "export",
+      "action": "Only canonical Goal-relative rationale may migrate; no new dosing/medical evaluator in this project.",
+      "sourceVerified": true,
+      "line": 33,
+      "exampleSource": "export default function StrategyDomainScreen({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 46,
+      "surface": "Operating Plan",
+      "component": "Supplements explanatory purpose",
+      "classification": "D",
+      "owner": "client mixed static + derived",
+      "file": "src/screens/StrategyDomainScreen.jsx",
+      "anchor": "supplementPurpose",
+      "action": "Split configured purpose from inferred goal benefit; no client-derived strategic recommendation.",
+      "sourceVerified": true,
+      "line": 222,
+      "exampleSource": "purpose: supplementPurpose(protocol, version, goalReference),",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 47,
+      "surface": "Operating Plan",
+      "component": "Tracking evidence purpose",
+      "classification": "D",
+      "owner": "server + presentation",
+      "file": "src/application/plan/OperatingPlanReadService.js",
+      "anchor": "export",
+      "action": "Configured schedule is factual; why evidence matters now projects canonical evidence request.",
+      "sourceVerified": true,
+      "line": 11,
+      "exampleSource": "export function createOperatingPlanReadService({ repositories } = {}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 48,
+      "surface": "Operating Plan",
+      "component": "Coaching Updates strategic explanation",
+      "classification": "D",
+      "owner": "server + presentation",
+      "file": "src/domain/services/OperatingPlanStrategyDetailService.js",
+      "anchor": "Coaching Updates",
+      "action": "Cadence toggles are static/factual; event importance and strategy change reasons use canonical V3.",
+      "sourceVerified": true,
+      "line": 59,
+      "exampleSource": "editLabel: strategyType === \"briefings\" ? \"Edit Coaching Updates\" : \"Edit Strategy\",",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 49,
+      "surface": "Operating Plan",
+      "component": "all eight domain configuration values",
+      "classification": "A",
+      "owner": "server typed plan",
+      "file": "src/application/plan/OperatingPlanReadService.js",
+      "anchor": "export",
+      "action": "Retain targets, strategy IDs as metadata, doses, dates and schedules; no Narrative for raw configuration.",
+      "sourceVerified": true,
+      "line": 11,
+      "exampleSource": "export function createOperatingPlanReadService({ repositories } = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 50,
+      "surface": "Operating Plan",
+      "component": "all eight domain editor labels",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/screens/OperatingPlanStrategyDetailScreen.jsx",
+      "anchor": "export",
+      "action": "Retain neutral field/editor instructions and navigation.",
+      "sourceVerified": true,
+      "line": 6,
+      "exampleSource": "export default function OperatingPlanStrategyDetailScreen({ detail }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 51,
+      "surface": "Operating Plan",
+      "component": "active/not configured status and identity",
+      "classification": "C",
+      "owner": "server typed domain presentation",
+      "file": "src/application/plan/OperatingPlanReadService.js",
+      "anchor": "export",
+      "action": "Humanize configured identity without treating configuration as effectiveness; review Maintenance Training Strategy title fallback.",
+      "sourceVerified": true,
+      "line": 11,
+      "exampleSource": "export function createOperatingPlanReadService({ repositories } = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 52,
+      "surface": "Evidence",
+      "component": "review factual parsed values",
+      "classification": "A",
+      "owner": "server pre-canonical read",
+      "file": "src/domain/services/EvidenceReviewPresentationService.js",
+      "anchor": "export",
+      "action": "Keep source values available for confirmation before strategic eligibility; no premature Goal inference.",
+      "sourceVerified": true,
+      "line": 23,
+      "exampleSource": "export function createEvidenceReviewPresentation({ evidencePackage = {}, itemDecisions = {} } = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 53,
+      "surface": "Evidence",
+      "component": "review confirmation instructions",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/screens/EvidenceReviewScreen.jsx",
+      "anchor": "Does this look right",
+      "action": "Retain neutral confirmation/edit/exclude instructions.",
+      "sourceVerified": true,
+      "line": 145,
+      "exampleSource": "<h1 className=\"mt-2 text-3xl font-extrabold text-[var(--text-primary)]\">Does this look right?</h1>",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 54,
+      "surface": "Evidence",
+      "component": "classification/reconciliation/duplicates",
+      "classification": "C",
+      "owner": "server presentation adapters",
+      "file": "src/domain/services/EvidenceExperiencePresentationService.js",
+      "anchor": "export",
+      "action": "Source observation to canonical record to eligibility remains separate from Goal-relative strategy.",
+      "sourceVerified": true,
+      "line": 10,
+      "exampleSource": "export function createEvidenceExperiencePresentation(review, { now = new Date() } = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 55,
+      "surface": "Evidence",
+      "component": "review summaries and confirmation explanations",
+      "classification": "C",
+      "owner": "server presentation",
+      "file": "src/domain/services/EvidenceReviewPresentationService.js",
+      "anchor": "export",
+      "action": "Human-readable parsing/conflict/completeness status belongs to ingestion adapters, not strategic engine.",
+      "sourceVerified": true,
+      "line": 23,
+      "exampleSource": "export function createEvidenceReviewPresentation({ evidencePackage = {}, itemDecisions = {} } = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 56,
+      "surface": "Evidence",
+      "component": "evidence what-it-means/Goal context",
+      "classification": "D",
+      "owner": "server domain contexts",
+      "file": "src/application/progress/ProgressEvidenceReadService.js",
+      "anchor": "export",
+      "action": "Attach canonical Goal-relative interpretation only after eligible evidence; never reinterpret inside client review.",
+      "sourceVerified": true,
+      "line": 14,
+      "exampleSource": "export function createProgressEvidenceReadService({ store } = {}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 57,
+      "surface": "Evidence",
+      "component": "timeline status/dates",
+      "classification": "C",
+      "owner": "server typed domain presentation",
+      "file": "src/application/timeline/EvidenceTimelineReadService.js",
+      "anchor": "export",
+      "action": "Translate lifecycle/reconciliation statuses; factual dates and navigation identity remain typed metadata.",
+      "sourceVerified": true,
+      "line": 3,
+      "exampleSource": "export function createEvidenceTimelineReadService({ store } = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 58,
+      "surface": "Evidence",
+      "component": "data source names/status presentation",
+      "classification": "C",
+      "owner": "server labels + client rendering",
+      "file": "src/components/progress/EvidenceReportContext.jsx",
+      "anchor": "source.status",
+      "action": "Inspected backing getDataSources uses Connected/Suggested/Future human labels; not a confirmed enum/ID leak. Validate truthfulness of Connected claims separately.",
+      "sourceVerified": true,
+      "line": 62,
+      "exampleSource": "<span className=\"text-[var(--text-subtle)]\">{source.status}</span>",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 59,
+      "surface": "Evidence",
+      "component": "Native intake/pending statuses and provenance",
+      "classification": "E",
+      "owner": "server raw contract risk",
+      "file": "src/application/native/NativeReadProjectionService.js",
+      "anchor": "export",
+      "action": "Potential contract leakage, not confirmed Native rendering: require display-safe statuses and no provider/storage/ID labels; Native source unavailable.",
+      "sourceVerified": true,
+      "line": 6,
+      "exampleSource": "export function projectNativeWeightRead({ timeline, report, limit = WEIGHT_HISTORY_DEFAULT } = {}) {",
+      "v3ShouldOwn": "approved display-safe domain/strategic boundary as applicable",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "potential contract leakage; Native rendering unverified",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "display-safe presentation adapter and text/a11y contract tests"
+    },
+    {
+      "id": 60,
+      "surface": "Evidence",
+      "component": "interpreter diagnostic warning boundary",
+      "classification": "E",
+      "owner": "provider diagnostics + downstream sanitizer",
+      "file": "src/domain/interpreters/ScreenshotInterpreterService.js",
+      "anchor": "OPENAI_API_KEY is not configured",
+      "action": "Potential backend/provider/error leakage if raw warning is rendered; prove display-safe review contracts before integration. Do not label extraction failures as strategic uncertainty.",
+      "sourceVerified": true,
+      "line": 42,
+      "exampleSource": "fallbackReason: \"OPENAI_API_KEY is not configured.\",",
+      "v3ShouldOwn": "approved display-safe domain/strategic boundary as applicable",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "potential contract leakage; Native rendering unverified",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "display-safe presentation adapter and text/a11y contract tests"
+    },
+    {
+      "id": 61,
+      "surface": "Training",
+      "component": "sets/reps/load/dates and PR records",
+      "classification": "A",
+      "owner": "server records",
+      "file": "src/components/training/TrainingLoggerClient.jsx",
+      "anchor": "export",
+      "action": "Retain pure performance facts; do not confuse numeric PR with Goal-relative significance.",
+      "sourceVerified": true,
+      "line": 84,
+      "exampleSource": "export default function TrainingLoggerClient({",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 62,
+      "surface": "Training",
+      "component": "exercise performance classification",
+      "classification": "C",
+      "owner": "server domain adapter",
+      "file": "src/domain/services/TrainingReportingPresentationService.js",
+      "anchor": "export",
+      "action": "Improving/Stable/Plateauing labels can remain approved domain presentation; significance for Goal is separately V3.",
+      "sourceVerified": true,
+      "line": 9,
+      "exampleSource": "export function createTrainingReportingPresentation(report = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 63,
+      "surface": "Training",
+      "component": "training intelligence Goal support",
+      "classification": "D",
+      "owner": "server separate intelligence",
+      "file": "src/domain/services/TrainingPerformanceIntelligenceService.js",
+      "anchor": "export",
+      "action": "Expose metric capability observations; canonical V3 determines whether training supports current Goal/strategy.",
+      "sourceVerified": true,
+      "line": 23,
+      "exampleSource": "export function createTrainingPerformanceIntelligenceReport({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 64,
+      "surface": "Training",
+      "component": "phase-relative progression recommendations",
+      "classification": "D",
+      "owner": "server Goal/phase-specific",
+      "file": "src/domain/services/TrainingLoggerProgressionService.js",
+      "anchor": "Preserving comparable performance",
+      "action": "Current cut/phase recommendation logic must bind configured expected response; local performance mechanics remain specialized domain evaluator.",
+      "sourceVerified": true,
+      "line": 130,
+      "exampleSource": "? \"Preserving comparable performance is productive during a cut.\"",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 65,
+      "surface": "Training",
+      "component": "repeated-workout suggestion reason",
+      "classification": "C",
+      "owner": "server human domain reason",
+      "file": "src/domain/services/TrainingLoggerSuggestionService.js",
+      "anchor": "Repeated on",
+      "action": "Human phrase based on confirmed weekday history; not a raw reason-code leak. Goal recommendation is a separate consumer.",
+      "sourceVerified": true,
+      "line": 39,
+      "exampleSource": "reason: `Repeated on ${weekdayLabel(targetWeekday)} across ${best[1].length} confirmed workouts`,",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 66,
+      "surface": "Training",
+      "component": "training summary/status client labels",
+      "classification": "C",
+      "owner": "server data + client labels",
+      "file": "src/screens/TrainingKnowledgeScreen.jsx",
+      "anchor": "export",
+      "action": "Consolidate approved human performance labels; prohibit local Goal effectiveness inference.",
+      "sourceVerified": true,
+      "line": 64,
+      "exampleSource": "export default function TrainingKnowledgeScreen({",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 67,
+      "surface": "Training",
+      "component": "history summary implementation phrasing",
+      "classification": "E",
+      "owner": "server presentation contract",
+      "file": "src/domain/services/TrainingReportingPresentationService.js",
+      "anchor": "Recent canonical training days and their session identities",
+      "action": "Potential normal-contract leakage: canonical/session identities is backend-oriented language; use human training-history summary. Native actual rendering is unverified.",
+      "sourceVerified": true,
+      "line": 46,
+      "exampleSource": "summary: \"Recent canonical training days and their session identities.\",",
+      "v3ShouldOwn": "approved display-safe domain/strategic boundary as applicable",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "potential contract leakage; Native rendering unverified",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "display-safe presentation adapter and text/a11y contract tests"
+    },
+    {
+      "id": 68,
+      "surface": "Training",
+      "component": "logger/exercise neutral controls",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/components/training/TrainingLoggerClient.jsx",
+      "anchor": "export",
+      "action": "Keep set logging, validation and navigation static; no dynamic language engine needed.",
+      "sourceVerified": true,
+      "line": 84,
+      "exampleSource": "export default function TrainingLoggerClient({",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 69,
+      "surface": "Nutrition",
+      "component": "calorie/macro totals and averages",
+      "classification": "A",
+      "owner": "server typed calculation",
+      "file": "src/domain/services/NutritionCaloriesPresentationService.js",
+      "anchor": "export",
+      "action": "Factual totals, means and chart axes remain factual, not strategic coaching.",
+      "sourceVerified": true,
+      "line": 6,
+      "exampleSource": "export function filterNutritionCaloriesReport(model, rangeId = \"all\") {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 70,
+      "surface": "Nutrition",
+      "component": "above/below configured target comparison",
+      "classification": "C",
+      "owner": "server domain assessment",
+      "file": "src/domain/services/NutritionSupportAssessmentService.js",
+      "anchor": "proteinTargetMetDayCount",
+      "action": "Arithmetic target comparison is domain presentation; supportive/adverse execution impact is V3.",
+      "sourceVerified": true,
+      "line": 62,
+      "exampleSource": "proteinTargetMetDayCount: met.length,",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 71,
+      "surface": "Nutrition",
+      "component": "Goal-relative nutrition context",
+      "classification": "D",
+      "owner": "server Goal-specific context",
+      "file": "src/domain/services/NutritionEvidenceContextService.js",
+      "anchor": "export",
+      "action": "Adapter supplies intake/completeness; canonical Goal contract decides authority and strategic meaning.",
+      "sourceVerified": true,
+      "line": 11,
+      "exampleSource": "export async function getNutritionTimelineReport({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 72,
+      "surface": "Nutrition",
+      "component": "food/meals static labels",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/screens/NutritionMealsReportScreen.jsx",
+      "anchor": "export",
+      "action": "Keep food names and neutral logging instructions outside Narrative.",
+      "sourceVerified": true,
+      "line": 27,
+      "exampleSource": "export default function NutritionMealsReportScreen({ report }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 73,
+      "surface": "Activity",
+      "component": "expenditure/activity data",
+      "classification": "A",
+      "owner": "server typed reporting",
+      "file": "src/domain/services/ProgressReportingService.js",
+      "anchor": "activityDays",
+      "action": "Retain factual duration/calories/heart rate and source-completeness.",
+      "sourceVerified": true,
+      "line": 97,
+      "exampleSource": "activityDays: context.activityDays.filter((day) =>",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 74,
+      "surface": "Activity",
+      "component": "Goal-relative activity context",
+      "classification": "D",
+      "owner": "server Goal-specific context",
+      "file": "src/domain/services/ActivityEvidenceContextService.js",
+      "anchor": "export",
+      "action": "Move support/strategy pace meaning to canonical Goal-relative assessment, not universal activity interpretation.",
+      "sourceVerified": true,
+      "line": 11,
+      "exampleSource": "export async function getActivityTimelineReport({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 75,
+      "surface": "Activity",
+      "component": "protocol builder neutral instructions",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/screens/ActivityProtocolBuilderScreen.jsx",
+      "anchor": "export",
+      "action": "Retain static editor copy; derived Goal advice needs server semantics.",
+      "sourceVerified": true,
+      "line": 16,
+      "exampleSource": "export default function ActivityProtocolBuilderScreen({ action, context }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 76,
+      "surface": "Weight",
+      "component": "measurements and factual trends",
+      "classification": "A",
+      "owner": "server typed reporting",
+      "file": "src/screens/WeightReportScreen.jsx",
+      "anchor": "export",
+      "action": "Retain dates, numeric trend/smoothing with declared calculation; favorable/too-fast claims are strategic.",
+      "sourceVerified": true,
+      "line": 10,
+      "exampleSource": "export default function WeightReportScreen({ evidenceContext, from, report }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 77,
+      "surface": "Weight",
+      "component": "Goal-relative pace/trend meaning",
+      "classification": "D",
+      "owner": "server context + legacy evaluations",
+      "file": "src/domain/services/WeightEvidenceContextService.js",
+      "anchor": "export",
+      "action": "Configured pace and authority only; no universal Weight means X or automatic composition inference.",
+      "sourceVerified": true,
+      "line": 12,
+      "exampleSource": "export async function getWeightTimelineReport({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 78,
+      "surface": "Weight",
+      "component": "weigh-in neutral instructions",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/screens/MorningCheckInScreen.jsx",
+      "anchor": "export",
+      "action": "Keep static logging copy; relevant execution impact belongs to canonical V3.",
+      "sourceVerified": true,
+      "line": 9,
+      "exampleSource": "export default function MorningCheckInScreen({",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 79,
+      "surface": "Photos",
+      "component": "media/date/pose/measurement facts",
+      "classification": "A",
+      "owner": "server photo read contract",
+      "file": "src/application/progress/ProgressPhotosReadService.js",
+      "anchor": "export",
+      "action": "Keep authorized media and actual date/pose mapping typed; do not narrate image sizing.",
+      "sourceVerified": true,
+      "line": 19,
+      "exampleSource": "export function createProgressPhotosReadService({ store } = {}) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 80,
+      "surface": "Photos",
+      "component": "visual comparison/comparability",
+      "classification": "C",
+      "owner": "server visual domain + vision input",
+      "file": "src/domain/interpreters/PhotoObservationModel.js",
+      "anchor": "export",
+      "action": "Observation and visual comparability are specialized domain semantics, not universal Goal authority.",
+      "sourceVerified": true,
+      "line": 1,
+      "exampleSource": "export const PHOTO_INTERPRETATION_SCHEMA_VERSION = \"photo_interpretation_v2\";",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 81,
+      "surface": "Photos",
+      "component": "Goal-relative photo meaning",
+      "classification": "D",
+      "owner": "server separate Photo Event intelligence",
+      "file": "src/domain/services/PhotoEventNarrativeService.js",
+      "anchor": "export",
+      "action": "Canonical V3 interprets eligible capabilities; stop duplicated strategic reasoning in vision/composition layers after approval.",
+      "sourceVerified": true,
+      "line": 20,
+      "exampleSource": "export function classifyPhotoAnalysis(view = {}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 82,
+      "surface": "Photos",
+      "component": "client Photo Briefing hardcoded strategy speech",
+      "classification": "D",
+      "owner": "client literals + server artifact",
+      "file": "src/screens/PhotoEventBriefingScreen.jsx",
+      "anchor": "export",
+      "action": "Remove current cut/transition fallback conclusions; preserve accepted historical artifact copy.",
+      "sourceVerified": true,
+      "line": 12,
+      "exampleSource": "export function createOrdinaryPhotoComparisonEntries(narrative={}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 83,
+      "surface": "Photos",
+      "component": "Native Progress Photos + Photo Briefing visual product",
+      "classification": "F",
+      "owner": "separate Native project",
+      "file": "src/application/media/NativeFounderPhotoAcceptanceService.js",
+      "anchor": "export",
+      "action": "Dedicated later rework with REAL Founder images, sizing, pose/date mapping, previews, detail/comparison and visual acceptance alongside V3 copy.",
+      "sourceVerified": true,
+      "line": 3,
+      "exampleSource": "export const NATIVE_FOUNDER_PHOTO_CONTRACT_VERSION =",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: separate product/architecture acceptance",
+      "dependencies": "dedicated Founder-approved rework"
+    },
+    {
+      "id": 84,
+      "surface": "Photos",
+      "component": "upload controls and instructions",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/screens/ProgressPhotoUploadScreen.jsx",
+      "anchor": "export",
+      "action": "Keep neutral upload/static help outside Narrative; do not mark existing Native visuals production-accepted.",
+      "sourceVerified": true,
+      "line": 19,
+      "exampleSource": "export default function ProgressPhotoUploadScreen({ action, defaultDate = \"\", confirmationIntent = null, recoveryContext = null, returnTo = null }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 85,
+      "surface": "DEXA",
+      "component": "scan measurements/dates/charts",
+      "classification": "A",
+      "owner": "server typed scan + client formatting",
+      "file": "src/screens/DEXAReportScreen.jsx",
+      "anchor": "export",
+      "action": "Raw scan data remains factual; body-fat measurement is not by itself Goal meaning.",
+      "sourceVerified": true,
+      "line": 10,
+      "exampleSource": "export default function DEXAReportScreen({ evidenceContext, from, report }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 86,
+      "surface": "DEXA",
+      "component": "DEXA detail Goal interpretation",
+      "classification": "D",
+      "owner": "server Goal-specific presentation",
+      "file": "src/domain/services/DEXAEventNarrativePresentationService.js",
+      "anchor": "export",
+      "action": "Use canonical interpretation/recommendation/achievement and evidence request vocabulary, not adapter strategic hierarchy.",
+      "sourceVerified": true,
+      "line": 1,
+      "exampleSource": "export function projectDEXAEventNarrativePresentation(narrative) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 87,
+      "surface": "DEXA",
+      "component": "upload and scan confirmation",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/screens/DEXAUploadScreen.jsx",
+      "anchor": "export",
+      "action": "Keep neutral upload/edit labels; eligibility/reconciliation belongs to evidence domain.",
+      "sourceVerified": true,
+      "line": 8,
+      "exampleSource": "\"invalid-pdf\": \"That file is not a valid PDF. Choose the raw PDF exported by BodySpec.\",",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 88,
+      "surface": "Other",
+      "component": "Goal transition proposed recommendation",
+      "classification": "D",
+      "owner": "client literal + legacy server",
+      "file": "src/screens/GoalTransitionPreviewScreen.jsx",
+      "anchor": "export",
+      "action": "Replace current-goal completion/next-goal claims with canonical transition semantics; draft user intent remains separate.",
+      "sourceVerified": true,
+      "line": 14,
+      "exampleSource": "export default function GoalTransitionPreviewScreen({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 89,
+      "surface": "Other",
+      "component": "protocol transition reconciliation",
+      "classification": "C",
+      "owner": "server draft + client workflow",
+      "file": "src/screens/ProtocolTransitionPreviewScreen.jsx",
+      "anchor": "unresolvedGroupNames",
+      "action": "Keep review readiness/draft configuration reconciliation domain-owned; a proposed strategy judgment must be separately canonical and never inferred from readiness.",
+      "sourceVerified": true,
+      "line": 164,
+      "exampleSource": "return <><Eyebrow/><h2 className=\"mt-3 text-[26px] font-extrabold leading-tight text-[var(--text-primary)]\">Let’s decide how each protocol should carry forward.</h2><p className=\"mt-2 text-sm font-semibold leading-6 text-[var(--text-secondary)]\">Each current p",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 90,
+      "surface": "Other",
+      "component": "phase recommendation server evaluator",
+      "classification": "D",
+      "owner": "server Goal-aware separate evaluator",
+      "file": "src/domain/services/GoalAwarePhaseReviewRecommendationService.js",
+      "anchor": "export",
+      "action": "Consume canonical Goal/strategy judgment; retain value-of-waiting/decision constraints as explicit configured policies rather than another confidence engine.",
+      "sourceVerified": true,
+      "line": 3,
+      "exampleSource": "export const PHASE_READINESS_CONCLUSIONS = Object.freeze({",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 91,
+      "surface": "Other",
+      "component": "profile/integrations/navigation",
+      "classification": "B",
+      "owner": "client static + factual profile",
+      "file": "src/screens/YouScreen.jsx",
+      "anchor": "export",
+      "action": "No Narrative required for static account/navigation/integration controls; connected-count facts remain typed.",
+      "sourceVerified": true,
+      "line": 14,
+      "exampleSource": "export default function YouScreen({ nativePairingAvailable = false, profile }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 92,
+      "surface": "Other",
+      "component": "speech transcription",
+      "classification": "C",
+      "owner": "server extraction provider",
+      "file": "src/domain/transcription/OpenAITranscriptionProvider.js",
+      "anchor": "export",
+      "action": "Existing runtime transcription is observation extraction, not V3 prose generation; do not silently change provider architecture.",
+      "sourceVerified": true,
+      "line": 3,
+      "exampleSource": "export function createOpenAITranscriptionProvider({",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 93,
+      "surface": "Other",
+      "component": "existing narrative engine",
+      "classification": "C",
+      "owner": "server deterministic composition",
+      "file": "src/domain/narrative/NarrativeEngine.js",
+      "anchor": "export",
+      "action": "Existing deterministic template engine is not an LLM; migrate only strategic consumers, not all static/domain copy.",
+      "sourceVerified": true,
+      "line": 28,
+      "exampleSource": "export function createNarrativeEngine({",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 94,
+      "surface": "Other",
+      "component": "Goal hub statuses and hierarchy",
+      "classification": "D",
+      "owner": "server Goal hub + client rendering",
+      "file": "src/application/goals/GoalsHubReadService.js",
+      "anchor": "export",
+      "action": "Live Goal statuses project canonical state; completed snapshots remain historical.",
+      "sourceVerified": true,
+      "line": 15,
+      "exampleSource": "export function createGoalsHubReadService({ repositories, readRuntimeStore } = {}) {",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "yes",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 95,
+      "surface": "Other",
+      "component": "energy evidence plan interpretation",
+      "classification": "D",
+      "owner": "server domain context",
+      "file": "src/screens/EnergyEvidenceScreen.jsx",
+      "anchor": "export",
+      "action": "Pure intake/expenditure balance is factual/domain; plan adequacy for Goal is canonical strategic meaning.",
+      "sourceVerified": true,
+      "line": 19,
+      "exampleSource": "export const ENERGY_HISTORY_PREVIEW_LIMIT = 3;",
+      "v3ShouldOwn": "canonical strategic semantics",
+      "confidenceV3Feeds": "when relevant, not automatically",
+      "narrativeV3Composes": "yes, when natural-language meaning is required",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: divergent meaning or implementation leakage",
+      "dependencies": "approved plumbing; Goal Contract mappings; canonical as-of assessment; publisher lineage; later client presentation parity"
+    },
+    {
+      "id": 96,
+      "surface": "Other",
+      "component": "generic progress placeholders/empty instructions",
+      "classification": "B",
+      "owner": "client static",
+      "file": "src/screens/ProgressPlaceholderScreen.jsx",
+      "anchor": "export",
+      "action": "Neutral no-data state remains static; why missing evidence matters now is a distinct V3 attention block.",
+      "sourceVerified": true,
+      "line": 43,
+      "exampleSource": "export const NUTRITION_HISTORY_PREVIEW_LIMIT = 3;",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 97,
+      "surface": "Other",
+      "component": "evidence queue/reconciliation attention",
+      "classification": "C",
+      "owner": "server domain presentation",
+      "file": "src/domain/services/BriefingReconciliationPresentationService.js",
+      "anchor": "export",
+      "action": "Human reconciliation status may remain domain; never show internal dependency/fingerprint IDs.",
+      "sourceVerified": true,
+      "line": 1,
+      "exampleSource": "export function createBriefingReconciliationPresentation({",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 98,
+      "surface": "Other",
+      "component": "LLM photo strategic prose overlap",
+      "classification": "F",
+      "owner": "runtime vision LLM + server",
+      "file": "src/domain/interpreters/PhotoInterpreterService.js",
+      "anchor": "goalContext",
+      "action": "Separate approval required to remove generated strategic coaching from vision input; V3 stays deterministic without new runtime LLM dependency.",
+      "sourceVerified": true,
+      "line": 12,
+      "exampleSource": "goalContext = \"General physique progress photo review\",",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "high: separate product/architecture acceptance",
+      "dependencies": "dedicated Founder-approved rework"
+    },
+    {
+      "id": 99,
+      "surface": "Other",
+      "component": "screenshot extraction and transcription",
+      "classification": "C",
+      "owner": "runtime extraction providers",
+      "file": "src/domain/interpreters/ScreenshotInterpreterService.js",
+      "anchor": "export",
+      "action": "Preserve observation extraction/provider boundary; no strategic inference from parser/provider identity.",
+      "sourceVerified": true,
+      "line": 30,
+      "exampleSource": "export async function interpretScreenshotsWithVision({",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    },
+    {
+      "id": 100,
+      "surface": "Other",
+      "component": "labs/simulator diagnostics",
+      "classification": "C",
+      "owner": "deliberate internal tools",
+      "file": "src/screens/FounderAlphaLabScreen.jsx",
+      "anchor": "export",
+      "action": "Raw debug/provider/model output is intentionally technical, excluded from normal-user leakage count; keep restricted.",
+      "sourceVerified": true,
+      "line": 43,
+      "exampleSource": "export default function FounderAlphaLabScreen({ personas = [] }) {",
+      "v3ShouldOwn": "no strategic engine required",
+      "confidenceV3Feeds": "no",
+      "narrativeV3Composes": "no; typed factual/static/domain presentation",
+      "leakage": "none confirmed in this content family; not a proof of no future leak",
+      "risk": "low: preserve current boundary",
+      "dependencies": "existing typed domain/read contracts"
+    }
+  ]
+}

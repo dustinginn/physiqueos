@@ -1,0 +1,1136 @@
+{
+  "schemaVersion": "confidence_narrative_v3_paired_calibration_report_v1",
+  "fixturePolicy": {
+    "bothFixturesRegeneratedTogether": true,
+    "v3EngineChangedDuringFixtureCorrection": false,
+    "v3EngineChangedDuringVoiceCalibration": true,
+    "v3GoalConfidenceModelRevised": true,
+    "confidenceModelChangedDuringFinalPass": false,
+    "strategicStateMachinesChangedDuringFinalPass": true,
+    "genericityQuestionLifecycleCorrected": true,
+    "homeSampleOnly": true,
+    "fixtureSpecificConfidenceAdjustmentUsed": false,
+    "sourceArtifactsMutated": false,
+    "productionDataMutated": false,
+    "publishedBriefingsMutated": false,
+    "persistenceWrites": 0,
+    "artifactWrites": 0,
+    "nativeWiring": false,
+    "webWiring": false,
+    "deployed": false,
+    "canonicalDocsUpdated": false
+  },
+  "fixtureChronology": {
+    "canonicalDexaDate": "2026-09-12",
+    "dexaArtifactId": "dexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "comparisonDexaDate": "2026-08-15",
+    "comparisonUsesAugustNotJuly": true,
+    "activeStrategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+    "strategyExposureDays": 28,
+    "weeklyArtifactId": "weekly_briefing_2026-09-06_2026-09-12",
+    "weeklyPublicationDate": "2026-09-13T07:02:58.048Z",
+    "weeklyEvidenceWindow": {
+      "startDate": "2026-09-06",
+      "endDate": "2026-09-12"
+    },
+    "dexaPublicationDate": "2026-09-13T06:28:58.012Z",
+    "newEvidenceAfterDexaBeforeWeekly": []
+  },
+  "dexa": {
+    "fixtureId": "real_founder_dexa_2026_09_12_v3_calibration_v1",
+    "sourceArtifactId": "dexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "strategicInterpretationId": "strategic_interpretation_v3|9bb5ee792efe18ebb1f6fe278074123cf34ac47a490649400df002818d4cff2b",
+    "objectiveFindings": [
+      {
+        "findingId": "objective_finding|objective_lean_mass_gain|evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+        "objectiveId": "objective_lean_mass_gain",
+        "strategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+        "metricCapability": {
+          "id": "body_composition.lean_mass",
+          "namespace": "body_composition",
+          "key": "lean_mass",
+          "version": "v1",
+          "valueKind": "scalar",
+          "canonicalUnit": "lb",
+          "displayName": "Lean tissue"
+        },
+        "priority": "primary",
+        "state": "progressed",
+        "currentValue": 153.3,
+        "baselineValue": 148.3,
+        "comparisonAt": "2026-08-15",
+        "evidenceObservedAt": "2026-09-12T23:59:59.999Z",
+        "exposureDays": 28,
+        "goalChange": 5.8,
+        "durationDays": null,
+        "change": 5,
+        "unit": "lb",
+        "significance": "major",
+        "successSatisfied": false,
+        "exceededSatisfied": false,
+        "authority": "decisive",
+        "quality": "robust",
+        "directness": "direct",
+        "evidenceIds": [
+          "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+        ],
+        "sourceReferences": [
+          "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+          "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+          "media:01a09886-24a6-752f-8ce1-85be9a92953a"
+        ],
+        "factualSummary": "The September 12 comparison measured 153.3 lb of lean tissue, up 5.0 lb from August 15",
+        "freshness": "new",
+        "changedThisEvaluation": true
+      }
+    ],
+    "goalAchievement": "in_progress",
+    "guardrailFindings": [
+      {
+        "findingId": "guardrail_finding|guardrail_body_fat_range|evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+        "guardrailId": "guardrail_body_fat_range",
+        "metricCapability": {
+          "id": "body_composition.body_fat_percentage",
+          "namespace": "body_composition",
+          "key": "body_fat_percentage",
+          "version": "v1",
+          "valueKind": "percentage",
+          "canonicalUnit": "%",
+          "displayName": "Body fat"
+        },
+        "status": "clear",
+        "currentValue": 8.1,
+        "deviation": 0,
+        "unit": "%",
+        "authority": "decisive",
+        "quality": "robust",
+        "consequencePolicy": {
+          "confidenceImpact": -1,
+          "recommendationConstraint": "monitor",
+          "celebrationCeiling": "measured",
+          "escalationLevel": "attention"
+        },
+        "evidenceIds": [
+          "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+        ],
+        "factualSummary": "Body fat measured 8.1%, compared with 7.6% on August 15.",
+        "freshness": "new",
+        "changedThisEvaluation": true
+      },
+      {
+        "findingId": "guardrail_finding|guardrail_gradual_weight_gain|unassessed",
+        "guardrailId": "guardrail_gradual_weight_gain",
+        "metricCapability": {
+          "id": "body_mass.weekly_change_rate",
+          "namespace": "body_mass",
+          "key": "weekly_change_rate",
+          "version": "v1",
+          "valueKind": "scalar",
+          "canonicalUnit": "lb/week",
+          "displayName": "Weight-gain pace"
+        },
+        "status": "not_assessed",
+        "currentValue": null,
+        "deviation": null,
+        "unit": "lb/week",
+        "consequencePolicy": {
+          "confidenceImpact": -1,
+          "recommendationConstraint": "monitor",
+          "celebrationCeiling": "measured",
+          "escalationLevel": "routine"
+        },
+        "evidenceIds": [],
+        "freshness": "unavailable",
+        "changedThisEvaluation": false
+      },
+      {
+        "findingId": "guardrail_finding|guardrail_strength_regression|build_interval_training_support_2026_08_15_2026_09_12",
+        "guardrailId": "guardrail_strength_regression",
+        "metricCapability": {
+          "id": "performance.training_support_index",
+          "namespace": "performance",
+          "key": "training_support_index",
+          "version": "v1",
+          "valueKind": "scalar",
+          "canonicalUnit": "index",
+          "displayName": "Training performance"
+        },
+        "status": "clear",
+        "currentValue": 1,
+        "deviation": 0,
+        "unit": "index",
+        "authority": "material",
+        "quality": "adequate",
+        "consequencePolicy": {
+          "confidenceImpact": -2,
+          "recommendationConstraint": "review",
+          "celebrationCeiling": "restrained",
+          "escalationLevel": "routine"
+        },
+        "evidenceIds": [
+          "build_interval_training_support_2026_08_15_2026_09_12"
+        ],
+        "factualSummary": "Training remained productive during the August 15 to September 12 build interval.",
+        "freshness": "new",
+        "changedThisEvaluation": true
+      },
+      {
+        "findingId": "guardrail_finding|guardrail_recovery_quality|unassessed",
+        "guardrailId": "guardrail_recovery_quality",
+        "metricCapability": {
+          "id": "recovery.capacity_index",
+          "namespace": "recovery",
+          "key": "capacity_index",
+          "version": "v1",
+          "valueKind": "scalar",
+          "canonicalUnit": "index",
+          "displayName": "Recovery capacity"
+        },
+        "status": "not_assessed",
+        "currentValue": null,
+        "deviation": null,
+        "unit": "index",
+        "consequencePolicy": {
+          "confidenceImpact": -1,
+          "recommendationConstraint": "monitor",
+          "celebrationCeiling": "measured",
+          "escalationLevel": "routine"
+        },
+        "evidenceIds": [],
+        "freshness": "unavailable",
+        "changedThisEvaluation": false
+      }
+    ],
+    "strategyFeasibility": "demonstrated",
+    "strategyPersistence": "emerging",
+    "attributionState": "plausible",
+    "strategyLineage": {
+      "priorStrategyRevisionId": null,
+      "strategyRevisionChanged": false,
+      "preservedPriorStrategyState": null
+    },
+    "importantTypedUncertainties": [
+      {
+        "uncertaintyId": "uncertainty|measurement|26e046ab68457d97",
+        "type": "measurement",
+        "materiality": "moderate",
+        "reasons": [
+          "hydration_glycogen_and_preparation_can_affect_lean_tissue",
+          "lean_tissue_is_not_identical_to_contractile_muscle"
+        ],
+        "evidenceIds": [
+          "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+        ]
+      },
+      {
+        "uncertaintyId": "uncertainty|persistence|3ef7d1ce8162ef26",
+        "type": "persistence",
+        "materiality": "high",
+        "reasons": [
+          "repeat_qualifying_response_required"
+        ],
+        "evidenceIds": []
+      },
+      {
+        "uncertaintyId": "uncertainty|causal_attribution|ed024df86b0e8926",
+        "type": "causal_attribution",
+        "materiality": "moderate",
+        "reasons": [
+          "causal_contribution_not_fully_resolved"
+        ],
+        "evidenceIds": []
+      },
+      {
+        "uncertaintyId": "uncertainty|guardrail|7b5753b93ab4ea29",
+        "type": "guardrail",
+        "materiality": "moderate",
+        "reasons": [
+          "unassessed:guardrail_gradual_weight_gain",
+          "unassessed:guardrail_recovery_quality"
+        ],
+        "evidenceIds": []
+      }
+    ],
+    "answeredCoachingQuestions": [
+      {
+        "questionId": "question_build_strategy_feasibility",
+        "text": "Does the newly authorized build strategy produce meaningful progress after adequate exposure?",
+        "answerCode": "build_strategy_feasibility_demonstrated",
+        "answeredByEvidenceIds": [
+          "build_interval_training_support_2026_08_15_2026_09_12",
+          "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+        ]
+      }
+    ],
+    "questionTransitions": [
+      {
+        "questionId": "question_build_strategy_feasibility",
+        "from": "open",
+        "to": "answered",
+        "reason": "build_strategy_feasibility_demonstrated",
+        "occurredAt": "2026-09-13T06:28:58.012Z"
+      },
+      {
+        "questionId": "question_build_strategy_persistence",
+        "from": null,
+        "to": "open",
+        "reason": "successor_question_raised",
+        "occurredAt": "2026-09-13T06:28:58.012Z"
+      }
+    ],
+    "nextCoachingQuestion": {
+      "questionId": "question_build_strategy_persistence",
+      "kind": "persistence",
+      "priority": 0,
+      "text": "Does the demonstrated response persist across another qualifying evidence period?",
+      "strategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+      "evidencePurpose": "confirm_persistence",
+      "status": "open",
+      "raisedAt": "2026-09-13T06:28:58.012Z",
+      "answeredAt": null,
+      "answerCode": null,
+      "answeredByEvidenceIds": []
+    },
+    "nextEvidencePurpose": "confirm_persistence",
+    "recommendation": {
+      "action": "continue_current_strategy",
+      "reason": "strategy_supported",
+      "urgency": "routine",
+      "nextEvidencePurpose": "confirm_persistence"
+    },
+    "confidenceBefore": 62,
+    "confidenceAfter": 79,
+    "confidenceMovement": "increase",
+    "confidenceMovementReason": "decisive_state_anchor: current Goal progress, discounted trajectory where supported, strategy support, execution and limits imply an anchored outlook of 79%.",
+    "confidenceContributions": [
+      {
+        "objectiveId": "objective_lean_mass_gain",
+        "dimensions": {
+          "strategy": 0.9000000000000001,
+          "progress": 0.58,
+          "trajectory": 0.766,
+          "execution": 0.8,
+          "guardrails": 1
+        },
+        "score": 78.54
+      }
+    ],
+    "confidenceProjectionPolicy": {
+      "version": "goal_completion_projection_v2",
+      "scoreFloor": 20,
+      "scoreSpan": 75,
+      "weights": {
+        "strategy": 0.35,
+        "progress": 0.2,
+        "trajectory": 0.25,
+        "execution": 0.1,
+        "guardrails": 0.1
+      },
+      "retention": {
+        "not_assessed": 0.4,
+        "emerging": 0.55,
+        "repeated": 0.7,
+        "sustained": 0.8,
+        "disrupted": 0.2
+      },
+      "trajectoryReserve": 0.35,
+      "executionRisk": {
+        "retentionPerReliableDay": 0.012,
+        "maximumRetentionCredit": 0.15,
+        "maximumPositiveMovement": 3
+      },
+      "ceilings": {
+        "not_assessed": 85,
+        "emerging": 88,
+        "repeated": 94,
+        "sustained": 97,
+        "disrupted": 55
+      },
+      "mode": "decisive_state_anchor",
+      "anchoredPercentage": 79,
+      "continuityGain": 1,
+      "rawDelta": 17,
+      "roundedDelta": 17,
+      "lowerBound": null,
+      "upperBound": null,
+      "boundApplied": false,
+      "priorAnchorConstrainedResult": false
+    },
+    "strategyConfidence": {
+      "percentage": 90,
+      "strength": 0.9000000000000001,
+      "evidenceReliability": 1,
+      "feasibility": "demonstrated",
+      "persistence": "emerging"
+    },
+    "goalConfidence": {
+      "percentage": 79,
+      "anchoredPercentage": 79,
+      "meaning": "active_goal_completion_given_appropriate_continued_execution"
+    },
+    "primaryConfidenceDimension": "goal_completion",
+    "goalAchievementOutlook": {
+      "version": "goal_completion_projection_v2",
+      "score": 78.54,
+      "asOf": "2026-09-12T23:59:59.999Z",
+      "assessment": "favorable",
+      "achievement": "in_progress",
+      "objectives": [
+        {
+          "objectiveId": "objective_lean_mass_gain",
+          "priority": "primary",
+          "importance": 1,
+          "dimensions": {
+            "strategy": 0.9000000000000001,
+            "progress": 0.58,
+            "trajectory": 0.766,
+            "execution": 0.8,
+            "guardrails": 1
+          },
+          "guardrailPenalty": 0,
+          "normalizedStrength": 0.7806,
+          "ceiling": 88,
+          "score": 78.54,
+          "trajectory": {
+            "supported": true,
+            "kind": "scalar_target",
+            "baseline": 147.5,
+            "current": 153.3,
+            "target": 157.5,
+            "completedRequirement": 5.8,
+            "totalRequirement": 10,
+            "fractionAchieved": 0.58,
+            "remainingRequirement": 4.2,
+            "startedAt": "2026-07-18",
+            "deadlineAt": "2026-10-31",
+            "strategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+            "intervalDays": 28,
+            "timeElapsedDays": 56,
+            "timeRemainingDays": 49,
+            "observedRate": 0.1786,
+            "requiredRate": 0.0857,
+            "retentionFactor": 0.55,
+            "executionRateMultiplier": 1,
+            "retiredExecutionRiskCredit": 0,
+            "supportedElapsedDays": 0,
+            "conditionalUnmeasuredProgress": 0,
+            "forecastRemainingRequirement": 4.2,
+            "forecastRequiredRate": 0.0857,
+            "discountedRate": 0.0982,
+            "rateRatio": 1.1458,
+            "projectedDaysToCompletion": 42.8,
+            "deadlineContributionApplicable": true,
+            "scheduleStrength": 0.766,
+            "scheduleState": "ahead_with_reserve",
+            "uncertainty": [
+              "observed_rate_is_not_a_promise",
+              "single_qualifying_response_discounted"
+            ]
+          }
+        }
+      ],
+      "uncertainty": [
+        "recent_response_not_yet_confirmed_across_another_period",
+        "conditional_on_appropriate_continued_execution",
+        "coaching_heuristic_not_statistical_probability"
+      ]
+    },
+    "executionState": {
+      "state": "supportive",
+      "health": 0.8,
+      "configured": true,
+      "evidenceIds": [
+        "build_interval_training_support_2026_08_15_2026_09_12"
+      ],
+      "coverageByDay": {},
+      "reliableSupportDays": 0,
+      "reliableAdverseDays": 0,
+      "retiredExecutionRiskCredit": 0,
+      "outcomeBoundary": "2026-09-12T23:59:59.999Z",
+      "rateMultiplier": 1
+    },
+    "newCanonicalEvidenceIds": [
+      "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+      "build_interval_training_support_2026_08_15_2026_09_12"
+    ],
+    "whatCouldRaiseConfidence": [
+      "A further qualifying outcome that confirms the response continues",
+      "Consistent execution supported by meaningful new evidence",
+      "Progress reaching the Goal success criteria"
+    ],
+    "whatCouldLowerConfidence": [
+      "Meaningful departure from the plan, including persistent missed work or inadequate inputs",
+      "A limit coming under pressure or being crossed",
+      "New contradictory outcomes or insufficient progress as time runs short"
+    ],
+    "briefingConfidenceSection": {
+      "heading": "confidence · 79% ↑",
+      "body": "Confidence jumped because the plan delivered a standout result: you added 5.0 lb of lean tissue since August 15, with body fat still controlled at 8.1%. You are more than halfway to the 10 lb lean-mass goal. There is enough time left to finish ahead of schedule if this level of progress continues.",
+      "percentage": 79,
+      "delta": 17,
+      "movement": "increase"
+    },
+    "latestMeaningfulConfidenceChange": {
+      "percentage": 79,
+      "delta": 17,
+      "movement": "increase",
+      "assessmentId": "confidence_assessment_v3|fce0a6666b2ab18c6359a2e4db4e33820bfb8ada492525e218a203d605de7660"
+    },
+    "nextEvidence": {
+      "purpose": "confirm_persistence",
+      "requestIds": [],
+      "capabilityAlternatives": [
+        [
+          "body_composition.lean_mass",
+          "body_composition.body_fat_percentage"
+        ]
+      ],
+      "displayName": "DEXA",
+      "grammaticalNumber": "singular",
+      "namedFromBinding": true,
+      "timing": {
+        "cadenceDays": 28,
+        "scheduledAt": null
+      }
+    },
+    "confidenceDeepExplanation": {
+      "why": "You are more than halfway to the 10 lb lean-mass goal. The build plan is clearly working. There is enough time to finish ahead of schedule if this level of progress continues.",
+      "whatIncreasedIt": [
+        "You added 5.0 lb of lean tissue since August 15.",
+        "Body fat stayed controlled at 8.1%."
+      ],
+      "whatSupportsItNow": [
+        "4.2 lb remain with 49 days left.",
+        "Training remained productive during the August 15 to September 12 build interval."
+      ],
+      "whatIsHoldingItBack": [
+        "One excellent response is not a promise that the next few weeks will match it."
+      ],
+      "whatCouldRaiseIt": [
+        "Consistent execution can strengthen confidence before the next DEXA.",
+        "The next DEXA showing that the progress continues.",
+        "Reaching the goal."
+      ],
+      "whatCouldLowerIt": [
+        "Meaningful missed work or persistent departures from the plan.",
+        "Body fat moving outside the intended range of 8% to 9%.",
+        "Training performance materially declining.",
+        "Progress stalling or a new result contradicting the current outlook.",
+        "Too much work remaining for the time left."
+      ],
+      "nextEvidence": "The next DEXA is about whether this kind of progress continues while body fat stays in a good place—not whether the plan works. That question has been answered.",
+      "assumptions": [
+        "The outlook depends on appropriate continued execution.",
+        "The forecast uses a reduced recent rate, not an assumption that the latest result repeats exactly.",
+        "This is a coaching outlook, not a measured statistical probability."
+      ]
+    },
+    "narrativeContinuityPolicy": {
+      "mode": "full_briefing",
+      "recencyHours": null,
+      "priorNarrativePlanId": null
+    },
+    "biggestTakeaway": {
+      "type": "question_transition",
+      "referenceId": "question_build_strategy_feasibility",
+      "priority": 88,
+      "reason": "strategic_question_answered",
+      "text": "This is a huge win."
+    },
+    "coachingAffect": {
+      "valence": "positive",
+      "intensity": "strong",
+      "urgency": "routine",
+      "celebrationCeiling": "strong",
+      "directness": "direct"
+    },
+    "userFacingSections": {
+      "result": "This is a huge win. You added 5.0 lb of lean tissue since August 15, while body fat stayed controlled at 8.1%.",
+      "meaning": "You are more than halfway to the 10 lb lean-mass goal. The build plan is clearly working. There is no reason to second-guess the approach.",
+      "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+      "watch": "The next DEXA is about whether this kind of progress continues while body fat stays in a good place—not whether the plan works. That question has been answered.",
+      "confidence": "confidence · 79% ↑\nConfidence jumped because the plan delivered a standout result: you added 5.0 lb of lean tissue since August 15, with body fat still controlled at 8.1%. You are more than halfway to the 10 lb lean-mass goal. There is enough time left to finish ahead of schedule if this level of progress continues."
+    },
+    "finalProposedNarrative": "This is a huge win. You added 5.0 lb of lean tissue since August 15, while body fat stayed controlled at 8.1%.\n\nYou are more than halfway to the 10 lb lean-mass goal. The build plan is clearly working. There is no reason to second-guess the approach.\n\nStay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.\n\nThe next DEXA is about whether this kind of progress continues while body fat stays in a good place—not whether the plan works. That question has been answered.\n\nconfidence · 79% ↑\nConfidence jumped because the plan delivered a standout result: you added 5.0 lb of lean tissue since August 15, with body fat still controlled at 8.1%. You are more than halfway to the 10 lb lean-mass goal. There is enough time left to finish ahead of schedule if this level of progress continues.",
+    "finalProposedCoachTake": "This is exactly what this build needed: you added 5.0 lb of lean tissue, with body fat still controlled at 8.1%. The goal is more than halfway there, and the plan is clearly working. Don't change it. Keep executing and use the next DEXA to see whether this level of progress continues."
+  },
+  "weekly": {
+    "fixtureId": "real_founder_weekly_2026_09_06_2026_09_12_v3_calibration_v1",
+    "sourceArtifactId": "weekly_briefing_2026-09-06_2026-09-12",
+    "strategicInterpretationId": "strategic_interpretation_v3|a3822ae7ddc38e971a7f2c4d2a3aed71d884a66026f6232deddf110aea28e13d",
+    "objectiveFindings": [
+      {
+        "findingId": "objective_finding|objective_lean_mass_gain|evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+        "objectiveId": "objective_lean_mass_gain",
+        "strategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+        "metricCapability": {
+          "id": "body_composition.lean_mass",
+          "namespace": "body_composition",
+          "key": "lean_mass",
+          "version": "v1",
+          "valueKind": "scalar",
+          "canonicalUnit": "lb",
+          "displayName": "Lean tissue"
+        },
+        "priority": "primary",
+        "state": "progressed",
+        "currentValue": 153.3,
+        "baselineValue": 148.3,
+        "comparisonAt": "2026-08-15",
+        "evidenceObservedAt": "2026-09-12T23:59:59.999Z",
+        "exposureDays": 28,
+        "goalChange": 5.8,
+        "durationDays": null,
+        "change": 5,
+        "unit": "lb",
+        "significance": "major",
+        "successSatisfied": false,
+        "exceededSatisfied": false,
+        "authority": "decisive",
+        "quality": "robust",
+        "directness": "direct",
+        "evidenceIds": [
+          "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+        ],
+        "sourceReferences": [
+          "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+          "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+          "media:01a09886-24a6-752f-8ce1-85be9a92953a"
+        ],
+        "factualSummary": "The September 12 comparison measured 153.3 lb of lean tissue, up 5.0 lb from August 15",
+        "freshness": "carried_forward",
+        "changedThisEvaluation": false
+      }
+    ],
+    "goalAchievement": "in_progress",
+    "guardrailFindings": [
+      {
+        "findingId": "guardrail_finding|guardrail_body_fat_range|evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+        "guardrailId": "guardrail_body_fat_range",
+        "metricCapability": {
+          "id": "body_composition.body_fat_percentage",
+          "namespace": "body_composition",
+          "key": "body_fat_percentage",
+          "version": "v1",
+          "valueKind": "percentage",
+          "canonicalUnit": "%",
+          "displayName": "Body fat"
+        },
+        "status": "clear",
+        "currentValue": 8.1,
+        "deviation": 0,
+        "unit": "%",
+        "authority": "decisive",
+        "quality": "robust",
+        "consequencePolicy": {
+          "confidenceImpact": -1,
+          "recommendationConstraint": "monitor",
+          "celebrationCeiling": "measured",
+          "escalationLevel": "attention"
+        },
+        "evidenceIds": [
+          "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+        ],
+        "factualSummary": "Body fat measured 8.1%, compared with 7.6% on August 15.",
+        "freshness": "carried_forward",
+        "changedThisEvaluation": false
+      },
+      {
+        "findingId": "guardrail_finding|guardrail_gradual_weight_gain|unassessed",
+        "guardrailId": "guardrail_gradual_weight_gain",
+        "metricCapability": {
+          "id": "body_mass.weekly_change_rate",
+          "namespace": "body_mass",
+          "key": "weekly_change_rate",
+          "version": "v1",
+          "valueKind": "scalar",
+          "canonicalUnit": "lb/week",
+          "displayName": "Weight-gain pace"
+        },
+        "status": "not_assessed",
+        "currentValue": null,
+        "deviation": null,
+        "unit": "lb/week",
+        "consequencePolicy": {
+          "confidenceImpact": -1,
+          "recommendationConstraint": "monitor",
+          "celebrationCeiling": "measured",
+          "escalationLevel": "routine"
+        },
+        "evidenceIds": [],
+        "freshness": "carried_forward",
+        "changedThisEvaluation": false
+      },
+      {
+        "findingId": "guardrail_finding|guardrail_strength_regression|weekly_training_summary_2026_09_06_2026_09_12",
+        "guardrailId": "guardrail_strength_regression",
+        "metricCapability": {
+          "id": "performance.training_support_index",
+          "namespace": "performance",
+          "key": "training_support_index",
+          "version": "v1",
+          "valueKind": "scalar",
+          "canonicalUnit": "index",
+          "displayName": "Training performance"
+        },
+        "status": "clear",
+        "currentValue": 1,
+        "deviation": 0,
+        "unit": "index",
+        "authority": "material",
+        "quality": "adequate",
+        "consequencePolicy": {
+          "confidenceImpact": -2,
+          "recommendationConstraint": "review",
+          "celebrationCeiling": "restrained",
+          "escalationLevel": "routine"
+        },
+        "evidenceIds": [
+          "weekly_training_summary_2026_09_06_2026_09_12"
+        ],
+        "factualSummary": "Seven of nine reviewed training areas improved; triceps was the only plateauing area.",
+        "freshness": "new",
+        "changedThisEvaluation": true
+      },
+      {
+        "findingId": "guardrail_finding|guardrail_recovery_quality|unassessed",
+        "guardrailId": "guardrail_recovery_quality",
+        "metricCapability": {
+          "id": "recovery.capacity_index",
+          "namespace": "recovery",
+          "key": "capacity_index",
+          "version": "v1",
+          "valueKind": "scalar",
+          "canonicalUnit": "index",
+          "displayName": "Recovery capacity"
+        },
+        "status": "not_assessed",
+        "currentValue": null,
+        "deviation": null,
+        "unit": "index",
+        "consequencePolicy": {
+          "confidenceImpact": -1,
+          "recommendationConstraint": "monitor",
+          "celebrationCeiling": "measured",
+          "escalationLevel": "routine"
+        },
+        "evidenceIds": [],
+        "freshness": "carried_forward",
+        "changedThisEvaluation": false
+      }
+    ],
+    "strategyFeasibility": "demonstrated",
+    "strategyPersistence": "emerging",
+    "attributionState": "plausible",
+    "strategyLineage": {
+      "priorStrategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+      "strategyRevisionChanged": false,
+      "preservedPriorStrategyState": null
+    },
+    "importantTypedUncertainties": [
+      {
+        "uncertaintyId": "uncertainty|measurement_coverage|761b07099e5c43d7",
+        "type": "measurement_coverage",
+        "materiality": "high",
+        "reasons": [
+          "expenditure_is_estimated",
+          "one_day_missing_paired_energy_evidence"
+        ],
+        "evidenceIds": [
+          "weekly_energy_coverage_2026_09_06_2026_09_12"
+        ]
+      },
+      {
+        "uncertaintyId": "uncertainty|persistence|3ef7d1ce8162ef26",
+        "type": "persistence",
+        "materiality": "high",
+        "reasons": [
+          "repeat_qualifying_response_required"
+        ],
+        "evidenceIds": []
+      },
+      {
+        "uncertaintyId": "uncertainty|causal_attribution|ed024df86b0e8926",
+        "type": "causal_attribution",
+        "materiality": "moderate",
+        "reasons": [
+          "causal_contribution_not_fully_resolved"
+        ],
+        "evidenceIds": []
+      },
+      {
+        "uncertaintyId": "uncertainty|guardrail|7b5753b93ab4ea29",
+        "type": "guardrail",
+        "materiality": "moderate",
+        "reasons": [
+          "unassessed:guardrail_gradual_weight_gain",
+          "unassessed:guardrail_recovery_quality"
+        ],
+        "evidenceIds": []
+      }
+    ],
+    "answeredCoachingQuestions": [],
+    "questionTransitions": [],
+    "nextCoachingQuestion": {
+      "questionId": "question_build_strategy_persistence",
+      "kind": "persistence",
+      "priority": 0,
+      "text": "Does the demonstrated response persist across another qualifying evidence period?",
+      "strategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+      "evidencePurpose": "confirm_persistence",
+      "status": "open",
+      "raisedAt": "2026-09-13T06:28:58.012Z",
+      "answeredAt": null,
+      "answerCode": null,
+      "answeredByEvidenceIds": []
+    },
+    "nextEvidencePurpose": "confirm_persistence",
+    "recommendation": {
+      "action": "continue_current_strategy",
+      "reason": "strategy_supported",
+      "urgency": "routine",
+      "nextEvidencePurpose": "confirm_persistence"
+    },
+    "confidenceBefore": 79,
+    "confidenceAfter": 79,
+    "confidenceMovement": "no_meaningful_change",
+    "confidenceMovementReason": "No new canonical evidence or material semantic event changed the accepted Goal-completion outlook.",
+    "confidenceContributions": [
+      {
+        "objectiveId": "objective_lean_mass_gain",
+        "dimensions": {
+          "strategy": 0.9000000000000001,
+          "progress": 0.58,
+          "trajectory": 0.766,
+          "execution": 0.8,
+          "guardrails": 1
+        },
+        "score": 78.54
+      }
+    ],
+    "confidenceProjectionPolicy": {
+      "version": "goal_completion_projection_v2",
+      "scoreFloor": 20,
+      "scoreSpan": 75,
+      "weights": {
+        "strategy": 0.35,
+        "progress": 0.2,
+        "trajectory": 0.25,
+        "execution": 0.1,
+        "guardrails": 0.1
+      },
+      "retention": {
+        "not_assessed": 0.4,
+        "emerging": 0.55,
+        "repeated": 0.7,
+        "sustained": 0.8,
+        "disrupted": 0.2
+      },
+      "trajectoryReserve": 0.35,
+      "executionRisk": {
+        "retentionPerReliableDay": 0.012,
+        "maximumRetentionCredit": 0.15,
+        "maximumPositiveMovement": 3
+      },
+      "ceilings": {
+        "not_assessed": 85,
+        "emerging": 88,
+        "repeated": 94,
+        "sustained": 97,
+        "disrupted": 55
+      },
+      "mode": "continuity_hold",
+      "anchoredPercentage": 79,
+      "continuityGain": 1,
+      "rawDelta": 0,
+      "roundedDelta": 0,
+      "lowerBound": -2,
+      "upperBound": 2,
+      "boundApplied": false,
+      "priorAnchorConstrainedResult": false
+    },
+    "strategyConfidence": {
+      "percentage": 90,
+      "strength": 0.9000000000000001,
+      "evidenceReliability": 1,
+      "feasibility": "demonstrated",
+      "persistence": "emerging"
+    },
+    "goalConfidence": {
+      "percentage": 79,
+      "anchoredPercentage": 79,
+      "meaning": "active_goal_completion_given_appropriate_continued_execution"
+    },
+    "primaryConfidenceDimension": "goal_completion",
+    "goalAchievementOutlook": {
+      "version": "goal_completion_projection_v2",
+      "score": 78.54,
+      "asOf": "2026-09-12T23:59:59.999Z",
+      "assessment": "favorable",
+      "achievement": "in_progress",
+      "objectives": [
+        {
+          "objectiveId": "objective_lean_mass_gain",
+          "priority": "primary",
+          "importance": 1,
+          "dimensions": {
+            "strategy": 0.9000000000000001,
+            "progress": 0.58,
+            "trajectory": 0.766,
+            "execution": 0.8,
+            "guardrails": 1
+          },
+          "guardrailPenalty": 0,
+          "normalizedStrength": 0.7806,
+          "ceiling": 88,
+          "score": 78.54,
+          "trajectory": {
+            "supported": true,
+            "kind": "scalar_target",
+            "baseline": 147.5,
+            "current": 153.3,
+            "target": 157.5,
+            "completedRequirement": 5.8,
+            "totalRequirement": 10,
+            "fractionAchieved": 0.58,
+            "remainingRequirement": 4.2,
+            "startedAt": "2026-07-18",
+            "deadlineAt": "2026-10-31",
+            "strategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+            "intervalDays": 28,
+            "timeElapsedDays": 56,
+            "timeRemainingDays": 49,
+            "observedRate": 0.1786,
+            "requiredRate": 0.0857,
+            "retentionFactor": 0.55,
+            "executionRateMultiplier": 1,
+            "retiredExecutionRiskCredit": 0,
+            "supportedElapsedDays": 0,
+            "conditionalUnmeasuredProgress": 0,
+            "forecastRemainingRequirement": 4.2,
+            "forecastRequiredRate": 0.0857,
+            "discountedRate": 0.0982,
+            "rateRatio": 1.1458,
+            "projectedDaysToCompletion": 42.8,
+            "deadlineContributionApplicable": true,
+            "scheduleStrength": 0.766,
+            "scheduleState": "ahead_with_reserve",
+            "uncertainty": [
+              "observed_rate_is_not_a_promise",
+              "single_qualifying_response_discounted"
+            ]
+          }
+        }
+      ],
+      "uncertainty": [
+        "recent_response_not_yet_confirmed_across_another_period",
+        "conditional_on_appropriate_continued_execution",
+        "coaching_heuristic_not_statistical_probability"
+      ]
+    },
+    "executionState": {
+      "state": "supportive",
+      "health": 0.8,
+      "configured": true,
+      "evidenceIds": [
+        "build_interval_training_support_2026_08_15_2026_09_12"
+      ],
+      "coverageByDay": {},
+      "reliableSupportDays": 0,
+      "reliableAdverseDays": 0,
+      "retiredExecutionRiskCredit": 0,
+      "outcomeBoundary": "2026-09-12T23:59:59.999Z",
+      "rateMultiplier": 1
+    },
+    "newCanonicalEvidenceIds": [],
+    "whatCouldRaiseConfidence": [
+      "A further qualifying outcome that confirms the response continues",
+      "Consistent execution supported by meaningful new evidence",
+      "Progress reaching the Goal success criteria"
+    ],
+    "whatCouldLowerConfidence": [
+      "Meaningful departure from the plan, including persistent missed work or inadequate inputs",
+      "A limit coming under pressure or being crossed",
+      "New contradictory outcomes or insufficient progress as time runs short"
+    ],
+    "briefingConfidenceSection": {
+      "heading": "confidence · 79% —",
+      "body": "Confidence holds after the recent jump. Training still supports the plan, and nothing here changes the outlook.",
+      "percentage": 79,
+      "delta": 0,
+      "movement": "no_meaningful_change"
+    },
+    "latestMeaningfulConfidenceChange": {
+      "percentage": 79,
+      "delta": 17,
+      "movement": "increase",
+      "assessmentId": "confidence_assessment_v3|fce0a6666b2ab18c6359a2e4db4e33820bfb8ada492525e218a203d605de7660"
+    },
+    "nextEvidence": {
+      "purpose": "confirm_persistence",
+      "requestIds": [],
+      "capabilityAlternatives": [
+        [
+          "body_composition.lean_mass",
+          "body_composition.body_fat_percentage"
+        ]
+      ],
+      "displayName": "DEXA",
+      "grammaticalNumber": "singular",
+      "namedFromBinding": true,
+      "timing": {
+        "cadenceDays": 28,
+        "scheduledAt": null
+      }
+    },
+    "confidenceDeepExplanation": {
+      "why": "You are more than halfway to the 10 lb lean-mass goal. The build plan is clearly working. There is enough time to finish ahead of schedule if this level of progress continues.",
+      "whatIncreasedIt": [
+        "You added 5.0 lb of lean tissue since August 15.",
+        "Body fat stayed controlled at 8.1%."
+      ],
+      "whatSupportsItNow": [
+        "4.2 lb remain with 49 days left.",
+        "Seven of nine reviewed training areas improved; triceps was the only plateauing area."
+      ],
+      "whatIsHoldingItBack": [
+        "One excellent response is not a promise that the next few weeks will match it."
+      ],
+      "whatCouldRaiseIt": [
+        "Consistent execution can strengthen confidence before the next DEXA.",
+        "The next DEXA showing that the progress continues.",
+        "Reaching the goal."
+      ],
+      "whatCouldLowerIt": [
+        "Meaningful missed work or persistent departures from the plan.",
+        "Body fat moving outside the intended range of 8% to 9%.",
+        "Training performance materially declining.",
+        "Progress stalling or a new result contradicting the current outlook.",
+        "Too much work remaining for the time left."
+      ],
+      "nextEvidence": "The next DEXA will show whether this kind of progress continues while body fat stays in a good place.",
+      "assumptions": [
+        "The outlook depends on appropriate continued execution.",
+        "The forecast uses a reduced recent rate, not an assumption that the latest result repeats exactly.",
+        "This is a coaching outlook, not a measured statistical probability."
+      ]
+    },
+    "narrativeContinuityPolicy": {
+      "mode": "recent_event_followup",
+      "recencyHours": 0.5666766666666667,
+      "priorNarrativePlanId": "narrative_plan_v3|2520f549febd34401a746744f9e6b9d85dcdf1ad47c02d330ad8d7b43249527b"
+    },
+    "biggestTakeaway": {
+      "type": "strategy_continuity",
+      "referenceId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+      "priority": 80,
+      "reason": "prior_strategy_state_retained",
+      "text": "The DEXA already gave a clear answer on the build plan: it is working."
+    },
+    "coachingAffect": {
+      "valence": "positive",
+      "intensity": "measured",
+      "urgency": "routine",
+      "celebrationCeiling": "strong",
+      "directness": "direct"
+    },
+    "userFacingSections": {
+      "result": "The DEXA already gave a clear answer on the build plan: it is working. Seven of nine reviewed training areas improved; triceps was the only plateauing area. Nothing here calls for a change.",
+      "meaning": null,
+      "action": "Stay consistent and keep the plan where it is.",
+      "watch": "The next DEXA will show whether this kind of progress continues while body fat stays in a good place.",
+      "confidence": "confidence · 79% —\nConfidence holds after the recent jump. Training still supports the plan, and nothing here changes the outlook."
+    },
+    "finalProposedNarrative": "The DEXA already gave a clear answer on the build plan: it is working. Seven of nine reviewed training areas improved; triceps was the only plateauing area. Nothing here calls for a change.\n\nStay consistent and keep the plan where it is.\n\nThe next DEXA will show whether this kind of progress continues while body fat stays in a good place.\n\nconfidence · 79% —\nConfidence holds after the recent jump. Training still supports the plan, and nothing here changes the outlook.",
+    "finalProposedCoachTake": "The plan is doing its job. Keep the focus on consistent execution; the next DEXA is about continued progress."
+  },
+  "homeConfidence": {
+    "schemaVersion": "home_confidence_v3_calibration_sample_v1",
+    "confidenceAssessmentId": "confidence_assessment_v3|fce0a6666b2ab18c6359a2e4db4e33820bfb8ada492525e218a203d605de7660",
+    "strategicInterpretationId": "strategic_interpretation_v3|9bb5ee792efe18ebb1f6fe278074123cf34ac47a490649400df002818d4cff2b",
+    "narrativePlanId": "narrative_plan_v3|2520f549febd34401a746744f9e6b9d85dcdf1ad47c02d330ad8d7b43249527b",
+    "primaryDimension": "goal_completion",
+    "latestMeaningfulConfidenceChange": {
+      "percentage": 79,
+      "delta": 17,
+      "movement": "increase",
+      "assessmentId": "confidence_assessment_v3|fce0a6666b2ab18c6359a2e4db4e33820bfb8ada492525e218a203d605de7660"
+    },
+    "collapsed": {
+      "percentage": 79,
+      "delta": 17,
+      "movement": "increase",
+      "label": "goal confidence",
+      "percentageLabel": "79%",
+      "directionSymbol": "↑",
+      "movementLabel": "up 17 points"
+    },
+    "expanded": {
+      "percentage": 79,
+      "delta": 17,
+      "movement": "increase",
+      "heading": "Why confidence is 79%",
+      "explanation": {
+        "why": "You are more than halfway to the 10 lb lean-mass goal. The build plan is clearly working. There is enough time to finish ahead of schedule if this level of progress continues.",
+        "whatIncreasedIt": [
+          "You added 5.0 lb of lean tissue since August 15.",
+          "Body fat stayed controlled at 8.1%."
+        ],
+        "whatSupportsItNow": [
+          "4.2 lb remain with 49 days left.",
+          "Training remained productive during the August 15 to September 12 build interval."
+        ],
+        "whatIsHoldingItBack": [
+          "One excellent response is not a promise that the next few weeks will match it."
+        ],
+        "whatCouldRaiseIt": [
+          "Consistent execution can strengthen confidence before the next DEXA.",
+          "The next DEXA showing that the progress continues.",
+          "Reaching the goal."
+        ],
+        "whatCouldLowerIt": [
+          "Meaningful missed work or persistent departures from the plan.",
+          "Body fat moving outside the intended range of 8% to 9%.",
+          "Training performance materially declining.",
+          "Progress stalling or a new result contradicting the current outlook.",
+          "Too much work remaining for the time left."
+        ],
+        "nextEvidence": "The next DEXA is about whether this kind of progress continues while body fat stays in a good place—not whether the plan works. That question has been answered.",
+        "assumptions": [
+          "The outlook depends on appropriate continued execution.",
+          "The forecast uses a reduced recent rate, not an assumption that the latest result repeats exactly.",
+          "This is a coaching outlook, not a measured statistical probability."
+        ]
+      }
+    },
+    "publication": {
+      "mode": "calibration_only",
+      "persistenceWrites": 0,
+      "artifactWrites": 0,
+      "clientWiring": false
+    },
+    "id": "home_confidence_sample_v3|c504f8843bb74fa36e056309ee3d9cafd2bf631266b6ca3a301c9c9b267888e4"
+  },
+  "confidenceConsistency": {
+    "allUsePrimaryGoalConfidence": true,
+    "allUseSameCurrentPercentage": true,
+    "homeUsesDexaAssessmentSnapshot": true,
+    "weeklyPublicationMovement": "no_meaningful_change",
+    "latestMeaningfulChangeInherited": true,
+    "sameCanonicalLatestMeaningfulMovement": true,
+    "explanationsOwnedByServer": true,
+    "nextEvidenceNamedFromBinding": true,
+    "full18CaseAcceptanceMatrixRun": true
+  },
+  "crossFixtureInvariants": {
+    "weeklyPredecessorInterpretationId": "strategic_interpretation_v3|9bb5ee792efe18ebb1f6fe278074123cf34ac47a490649400df002818d4cff2b",
+    "expectedDexaInterpretationId": "strategic_interpretation_v3|9bb5ee792efe18ebb1f6fe278074123cf34ac47a490649400df002818d4cff2b",
+    "predecessorInherited": true,
+    "dexaObjectiveCarriedForward": true,
+    "priorStrategyHistoryPreserved": true,
+    "strategyContinuityInherited": true,
+    "newStrategyFeasibilityScopeReset": false,
+    "weeklyPreservesDexaFeasibility": true,
+    "weeklyPreservesDexaPersistence": true
+  }
+}
