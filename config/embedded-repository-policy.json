@@ -12,18 +12,6 @@
   ],
   "repositories": [
     {
-      "path": ".tmp/server-build39-followup",
-      "repositoryType": "linked_worktree",
-      "purpose": "Exact production-server authority worktree at a191c27440f953ad05af8d1a09e9ec90d46cdc95 while the Native shipping line remains intentionally divergent",
-      "owner": "founder",
-      "lifecycle": "current_production_server_authority",
-      "mayBeDirty": false,
-      "generatedOnlyDirtyAllowed": false,
-      "participatesInBackup": true,
-      "recoveryRequirements": "Keep clean and at the verified production server authority. Generated .next output is disposable; source, branch identity, and migrations 000001-000014 are not.",
-      "endWorkSessionBehavior": "allow_clean"
-    },
-    {
       "path": ".tmp/windows-deploy-264a6306",
       "repositoryType": "linked_worktree",
       "purpose": "Anchor for preserved failed-deployment incident evidence at .tmp/incident-failed-artifact-264a6306",
