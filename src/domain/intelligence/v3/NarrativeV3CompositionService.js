@@ -406,9 +406,7 @@ function recurringNextCheck(context) {
 
 function recurringCoachTake(context, { resultObservation, operatingSignal }) {
   if (resultObservation) {
-    const milestone = resultObservation.domain === "training"
-      ? "training milestone" : "milestone";
-    return `That is useful progress—the kind of ${milestone} worth recognizing.`;
+    return realizeCoachingObservation(resultObservation, "coach_take");
   }
   if (operatingSignal?.direction === "supports") {
     return "This was a useful check-in. Keep stacking work like this and save adjustments for evidence that would actually change the decision.";
@@ -443,6 +441,12 @@ function realizeCoachingObservation(candidate, purpose) {
   if (candidate.type === "first_weighted_work") {
     return purpose === "coach_take"
       ? `${label} moved into weighted work for the first time in this phase. That is a big personal milestone.`
+      : sentence(candidate.narrativeText);
+  }
+  if (candidate.type === "load_milestone") {
+    return purpose === "coach_take"
+      ? `${label} reaching ${formatCoachingMeasurement(basis.currentValue,
+        basis.unit)} is a training milestone worth recognizing.`
       : sentence(candidate.narrativeText);
   }
   if (candidate.type === "related_movement_contrast") {
@@ -962,14 +966,29 @@ function describeGuardrailRisk(context, guardrail) {
   if (riskPhrase) return `${upperFirst(label)} ${stripPeriod(riskPhrase)}.`;
   if (evaluation.mode === "allowed_range") {
     const unit = guardrail.metricCapability.canonicalUnit;
-    const min = formatValue(evaluation.allowedRange.min, unit);
-    const max = formatValue(evaluation.allowedRange.max, unit);
-    return `${upperFirst(label)} moving outside the intended range of ${min} to ${max}.`;
+    const range = formatNaturalRange(evaluation.allowedRange.min,
+      evaluation.allowedRange.max, unit);
+    return `${upperFirst(label)} moving outside the intended range of ${range}.`;
   }
   if (["minimum", "maximum"].includes(evaluation.mode)) {
     return `${upperFirst(label)} ${evaluation.mode === "minimum" ? "falling below" : "rising above"} ${formatValue(evaluation.threshold, guardrail.metricCapability.canonicalUnit)}.`;
   }
   return `${upperFirst(label)} no longer meeting its intended target.`;
+}
+
+function formatNaturalRange(minimum, maximum, unit) {
+  const compact = (value) => Number(value).toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  });
+  const suffix = unit === "%" ? "%" : unit ? ` ${unit}` : "";
+  return `${compact(minimum)}–${compact(maximum)}${suffix}`;
+}
+
+function formatCoachingMeasurement(value, unit) {
+  if (!Number.isFinite(Number(value))) return "a new best";
+  return `${Number(value).toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  })}${unit === "%" ? "%" : unit ? ` ${unit}` : ""}`;
 }
 
 function shouldSurfaceUncertainty(item, interpretation) {

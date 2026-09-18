@@ -45,6 +45,25 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
     });
   });
 
+  it("uses canonical Goal metric vocabulary in coaching while preserving factual DEXA labels", () => {
+    const fixture = createPairedCalibrationFixtures().dexa;
+    const configured = structuredClone(fixture.goalContract);
+    configured.vocabulary.objective.displayName = "lean tissue";
+    const input = buildProductionConfidenceNarrativeV3Input({
+      goal: {
+        id: configured.goalId,
+        target: { metric: "lean_mass" },
+        goalContractV3: configured,
+      },
+      phase: { id: configured.phase.phaseId },
+      store: { dexaScans: scans() },
+      evidenceCutoff: fixture.evaluationContext.evidenceCutoff,
+    });
+    expect(input.goalContract.vocabulary.objective.displayName).toBe("lean mass");
+    expect(input.goalContract.objectives[0].metricCapability.displayName)
+      .toBe("Lean tissue");
+  });
+
   it("uses canonical DEXA measurements and never raw PDF interpretation as authority", () => {
     const fixture = createPairedCalibrationFixtures().dexa;
     const observations = createCanonicalEvidenceObservationsV3({

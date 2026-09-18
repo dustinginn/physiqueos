@@ -127,6 +127,18 @@ describe("Narrative V3 briefing section intelligence", () => {
     expect(recurring.confidence.currentPercentage).toBe(event.confidence.currentPercentage);
   });
 
+  it("grounds a single-observation Coach's Take in the selected movement", () => {
+    const { recurring } = recurringWithDetails({ exercises: [exercisePi({
+      id: "row", label: "ISO-Lateral High Rows", percent: 20,
+      prs: [{ type: "heaviest_load", value: 120,
+        previous_best: 100, unit: "lb" }],
+    })] });
+    expect(recurring.narrativePlan.composition.coachTake)
+      .toMatch(/ISO-Lateral High Rows reaching 120 lb.*training milestone worth recognizing/iu);
+    expect(recurring.narrativePlan.composition.coachTake)
+      .not.toMatch(/^That is useful progress/iu);
+  });
+
   it("lets Coach's Take raise a bounded plateau concern without changing strategy", () => {
     const { event, recurring } = recurringWithDetails({ exercises: [
       exercisePi({ id: "leg_press", label: "Leg Press", category: "Lower Body",

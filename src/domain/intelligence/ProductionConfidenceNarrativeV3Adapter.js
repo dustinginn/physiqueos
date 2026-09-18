@@ -54,11 +54,12 @@ export function buildGoalContractV3FromCanonical({
     }
     // Re-normalize stored contracts through the current additive schema so
     // older V3 contracts safely receive newly introduced semantic defaults.
-    return createGoalContractV3(configured);
+    return createGoalContractV3(withCanonicalGoalVocabularyV3(configured,
+      goal));
   }
   if (configured) {
     return createGoalContractV3({
-      ...configured,
+      ...withCanonicalGoalVocabularyV3(configured, goal),
       goalId: goal.id,
       phase: { ...configured.phase, phaseId: phase.id },
     });
@@ -236,6 +237,24 @@ export function buildGoalContractV3FromCanonical({
       phase.coachingObservationPolicyV3 ?? {},
     vocabulary,
   });
+}
+
+function withCanonicalGoalVocabularyV3(configured, goal) {
+  const target = goal?.target ?? {};
+  const canonicalObjectiveName = goal?.v3Vocabulary?.objective?.displayName ??
+    target.objectiveNoun ?? target.displayName ?? humanize(machine(
+      target.metric));
+  if (!canonicalObjectiveName) return configured;
+  return {
+    ...configured,
+    vocabulary: {
+      ...configured.vocabulary,
+      objective: {
+        ...configured.vocabulary?.objective,
+        displayName: canonicalObjectiveName,
+      },
+    },
+  };
 }
 
 function deriveSignificanceSemanticsV3({

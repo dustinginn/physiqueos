@@ -278,7 +278,7 @@ function baseContract(overrides) {
     evidenceRequests: overrides.evidenceRequests ?? [],
     vocabulary: {
       objective: {
-        displayName: "lean tissue",
+        displayName: "lean mass",
         unit: "lb",
         decimals: 1,
         subject: "you",
