@@ -181,6 +181,12 @@ export function createBriefingGoalConfidenceBlockFromV3({
     narrativeDetail: assessment.narrativeDetail ?? null,
     narrativeSections: structuredClone(narrativePlan?.composition?.sections ??
       assessment.narrativeSections ?? null),
+    narrativePresentationV3: structuredClone(
+      assessment.narrativePresentationV3 ?? null),
+    coachTake: assessment.narrativePresentationV3?.coachTake ??
+      narrativePlan?.composition?.coachTake ?? null,
+    latestMeaningfulMovement: structuredClone(
+      assessment.narrativePresentationV3?.latestMeaningfulMovement ?? null),
   };
 }
 
@@ -248,6 +254,13 @@ export function applyNarrativeV3ToBriefingArtifact({
     summary: narrativePlan?.composition?.headline ?? null,
     detail: narrativePlan?.composition?.finalNarrative ?? null,
     sections: structuredClone(sections),
+    coachTake: narrativePlan?.composition?.coachTake ?? null,
+    confidenceExplanation: structuredClone(
+      narrativePlan?.confidenceDeepExplanation ?? null),
+    strategicQuestion: structuredClone(
+      strategicInterpretation?.nextCoachingQuestion ?? null),
+    recommendation: structuredClone(
+      strategicInterpretation?.recommendation ?? null),
     strategicInterpretationId: strategicInterpretation?.id ?? null,
   };
   candidate.briefing ??= {};
@@ -259,7 +272,8 @@ export function applyNarrativeV3ToBriefingArtifact({
       verdict: canonical.summary,
       summary: sections.meaning ?? sections.result ?? canonical.summary,
     };
-    candidate.briefing.coachTake = sections.action ?? canonical.summary;
+    candidate.briefing.coachTake = canonical.coachTake ?? sections.action ??
+      canonical.summary;
     candidate.briefing.prioritiesThroughSunday = [sections.action, sections.watch]
       .filter(Boolean);
   } else if (publicationType === "weekly") {
@@ -274,9 +288,24 @@ export function applyNarrativeV3ToBriefingArtifact({
       weekly.cards.hero.body = sections.meaning ?? sections.result ?? canonical.summary;
     }
     if (weekly.cards?.coachInsight) {
-      weekly.cards.coachInsight.explanation = sections.action ?? null;
+      weekly.cards.coachInsight.celebration = sections.result ?? null;
+      weekly.cards.coachInsight.explanation = canonical.coachTake ??
+        sections.action ?? null;
       weekly.cards.coachInsight.preparation = sections.watch ?? null;
     }
+    weekly.narrativePresentationSelection ??= {};
+    weekly.narrativePresentationSelection.hero = {
+      ...(weekly.narrativePresentationSelection.hero ?? {}),
+      headline: canonical.summary,
+      summary: sections.meaning ?? sections.result ?? canonical.summary,
+    };
+    weekly.narrativePresentationSelection.coachInsight = {
+      ...(weekly.narrativePresentationSelection.coachInsight ?? {}),
+      biggestWin: sections.result ?? canonical.summary,
+      keepBuilding: canonical.coachTake ?? sections.action ?? null,
+      watchNextWeek: sections.watch ?? null,
+      actionItems: [sections.action, sections.watch].filter(Boolean),
+    };
     candidate.briefing.weeklyNarrative = weekly;
   } else if (publicationType === "monthly") {
     const monthly = candidate.briefing.monthlyNarrative ?? {};
@@ -295,11 +324,28 @@ export function applyNarrativeV3ToBriefingArtifact({
     event.hero = { ...(event.hero ?? {}), title: canonical.summary,
       body: sections.result ?? canonical.summary };
     event.strategicMeaningV3 = {
+      result: sections.result ?? null,
       meaning: sections.meaning ?? null,
       action: sections.action ?? null,
       watch: sections.watch ?? null,
       confidence: sections.confidence ?? null,
+      coachTake: canonical.coachTake,
     };
+    if (publicationType === "dexa") {
+      event.coachInsight = {
+        ...(event.coachInsight ?? {}),
+        biggestWin: sections.result ?? canonical.summary,
+        protect: sections.action ?? null,
+        watch: sections.watch ?? null,
+        next: canonical.coachTake ?? sections.action ?? null,
+      };
+    } else {
+      event.cardContent ??= {};
+      event.cardContent.coachInsight = {
+        ...(event.cardContent.coachInsight ?? {}),
+        body: canonical.coachTake ?? sections.action ?? canonical.summary,
+      };
+    }
     candidate.briefing[key] = event;
   }
   return candidate;

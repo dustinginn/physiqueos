@@ -113,11 +113,30 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
   it("binds a known single direct assessment to its natural evidence name", () => {
     const fixture = createPairedCalibrationFixtures().dexa;
     const goal = canonicalFallbackGoal(fixture);
+    const phase = { id: fixture.goalContract.phase.phaseId,
+      name: "Lean Mass Build", startedAt: "2026-08-15" };
     const input = buildProductionConfidenceNarrativeV3Input({
       goal,
-      phase: { id: fixture.goalContract.phase.phaseId, startedAt: "2026-08-15" },
+      phase,
       store: { dexaScans: scans() },
       evidenceCutoff: fixture.evaluationContext.evidenceCutoff,
+    });
+    expect(input.goalContract.objectives[0].evaluation).toMatchObject({
+      meaningfulChangeThreshold: 0.5,
+      significanceBands: [
+        { significance: "major", minimumAbsoluteChange: 3 },
+        { significance: "meaningful", minimumAbsoluteChange: 0.5 },
+        { significance: "minor", minimumAbsoluteChange: 0.1 },
+      ],
+    });
+    expect(input.goalContract.vocabulary).toMatchObject({
+      goal: { displayName: "the 10 lb lean-mass goal" },
+      objective: { displayName: "lean mass", subject: "you",
+        progressVerb: "added", ongoingPhrase: "this kind of progress" },
+      phase: { displayName: "Lean Mass Build", contextName: "this build" },
+      strategy: { displayName: "the build plan",
+        continueAction: "Keep executing consistently",
+        reconsiderationTrigger: "if something meaningful changes" },
     });
     expect(input.goalContract.evidenceRequests.find((request) =>
       request.evidencePurpose === "confirm_persistence"))
@@ -135,6 +154,7 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
       displayName: "DEXA",
       grammaticalNumber: "singular",
     });
+    expect(input.goalContract.vocabulary.guardrails.body_fat.decimals).toBe(1);
     const result = runConfidenceNarrativeV3({
       ...fixture,
       goalContract: input.goalContract,
@@ -142,6 +162,16 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
     });
     expect(result.narrativePlan.composition.sections.watch)
       .toContain("The next DEXA is about");
+    expect(result.narrativePlan.composition.sections.result)
+      .toMatch(/^This is a huge win\./u);
+    expect(result.narrativePlan.composition.sections.result)
+      .toContain("body fat stayed controlled at 8.1%");
+    expect(result.narrativePlan.composition.sections.meaning)
+      .toContain("The build plan is clearly working.");
+    expect(result.narrativePlan.composition.sections.action)
+      .toContain("Stay the course.");
+    expect(result.narrativePlan.composition.coachTake)
+      .toMatch(/exactly what this build needed/iu);
     expect(result.narrativePlan.nextEvidence)
       .toMatchObject({ displayName: "DEXA", namedFromBinding: true });
   });
@@ -262,6 +292,13 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
       .toEqual(["body_fat", "strength"]);
     expect(input.goalContract.guardrails[0].evaluation.allowedRange)
       .toMatchObject({ min: 8, max: 9, approximate: true });
+    expect(input.goalContract.vocabulary.guardrails).toMatchObject({
+      body_fat: { displayName: "body fat", clearDescription: "controlled" },
+      strength: { displayName: "training performance",
+        riskPhrases: { minimum: "materially declining" } },
+    });
+    expect(JSON.stringify(input.goalContract.vocabulary))
+      .not.toMatch(/support index|falling below 0/iu);
     expect(adaptLatestCanonicalCadenceObservationsV3({
       goalContract: input.goalContract,
       phase: { id: phaseId }, store, cutoff: "2026-09-18T00:00:00.000Z",

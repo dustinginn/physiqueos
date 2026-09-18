@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { createPairedCalibrationFixtures } from
+  "../../../fixtures/confidenceNarrativeV3CalibrationFixtures.js";
 import { createEvidenceObservationV3 } from "./EvidenceObservationV3.js";
 import { createGoalContractV3 } from "./GoalContractV3.js";
 import { runConfidenceNarrativeV3 } from "./ConfidenceNarrativeV3Pipeline.js";
@@ -46,6 +48,45 @@ describe("Narrative V3 deterministic voice matrix", () => {
       "first_person_singular:mine",
     ]);
     expect(findNarrativeV3VoiceViolations("I’m confident.")).toEqual(["first_person_singular:I’m"]);
+  });
+});
+
+describe("Narrative V3 positive coaching requirements", () => {
+  it("synthesizes a major result with proportionate celebration, a clear action, and natural next evidence", () => {
+    const result = runConfidenceNarrativeV3(
+      createPairedCalibrationFixtures().dexa);
+    expect(result.narrativePlan.composition).toMatchObject({
+      sections: {
+        result: expect.stringMatching(/^This is a huge win\./u),
+        meaning: expect.stringMatching(/plan is clearly working/iu),
+        action: expect.stringMatching(/^Stay the course\./u),
+        watch: expect.stringMatching(/next DEXA.*not whether the plan works/iu),
+        confidence: expect.stringMatching(/Confidence jumped.*standout result/iu),
+      },
+      coachTake: expect.stringMatching(/exactly what this build needed/iu),
+    });
+    expect(result.narrativePlan.confidenceDeepExplanation.whatCouldLowerIt)
+      .toContain("Falling far enough behind that there is no longer enough time to finish the goal.");
+    expect(JSON.stringify(result.narrativePlan.confidenceDeepExplanation))
+      .not.toMatch(/too much work remaining|support index|repric/iu);
+  });
+
+  it("describes event-to-recurring continuity in ordinary coaching language", () => {
+    const fixtures = createPairedCalibrationFixtures();
+    const event = runConfidenceNarrativeV3(fixtures.dexa);
+    const weekly = runConfidenceNarrativeV3({
+      ...fixtures.weekly,
+      priorInterpretation: event.strategicInterpretation,
+      priorCoachingState: event.coachingState,
+      priorConfidence: event.confidence,
+      priorNarrativePlan: event.narrativePlan,
+    });
+    expect(weekly.narrativePlan.confidenceBriefing.body)
+      .toContain("Confidence holds after the recent jump.");
+    expect(weekly.narrativePlan.composition.finalNarrative)
+      .not.toMatch(/repric|scoring|authority|persistence/iu);
+    expect(weekly.narrativePlan.composition.coachTake)
+      .toMatch(/plan is doing its job.*consistent execution/iu);
   });
 });
 

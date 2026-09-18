@@ -1,4 +1,4 @@
-const INCREASE_LANGUAGE = /\b(increas(?:e|ed|es|ing)|improv(?:e|ed|es|ing)|higher|rose|risen|rising|stronger|strengthened|grew|grown|gaining|gained)\b/iu;
+const INCREASE_LANGUAGE = /\b(increas(?:e|ed|es|ing)|improv(?:e|ed|es|ing)|higher|rose|risen|rising|stronger|strengthened|grew|grown|gaining|gained|jump(?:s|ed|ing)?)\b/iu;
 const DECREASE_LANGUAGE = /\b(decreas(?:e|ed|es|ing)|declin(?:e|ed|es|ing)|lower|fell|fallen|falling|weaker|weakened|dropp(?:ed|ing)|lost)\b/iu;
 
 export function assertCanonicalConfidencePresentation(confidence) {
@@ -25,9 +25,15 @@ export function assertCanonicalConfidencePresentation(confidence) {
   if (!explanation) {
     throw invariantError("MISSING_EXPLANATION", "Canonical published confidence requires its published explanation.");
   }
-  const hasIncrease = INCREASE_LANGUAGE.test(explanation);
-  const hasDecrease = DECREASE_LANGUAGE.test(explanation);
   const movement = confidence.movementDirection;
+  // A hold may naturally reference an earlier change (for example, "holds
+  // after the recent jump"). Remove only that explicitly historical clause
+  // before validating the direction of the current publication.
+  const directionalExplanation = movement === "held"
+    ? explanation.replace(/\bafter the recent (?:jump|increase|decrease|drop)\b/giu, "")
+    : explanation;
+  const hasIncrease = INCREASE_LANGUAGE.test(directionalExplanation);
+  const hasDecrease = DECREASE_LANGUAGE.test(directionalExplanation);
   if (movement === "held" && (hasIncrease || hasDecrease)) {
     throw invariantError("HELD_DIRECTION_CONTRADICTION", "Held confidence cannot communicate an increase or decrease.");
   }

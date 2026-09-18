@@ -417,7 +417,7 @@ function composeConfidenceBriefing(context) {
   if (context.recentEventFollowup) {
     const executionName = context.goalContract.vocabulary?.evidence?.executionName;
     const previousMove = context.priorConfidenceMovement > 0
-      ? " after the recent repricing" : "";
+      ? " after the recent jump" : "";
     return { heading, body: `Confidence holds${previousMove}. ${executionName && confidence.execution.state === "supportive" ? `${executionName} still supports the plan, and nothing here changes the outlook.` : "Nothing here changes the outlook."}` };
   }
   if (confidence.delta < 0) {
@@ -437,7 +437,7 @@ function composeConfidenceBriefing(context) {
   const trajectory = confidenceTrajectory(context);
   const strong = context.objective?.significance === "major" && context.objective?.quality === "robust";
   const opening = confidence.delta >= 10
-    ? "Confidence increased sharply" : "Confidence increased";
+    ? "Confidence jumped" : "Confidence increased";
   const result = context.objective?.state !== "not_assessed" ? stripPeriod(objectiveMovement(context)) : null;
   const guardrail = primaryGuardrail?.status === "clear" ? compactGuardrail(context, primaryGuardrail) : null;
   const progress = goalProgressSentence(context);
@@ -482,7 +482,9 @@ function composeConfidenceDeepExplanation(context) {
       ...(confidence.execution.configured ? ["Meaningful missed work or persistent departures from the plan."] : []),
       ...context.goalContract.guardrails.filter((guardrail) => context.guardrails.some((finding) => finding.guardrailId === guardrail.guardrailId)).map((guardrail) => describeGuardrailRisk(context, guardrail)),
       nonDirectional ? "A new result no longer meeting the target." : "Progress stalling or a new result contradicting the current outlook.",
-      ...(trajectory?.deadlineContributionApplicable ? ["Too much work remaining for the time left."] : []),
+      ...(trajectory?.deadlineContributionApplicable
+        ? ["Falling far enough behind that there is no longer enough time to finish the goal."]
+        : []),
     ],
     nextEvidence: composeWatch(context),
     assumptions: [

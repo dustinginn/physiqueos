@@ -35,14 +35,37 @@ describe("shared canonical V3 strategic publication", () => {
     });
 
     const afterEvent = JSON.parse(fs.readFileSync(setup.filePath, "utf8"));
-    expect(resolveActiveGoalConfidencePresentation({
+    const eventPresentation = resolveActiveGoalConfidencePresentation({
       activeGoal: { id: fixtures.dexa.goalContract.goalId,
+        title: "Build 10 lb of lean mass",
         phases: [{ id: fixtures.dexa.goalContract.phase.phaseId,
           status: "active" }] },
-      activePhase: { id: fixtures.dexa.goalContract.phase.phaseId },
+      activePhase: { id: fixtures.dexa.goalContract.phase.phaseId,
+        name: "Lean Mass Build" },
       store: afterEvent,
-    })).toMatchObject({ value: 79, movementDirection: "increased",
+    });
+    expect(eventPresentation).toMatchObject({ value: 79,
+      movementDirection: "increased",
       piVersion: "confidence_v3" });
+    expect(eventPresentation.explanationDetail).toMatchObject({
+      schemaVersion: "home_confidence_presentation_v3",
+      currentPercentage: 79,
+      movement: "increased",
+      delta: 17,
+      whyConfidence: expect.stringMatching(/plan is clearly working/iu),
+      whatIncreasedIt: expect.arrayContaining([
+        expect.stringMatching(/added 5\.0 lb/iu),
+      ]),
+      whatCouldRaiseIt: expect.arrayContaining([
+        expect.stringMatching(/next DEXA/iu),
+      ]),
+      nextEvidence: expect.stringMatching(/not whether the plan works/iu),
+      coachTake: expect.stringMatching(/exactly what this build needed/iu),
+      goal: { id: fixtures.dexa.goalContract.goalId,
+        label: "the 10 lb lean-mass goal" },
+      phase: { id: fixtures.dexa.goalContract.phase.phaseId,
+        label: "Lean Mass Build" },
+    });
     const weekly = await publishFixture({ setup, fixture: fixtures.weekly,
       publisherType: "weekly_briefing", cadenceOrEventType: "weekly",
       previous: afterEvent.goalConfidenceHistory.at(-1).assessment });
@@ -71,19 +94,25 @@ describe("shared canonical V3 strategic publication", () => {
     const persisted = JSON.parse(fs.readFileSync(setup.filePath, "utf8"));
     expect(persisted.goalConfidenceHistory).toHaveLength(3);
     expect(persisted.dailyBriefings).toHaveLength(3);
-    expect(resolveActiveGoalConfidencePresentation({
+    const weeklyPresentation = resolveActiveGoalConfidencePresentation({
       activeGoal: { id: fixtures.weekly.goalContract.goalId,
         phases: [{ id: fixtures.weekly.goalContract.phase.phaseId,
           status: "active" }] },
       activePhase: { id: fixtures.weekly.goalContract.phase.phaseId },
       store: persisted,
-    })).toMatchObject({
+    });
+    expect(weeklyPresentation).toMatchObject({
       value: 79, piVersion: "confidence_v3",
       narrativeSummary: expect.any(String),
       narrativeDetail: expect.any(String),
       goalAchievementState: "in_progress",
       strategyEffectiveness: { feasibility: "demonstrated",
         persistence: "emerging" },
+    });
+    expect(weeklyPresentation.explanationDetail).toMatchObject({
+      movement: "held", delta: 0,
+      latestMeaningfulMovement: { percentage: 79, delta: 17,
+        movement: "increase" },
     });
   });
 
@@ -116,8 +145,35 @@ describe("shared canonical V3 strategic publication", () => {
       expect(projected.briefing.narrativeV3).toMatchObject({
         summary: preview.narrativePlan.composition.headline,
         detail: preview.narrativePlan.composition.finalNarrative,
+        coachTake: preview.narrativePlan.composition.coachTake,
+        confidenceExplanation:
+          preview.narrativePlan.confidenceDeepExplanation,
         strategicInterpretationId: preview.strategicInterpretation.id,
       });
+      if (publicationType === "midweek") {
+        expect(projected.briefing.coachTake)
+          .toBe(preview.narrativePlan.composition.coachTake);
+      }
+      if (publicationType === "weekly") {
+        expect(projected.briefing.weeklyNarrative.cards.coachInsight)
+          .toMatchObject({
+            celebration: preview.narrativePlan.composition.sections.result,
+            explanation: preview.narrativePlan.composition.coachTake,
+            preparation: preview.narrativePlan.composition.sections.watch,
+          });
+        expect(projected.briefing.weeklyNarrative
+          .narrativePresentationSelection.coachInsight.keepBuilding)
+          .toBe(preview.narrativePlan.composition.coachTake);
+      }
+      if (publicationType === "dexa") {
+        expect(projected.briefing.dexaEventNarrative.coachInsight.next)
+          .toBe(preview.narrativePlan.composition.coachTake);
+      }
+      if (publicationType === "photo") {
+        expect(projected.briefing.photoEventNarrative.cardContent
+          .coachInsight.body)
+          .toBe(preview.narrativePlan.composition.coachTake);
+      }
       expect(JSON.stringify(projected)).not.toContain("legacy strategic conclusion");
     },
   );
@@ -140,6 +196,10 @@ function briefingShell(type) {
   return { ...common, briefing: {
     [type === "dexa" ? "dexaEventNarrative" : "photoEventNarrative"]: {
       hero: { title: "legacy strategic conclusion" },
+      ...(type === "dexa"
+        ? { coachInsight: { next: "legacy strategic conclusion" } }
+        : { cardContent: { coachInsight: {
+          body: "legacy strategic conclusion" } } }),
     },
   } };
 }

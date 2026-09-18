@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { HomeConfidenceDetailBody } from "./HomeConfidenceDetail";
+import HomeConfidenceDetail, { HomeConfidenceDetailBody } from "./HomeConfidenceDetail";
 import { buildConfidenceExplanationDetail } from "../../domain/presentation/confidenceExplanationPresentation";
 import { expectInternalDomainNamesNatural } from "../../domain/presentation/proseCapitalization";
 
@@ -41,6 +41,38 @@ describe("HomeConfidenceDetailBody — final rendered explanation output", () =>
       detail: { qualitativeLevel: "Moderate", supportingFactors: [], limitingFactors: [], clarifyingFactors: [], uncertaintyStatement: "" },
     }));
     expect(html).not.toMatch(/rounded-xl bg-\[var\(--surface-muted\)\]/);
+    expect(html).not.toContain("What changed");
+    expect(html).not.toContain("What we need next");
+  });
+
+  it("renders the rich V3 coaching taxonomy and suppresses empty semantic sections", () => {
+    const detail = richV3Detail();
+    const html = renderToStaticMarkup(React.createElement(
+      HomeConfidenceDetailBody, { detail }));
+    for (const text of ["What moved Confidence", "What supports the outlook",
+      "What still limits the outlook", "What could raise Confidence",
+      "What could lower Confidence", "What happens next", "Coach’s Take"]) {
+      expect(html).toContain(text);
+    }
+    expect(html).toContain("The build plan is clearly working");
+    expect(html).toContain("The next DEXA");
+    expect(html).not.toContain("What changed");
+    expect(html).not.toContain("What we need next");
+    expect(html).not.toMatch(/support index|repricing|No items/iu);
+  });
+
+  it("shows the current publication movement without converting a later hold into another increase", () => {
+    const increase = renderToStaticMarkup(React.createElement(
+      HomeConfidenceDetail, { confidence: 79, detail: richV3Detail() }));
+    expect(increase).toContain("↑ Up 17 points");
+    const hold = renderToStaticMarkup(React.createElement(
+      HomeConfidenceDetail, { confidence: 79, detail: {
+        ...richV3Detail(), movement: "held", delta: 0,
+        latestMeaningfulMovement: { percentage: 79, delta: 17,
+          movement: "increase" },
+      } }));
+    expect(hold).toContain("— Held");
+    expect(hold).not.toContain("Up 17 points");
   });
 
   it("still renders a legacy explanation's summary paragraph when one is genuinely supplied", () => {
@@ -62,3 +94,23 @@ describe("HomeConfidenceDetailBody — final rendered explanation output", () =>
     expect(html).not.toMatch(/\[object Object\]/);
   });
 });
+
+function richV3Detail() {
+  return {
+    schemaVersion: "home_confidence_presentation_v3",
+    currentPercentage: 79,
+    qualitativeLevel: "Moderate",
+    movement: "increased",
+    delta: 17,
+    whyConfidence: "The build plan is clearly working.",
+    whatIncreasedIt: ["You added meaningful lean tissue."],
+    whatSupportsItNow: ["There is enough time left."],
+    whatIsHoldingItBack: ["One result does not promise an identical repeat."],
+    whatCouldRaiseIt: ["Consistent execution before the next DEXA."],
+    whatCouldLowerIt: ["Training performance materially declining."],
+    nextEvidence: "The next DEXA tests whether this progress continues.",
+    coachTake: "Stay the course and keep executing.",
+    goal: { id: "goal", label: "the goal" },
+    phase: { id: "phase", label: "Current phase" },
+  };
+}

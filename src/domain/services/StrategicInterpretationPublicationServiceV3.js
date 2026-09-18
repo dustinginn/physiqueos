@@ -50,6 +50,10 @@ export function createStrategicInterpretationPublicationServiceV3({
     const assessment = createCanonicalConfidenceAssessmentV3({
       goalId: normalized.goal.id,
       phaseId: normalized.phase.id,
+      goalLabel: production.goalContract.vocabulary?.goal?.displayName ??
+        production.goalContract.goalLabel,
+      phaseLabel: production.goalContract.vocabulary?.phase?.displayName ??
+        production.goalContract.phase.label,
       goalContractId: production.goalContract.id,
       goalContractVersion: production.goalContract.contractVersion,
       goalContractFingerprint: production.goalContract.semanticFingerprint,

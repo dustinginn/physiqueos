@@ -98,6 +98,14 @@ export function buildGoalContractV3FromCanonical({
     objectiveCapability: capability,
     guardrails,
   });
+  const significance = deriveSignificanceSemanticsV3({
+    target, baseline, targetValue, direction, maintenanceRange,
+  });
+  const vocabulary = deriveGoalContractVocabularyV3({
+    goal, phase, target, metric, capability, direction, maintenanceRange,
+    baseline, targetValue, guardrails: configuredGuardrails,
+    inferredEvidenceBinding,
+  });
   const policies = [
     {
       policyId: `objective_direct|${objectiveId}`,
@@ -154,7 +162,8 @@ export function buildGoalContractV3FromCanonical({
         minimumDays: number(phase.minimumStrategyExposureDays ??
           goal.minimumStrategyExposureDays) ?? 0,
       },
-      coachingActions: goal.safeCoachingActionsV3 ?? [],
+      coachingActions: goal.safeCoachingActionsV3 ??
+        defaultSafeCoachingActionsV3(objectiveId),
       feasibilityCriteria: [{
         source: "objective",
         subjectId: objectiveId,
@@ -182,8 +191,8 @@ export function buildGoalContractV3FromCanonical({
         targetValue,
         targetRange: maintenanceRange,
         desiredDirection: direction,
-        meaningfulChangeThreshold: number(target.meaningfulChangeThreshold) ?? 0,
-        significanceBands: target.significanceBands ?? [],
+        meaningfulChangeThreshold: significance.meaningfulChangeThreshold,
+        significanceBands: significance.significanceBands,
         successCriteria,
         exceededCriteria: target.exceededCriteria ?? [],
         predicate: target.predicate ?? null,
@@ -207,16 +216,84 @@ export function buildGoalContractV3FromCanonical({
     achievementPolicy: goal.achievementPolicyV3 ??
       { onAchieved: "transition_goal" },
     narrativePolicy: goal.narrativePolicyV3 ?? { recentEventHours: 24 },
-    vocabulary: goal.v3Vocabulary ?? {
-      goal: { displayName: goal.title ?? goal.name ?? "the active goal" },
-      objective: {
-        displayName: target.displayName ?? humanize(metric),
-        unit: target.unit ?? null,
-        ongoingPhrase: "the current response",
-      },
-      phase: { displayName: phase.title ?? phase.name ?? "the current phase" },
-      strategy: { displayName: phase.strategyLabel ?? "the current plan" },
-      evidence: inferredEvidenceBinding ? {
+    vocabulary,
+  });
+}
+
+function deriveSignificanceSemanticsV3({
+  target, baseline, targetValue, direction, maintenanceRange,
+} = {}) {
+  const configured = Array.isArray(target.significanceBands)
+    ? target.significanceBands : [];
+  const explicitMeaningful = number(target.meaningfulChangeThreshold);
+  if (configured.length || maintenanceRange || !direction || baseline == null ||
+      targetValue == null) {
+    return {
+      meaningfulChangeThreshold: explicitMeaningful ?? 0,
+      significanceBands: configured,
+    };
+  }
+  const requirement = Math.abs(targetValue - baseline);
+  if (!(requirement > 0)) {
+    return { meaningfulChangeThreshold: explicitMeaningful ?? 0,
+      significanceBands: [] };
+  }
+  // These are proportions of the configured Goal requirement, not thresholds
+  // attached to any Goal name or evidence source. A result that closes 30% of
+  // the whole requirement is major; 5% is meaningful; 1% is minor.
+  const meaningful = positiveNumber(explicitMeaningful) ??
+    positiveNumber(target.meaningfulChangeFraction * requirement) ??
+    requirement * 0.05;
+  const major = positiveNumber(target.majorChangeThreshold) ??
+    positiveNumber(target.majorChangeFraction * requirement) ??
+    requirement * 0.3;
+  const minor = positiveNumber(target.minorChangeThreshold) ??
+    positiveNumber(target.minorChangeFraction * requirement) ??
+    requirement * 0.01;
+  return {
+    meaningfulChangeThreshold: meaningful,
+    significanceBands: [
+      { significance: "major", minimumAbsoluteChange: major },
+      { significance: "meaningful", minimumAbsoluteChange: meaningful },
+      { significance: "minor", minimumAbsoluteChange: minor },
+    ],
+  };
+}
+
+function deriveGoalContractVocabularyV3({
+  goal, phase, target, metric, capability, direction, maintenanceRange,
+  baseline, targetValue, guardrails, inferredEvidenceBinding,
+} = {}) {
+  const objectiveName = target.objectiveNoun ?? target.displayName ??
+    humanize(metric);
+  const phaseName = phase.title ?? phase.name ?? "the current phase";
+  const phaseContext = phase.contextName ?? phase.narrativeContext ??
+    derivePhaseContextNameV3(phaseName);
+  const targetPhrase = target.naturalTargetPhrase ??
+    deriveNaturalTargetPhraseV3({ target, metric, objectiveName, direction,
+      maintenanceRange, baseline, targetValue });
+  const derived = {
+    goal: { displayName: targetPhrase ?? "the goal" },
+    objective: {
+      displayName: objectiveName,
+      unit: target.unit ?? null,
+      decimals: configuredDecimalsV3(target, target.unit),
+      ...deriveObjectiveActionVocabularyV3({ capability, direction,
+        maintenanceRange, unit: target.unit }),
+    },
+    phase: { displayName: phaseName, contextName: phaseContext },
+    strategy: {
+      displayName: phase.strategyLabel ?? goal.strategyLabel ??
+        deriveStrategyDisplayNameV3(phaseContext),
+      continueAction: phase.continueAction ?? goal.continueActionV3 ??
+        "Keep executing consistently",
+      executeAction: phase.executeAction ?? goal.executeActionV3 ??
+        "Keep executing",
+      reconsiderationTrigger: phase.reconsiderationTrigger ??
+        goal.reconsiderationTriggerV3 ?? "if something meaningful changes",
+    },
+    evidence: {
+      ...(inferredEvidenceBinding ? {
         eventName: inferredEvidenceBinding.displayName,
         requests: {
           [inferredEvidenceBinding.vocabularyKey]: {
@@ -224,9 +301,153 @@ export function buildGoalContractV3FromCanonical({
             grammaticalNumber: inferredEvidenceBinding.grammaticalNumber,
           },
         },
-      } : {},
+      } : {}),
+      ...(hasCapabilityV3(guardrails, "performance.training_support_index")
+        ? { executionName: "Training" } : {}),
     },
+    guardrails: Object.fromEntries(guardrails.map((guardrail) => [
+      guardrail.vocabularyKey ?? guardrail.guardrailId ?? guardrail.id,
+      deriveGuardrailVocabularyV3(guardrail),
+    ])),
+  };
+  return mergeVocabularyV3(derived, goal.v3Vocabulary ?? {});
+}
+
+function deriveObjectiveActionVocabularyV3({ capability, direction,
+  maintenanceRange, unit } = {}) {
+  if (maintenanceRange) return { ongoingPhrase: "this stability" };
+  const [, key = ""] = String(capability ?? "").split(".");
+  const unitIsMass = /^(?:lb|lbs|kg|kilograms?|pounds?)$/iu.test(
+    String(unit ?? ""));
+  const massLike = unitIsMass || /(?:^|_)(?:mass|weight)(?:$|_)/u.test(key);
+  if (massLike && direction === "increase") {
+    return { subject: "you", progressVerb: "added",
+      ongoingPhrase: "this kind of progress" };
+  }
+  if (massLike && direction === "decrease") {
+    return { subject: "you", progressVerb: "lost",
+      ongoingPhrase: "this kind of progress" };
+  }
+  return { ongoingPhrase: direction ? "this kind of progress" :
+    "the current response" };
+}
+
+function deriveNaturalTargetPhraseV3({ target, metric, objectiveName, direction,
+  maintenanceRange, baseline, targetValue } = {}) {
+  if (maintenanceRange) return `the ${objectiveName} goal`;
+  const configuredAmount = positiveNumber(target.amount);
+  const amount = configuredAmount ?? (direction && baseline != null &&
+    targetValue != null ? Math.abs(targetValue - baseline) : null);
+  if (amount == null) return `the ${objectiveName} goal`;
+  const unit = target.unit ? ` ${target.unit}` : "";
+  const noun = adjectivePhraseV3(humanize(metric) || objectiveName);
+  return `the ${formatContractNumberV3(amount)}${unit} ${noun} goal`;
+}
+
+function derivePhaseContextNameV3(value) {
+  const words = String(value ?? "").trim().split(/\s+/u).filter(Boolean);
+  const last = machine(words.at(-1));
+  const naturalContextNouns = new Set([
+    "build", "block", "cycle", "phase", "calibration", "maintenance",
+    "cut", "taper", "recovery",
+  ]);
+  return naturalContextNouns.has(last) ? `this ${last}` : "this phase";
+}
+
+function deriveStrategyDisplayNameV3(phaseContext) {
+  const context = String(phaseContext ?? "").replace(/^this\s+/iu, "");
+  return context && context !== "phase" ? `the ${context} plan` :
+    "the current plan";
+}
+
+function deriveGuardrailVocabularyV3(guardrail = {}) {
+  const capability = typeof guardrail.metricCapability === "string"
+    ? guardrail.metricCapability : guardrail.metricCapability?.id ?? "";
+  const capabilityName = humanize(capability.split(".").at(-1));
+  const withoutInternalSuffix = capabilityName
+    .replace(/\s+(?:support|capacity)\s+index$/iu, "")
+    .replace(/\s+percentage$/iu, "");
+  const naturalCapabilityName = capability.startsWith("performance.") &&
+    withoutInternalSuffix === "training" ? "training performance" :
+    withoutInternalSuffix;
+  const displayName = guardrail.displayName ?? guardrail.label ??
+    guardrail.vocabulary?.displayName ?? (naturalCapabilityName || "the limit");
+  const riskPhrases = guardrail.vocabulary?.riskPhrases ??
+    (guardrail.evaluation?.mode === "minimum" && /index$/iu.test(capabilityName)
+      ? { minimum: "materially declining" } : undefined);
+  return {
+    displayName,
+    decimals: guardrail.vocabulary?.decimals ??
+      configuredDecimalsV3(guardrail, guardrail.metricCapability?.canonicalUnit),
+    ...(guardrail.evaluation?.mode === "allowed_range"
+      ? { clearDescription: guardrail.vocabulary?.clearDescription ?? "controlled" }
+      : {}),
+    ...(riskPhrases ? { riskPhrases } : {}),
+    ...(guardrail.vocabulary ?? {}),
+  };
+}
+
+function defaultSafeCoachingActionsV3(objectiveId) {
+  return [{
+    actionId: `continue_consistent_execution|${objectiveId}`,
+    text: "Keep executing consistently",
+    recommendationActions: ["continue_current_strategy"],
+    requires: [],
+  }];
+}
+
+function mergeVocabularyV3(derived, configured) {
+  const evidenceRequests = { ...(derived.evidence?.requests ?? {}),
+    ...(configured.evidence?.requests ?? {}) };
+  const evidence = {
+    ...derived.evidence,
+    ...(configured.evidence ?? {}),
+    ...(Object.keys(evidenceRequests).length
+      ? { requests: evidenceRequests } : {}),
+  };
+  if (!Object.keys(evidenceRequests).length) delete evidence.requests;
+  return {
+    ...derived,
+    ...configured,
+    goal: { ...derived.goal, ...(configured.goal ?? {}) },
+    objective: { ...derived.objective, ...(configured.objective ?? {}) },
+    objectives: { ...(derived.objectives ?? {}),
+      ...(configured.objectives ?? {}) },
+    phase: { ...derived.phase, ...(configured.phase ?? {}) },
+    strategy: { ...derived.strategy, ...(configured.strategy ?? {}) },
+    evidence,
+    guardrails: { ...derived.guardrails, ...(configured.guardrails ?? {}) },
+  };
+}
+
+function hasCapabilityV3(guardrails, capabilityId) {
+  return guardrails.some((guardrail) => {
+    const capability = typeof guardrail.metricCapability === "string"
+      ? guardrail.metricCapability : guardrail.metricCapability?.id;
+    return capability === capabilityId;
   });
+}
+
+function configuredDecimalsV3(value, unit) {
+  if (Number.isInteger(Number(value?.decimals))) return Number(value.decimals);
+  const capability = typeof value?.metricCapability === "string"
+    ? value.metricCapability : value?.metricCapability?.id;
+  const precisionHint = unit ?? capability ?? "";
+  return precisionHint === "%" || /(?:_percentage|^(?:lb|lbs|kg)$)/iu.test(
+    String(precisionHint)) ? 1 : 0;
+}
+
+function adjectivePhraseV3(value) {
+  return String(value ?? "result").trim().split(/\s+/u).join("-");
+}
+
+function formatContractNumberV3(value) {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+}
+
+function positiveNumber(value) {
+  const result = number(value);
+  return result != null && result > 0 ? result : null;
 }
 
 export function createCanonicalEvidenceObservationsV3({

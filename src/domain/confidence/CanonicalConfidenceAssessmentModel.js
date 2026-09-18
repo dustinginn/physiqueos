@@ -185,6 +185,23 @@ export function createCanonicalConfidenceAssessmentV3(input = {}) {
         ...(narrative.confidenceDeepExplanation.whatCouldLowerIt ?? []),
       ].map(textItem)
     : [...(narrative.limitingFactors ?? [])];
+  const deepExplanation = narrative.confidenceDeepExplanation ?? null;
+  const narrativePresentationV3 = deepExplanation ? {
+    schemaVersion: "confidence_narrative_presentation_v3",
+    whyConfidence: deepExplanation.why ?? null,
+    whatIncreasedIt: textValues(deepExplanation.whatIncreasedIt),
+    whatSupportsItNow: textValues(deepExplanation.whatSupportsItNow),
+    whatIsHoldingItBack: textValues(deepExplanation.whatIsHoldingItBack),
+    whatCouldRaiseIt: textValues(deepExplanation.whatCouldRaiseIt),
+    whatCouldLowerIt: textValues(deepExplanation.whatCouldLowerIt),
+    nextEvidence: deepExplanation.nextEvidence ?? null,
+    assumptions: textValues(deepExplanation.assumptions),
+    coachTake: narrative.composition?.coachTake ?? narrative.coachTake ?? null,
+    sections: structuredClone(narrative.composition?.sections ??
+      narrative.sections ?? null),
+    latestMeaningfulMovement: structuredClone(
+      narrative.latestMeaningfulConfidenceChange ?? null),
+  } : null;
   const canonical = {
     schemaVersion: CANONICAL_CONFIDENCE_ASSESSMENT_V3_VERSION,
     goalId: required(input.goalId, "goalId"),
@@ -193,6 +210,10 @@ export function createCanonicalConfidenceAssessmentV3(input = {}) {
       id: input.goalContractId ?? null,
       version: required(input.goalContractVersion, "goalContractVersion"),
     },
+    goal: { id: required(input.goalId, "goalId"),
+      label: input.goalLabel ?? null },
+    phase: input.phaseId ? { id: input.phaseId,
+      label: input.phaseLabel ?? null } : null,
     publisherType: input.publisherType,
     originatingBriefingId: required(input.originatingBriefingId, "originatingBriefingId"),
     briefingArtifactId: required(input.briefingArtifactId, "briefingArtifactId"),
@@ -286,6 +307,7 @@ export function createCanonicalConfidenceAssessmentV3(input = {}) {
     narrativeSections: narrative.sections ?? narrative.composition?.sections ?? null,
     narrativeSupportingFactors: supportingFactors,
     narrativeLimitingFactors: limitingFactors,
+    narrativePresentationV3,
     operatingPlanImplications: narrative.sections?.operatingPlanImplications ??
       (narrative.composition?.sections?.action
         ? [narrative.composition.sections.action] : []),
@@ -369,6 +391,10 @@ function summarizeEligibilityFreshness(items = []) {
 }
 function textItem(value) {
   return typeof value === "string" ? { text: value } : structuredClone(value);
+}
+function textValues(values = []) {
+  return values.map((value) => typeof value === "string" ? value : value?.text)
+    .filter(Boolean);
 }
 
 function assessmentIdentity(value) {

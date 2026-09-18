@@ -50,7 +50,10 @@ export function resolveActiveGoalConfidencePresentation({
   });
   const primaryReason = explanationModel?.summary ??
     assessment.narrativeExplanation?.text ?? null;
-  const explanationDetail = explanationModel
+  const richV3Detail = isV3 && assessment.narrativePresentationV3
+    ? createRichV3ExplanationDetail({ assessment, activeGoal, activePhase,
+      presentationMovement }) : null;
+  const explanationDetail = richV3Detail ?? (explanationModel
     ? confidenceExplanationDetailFromModel(explanationModel)
     // V3's Narrative already computed structured, presentation-ready
     // supporting/limiting factors (NarrativeV3Service) — surface those
@@ -77,7 +80,7 @@ export function resolveActiveGoalConfidencePresentation({
         remainingUncertaintyItems: assessment.remainingUncertainty?.items ?? [],
         nextConfidenceBuildingEvidence:
           assessment.nextConfidenceBuildingEvidence ?? null,
-      });
+      }));
   const presentation = {
     status: v1Compatibility ? "canonical" : canonical.status,
     source: v1Compatibility ? "canonical_pi_snapshot" : canonical.source,
@@ -112,6 +115,8 @@ export function resolveActiveGoalConfidencePresentation({
     narrativeDetail: assessment.narrativeDetail ??
       assessment.narrativeExplanation?.text ?? null,
     narrativeSections: structuredClone(assessment.narrativeSections ?? null),
+    narrativePresentationV3: structuredClone(
+      assessment.narrativePresentationV3 ?? null),
     goalAchievementState: assessment.goalAchievementState ?? null,
     strategyConfidence: structuredClone(assessment.strategyConfidence ?? null),
     strategyEffectiveness: structuredClone(assessment.strategyEffectiveness ?? null),
@@ -140,6 +145,51 @@ export function resolveActiveGoalConfidencePresentation({
   };
   assertCanonicalConfidencePresentation(presentation);
   return Object.freeze(presentation);
+}
+
+function createRichV3ExplanationDetail({ assessment, activeGoal, activePhase,
+  presentationMovement }) {
+  const narrative = assessment.narrativePresentationV3;
+  return {
+    schemaVersion: "home_confidence_presentation_v3",
+    currentPercentage: assessment.currentPercentage,
+    band: assessment.confidenceBand,
+    qualitativeLevel: confidenceBandLabel(assessment.confidenceBand),
+    movement: presentationMovement,
+    delta: assessment.confidenceDelta ?? (assessment.priorPercentage == null
+      ? null : assessment.currentPercentage - assessment.priorPercentage),
+    latestMeaningfulMovement: structuredClone(
+      narrative.latestMeaningfulMovement ?? null),
+    whyConfidence: narrative.whyConfidence ?? null,
+    whatIncreasedIt: [...(narrative.whatIncreasedIt ?? [])],
+    whatSupportsItNow: [...(narrative.whatSupportsItNow ?? [])],
+    whatIsHoldingItBack: [...(narrative.whatIsHoldingItBack ?? [])],
+    whatCouldRaiseIt: [...(narrative.whatCouldRaiseIt ?? [])],
+    whatCouldLowerIt: [...(narrative.whatCouldLowerIt ?? [])],
+    nextEvidence: narrative.nextEvidence ?? null,
+    coachTake: narrative.coachTake ?? null,
+    assumptions: [...(narrative.assumptions ?? [])],
+    sections: structuredClone(narrative.sections ?? null),
+    goal: {
+      id: assessment.goal?.id ?? assessment.goalId,
+      label: assessment.goal?.label ?? activeGoal?.title ??
+        activeGoal?.name ?? null,
+    },
+    phase: assessment.phaseId ? {
+      id: assessment.phase?.id ?? assessment.phaseId,
+      label: assessment.phase?.label ?? activePhase?.title ??
+        activePhase?.name ?? null,
+    } : null,
+    evidenceCutoff: assessment.sourceCutoff,
+    publicationTimestamp: assessment.publicationTimestamp,
+    // Additive compatibility aliases for existing Build 40/Web consumers.
+    supportingFactors: (assessment.narrativeSupportingFactors ?? [])
+      .map((item) => item.text).filter(Boolean),
+    limitingFactors: (assessment.narrativeLimitingFactors ?? [])
+      .map((item) => item.text).filter(Boolean),
+    clarifyingFactors: [],
+    uncertaintyStatement: assessment.narrativeExplanation?.text ?? "",
+  };
 }
 
 function unavailable(goal, phase, reason) {
