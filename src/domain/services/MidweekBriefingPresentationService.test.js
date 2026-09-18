@@ -45,7 +45,87 @@ function presentation() {
   });
 }
 
+function v3Presentation() {
+  const window = createMidweekEvidenceWindow({
+    now: new Date("2026-07-22T19:00:00Z"),
+    timeZone: "America/Los_Angeles",
+  });
+  const briefing = structuredClone(composeMidweekBriefingPreview({
+    ...midweekPreviewFixtures.trainingImprovement,
+    window,
+    generatedAt: "2026-07-22T19:00:00.000Z",
+  }));
+  briefing.hero = {
+    verdict: "Canonical V3 headline.",
+    summary: "Canonical V3 meaning.",
+  };
+  briefing.narrativeV3 = {
+    summary: "Canonical V3 headline.",
+    detail: "Canonical V3 detail.",
+    sections: {
+      result: "Canonical V3 result.",
+      meaning: "Canonical V3 meaning.",
+      action: "Canonical V3 action.",
+      watch: "Canonical V3 watch.",
+      confidence: "Canonical V3 confidence explanation.",
+    },
+    coachTake: "Canonical V3 coach take.",
+  };
+  briefing.goalConfidence = {
+    score: 79,
+    band: "high",
+    priorScore: 79,
+    delta: 0,
+    movementDirection: "held",
+    primaryReason: "Canonical V3 confidence explanation.",
+    modelVersion: "canonical_confidence_assessment_v3",
+    piVersion: "confidence_v3",
+  };
+  return prepareMidweekBriefingReviewPresentation({ artifact: {
+    cadence: "midweek",
+    confidencePublication: {
+      schemaVersion: "briefing_confidence_binding_v3",
+    },
+    briefing,
+  } });
+}
+
 describe("Midweek briefing presentation", () => {
+  it("preserves the complete canonical V3 narrative instead of legacy editorial", () => {
+    const result = v3Presentation();
+    expect(result.presentationModel).toBe("canonical_narrative_v3");
+    expect(result.hero).toEqual({
+      verdict: "Canonical V3 headline.",
+      summary: "Canonical V3 meaning.",
+    });
+    expect(result.narrativeV3.sections).toEqual({
+      result: "Canonical V3 result.",
+      meaning: "Canonical V3 meaning.",
+      action: "Canonical V3 action.",
+      watch: "Canonical V3 watch.",
+      confidence: "Canonical V3 confidence explanation.",
+    });
+    expect(result.coachTake).toEqual({
+      biggestTakeaway: "Canonical V3 coach take.",
+      recommendation: "Canonical V3 action.",
+    });
+    expect(result.hero.verdict).not.toBe(
+      "Calories are moving closer to supporting stronger training."
+    );
+  });
+
+  it("fails closed instead of substituting legacy copy for an incomplete V3 publication", () => {
+    const result = v3Presentation();
+    delete result.narrativeV3.sections.watch;
+    expect(() => prepareMidweekBriefingReviewPresentation({ artifact: {
+      cadence: "midweek",
+      confidencePublication: {
+        schemaVersion: "briefing_confidence_binding_v3",
+      },
+      briefing: result,
+    } })).toThrow(/requires complete canonical Narrative V3/);
+  });
+
   it("preserves canonical published confidence without editorial translation", () => {
     const result = presentation();
     expect(result.goalConfidence).toMatchObject({

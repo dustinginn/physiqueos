@@ -4,6 +4,26 @@ import { createMidweekEditorialNarrative } from "./MidweekBriefingEditorialServi
 export function prepareMidweekBriefingReviewPresentation({ artifact } = {}) {
   if (!artifact?.briefing) return null;
   const briefing = artifact.briefing;
+  if (artifact.confidencePublication?.schemaVersion ===
+      "briefing_confidence_binding_v3") {
+    const narrativeV3 = requireCanonicalMidweekNarrativeV3(briefing);
+    return {
+      ...briefing,
+      presentationModel: "canonical_narrative_v3",
+      energyBalance: {
+        ...briefing.energyBalance,
+        ...createMidweekEnergyPresentation(briefing.energyBalance),
+      },
+      coachTake: {
+        biggestTakeaway: narrativeV3.coachTake,
+        recommendation: narrativeV3.sections.action,
+      },
+      goalConfidence: createMidweekConfidencePresentation(
+        briefing.goalConfidence,
+        { briefing }
+      ),
+    };
+  }
   const editorial = createMidweekEditorialNarrative({
     energyBalance: briefing.energyBalance,
     training: briefing.training,
@@ -27,6 +47,28 @@ export function prepareMidweekBriefingReviewPresentation({ artifact } = {}) {
       { briefing }
     ),
   };
+}
+
+function requireCanonicalMidweekNarrativeV3(briefing) {
+  const narrative = briefing.narrativeV3;
+  const confidence = briefing.goalConfidence;
+  const required = [
+    narrative?.summary,
+    narrative?.sections?.result,
+    narrative?.sections?.meaning,
+    narrative?.sections?.action,
+    narrative?.sections?.watch,
+    narrative?.sections?.confidence,
+    narrative?.coachTake,
+  ];
+  if (confidence?.modelVersion !== "canonical_confidence_assessment_v3" ||
+      confidence?.piVersion !== "confidence_v3" ||
+      required.some((value) => typeof value !== "string" || !value.trim())) {
+    throw new Error(
+      "A V3 Midweek publication requires complete canonical Narrative V3."
+    );
+  }
+  return narrative;
 }
 
 export function createMidweekEnergyPresentation(energy = {}) {

@@ -3,10 +3,47 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { createMidweekEvidenceWindow } from "../domain/services/BriefingEvidenceWindowService";
 import { composeMidweekBriefingPreview } from "../domain/services/MidweekBriefingPreviewService";
+import { prepareMidweekBriefingReviewPresentation } from
+  "../domain/services/MidweekBriefingPresentationService";
 import { midweekPreviewFixtures } from "../fixtures/midweekBriefingPreview";
 import MidweekBriefingScreen from "./MidweekBriefingScreen";
 
 describe("MidweekBriefingScreen", () => {
+  it("renders canonical V3 sections and Coach's Take without legacy substitution", () => {
+    const window=createMidweekEvidenceWindow({now:new Date("2026-07-22T19:00:00Z"),timeZone:"America/Los_Angeles"});
+    const source=structuredClone(composeMidweekBriefingPreview({...midweekPreviewFixtures.current,window,generatedAt:"2026-07-22T19:00:00Z"}));
+    source.hero={verdict:"Canonical headline.",summary:"Canonical meaning."};
+    source.narrativeV3={summary:"Canonical headline.",detail:"Canonical detail.",sections:{
+      result:"Shoulder press reached a new best.",
+      meaning:"Training is moving in the direction this goal needs.",
+      action:"Keep the current setup in place.",
+      watch:"Watch whether this progress continues.",
+      confidence:"Confidence holds at 79%.",
+    },coachTake:"Leg press reached a milestone worth recognizing."};
+    source.goalConfidence={score:79,band:"high",priorScore:79,delta:0,
+      movementDirection:"held",primaryReason:"Confidence holds at 79%.",
+      modelVersion:"canonical_confidence_assessment_v3",piVersion:"confidence_v3"};
+    const briefing=prepareMidweekBriefingReviewPresentation({artifact:{
+      cadence:"midweek",confidencePublication:{
+        schemaVersion:"briefing_confidence_binding_v3"},briefing:source}});
+    const html=renderToStaticMarkup(React.createElement(MidweekBriefingScreen,{briefing}));
+    for(const text of ["Result","What It Means","What To Do","What To Watch",
+      "Confidence","Shoulder press reached a new best.",
+      "Training is moving in the direction this goal needs.",
+      "Keep the current setup in place.","Watch whether this progress continues.",
+      "Confidence holds at 79%.","Leg press reached a milestone worth recognizing."])
+      expect(html).toContain(text);
+    expect(html).toContain('data-testid="midweek-narrative-v3"');
+    expect(html).not.toContain("Calories are moving closer to supporting stronger training.");
+    expect(html).not.toContain("Biggest Takeaway");
+    expect(html).not.toContain("My Recommendation");
+    expect(html).not.toContain("Through Sunday");
+    expect(html).not.toContain("Energy Balance");
+    expect(html).not.toContain("Weight Context");
+    expect(html).not.toContain("Training Response");
+    expect(html).not.toContain("Body Composition");
+  });
+
   it("renders one concise coaching narrative without internal continuity or coverage UI", () => {
     const window=createMidweekEvidenceWindow({now:new Date("2026-07-22T19:00:00Z"),timeZone:"America/Los_Angeles"});
     const briefing=composeMidweekBriefingPreview({...midweekPreviewFixtures.current,window,generatedAt:"2026-07-22T19:00:00Z"});

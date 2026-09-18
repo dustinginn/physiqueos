@@ -105,6 +105,35 @@ describe("Native Briefing detail composition", () => {
     expect(result).not.toHaveProperty("briefing");
   });
 
+  it("keeps the Native Midweek compatibility envelope while projecting canonical V3", async () => {
+    const artifact = midweekV3Artifact();
+    const service = createBriefingNavigationReadService({ store: store(artifact) });
+    const result = await service.getNativeArtifact({ artifactId: artifact.id });
+    expect(result).toMatchObject({
+      schemaVersion: "1",
+      artifact: { artifactId: artifact.id, cadence: "midweek", version: 3 },
+      historical: { frozen: true, artifactBound: true },
+      presentation: {
+        presentationModel: "canonical_narrative_v3",
+        hero: { verdict: "Canonical V3 headline." },
+        narrativeV3: {
+          sections: {
+            result: "Canonical V3 result.",
+            meaning: "Canonical V3 meaning.",
+            action: "Canonical V3 action.",
+            watch: "Canonical V3 watch.",
+            confidence: "Canonical V3 confidence explanation.",
+          },
+          coachTake: "Canonical V3 coach take.",
+        },
+        coachTake: {
+          biggestTakeaway: "Canonical V3 coach take.",
+          recommendation: "Canonical V3 action.",
+        },
+      },
+    });
+  });
+
   it("resolves both Photo Event comparison identities before Native media projection", async () => {
     const prior = "media-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbb";
     const current = "media-cccccccccccccccccccccccccccccccc-dddddddddddd";
@@ -238,4 +267,43 @@ function midweekArtifact() {
       prioritiesThroughSunday: [], charts: {}, weightContext: {}, bodyComposition: {},
     },
   };
+}
+
+function midweekV3Artifact() {
+  const artifact = midweekArtifact();
+  artifact.id = "midweek-v3";
+  artifact.version = 3;
+  artifact.confidencePublication = {
+    schemaVersion: "briefing_confidence_binding_v3",
+    assessmentId: "confidence-v3",
+    publisherType: "midweek",
+  };
+  artifact.briefing.hero = {
+    verdict: "Canonical V3 headline.",
+    summary: "Canonical V3 meaning.",
+  };
+  artifact.briefing.narrativeV3 = {
+    summary: "Canonical V3 headline.",
+    detail: "Canonical V3 detail.",
+    sections: {
+      result: "Canonical V3 result.",
+      meaning: "Canonical V3 meaning.",
+      action: "Canonical V3 action.",
+      watch: "Canonical V3 watch.",
+      confidence: "Canonical V3 confidence explanation.",
+    },
+    coachTake: "Canonical V3 coach take.",
+  };
+  artifact.briefing.goalConfidence = {
+    assessmentId: "confidence-v3",
+    score: 79,
+    band: "high",
+    priorScore: 79,
+    delta: 0,
+    movementDirection: "held",
+    primaryReason: "Canonical V3 confidence explanation.",
+    modelVersion: "canonical_confidence_assessment_v3",
+    piVersion: "confidence_v3",
+  };
+  return artifact;
 }
