@@ -33,7 +33,9 @@ export function createGoalsHubReadService({ repositories, readRuntimeStore } = {
       const evaluations = GoalEvaluationService.getGoalEvaluations({ goals, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext, photoAnalyses: analyses, trainingPerformance });
       const intelligence = GoalIntelligenceService.getGoalIntelligence({ evaluations, activeGoal });
       const runtimeStore = readRuntimeStore();
-      const canonicalConfidence = activeGoal?.type === "build_lean_mass"
+      // See HomeBriefingService.js for why this is no longer gated to one
+      // Goal `type` — Confidence V3's engine is Goal-agnostic by design.
+      const canonicalConfidence = activeGoal
         ? resolveActiveGoalConfidencePresentation({ activeGoal, store: runtimeStore })
         : null;
       const summaries = intelligence.goals.map((summary) => mapGoalSummary(

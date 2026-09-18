@@ -268,6 +268,7 @@ describe("canonical briefing and Confidence V2 atomic publication", () => {
         "goalConfidenceSnapshots",
         "goalConfidenceHistory",
         "confidenceInitializationArtifacts",
+        "confidenceActivationArtifacts",
       ],
     });
   });
@@ -327,7 +328,7 @@ describe("canonical briefing and Confidence V2 atomic publication", () => {
         runtimeLoadCount: 1,
         runtimeCloneCount: 0,
         fullRuntimeSerializationCount: 0,
-        runtimeCollectionLoadCount: 4,
+        runtimeCollectionLoadCount: 5,
       },
     });
     expect(fixture.unitOfWorkFactory).not.toHaveBeenCalled();
@@ -339,12 +340,14 @@ describe("canonical briefing and Confidence V2 atomic publication", () => {
         "goalConfidenceSnapshots",
         "goalConfidenceHistory",
         "confidenceInitializationArtifacts",
+        "confidenceActivationArtifacts",
       ],
       readCollections: [
         "dailyBriefings",
         "goalConfidenceSnapshots",
         "goalConfidenceHistory",
         "confidenceInitializationArtifacts",
+        "confidenceActivationArtifacts",
       ],
       readApplicationContext: false,
       readImportMetadata: false,

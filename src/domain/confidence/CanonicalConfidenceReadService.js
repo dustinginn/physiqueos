@@ -1,4 +1,5 @@
 import {
+  CANONICAL_CONFIDENCE_ASSESSMENT_V3_VERSION,
   validateCanonicalConfidenceAssessment,
 } from "./CanonicalConfidenceAssessmentModel";
 import { adaptV1ConfidenceAssessment } from "./ConfidenceV1CompatibilityAdapter";
@@ -35,10 +36,8 @@ export function createCanonicalConfidenceReadService({ store = {}, repository = 
       return unavailable("canonical_snapshot_or_history_invalid", goalId, phaseId);
     }
     return Object.freeze({
-      status: assessment.schemaVersion === "canonical_confidence_assessment_v2"
-        ? "canonical_v2" : "canonical_v1_compatibility",
-      source: assessment.schemaVersion === "canonical_confidence_assessment_v2"
-        ? "canonical_confidence_v2_snapshot" : "canonical_pi_v1_snapshot",
+      status: statusFor(assessment),
+      source: sourceFor(assessment, "snapshot"),
       canonicalSeries: true,
       assessment,
       snapshot: structuredClone(snapshot),
@@ -62,10 +61,8 @@ export function createCanonicalConfidenceReadService({ store = {}, repository = 
     const winner = selection.selected;
     if (!winner) return unavailable("canonical_series_unavailable", goalId, null);
     return Object.freeze({
-      status: winner.assessment.schemaVersion === "canonical_confidence_assessment_v2"
-        ? "canonical_v2" : "canonical_v1_compatibility",
-      source: winner.assessment.schemaVersion === "canonical_confidence_assessment_v2"
-        ? "canonical_confidence_v2_latest_briefing" : "canonical_pi_v1_latest_briefing",
+      status: statusFor(winner.assessment),
+      source: sourceFor(winner.assessment, "latest_briefing"),
       canonicalSeries: true,
       assessment: winner.assessment,
       snapshot: null,
@@ -107,10 +104,7 @@ export function createCanonicalConfidenceReadService({ store = {}, repository = 
         ...selected,
         historyRecordId: selected.record.id,
         selectedAtOrBefore: new Date(at).toISOString(),
-        source: selected.assessment.schemaVersion ===
-          "canonical_confidence_assessment_v2"
-          ? "canonical_confidence_v2_history_at_or_before"
-          : "canonical_pi_history_at_or_before",
+        source: sourceFor(selected.assessment, "history_at_or_before"),
       });
     },
     getAssessmentForEvidenceCutoff({ goalId, phaseId = null, cutoff } = {}) {
@@ -135,8 +129,24 @@ export function createCanonicalConfidenceReadService({ store = {}, repository = 
   });
 }
 
+function statusFor(assessment) {
+  if (assessment.schemaVersion === CANONICAL_CONFIDENCE_ASSESSMENT_V3_VERSION) return "canonical_v3";
+  if (assessment.schemaVersion === "canonical_confidence_assessment_v2") return "canonical_v2";
+  return "canonical_v1_compatibility";
+}
+function sourceFor(assessment, suffix) {
+  if (assessment.schemaVersion === CANONICAL_CONFIDENCE_ASSESSMENT_V3_VERSION) {
+    return `canonical_confidence_v3_${suffix}`;
+  }
+  if (assessment.schemaVersion === "canonical_confidence_assessment_v2") {
+    return `canonical_confidence_v2_${suffix}`;
+  }
+  return suffix === "history_at_or_before" ? "canonical_pi_history_at_or_before" : `canonical_pi_v1_${suffix}`;
+}
+
 function normalizeAssessment(assessment, record) {
-  if (assessment?.schemaVersion === "canonical_confidence_assessment_v2") {
+  if (assessment?.schemaVersion === "canonical_confidence_assessment_v2" ||
+      assessment?.schemaVersion === CANONICAL_CONFIDENCE_ASSESSMENT_V3_VERSION) {
     try {
       validateCanonicalConfidenceAssessment(assessment);
       return assessment;

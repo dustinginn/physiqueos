@@ -33,6 +33,7 @@ const PERSISTED_COLLECTIONS = [
   "dailyBriefings",
   "briefingReconciliationWorkItems",
   "confidenceInitializationArtifacts",
+  "confidenceActivationArtifacts",
   "analyses",
   "evidencePackages",
   "canonicalEvidenceObjects",
@@ -50,6 +51,7 @@ const PERSISTED_COLLECTIONS = [
   "goalConfidenceSnapshots",
   "goalConfidenceHistory",
   "confidenceInitializationArtifacts",
+  "confidenceActivationArtifacts",
   "goalConfidenceContinuitySeeds",
   "phaseReviewDecisions",
   "phaseReviewTransactions",
@@ -70,6 +72,7 @@ const APPEND_ONLY_COLLECTIONS = [
   "piLowerLevelConfidenceWorkerRuns",
   "goalConfidenceHistory",
   "confidenceInitializationArtifacts",
+  "confidenceActivationArtifacts",
   "goalConfidenceContinuitySeeds",
   "phaseReviewDecisions",
   "phaseReviewTransactions",
@@ -158,6 +161,10 @@ export function createFounderRuntimeStore(persisted = readPersistedRuntimeStore(
     confidenceInitializationArtifacts: mergeSeedWithPersisted(
       [],
       persisted.confidenceInitializationArtifacts
+    ),
+    confidenceActivationArtifacts: mergeSeedWithPersisted(
+      [],
+      persisted.confidenceActivationArtifacts
     ),
     analyses: mergeSeedWithPersisted(founderSeedPack.analyses, persisted.analyses),
     evidencePackages: mergeSeedWithPersisted([], persisted.evidencePackages),

@@ -8,6 +8,16 @@ export const ConfidencePublisherType = Object.freeze({
   MONTHLY_BRIEFING: "monthly_briefing",
   DEXA_EVENT_BRIEFING: "dexa_event_briefing",
   PHOTO_EVENT_BRIEFING: "photo_event_briefing",
+  // Confidence V3 activation baseline — see StrategicActivationService. A
+  // distinct kind (`strategic_activation`, not `cadence_briefing` or
+  // `event_briefing`) so it is never mistaken for, and never overloads, a
+  // recurring Midweek/Weekly/Monthly or DEXA/Photo Event briefing. Unlike
+  // GOAL_INITIALIZATION it is immediately user-facing (see
+  // INTERNAL_ONLY_CONFIDENCE_PUBLISHER_TYPES below) and, unlike
+  // GOAL_INITIALIZATION, it requires an existing prior assessment — it
+  // re-expresses an ALREADY-ACTIVE Goal's Confidence through the V3 engine,
+  // it does not start a new series.
+  V3_STRATEGIC_ACTIVATION: "v3_strategic_activation",
 });
 
 // The briefing contract: a briefing reviews and interprets evidence and owns publication of
@@ -46,6 +56,9 @@ const DEFINITIONS = Object.freeze({
   [ConfidencePublisherType.PHOTO_EVENT_BRIEFING]: Object.freeze({
     kind: "event_briefing", eventType: "photo", requiresPrior: true,
     requiresMeaningfulVisualInterpretation: true,
+  }),
+  [ConfidencePublisherType.V3_STRATEGIC_ACTIVATION]: Object.freeze({
+    kind: "strategic_activation", requiresPrior: true,
   }),
 });
 

@@ -39,6 +39,7 @@ export function resolveActiveGoalConfidencePresentation({
   }
   const presentationMovement = ({ increase: "increased", decrease: "decreased",
     no_meaningful_change: "held" })[assessment.movement] ?? assessment.movement;
+  const isV3 = assessment.schemaVersion === "canonical_confidence_assessment_v3";
   const explanationModel = buildConfidenceExplanationModel({
     assessment,
     surface: "home",
@@ -51,6 +52,20 @@ export function resolveActiveGoalConfidencePresentation({
     assessment.narrativeExplanation?.text ?? null;
   const explanationDetail = explanationModel
     ? confidenceExplanationDetailFromModel(explanationModel)
+    // V3's Narrative already computed structured, presentation-ready
+    // supporting/limiting factors (NarrativeV3Service) — surface those
+    // directly rather than re-deriving them from the flat narrative
+    // sentence via buildConfidenceExplanationDetail's generic (V1-era)
+    // text-mining fallback, which exists for schemas that never had
+    // structured factors to begin with.
+    : isV3
+    ? {
+        qualitativeLevel: confidenceBandLabel(assessment.confidenceBand),
+        supportingFactors: (assessment.narrativeSupportingFactors ?? []).map((item) => item.text).filter(Boolean),
+        limitingFactors: (assessment.narrativeLimitingFactors ?? []).map((item) => item.text).filter(Boolean),
+        clarifyingFactors: [],
+        uncertaintyStatement: assessment.narrativeExplanation?.text ?? "",
+      }
     : buildConfidenceExplanationDetail({
         qualitativeLevel: confidenceBandLabel(assessment.confidenceBand),
         narrativeText: assessment.narrativeExplanation?.text ?? "",
@@ -107,7 +122,7 @@ export function resolveActiveGoalConfidencePresentation({
     goalContractId: assessment.goalContract?.id ?? null,
     goalContractVersion: assessment.goalContract?.version ?? null,
     modelVersion: assessment.schemaVersion,
-    piVersion: v1Compatibility ? "pi_v1_compatibility" : "confidence_v2",
+    piVersion: v1Compatibility ? "pi_v1_compatibility" : isV3 ? "confidence_v3" : "confidence_v2",
     fallbackReason: null,
     provenance: assessment.reproducibility ?? assessment.compatibility ?? null,
   };

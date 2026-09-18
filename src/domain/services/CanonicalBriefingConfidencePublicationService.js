@@ -29,7 +29,17 @@ const BRIEFING_PUBLICATION_COLLECTIONS = Object.freeze([
   "goalConfidenceSnapshots",
   "goalConfidenceHistory",
   "confidenceInitializationArtifacts",
+  "confidenceActivationArtifacts",
 ]);
+const NON_BRIEFING_ARTIFACT_PUBLISHERS = Object.freeze(new Set([
+  "goal_initialization",
+  "v3_strategic_activation",
+]));
+function nonBriefingArtifactCollection(publisherType) {
+  return publisherType === "goal_initialization"
+    ? "confidenceInitializationArtifacts"
+    : "confidenceActivationArtifacts";
+}
 
 const REPLACE_CURRENT_ASSESSMENT = "replace-current-assessment";
 
@@ -142,8 +152,8 @@ export function createCanonicalBriefingConfidencePublicationService(options = {}
         await transaction.mutate(async (candidate) => {
           ensureCollections(candidate);
           stageAssessment(candidate, command.assessment);
-          if (command.assessment.publisherType === "goal_initialization") {
-            candidate.confidenceInitializationArtifacts.push(
+          if (NON_BRIEFING_ARTIFACT_PUBLISHERS.has(command.assessment.publisherType)) {
+            candidate[nonBriefingArtifactCollection(command.assessment.publisherType)].push(
               structuredClone(command.artifact));
           } else {
             const repository = createDailyBriefingRepository(candidate.dailyBriefings);
@@ -364,9 +374,10 @@ async function publishBounded({ command, mutateCanonicalRuntime, now }) {
         }
 
         stageAssessment(candidate, command.assessment);
-        if (command.assessment.publisherType === "goal_initialization") {
-          candidate.confidenceInitializationArtifacts = [
-            ...(candidate.confidenceInitializationArtifacts ?? []),
+        if (NON_BRIEFING_ARTIFACT_PUBLISHERS.has(command.assessment.publisherType)) {
+          const collection = nonBriefingArtifactCollection(command.assessment.publisherType);
+          candidate[collection] = [
+            ...(candidate[collection] ?? []),
             structuredClone(command.artifact),
           ];
         } else {
@@ -462,6 +473,7 @@ function ensureCollections(store) {
   store.goalConfidenceHistory ??= [];
   store.dailyBriefings ??= [];
   store.confidenceInitializationArtifacts ??= [];
+  store.confidenceActivationArtifacts ??= [];
 }
 function stageAssessment(store, assessment) {
   const history = {
@@ -529,13 +541,13 @@ function validateCandidate(store, command, context = null) {
   return { valid: true };
 }
 function findArtifact(store, artifact) {
-  const collection = artifact?.confidencePublication?.publisherType ===
-    "goal_initialization"
-    ? store.confidenceInitializationArtifacts : store.dailyBriefings;
+  const publisherType = artifact?.confidencePublication?.publisherType;
+  const collection = NON_BRIEFING_ARTIFACT_PUBLISHERS.has(publisherType)
+    ? store[nonBriefingArtifactCollection(publisherType)] : store.dailyBriefings;
   return (collection ?? []).find((item) => item.id === artifact?.id) ?? null;
 }
 function findOccurrenceArtifact(store, artifact) {
-  if (artifact?.confidencePublication?.publisherType === "goal_initialization") {
+  if (NON_BRIEFING_ARTIFACT_PUBLISHERS.has(artifact?.confidencePublication?.publisherType)) {
     return findArtifact(store, artifact);
   }
   const identity = getBriefingOccurrenceIdentity(artifact);

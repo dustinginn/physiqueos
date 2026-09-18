@@ -250,7 +250,16 @@ export function createHomeBriefingService({
         selection: briefingSelections.currentCadenceSelection,
       });
       const briefingCard = activeEventBriefing ?? currentCadenceBriefing;
-      const overallGoalConfidence = activeGoal?.type === "build_lean_mass"
+      // Confidence V3's single canonical strategic-interpretation system is
+      // Goal-agnostic by design (see StrategicInterpretationService's
+      // GENERICITY discipline) — it must not be gated to one Goal `type`
+      // string. `resolveActiveGoalConfidencePresentation` already returns a
+      // proper `status: "unavailable"` presentation when no canonical
+      // assessment exists for a Goal/Phase, so removing the gate cannot
+      // regress a Goal type that never published Confidence before; it only
+      // stops silently hiding Confidence for any Goal other than
+      // "build_lean_mass".
+      const overallGoalConfidence = activeGoal
         ? resolveActiveGoalConfidencePresentation({
             activeGoal,
             store: readRuntimeStore(),
