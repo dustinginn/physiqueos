@@ -100,6 +100,44 @@ export function createNarrativeV3CrossSurfaceShadowPreviews({
   });
 }
 
+// Shadow-only decision-support and Monthly projections for the final Founder
+// review. Like the other shadow projections in this module, these models are
+// derived from one completed canonical interpretation and deliberately contain
+// no command, mutation, publication or client-wiring payload.
+export function createNarrativeV3RemainingSurfaceShadowPreviews({
+  goalContract,
+  result,
+} = {}) {
+  assertCanonicalV3Inputs(goalContract, result);
+  const context = createProjectionContext(goalContract, result);
+  const semantic = {
+    schemaVersion: "narrative_v3_remaining_surface_shadow_preview_v1",
+    strategicInterpretationId: result.strategicInterpretation.id,
+    confidenceAssessmentId: result.confidence.id,
+    narrativePlanId: result.narrativePlan.id,
+    monthly: projectMonthly(context),
+    phaseReview: projectPhaseReview(context),
+    goalTransitionReview: projectGoalTransitionReview(context),
+    goalHubPreviewNeeded: false,
+    photo: {
+      v3Plumbing: "PRESERVED",
+      founderQualityAcceptance: "DEFERRED",
+    },
+    publication: {
+      mode: "shadow_only",
+      persistenceWrites: 0,
+      artifactWrites: 0,
+      clientWiring: false,
+      structuralCommands: 0,
+    },
+  };
+  return deepFreeze({
+    ...semantic,
+    id: `narrative_v3_remaining_surface_shadow|${semanticFingerprint(
+      semantic).slice(7)}`,
+  });
+}
+
 function assertOperatingPlanDetails(details) {
   for (const type of ["training", "energy"]) {
     const detail = details?.[type];
@@ -212,6 +250,304 @@ function projectOperatingPlanPurpose(detail) {
     status: detail.status,
     sections: detail.sections,
   };
+}
+
+function projectMonthly(context) {
+  const { goalContract, result, interpretation, objective, objectiveWords,
+    trajectory, guardrail } = context;
+  const narrative = result.narrativePlan;
+  const trainingSignal = selectNarrativeSignal(interpretation,
+    "LEADING_INDICATOR");
+  const energySignal = selectNarrativeSignal(interpretation,
+    "DERIVED_ESTIMATE");
+  const trainingObservation = interpretation.coachingObservationSelection
+    ?.selected?.find((item) => item.domain === "training") ?? null;
+  const confidence = result.confidence;
+  const phaseName = goalContract.vocabulary?.phase?.displayName ??
+    goalContract.phase.label;
+  const progress = progressStatement(objective, objectiveWords, trajectory);
+  const progressPercent = Number.isFinite(trajectory?.fractionAchieved)
+    ? round(trajectory.fractionAchieved * 100) : null;
+  const bodyFat = bodyFatFinding(context);
+  const trainingSummary = trainingObservation
+    ? trainingObservationSummary(trainingObservation)
+    : trainingSignal?.factualSummary ?? null;
+  const energySummary = energySignal && wasNarrated(result.narrativePlan,
+    energySignal.signalId) ? monthlyEnergyCoaching(context, energySignal) : null;
+  const changeThemes = [
+    {
+      label: "Goal trajectory",
+      title: progress,
+      body: `${upperFirst(strategyName(goalContract))} has produced a clear result, and the Goal remains in progress.`,
+      tone: "baseline",
+    },
+    trainingSummary ? {
+      label: "Training",
+      title: trainingObservation
+        ? `${trainingObservation.subjectLabel} provided the clearest fresh training signal.`
+        : "Training remained productive.",
+      body: "That progression supports the current plan without replacing the next outcome check.",
+      tone: "training",
+    } : null,
+    energySummary ? {
+      label: "Energy",
+      title: "The current Energy setup does not need an adjustment.",
+      body: energySummary,
+      tone: "energy",
+    } : null,
+  ].filter(Boolean);
+  const watch = naturalMonthlyWatch(context);
+  return {
+    density: NARRATIVE_V3_DENSITY.FULL,
+    cadence: {
+      calendarDay: 1,
+      recurringPrecedence: true,
+    },
+    hero: {
+      eyebrow: "Monthly Briefing",
+      period: `Evidence through ${longDate(confidence.evidenceCutoff ??
+        narrative.publicationContext?.publishedAt)}`,
+      goal: phaseName,
+      confidence: {
+        score: confidence.currentPercentage,
+        band: confidence.confidenceBand,
+        priorScore: confidence.priorPercentage,
+        delta: confidence.delta,
+        movementDirection: presentationMovement(confidence.movement),
+        primaryReason: narrative.confidenceBriefing.body,
+        presentationExplanation: narrative.confidenceBriefing.body,
+        assessmentId: confidence.id,
+        assessmentDate: narrative.publicationContext?.publishedAt,
+        evidenceCutoff: confidence.evidenceCutoff,
+        goalId: confidence.goalId,
+        phaseId: goalContract.phase.phaseId,
+        source: "canonical_v3_shadow_projection",
+        modelVersion: confidence.policyVersion,
+        piVersion: "confidence_v3",
+      },
+      title: progressPercent == null
+        ? `${achievementLabel(interpretation.goalAchievement,
+          trajectory)}, and the current plan remains appropriate.`
+        : `${progressPercent}% of the Goal is complete, and the plan is working.`,
+      thesis: `${progress ?? `${upperFirst(objectiveWords.displayName ??
+        "Goal progress")} remains in progress.`} Current training supports continuing the plan, while the next ${
+        narrative.nextEvidence.displayName} will show whether that progress continues.`,
+      highlights: [
+        Number.isFinite(trajectory?.completedRequirement) &&
+          Number.isFinite(trajectory?.totalRequirement) ?
+          { label: "Goal progress", value: `${number(
+          trajectory?.completedRequirement, objectiveWords.decimals)} of ${
+          number(trajectory?.totalRequirement)} ${objective?.unit}`,
+          detail: `${progressPercent}% complete` } :
+          { label: "Goal status", value: achievementLabel(
+            interpretation.goalAchievement, trajectory),
+          detail: "Based on the current Goal criteria" },
+        bodyFat ? { label: "Guardrail", value: `${number(bodyFat.value,
+          1)}% body fat`, detail: `Inside the ${guardrail.range} range` } : null,
+        { label: "Goal Confidence", value: `${confidence.currentPercentage}%`,
+          detail: confidence.delta === 0 ? "Holding steady" :
+            `${confidence.delta > 0 ? "Up" : "Down"} ${Math.abs(
+              confidence.delta)} points` },
+      ].filter(Boolean),
+    },
+    training: trainingSummary ? {
+      eyebrow: "Training Progress",
+      title: trainingObservation?.narrativeText ?? trainingSummary,
+      summary: trainingSummary,
+      interpretation: "That supports keeping the current setup in place; it does not replace the next outcome check.",
+      next: "Keep executing the current progression and watch whether the same movements continue to advance.",
+    } : null,
+    energy: energySummary ? {
+      eyebrow: "Energy",
+      title: "The current Energy setup still fits the result.",
+      summary: energySummary,
+      interpretation: "There is no reason to change intake or activity just to make an estimate look different while the realized result and guardrail remain favorable.",
+    } : null,
+    changes: {
+      eyebrow: "What Changed",
+      title: "The month strengthened the case for staying the course.",
+      themes: changeThemes,
+    },
+    monthAhead: {
+      eyebrow: "Month Ahead",
+      title: "Keep the build steady and make the next check count.",
+      thesis: `${upperFirst(goalContract.vocabulary?.strategy
+        ?.continueAction ?? "Keep executing consistently")}. Nothing in the current evidence calls for a structural change.`,
+      guidance: [
+        { label: "Continue", value: "Keep the current plan in place.",
+          detail: trainingObservation
+            ? "Maintain the same progression and execution cadence."
+            : "Execution remains supportive." },
+        { label: "Watch", value: watch,
+          detail: "A watch item is not a reason to change the plan by itself." },
+        { label: "Next check", value: `Use the next ${
+          narrative.nextEvidence.displayName} to test continuation.`,
+        detail: "It is testing whether the response continues, not whether the plan worked." },
+        { label: "Confidence", value: `${confidence.currentPercentage}% · ${
+          confidence.delta === 0 ? "Holding" : "Changed"}`,
+        detail: confidence.delta === 0 ?
+          "Current evidence supports the outlook without creating a new movement." :
+          confidence.movementReason },
+      ],
+      coachTake: trainingObservation ? monthlyCoachTake(trainingObservation) :
+        narrative.composition?.coachTake ?? trainingSummary,
+    },
+  };
+}
+
+function projectPhaseReview(context) {
+  const { goalContract, result, interpretation, trajectory, guardrail } = context;
+  const achieved = ["achieved", "exceeded"].includes(
+    interpretation.goalAchievement);
+  const hasNextPhase = Boolean(goalContract.phase.nextPhaseLabel);
+  const shouldTransition = achieved && hasNextPhase;
+  const currentPhase = goalContract.vocabulary?.phase?.displayName ??
+    goalContract.phase.label;
+  const nextPhase = goalContract.phase.nextPhaseLabel;
+  const progress = Number.isFinite(trajectory?.fractionAchieved)
+    ? `${round(trajectory.fractionAchieved * 100)}% of the Goal is complete`
+    : `${achievementLabel(interpretation.goalAchievement, trajectory)}`;
+  const recommendationLabel = shouldTransition
+    ? `Review beginning ${nextPhase}` : `Continue ${currentPhase}`;
+  const explanation = shouldTransition
+    ? `The current phase has completed its job, and the Goal evidence supports reviewing the planned transition to ${nextPhase}.`
+    : `${upperFirst(progress)}. The current phase is still doing its job: the plan has produced meaningful progress, training remains supportive, and ${
+      guardrail ? `${guardrail.label} remains inside the ${guardrail.range} guardrail` :
+        "no assessed guardrail requires a change"}.`;
+  return {
+    density: NARRATIVE_V3_DENSITY.MEDIUM,
+    eyebrow: "Phase Review",
+    recommendationLabel,
+    explanation,
+    currentEvidence: result.narrativePlan.confidenceDeepExplanation.why,
+    changeConditions: phaseChangeConditions(context),
+    unresolved: shouldTransition
+      ? `Founder review is still required before ${nextPhase} can begin.`
+      : `The next ${result.narrativePlan.nextEvidence.displayName} still needs to show whether this response continues.`,
+    decisionOptions: [
+      shouldTransition ? { label: `Begin ${nextPhase}`, recommended: true } :
+        { label: `Continue ${currentPhase}`, recommended: true },
+      ...(hasNextPhase && !shouldTransition
+        ? [{ label: `Review ${nextPhase}`, recommended: false }] : []),
+    ],
+    founderAuthority: "This is a recommendation only. Nothing changes until you choose and confirm a decision.",
+  };
+}
+
+function projectGoalTransitionReview(context) {
+  const { goalContract, result, interpretation, trajectory, guardrail } = context;
+  const achieved = ["achieved", "exceeded"].includes(
+    interpretation.goalAchievement);
+  const goalName = goalContract.vocabulary?.goal?.displayName ??
+    goalContract.goalLabel;
+  const phaseName = goalContract.vocabulary?.phase?.displayName ??
+    goalContract.phase.label;
+  const strategy = strategyName(goalContract);
+  return {
+    density: NARRATIVE_V3_DENSITY.MEDIUM,
+    eyebrow: "Goal Review",
+    status: achieved ? "Ready for completion review" :
+      achievementLabel(interpretation.goalAchievement, trajectory),
+    recommendationLabel: achieved ? "Review Goal completion and what comes next" :
+      `Keep ${goalName} active`,
+    explanation: achieved
+      ? `The Goal result supports a Founder review of completion before a new Goal is authorized.`
+      : Number.isFinite(trajectory?.completedRequirement) &&
+        Number.isFinite(trajectory?.totalRequirement)
+        ? `No Goal transition is warranted right now. You have completed ${number(
+        trajectory?.completedRequirement, 1)} of the ${number(
+        trajectory?.totalRequirement)} ${context.objective?.unit}, ${strategy} is working, and ${
+        guardrail ? `${guardrail.label} remains inside the ${guardrail.range} guardrail` :
+          "no assessed guardrail requires a change"}.`
+        : `No Goal transition is warranted right now. ${upperFirst(
+          strategy)} remains appropriate, and the current Goal criteria are still in progress.`,
+    strategy: achieved ? "The current strategy should remain historical once completion is confirmed." :
+      `${upperFirst(strategy)} remains appropriate for ${phaseName}.`,
+    nextStructuralAction: achieved
+      ? "If you confirm completion, preserve this Goal and its interpretation as history before authorizing the next Goal."
+      : `Keep the current Goal and ${phaseName} active. Revisit transition when the Goal is achieved or new evidence materially changes the outlook.`,
+    decisionOptions: achieved
+      ? [{ label: "Review Goal completion", recommended: true },
+        { label: "Continue current Goal", recommended: false }]
+      : [{ label: "Continue current Goal", recommended: true }],
+    founderAuthority: "You remain the decision-maker. This review does not complete, replace, or transition the Goal.",
+  };
+}
+
+function selectNarrativeSignal(interpretation, semanticClass) {
+  return interpretation.crossDomainSynthesis?.selectedNarrativeSignals?.find(
+    (item) => item.semanticClass === semanticClass) ?? null;
+}
+
+function wasNarrated(narrativePlan, signalId) {
+  return Object.values(narrativePlan.composition?.sectionAllocations ?? {})
+    .some((allocation) => allocation.topicKeys?.includes(signalId));
+}
+
+function trainingObservationSummary(observation) {
+  const basis = observation.evidenceBasis ?? {};
+  if (Number.isFinite(basis.currentValue) &&
+      Number.isFinite(basis.previousValue)) {
+    return `${observation.subjectLabel} moved from ${number(
+      basis.previousValue)} to ${number(basis.currentValue)}${
+      basis.unit ? ` ${basis.unit}` : ""} across the latest comparable exposures.`;
+  }
+  return observation.narrativeText;
+}
+
+function monthlyCoachTake(observation) {
+  return `${observation.subjectLabel} is worth recognizing. Keep building from that progress without changing the broader plan.`;
+}
+
+function bodyFatFinding(context) {
+  const finding = context.interpretation.guardrailFindings.find((item) =>
+    /body.?fat/iu.test(item.metricCapability?.id ?? "") &&
+      Number.isFinite(item.currentValue));
+  return finding ? { value: finding.currentValue, status: finding.status } : null;
+}
+
+function monthlyEnergyCoaching(context, signal) {
+  const watch = context.result.narrativePlan.composition?.sections?.watch;
+  if (watch && !/paired|derived|estimate-vs|authority|support index/iu.test(
+    watch)) return watch;
+  if (signal.direction === "supports") {
+    return `Energy intake looks compatible with the current ${
+      objectiveName(context)} goal. Keep the current setup while the realized result and guardrails remain favorable.`;
+  }
+  return `The Energy numbers look lower than expected on paper, but the realized result does not support changing the setup on that estimate alone.`;
+}
+
+function naturalMonthlyWatch(context) {
+  if (context.guardrail) {
+    return `Keep ${context.guardrail.label} inside the ${
+      context.guardrail.range} guardrail.`;
+  }
+  const watch = context.result.narrativePlan.composition?.sections?.watch;
+  if (watch && !/paired|derived|estimate-vs|authority|support index/iu.test(
+    watch)) return watch;
+  return `Watch for a meaningful change in ${objectiveName(context)} or current execution.`;
+}
+
+function phaseChangeConditions(context) {
+  const conditions = [];
+  if (context.guardrail) conditions.push(`${upperFirst(
+    context.guardrail.label)} moving outside the ${context.guardrail.range} guardrail.`);
+  conditions.push("Training performance materially declining across enough comparable work to change the outlook.");
+  conditions.push(`The next ${context.result.narrativePlan.nextEvidence.displayName} stalling or contradicting the current result.`);
+  conditions.push("The Goal being achieved and ready for completion review.");
+  return conditions;
+}
+
+function longDate(value) {
+  if (!value) return "the current evidence cutoff";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long", day: "numeric", year: "numeric", timeZone: "UTC",
+  }).format(new Date(value));
+}
+
+function presentationMovement(value) {
+  return ({ increase: "increased", decrease: "decreased",
+    no_meaningful_change: "held" })[value] ?? value;
 }
 
 function configuredObjectiveName(goalContract) {

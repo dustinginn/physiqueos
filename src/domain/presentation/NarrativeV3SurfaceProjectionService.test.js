@@ -4,11 +4,14 @@ import { createPairedCalibrationFixtures } from
   "../../fixtures/confidenceNarrativeV3CalibrationFixtures.js";
 import { runConfidenceNarrativeV3 } from
   "../intelligence/v3/ConfidenceNarrativeV3Pipeline.js";
+import { adaptLatestCanonicalCadenceObservationsV3 } from
+  "../intelligence/ProductionConfidenceNarrativeV3Adapter.js";
 import { composeOperatingPlanStrategyDetail } from
   "../services/OperatingPlanStrategyDetailService.js";
 import {
   BRIEFING_V3_DENSITY_CONTRACTS,
   createNarrativeV3CrossSurfaceShadowPreviews,
+  createNarrativeV3RemainingSurfaceShadowPreviews,
   NARRATIVE_V3_DENSITY,
 } from "./NarrativeV3SurfaceProjectionService.js";
 
@@ -124,6 +127,114 @@ describe("Narrative V3 cross-surface shadow projections", () => {
   });
 });
 
+describe("Narrative V3 remaining surface shadow projections", () => {
+  it("projects a selective FULL Monthly synthesis from canonical V3 state", () => {
+    const { goalContract, result } = currentResult();
+    const preview = createNarrativeV3RemainingSurfaceShadowPreviews({
+      goalContract, result,
+    });
+    expect(preview.monthly).toMatchObject({
+      density: NARRATIVE_V3_DENSITY.FULL,
+      cadence: { calendarDay: 1, recurringPrecedence: true },
+      hero: {
+        goal: "Lean Mass Build",
+        confidence: { score: 79, delta: 0, movementDirection: "held",
+          primaryReason: expect.stringContaining("Confidence holds") },
+      },
+    });
+    expect(preview.monthly.hero.title).toContain("58% of the Goal");
+    expect(preview.monthly.hero.highlights).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Goal progress", value: "5.8 of 10 lb" }),
+      expect.objectContaining({ label: "Guardrail", value: "8.1% body fat",
+        detail: "Inside the 8–9% range" }),
+    ]));
+    expect(preview.monthly.training.title)
+      .toBe("Iso-lateral high rows reached 120 lb, up from the previous best of 100 lb.");
+    expect(preview.monthly.training.summary)
+      .toBe("Iso-Lateral High Rows moved from 100 to 120 lb across the latest comparable exposures.");
+    expect(preview.monthly.energy).toBeNull();
+    expect(preview.monthly.changes.themes).toHaveLength(2);
+    expect(preview.monthly.monthAhead.guidance).toHaveLength(4);
+    expect(preview.monthly.monthAhead.guidance[1].value)
+      .toBe("Keep body fat inside the 8–9% guardrail.");
+    expect(new Set([
+      preview.monthly.training.title,
+      preview.monthly.training.summary,
+      preview.monthly.changes.themes[1].title,
+      preview.monthly.monthAhead.coachTake,
+    ]).size).toBe(4);
+  });
+
+  it("keeps Monthly broader than recurring check-ins without a domain laundry list", () => {
+    const { goalContract, result } = currentResult();
+    const monthly = createNarrativeV3RemainingSurfaceShadowPreviews({
+      goalContract, result,
+    }).monthly;
+    expect(BRIEFING_V3_DENSITY_CONTRACTS.weekly.maximumRoutineDensity)
+      .toBe(NARRATIVE_V3_DENSITY.MEDIUM);
+    expect(monthly.density).toBe(NARRATIVE_V3_DENSITY.FULL);
+    expect(monthly.changes.themes.map((item) => item.label))
+      .toEqual(["Goal trajectory", "Training"]);
+    const copy = JSON.stringify(monthly);
+    expect(copy).not.toMatch(/paired.?day|direct result|operating evidence|estimate-vs-outcome|support index|evidence authority|persistence state/iu);
+  });
+
+  it("projects Phase Review as recommendation-only Founder decision support", () => {
+    const { goalContract, result } = currentResult();
+    const review = createNarrativeV3RemainingSurfaceShadowPreviews({
+      goalContract, result,
+    }).phaseReview;
+    expect(review).toMatchObject({
+      density: NARRATIVE_V3_DENSITY.MEDIUM,
+      eyebrow: "Phase Review",
+      recommendationLabel: "Continue Lean Mass Build",
+      decisionOptions: [{ label: "Continue Lean Mass Build", recommended: true }],
+    });
+    expect(review.explanation).toContain("current phase is still doing its job");
+    expect(review.unresolved).toContain("The next DEXA");
+    expect(review.founderAuthority).toContain("Nothing changes until you choose");
+    expect(review).not.toHaveProperty("command");
+    expect(review).not.toHaveProperty("actionRequest");
+  });
+
+  it("keeps an in-progress Goal active and preserves Founder transition authority", () => {
+    const { goalContract, result } = currentResult();
+    const review = createNarrativeV3RemainingSurfaceShadowPreviews({
+      goalContract, result,
+    }).goalTransitionReview;
+    expect(review).toMatchObject({
+      density: NARRATIVE_V3_DENSITY.MEDIUM,
+      eyebrow: "Goal Review",
+      status: "In progress · 58% complete",
+      recommendationLabel: "Keep the 10 lb lean-mass goal active",
+      decisionOptions: [{ label: "Continue current Goal", recommended: true }],
+    });
+    expect(review.explanation).toContain("No Goal transition is warranted");
+    expect(review.nextStructuralAction).toContain("Revisit transition when the Goal is achieved");
+    expect(review.founderAuthority).toContain("does not complete, replace, or transition");
+    expect(review).not.toHaveProperty("command");
+    expect(review).not.toHaveProperty("actionRequest");
+  });
+
+  it("does not wire, publish, write, or alter Confidence while previewing", () => {
+    const { goalContract, result } = currentResult();
+    const before = JSON.stringify(result);
+    const preview = createNarrativeV3RemainingSurfaceShadowPreviews({
+      goalContract, result,
+    });
+    expect(preview).toMatchObject({
+      goalHubPreviewNeeded: false,
+      photo: { v3Plumbing: "PRESERVED",
+        founderQualityAcceptance: "DEFERRED" },
+      publication: { mode: "shadow_only", persistenceWrites: 0,
+        artifactWrites: 0, clientWiring: false, structuralCommands: 0 },
+    });
+    expect(result.confidence).toMatchObject({ currentPercentage: 79, delta: 0,
+      strategyConfidence: { percentage: 90 } });
+    expect(JSON.stringify(result)).toBe(before);
+  });
+});
+
 function currentResult() {
   const fixtures = createPairedCalibrationFixtures();
   const event = runConfidenceNarrativeV3(fixtures.dexa);
@@ -134,27 +245,73 @@ function currentResult() {
     priorConfidence: event.confidence,
     priorNarrativePlan: event.narrativePlan,
   });
-  const result = structuredClone(weekly);
-  const energySignal = result.strategicInterpretation.crossDomainSynthesis.signals
-    .find((item) => item.semanticClass === "DERIVED_ESTIMATE");
-  result.strategicInterpretation.crossDomainSynthesis.tensions = [{
-    type: "ESTIMATE_VS_OUTCOME_TENSION",
-    lowerAuthorityObservationIds: [energySignal.observationId],
-  }];
-  result.strategicInterpretation.coachingObservationSelection.selected = [{
-    candidateId: "training|iso_lateral_high_row|load_milestone|120",
-    subjectId: "iso_lateral_high_row",
-    subjectLabel: "ISO-Lateral High Rows",
-    domain: "training",
-    type: "load_milestone",
-    narrativeText: "ISO-Lateral High Rows reached a new load best at 120 lb.",
-    topicKey: "training|iso_lateral_high_row",
-    materialStateKey: "load|120",
-    evidenceBasis: { currentValue: 120, previousValue: 100, unit: "lb" },
-    recommendationCapability: { capable: false, mode: "observation_only",
-      text: null },
-  }];
-  return { goalContract: fixtures.weekly.goalContract, result };
+  const goalContract = fixtures.weekly.goalContract;
+  const evidenceWindow = { startDate: "2026-09-13", endDate: "2026-09-15",
+    cutoff: "2026-09-16T06:59:59.999Z" };
+  const assessmentId = "confidence_assessment_v2|midweek";
+  const observations = adaptLatestCanonicalCadenceObservationsV3({
+    goalContract,
+    phase: { id: goalContract.phase.phaseId },
+    cutoff: evidenceWindow.cutoff,
+    store: {
+      canonicalEvidenceObjects: [
+        trainingSession("training_sep13", "2026-09-13", 90),
+        trainingSession("training_sep14", "2026-09-14", 100),
+        trainingSession("training_sep15", "2026-09-15", 120),
+      ],
+      goalConfidenceHistory: [{ assessmentId, assessment: { id: assessmentId,
+        goalId: goalContract.goalId, phaseId: goalContract.phase.phaseId } }],
+      dailyBriefings: [{
+        id: "midweek_briefing_user_20260913_20260915",
+        evidenceWindow,
+        confidencePublication: { assessmentId },
+        briefing: {
+          activeGoal: { id: goalContract.goalId },
+          activePhase: { id: goalContract.phase.phaseId },
+          evidenceWindow,
+          training: { performanceTrend: "improving", sessionsCompleted: 4,
+            performanceHeadline: "This window produced measurable training progress",
+            interpretation: "Current performance supports the productive environment." },
+          energyBalance: { comparableDays: 2,
+            estimatedAverageDailyBalance: -454.5,
+            balanceDirection: "probably_below", reliability: "limited",
+            warnings: ["Nutrition coverage is incomplete."] },
+          weightContext: { observations: 3, averageWeight: 171.6,
+            changeFromPriorComparable: 0.4 },
+          evidenceCompleteness: {
+            nutrition: { completeDays: 1, expectedDays: 3 },
+            activity: { completeDays: 3, expectedDays: 3 },
+            recovery: { completeDays: 0, expectedDays: 3 },
+          },
+        },
+      }],
+    },
+  });
+  const result = runConfidenceNarrativeV3({
+    goalContract, observations,
+    priorInterpretation: weekly.strategicInterpretation,
+    priorCoachingState: weekly.coachingState,
+    priorConfidence: weekly.confidence,
+    priorNarrativePlan: weekly.narrativePlan,
+    evaluationContext: { type: "closed_cadence_boundary", evidenceWindow,
+      evidenceCutoff: evidenceWindow.cutoff,
+      evaluatedAt: "2026-09-16T07:04:38.549Z" },
+    surface: "midweek_briefing",
+  });
+  return { goalContract, result };
+}
+
+function trainingSession(id, date, load) {
+  return {
+    id, evidence_type: "training", observed_at: `${date}T18:00:00.000Z`,
+    metadata: { activity_type: "Traditional Strength Training" },
+    exercises: [{ exercise_id: "iso_lateral_high_row",
+      name: "Iso-Lateral High Rows", category: "Back",
+      sets: [
+        { set_number: 1, reps: 10, weight: load, weight_unit: "lb" },
+        { set_number: 2, reps: 10, weight: load, weight_unit: "lb" },
+      ] }],
+  };
 }
 
 function operatingPlanDetails() {
