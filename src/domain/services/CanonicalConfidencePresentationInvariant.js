@@ -6,11 +6,17 @@ export function assertCanonicalConfidencePresentation(confidence) {
   const primary = normalize(confidence.primaryReason);
   const presentation = normalize(confidence.presentationExplanation);
   const structured = normalize(confidence.explanationModel?.summary);
+  const displayedAssessmentId = normalize(confidence.assessmentId);
+  const structuredAssessmentId = normalize(
+    confidence.explanationModel?.sourceAssessmentId
+  );
   if (confidence.explanationModel && (
     confidence.explanationModel.score !== confidence.score ||
     confidence.explanationModel.band !== confidence.band ||
     normalizedMovement(confidence.explanationModel.movement) !==
-      confidence.movementDirection
+      confidence.movementDirection ||
+    (displayedAssessmentId && structuredAssessmentId &&
+      displayedAssessmentId !== structuredAssessmentId)
   )) {
     throw invariantError("STRUCTURED_IDENTITY_MISMATCH",
       "The shared Confidence explanation must describe the displayed assessment.");

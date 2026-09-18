@@ -24,6 +24,18 @@ describe("canonical confidence presentation invariant", () => {
     }))).toThrow(/MIXED_SOURCE/);
   });
 
+  it("fails closed when a structured explanation belongs to another assessment", () => {
+    expect(() => assertCanonicalConfidencePresentation(confidence({
+      explanationModel: {
+        score: 59,
+        band: "developing",
+        movement: "no_meaningful_change",
+        summary: "Confidence remained stable because the outlook did not materially change.",
+        sourceAssessmentId: "different-confidence-assessment",
+      },
+    }))).toThrow(/STRUCTURED_IDENTITY_MISMATCH/);
+  });
+
   it.each([
     [{ movementDirection: "held", delta: 0, primaryReason: "Confidence increased this week.", presentationExplanation: null }, "HELD_DIRECTION"],
     [{ movementDirection: "held", delta: 0, primaryReason: "Confidence decreased this week.", presentationExplanation: null }, "HELD_DIRECTION"],

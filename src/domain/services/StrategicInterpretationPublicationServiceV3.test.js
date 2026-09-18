@@ -90,6 +90,14 @@ describe("shared canonical V3 strategic publication", () => {
       phaseId: fixtures.weekly.goalContract.phase.phaseId,
       assessmentDate: fixtures.weekly.evaluationContext.evaluatedAt,
       source: "canonical_confidence_v3_snapshot",
+      explanationModel: {
+        score: 79,
+        band: "moderate",
+        movement: "no_meaningful_change",
+        sourceAssessmentId: weekly.assessment.id,
+        sourceCutoff: weekly.assessment.sourceCutoff,
+        sourcePublisher: weekly.assessment.publisherType,
+      },
     });
     const persisted = JSON.parse(fs.readFileSync(setup.filePath, "utf8"));
     expect(persisted.goalConfidenceHistory).toHaveLength(3);

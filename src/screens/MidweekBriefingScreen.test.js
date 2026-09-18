@@ -5,10 +5,35 @@ import { createMidweekEvidenceWindow } from "../domain/services/BriefingEvidence
 import { composeMidweekBriefingPreview } from "../domain/services/MidweekBriefingPreviewService";
 import { prepareMidweekBriefingReviewPresentation } from
   "../domain/services/MidweekBriefingPresentationService";
+import { createBriefingGoalConfidenceBlockFromV3 } from
+  "../domain/services/BriefingGoalConfidencePresentationService";
+import { projectConfidenceExplanationForSurface } from
+  "../domain/presentation/confidenceExplanationPresentation";
 import { midweekPreviewFixtures } from "../fixtures/midweekBriefingPreview";
 import MidweekBriefingScreen from "./MidweekBriefingScreen";
 
 describe("MidweekBriefingScreen", () => {
+  it("renders a producer-bound V3 assessment with its canonical explanation identity", () => {
+    const assessment={id:"confidence-v3-midweek",schemaVersion:"canonical_confidence_assessment_v3",
+      currentPercentage:79,confidenceBand:"moderate",priorPercentage:79,
+      confidenceDelta:0,movement:"no_meaningful_change",movementMagnitude:"none",
+      narrativeExplanation:{text:"Confidence holds because the overall outlook did not change."},
+      narrativeSupportingFactors:[],narrativeLimitingFactors:[],
+      remainingUncertainty:{items:[]},goalId:"goal-build",phaseId:"phase-build",
+      goalContract:{id:"goal-contract-build"},sourceCutoff:"2026-09-16T06:59:59.999Z",
+      publicationTimestamp:"2026-09-16T14:00:00.000Z",publisherType:"midweek_briefing",
+      briefingArtifactId:"midweek-v3"};
+    const publishedConfidence=createBriefingGoalConfidenceBlockFromV3({assessment});
+    const goalConfidence=projectConfidenceExplanationForSurface(
+      publishedConfidence,{assessment,surface:"midweek"});
+    expect(goalConfidence.explanationModel).toMatchObject({score:79,band:"moderate",
+      movement:"no_meaningful_change",sourceAssessmentId:assessment.id});
+    const briefing=v3PresentationSource(goalConfidence);
+    const html=renderToStaticMarkup(React.createElement(MidweekBriefingScreen,{briefing}));
+    expect(html).toContain("Confidence holds because the overall outlook did not change.");
+    expect(html).toContain('data-testid="midweek-confidence"');
+  });
+
   it("renders canonical V3 sections and Coach's Take without legacy substitution", () => {
     const window=createMidweekEvidenceWindow({now:new Date("2026-07-22T19:00:00Z"),timeZone:"America/Los_Angeles"});
     const source=structuredClone(composeMidweekBriefingPreview({...midweekPreviewFixtures.current,window,generatedAt:"2026-07-22T19:00:00Z"}));
@@ -67,3 +92,17 @@ describe("MidweekBriefingScreen", () => {
     expect(html).not.toMatch(/led by (?:Single-Leg|Pull-Up|Row)/);
   });
 });
+
+function v3PresentationSource(goalConfidence) {
+  const window=createMidweekEvidenceWindow({now:new Date("2026-07-22T19:00:00Z"),timeZone:"America/Los_Angeles"});
+  const source=structuredClone(composeMidweekBriefingPreview({...midweekPreviewFixtures.current,window,generatedAt:"2026-07-22T19:00:00Z"}));
+  source.hero={verdict:"Canonical headline.",summary:"Canonical meaning."};
+  source.narrativeV3={summary:"Canonical headline.",detail:"Canonical detail.",sections:{
+    result:"Shoulder press reached a new best.",meaning:"Training is moving in the direction this goal needs.",
+    action:"Keep the current setup in place.",watch:"Watch whether this progress continues.",
+    confidence:"Confidence holds because the overall outlook did not change.",
+  },coachTake:"Leg press reached a milestone worth recognizing."};
+  source.goalConfidence=goalConfidence;
+  return prepareMidweekBriefingReviewPresentation({artifact:{cadence:"midweek",
+    confidencePublication:{schemaVersion:"briefing_confidence_binding_v3"},briefing:source}});
+}
