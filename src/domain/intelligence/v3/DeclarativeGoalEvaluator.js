@@ -25,11 +25,11 @@ function evaluateObjective(objective, bindings, priorInterpretation, strategyRev
     binding.subjectType === "objective" && binding.subjectId === objective.objectiveId &&
     binding.usableFor.includes("objective"));
   const binding = candidates[0] ?? null;
+  const prior = priorInterpretation?.objectiveFindings?.find((item) =>
+    item.objectiveId === objective.objectiveId);
   const durationBinding = bindings.find((item) => item.capabilityId === objective.forecast?.durationCapabilityId &&
     item.usableFor.includes("trajectory"));
   if (!binding) {
-    const prior = priorInterpretation?.objectiveFindings?.find((item) =>
-      item.objectiveId === objective.objectiveId);
     if (prior && durationBinding) {
       const context = { current: prior.currentValue, baseline: prior.baselineValue, change: prior.change,
         goalChange: prior.goalChange, durationDays: numeric(durationBinding.measurement.value), absoluteChange: Math.abs(prior.change ?? 0) };
@@ -63,6 +63,8 @@ function evaluateObjective(objective, bindings, priorInterpretation, strategyRev
     objective.evaluation.successCriteria.every((criterion) => allPredicates(context, [criterion]));
   const exceededSatisfied = objective.evaluation.exceededCriteria.length > 0 &&
     objective.evaluation.exceededCriteria.every((criterion) => allPredicates(context, [criterion]));
+  const replayed = prior?.strategyRevisionId === strategyRevisionId &&
+    prior.evidenceIds?.includes(binding.observationId);
   return {
     findingId: `objective_finding|${objective.objectiveId}|${binding.observationId}`,
     objectiveId: objective.objectiveId,
@@ -88,8 +90,8 @@ function evaluateObjective(objective, bindings, priorInterpretation, strategyRev
     evidenceIds: [binding.observationId],
     sourceReferences: [...binding.sourceReferences],
     factualSummary: binding.measurement.factualSummary,
-    freshness: "new",
-    changedThisEvaluation: true,
+    freshness: replayed ? "carried_forward" : "new",
+    changedThisEvaluation: !replayed,
   };
 }
 
@@ -179,10 +181,11 @@ function evaluateAchievement(goalContract, findings, priorInterpretation) {
 }
 
 function evaluateGuardrail(guardrail, bindings, priorInterpretation) {
+  const prior = priorInterpretation?.guardrailFindings?.find((item) =>
+    item.guardrailId === guardrail.guardrailId);
   const binding = bindings.find((item) => item.subjectType === "guardrail" &&
     item.subjectId === guardrail.guardrailId && item.usableFor.includes("guardrail"));
   if (!binding) {
-    const prior = priorInterpretation?.guardrailFindings?.find((item) => item.guardrailId === guardrail.guardrailId);
     return prior ? { ...structuredClone(prior), freshness: "carried_forward", changedThisEvaluation: false } : {
       findingId: `guardrail_finding|${guardrail.guardrailId}|unassessed`,
       guardrailId: guardrail.guardrailId,
@@ -203,6 +206,7 @@ function evaluateGuardrail(guardrail, bindings, priorInterpretation) {
   const { satisfied, deviation } = guardrailResult(guardrail.evaluation, context);
   const status = satisfied ? "clear" : guardrail.severityBands.find((band) =>
     deviation >= band.minimumDeviation)?.status ?? "breached";
+  const replayed = prior?.evidenceIds?.includes(binding.observationId);
   return {
     findingId: `guardrail_finding|${guardrail.guardrailId}|${binding.observationId}`,
     guardrailId: guardrail.guardrailId,
@@ -216,8 +220,8 @@ function evaluateGuardrail(guardrail, bindings, priorInterpretation) {
     consequencePolicy: guardrail.consequencePolicy,
     evidenceIds: [binding.observationId],
     factualSummary: binding.measurement.factualSummary,
-    freshness: "new",
-    changedThisEvaluation: true,
+    freshness: replayed ? "carried_forward" : "new",
+    changedThisEvaluation: !replayed,
   };
 }
 

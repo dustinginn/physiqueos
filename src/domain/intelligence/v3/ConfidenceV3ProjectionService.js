@@ -63,9 +63,15 @@ export function projectConfidenceV3({ goalContract, interpretation, authorityBin
   const authoritativeAchievement = ["achieved", "exceeded"].includes(interpretation.goalAchievement) &&
     newBindings.some((item) => ["objective", "achievement"].includes(item.subjectType) &&
       AUTHORITY[item.role] >= AUTHORITY.material && QUALITY[item.quality.status] >= QUALITY.adequate);
+  const forecastAt = authoritativeOutcome
+    ? latestOutcomeAt(interpretation, assessedAt)
+    : !sameScope || materialSemanticReassessment
+      ? assessedAt
+      : priorConfidence?.goalAchievementOutlook?.asOf ??
+        latestOutcomeAt(interpretation, assessedAt);
   const outlook = noMaterialChange ? priorConfidence.goalAchievementOutlook : assessOutlook({
     goalContract, interpretation, strategyConfidence, execution,
-    forecastAt: authoritativeOutcome ? latestOutcomeAt(interpretation, assessedAt) : assessedAt,
+    forecastAt,
   });
   const anchoredPercentage = Math.round(outlook.score);
   const projectionMode = noMaterialChange ? "continuity_hold" : authoritativeBreach ? "authoritative_guardrail_anchor" : authoritativeAchievement ? "achieved_state_anchor" : decisiveOutcome ? "decisive_state_anchor" :

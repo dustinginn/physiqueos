@@ -110,6 +110,97 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
       .toBe("phase_strategy|accepted|v1");
   });
 
+  it("binds a known single direct assessment to its natural evidence name", () => {
+    const fixture = createPairedCalibrationFixtures().dexa;
+    const goal = canonicalFallbackGoal(fixture);
+    const input = buildProductionConfidenceNarrativeV3Input({
+      goal,
+      phase: { id: fixture.goalContract.phase.phaseId, startedAt: "2026-08-15" },
+      store: { dexaScans: scans() },
+      evidenceCutoff: fixture.evaluationContext.evidenceCutoff,
+    });
+    expect(input.goalContract.evidenceRequests.find((request) =>
+      request.evidencePurpose === "confirm_persistence"))
+      .toMatchObject({
+        alternatives: [{
+          capabilityIds: [
+            "body_composition.lean_mass",
+            "body_composition.body_fat_percentage",
+          ],
+          vocabularyKey: "canonical_dexa_assessment",
+        }],
+      });
+    expect(input.goalContract.vocabulary.evidence.requests
+      .canonical_dexa_assessment).toEqual({
+      displayName: "DEXA",
+      grammaticalNumber: "singular",
+    });
+    const result = runConfidenceNarrativeV3({
+      ...fixture,
+      goalContract: input.goalContract,
+      observations: input.observations,
+    });
+    expect(result.narrativePlan.composition.sections.watch)
+      .toContain("The next DEXA is about");
+    expect(result.narrativePlan.nextEvidence)
+      .toMatchObject({ displayName: "DEXA", namedFromBinding: true });
+  });
+
+  it("keeps unknown and multiple direct-assessment alternatives generic", () => {
+    const fixture = createPairedCalibrationFixtures().dexa;
+    const phase = { id: fixture.goalContract.phase.phaseId, startedAt: "2026-08-15" };
+    const unknown = buildProductionConfidenceNarrativeV3Input({
+      goal: {
+        id: "future_custom_goal",
+        title: "Future Custom Goal",
+        target: {
+          metric: "launch_index", direction: "increase", unit: "points",
+          baselineValue: 0, targetValue: 10,
+        },
+        timeline: { startDate: "2026-08-15", targetDate: "2026-10-31" },
+      },
+      phase,
+      store: {},
+      evidenceCutoff: fixture.evaluationContext.evidenceCutoff,
+    });
+    expect(unknown.goalContract.evidenceRequests).toEqual([]);
+    expect(unknown.goalContract.vocabulary.evidence).toEqual({});
+
+    const goal = canonicalFallbackGoal(fixture);
+    goal.evidenceRequestsV3 = [{
+      evidencePurpose: "confirm_persistence",
+      strategyRevisionId: fixture.goalContract.strategy.strategyRevisionId,
+      alternatives: [{
+        capabilityIds: ["body_composition.lean_mass"],
+        vocabularyKey: "composition_assessment",
+      }, {
+        capabilityIds: ["performance.load"],
+        vocabularyKey: "strength_assessment",
+      }],
+    }];
+    goal.v3Vocabulary = {
+      goal: { displayName: goal.title },
+      objective: { displayName: "lean mass", ongoingPhrase: "the current response" },
+      strategy: { displayName: "the current plan" },
+      evidence: { requests: {
+        composition_assessment: { displayName: "DEXA", grammaticalNumber: "singular" },
+        strength_assessment: { displayName: "strength assessment", grammaticalNumber: "singular" },
+      } },
+    };
+    const multiple = buildProductionConfidenceNarrativeV3Input({
+      goal, phase, store: { dexaScans: scans() },
+      evidenceCutoff: fixture.evaluationContext.evidenceCutoff,
+    });
+    const result = runConfidenceNarrativeV3({
+      ...fixture,
+      goalContract: multiple.goalContract,
+      observations: multiple.observations,
+    });
+    expect(result.narrativePlan.nextEvidence.namedFromBinding).toBe(false);
+    expect(result.narrativePlan.composition.sections.watch)
+      .toContain("The next check is about");
+  });
+
   it("adapts safe legacy guardrails and the latest bound canonical cadence evidence", () => {
     const fixture = createPairedCalibrationFixtures().dexa;
     const goalId = fixture.goalContract.goalId;
@@ -438,6 +529,25 @@ function scans() {
     scan("dexa_aug15", "2026-08-15", 168.3, 148.3, 12.8, 7.6),
     scan("dexa_sep12", "2026-09-12", 174.7, 153.3, 14.2, 8.1),
   ];
+}
+
+function canonicalFallbackGoal(fixture) {
+  return {
+    id: fixture.goalContract.goalId,
+    title: "Build Lean Mass",
+    target: {
+      metric: "lean_mass", direction: "increase", unit: "lb",
+      baselineValue: 147.5, amount: 10,
+    },
+    timeline: {
+      startDate: "2026-07-18", targetDate: "2026-10-31",
+      activePhaseStrategyId: fixture.goalContract.strategy.strategyRevisionId,
+    },
+    guardrails: [{
+      id: "body_fat", accepted: true,
+      text: "Maintain approximately 8–9% body fat.",
+    }],
+  };
 }
 
 function scan(id, date, total, lean, fat, bodyFat) {

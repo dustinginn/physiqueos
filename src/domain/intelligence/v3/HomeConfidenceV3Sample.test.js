@@ -3,7 +3,7 @@ import { createPairedCalibrationFixtures } from "../../../fixtures/confidenceNar
 import { createGoalContractV3 } from "./GoalContractV3.js";
 import { runConfidenceNarrativeV3 } from "./ConfidenceNarrativeV3Pipeline.js";
 import { createHomeConfidenceV3Sample } from "./HomeConfidenceV3SampleService.js";
-import { findNarrativeV3VoiceViolations } from "./NarrativeV3CompositionService.js";
+import { composeNarrativeV3, findNarrativeV3VoiceViolations } from "./NarrativeV3CompositionService.js";
 
 describe("Unwired Home Confidence and canonical evidence vocabulary", () => {
   it.each([
@@ -84,5 +84,33 @@ describe("Unwired Home Confidence and canonical evidence vocabulary", () => {
     expect(result.narrativePlan.nextEvidence.namedFromBinding).toBe(false);
     expect(result.narrativePlan.composition.sections.watch).toContain("The next check");
     expect(result.narrativePlan.composition.sections.watch).not.toContain("DEXA");
+  });
+
+  it("keeps the single direct-assessment name after the question lifecycle is complete", () => {
+    const fixture = createPairedCalibrationFixtures().dexa;
+    const result = runConfidenceNarrativeV3(fixture);
+    const goalContract = createGoalContractV3({
+      ...fixture.goalContract,
+      evidenceRequests: fixture.goalContract.evidenceRequests.map((request) => ({
+        ...request,
+        questionId: null,
+      })),
+    });
+    const narrative = composeNarrativeV3({
+      goalContract,
+      interpretation: {
+        ...result.strategicInterpretation,
+        nextCoachingQuestion: null,
+        recommendation: {
+          ...result.strategicInterpretation.recommendation,
+          nextEvidencePurpose: null,
+        },
+      },
+      confidence: result.confidence,
+      surface: "test",
+      evaluatedAt: fixture.evaluationContext.evidenceCutoff,
+    });
+    expect(narrative.nextEvidence)
+      .toMatchObject({ displayName: "DEXA", namedFromBinding: true });
   });
 });

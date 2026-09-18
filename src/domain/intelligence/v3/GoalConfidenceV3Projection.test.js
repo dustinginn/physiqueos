@@ -263,6 +263,21 @@ describe("Goal Confidence V3 focused declarative coverage", () => {
     expect(confirmed.confidence.execution.reliableSupportDays).toBe(0);
   });
 
+  it("does not count new execution support as an independent repeat of the same direct result", () => {
+    const config = cases[0];
+    const direct = initial(config);
+    const supported = run(config, [
+      ...observations(config),
+      executionObservation(1, "execution_after_direct", "2026-09-14T00:00:00.000Z"),
+    ], direct, "2026-09-14T06:00:00.000Z");
+    expect(supported.strategicInterpretation.strategyEffectiveness)
+      .toMatchObject({ feasibility: "demonstrated", persistence: "emerging" });
+    expect(supported.strategicInterpretation.strategyEffectiveness.continuity)
+      .toMatchObject({ independentDemonstration: false });
+    expect(supported.strategicInterpretation.objectiveFindings[0])
+      .toMatchObject({ freshness: "carried_forward", changedThisEvaluation: false });
+  });
+
   it("a later decisive outcome can substantially reprice after poor execution", () => {
     const config = cases[0];
     const direct = initial(config);
@@ -273,16 +288,29 @@ describe("Goal Confidence V3 focused declarative coverage", () => {
     expect(achieved.confidence.delta).toBeGreaterThan(3);
   });
 
-  it("does not increase from time passing, even after supportive execution", () => {
+  it("does not move from time passing, even after supportive execution", () => {
     const config = cases[0];
     const direct = initial(config);
     const good = executionWeek(config, direct, 1, 1);
     const elapsed = run(config, [], good, "2026-09-28T06:00:00.000Z");
-    expect(elapsed.confidence.currentPercentage).toBeLessThanOrEqual(good.confidence.currentPercentage);
+    expect(elapsed.confidence.currentPercentage).toBe(good.confidence.currentPercentage);
     expect(elapsed.confidence.execution.reliableSupportDays).toBe(good.confidence.execution.reliableSupportDays);
     const noDeadline = { ...config, noDeadline: true };
     const untimed = initial(noDeadline);
     expect(run(noDeadline, [], untimed, "2026-10-20T06:00:00.000Z").confidence.currentPercentage).toBe(untimed.confidence.currentPercentage);
+  });
+
+  it("keeps the prior forecast date when new execution evidence updates the outlook", () => {
+    const config = cases[0];
+    const direct = initial(config);
+    const supported = run(config, [
+      ...observations(config),
+      executionObservation(1, "execution_later", "2026-09-16T00:00:00.000Z", "robust", {
+        startDate: "2026-09-13", endDate: "2026-09-15",
+      }),
+    ], direct, "2026-09-16T06:00:00.000Z");
+    expect(supported.confidence.goalAchievementOutlook.asOf)
+      .toBe(direct.confidence.goalAchievementOutlook.asOf);
   });
 
   it("deduplicates overlapping windows and replayed observations across assessments", () => {

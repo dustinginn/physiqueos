@@ -144,9 +144,10 @@ function evaluateStrategy({ goalContract, authorityBindings, evaluatedGoal, prio
     ...evaluatedGoal.objectiveFindings,
     ...evaluatedGoal.guardrailFindings,
   ].filter((item) => item.changedThisEvaluation);
-  const hasNewCriterionEvidence = changedFindings.some((finding) => criteria.some((criterion) =>
+  const changedCriterionFindings = changedFindings.filter((finding) => criteria.some((criterion) =>
     criterion.source !== "achievement" &&
     (finding.objectiveId ?? finding.guardrailId) === criterion.subjectId));
+  const hasNewCriterionEvidence = changedCriterionFindings.length > 0;
   const achievementChanged = criteria.some((criterion) => criterion.source === "achievement") &&
     changedFindings.length > 0;
   const currentDemonstration = criteriaSatisfied && currentAdequateExposure &&
@@ -182,7 +183,16 @@ function evaluateStrategy({ goalContract, authorityBindings, evaluatedGoal, prio
     feasibility = "testing";
   }
 
-  const currentBasisIds = new Set(changedFindings.flatMap((item) => item.evidenceIds ?? []));
+  // Persistence advances only when the evidence that satisfies the configured
+  // feasibility criteria is independently new. Execution or another unrelated
+  // changed finding can support the outlook, but cannot masquerade as a repeat
+  // of the direct outcome that originally demonstrated feasibility.
+  const currentDemonstrationFindings = criteria.some((criterion) =>
+    criterion.source === "achievement")
+    ? evaluatedGoal.objectiveFindings.filter((item) => item.changedThisEvaluation)
+    : changedCriterionFindings;
+  const currentBasisIds = new Set(currentDemonstrationFindings
+    .flatMap((item) => item.evidenceIds ?? []));
   const independentDemonstration = currentDemonstration && [...currentBasisIds].some((id) => !priorBasisIds.has(id));
   let persistence = "not_assessed";
   if (feasibility === "demonstrated") {

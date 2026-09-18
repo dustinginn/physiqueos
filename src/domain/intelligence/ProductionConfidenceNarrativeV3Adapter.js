@@ -94,6 +94,10 @@ export function buildGoalContractV3FromCanonical({
   const configuredGuardrails = resolveGoalGuardrailsV3(goal);
   const guardrails = configuredGuardrails.map((guardrail, index) =>
     normalizeConfiguredGuardrail(guardrail, index));
+  const inferredEvidenceBinding = inferDirectAssessmentBindingV3({
+    objectiveCapability: capability,
+    guardrails,
+  });
   const policies = [
     {
       policyId: `objective_direct|${objectiveId}`,
@@ -191,7 +195,13 @@ export function buildGoalContractV3FromCanonical({
     strategicQuestions: goal.strategicQuestionsV3 ??
       defaultStrategicQuestions(strategyRevisionId),
     evidencePolicies: policies,
-    evidenceRequests: goal.evidenceRequestsV3 ?? [],
+    evidenceRequests: goal.evidenceRequestsV3 ??
+      inferredEvidenceRequestsV3({
+        binding: inferredEvidenceBinding,
+        strategyRevisionId,
+        cadenceDays: goal.evidenceCadenceDaysV3 ??
+          target.evidenceCadenceDays ?? null,
+      }),
     objectiveDecisionPolicy: goal.objectiveDecisionPolicyV3 ??
       { mode: "all_required" },
     achievementPolicy: goal.achievementPolicyV3 ??
@@ -206,7 +216,15 @@ export function buildGoalContractV3FromCanonical({
       },
       phase: { displayName: phase.title ?? phase.name ?? "the current phase" },
       strategy: { displayName: phase.strategyLabel ?? "the current plan" },
-      evidence: {},
+      evidence: inferredEvidenceBinding ? {
+        eventName: inferredEvidenceBinding.displayName,
+        requests: {
+          [inferredEvidenceBinding.vocabularyKey]: {
+            displayName: inferredEvidenceBinding.displayName,
+            grammaticalNumber: inferredEvidenceBinding.grammaticalNumber,
+          },
+        },
+      } : {},
     },
   });
 }
@@ -637,6 +655,74 @@ function defaultStrategicQuestions(strategyRevisionId) {
     answerWhen: predicate("strategy.feasibility", "eq", "demonstrated"),
     answerCode: "strategy_contradiction_resolved",
   }];
+}
+
+function inferDirectAssessmentBindingV3({
+  objectiveCapability,
+  guardrails,
+} = {}) {
+  const source = directAssessmentSourceV3(objectiveCapability);
+  if (!source) return null;
+  const capabilityIds = [objectiveCapability, ...guardrails
+    .map((guardrail) => typeof guardrail.metricCapability === "string"
+      ? guardrail.metricCapability
+      : guardrail.metricCapability?.id ?? null)
+    .filter((capabilityId) => capabilityId &&
+      directAssessmentSourceV3(capabilityId)?.vocabularyKey ===
+        source.vocabularyKey)];
+  return {
+    ...source,
+    capabilityIds: [...new Set(capabilityIds)],
+  };
+}
+
+function directAssessmentSourceV3(capabilityId) {
+  const id = String(capabilityId ?? "").toLocaleLowerCase("en-US");
+  if (id.startsWith("body_composition.")) {
+    return {
+      vocabularyKey: "canonical_dexa_assessment",
+      displayName: "DEXA",
+      grammaticalNumber: "singular",
+    };
+  }
+  if (/^performance\.(?:load|strength|one_rep_max|repetition_max|power)(?:$|\.)/u
+    .test(id)) {
+    return {
+      vocabularyKey: "canonical_strength_assessment",
+      displayName: "strength assessment",
+      grammaticalNumber: "singular",
+    };
+  }
+  if (/^performance\.(?:time|time_trial|cardio|pace|distance)(?:$|\.)/u
+    .test(id)) {
+    return {
+      vocabularyKey: "canonical_time_trial",
+      displayName: "time trial",
+      grammaticalNumber: "singular",
+    };
+  }
+  return null;
+}
+
+function inferredEvidenceRequestsV3({
+  binding,
+  strategyRevisionId,
+  cadenceDays,
+} = {}) {
+  if (!binding) return [];
+  return ["establish_feasibility", "confirm_persistence", "resolve_contradiction"]
+    .map((evidencePurpose) => ({
+      requestId: `evidence_request|${strategyRevisionId}|${evidencePurpose}`,
+      strategyRevisionId,
+      evidencePurpose,
+      timing: {
+        cadenceDays: number(cadenceDays),
+      },
+      alternatives: [{
+        capabilityIds: binding.capabilityIds,
+        vocabularyKey: binding.vocabularyKey,
+      }],
+    }));
 }
 
 function normalizeConfiguredGuardrail(input, index) {

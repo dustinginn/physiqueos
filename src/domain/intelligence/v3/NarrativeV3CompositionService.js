@@ -137,20 +137,28 @@ function narrativeContext(goalContract, interpretation, objective) {
 function resolveNextEvidence(goalContract, interpretation) {
   const question = interpretation.nextCoachingQuestion;
   const purpose = question?.evidencePurpose ?? interpretation.recommendation.nextEvidencePurpose;
-  const requests = (goalContract.evidenceRequests ?? []).filter((request) => request.evidencePurpose === purpose &&
+  const eligibleRequests = (goalContract.evidenceRequests ?? []).filter((request) =>
+    (!request.strategyRevisionId || request.strategyRevisionId === interpretation.strategyRevisionId));
+  const requests = eligibleRequests.filter((request) => request.evidencePurpose === purpose &&
     (!request.questionId || request.questionId === question?.questionId) &&
     (!request.strategyRevisionId || request.strategyRevisionId === interpretation.strategyRevisionId));
-  const alternatives = requests.flatMap((request) => request.alternatives);
+  // When the question lifecycle is complete, the contract may no longer name a
+  // purpose even though it still identifies one unambiguous direct assessment.
+  // Preserve that natural name without guessing across multiple alternatives.
+  const namingRequests = purpose == null && requests.length === 0
+    ? eligibleRequests.filter((request) => !request.questionId)
+    : requests;
+  const alternatives = namingRequests.flatMap((request) => request.alternatives);
   const words = alternatives.map((alternative) => goalContract.vocabulary?.evidence?.requests?.[alternative.vocabularyKey]);
   const names = new Set(words.map((item) => item?.displayName));
   const known = alternatives.length > 0 && alternatives.every((item) => item.capabilityIds.length > 0) && names.size === 1 && words.every((item) => item?.displayName);
   return {
-    purpose, requestIds: requests.map((item) => item.requestId).filter(Boolean),
+    purpose, requestIds: namingRequests.map((item) => item.requestId).filter(Boolean),
     capabilityAlternatives: alternatives.map((item) => item.capabilityIds),
     displayName: known ? words[0].displayName : "check",
     grammaticalNumber: known && words[0].grammaticalNumber === "plural" ? "plural" : "singular",
     namedFromBinding: Boolean(known),
-    timing: requests.length === 1 ? requests[0].timing : null,
+    timing: namingRequests.length === 1 ? namingRequests[0].timing : null,
   };
 }
 
