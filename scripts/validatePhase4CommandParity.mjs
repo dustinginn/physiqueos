@@ -1,6 +1,7 @@
 import { register } from "node:module";
 import { createValidationPostgresPool } from "./validationPostgresPool.mjs";
 import {
+  applyPhase4CommandParityFixtureOverlays,
   createPhase4CommandParityFixtureCollections,
   createPhase4CommandParityMemoryCollections,
 } from "./phase4CommandParityFixture.mjs";
@@ -24,9 +25,8 @@ const now = () => new Date("2026-08-12T04:00:00.000Z");
 const principal = { userId: ownerUserId, deviceId: "phase4-device", sessionId: "phase4-session" };
 const fixtureCollections = createPhase4CommandParityFixtureCollections(ownerUserId);
 const memoryRecords = createInMemoryCanonicalRecordStore(createPhase4CommandParityMemoryCollections({
-  canonicalOwner: packageData.collections.user,
+  packageCollections: packageData.collections,
   expectedOwnerUserId: ownerUserId,
-  fixtureCollections,
 }));
 const postgresRecords = createPhase4CanonicalRecordStore({ query: (text, values) => pool.query(text, values) });
 try {
@@ -37,9 +37,8 @@ try {
     await transaction.identity.createDevice({ id: principal.deviceId, userId: ownerUserId, platform: "phase4-test", displayName: "Phase 4 isolated" });
     await transaction.identity.createSession({ id: principal.sessionId, userId: ownerUserId, deviceId: principal.deviceId, authenticatedAt: now(), idleExpiresAt: new Date(now().getTime() + 86_400_000), absoluteExpiresAt: new Date(now().getTime() + 172_800_000), refreshFamilyId: "phase4-family" });
   });
-  for (const [collection, records] of Object.entries(fixtureCollections)) {
-    for (const record of records) await postgresRecords.put({ ownerUserId, collection, recordId: record.id, payload: record });
-  }
+  await applyPhase4CommandParityFixtureOverlays({ records: memoryRecords, ownerUserId, fixtureCollections });
+  await applyPhase4CommandParityFixtureOverlays({ records: postgresRecords, ownerUserId, fixtureCollections });
   const memoryPorts = createCanonicalPersistenceCommandPorts({ records: memoryRecords, now });
   const postgresPorts = Object.fromEntries(CANONICAL_PERSISTENCE_PORT_NAMES.map((name) => [name, (context) =>
     createCanonicalPersistenceCommandPorts({ records: context.transaction.canonicalRecords, now })[name](context)]));
