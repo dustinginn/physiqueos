@@ -253,6 +253,7 @@ struct ProductionEvidenceUploadView: View {
         }
     }
 
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("ADD EVIDENCE").physiqueOSFont(PhysiqueOSTypography.screenEyebrow).foregroundStyle(PhysiqueOSTheme.accent)
@@ -430,28 +431,62 @@ struct ProductionEvidenceUploadView: View {
     private var progressPhotoDetails: some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(Array(photoIdentities.enumerated()), id: \.element.id) { index, identity in
-                CardContainer { VStack(alignment: .leading, spacing: 10) {
-                    Text("Photo \(index + 1) · \(identity.poseLabel)")
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    HStack(spacing: 8) {
-                        photoPicker("Orientation", selection: photoBinding(identity, \.orientation), values: ProgressPhotoOrientation.allCases)
-                        photoPicker("Condition", selection: photoBinding(identity, \.contraction), values: ProgressPhotoContraction.allCases)
-                    }
-                    photoPicker("Pose", selection: photoBinding(identity, \.poseVariant), values: ProgressPhotoPoseVariant.allCases)
-                    if identity.poseVariant == .other {
-                        TextField("Custom pose label", text: photoBinding(identity, \.customLabel)).textFieldStyle(.roundedBorder)
-                    }
-                    photoPicker("Goal role", selection: photoBinding(identity, \.goalRole), values: ProgressPhotoGoalRole.allCases)
-                    Button(identity.confirmed ? "Pose confirmed" : "Confirm pose") {
-                        updatePhoto(identity.id) { draft in
-                            draft.confirmed = draft.orientation != .unconfirmed && draft.contraction != .unconfirmed &&
-                                (draft.poseVariant != .other || !draft.customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                // Card tint carries the same pre-upload identity state the
+                // approved sandbox card used: yellow until the Founder
+                // explicitly confirms this photo, green afterwards. This is
+                // local identity-confirmation state only — never a claim
+                // about Server-side Evidence Review completion.
+                CardContainer(background: (identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent).opacity(0.10)) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        // The actual photo being classified, shown with the
+                        // controls rather than in a separate list above, so
+                        // the Founder never has to correlate the two. This is
+                        // a display-only downsample: `previewImage` does not
+                        // touch the bytes this screen uploads.
+                        if let attachment = attachments.first(where: { $0.id == identity.attachmentId }),
+                           let data = attachment.data,
+                           let image = EvidenceAttachmentLoader.previewImage(data: data) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity, maxHeight: 360)
+                                .background(Color.black.opacity(0.14))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Photo \(index + 1)")
+                                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                Text(identity.poseLabel).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            }
+                            Spacer()
+                            Text(identity.confirmed ? "Confirmed" : "Review")
+                                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .foregroundStyle(identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent)
+                                .background((identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent).opacity(0.16))
+                                .clipShape(Capsule())
+                        }
+                        HStack(spacing: 8) {
+                            photoPicker("Orientation", selection: photoBinding(identity, \.orientation), values: ProgressPhotoOrientation.allCases)
+                            photoPicker("Contraction", selection: photoBinding(identity, \.contraction), values: ProgressPhotoContraction.allCases)
+                        }
+                        photoPicker("Pose", selection: photoBinding(identity, \.poseVariant), values: ProgressPhotoPoseVariant.allCases)
+                        if identity.poseVariant == .other {
+                            TextField("Custom pose label", text: photoBinding(identity, \.customLabel)).textFieldStyle(.roundedBorder)
+                        }
+                        Button(identity.confirmed ? "Pose confirmed" : "Confirm pose") {
+                            updatePhoto(identity.id) { draft in
+                                draft.confirmed = draft.orientation != .unconfirmed && draft.contraction != .unconfirmed &&
+                                    (draft.poseVariant != .other || !draft.customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent)
+                        .disabled(identity.orientation == .unconfirmed || identity.contraction == .unconfirmed)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent)
-                    .disabled(identity.orientation == .unconfirmed || identity.contraction == .unconfirmed)
-                } }
+                }
             }
             CardContainer { VStack(alignment: .leading, spacing: 10) {
                 Text("Session conditions").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
@@ -927,7 +962,7 @@ struct ProductionEvidenceUploadView: View {
                     Image(systemName: "chevron.up.chevron.down").font(.caption2)
                 }
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(value == field.unselectedLabel ? Color.orange : PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(value == field.unselectedLabel ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textPrimary)
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, minHeight: 42)
                 .background(PhysiqueOSTheme.surfaceMuted)
@@ -950,7 +985,12 @@ struct ProductionEvidenceUploadView: View {
         var userConfirmedIdentity = true
     }
 
-    private static func photoIdentitiesJSON(_ identities: [ProgressPhotoIdentityDraft]) throws -> String {
+    /// Goal role is no longer a Founder-facing control (Build 8 removed
+    /// Goal relationship from Progress Photos after physical-device
+    /// feedback), but the intake contract still carries the field, so every
+    /// identity keeps the established `supporting` default. Internal rather
+    /// than private so that default is covered by a regression test.
+    static func photoIdentitiesJSON(_ identities: [ProgressPhotoIdentityDraft]) throws -> String {
         let payload = identities.map { identity in
             let customLabel = identity.customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
             return PhotoIdentityPayload(

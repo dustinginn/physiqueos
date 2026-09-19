@@ -324,7 +324,7 @@ struct EvidenceIntakeView: View {
             if !store.evidenceDraft.photoIdentities.isEmpty {
                 Text("Identify each photo").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                 ForEach(Array(store.evidenceDraft.photoIdentities.enumerated()), id: \.element.id) { index, identity in
-                    CardContainer(background: (identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.yellow).opacity(0.10)) {
+                    CardContainer(background: (identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent).opacity(0.10)) {
                         VStack(alignment: .leading, spacing: 10) {
                             if let attachment = store.evidenceDraft.attachments.first(where: { $0.id == identity.attachmentId }),
                                let data = attachment.data, let image = EvidenceAttachmentLoader.previewImage(data: data) {
@@ -344,8 +344,8 @@ struct EvidenceIntakeView: View {
                                 Text(identity.confirmed ? "Confirmed" : "Review")
                                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                                     .padding(.horizontal, 8).padding(.vertical, 4)
-                                    .foregroundStyle(identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.orange)
-                                    .background((identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.yellow).opacity(0.16)).clipShape(Capsule())
+                                    .foregroundStyle(identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent)
+                                    .background((identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent).opacity(0.16)).clipShape(Capsule())
                             }
                             HStack(spacing: 8) {
                                 photoPicker("Orientation", selection: photoOrientationBinding(identity), values: ProgressPhotoOrientation.allCases)
@@ -363,7 +363,7 @@ struct EvidenceIntakeView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.regular)
-                            .tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.orange)
+                            .tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent)
                             .frame(maxWidth: .infinity)
                             .disabled(identity.orientation == .unconfirmed || identity.contraction == .unconfirmed)
                         }
@@ -462,7 +462,7 @@ struct EvidenceIntakeView: View {
                     Image(systemName: "chevron.up.chevron.down").font(.caption2)
                 }
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(value == "Choose" || value == "Unknown" ? Color.orange : PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(value == "Choose" || value == "Unknown" ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textPrimary)
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, minHeight: 42)
                 .background(PhysiqueOSTheme.surfaceMuted)

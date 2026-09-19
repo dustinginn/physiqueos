@@ -1661,6 +1661,45 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertTrue(item.hasRequiredValues)
     }
 
+    /// Build 8 removed Goal relationship from Founder-facing Progress
+    /// Photos, but the production intake contract still carries
+    /// `goalValidationRole`. With no control on screen, every identity must
+    /// keep sending the established `supporting` default — including after
+    /// the Founder edits and confirms a pose.
+    func testGoalRoleStaysSupportingDefaultWithoutAFounderFacingControl() throws {
+        let attachments = [
+            SandboxAttachment(id: "a1", displayName: "front.jpg", source: .photos, contentType: "image/jpeg", data: Data([1])),
+            SandboxAttachment(id: "a2", displayName: "back.jpg", source: .photos, contentType: "image/jpeg", data: Data([2])),
+        ]
+        var identities = EvidenceLocalInterpretation.defaultPhotoIdentities(for: attachments)
+        XCTAssertEqual(identities.map(\.goalRole), [.supporting, .supporting])
+
+        identities[0].orientation = .front
+        identities[0].contraction = .relaxed
+        identities[0].poseVariant = .doubleBiceps
+        identities[0].confirmed = true
+        identities[1].orientation = .rear
+        identities[1].contraction = .flexed
+        identities[1].confirmed = true
+        XCTAssertEqual(identities.map(\.goalRole), [.supporting, .supporting])
+
+        let json = try ProductionEvidenceUploadView.photoIdentitiesJSON(identities)
+        let decoded = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]
+        )
+        XCTAssertEqual(decoded.count, 2)
+        for entry in decoded {
+            XCTAssertEqual(entry["goalValidationRole"] as? String, "supporting")
+            XCTAssertEqual(entry["identityStatus"] as? String, "confirmed")
+            XCTAssertEqual(entry["userConfirmedIdentity"] as? Bool, true)
+        }
+        XCTAssertEqual(decoded[0]["orientation"] as? String, "front")
+        XCTAssertEqual(decoded[0]["contractionState"] as? String, "relaxed")
+        XCTAssertEqual(decoded[0]["poseVariant"] as? String, "double_biceps")
+        XCTAssertEqual(decoded[1]["orientation"] as? String, "rear")
+        XCTAssertEqual(decoded[1]["contractionState"] as? String, "flexed")
+    }
+
     func testProgressPhotoSessionLabelsAndPoseMutationAreExplicit() async throws {
         XCTAssertEqual(ProgressPhotoSessionDraft.userFacingConditionLabels, ["Time of day", "Fasted", "Post-workout", "Pump"])
 
