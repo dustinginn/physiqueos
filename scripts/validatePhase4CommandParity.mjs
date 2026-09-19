@@ -1,5 +1,9 @@
 import { register } from "node:module";
 import { createValidationPostgresPool } from "./validationPostgresPool.mjs";
+import {
+  createPhase4CommandParityFixtureCollections,
+  createPhase4CommandParityMemoryCollections,
+} from "./phase4CommandParityFixture.mjs";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 const { createPayloadHash } = await import("../src/contracts/v1/canonicalJson.js");
@@ -18,8 +22,12 @@ const ownerUserId = packageData.collections.user.id;
 const pool = createValidationPostgresPool({ connectionString: databaseUrl, maximumPoolSize: 4, applicationName: "physiqueos-command-parity" });
 const now = () => new Date("2026-08-12T04:00:00.000Z");
 const principal = { userId: ownerUserId, deviceId: "phase4-device", sessionId: "phase4-session" };
-const fixtureCollections = createFixtureCollections(ownerUserId);
-const memoryRecords = createInMemoryCanonicalRecordStore(fixtureCollections);
+const fixtureCollections = createPhase4CommandParityFixtureCollections(ownerUserId);
+const memoryRecords = createInMemoryCanonicalRecordStore(createPhase4CommandParityMemoryCollections({
+  canonicalOwner: packageData.collections.user,
+  expectedOwnerUserId: ownerUserId,
+  fixtureCollections,
+}));
 const postgresRecords = createPhase4CanonicalRecordStore({ query: (text, values) => pool.query(text, values) });
 try {
   const runner = createPhase4TransactionRunner({ pool });
@@ -90,17 +98,6 @@ try {
 
   process.stdout.write(`${JSON.stringify({ commandParity: results, commandCount: Object.keys(results).length, replay: "pass", payloadDrift: "pass", transactionalOutbox: "pass", interruptedRollback: "pass", sameAggregateConcurrency: "pass", independentConcurrency: "pass", duplicateOccurrence: "pass", duplicateSourceIdentity: "pass", crossOwnerRead: "pass" })}\n`);
 } finally { await pool.end(); }
-
-function createFixtureCollections(userId) {
-  const record = (id, extra = {}) => ({ id, userId, version: 1, ...extra });
-  return {
-    goals: [record("synthetic-goal"), record("synthetic-transition-goal")],
-    protocols: [record("synthetic-protocol")], executionItems: [record("synthetic-priority", { completionHistory: [] })],
-    evidenceReviews: ["edit", "confirm", "dispose", "nutrition", "photo", "dexa"].map((kind) => record(`synthetic-review-${kind}`, { status: "pending" })),
-    trainingPerformanceEvents: [record("synthetic-training-correct"), record("synthetic-training-draft", { reconciliations: [] })],
-    weightEntries: [], dailyCheckIns: [], evidencePackages: [], goalTransitionDrafts: [], progressPhotos: [], dexaScans: [],
-  };
-}
 
 function commandCases() {
   return [

@@ -6,6 +6,7 @@ export default defineConfig({
     include: [
       "src/platform/migration/phase4Schema.test.js",
       "scripts/PhysiqueOSMigrationDiscovery.test.js",
+      "scripts/Phase4CommandParityFixture.test.js",
       "src/platform/migration/phase4CanonicalExport.test.js",
       "src/platform/migration/migrationManifest.test.js",
       "src/platform/database/phase4PostgresComposition.test.js",
