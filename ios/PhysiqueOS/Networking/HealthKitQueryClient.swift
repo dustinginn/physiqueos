@@ -147,9 +147,11 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                 timeZoneIdentifier: calendar.timeZone.identifier
             )
         }
-        let start = calendar.dateComponents([.era, .year, .month, .day], from: bounds.startDateInclusive)
-        let end = calendar.dateComponents([.era, .year, .month, .day], from: bounds.endDateExclusive)
-        let predicate = HKQuery.predicate(forActivitySummariesBetweenStart: start, end: end)
+        let components = Self.activitySummaryPredicateComponents(bounds: bounds, calendar: calendar)
+        let predicate = HKQuery.predicate(
+            forActivitySummariesBetweenStart: components.start,
+            end: components.end
+        )
         let supplementalMetrics = try await activitySupplementalMetrics(bounds: bounds)
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -243,6 +245,26 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
             }
             self.store.execute(query)
         }
+    }
+
+    /// HealthKit's activity-summary predicate requires both operands to carry
+    /// a calendar in addition to era/year/month/day: without one it raises an
+    /// uncaught `NSInvalidArgumentException` ("startDateComponents: Date
+    /// components require a calendar"), which aborted Build 42 on device the
+    /// moment a foreground validation run built its predicate.
+    /// `Calendar.dateComponents(_:from:)` populates `DateComponents.calendar`
+    /// only when `.calendar` is part of the requested set, so requesting it is
+    /// load-bearing — do not trim it back to the date fields. The window's
+    /// day boundaries are unchanged; only the components' calendar is added.
+    static func activitySummaryPredicateComponents(
+        bounds: HealthKitQueryBounds,
+        calendar: Calendar
+    ) -> (start: DateComponents, end: DateComponents) {
+        let required: Set<Calendar.Component> = [.calendar, .era, .year, .month, .day]
+        return (
+            calendar.dateComponents(required, from: bounds.startDateInclusive),
+            calendar.dateComponents(required, from: bounds.endDateExclusive)
+        )
     }
 
     private func activitySupplementalMetrics(

@@ -1,4 +1,5 @@
 import Foundation
+import HealthKit
 import XCTest
 @testable import PhysiqueOS
 
@@ -30,6 +31,44 @@ final class HealthKitFounderCanaryTests: XCTestCase {
         XCTAssertEqual(Self.localDate(bounds.endDateExclusive, calendar: calendar), "2026-09-11")
         XCTAssertTrue(window.isProvisional(now: calendar.date(from: DateComponents(year: 2026, month: 9, day: 10, hour: 12))!, calendar: calendar))
         XCTAssertFalse(window.isProvisional(now: calendar.date(from: DateComponents(year: 2026, month: 9, day: 11, hour: 12))!, calendar: calendar))
+    }
+
+    /// Build 42 physical-device crash: the real query client handed HealthKit
+    /// date components without a calendar, and HealthKit raised an uncaught
+    /// NSInvalidArgumentException ("Date components require a calendar")
+    /// before any Activity query ran. Every canary test injects a fake query
+    /// client, so this exercises the real HealthKit predicate API with the
+    /// exact components `SystemHealthKitQueryClient` builds. No Health store,
+    /// authorization, or data is involved.
+    func testActivitySummaryPredicateComponentsSatisfyRealHealthKitCalendarContract() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let window = try HealthKitActivityValidationWindow(startDate: "2026-09-05", endDate: "2026-09-10")
+        let bounds = try window.queryBounds(calendar: calendar)
+
+        let components = SystemHealthKitQueryClient.activitySummaryPredicateComponents(
+            bounds: bounds,
+            calendar: calendar
+        )
+
+        // Checked before calling HealthKit: a missing calendar here is the
+        // Build 42 crash, which would otherwise abort the test process.
+        let startCalendar = try XCTUnwrap(components.start.calendar, "HealthKit requires a calendar on startDateComponents")
+        let endCalendar = try XCTUnwrap(components.end.calendar, "HealthKit requires a calendar on endDateComponents")
+        XCTAssertEqual(startCalendar.identifier, calendar.identifier)
+        XCTAssertEqual(startCalendar.timeZone, calendar.timeZone)
+        XCTAssertEqual(endCalendar.identifier, calendar.identifier)
+        XCTAssertEqual(endCalendar.timeZone, calendar.timeZone)
+        XCTAssertEqual(components.start.era, 1)
+        XCTAssertEqual([components.start.year, components.start.month, components.start.day], [2026, 9, 5])
+        XCTAssertEqual(components.end.era, 1)
+        XCTAssertEqual([components.end.year, components.end.month, components.end.day], [2026, 9, 11])
+
+        let predicate = HKQuery.predicate(
+            forActivitySummariesBetweenStart: components.start,
+            end: components.end
+        )
+        XCTAssertFalse(predicate.predicateFormat.isEmpty)
     }
 
     @MainActor
