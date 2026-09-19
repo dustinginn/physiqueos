@@ -4,9 +4,10 @@ import {
   createEvidenceUploadArtifactManifest,
 } from "../../domain/services/EvidenceUploadArtifactManifest.js";
 import { validateDexaPdfUpload } from "../../domain/services/DexaPdfIntakeService.js";
+import { normalizePhotoViewIdentity } from "../../domain/models/progressPhotoPoseVocabulary.js";
 import { foundationLogger } from "../../platform/foundation/runtime.js";
 
-const TYPES = new Set(["dexa_scan", "nutrition", "activity_day", "training"]);
+const TYPES = new Set(["dexa_scan", "nutrition", "activity_day", "training", "photo_session"]);
 const MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024;
 const MAX_SCREENSHOTS = 4;
 // The largest single accepted file (the 50 MB DEXA PDF) plus headroom for
@@ -45,7 +46,7 @@ export async function parseNativeEvidenceIntakeRequest(request) {
   }
   const expectedEvidenceType = String(formData.get("expectedEvidenceType") ?? "").trim();
   if (!TYPES.has(expectedEvidenceType)) {
-    throw problem(400, "EVIDENCE_TYPE_UNAVAILABLE", "Native intake accepts dexa_scan, nutrition, activity_day, or training evidence only.");
+    throw problem(400, "EVIDENCE_TYPE_UNAVAILABLE", "Native intake accepts dexa_scan, nutrition, activity_day, training, or photo_session evidence only.");
   }
   const files = formData.getAll("evidenceFiles")
     .filter((file) => typeof file?.arrayBuffer === "function" && file.size > 0);
@@ -81,6 +82,9 @@ export async function parseNativeEvidenceIntakeRequest(request) {
   if (replacementForSubmissionIdentity === submissionIdentity) {
     throw problem(400, "EVIDENCE_REPLACEMENT_IDENTITY_INVALID", "Replacement evidence requires a new submission identity.");
   }
+  const photoSessionContext = expectedEvidenceType === "photo_session"
+    ? parsePhotoSessionContext(formData, files)
+    : null;
   const artifactManifest = createEvidenceUploadArtifactManifest(files);
   assertEvidenceUploadReceiptMatchesManifest({ manifest: artifactManifest, receivedFiles: files });
   return Object.freeze({
@@ -93,15 +97,72 @@ export async function parseNativeEvidenceIntakeRequest(request) {
     // user-authored canonical claim. Keep it on a separate contract so it
     // can never become a typed-evidence artifact or presentation surface.
     clientExtractedText: clientExtractedText || null,
-    recoveryContext: targetTrainingSessionCanonicalId ? Object.freeze({
+    recoveryContext: photoSessionContext ?? (targetTrainingSessionCanonicalId ? Object.freeze({
       kind: "training_logger_support",
       targetTrainingDraftId,
       targetTrainingSessionCanonicalId,
     }) : replacementForSubmissionIdentity ? Object.freeze({
       kind: "dismissed_evidence_replacement",
       predecessorSubmissionIdentity: replacementForSubmissionIdentity,
-    }) : null,
+    }) : null),
   });
+}
+
+function parsePhotoSessionContext(formData, files) {
+  if (String(formData.get("originalUnedited") ?? "") !== "true") {
+    throw problem(400, "PHOTO_ORIGINAL_CONFIRMATION_REQUIRED", "Confirm that every progress photo is original and unedited.");
+  }
+  const timeOfDay = String(formData.get("photoSessionTimeOfDay") ?? "").trim();
+  if (!["morning", "afternoon", "evening"].includes(timeOfDay)) {
+    throw problem(400, "PHOTO_SESSION_TIME_REQUIRED", "Choose Morning, Afternoon, or Evening for this photo session.");
+  }
+  let requested;
+  try {
+    requested = JSON.parse(String(formData.get("photoIdentitiesJson") ?? "[]"));
+  } catch {
+    throw problem(400, "PHOTO_IDENTITIES_INVALID", "Progress Photo identities are invalid.");
+  }
+  if (!Array.isArray(requested) || requested.length !== files.length) {
+    throw problem(400, "PHOTO_IDENTITIES_INVALID", "Confirm one identity for every Progress Photo.");
+  }
+  const photoIdentities = requested.map((candidate, index) => {
+    if (candidate?.identityStatus !== "confirmed" || candidate?.userConfirmedIdentity !== true) {
+      throw problem(400, "PHOTO_IDENTITY_UNCONFIRMED", `Confirm the identity for photo ${index + 1}.`);
+    }
+    const identity = normalizePhotoViewIdentity(candidate);
+    if (identity.poseId === "unknown" || (identity.poseVariant === "other" && !identity.customLabel)) {
+      throw problem(400, "PHOTO_IDENTITY_INVALID", `Photo ${index + 1} needs a valid pose identity.`);
+    }
+    return Object.freeze({
+      ...identity,
+      identityStatus: "confirmed",
+      userConfirmedIdentity: true,
+      sourceOrder: index,
+      order: index,
+      tags: Array.isArray(candidate.tags) ? candidate.tags.map(String).map((value) => value.trim()).filter(Boolean) : [],
+      goalValidationRole: ["primary", "supporting", "context_only"].includes(candidate.goalValidationRole)
+        ? candidate.goalValidationRole
+        : "supporting",
+    });
+  });
+  return Object.freeze({
+    kind: "progress_photo_session",
+    timeOfDay,
+    originalUnedited: true,
+    photoIdentities,
+    conditions: Object.freeze({
+      timeOfDay,
+      fasted: triState(formData.get("photoSessionFasted")),
+      postWorkout: triState(formData.get("photoSessionPostWorkout")),
+      pump: triState(formData.get("photoSessionPump")),
+    }),
+  });
+}
+
+function triState(value) {
+  if (String(value) === "true") return true;
+  if (String(value) === "false") return false;
+  return null;
 }
 
 // Every uploaded part's declared type is propagated verbatim into the
@@ -143,7 +204,10 @@ async function validateFiles({ expectedEvidenceType, files }) {
     });
     return;
   }
-  if (files.length < 1 || files.length > MAX_SCREENSHOTS) {
+  if (expectedEvidenceType === "photo_session" && files.length < 1) {
+    throw problem(400, "PROGRESS_PHOTO_REQUIRED", "Progress Photos intake requires at least one image.");
+  }
+  if (expectedEvidenceType !== "photo_session" && (files.length < 1 || files.length > MAX_SCREENSHOTS)) {
     throw problem(400, "SCREENSHOT_COUNT_INVALID", `Native ${expectedEvidenceType} intake requires one to ${MAX_SCREENSHOTS} screenshots.`);
   }
   for (const file of files) {

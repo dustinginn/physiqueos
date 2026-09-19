@@ -52,7 +52,22 @@ export function createEvidenceIntakeInterpretationWorkerHandler({
         typedEvidence: receipt.typedEvidence,
         clientExtractedText: receipt.clientExtractedText,
         userId: receipt.ownerUserId,
-        photoSessionContext: {
+        photoSessionContext: receipt.recoveryContext?.kind === "progress_photo_session" ? {
+          ...receipt.recoveryContext,
+          captureMetadata: {
+            status: "reviewed",
+            capturedAt: null,
+            timeOfDay: receipt.recoveryContext.timeOfDay,
+            source: "user_session_review",
+            reviewed: true,
+            limitations: ["exact_capture_time_unavailable"],
+          },
+          goalRelationship: resolvePhotoSessionGoalRelationship({
+            evidenceDate: receipt.effectiveDate,
+            goals: context.goals,
+            executionItems: context.executionItems,
+          }),
+        } : {
           goalRelationship: resolvePhotoSessionGoalRelationship({
             evidenceDate: receipt.effectiveDate,
             goals: context.goals,

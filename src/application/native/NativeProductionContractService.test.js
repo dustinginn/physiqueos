@@ -476,7 +476,7 @@ describe("Native production contract boundary", () => {
     expect(current.confirmEvidenceReview).not.toHaveBeenCalled();
   });
 
-  it("allows versioned photo dismissal without enabling photo confirmation", async () => {
+  it("allows versioned photo dismissal and confirmation through the shared canonical lifecycle", async () => {
     const current = fixture();
     await current.service.command({
       request: request(), commandType: "evidence-review.dispose.v1",
@@ -497,11 +497,15 @@ describe("Native production contract boundary", () => {
       metadata: { idempotencyKey: "dismiss-photo", expectedVersion: "1" },
       payload: { reviewId: "review-photo", disposition: "discarded" },
     });
-    await expect(current.service.command({
+    const confirmed = await current.service.command({
       request: request(), commandType: "evidence-review.commit.v1",
       metadata: { idempotencyKey: "confirm-photo", expectedVersion: "1" },
       payload: { reviewId: "review-photo" },
-    })).rejects.toMatchObject({ status: 400, code: "NATIVE_EVIDENCE_REVIEW_UNAVAILABLE" });
+    });
+    expect(current.confirmEvidenceReview).toHaveBeenCalledWith(expect.objectContaining({
+      reviewId: "review-photo",
+    }));
+    expect(confirmed.confirmation).toMatchObject({ state: "processing", reviewId: "review-photo" });
   });
 
   it("acknowledges a structured Training log at its direct durable canonical boundary", async () => {

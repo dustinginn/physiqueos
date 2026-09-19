@@ -17,6 +17,7 @@ const RESOURCES = new Set(Object.values(NativeProductionResource));
 const CONTEXTS = new Set(["all", "build-lean-mass", "visible-abs"]);
 const NATIVE_EVIDENCE_REVIEW_TYPES = new Set([
   "nutrition", "activity", "activity_day", "training", "dexa", "dexa_scan", "body_composition",
+  "photo_session", "progress_photo",
 ]);
 const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.SUBMIT_WEIGHT,
@@ -225,11 +226,7 @@ export function createNativeProductionContractService({
           ...(review.evidenceTypes ?? []),
           ...(review.interpretedEvidence?.evidence_objects ?? []).map((item) => item?.evidence_type),
         ].filter(Boolean));
-        // Discarding a pending photo review cannot create canonical photo
-        // history. Keep confirmation's narrower family allowlist intact.
-        const allowedTypes = commandType === Phase3Command.DISPOSE_EVIDENCE_REVIEW
-          ? new Set([...NATIVE_EVIDENCE_REVIEW_TYPES, "photo_session", "progress_photo"])
-          : NATIVE_EVIDENCE_REVIEW_TYPES;
+        const allowedTypes = NATIVE_EVIDENCE_REVIEW_TYPES;
         if (evidenceTypes.size === 0 || [...evidenceTypes].some((type) => !allowedTypes.has(type))) {
           throw new ApplicationProblem({
             status: 400,
@@ -244,7 +241,7 @@ export function createNativeProductionContractService({
             throw new ApplicationProblem({
               status: 400,
               code: error?.code ?? "EVIDENCE_REVIEW_NOT_COMMITTABLE",
-              title: "This Nutrition review needs a correction before it can be confirmed.",
+              title: "This Evidence Review needs a correction before it can be confirmed.",
               detail: error?.message,
               fieldErrors: (error?.fields ?? []).map((field) => ({
                 field: `dailyTotals.${field}`,

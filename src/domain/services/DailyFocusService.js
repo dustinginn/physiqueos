@@ -680,7 +680,6 @@ function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now 
       color: "evidence",
       completed,
       satisfiedByEvidence: evidenceSatisfied,
-      session: timeBlock,
       state: state.name,
       priority: state.priorityOffset + 12,
       executionContract,
@@ -720,7 +719,8 @@ function getDailySessionsFromItems(items) {
       label: `${formatSessionLabel(timeBlock)} Check-in`,
       subtitle: `Complete today's scheduled ${formatSessionLabel(timeBlock).toLowerCase()} evidence.`,
       metadata: `${completedCount}/${sessionItems.length} complete`,
-      href: dedicatedWeight?.href ?? `/log?session=${timeBlock}`,
+      href: dedicatedWeight?.href ??
+        (timeBlock === "morning" ? "/check-in/morning" : `/log?session=${timeBlock}`),
       icon: "target",
       color: "primary",
       completed: pendingCount === 0,

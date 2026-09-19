@@ -70,6 +70,43 @@ describe("Evidence intake background interpretation", () => {
     expect(persisted.review.status).toBe("pending");
   });
 
+  it("preserves Founder-confirmed Progress Photo identities and resolves the scheduled goal server-side", async () => {
+    const recoveryContext = {
+      kind: "progress_photo_session",
+      timeOfDay: "morning",
+      originalUnedited: true,
+      conditions: { timeOfDay: "morning", fasted: true, postWorkout: false, pump: false },
+      photoIdentities: [{
+        orientation: "front", contractionState: "relaxed", poseVariant: "standard",
+        poseId: "front-relaxed", identityStatus: "confirmed", userConfirmedIdentity: true,
+      }],
+    };
+    const handler = createEvidenceIntakeInterpretationWorkerHandler({
+      store: fixtureStore({
+        claimInterpretation: async () => ({ outcome: "claimed", receipt: receipt({
+          expectedEvidenceType: "photo_session", recoveryContext,
+        }) }),
+        loadPhotoSessionContext: async () => ({
+          goals: [{ id: "goal-visible-abs", status: "active" }],
+          executionItems: [{ linkedEvidenceType: "progress_photo", linkedGoalId: "goal-visible-abs", occurrenceDate: "2026-08-31" }],
+        }),
+      }),
+      loadArtifact: vi.fn(async () => ({})),
+    });
+
+    await handler(message());
+
+    expect(interpretEvidenceIntakeStoredArtifacts).toHaveBeenCalledWith(expect.objectContaining({
+      photoSessionContext: expect.objectContaining({
+        kind: "progress_photo_session",
+        photoIdentities: recoveryContext.photoIdentities,
+        conditions: recoveryContext.conditions,
+        captureMetadata: expect.objectContaining({ status: "reviewed", timeOfDay: "morning" }),
+        goalRelationship: expect.objectContaining({ status: "resolved" }),
+      }),
+    }));
+  });
+
   it("post-completion replay performs no interpretation or staging", async () => {
     const completeInterpretation = vi.fn();
     const loadArtifact = vi.fn();

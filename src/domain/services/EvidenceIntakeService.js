@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { interpretPdfEvidence } from "../interpreters/PdfInterpreter";
 import {
@@ -833,7 +834,8 @@ function createProgressPhotoEvidencePackage({
     id: photoSetId,
     evidence_type: "photo_session",
     observed_at: evidenceDate,
-    captureMetadata: inferPhotoSessionCaptureMetadata(artifacts, { evidenceDate }),
+    captureMetadata: photoSessionContext?.captureMetadata ??
+      inferPhotoSessionCaptureMetadata(artifacts, { evidenceDate }),
     goalRelationship: photoSessionContext?.goalRelationship ?? {
       status: "needs_review",
       goalIds: [],
@@ -858,17 +860,21 @@ function createProgressPhotoEvidencePackage({
         )
       ),
     },
+    conditions: photoSessionContext?.conditions ?? {},
     photos: artifacts.map((artifact, index) => {
-      const view = inferProgressPhotoView(artifact.fileName, index);
+      const reviewedIdentity = photoSessionContext?.photoIdentities?.[index] ?? null;
+      const view = reviewedIdentity?.orientation ?? inferProgressPhotoView(artifact.fileName, index);
 
       return {
         id: `${photoSetId}_${index + 1}`,
         captured_at: evidenceDate,
         file_name: artifact.fileName,
         mime_type: artifact.mimeType,
-        pose: inferProgressPhotoPose(artifact.fileName, view),
+        ...(reviewedIdentity ?? {}),
+        pose: reviewedIdentity?.contractionState ?? inferProgressPhotoPose(artifact.fileName, view),
         source_artifact_ref: artifact.id,
         storage_path: artifact.relativePath,
+        source_hash: artifact.sourceHash,
         view,
       };
     }),
@@ -1314,6 +1320,7 @@ export function createStoredEvidenceArtifactDescriptor({
     observedDate,
     originalCaptureMetadata,
     relativePath,
+    sourceHash: createHash("sha256").update(buffer).digest("hex"),
     text: isPdfArtifact({ mimeType }) ? "" : buffer.toString("utf8").slice(0, 20000),
     uploadedAt: capturedAt,
   };
@@ -1623,6 +1630,9 @@ export function classifyImageArtifacts(artifacts = [], { expectedEvidenceType = 
   // parser independently fails closed to visual interpretation.
   if (["training", "activity_day"].includes(expectedEvidenceType)) {
     return { progressPhotos: [], screenshots: [...artifacts] };
+  }
+  if (expectedEvidenceType === "photo_session") {
+    return { progressPhotos: [...artifacts], screenshots: [] };
   }
   return artifacts.reduce(
     (groups, artifact) => {

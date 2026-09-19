@@ -19,6 +19,52 @@ describe("Native production Evidence intake", () => {
       .resolves.toMatchObject({ expectedEvidenceType: type, files: [file] });
   });
 
+  it("accepts a Founder-confirmed Progress Photo set without inferring pose identity from filenames", async () => {
+    const first = png("IMG_5001.png");
+    const second = png("IMG_5002.png");
+    const body = baseBody("photo_session");
+    body.set("originalUnedited", "true");
+    body.set("photoSessionTimeOfDay", "morning");
+    body.set("photoSessionFasted", "true");
+    body.set("photoSessionPostWorkout", "false");
+    body.set("photoSessionPump", "false");
+    body.set("photoIdentitiesJson", JSON.stringify([
+      { orientation: "front", contractionState: "relaxed", poseVariant: "standard", identityStatus: "confirmed", userConfirmedIdentity: true, goalValidationRole: "primary" },
+      { orientation: "rear", contractionState: "flexed", poseVariant: "double_biceps", identityStatus: "confirmed", userConfirmedIdentity: true },
+    ]));
+    body.append("evidenceFiles", first);
+    body.append("evidenceFiles", second);
+
+    await expect(parseNativeEvidenceIntakeRequest(nativeRequest(body))).resolves.toMatchObject({
+      expectedEvidenceType: "photo_session",
+      recoveryContext: {
+        kind: "progress_photo_session",
+        timeOfDay: "morning",
+        originalUnedited: true,
+        conditions: { timeOfDay: "morning", fasted: true, postWorkout: false, pump: false },
+        photoIdentities: [
+          expect.objectContaining({ poseId: "front-relaxed", sourceOrder: 0, goalValidationRole: "primary" }),
+          expect.objectContaining({ poseId: "back-flexed", sourceOrder: 1, goalValidationRole: "supporting" }),
+        ],
+      },
+    });
+  });
+
+  it("rejects a Progress Photo set without explicit session and pose confirmations", async () => {
+    const body = baseBody("photo_session");
+    body.append("evidenceFiles", png("front.png"));
+    await expect(parseNativeEvidenceIntakeRequest(nativeRequest(body)))
+      .rejects.toMatchObject({ code: "PHOTO_ORIGINAL_CONFIRMATION_REQUIRED" });
+
+    body.set("originalUnedited", "true");
+    body.set("photoSessionTimeOfDay", "morning");
+    body.set("photoIdentitiesJson", JSON.stringify([
+      { orientation: "front", contractionState: "relaxed", poseVariant: "standard", identityStatus: "suggested", userConfirmedIdentity: false },
+    ]));
+    await expect(parseNativeEvidenceIntakeRequest(nativeRequest(body)))
+      .rejects.toMatchObject({ code: "PHOTO_IDENTITY_UNCONFIRMED" });
+  });
+
   it("persists an exact Logger target only for Training supporting evidence", async () => {
     const file = new File([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])], "screen.png", { type: "image/png" });
     const draftId = "draft-123";
@@ -98,13 +144,26 @@ describe("Native production Evidence intake", () => {
 });
 
 function request(type, file, key = ID, clientExtractedText = null) {
+  const body = baseBody(type);
+  if (clientExtractedText) body.set("clientExtractedText", clientExtractedText);
+  body.append("evidenceFiles", file);
+  return nativeRequest(body, key);
+}
+
+function baseBody(type) {
   const body = new FormData();
   body.set("submissionIdentity", ID);
   body.set("effectiveDate", "2026-09-11");
   body.set("expectedEvidenceType", type);
-  if (clientExtractedText) body.set("clientExtractedText", clientExtractedText);
-  body.append("evidenceFiles", file);
+  return body;
+}
+
+function nativeRequest(body, key = ID) {
   return new Request("https://physiqueos.example/api/v1/native/evidence/intakes", {
     method: "POST", headers: { authorization: `Bearer ${"x".repeat(43)}`, "idempotency-key": key }, body,
   });
+}
+
+function png(name) {
+  return new File([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])], name, { type: "image/png" });
 }
