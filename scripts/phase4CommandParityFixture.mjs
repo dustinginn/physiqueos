@@ -108,10 +108,74 @@ export async function applyPhase4CommandParityFixtureOverlays({
   return Object.freeze(applied);
 }
 
+export async function readPhase4CommandParityOutbox({
+  query,
+  ownerUserId,
+  commandIds,
+} = {}) {
+  if (typeof query !== "function") {
+    throw new Error("Phase 4 command parity requires a PostgreSQL query function for outbox inspection.");
+  }
+  const ownerId = requiredIdentity(ownerUserId, "Phase 4 command-parity outbox owner");
+  const scopedCommandIds = requiredCommandIds(commandIds);
+  const outboxIds = scopedCommandIds.map((commandId) => `outbox:${commandId}`);
+  const dedupeKeys = scopedCommandIds.map((commandId) => `command:${commandId}`);
+  const result = await query(
+    `WITH parity_receipts AS (
+       SELECT operation_id
+         FROM physiqueos.command_receipts
+        WHERE user_id = $1
+          AND command_id = ANY($2::text[])
+          AND operation_id IS NOT NULL
+     )
+     SELECT DISTINCT message.id, message.topic, message.dedupe_key, message.operation_id
+       FROM physiqueos.outbox_messages AS message
+      WHERE message.user_id = $1
+        AND (
+          message.operation_id IN (SELECT operation_id FROM parity_receipts)
+          OR message.payload ->> 'commandId' = ANY($2::text[])
+          OR message.id = ANY($3::text[])
+          OR message.dedupe_key = ANY($4::text[])
+        )
+      ORDER BY message.id`,
+    [ownerId, scopedCommandIds, outboxIds, dedupeKeys],
+  );
+  return Object.freeze((result?.rows ?? []).map((row) => Object.freeze({
+    id: String(row.id),
+    topic: String(row.topic),
+    dedupeKey: String(row.dedupe_key),
+    operationId: row.operation_id == null ? null : String(row.operation_id),
+  })));
+}
+
+export function assertPhase4CommandParityOutboxEmpty(messages) {
+  if (!Array.isArray(messages)) {
+    throw new Error("Phase 4 command-parity outbox messages must be an array.");
+  }
+  const invalidations = messages.filter((message) => message?.topic === "canonical.read-model.invalidate");
+  if (invalidations.length > 0) {
+    throw new Error("Phase 4 parity commands unexpectedly enqueued canonical.read-model.invalidate.");
+  }
+  if (messages.length > 0) {
+    throw new Error("Phase 4 parity commands unexpectedly enqueued transactional outbox work.");
+  }
+}
+
 function requiredIdentity(value, label) {
   const identity = String(value ?? "").trim();
   if (!identity) throw new Error(`${label} identity is required.`);
   return identity;
+}
+
+function requiredCommandIds(commandIds) {
+  if (!Array.isArray(commandIds) || commandIds.length === 0) {
+    throw new Error("Phase 4 command-parity outbox inspection requires command identities.");
+  }
+  const identities = commandIds.map((commandId) => requiredIdentity(commandId, "Phase 4 command-parity command"));
+  if (new Set(identities).size !== identities.length) {
+    throw new Error("Phase 4 command-parity outbox inspection requires unique command identities.");
+  }
+  return identities;
 }
 
 function recordsFor(source) {

@@ -2,9 +2,11 @@ import { register } from "node:module";
 import { createValidationPostgresPool } from "./validationPostgresPool.mjs";
 import {
   applyPhase4CommandParityFixtureOverlays,
+  assertPhase4CommandParityOutboxEmpty,
   createPhase4CommandParityCases,
   createPhase4CommandParityFixtureCollections,
   createPhase4CommandParityMemoryCollections,
+  readPhase4CommandParityOutbox,
 } from "./phase4CommandParityFixture.mjs";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
@@ -46,6 +48,7 @@ try {
   const memory = createPhase3CommandService({ transactionRunner: createInMemoryFoundationTransactionStore(), ports: memoryPorts });
   const postgres = createPhase3CommandService({ transactionRunner: runner, ports: postgresPorts });
   const cases = createPhase4CommandParityCases();
+  const parityCommandIds = cases.map((_, caseIndex) => commandId(caseIndex + 1));
   const results = {};
   let index = 0;
   for (const testCase of cases) {
@@ -56,14 +59,24 @@ try {
     assertSemanticEqual(left.receipt.result, right.receipt.result, testCase.commandType);
     results[testCase.commandType] = "pass";
   }
-  const outboxAfterCommands = Number((await pool.query("SELECT count(*)::integer AS count FROM physiqueos.outbox_messages WHERE topic='canonical.read-model.invalidate'")).rows[0].count);
-  assert(outboxAfterCommands === cases.length, "Canonical mutations did not commit exactly one transactional outbox effect each.");
+  const outboxAfterCommands = await readPhase4CommandParityOutbox({
+    query: (text, values) => pool.query(text, values),
+    ownerUserId,
+    commandIds: parityCommandIds,
+  });
+  assertPhase4CommandParityOutboxEmpty(outboxAfterCommands);
 
   const replayCase = cases[0];
   const replayInput = { commandType: replayCase.commandType, principal, metadata: { commandId: commandId(1), idempotencyKey: "phase4-command-parity-001" }, payload: replayCase.payload };
   const replay = await postgres.execute(replayInput);
   assert(replay.outcome === "replayed", "Committed response-loss retry did not replay its receipt.");
-  assert(Number((await pool.query("SELECT count(*)::integer AS count FROM physiqueos.outbox_messages WHERE topic='canonical.read-model.invalidate'")).rows[0].count) === outboxAfterCommands, "Receipt replay duplicated its outbox effect.");
+  const outboxAfterReplay = await readPhase4CommandParityOutbox({
+    query: (text, values) => pool.query(text, values),
+    ownerUserId,
+    commandIds: parityCommandIds,
+  });
+  assertPhase4CommandParityOutboxEmpty(outboxAfterReplay);
+  assert(outboxAfterReplay.length === outboxAfterCommands.length, "Receipt replay changed the parity-command outbox count.");
   await expectCode("IDEMPOTENCY_KEY_REUSED", () => postgres.execute({ ...replayInput, payload: { ...replayInput.payload, value: 999 } }));
 
   const duplicateInput = { commandType: Phase3Command.COMPLETE_PRIORITY, principal, metadata: { commandId: commandId(90), idempotencyKey: "phase4-duplicate-priority-001", expectedVersion: "1" }, payload: { priorityId: "synthetic-priority", occurrenceDate: "2026-08-11" } };

@@ -18,9 +18,11 @@ import {
 } from "../src/platform/migration/phase5SyntheticPackage.js";
 import {
   applyPhase4CommandParityFixtureOverlays,
+  assertPhase4CommandParityOutboxEmpty,
   createPhase4CommandParityCases,
   createPhase4CommandParityFixtureCollections,
   createPhase4CommandParityMemoryCollections,
+  readPhase4CommandParityOutbox,
 } from "./phase4CommandParityFixture.mjs";
 
 const now = () => new Date("2026-08-12T04:00:00.000Z");
@@ -194,8 +196,9 @@ describe("Phase 4 command-parity starting state", () => {
       ownerUserId: runtime.user.id,
       fixtureCollections,
     });
+    const transactionStore = createInMemoryFoundationTransactionStore();
     const service = createPhase3CommandService({
-      transactionRunner: createInMemoryFoundationTransactionStore(),
+      transactionRunner: transactionStore,
       ports: createCanonicalPersistenceCommandPorts({ records, now }),
     });
     const results = new Map();
@@ -209,6 +212,21 @@ describe("Phase 4 command-parity starting state", () => {
       expect(executed.outcome, testCase.commandType).toBe("committed");
       results.set(testCase.commandType, executed.receipt.result);
     }
+
+    expect(transactionStore.inspect().commandReceipts.size).toBe(17);
+    expect([...transactionStore.inspect().commandReceipts.values()]
+      .every((receipt) => receipt.status === "committed")).toBe(true);
+    expect(transactionStore.inspect().outbox.size).toBe(0);
+    const replayCase = createPhase4CommandParityCases()[0];
+    const replay = await service.execute({
+      commandType: replayCase.commandType,
+      principal: parityPrincipal(runtime.user.id),
+      metadata: parityMetadata(1, replayCase.expectedVersion, "prerequisite"),
+      payload: replayCase.payload,
+    });
+    expect(replay.outcome).toBe("replayed");
+    expect(transactionStore.inspect().commandReceipts.size).toBe(17);
+    expect(transactionStore.inspect().outbox.size).toBe(0);
 
     expect(results.get(Phase3Command.SUBMIT_CHECK_IN)).toEqual({
       status: "unchanged",
@@ -230,6 +248,47 @@ describe("Phase 4 command-parity starting state", () => {
       collection: "reminders",
       recordId: "synthetic-priority",
     })).toMatchObject({ version: 2 });
+  });
+
+  it("scopes PostgreSQL outbox inspection to the parity commands and fails closed on attributable work", async () => {
+    const commandIds = [
+      "0198f100-0000-7000-8000-000000000001",
+      "0198f100-0000-7000-8000-000000000002",
+    ];
+    const query = vi.fn(async () => ({ rows: [] }));
+
+    const messages = await readPhase4CommandParityOutbox({
+      query,
+      ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+      commandIds,
+    });
+
+    expect(messages).toEqual([]);
+    expect(query).toHaveBeenCalledOnce();
+    const [sql, values] = query.mock.calls[0];
+    expect(sql).toContain("FROM physiqueos.command_receipts");
+    expect(sql).toContain("FROM physiqueos.outbox_messages");
+    expect(sql).toContain("message.operation_id IN");
+    expect(sql).toContain("message.payload ->> 'commandId'");
+    expect(values).toEqual([
+      PHASE5_SYNTHETIC_OWNER_ID,
+      commandIds,
+      commandIds.map((commandId) => `outbox:${commandId}`),
+      commandIds.map((commandId) => `command:${commandId}`),
+    ]);
+    expect(() => assertPhase4CommandParityOutboxEmpty(messages)).not.toThrow();
+    expect(() => assertPhase4CommandParityOutboxEmpty([{
+      id: "outbox:parity",
+      topic: "canonical.read-model.invalidate",
+      dedupeKey: "command:parity",
+      operationId: null,
+    }])).toThrow("unexpectedly enqueued canonical.read-model.invalidate");
+    expect(() => assertPhase4CommandParityOutboxEmpty([{
+      id: "supported-work",
+      topic: "operations.simplified-provider-migration",
+      dedupeKey: "supported-work",
+      operationId: "operation-1",
+    }])).toThrow("unexpectedly enqueued transactional outbox work");
   });
 
   it("preserves RESOURCE_NOT_FOUND when the canonical owner is genuinely absent", async () => {
