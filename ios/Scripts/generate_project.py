@@ -289,6 +289,25 @@ late_resource_files = [
     ("Resources", "Assets.xcassets"),
 ]
 
+# N0 HealthKit files are allocated after every established project object so
+# adding the capability shell does not renumber unrelated Build 41 objects.
+late_app_files = [
+    ("Contracts", "HealthKitCapabilityModels.swift"),
+    ("Networking", "HealthKitTypeRegistry.swift"),
+    ("Networking", "HealthKitService.swift"),
+    ("Networking", "HealthKitAuthorizationCoordinator.swift"),
+]
+
+late_test_files = [
+    ("PhysiqueOSTests", "HealthKitCapabilityTests.swift"),
+]
+
+late_reference_only_files = [
+    ("Supporting", "PhysiqueOS.entitlements"),
+]
+
+system_frameworks = ["HealthKit.framework"]
+
 # Files that must be visible/navigable in Xcode and resolvable by path (an
 # Info.plist referenced via the INFOPLIST_FILE build setting) but are NOT
 # copied via a Sources/Resources build phase themselves.
@@ -366,6 +385,8 @@ def file_type_for(fname):
         return "text.json"
     if fname.endswith(".plist"):
         return "text.plist.xml"
+    if fname.endswith(".entitlements"):
+        return "text.plist.entitlements"
     if fname.endswith(".ttf"):
         return "file"
     if fname.endswith(".txt"):
@@ -388,9 +409,9 @@ for group, fname in test_files:
 # Groups (every distinct directory that needs a PBXGroup)
 group_names = sorted(set(
     ["App", "Contracts", "Networking", "SharedUI", "Resources", "Presentation", "Supporting"]
-    + [g for g, _ in app_files]
+    + [g for g, _ in app_files + late_app_files]
     + [g for g, _ in resource_files]
-    + [g for g, _ in reference_only_files]
+    + [g for g, _ in reference_only_files + late_reference_only_files]
 ), key=lambda g: (g.count("/"), g))
 I("group:main")
 I("group:products")
@@ -449,6 +470,17 @@ I("uiTestContainerProxy")
 for group, fname in late_resource_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:{group}/{fname}")
+for group, fname in late_app_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:{group}/{fname}")
+for group, fname in late_test_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:{group}/{fname}")
+for group, fname in late_reference_only_files:
+    I(f"fileref:{group}/{fname}")
+for framework in system_frameworks:
+    I(f"fileref:framework:{framework}")
+    I(f"buildfile:framework:{framework}")
 
 # ---------------- PBXBuildFile ----------------
 buildfile_lines = []
@@ -467,6 +499,15 @@ for group, fname in test_files:
 for group, fname in ui_test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
+for group, fname in late_app_files:
+    bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
+    buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
+for group, fname in late_test_files:
+    bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
+    buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
+for framework in system_frameworks:
+    bf, fr = I(f"buildfile:framework:{framework}"), I(f"fileref:framework:{framework}")
+    buildfile_lines.append(f"\t\t{bf} /* {framework} in Frameworks */ = {{isa = PBXBuildFile; fileRef = {fr} /* {framework} */; }};")
 
 # ---------------- PBXContainerItemProxy ----------------
 container_proxy = f"""\t\t{I('testContainerProxy')} /* PBXContainerItemProxy */ = {{
@@ -486,18 +527,29 @@ container_proxy = f"""\t\t{I('testContainerProxy')} /* PBXContainerItemProxy */ 
 
 # ---------------- PBXFileReference ----------------
 fileref_lines = []
-for group, fname in app_files + resource_files + late_resource_files + reference_only_files + test_files + ui_test_files:
+for group, fname in app_files + late_app_files + resource_files + late_resource_files + reference_only_files + late_reference_only_files + test_files + late_test_files + ui_test_files:
     fr = I(f"fileref:{group}/{fname}")
     fileref_lines.append(f"\t\t{fr} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};")
+for framework in system_frameworks:
+    fileref_lines.append(
+        f"\t\t{I(f'fileref:framework:{framework}')} /* {framework} */ = "
+        f"{{isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = {framework}; "
+        f"path = System/Library/Frameworks/{framework}; sourceTree = SDKROOT; }};"
+    )
 fileref_lines.append(f"\t\t{I('fileref:PhysiqueOS.app')} /* PhysiqueOS.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; }};")
 fileref_lines.append(f"\t\t{I('fileref:PhysiqueOSTests.xctest')} /* PhysiqueOSTests.xctest */ = {{isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; }};")
 fileref_lines.append(f"\t\t{I('fileref:PhysiqueOSUITests.xctest')} /* PhysiqueOSUITests.xctest */ = {{isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; }};")
 
 # ---------------- PBXFrameworksBuildPhase ----------------
+app_framework_build_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:framework:{framework}')} /* {framework} in Frameworks */,"
+    for framework in system_frameworks
+)
 frameworks_phases = f"""\t\t{I('appFrameworksPhase')} /* Frameworks */ = {{
 \t\t\tisa = PBXFrameworksBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = (
+{app_framework_build_ids}
 \t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};
@@ -518,10 +570,10 @@ frameworks_phases = f"""\t\t{I('appFrameworksPhase')} /* Frameworks */ = {{
 
 # ---------------- PBXGroup ----------------
 all_members = (
-    [(g, f) for g, f in app_files]
+    [(g, f) for g, f in app_files + late_app_files]
     + [(g, f) for g, f in resource_files]
     + [(g, f) for g, f in late_resource_files]
-    + [(g, f) for g, f in reference_only_files]
+    + [(g, f) for g, f in reference_only_files + late_reference_only_files]
 )
 
 def group_children_for(path):
@@ -572,7 +624,7 @@ for g in group_names:
 \t\t\tsourceTree = "<group>";
 \t\t}};""")
 
-test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files)
+test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files + late_test_files)
 group_lines.append(f"""\t\t{I('group:PhysiqueOSTests')} /* PhysiqueOSTests */ = {{
 \t\t\tisa = PBXGroup;
 \t\t\tchildren = (
@@ -615,12 +667,12 @@ group_lines.append(f"""\t\t{I('group:main')} /* Main */ = {{
 \t\t}};""")
 
 # ---------------- PBXNativeTarget ----------------
-app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files)
+app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files + late_app_files)
 app_resource_build_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Resources */,"
     for g, f in resource_files + late_resource_files
 )
-test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files)
+test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files + late_test_files)
 ui_test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in ui_test_files)
 
 sources_phases = f"""\t\t{I('appSourcesPhase')} /* Sources */ = {{
@@ -860,6 +912,7 @@ proj_release = f"""\t\t{I('projRelease')} /* Release */ = {{
 app_common = f"""
 \t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 \t\t\t\tASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+\t\t\t\tCODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";
 \t\t\t\tCODE_SIGN_STYLE = Automatic;
 \t\t\t\tCURRENT_PROJECT_VERSION = {APP_BUILD_NUMBER};
 \t\t\t\tDEVELOPMENT_TEAM = {DEVELOPMENT_TEAM};
@@ -1058,6 +1111,7 @@ with open(f"{ROOT}/PhysiqueOS.xcodeproj/project.pbxproj", "w") as f:
 print("wrote project.pbxproj,", len(pbxproj), "bytes")
 print("appTarget id:", I('appTarget'))
 print("testTarget id:", I('testTarget'))
-print("app files:", len(app_files), "resources:", len(resource_files + late_resource_files),
-      "reference-only:", len(reference_only_files), "test files:", len(test_files))
+print("app files:", len(app_files + late_app_files), "resources:", len(resource_files + late_resource_files),
+      "reference-only:", len(reference_only_files + late_reference_only_files),
+      "test files:", len(test_files + late_test_files))
 print("development team:", DEVELOPMENT_TEAM)

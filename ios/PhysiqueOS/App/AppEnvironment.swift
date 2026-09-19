@@ -237,6 +237,10 @@ final class AppEnvironment {
     /// Shared across every Production write domain — see
     /// `ProductionIdempotencyKeyStore`'s doc comment.
     let productionIdempotencyKeyStore: ProductionIdempotencyKeyStore
+    /// N0 capability shell. The default gate enables no operation, and the
+    /// app lifecycle never invokes the coordinator automatically.
+    let healthKitFeatureGate: HealthKitFeatureGate
+    let healthKitAuthorizationCoordinator: HealthKitAuthorizationCoordinator
 
     var weightEvidenceAPI: WeightEvidenceAPI {
         switch nativeAuthority {
@@ -527,7 +531,9 @@ final class AppEnvironment {
         briefingSandboxStore: BriefingSandboxStore = BriefingSandboxStore(),
         founderServerAPI: FounderServerAPI = FounderServerAPI(),
         productionNativeAPI: ProductionNativeAPI = ProductionNativeAPI(),
-        founderPhotoMediaStore: FounderPhotoMediaStore? = nil
+        founderPhotoMediaStore: FounderPhotoMediaStore? = nil,
+        healthKitFeatureGate: HealthKitFeatureGate = .n0Disabled,
+        healthKitService: any HealthKitService = SystemHealthKitService()
     ) {
         self.authoritySelectionStore = authoritySelectionStore
         self.nativeAuthority = nativeAuthority ?? authoritySelectionStore.load() ?? .sandbox
@@ -558,6 +564,11 @@ final class AppEnvironment {
         self.founderPhotoMediaStore = founderPhotoMediaStore ?? FounderPhotoMediaStore(api: founderServerAPI)
         self.founderProductionPhotoMediaStore = FounderProductionPhotoMediaStore(api: productionNativeAPI)
         self.productionIdempotencyKeyStore = ProductionIdempotencyKeyStore()
+        self.healthKitFeatureGate = healthKitFeatureGate
+        self.healthKitAuthorizationCoordinator = HealthKitAuthorizationCoordinator(
+            service: healthKitService,
+            featureGate: healthKitFeatureGate
+        )
     }
 
     func selectNativeAuthority(_ authority: NativeAPIEnvironment) {

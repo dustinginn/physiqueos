@@ -10,6 +10,7 @@ REPOSITORY_ROOT = IOS_ROOT.parent
 GENERATOR = IOS_ROOT / "Scripts" / "generate_project.py"
 PROJECT = IOS_ROOT / "PhysiqueOS.xcodeproj" / "project.pbxproj"
 INFO = IOS_ROOT / "PhysiqueOS" / "Supporting" / "Info.plist"
+ENTITLEMENTS = IOS_ROOT / "PhysiqueOS" / "Supporting" / "PhysiqueOS.entitlements"
 
 
 def main() -> None:
@@ -28,11 +29,26 @@ def main() -> None:
         raise SystemExit("App bundle identifier changed or is not present in both app configurations")
     if project.count("ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;") != 2:
         raise SystemExit("AppIcon is not wired in both app configurations")
+    if project.count('CODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";') != 2:
+        raise SystemExit("HealthKit entitlements are not wired in both app configurations")
+    if "HealthKit.framework in Frameworks" not in project:
+        raise SystemExit("HealthKit.framework is not linked by the app target")
     with INFO.open("rb") as handle:
         info = plistlib.load(handle)
     if info.get("ITSAppUsesNonExemptEncryption") is not False:
         raise SystemExit("ITSAppUsesNonExemptEncryption must be false for the approved declaration")
-    print(f"release configuration verified: version 1.0 ({build_number}), AppIcon, exempt encryption")
+    if not info.get("NSHealthShareUsageDescription") or not info.get("NSHealthUpdateUsageDescription"):
+        raise SystemExit("HealthKit privacy-purpose strings are missing")
+    with ENTITLEMENTS.open("rb") as handle:
+        entitlements = plistlib.load(handle)
+    if entitlements.get("com.apple.developer.healthkit") is not True:
+        raise SystemExit("HealthKit entitlement is missing")
+    if entitlements.get("com.apple.developer.healthkit.background-delivery") is not True:
+        raise SystemExit("Future HealthKit background-delivery entitlement is missing")
+    print(
+        f"release configuration verified: version 1.0 ({build_number}), AppIcon, "
+        "HealthKit capability declarations, exempt encryption"
+    )
 
 
 if __name__ == "__main__":

@@ -15,6 +15,10 @@
 	</array>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>PhysiqueOS uses Apple Health data to automatically synchronize fitness, activity, nutrition, workout, and recovery information for your fitness tracking and coaching experience.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>PhysiqueOS may write canonical body measurements, such as weight and supported body-composition measurements, to Apple Health when you enable that feature.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>PlusJakartaSans[wght].ttf</string>
