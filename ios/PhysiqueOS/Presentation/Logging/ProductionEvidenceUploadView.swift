@@ -441,9 +441,7 @@ struct ProductionEvidenceUploadView: View {
                     if identity.poseVariant == .other {
                         TextField("Custom pose label", text: photoBinding(identity, \.customLabel)).textFieldStyle(.roundedBorder)
                     }
-                    Picker("Goal role", selection: photoBinding(identity, \.goalRole)) {
-                        ForEach(ProgressPhotoGoalRole.allCases) { Text($0.label).tag($0) }
-                    }
+                    photoPicker("Goal role", selection: photoBinding(identity, \.goalRole), values: ProgressPhotoGoalRole.allCases)
                     Button(identity.confirmed ? "Pose confirmed" : "Confirm pose") {
                         updatePhoto(identity.id) { draft in
                             draft.confirmed = draft.orientation != .unconfirmed && draft.contraction != .unconfirmed &&
@@ -457,13 +455,11 @@ struct ProductionEvidenceUploadView: View {
             }
             CardContainer { VStack(alignment: .leading, spacing: 10) {
                 Text("Session conditions").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                Picker("Time of day", selection: $photoSession.timeOfDay) {
-                    Text("Choose time").tag(ProgressPhotoTimeOfDay?.none)
-                    ForEach(ProgressPhotoTimeOfDay.allCases) { Text($0.label).tag(Optional($0)) }
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    ForEach(ProgressPhotoSessionDraft.conditionGrid.flatMap { $0 }) { field in
+                        sessionConditionMenu(field)
+                    }
                 }
-                triStatePicker("Fasted", value: $photoSession.fasted)
-                triStatePicker("Post-workout", value: $photoSession.postWorkout)
-                triStatePicker("Pump", value: $photoSession.pump)
                 Toggle("These are original, unedited photos.", isOn: $photoSession.originalUnedited)
                     .tint(PhysiqueOSTheme.chartSuccess)
                 Text("Every pose and condition is sent to the Server-owned Progress Photos review. Confirmation creates the canonical PhotoSession and starts the existing Photo Briefing lifecycle.")
@@ -877,18 +873,69 @@ struct ProductionEvidenceUploadView: View {
         )
     }
 
+    /// Pose identity control matching the approved sandbox presentation: a
+    /// visible label above the value. A bare `Picker` renders no label
+    /// outside a Form/List, which is what left Build 42's pose controls
+    /// unreadable without opening each one.
     private func photoPicker<Value: Hashable & Identifiable & EvidenceLabeledChoice>(
         _ label: String, selection: Binding<Value>, values: [Value]
     ) -> some View {
-        Picker(label, selection: selection) { ForEach(values) { Text($0.label).tag($0) } }
-            .pickerStyle(.menu)
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Menu {
+                ForEach(values) { value in
+                    Button(value.label) { selection.wrappedValue = value }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(selection.wrappedValue.label).lineLimit(1)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                }
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(PhysiqueOSTheme.accent)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .background(PhysiqueOSTheme.surfaceMuted)
+                .clipShape(Capsule())
+                .contentShape(Capsule())
+            }
+            .accessibilityLabel(label)
+            .accessibilityValue(selection.wrappedValue.label)
+        }
     }
 
-    private func triStatePicker(_ label: String, value: Binding<Bool?>) -> some View {
-        Picker(label, selection: value) {
-            Text("Unknown").tag(Bool?.none)
-            Text("Yes").tag(Bool?.some(true))
-            Text("No").tag(Bool?.some(false))
+    /// Session Conditions control matching the approved presentation: the
+    /// label stays visible beside its value, so all four conditions are
+    /// readable without opening a single picker.
+    private func sessionConditionMenu(_ field: ProgressPhotoConditionField) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(field.label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            let value = photoSession.selectedLabel(for: field)
+            Menu {
+                ForEach(field.options, id: \.label) { option in
+                    Button(option.label) { photoSession.apply(option, to: field) }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(value)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                }
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(value == field.unselectedLabel ? Color.orange : PhysiqueOSTheme.textPrimary)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .background(PhysiqueOSTheme.surfaceMuted)
+                .clipShape(Capsule())
+                .contentShape(Capsule())
+            }
+            .accessibilityLabel(field.label)
+            .accessibilityValue(value)
         }
     }
 

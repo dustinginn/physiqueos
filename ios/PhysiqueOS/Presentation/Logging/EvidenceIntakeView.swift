@@ -374,10 +374,9 @@ struct EvidenceIntakeView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Session conditions").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        timeOfDayPicker
-                        triStatePicker("Fasted", keyPath: \.fasted)
-                        triStatePicker("Post-workout", keyPath: \.postWorkout)
-                        triStatePicker("Pump", keyPath: \.pump, trueLabel: "Present", falseLabel: "None")
+                        ForEach(ProgressPhotoSessionDraft.conditionGrid.flatMap { $0 }) { field in
+                            sessionConditionMenu(field)
+                        }
                     }
                     Toggle("These are original, unedited photos.", isOn: Binding(get: { store.evidenceDraft.photoSession.originalUnedited }, set: { store.evidenceDraft.photoSession.originalUnedited = $0 }))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
@@ -431,26 +430,15 @@ struct EvidenceIntakeView: View {
     private func photoTextBinding(_ identity: ProgressPhotoIdentityDraft, keyPath: WritableKeyPath<ProgressPhotoIdentityDraft, String>) -> Binding<String> {
         .init(get: { store.evidenceDraft.photoIdentities.first(where: { $0.id == identity.id })?[keyPath: keyPath] ?? "" }, set: { value in store.updatePhotoIdentity(id: identity.id) { $0[keyPath: keyPath] = value; $0.confirmed = false } })
     }
-    private var timeOfDayPicker: some View {
+    /// Renders one Session Conditions control from the shared approved
+    /// definition, so this surface and the production upload view cannot
+    /// drift apart in label, option set, or serialized value.
+    private func sessionConditionMenu(_ field: ProgressPhotoConditionField) -> some View {
         sessionConditionMenu(
-            label: "Time of day",
-            value: store.evidenceDraft.photoSession.timeOfDay?.label ?? "Choose",
-            choices: ProgressPhotoTimeOfDay.allCases.map { ($0.label, Optional($0)) }
-        ) { store.evidenceDraft.photoSession.timeOfDay = $0 }
-    }
-
-    private func triStatePicker(
-        _ label: String,
-        keyPath: WritableKeyPath<ProgressPhotoSessionDraft, Bool?>,
-        trueLabel: String = "Yes",
-        falseLabel: String = "No"
-    ) -> some View {
-        let value = store.evidenceDraft.photoSession[keyPath: keyPath]
-        return sessionConditionMenu(
-            label: label,
-            value: value.map { $0 ? trueLabel : falseLabel } ?? "Unknown",
-            choices: [("Unknown", nil), (trueLabel, Optional(true)), (falseLabel, Optional(false))]
-        ) { store.evidenceDraft.photoSession[keyPath: keyPath] = $0 }
+            label: field.label,
+            value: store.evidenceDraft.photoSession.selectedLabel(for: field),
+            choices: field.options.map { ($0.label, $0) }
+        ) { store.evidenceDraft.photoSession.apply($0, to: field) }
     }
 
     private func sessionConditionMenu<Value>(

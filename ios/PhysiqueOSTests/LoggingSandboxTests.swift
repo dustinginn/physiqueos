@@ -1536,6 +1536,131 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertFalse(item.fields.contains { ["source", "goalRelationship", "linkedGoal", "tags"].contains($0.id) })
     }
 
+    /// Build 42's production upload view rendered Session Conditions as four
+    /// bare pickers: no visible labels, and Pump reading Yes/No instead of the
+    /// Web flow's Present/None. Both surfaces now render from this one
+    /// definition, so the approved 2x2 presentation and the canonical
+    /// serialization stay together.
+    func testSessionConditionsUseApprovedTwoByTwoGridWithWebLabels() {
+        XCTAssertEqual(ProgressPhotoSessionDraft.conditionGrid.count, 2)
+        XCTAssertEqual(ProgressPhotoSessionDraft.conditionGrid.map(\.count), [2, 2])
+        XCTAssertEqual(ProgressPhotoSessionDraft.conditionGrid[0], [.timeOfDay, .fasted])
+        XCTAssertEqual(ProgressPhotoSessionDraft.conditionGrid[1], [.postWorkout, .pump])
+        XCTAssertEqual(
+            ProgressPhotoSessionDraft.userFacingConditionLabels,
+            ["Time of day", "Fasted", "Post-workout", "Pump"]
+        )
+        XCTAssertEqual(ProgressPhotoConditionField.allCases.count, 4)
+
+        XCTAssertEqual(ProgressPhotoConditionField.timeOfDay.options.map(\.label), ["Morning", "Afternoon", "Evening"])
+        XCTAssertEqual(ProgressPhotoConditionField.fasted.options.map(\.label), ["Unknown", "Yes", "No"])
+        XCTAssertEqual(ProgressPhotoConditionField.postWorkout.options.map(\.label), ["Unknown", "Yes", "No"])
+        XCTAssertEqual(ProgressPhotoConditionField.pump.options.map(\.label), ["Unknown", "Present", "None"])
+
+        // Time of day is required by the Server contract, so it prompts
+        // instead of offering an unknown tri-state.
+        XCTAssertEqual(ProgressPhotoConditionField.timeOfDay.unselectedLabel, "Choose")
+        XCTAssertFalse(ProgressPhotoConditionField.timeOfDay.options.contains { $0.wireValue == nil })
+        for field in [ProgressPhotoConditionField.fasted, .postWorkout, .pump] {
+            XCTAssertEqual(field.unselectedLabel, "Unknown")
+        }
+    }
+
+    /// Every option's serialized value, against the Web flow's own values
+    /// (`unknown`/`true`/`false`, with Pump's Present/None carrying that same
+    /// tri-state rather than a separate enum).
+    func testSessionConditionOptionsSerializeExactlyLikeWeb() throws {
+        XCTAssertEqual(
+            ProgressPhotoConditionField.timeOfDay.options.map(\.wireValue),
+            ["morning", "afternoon", "evening"]
+        )
+        XCTAssertEqual(ProgressPhotoConditionField.fasted.options.map(\.wireValue), [nil, "true", "false"])
+        XCTAssertEqual(ProgressPhotoConditionField.postWorkout.options.map(\.wireValue), [nil, "true", "false"])
+        XCTAssertEqual(ProgressPhotoConditionField.pump.options.map(\.wireValue), [nil, "true", "false"])
+        XCTAssertEqual(
+            ProgressPhotoConditionField.pump.options.map(\.wireValue),
+            ProgressPhotoConditionField.fasted.options.map(\.wireValue),
+            "Pump Present/None must serialize as the same tri-state Web sends, not a separate enum"
+        )
+
+        // Selecting any option must produce that option's wire value, through
+        // the same `String.init` mapping FounderServerAPI applies, and read
+        // back as the same visible label.
+        for field in ProgressPhotoConditionField.allCases {
+            for option in field.options {
+                var draft = ProgressPhotoSessionDraft()
+                draft.apply(option, to: field)
+                XCTAssertEqual(draft.wireValue(for: field), option.wireValue)
+                XCTAssertEqual(draft.selectedLabel(for: field), option.label)
+                switch field {
+                case .timeOfDay: XCTAssertEqual(draft.timeOfDay?.rawValue, option.wireValue)
+                case .fasted: XCTAssertEqual(draft.fasted.map(String.init), option.wireValue)
+                case .postWorkout: XCTAssertEqual(draft.postWorkout.map(String.init), option.wireValue)
+                case .pump: XCTAssertEqual(draft.pump.map(String.init), option.wireValue)
+                }
+                // Unknown stays unknown: no field may invent a default.
+                if option.wireValue == nil {
+                    XCTAssertNil(draft.wireValue(for: field))
+                    XCTAssertEqual(draft.selectedLabel(for: field), field.unselectedLabel)
+                }
+            }
+        }
+    }
+
+    func testSessionConditionDraftRoundTripsThroughCodableAndBack() throws {
+        var draft = ProgressPhotoSessionDraft()
+        draft.apply(.init(label: "Morning", wireValue: "morning"), to: .timeOfDay)
+        draft.apply(.init(label: "Yes", wireValue: "true"), to: .fasted)
+        draft.apply(.init(label: "No", wireValue: "false"), to: .postWorkout)
+        draft.apply(.init(label: "Present", wireValue: "true"), to: .pump)
+        draft.originalUnedited = true
+
+        let decoded = try JSONDecoder().decode(
+            ProgressPhotoSessionDraft.self, from: JSONEncoder().encode(draft)
+        )
+        XCTAssertEqual(decoded, draft)
+        XCTAssertEqual(decoded.timeOfDay, .morning)
+        XCTAssertEqual(decoded.fasted, true)
+        XCTAssertEqual(decoded.postWorkout, false)
+        XCTAssertEqual(decoded.pump, true)
+        XCTAssertTrue(decoded.originalUnedited)
+        for field in ProgressPhotoConditionField.allCases {
+            XCTAssertEqual(decoded.wireValue(for: field), draft.wireValue(for: field))
+            XCTAssertEqual(decoded.selectedLabel(for: field), draft.selectedLabel(for: field))
+        }
+
+        // An unset draft serializes nothing for the three tri-states.
+        let empty = ProgressPhotoSessionDraft()
+        XCTAssertNil(empty.wireValue(for: .timeOfDay))
+        XCTAssertNil(empty.wireValue(for: .fasted))
+        XCTAssertNil(empty.wireValue(for: .postWorkout))
+        XCTAssertNil(empty.wireValue(for: .pump))
+    }
+
+    /// Evidence Review must read back the same wording the grid offered, so a
+    /// Pump selection never changes vocabulary between entry and review.
+    func testEvidenceReviewReadsBackTheSameConditionWordingAsTheGrid() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.setEvidenceScenario(.progressPhotos)
+        store.addAttachments([.init(id: "photo", displayName: "photo.jpg", source: .photos, contentType: "image/jpeg", data: Data([1]))])
+        let identityID = try XCTUnwrap(store.evidenceDraft.photoIdentities.first?.id)
+        store.updatePhotoIdentity(id: identityID) { $0.orientation = .front; $0.contraction = .relaxed; $0.confirmed = true }
+        store.evidenceDraft.photoSession.apply(.init(label: "Morning", wireValue: "morning"), to: .timeOfDay)
+        store.evidenceDraft.photoSession.apply(.init(label: "Yes", wireValue: "true"), to: .fasted)
+        store.evidenceDraft.photoSession.apply(.init(label: "Present", wireValue: "true"), to: .pump)
+        store.evidenceDraft.photoSession.originalUnedited = true
+
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let reviewId = try await reviewID(store)
+        let item = try XCTUnwrap(store.review(id: reviewId)?.items[0])
+
+        XCTAssertEqual(item.fields.first { $0.id == "timeOfDay" }?.value, "Morning")
+        XCTAssertEqual(item.fields.first { $0.id == "fasted" }?.value, "Yes")
+        XCTAssertEqual(item.fields.first { $0.id == "pump" }?.value, "Present")
+        XCTAssertEqual(item.fields.first { $0.id == "postWorkout" }?.value, "")
+        XCTAssertTrue(item.hasRequiredValues)
+    }
+
     func testProgressPhotoSessionLabelsAndPoseMutationAreExplicit() async throws {
         XCTAssertEqual(ProgressPhotoSessionDraft.userFacingConditionLabels, ["Time of day", "Fasted", "Post-workout", "Pump"])
 

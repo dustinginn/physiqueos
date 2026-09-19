@@ -227,14 +227,99 @@ struct ProgressPhotoIdentityDraft: Codable, Equatable, Identifiable {
     }
 }
 
+/// One choice in a Session Conditions control: what the Founder reads, and
+/// the exact multipart value Native sends. `wireValue == nil` means the field
+/// is omitted from the request, which the Server canonicalizes to "unknown".
+struct ProgressPhotoConditionOption: Equatable {
+    let label: String
+    let wireValue: String?
+}
+
+/// The Session Conditions controls, as approved in Build 8: time of day
+/// replaced the earlier Morning tri-state, and lighting/location/session
+/// notes stopped being Founder-facing. Labels, option sets, and wire values
+/// live here so the sandbox and production upload surfaces render the same
+/// approved presentation from one definition instead of drifting apart —
+/// Build 42's production view was written with its own unlabeled pickers and
+/// lost both the labels and Pump's Present/None wording.
+///
+/// Pump reads Unknown/Present/None to match the Web flow's wording while
+/// serializing the same canonical tri-state as Fasted and Post-workout
+/// ("true"/"false"); Web's own Pump control carries those identical values.
+enum ProgressPhotoConditionField: String, Codable, CaseIterable, Identifiable {
+    case timeOfDay, fasted, postWorkout, pump
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .timeOfDay: "Time of day"
+        case .fasted: "Fasted"
+        case .postWorkout: "Post-workout"
+        case .pump: "Pump"
+        }
+    }
+
+    var options: [ProgressPhotoConditionOption] {
+        switch self {
+        case .timeOfDay:
+            ProgressPhotoTimeOfDay.allCases.map { .init(label: $0.label, wireValue: $0.rawValue) }
+        case .fasted, .postWorkout:
+            [.init(label: "Unknown", wireValue: nil),
+             .init(label: "Yes", wireValue: "true"),
+             .init(label: "No", wireValue: "false")]
+        case .pump:
+            [.init(label: "Unknown", wireValue: nil),
+             .init(label: "Present", wireValue: "true"),
+             .init(label: "None", wireValue: "false")]
+        }
+    }
+
+    /// Shown when nothing is selected. Time of day is required by the Server
+    /// contract, so it prompts rather than claiming an unknown tri-state.
+    var unselectedLabel: String { self == .timeOfDay ? "Choose" : "Unknown" }
+}
+
 struct ProgressPhotoSessionDraft: Codable, Equatable {
-    static let userFacingConditionLabels = ["Time of day", "Fasted", "Post-workout", "Pump"]
+    /// Two columns by two rows, reading left to right, top to bottom.
+    static let conditionGrid: [[ProgressPhotoConditionField]] = [
+        [.timeOfDay, .fasted],
+        [.postWorkout, .pump],
+    ]
+
+    static let userFacingConditionLabels = conditionGrid.flatMap { $0 }.map(\.label)
 
     var timeOfDay: ProgressPhotoTimeOfDay? = nil
     var fasted: Bool?
     var postWorkout: Bool?
     var pump: Bool?
     var originalUnedited = false
+
+    /// The exact multipart value this draft sends for `field`, or nil when the
+    /// field is omitted.
+    func wireValue(for field: ProgressPhotoConditionField) -> String? {
+        switch field {
+        case .timeOfDay: timeOfDay?.rawValue
+        case .fasted: fasted.map(String.init)
+        case .postWorkout: postWorkout.map(String.init)
+        case .pump: pump.map(String.init)
+        }
+    }
+
+    func selectedLabel(for field: ProgressPhotoConditionField) -> String {
+        let value = wireValue(for: field)
+        guard value != nil else { return field.unselectedLabel }
+        return field.options.first { $0.wireValue == value }?.label ?? field.unselectedLabel
+    }
+
+    mutating func apply(_ option: ProgressPhotoConditionOption, to field: ProgressPhotoConditionField) {
+        switch field {
+        case .timeOfDay: timeOfDay = option.wireValue.flatMap(ProgressPhotoTimeOfDay.init(rawValue:))
+        case .fasted: fasted = option.wireValue.map { $0 == "true" }
+        case .postWorkout: postWorkout = option.wireValue.map { $0 == "true" }
+        case .pump: pump = option.wireValue.map { $0 == "true" }
+        }
+    }
 }
 
 struct DEXAIntakeDraft: Codable, Equatable {
