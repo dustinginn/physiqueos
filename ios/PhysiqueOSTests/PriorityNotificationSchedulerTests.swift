@@ -366,17 +366,19 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         let request = try Self.actionablePeptideRequest()
         var attempts = 0
         var resolverCalls = 0
+        var shouldReject = true
+        var cleanupCalls = 0
         let delegate = PriorityNotificationDelegate(
             environment: nil,
             completeActionHandler: { _ in
                 attempts += 1
-                throw URLError(.cannotConnectToHost)
+                if shouldReject { throw URLError(.cannotConnectToHost) }
             },
             staleCompletionResolver: { _ in
                 resolverCalls += 1
                 return nil
             },
-            completionCleanup: { _, _ in XCTFail("rejected completion must not clean notifications") }
+            completionCleanup: { _, _ in cleanupCalls += 1 }
         )
         await delegate.handle(snapshot: .init(
             actionIdentifier: PriorityNotificationActionIdentifier.complete,
@@ -386,6 +388,19 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         ))
         XCTAssertEqual(attempts, 1)
         XCTAssertEqual(resolverCalls, 0)
+        XCTAssertEqual(cleanupCalls, 0, "rejected completion must not clean notifications")
+
+        // A terminally failed action remains retryable; only durable success
+        // consumes this notification identity.
+        shouldReject = false
+        await delegate.handle(snapshot: .init(
+            actionIdentifier: PriorityNotificationActionIdentifier.complete,
+            requestIdentifier: request.identifier,
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier
+        ))
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(cleanupCalls, 1, "durable retry must clean the completed occurrence")
     }
 
     @MainActor
@@ -573,7 +588,7 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
     }
 
     @MainActor
-    func testAppleCompletionIsPromptWhileLiveShapedCompleteAndReconciliationRemainPending() async throws {
+    func testAppleCompletionRetainsBackgroundExecutionUntilCompleteAndReconciliationFinish() async throws {
         for (label, request) in [
             ("direct", try Self.directCompletionRequest()),
             ("peptide", try Self.actionablePeptideRequest()),
@@ -593,9 +608,8 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
                     await commandGate.wait()
                 },
                 postActionReconciliation: {
-                    // Live-shaped reconciliation: the canonical Home reread
-                    // and notification-center horizon sync are independently
-                    // slow, but neither owns Apple's callback lifetime.
+                    // Live-shaped reconciliation remains inside Apple's
+                    // bounded response-processing window.
                     homeFetchStarted.fulfill()
                     await homeFetchGate.wait()
                     notificationSyncStarted.fulfill()
@@ -606,21 +620,28 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
             )
             let appleCompleted = expectation(description: "\(label)-apple-completed")
             appleCompleted.assertForOverFulfill = true
+            var appleCompletionCalled = false
             delegate.dispatch(snapshot: .init(
                 actionIdentifier: PriorityNotificationActionIdentifier.complete,
                 requestIdentifier: request.identifier,
                 userInfo: request.content.userInfo,
                 categoryIdentifier: request.content.categoryIdentifier
-            )) { appleCompleted.fulfill() }
+            )) {
+                appleCompletionCalled = true
+                appleCompleted.fulfill()
+            }
 
-            await fulfillment(of: [appleCompleted], timeout: 0.25)
             await fulfillment(of: [commandStarted], timeout: 1)
+            XCTAssertFalse(appleCompletionCalled)
             commandGate.open()
             await fulfillment(of: [homeFetchStarted], timeout: 1)
+            XCTAssertFalse(appleCompletionCalled)
             homeFetchGate.open()
             await fulfillment(of: [notificationSyncStarted], timeout: 1)
+            XCTAssertFalse(appleCompletionCalled)
             notificationSyncGate.open()
             await fulfillment(of: [workFinished], timeout: 1)
+            await fulfillment(of: [appleCompleted], timeout: 1)
         }
     }
 

@@ -935,6 +935,12 @@ actor ProductionNativeAPI {
     // no error anywhere, exactly the Build 32/33 workout-visibility defect
     // this was found fixing.
     func resourcesAffected(by commandType: String) -> Set<String> {
+        if commandType == ProductionCommandType.submitWeight {
+            return ["home", "weight"]
+        }
+        if commandType == ProductionCommandType.submitCheckIn {
+            return ["home", "weight", "morning-check-in", "priority"]
+        }
         if commandType.hasPrefix("operating-plan.") {
             return [
                 "home", "priority", "operating-plan", "operating-plan-recurring-support",

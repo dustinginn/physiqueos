@@ -63,6 +63,104 @@ struct WeightSubmitResult: Decodable, Equatable, Sendable {
     var continuationWorkItemIds: [String]?
 }
 
+/// Resolves the manual Weight write lifecycle without turning an unknown
+/// transport outcome into a false failure. A committed command response is
+/// durable proof on its own. When that response is lost, the same logical
+/// submission is retried once (and therefore reuses its persisted
+/// idempotency key) while fresh canonical Weight reads can independently
+/// prove that the intended date/value is already durable.
+@MainActor
+struct WeightSubmissionLifecycle {
+    enum Resolution: Equatable {
+        case saved
+        case processing
+    }
+
+    let invalidateWeightRead: () async -> Void
+    let fetchWeightReport: () async throws -> WeightReportReadModel
+    let submitWeight: (_ localDate: String, _ value: Double, _ expectedVersion: String?) async throws -> WeightSubmitResult
+
+    func submit(localDate: String, value: Double) async throws -> Resolution {
+        await invalidateWeightRead()
+        let initial = try await fetchWeightReport()
+        let expectedVersion = initial.revision(forDateKey: localDate).map(String.init)
+
+        for attempt in 0..<2 {
+            do {
+                _ = try await submitWeight(localDate, value, expectedVersion)
+                // The receipt proves durability. Refresh canonical Weight as
+                // reconciliation, but never turn a later read outage into a
+                // false write failure.
+                await invalidateWeightRead()
+                _ = try? await fetchWeightReport()
+                return .saved
+            } catch {
+                guard ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) else {
+                    throw error
+                }
+                await invalidateWeightRead()
+                if let report = try? await fetchWeightReport(),
+                   Self.contains(report, localDate: localDate, pounds: value) {
+                    return .saved
+                }
+                if attempt == 1 { return .processing }
+                // The exact WeightWriteAPI call resolves the same persisted
+                // idempotency key. This is receipt recovery, not a new write.
+            }
+        }
+        return .processing
+    }
+
+    static func contains(_ report: WeightReportReadModel, localDate: String, pounds: Double) -> Bool {
+        let entries = [report.current].compactMap { $0 } + (report.recentWeighIns ?? []) + report.history
+        return entries.contains { entry in
+            guard entry.date == localDate,
+                  let value = Double(entry.value.split(separator: " ").first.map(String.init) ?? entry.value)
+            else { return false }
+            return abs(value - pounds) < 0.051
+        }
+    }
+}
+
+/// The Morning Check-In command atomically combines Weight with canonical
+/// priority reconciliation. A Weight read alone therefore cannot prove the
+/// whole command committed after a lost response. Recover only by replaying
+/// the exact idempotent command once; if its receipt is still unavailable,
+/// surface an honest processing state rather than either failure or success.
+@MainActor
+struct MorningCheckInSubmissionLifecycle {
+    enum Resolution: Equatable {
+        case saved
+        case processing
+    }
+
+    let invalidateWeightRead: () async -> Void
+    let fetchWeightReport: () async throws -> WeightReportReadModel
+    let submitCheckIn: (_ expectedVersion: String?) async throws -> WeightSubmitResult
+
+    func submit(localDate: String) async throws -> Resolution {
+        await invalidateWeightRead()
+        let initial = try await fetchWeightReport()
+        let expectedVersion = initial.revision(forDateKey: localDate).map(String.init)
+
+        for attempt in 0..<2 {
+            do {
+                _ = try await submitCheckIn(expectedVersion)
+                await invalidateWeightRead()
+                return .saved
+            } catch {
+                guard ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) else {
+                    throw error
+                }
+                if attempt == 1 { return .processing }
+                // ProductionWeightWriteAPI resolves the same persisted key
+                // from the unchanged date/value/reconciliation signature.
+            }
+        }
+        return .processing
+    }
+}
+
 struct ProductionWeightWriteAPI: WeightWriteAPI {
     let api: ProductionNativeAPI
     let idempotencyStore: ProductionIdempotencyKeyStore

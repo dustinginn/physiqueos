@@ -302,4 +302,150 @@ final class WeightReadModelTests: XCTestCase {
         XCTAssertEqual(Set(report.chart.markers.map(\.date)), ["2026-05-24", "2026-07-05", "2026-08-16"])
         XCTAssertTrue(report.chart.markers.allSatisfy { $0.label == "DEXA" })
     }
+
+    // MARK: - Manual Weight durable submission lifecycle
+
+    @MainActor
+    func testWeightSubmissionLostAcknowledgementUsesFreshCanonicalReadback() async throws {
+        var invalidations = 0
+        var submissions = 0
+        var reports = [Self.emptyReport(), Self.report(date: "2026-09-19", pounds: 168.4, revision: 1)]
+        let lifecycle = WeightSubmissionLifecycle(
+            invalidateWeightRead: { invalidations += 1 },
+            fetchWeightReport: { reports.removeFirst() },
+            submitWeight: { _, _, _ in
+                submissions += 1
+                throw ProductionNativeError.networkFailure
+            }
+        )
+
+        let resolution = try await lifecycle.submit(localDate: "2026-09-19", value: 168.4)
+        XCTAssertEqual(resolution, .saved)
+        XCTAssertEqual(submissions, 1)
+        XCTAssertEqual(invalidations, 2)
+    }
+
+    @MainActor
+    func testWeightSubmissionUnknownOutcomeReplaysExactAttemptOnceThenReportsProcessing() async throws {
+        var submissions = 0
+        var expectedVersions: [String?] = []
+        let lifecycle = WeightSubmissionLifecycle(
+            invalidateWeightRead: {},
+            fetchWeightReport: { Self.emptyReport() },
+            submitWeight: { _, _, expectedVersion in
+                submissions += 1
+                expectedVersions.append(expectedVersion)
+                throw ProductionNativeError.networkFailure
+            }
+        )
+
+        let resolution = try await lifecycle.submit(localDate: "2026-09-19", value: 168.4)
+        XCTAssertEqual(resolution, .processing)
+        XCTAssertEqual(submissions, 2)
+        XCTAssertEqual(expectedVersions.count, 2)
+        XCTAssertNil(expectedVersions[0])
+        XCTAssertNil(expectedVersions[1])
+    }
+
+    @MainActor
+    func testWeightSubmissionCommittedReceiptIsSuccessEvenWhenRefreshFails() async throws {
+        var reads = 0
+        let lifecycle = WeightSubmissionLifecycle(
+            invalidateWeightRead: {},
+            fetchWeightReport: {
+                reads += 1
+                if reads == 1 { return Self.report(date: "2026-09-19", pounds: 167.8, revision: 4) }
+                throw ProductionNativeError.networkFailure
+            },
+            submitWeight: { _, _, expectedVersion in
+                XCTAssertEqual(expectedVersion, "4")
+                return Self.committedWeightResult
+            }
+        )
+
+        let resolution = try await lifecycle.submit(localDate: "2026-09-19", value: 168.4)
+        XCTAssertEqual(resolution, .saved)
+    }
+
+    @MainActor
+    func testWeightSubmissionGenuineRejectionRemainsFailure() async {
+        let lifecycle = WeightSubmissionLifecycle(
+            invalidateWeightRead: {},
+            fetchWeightReport: { Self.emptyReport() },
+            submitWeight: { _, _, _ in throw NotAvailableWeightWriteAPI.NotAvailable() }
+        )
+        do {
+            _ = try await lifecycle.submit(localDate: "2026-09-19", value: 168.4)
+            XCTFail("A terminal rejection must not become processing or success.")
+        } catch is NotAvailableWeightWriteAPI.NotAvailable {
+            // Expected.
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    @MainActor
+    func testMorningCheckInLostAcknowledgementReplaysSameLogicalCommandOnce() async throws {
+        var attempts = 0
+        var expectedVersions: [String?] = []
+        let lifecycle = MorningCheckInSubmissionLifecycle(
+            invalidateWeightRead: {},
+            fetchWeightReport: { Self.report(date: "2026-09-19", pounds: 168.4, revision: 7) },
+            submitCheckIn: { expectedVersion in
+                attempts += 1
+                expectedVersions.append(expectedVersion)
+                if attempts == 1 { throw ProductionNativeError.networkFailure }
+                return Self.committedWeightResult
+            }
+        )
+
+        let resolution = try await lifecycle.submit(localDate: "2026-09-19")
+
+        XCTAssertEqual(resolution, .saved)
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(expectedVersions.compactMap { $0 }, ["7", "7"])
+    }
+
+    @MainActor
+    func testMorningCheckInUnknownOutcomeNeverFabricatesFailureOrSuccess() async throws {
+        var attempts = 0
+        let lifecycle = MorningCheckInSubmissionLifecycle(
+            invalidateWeightRead: {},
+            fetchWeightReport: { Self.report(date: "2026-09-19", pounds: 168.4, revision: 7) },
+            submitCheckIn: { _ in
+                attempts += 1
+                throw ProductionNativeError.networkFailure
+            }
+        )
+
+        let resolution = try await lifecycle.submit(localDate: "2026-09-19")
+
+        XCTAssertEqual(resolution, .processing)
+        XCTAssertEqual(attempts, 2)
+    }
+
+    private static var committedWeightResult: WeightSubmitResult {
+        WeightSubmitResult(
+            status: "committed", weightId: "weight-1", weightRevision: 5,
+            checkInId: nil, checkInRevision: nil, analysisId: nil,
+            intendedDate: "2026-09-19", goalIds: [], continuationWorkItemIds: []
+        )
+    }
+
+    private static func emptyReport() -> WeightReportReadModel {
+        WeightReportReadModel(
+            title: "Weight", subtitle: "", scope: TrainingScopeContext(options: [], dateRangeLabel: ""),
+            summary: [], chart: WeightChartData(points: [], markers: []),
+            weeklyAverages: [], history: [], dataSources: []
+        )
+    }
+
+    private static func report(date: String, pounds: Double, revision: Int) -> WeightReportReadModel {
+        var report = emptyReport()
+        report.current = WeightHistoryEntry(
+            id: "weight-\(date)", date: date, detail: "Morning weight",
+            value: String(format: "%.1f lb", pounds), revision: revision
+        )
+        return report
+    }
 }

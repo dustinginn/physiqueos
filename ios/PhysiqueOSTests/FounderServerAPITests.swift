@@ -85,6 +85,45 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(plan.toAdd.first?.content.categoryIdentifier, PriorityNotificationCategory.specializedWorkflow)
     }
 
+    func testProductionHomePreservesStandalonePhotoPriorityDestinationForTapAndNotification() async throws {
+        let homeJSON = productionEnvelope(resource: "home", data: #"{"header":{"greeting":"Hello","name":"Founder"},"hero":{"mode":"active","goalLabel":"Current Goal","headline":"On track","supportLine":"Canonical state"},"nextBestAction":{"title":"Weekly Progress Photo Set","icon":"camera","destination":{"id":"photo.upload","parameters":{}}},"briefingCards":[],"goals":[],"notificationTimeZone":"America/Los_Angeles","todaysFocus":[{"id":"reminder_weekly_progress_photo_set","executionId":"execution_progress_photos","occurrenceDate":"2026-09-20","label":"Weekly Progress Photo Set","subtitle":"Sunday morning","icon":"camera","color":"evidence","state":"upcoming","completed":false,"completable":false,"destination":{"id":"photo.upload","parameters":{}},"executionContract":{"priorityId":"reminder_weekly_progress_photo_set","occurrenceDate":"2026-09-20","expectedVersion":4},"notificationAction":{"classification":"specialized_workflow_required","workflow":"progress_photos","scheduledTime":"08:00","completionCommand":null}}]}"#)
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["home": homeJSON]
+        )
+        let native = ProductionNativeAPI(
+            baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport
+        )
+        _ = try await native.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Isolated fixture"
+        )
+
+        let home = try await ProductionHomeAPI(api: native).fetchHome()
+        let item = try XCTUnwrap(home.todaysFocus.first)
+        XCTAssertEqual(item.destination, .photoUpload)
+        XCTAssertEqual(item.notificationAction?.classification, .specializedWorkflowRequired)
+
+        var pacific = Calendar(identifier: .gregorian)
+        pacific.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let plan = PriorityNotificationScheduler.reconciliationPlan(
+            items: home.todaysFocus, existingScheduledIdentifiers: [],
+            now: try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-20T14:00:00Z")),
+            calendar: pacific
+        )
+        let request = try XCTUnwrap(plan.toAdd.first)
+        XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.specializedWorkflow)
+        let snapshot = PriorityNotificationDelegate.ResponseSnapshot(
+            actionIdentifier: UNNotificationDefaultActionIdentifier,
+            requestIdentifier: request.identifier,
+            userInfo: request.content.userInfo,
+            categoryIdentifier: request.content.categoryIdentifier
+        )
+        let destinationJSON = try XCTUnwrap(snapshot.open.destinationJSON)
+        let notificationDestination = try JSONDecoder().decode(
+            AppDestination.self, from: Data(destinationJSON.utf8)
+        )
+        XCTAssertEqual(notificationDestination, .photoUpload)
+    }
+
     func testProductionHomeDecodesCanonicalFutureNotificationHorizonIndependentOfVisibleFocus() async throws {
         let data = #"{"header":{"greeting":"Good evening","name":"Founder"},"hero":{"mode":"active","goalLabel":"Current Goal","headline":"On track","supportLine":"Canonical state"},"nextBestAction":{"title":"Review today","icon":"target","destination":{"id":"goal.detail","parameters":{"goalId":"goal-canonical"}}},"briefingCards":[],"goals":[],"todaysFocus":[],"notificationTimeZone":"America/Los_Angeles","notificationOccurrences":[{"id":"reminder_morning_weight","occurrenceDate":"2026-09-17","label":"Morning Weigh-In","subtitle":"Morning","icon":"scale","color":"evidence","state":"upcoming","completed":false,"completable":false,"executionContract":{"priorityId":"reminder_morning_weight","occurrenceDate":"2026-09-17"},"notificationAction":{"classification":"specialized_workflow_required","workflow":"morning_check_in","scheduledTime":"05:30","completionCommand":null}},{"id":"reminder_fadogia","occurrenceDate":"2026-09-17","label":"Fadogia Agrestis","subtitle":"Morning","icon":"pills","color":"effort","state":"upcoming","completed":false,"completable":true,"executionContract":{"priorityId":"reminder_fadogia","occurrenceDate":"2026-09-17","expectedVersion":8},"notificationAction":{"classification":"direct_completion_allowed","workflow":"priority_detail","scheduledTime":"05:45","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":8,"payload":{"priorityId":"reminder_fadogia","occurrenceDate":"2026-09-17"}}}}]}"#
         let transport = RoutedFounderTransport(
@@ -266,6 +305,17 @@ final class FounderServerAPITests: XCTestCase {
         for resource in ["training-library", "training-logger", "training-landing", "training-day", "training-session", "training-reporting"] {
             XCTAssertTrue(affected.contains(resource), "Training evidence changes must invalidate membership and reconciled workout projections.")
         }
+    }
+
+    func testWeightAndCheckInCommandsInvalidateTheirCanonicalReads() async {
+        let api = ProductionNativeAPI(
+            baseURL: testOrigin, credentialStore: MemoryCredentialStore(),
+            transport: RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: [:])
+        )
+        let weight = await api.resourcesAffected(by: ProductionCommandType.submitWeight)
+        XCTAssertEqual(weight, ["home", "weight"])
+        let checkIn = await api.resourcesAffected(by: ProductionCommandType.submitCheckIn)
+        XCTAssertEqual(checkIn, ["home", "weight", "morning-check-in", "priority"])
     }
 
     func testProductionReadCacheDeduplicatesConcurrentCanonicalReads() async throws {
@@ -2696,6 +2746,46 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(submissions.first?["priorityId"] as? String, "priority-1")
     }
 
+    func testProductionMorningCheckInLostResponseRetryReusesIdempotencyIdentity() async throws {
+        let result = #"{"status":"committed","weightId":"weight_2026_09_19","weightRevision":2,"checkInId":"check-in-1","checkInRevision":1,"analysisId":null,"intendedDate":"2026-09-19","goalIds":[],"continuationWorkItemIds":[]}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.timedOut)),
+            .json(200, productionCommandOutcomeJSON(result: result, outcome: "replayed")),
+        ])
+        let api = ProductionNativeAPI(
+            baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport
+        )
+        _ = try await api.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone"
+        )
+        let writeAPI = ProductionWeightWriteAPI(
+            api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults())
+        )
+        let submissions = [MorningCheckInReconciliationSubmission(
+            priorityId: "reminder-fadogia", occurrenceDate: "2026-09-18",
+            occurrenceKey: "reminder-fadogia:2026-09-18", disposition: "completed", note: nil
+        )]
+
+        await XCTAssertThrowsErrorAsync(try await writeAPI.submitMorningCheckIn(
+            localDate: "2026-09-19", value: 168.4, expectedVersion: "1",
+            reconciliationSubmissions: submissions
+        )) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .networkFailure)
+        }
+        _ = try await writeAPI.submitMorningCheckIn(
+            localDate: "2026-09-19", value: 168.4, expectedVersion: "1",
+            reconciliationSubmissions: submissions
+        )
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 3)
+        XCTAssertEqual(
+            requests[1].value(forHTTPHeaderField: "Idempotency-Key"),
+            requests[2].value(forHTTPHeaderField: "Idempotency-Key")
+        )
+    }
+
     func testProductionSubmitWeightMapsStaleVersionAndPreconditionRequired() async throws {
         for (status, code): (Int, String) in [(412, "STALE_VERSION"), (428, "PRECONDITION_REQUIRED")] {
             let transport = SequencedFounderTransport([
@@ -2775,6 +2865,48 @@ final class FounderServerAPITests: XCTestCase {
                 XCTFail("Expected stale-version failure")
             }
         }
+    }
+
+    func testProductionPriorityCompletionRecoversLostAcknowledgementWithSameIdempotencyKey() async throws {
+        let result = #"{"status":"already_completed","record":{"id":"reminder-fadogia"}}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.timedOut)),
+            .json(200, productionCommandOutcomeJSON(result: result, outcome: "replayed")),
+        ])
+        let api = ProductionNativeAPI(
+            baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport
+        )
+        _ = try await api.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone"
+        )
+        let writeAPI = ProductionPriorityCompletionWriteAPI(
+            api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults())
+        )
+
+        try await writeAPI.complete(
+            priorityId: "reminder-fadogia", occurrenceDate: "2026-09-19",
+            context: .init(occurrenceDate: "2026-09-19", dose: nil, protocolId: nil),
+            expectedVersion: 8
+        )
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 3)
+        XCTAssertEqual(
+            requests[1].value(forHTTPHeaderField: "Idempotency-Key"),
+            requests[2].value(forHTTPHeaderField: "Idempotency-Key")
+        )
+        let first = try XCTUnwrap(requests[1].httpBody)
+        let second = try XCTUnwrap(requests[2].httpBody)
+        var firstEnvelope = try XCTUnwrap(JSONSerialization.jsonObject(with: first) as? [String: Any])
+        var secondEnvelope = try XCTUnwrap(JSONSerialization.jsonObject(with: second) as? [String: Any])
+        var firstMetadata = try XCTUnwrap(firstEnvelope["metadata"] as? [String: Any])
+        var secondMetadata = try XCTUnwrap(secondEnvelope["metadata"] as? [String: Any])
+        firstMetadata.removeValue(forKey: "commandId")
+        secondMetadata.removeValue(forKey: "commandId")
+        firstEnvelope["metadata"] = firstMetadata
+        secondEnvelope["metadata"] = secondMetadata
+        XCTAssertEqual(firstEnvelope as NSDictionary, secondEnvelope as NSDictionary)
     }
 
     func testProductionMorningCheckInReadDecodesCanonicalOccurrenceIdentity() async throws {

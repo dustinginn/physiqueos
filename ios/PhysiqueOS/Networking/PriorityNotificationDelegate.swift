@@ -228,6 +228,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     private let openActionHandler: (@MainActor @Sendable (String, AppDestination) async -> Bool)?
     private let staleCompletionResolver: (@MainActor @Sendable (CompleteActionPayload) async -> CompleteActionPayload?)?
     private let continuationCoordinator: NotificationActionContinuationCoordinator
+    private let responseCompletionTimeout: Duration
     @MainActor private var consumedActionIdentities = Set<String>()
     @MainActor private var consumedActionOrder: [String] = []
 
@@ -240,6 +241,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         openActionHandler: (@MainActor @Sendable (String, AppDestination) async -> Bool)? = nil,
         staleCompletionResolver: (@MainActor @Sendable (CompleteActionPayload) async -> CompleteActionPayload?)? = nil,
         postActionReconciliation: (@MainActor @Sendable () async -> Void)? = nil,
+        responseCompletionTimeout: Duration = .seconds(25),
         continuationCoordinator: NotificationActionContinuationCoordinator = .init(),
         completionCleanup: @escaping @MainActor @Sendable (String, String) async -> Void = { priorityId, occurrenceDate in
             await PriorityNotificationScheduler.cleanupCompletedOccurrence(
@@ -255,6 +257,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         self.continuationCoordinator = continuationCoordinator
         self.postActionReconciliation = postActionReconciliation
         self.staleCompletionResolver = staleCompletionResolver
+        self.responseCompletionTimeout = responseCompletionTimeout
         super.init()
     }
 
@@ -278,17 +281,28 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     }
 
     /// Testable delegate boundary. Ownership of the primitive snapshot is
-    /// established in the app continuation coordinator first; Apple's
-    /// completion is then invoked promptly and exactly once. Network writes,
-    /// navigation readiness, cleanup, Home fetches, and horizon reconciliation
-    /// continue independently and can never extend the system callback.
+    /// established in the app continuation coordinator first. A canonical
+    /// Complete action retains Apple's background execution window until the
+    /// bounded write/reconciliation finishes; non-mutating Open/Snooze actions
+    /// release it promptly. The completion gate remains exactly-once.
     func dispatch(snapshot: ResponseSnapshot, completion: @escaping () -> Void) {
         let gate = NotificationResponseCompletionGate(completion)
+        let retainsBackgroundExecution = snapshot.actionIdentifier == PriorityNotificationActionIdentifier.complete
         continuationCoordinator.submit { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self else { gate.complete(); return }
             await self.handle(snapshot: snapshot)
+            if retainsBackgroundExecution { gate.complete() }
         }
-        gate.complete()
+        guard retainsBackgroundExecution else { gate.complete(); return }
+        // Apple's response handler owns the background execution window.
+        // Keep it until canonical processing finishes, with a bounded
+        // fail-safe so an unavailable network cannot hold the callback
+        // indefinitely. The exactly-once gate safely arbitrates both paths.
+        let timeout = responseCompletionTimeout
+        Task {
+            try? await Task.sleep(for: timeout)
+            gate.complete()
+        }
     }
 
     @MainActor
@@ -304,7 +318,10 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             }
             recordActionStage(snapshot: snapshot, operation: "action decoded",
                               reason: "Complete was decoded and dispatched on the main actor.")
-            await handleComplete(payload: snapshot.complete)
+            let completed = await handleComplete(payload: snapshot.complete)
+            if !completed {
+                releaseAction(identifier: snapshot.requestIdentifier, action: snapshot.actionIdentifier)
+            }
         case PriorityNotificationActionIdentifier.snooze:
             guard claimAction(identifier: snapshot.requestIdentifier, action: snapshot.actionIdentifier) else {
                 recordActionStage(snapshot: snapshot, operation: "duplicate action ignored",
@@ -352,6 +369,13 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     }
 
     @MainActor
+    private func releaseAction(identifier: String, action: String) {
+        let identity = "\(identifier)|\(action)"
+        consumedActionIdentities.remove(identity)
+        consumedActionOrder.removeAll { $0 == identity }
+    }
+
+    @MainActor
     private func recordActionStage(snapshot: ResponseSnapshot, operation: String, reason: String) {
         NotificationDiagnostics.record(.init(
             capturedAt: Date(), identifier: snapshot.requestIdentifier,
@@ -361,7 +385,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     }
 
     @MainActor
-    private func handleComplete(payload: CompleteActionPayload) async {
+    private func handleComplete(payload: CompleteActionPayload) async -> Bool {
         guard let commandType = payload.commandType,
               commandType == ProductionCommandType.completePriority,
               let expectedVersion = payload.expectedVersion,
@@ -374,7 +398,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 reason: "The notification did not carry the complete canonical command contract.",
                 fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
             ))
-            return
+            return false
         }
         // Best-effort: there is no UI here to surface a failure to. A
         // network failure or stale version simply leaves the occurrence
@@ -389,7 +413,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 reason: "The application environment was not available; canonical state remains unchanged.",
                 fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
             ))
-            return
+            return false
         }
         do {
             try await performComplete(
@@ -404,6 +428,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             ))
             await completionCleanup(priorityId, occurrenceDate)
             await reconcileAfterAction()
+            return true
         } catch {
             if Self.isStaleVersion(error),
                let refreshed = await resolveStaleCompletion(payload),
@@ -423,7 +448,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                     ))
                     await completionCleanup(refreshedPriorityId, refreshedOccurrenceDate)
                     await reconcileAfterAction()
-                    return
+                    return true
                 } catch { /* bounded retry exhausted; record the safe rejection below */ }
             }
             NotificationDiagnostics.record(.init(
@@ -432,6 +457,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 reason: "The canonical completion command did not succeed; the occurrence remains unchanged.",
                 fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
             ))
+            return false
         }
     }
 

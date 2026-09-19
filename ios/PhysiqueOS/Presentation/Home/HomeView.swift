@@ -68,6 +68,9 @@ struct HomeView: View {
                 await syncPriorityNotifications()
             }
         }
+        .onChange(of: environment.canonicalPriorityRefreshGeneration) { _, _ in
+            Task { await viewModel?.load() }
+        }
         .alert("Priority could not be completed", isPresented: Binding(
             get: { completionError != nil },
             set: { if !$0 { completionError = nil } }

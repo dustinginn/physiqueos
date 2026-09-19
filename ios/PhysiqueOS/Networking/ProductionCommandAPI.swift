@@ -115,19 +115,33 @@ struct ProductionPriorityCompletionWriteAPI: PriorityCompletionWriteAPI {
             context?.dose ?? "", context?.protocolId ?? "", String(expectedVersion),
         ])
         let scope = "priority-complete.\(priorityId).\(occurrenceDate)"
-        let outcome: ProductionCommandOutcome<PriorityCompletionResult> = try await api.submitCommand(
-            ProductionCommandType.completePriority,
-            idempotencyKey: idempotencyStore.resolvedKey(scope: scope, signature: signature),
-            expectedVersion: String(expectedVersion),
-            payload: PriorityCompletionPayload(
-                priorityId: priorityId,
-                occurrenceDate: occurrenceDate,
-                dose: context?.dose,
-                protocolId: context?.protocolId
-            )
+        let idempotencyKey = idempotencyStore.resolvedKey(scope: scope, signature: signature)
+        let payload = PriorityCompletionPayload(
+            priorityId: priorityId,
+            occurrenceDate: occurrenceDate,
+            dose: context?.dose,
+            protocolId: context?.protocolId
         )
-        guard outcome.isConfirmed, outcome.receipt.result != nil else {
-            throw ProductionNativeError.invalidResponse
+        for attempt in 0..<2 {
+            do {
+                let outcome: ProductionCommandOutcome<PriorityCompletionResult> = try await api.submitCommand(
+                    ProductionCommandType.completePriority,
+                    idempotencyKey: idempotencyKey,
+                    expectedVersion: String(expectedVersion),
+                    payload: payload
+                )
+                guard outcome.isConfirmed, outcome.receipt.result != nil else {
+                    throw ProductionNativeError.invalidResponse
+                }
+                return
+            } catch {
+                guard attempt == 0,
+                      ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error)
+                else { throw error }
+                // A lost response may follow a durable commit. Repeating the
+                // exact envelope identity asks the Server for the original
+                // command receipt and cannot create a second completion.
+            }
         }
     }
 }

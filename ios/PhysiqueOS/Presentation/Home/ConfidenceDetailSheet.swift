@@ -45,7 +45,6 @@ struct ConfidenceDetailSheet: View {
                     if let coachTake = detail.coachTake, !coachTake.isEmpty {
                         narrativeSection(title: "Coach's take", text: coachTake)
                     }
-                    factorGroup(systemImage: "info.circle.fill", title: "Assumptions", items: detail.assumptions)
                 } else {
                     factorGroup(systemImage: "arrow.left.arrow.right.circle.fill", title: "What changed", items: detail.movementFactors)
                     factorGroup(systemImage: "checkmark.circle.fill", title: "What supports confidence", items: detail.supportingFactors)

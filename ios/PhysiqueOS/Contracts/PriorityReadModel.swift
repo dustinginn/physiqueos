@@ -257,6 +257,7 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
         if Self.isMorningWeighIn(executionItemId: executionItemId, id: id), !completed {
             return .checkIn(checkInType: "morning")
         }
+        if let continueActionDestination { return continueActionDestination }
         return .priorityOccurrence(priorityId: routePriorityId ?? id, occurrenceDate: date)
     }
 

@@ -295,6 +295,7 @@ struct ProductionHomeAPI: HomeAPI {
         var completed: Bool
         var completable: Bool?
         var actionLabel: String?
+        var destination: AppDestination?
         var completionContext: PriorityCompletionContext?
         var sessionItems: [PrioritySessionItem]?
         var executionContract: ExecutionContract?
@@ -334,7 +335,7 @@ struct ProductionHomeAPI: HomeAPI {
                 actionLabel: actionLabel,
                 completionContext: completionContext,
                 sessionItems: sessionItems,
-                continueActionDestination: nil,
+                continueActionDestination: destination,
                 attributedScope: nil,
                 notificationAction: notificationAction
             )

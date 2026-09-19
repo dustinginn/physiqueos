@@ -6,6 +6,7 @@ struct MorningCheckInView: View {
     var onNavigate: (AppDestination) -> Void = { _ in }
     @State private var weightText = ""
     @State private var message: String?
+    @State private var messageIsError = false
     @State private var complete = false
     /// One disposition + note per occurrence id — mirrors the real check-in
     /// form's own per-item `${occurrenceKey}_status`/`${occurrenceKey}_note`
@@ -72,7 +73,10 @@ struct MorningCheckInView: View {
                     Text("What’s your weight today?").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     HStack { NumericEditField(text: $weightText, accessibilityLabel: "Morning weight", placeholder: "150.5").frame(height: 48); Text("lb").physiqueOSFont(PhysiqueOSTypography.cardHeading16) }
                 } }
-                if let message { Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(PhysiqueOSTheme.destructive) }
+                if let message {
+                    Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong)
+                        .foregroundStyle(messageIsError ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.textSecondary)
+                }
                 PrimaryActionButton(title: isSubmitting ? "Saving…" : "Complete Morning Weigh-In") { save() }
                     .disabled(isSubmitting)
                     .accessibilityIdentifier("morningCheckIn.save")
@@ -219,6 +223,7 @@ struct MorningCheckInView: View {
         var resolved: [String: (disposition: PriorityDisposition, note: String)] = [:]
         for occurrence in unfinished {
             guard let disposition = choices[occurrence.id]?.disposition else {
+                messageIsError = true
                 message = "Choose an outcome for each unfinished priority."
                 return
             }
@@ -226,17 +231,19 @@ struct MorningCheckInView: View {
         }
         guard isProduction else {
             switch store.saveMorningCheckIn(weightText: weightText, dispositions: resolved) {
-            case .success: message = nil; complete = true
-            case .failure(let error): message = error.message
+            case .success: messageIsError = false; message = nil; complete = true
+            case .failure(let error): messageIsError = true; message = error.message
             }
             return
         }
         guard (try? NativeProductWriteGuard.authorize(.morningCheckInAndWeight, in: .founderProduction)) != nil else { return }
         guard let value = Double(weightText.trimmingCharacters(in: .whitespacesAndNewlines)), value > 0 else {
+            messageIsError = true
             message = "Enter a valid weight."
             return
         }
         guard let localDate = productionCheckIn?.today else {
+            messageIsError = true
             message = "Today's check-in context could not be loaded."
             return
         }
@@ -244,6 +251,7 @@ struct MorningCheckInView: View {
         for occurrence in unfinished {
             guard let disposition = resolved[occurrence.id]?.disposition else { continue }
             guard let canonicalOccurrence = productionCheckIn?.reconciliationItems.first(where: { $0.id == occurrence.id }) else {
+                messageIsError = true
                 message = "This priority's canonical occurrence could not be loaded. Refresh Morning Weigh-In before saving."
                 return
             }
@@ -259,16 +267,32 @@ struct MorningCheckInView: View {
             isSubmitting = true
             defer { isSubmitting = false }
             do {
-                let report = try await environment.weightEvidenceAPI.fetchWeightReport(scope: .all)
-                let expectedVersion = report.revision(forDateKey: localDate).map(String.init)
-                _ = try await environment.weightWriteAPI.submitMorningCheckIn(
-                    localDate: localDate, value: value, expectedVersion: expectedVersion,
-                    reconciliationSubmissions: submissions
+                let lifecycle = MorningCheckInSubmissionLifecycle(
+                    invalidateWeightRead: {
+                        await environment.productionNativeAPI.invalidateReadResources(["weight", "morning-check-in", "home"])
+                    },
+                    fetchWeightReport: {
+                        try await environment.weightEvidenceAPI.fetchWeightReport(scope: .all)
+                    },
+                    submitCheckIn: { expectedVersion in
+                        try await environment.weightWriteAPI.submitMorningCheckIn(
+                            localDate: localDate, value: value, expectedVersion: expectedVersion,
+                            reconciliationSubmissions: submissions
+                        )
+                    }
                 )
-                productionCheckIn = try await environment.morningCheckInAPI.fetchMorningCheckIn()
-                message = nil
-                complete = true
+                let resolution = try await lifecycle.submit(localDate: localDate)
+                if resolution == .saved {
+                    productionCheckIn = try? await environment.morningCheckInAPI.fetchMorningCheckIn()
+                    messageIsError = false
+                    message = nil
+                    complete = true
+                } else {
+                    messageIsError = false
+                    message = "Morning Check-In was accepted and is still reconciling. It is safe to leave this screen or retry the same submission."
+                }
             } catch {
+                messageIsError = true
                 message = ManualWeighInView.errorMessage(for: error)
             }
         }
@@ -326,20 +350,24 @@ struct ManualWeighInView: View {
             isSubmitting = true
             defer { isSubmitting = false }
             do {
-                // Always re-read the current revision immediately before
-                // submitting a same-day correction — a cached value can go
-                // stale if the web edits the same day between reads.
-                let report = try await environment.weightEvidenceAPI.fetchWeightReport(scope: .all)
-                let expectedVersion = report.revision(forDateKey: localDate).map(String.init)
-                _ = try await environment.weightWriteAPI.submitWeight(
-                    localDate: localDate, value: valueInPounds, expectedVersion: expectedVersion
+                let lifecycle = WeightSubmissionLifecycle(
+                    invalidateWeightRead: {
+                        await environment.productionNativeAPI.invalidateReadResources(["weight"])
+                    },
+                    fetchWeightReport: {
+                        try await environment.weightEvidenceAPI.fetchWeightReport(scope: .all)
+                    },
+                    submitWeight: { localDate, value, expectedVersion in
+                        try await environment.weightWriteAPI.submitWeight(
+                            localDate: localDate, value: value, expectedVersion: expectedVersion
+                        )
+                    }
                 )
-                let refreshed = try await environment.weightEvidenceAPI.fetchWeightReport(scope: .all)
-                guard refreshed.history.contains(where: { $0.date == localDate }) || refreshed.current?.date == localDate else {
-                    throw ProductionNativeError.invalidResponse
-                }
+                let resolution = try await lifecycle.submit(localDate: localDate, value: valueInPounds)
                 isError = false
-                message = "Weight saved for \(Self.mediumDate.string(from: date))."
+                message = resolution == .saved
+                    ? "Weight saved for \(Self.mediumDate.string(from: date))."
+                    : "Weight accepted and still reconciling. It is safe to leave this screen or retry the same value."
             } catch {
                 isError = true
                 message = Self.errorMessage(for: error)

@@ -186,6 +186,10 @@ final class AppEnvironment {
     /// still display as if reminders were active. `.notDetermined` means
     /// sync hasn't run yet this launch (nothing to report either way).
     var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
+    /// Advances only after a post-action canonical Home read succeeds.
+    /// Home observes this generation so a completion performed from an iOS
+    /// notification updates the visible row after durable acknowledgement.
+    var canonicalPriorityRefreshGeneration = 0
     private let authoritySelectionStore: NativeAuthoritySelectionStore
     private let sandboxHomeAPI: HomeAPI
     private let sandboxGoalsAPI: GoalsAPI
@@ -641,6 +645,7 @@ extension AppEnvironment {
                 calendar: home.notificationCalendar,
                 center: .current()
             )
+            canonicalPriorityRefreshGeneration += 1
         } catch {
             NotificationDiagnostics.record(.init(
                 capturedAt: Date(),
