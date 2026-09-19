@@ -4,7 +4,8 @@ import HealthKit
 protocol HealthKitAnchoredQueryClient: Sendable {
     func execute(
         stream: HealthKitSynchronizationStream,
-        after anchorData: Data?
+        after anchorData: Data?,
+        bounds: HealthKitQueryBounds?
     ) async throws -> HealthKitAnchoredQueryResult
 }
 
@@ -49,10 +50,11 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
 
     func execute(
         stream: HealthKitSynchronizationStream,
-        after anchorData: Data?
+        after anchorData: Data?,
+        bounds: HealthKitQueryBounds? = nil
     ) async throws -> HealthKitAnchoredQueryResult {
         if stream == .activitySummary {
-            return try await executeActivitySummary(after: anchorData)
+            return try await executeActivitySummary(after: anchorData, bounds: bounds)
         }
         guard let sampleType = Self.sampleType(for: stream) else {
             throw HealthKitSyncError.operational(code: "healthkit_stream_type_unavailable")
@@ -73,7 +75,13 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKAnchoredObjectQuery(
                 type: sampleType,
-                predicate: nil,
+                predicate: bounds.map {
+                    HKQuery.predicateForSamples(
+                        withStart: $0.startDateInclusive,
+                        end: $0.endDateExclusive,
+                        options: [.strictStartDate]
+                    )
+                },
                 anchor: anchor,
                 limit: HKObjectQueryNoLimit
             ) { _, samples, deletedObjects, proposedAnchor, error in
@@ -112,7 +120,10 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         }
     }
 
-    private func executeActivitySummary(after cursorData: Data?) async throws -> HealthKitAnchoredQueryResult {
+    private func executeActivitySummary(
+        after cursorData: Data?,
+        bounds requestedBounds: HealthKitQueryBounds?
+    ) async throws -> HealthKitAnchoredQueryResult {
         let prior: ActivityCursor
         do {
             prior = try cursorData.map { try JSONDecoder().decode(ActivityCursor.self, from: $0) }
@@ -121,10 +132,25 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
             throw HealthKitSyncError.corruptCursor
         }
         let current = now()
-        let startDate = calendar.date(byAdding: .day, value: -activityLookbackDays, to: current) ?? current
-        let start = calendar.dateComponents([.era, .year, .month, .day], from: startDate)
-        let end = calendar.dateComponents([.era, .year, .month, .day], from: current)
+        let bounds: HealthKitQueryBounds
+        if let requestedBounds {
+            bounds = requestedBounds
+        } else {
+            let currentStart = calendar.startOfDay(for: current)
+            let startDate = calendar.date(byAdding: .day, value: -activityLookbackDays, to: currentStart) ?? currentStart
+            let endExclusive = calendar.date(byAdding: .day, value: 1, to: currentStart) ?? currentStart
+            bounds = HealthKitQueryBounds(
+                startDateInclusive: startDate,
+                endDateExclusive: endExclusive,
+                startLocalDate: Self.localDate(startDate, calendar: calendar),
+                endLocalDate: Self.localDate(currentStart, calendar: calendar),
+                timeZoneIdentifier: calendar.timeZone.identifier
+            )
+        }
+        let start = calendar.dateComponents([.era, .year, .month, .day], from: bounds.startDateInclusive)
+        let end = calendar.dateComponents([.era, .year, .month, .day], from: bounds.endDateExclusive)
         let predicate = HKQuery.predicate(forActivitySummariesBetweenStart: start, end: end)
+        let supplementalMetrics = try await activitySupplementalMetrics(bounds: bounds)
 
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, error in
@@ -142,12 +168,14 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                         let components = summary.dateComponents(for: self.calendar)
                         guard let date = self.calendar.date(from: components) else { continue }
                         let localDate = Self.localDate(date, calendar: self.calendar)
+                        guard bounds.contains(localDate: localDate) else { continue }
                         returnedDates.insert(localDate)
-                        let metrics: [String: Double] = [
+                        var metrics: [String: Double] = [
                             "move_calories": summary.activeEnergyBurned.doubleValue(for: .kilocalorie()),
                             "exercise_minutes": summary.appleExerciseTime.doubleValue(for: .minute()),
                             "stand_hours": summary.appleStandHours.doubleValue(for: .count()),
                         ]
+                        supplementalMetrics[localDate]?.forEach { metrics[$0.key] = $0.value }
                         let fingerprint = HealthKitStableDigest.hex(
                             try Self.stableEncoder.encode(metrics)
                         )
@@ -189,10 +217,8 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                             allowlistedMetadata: [:]
                         ))
                     }
-                    let startLocalDate = Self.localDate(startDate, calendar: self.calendar)
-                    let endLocalDate = Self.localDate(current, calendar: self.calendar)
                     let queriedPriorDates = Set(prior.entries.keys.filter {
-                        $0 >= startLocalDate && $0 <= endLocalDate
+                        bounds.contains(localDate: $0)
                     })
                     let deletedDates = queriedPriorDates.subtracting(returnedDates)
                     deletedDates.forEach { nextEntries.removeValue(forKey: $0) }
@@ -216,6 +242,77 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                 }
             }
             self.store.execute(query)
+        }
+    }
+
+    private func activitySupplementalMetrics(
+        bounds: HealthKitQueryBounds
+    ) async throws -> [String: [String: Double]] {
+        async let steps = dailyCumulativeValues(
+            identifier: .stepCount, unit: .count(), bounds: bounds
+        )
+        async let distance = dailyCumulativeValues(
+            identifier: .distanceWalkingRunning, unit: .meter(), bounds: bounds
+        )
+        async let flights = dailyCumulativeValues(
+            identifier: .flightsClimbed, unit: .count(), bounds: bounds
+        )
+        let (stepValues, distanceValues, flightValues) = try await (steps, distance, flights)
+        var result: [String: [String: Double]] = [:]
+        for (key, daily) in [
+            ("steps", stepValues),
+            ("walking_running_distance", distanceValues),
+            ("flights_climbed", flightValues),
+        ] {
+            for (date, value) in daily where bounds.contains(localDate: date) {
+                result[date, default: [:]][key] = value
+            }
+        }
+        return result
+    }
+
+    private func dailyCumulativeValues(
+        identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        bounds: HealthKitQueryBounds
+    ) async throws -> [String: Double] {
+        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+            throw HealthKitSyncError.operational(code: "healthkit_activity_quantity_type_unavailable")
+        }
+        let predicate = HKQuery.predicateForSamples(
+            withStart: bounds.startDateInclusive,
+            end: bounds.endDateExclusive,
+            options: [.strictStartDate]
+        )
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsCollectionQuery(
+                quantityType: type,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum,
+                anchorDate: bounds.startDateInclusive,
+                intervalComponents: DateComponents(day: 1)
+            )
+            query.initialResultsHandler = { _, collection, error in
+                guard error == nil, let collection else {
+                    continuation.resume(throwing: HealthKitSyncError.operational(
+                        code: "healthkit_activity_quantity_query_failed"
+                    ))
+                    return
+                }
+                var result: [String: Double] = [:]
+                collection.enumerateStatistics(
+                    from: bounds.startDateInclusive,
+                    to: bounds.endDateExclusive
+                ) { statistics, _ in
+                    guard let sum = statistics.sumQuantity() else { return }
+                    let localDate = Self.localDate(statistics.startDate, calendar: self.calendar)
+                    if bounds.contains(localDate: localDate) {
+                        result[localDate] = sum.doubleValue(for: unit)
+                    }
+                }
+                continuation.resume(returning: result)
+            }
+            store.execute(query)
         }
     }
 

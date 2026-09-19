@@ -291,6 +291,24 @@ struct ProductionContractManifest: Decodable, Sendable, Equatable {
         let revision: String
     }
 
+    struct HealthKitIngestion: Decodable, Sendable, Equatable {
+        let commandType: String
+        let contractVersion: String
+        let maximumBatchSize: Int
+        let observationTypes: [String]
+        let ingestionPurposes: [String]
+        let defaultIngestionPurpose: String
+        let validationOnly: String
+        let activityActivation: String
+        let validationDiagnostic: String
+        let identity: String
+        let occurrenceTime: String
+        let dailyActivity: String
+        let workoutReconciliation: String
+        let evidenceEligibility: String
+        let queryCursor: String
+    }
+
     let contractVersion: String
     let apiVersion: String
     let authority: String
@@ -302,6 +320,7 @@ struct ProductionContractManifest: Decodable, Sendable, Equatable {
     let media: Media
     let reads: [Read]
     let writes: [Command]
+    let healthKitIngestion: HealthKitIngestion?
 }
 
 indirect enum ProductionJSONValue: Codable, Sendable, Equatable {

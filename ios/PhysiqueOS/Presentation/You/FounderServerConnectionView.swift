@@ -452,6 +452,8 @@ private struct ProductionFounderConnectionView: View {
                 }
 
                 if isConnected {
+                    HealthKitFounderCanaryView()
+
                     Button("Disconnect this production session", role: .destructive) {
                         revoke()
                     }

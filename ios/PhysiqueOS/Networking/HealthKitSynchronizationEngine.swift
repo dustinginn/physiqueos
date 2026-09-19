@@ -94,11 +94,15 @@ actor HealthKitSynchronizationEngine {
         var cursor = try await store.authoritativeCursor(for: scope)
         let result: HealthKitAnchoredQueryResult
         do {
-            result = try await queryClient.execute(stream: scope.stream, after: cursor?.opaqueAnchorData)
+            result = try await queryClient.execute(
+                stream: scope.stream,
+                after: cursor?.opaqueAnchorData,
+                bounds: nil
+            )
         } catch HealthKitSyncError.corruptCursor {
             try await store.resetCursorForBoundedRecovery(for: scope)
             cursor = nil
-            result = try await queryClient.execute(stream: scope.stream, after: nil)
+            result = try await queryClient.execute(stream: scope.stream, after: nil, bounds: nil)
         }
         try await store.recordSuccessfulQuery(for: scope, at: result.completedAt)
         let batch = try batchBuilder.build(
@@ -110,6 +114,87 @@ actor HealthKitSynchronizationEngine {
         try await store.stage(batch)
         stagingCompletion?()
         if featureGate.allows(.serverUpload) { try await deliverPending(scope: scope) }
+    }
+
+    /// Explicit foreground-only Founder canary path. The cursor scope binds
+    /// the selected window, and validation purpose is persisted in both the
+    /// batch and partition identities so crash recovery can only replay the
+    /// exact same permanently-raw upload.
+    func synchronizeActivityValidation(
+        scope: HealthKitCursorScope,
+        window: HealthKitActivityValidationWindow,
+        calendar: Calendar = .autoupdatingCurrent
+    ) async throws -> HealthKitCanarySyncSummary {
+        guard featureGate.allows(.observationQuery), featureGate.allows(.serverUpload) else {
+            throw HealthKitSyncError.featureDisabled
+        }
+        guard scope.stream == .activitySummary,
+              scope.predicateVersion == window.predicateVersion
+        else { throw HealthKitSyncError.ownerOrDeviceMismatch }
+
+        let pending = try await store.pendingBatches(for: scope)
+        if !pending.isEmpty {
+            guard pending.allSatisfy({ $0.ingestionPurpose == .validationOnly }) else {
+                throw HealthKitSyncError.ownerOrDeviceMismatch
+            }
+            try await deliverPending(scope: scope)
+            return HealthKitCanarySyncSummary(
+                batchIdentity: pending.first?.identity,
+                additionsDiscovered: 0,
+                deletionsDiscovered: 0,
+                additionsFilteredByWindow: 0,
+                deletionsFilteredByWindow: 0,
+                resumedPendingBatch: true
+            )
+        }
+
+        let bounds = try window.queryBounds(calendar: calendar)
+        var cursor = try await store.authoritativeCursor(for: scope)
+        let raw: HealthKitAnchoredQueryResult
+        do {
+            raw = try await queryClient.execute(
+                stream: .activitySummary,
+                after: cursor?.opaqueAnchorData,
+                bounds: bounds
+            )
+        } catch HealthKitSyncError.corruptCursor {
+            try await store.resetCursorForBoundedRecovery(for: scope)
+            cursor = nil
+            raw = try await queryClient.execute(stream: .activitySummary, after: nil, bounds: bounds)
+        }
+
+        let additions = raw.additions.filter { window.contains(localDate: $0.occurrence.localDate) }
+        let deletions = raw.deletions.filter { deletion in
+            guard deletion.objectTypeIdentifier == HealthKitSynchronizationStream.activitySummary.objectTypeIdentifier,
+                  let externalID = deletion.immutableExternalID,
+                  externalID.hasPrefix("activity-summary:")
+            else { return false }
+            return window.contains(localDate: String(externalID.dropFirst("activity-summary:".count)))
+        }
+        let bounded = HealthKitAnchoredQueryResult(
+            additions: additions,
+            deletions: deletions,
+            proposedAnchorData: raw.proposedAnchorData,
+            completedAt: raw.completedAt
+        )
+        try await store.recordSuccessfulQuery(for: scope, at: bounded.completedAt)
+        let batch = try batchBuilder.build(
+            scope: scope,
+            previousCursor: cursor,
+            queryResult: bounded,
+            createdAt: now(),
+            ingestionPurpose: .validationOnly
+        )
+        try await store.stage(batch)
+        try await deliverPending(scope: scope)
+        return HealthKitCanarySyncSummary(
+            batchIdentity: batch.identity,
+            additionsDiscovered: raw.additions.count,
+            deletionsDiscovered: raw.deletions.count,
+            additionsFilteredByWindow: raw.additions.count - additions.count,
+            deletionsFilteredByWindow: raw.deletions.count - deletions.count,
+            resumedPendingBatch: false
+        )
     }
 
     /// Relaunch recovery uses only already-staged bytes and identities. It

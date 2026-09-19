@@ -46,7 +46,8 @@ struct HealthKitBatchBuilder: Sendable {
         scope: HealthKitCursorScope,
         previousCursor: HealthKitAuthoritativeCursor?,
         queryResult: HealthKitAnchoredQueryResult,
-        createdAt: Date
+        createdAt: Date,
+        ingestionPurpose: HealthKitIngestionPurpose = .operational
     ) throws -> HealthKitStagedBatch {
         let normalizer = HealthKitObservationNormalizer()
         let additions = queryResult.additions.map(normalizer.normalize).sorted(by: Self.observationOrder)
@@ -66,6 +67,7 @@ struct HealthKitBatchBuilder: Sendable {
             scope: scope,
             previousCursorDigest: previousCursor?.digest,
             proposedCursorDigest: proposedDigest,
+            ingestionPurpose: ingestionPurpose,
             additions: additions,
             deletions: deletions
         ))
@@ -80,6 +82,7 @@ struct HealthKitBatchBuilder: Sendable {
                 partitions.append(try partition(
                     batchID: batchID,
                     index: partitions.count,
+                    ingestionPurpose: ingestionPurpose,
                     disposition: .serverRequired,
                     additions: chunk,
                     deletions: [],
@@ -91,6 +94,7 @@ struct HealthKitBatchBuilder: Sendable {
                 partitions.append(try partition(
                     batchID: batchID,
                     index: partitions.count,
+                    ingestionPurpose: ingestionPurpose,
                     disposition: .localDeferred(reason: "server_observation_shape_deferred"),
                     additions: chunk,
                     deletions: [],
@@ -101,6 +105,7 @@ struct HealthKitBatchBuilder: Sendable {
                 partitions.append(try partition(
                     batchID: batchID,
                     index: partitions.count,
+                    ingestionPurpose: ingestionPurpose,
                     disposition: .localDeferred(reason: deferredReason),
                     additions: [],
                     deletions: chunk,
@@ -119,6 +124,7 @@ struct HealthKitBatchBuilder: Sendable {
                     partitions.append(try partition(
                         batchID: batchID,
                         index: partitions.count,
+                        ingestionPurpose: ingestionPurpose,
                         disposition: .localDeferred(reason: reason),
                         additions: additionChunk,
                         deletions: deletionChunk,
@@ -132,6 +138,7 @@ struct HealthKitBatchBuilder: Sendable {
             partitions.append(try partition(
                 batchID: batchID,
                 index: 0,
+                ingestionPurpose: ingestionPurpose,
                 disposition: .localCheckpoint,
                 additions: [],
                 deletions: [],
@@ -141,6 +148,7 @@ struct HealthKitBatchBuilder: Sendable {
         return HealthKitStagedBatch(
             identity: batchID,
             scope: scope,
+            ingestionPurpose: ingestionPurpose,
             previousCursorDigest: previousCursor?.digest,
             proposedCursor: proposedCursor,
             createdAt: createdAt,
@@ -151,6 +159,7 @@ struct HealthKitBatchBuilder: Sendable {
     private func partition(
         batchID: String,
         index: Int,
+        ingestionPurpose: HealthKitIngestionPurpose,
         disposition: HealthKitPartitionDisposition,
         additions: [NormalizedHealthKitObservation],
         deletions: [NormalizedHealthKitDeletion],
@@ -159,12 +168,14 @@ struct HealthKitBatchBuilder: Sendable {
         let material = try encoder.encode(PartitionIdentityMaterial(
             batchID: batchID,
             index: index,
+            ingestionPurpose: ingestionPurpose,
             additions: additions,
             deletions: deletions
         ))
         return HealthKitStagedPartition(
             identity: "healthkit_partition_\(HealthKitStableDigest.hex(material))",
             index: index,
+            ingestionPurpose: ingestionPurpose,
             disposition: disposition,
             additions: additions,
             deletions: deletions,
@@ -188,6 +199,7 @@ struct HealthKitBatchBuilder: Sendable {
         let scope: HealthKitCursorScope
         let previousCursorDigest: String?
         let proposedCursorDigest: String
+        let ingestionPurpose: HealthKitIngestionPurpose
         let additions: [NormalizedHealthKitObservation]
         let deletions: [NormalizedHealthKitDeletion]
     }
@@ -195,6 +207,7 @@ struct HealthKitBatchBuilder: Sendable {
     private struct PartitionIdentityMaterial: Encodable {
         let batchID: String
         let index: Int
+        let ingestionPurpose: HealthKitIngestionPurpose
         let additions: [NormalizedHealthKitObservation]
         let deletions: [NormalizedHealthKitDeletion]
     }
@@ -222,14 +235,18 @@ struct HealthKitS1WirePayload: Encodable, Sendable {
 struct HealthKitS1WireObservation: Encodable, Sendable {
     struct Source: Encodable, Sendable {
         let bundleIdentifier: String
+        let sourceName: String?
+        let sourceRevision: String?
         let productType: String?
         let deviceModel: String?
         let operatingSystemVersion: String?
+        let privacySafeDeviceProvenance: String?
     }
 
     struct Occurrence: Encodable, Sendable {
         let localDate: String
         let timeZone: String
+        let utcOffsetSeconds: Int
         let startedAt: String?
         let endedAt: String?
     }
@@ -260,6 +277,7 @@ struct HealthKitS1WireObservation: Encodable, Sendable {
 
     let observationType: String
     let externalId: String
+    let ingestionPurpose: String
     let source: Source
     let occurrence: Occurrence
     let activitySummary: ActivitySummary?
@@ -279,20 +297,29 @@ enum HealthKitS1WireMapper {
         else { throw HealthKitSyncError.operational(code: "healthkit_partition_not_s1_deliverable") }
         return HealthKitS1WirePayload(
             batchId: partition.identity,
-            observations: try partition.additions.map(map)
+            observations: try partition.additions.map {
+                try map($0, ingestionPurpose: partition.ingestionPurpose)
+            }
         )
     }
 
-    private static func map(_ observation: NormalizedHealthKitObservation) throws -> HealthKitS1WireObservation {
+    private static func map(
+        _ observation: NormalizedHealthKitObservation,
+        ingestionPurpose: HealthKitIngestionPurpose = .operational
+    ) throws -> HealthKitS1WireObservation {
         let source = HealthKitS1WireObservation.Source(
             bundleIdentifier: observation.source.bundleIdentifier,
+            sourceName: observation.source.sourceName,
+            sourceRevision: observation.source.sourceRevision,
             productType: observation.source.productType,
             deviceModel: observation.source.privacySafeDeviceProvenance,
-            operatingSystemVersion: nil
+            operatingSystemVersion: nil,
+            privacySafeDeviceProvenance: observation.source.privacySafeDeviceProvenance
         )
         let occurrence = HealthKitS1WireObservation.Occurrence(
             localDate: observation.occurrence.localDate,
             timeZone: observation.occurrence.timeZoneIdentifier,
+            utcOffsetSeconds: observation.occurrence.utcOffsetSeconds,
             startedAt: observation.occurrence.startedAt.map { ISO8601DateFormatter().string(from: $0) },
             endedAt: observation.occurrence.endedAt.map { ISO8601DateFormatter().string(from: $0) }
         )
@@ -305,6 +332,7 @@ enum HealthKitS1WireMapper {
             return HealthKitS1WireObservation(
                 observationType: HealthKitS1ObservationType.activitySummary.rawValue,
                 externalId: observation.immutableExternalID,
+                ingestionPurpose: ingestionPurpose.rawValue,
                 source: source,
                 occurrence: occurrence,
                 activitySummary: .init(
@@ -320,6 +348,7 @@ enum HealthKitS1WireMapper {
             return HealthKitS1WireObservation(
                 observationType: HealthKitS1ObservationType.workout.rawValue,
                 externalId: observation.immutableExternalID,
+                ingestionPurpose: ingestionPurpose.rawValue,
                 source: source,
                 occurrence: occurrence,
                 activitySummary: nil,
@@ -342,6 +371,7 @@ enum HealthKitS1WireMapper {
             return HealthKitS1WireObservation(
                 observationType: HealthKitS1ObservationType.quantitySample.rawValue,
                 externalId: observation.immutableExternalID,
+                ingestionPurpose: ingestionPurpose.rawValue,
                 source: source,
                 occurrence: occurrence,
                 activitySummary: nil,

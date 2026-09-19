@@ -212,6 +212,7 @@ enum HealthKitPartitionAttemptState: Equatable, Codable, Sendable {
 struct HealthKitStagedPartition: Equatable, Codable, Sendable {
     let identity: String
     let index: Int
+    let ingestionPurpose: HealthKitIngestionPurpose
     let disposition: HealthKitPartitionDisposition
     let additions: [NormalizedHealthKitObservation]
     let deletions: [NormalizedHealthKitDeletion]
@@ -223,6 +224,7 @@ struct HealthKitStagedPartition: Equatable, Codable, Sendable {
 struct HealthKitStagedBatch: Equatable, Codable, Sendable {
     let identity: String
     let scope: HealthKitCursorScope
+    let ingestionPurpose: HealthKitIngestionPurpose
     let previousCursorDigest: String?
     let proposedCursor: HealthKitAuthoritativeCursor
     let createdAt: Date

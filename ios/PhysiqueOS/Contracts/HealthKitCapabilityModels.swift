@@ -17,6 +17,16 @@ struct HealthKitFeatureGate: Equatable, Sendable {
 
     static let n0Disabled = HealthKitFeatureGate(enabledOperations: [])
 
+    /// The first Founder canary is deliberately narrower than N1's future
+    /// production runtime: explicit authorization, one foreground query,
+    /// and its acknowledged validation-only upload are the only operations
+    /// it can perform.
+    static let founderActivityValidation = HealthKitFeatureGate(enabledOperations: [
+        .requestAuthorization,
+        .observationQuery,
+        .serverUpload,
+    ])
+
     func allows(_ operation: HealthKitCapabilityOperation) -> Bool {
         enabledOperations.contains(operation)
     }
@@ -58,8 +68,11 @@ enum HealthKitAuthorizationOutcome: Equatable, Sendable {
 
 enum HealthKitServerIngestionContract {
     static let commandType = "healthkit.observations.ingest.v1"
+    static let contractVersion = "healthkit-ingestion-v1"
     static let maximumObservationsPerBatch = 100
     static let queryCursorAuthority = "device"
+    static let activityCanaryDiagnosticResource = "healthkit-activity-canary"
+    static let activityCanaryDiagnosticEndpoint = "/api/v1/native/read/healthkit-activity-canary"
 }
 
 /// Opaque HealthKit query state is device-owned. These bytes must never be

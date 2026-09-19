@@ -503,7 +503,11 @@ private actor MockQueryClient: HealthKitAnchoredQueryClient {
 
     init(results: [HealthKitAnchoredQueryResult]) { self.results = results }
 
-    func execute(stream: HealthKitSynchronizationStream, after anchorData: Data?) async throws -> HealthKitAnchoredQueryResult {
+    func execute(
+        stream: HealthKitSynchronizationStream,
+        after anchorData: Data?,
+        bounds: HealthKitQueryBounds?
+    ) async throws -> HealthKitAnchoredQueryResult {
         anchors.append(anchorData)
         guard !results.isEmpty else { throw HealthKitSyncError.operational(code: "mock_query_exhausted") }
         return results.removeFirst()

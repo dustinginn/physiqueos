@@ -242,6 +242,11 @@ final class AppEnvironment {
     let healthKitFeatureGate: HealthKitFeatureGate
     let healthKitAuthorizationCoordinator: HealthKitAuthorizationCoordinator
     let healthKitSynchronizationEngine: HealthKitSynchronizationEngine
+    /// Temporary Founder-only foreground canary. Its capability shell can
+    /// query and upload only after the coordinator's runtime switch is
+    /// explicitly enabled; background delivery and HealthKit writes are not
+    /// present in this gate.
+    let healthKitFounderCanaryCoordinator: HealthKitFounderCanaryCoordinator
 
     var weightEvidenceAPI: WeightEvidenceAPI {
         switch nativeAuthority {
@@ -574,12 +579,31 @@ final class AppEnvironment {
             service: healthKitService,
             featureGate: healthKitFeatureGate
         )
+        let uploader = healthKitObservationUploader
+            ?? ProductionHealthKitObservationUploader(api: productionNativeAPI)
         self.healthKitSynchronizationEngine = HealthKitSynchronizationEngine(
             queryClient: healthKitQueryClient,
             observerClient: healthKitObserverClient,
             store: healthKitSynchronizationStore,
-            uploader: healthKitObservationUploader ?? ProductionHealthKitObservationUploader(api: productionNativeAPI),
+            uploader: uploader,
             featureGate: healthKitFeatureGate
+        )
+        let canaryGate = HealthKitFeatureGate.founderActivityValidation
+        let canaryAuthorization = HealthKitAuthorizationCoordinator(
+            service: healthKitService,
+            featureGate: canaryGate
+        )
+        let canarySynchronizer = HealthKitSynchronizationEngine(
+            queryClient: healthKitQueryClient,
+            observerClient: healthKitObserverClient,
+            store: healthKitSynchronizationStore,
+            uploader: uploader,
+            featureGate: canaryGate
+        )
+        self.healthKitFounderCanaryCoordinator = HealthKitFounderCanaryCoordinator(
+            authorization: canaryAuthorization,
+            synchronizer: canarySynchronizer,
+            server: productionNativeAPI
         )
     }
 
