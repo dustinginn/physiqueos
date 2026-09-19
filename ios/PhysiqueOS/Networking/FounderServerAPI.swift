@@ -398,6 +398,7 @@ actor ProductionNativeAPI {
     private var inFlightReads: [String: InFlightRead] = [:]
     private var readCacheGeneration = 0
     private let maximumCachedReads = 32
+    private var acceptedEvidenceReviewProcessing: [String: AcceptedEvidenceReviewProcessing] = [:]
 
     enum ReadPolicy: Sendable, Equatable {
         case cacheFirst
@@ -556,6 +557,18 @@ actor ProductionNativeAPI {
         readCacheOrder.removeAll { key in
             resources.contains(where: { key == $0 || key.hasPrefix("\($0)?") })
         }
+    }
+
+    func acknowledgeAcceptedEvidenceReviewProcessing(_ value: AcceptedEvidenceReviewProcessing) {
+        acceptedEvidenceReviewProcessing[value.id] = value
+    }
+
+    func acceptedEvidenceReviewProcessingAcknowledgments() -> [AcceptedEvidenceReviewProcessing] {
+        acceptedEvidenceReviewProcessing.values.sorted { $0.id < $1.id }
+    }
+
+    func clearAcceptedEvidenceReviewProcessing(reviewId: String) {
+        acceptedEvidenceReviewProcessing[reviewId] = nil
     }
 
     private func loadReadData(resource: String, query: [String: String]) async throws -> Data {

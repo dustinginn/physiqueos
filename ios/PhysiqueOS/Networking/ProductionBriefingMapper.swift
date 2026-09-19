@@ -108,7 +108,7 @@ enum ProductionBriefingMapper {
             window: window,
             attribution: attribution(from: attributionValue, fallbackTitle: activeGoal?["title"]?.string ?? activeGoal?["name"]?.string ?? "Goal at publication", phaseName: presentation["activePhase"]?["name"]?.string),
             confidence: try confidence(from: presentation["goalConfidence"]),
-            midweek: midweek(from: presentation, window: window)
+            midweek: try midweek(from: presentation, window: window)
         )
     }
 
@@ -346,7 +346,27 @@ enum ProductionBriefingMapper {
         )
     }
 
-    private static func midweek(from value: BriefingJSONValue, window: BriefingEvidenceWindowReadModel) -> MidweekBriefingContent {
+    private static func midweek(from value: BriefingJSONValue, window: BriefingEvidenceWindowReadModel) throws -> MidweekBriefingContent {
+        let narrativeV3: CanonicalNarrativeV3ReadModel?
+        if value["presentationModel"]?.string == "canonical_narrative_v3" {
+            let narrative = value["narrativeV3"]
+            guard
+                let summary = nonEmptyString(narrative?["summary"]),
+                let detail = nonEmptyString(narrative?["detail"]),
+                let result = nonEmptyString(narrative?["sections"]?["result"]),
+                let meaning = nonEmptyString(narrative?["sections"]?["meaning"]),
+                let action = nonEmptyString(narrative?["sections"]?["action"]),
+                let watch = nonEmptyString(narrative?["sections"]?["watch"]),
+                let confidence = nonEmptyString(narrative?["sections"]?["confidence"]),
+                let coachTake = nonEmptyString(narrative?["coachTake"])
+            else { throw ProductionNativeError.invalidResponse }
+            narrativeV3 = .init(
+                summary: summary, detail: detail, result: result, meaning: meaning,
+                action: action, watch: watch, confidence: confidence, coachTake: coachTake
+            )
+        } else {
+            narrativeV3 = nil
+        }
         let energy = value["energyBalance"]
         let training = value["training"]
         let coach = value["coachTake"]
@@ -401,7 +421,8 @@ enum ProductionBriefingMapper {
             bodyComposition: bodySection,
             coachTakeNarrative: coach?["biggestTakeaway"]?.string ?? "",
             coachRecommendation: coach?["recommendation"]?.string,
-            prioritiesThroughSunday: strings(value["prioritiesThroughSunday"])
+            prioritiesThroughSunday: strings(value["prioritiesThroughSunday"]),
+            narrativeV3: narrativeV3
         )
     }
 
@@ -857,6 +878,12 @@ enum ProductionBriefingMapper {
 
     private static func strings(_ value: BriefingJSONValue?) -> [String] {
         value?.array.compactMap(\.string) ?? []
+    }
+
+    private static func nonEmptyString(_ value: BriefingJSONValue?) -> String? {
+        guard let text = value?.literalString?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty else { return nil }
+        return text
     }
 
     private static func factorTexts(_ value: BriefingJSONValue?) -> [String] {

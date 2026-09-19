@@ -505,6 +505,9 @@ struct EvidenceReviewDetailView: View {
             let confirmation = try await environment.evidenceIntakePipeline.commitReview(
                 domain: domain, reviewId: reviewId, expectedVersion: String(version)
             )
+            if confirmation?.accepted == true || confirmation?.state == "confirmed" {
+                await acknowledgeAcceptedProcessing(review: review, domain: domain)
+            }
             if confirmation?.canonicalStateDurable == true {
                 // The server has crossed the canonical durability boundary,
                 // but Log may still hold a pre-confirm cache. Detach it and
@@ -543,6 +546,7 @@ struct EvidenceReviewDetailView: View {
                     reviewAPI: environment.evidenceReviewAPI, reviewId: reviewId,
                     pollInterval: Self.fastFollowUpPollInterval, maxPolls: Self.fastFollowUpMaxPolls
                 )
+                await acknowledgeAcceptedProcessing(review: review, domain: domain)
                 actionState = .confirmed
                 Self.recordConfirmationTiming(from: confirmationStartedAt, outcome: "confirmed_readback")
                 return
@@ -579,6 +583,7 @@ struct EvidenceReviewDetailView: View {
             switch refreshed.status {
             case "confirmed": actionState = .confirmed
             case "committing":
+                await acknowledgeAcceptedProcessing(review: refreshed, domain: domain)
                 actionState = .accepted
                 await invalidateAcceptedProcessingReads()
             case "partially_committed":
@@ -597,6 +602,27 @@ struct EvidenceReviewDetailView: View {
         // Detach the pre-confirm cache immediately so returning to Log cannot
         // continue offering a second Confirm for a server-owned operation.
         await environment.productionNativeAPI.invalidateReadResources(["evidence-review-queue"])
+    }
+
+    @MainActor
+    private func acknowledgeAcceptedProcessing(
+        review: EvidenceReviewDetailReadModel,
+        domain: NativeProductWriteDomain
+    ) async {
+        let projection: (domain: String, label: String) = switch domain {
+        case .workoutLogger: ("training", "Training")
+        case .nutrition: ("nutrition", "Nutrition")
+        case .activityEvidence: ("activity", "Activity")
+        case .dexa: ("dexa", "DEXA")
+        default: ("evidence", "Evidence")
+        }
+        await environment.productionNativeAPI.acknowledgeAcceptedEvidenceReviewProcessing(.init(
+            id: review.id,
+            localDate: review.items.compactMap(\.date).first,
+            domain: projection.domain,
+            label: projection.label
+        ))
+        await invalidateAcceptedProcessingReads()
     }
 
     @MainActor

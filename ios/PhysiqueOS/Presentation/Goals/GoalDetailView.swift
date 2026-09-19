@@ -146,6 +146,11 @@ private struct ActiveGoalDetailContent: View {
                     if goal.confidence.detail != nil { isShowingConfidenceDetail = true }
                 }
                 .accessibilityAddTraits(goal.confidence.detail != nil ? .isButton : [])
+                if !goal.confidence.explanation.isEmpty {
+                    Text(goal.confidence.explanation)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
             }
         }
         .padding(.bottom, 12)

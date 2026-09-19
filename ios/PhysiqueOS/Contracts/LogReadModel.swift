@@ -77,6 +77,17 @@ struct ProcessingEvidenceReview: Codable, Equatable, Identifiable {
     var status: String
 }
 
+/// Ephemeral client acknowledgment of a Server-accepted confirmation. It
+/// bridges only the read-projection race between the durable command
+/// receipt and the queue's next lifecycle snapshot; the Server review
+/// status remains authoritative and terminal failures restore retry UI.
+struct AcceptedEvidenceReviewProcessing: Equatable, Sendable {
+    var id: String
+    var localDate: String?
+    var domain: String
+    var label: String
+}
+
 struct PendingEvidenceReview: Codable, Equatable, Identifiable {
     var id: String
     var title: String

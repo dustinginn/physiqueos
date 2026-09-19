@@ -25,18 +25,36 @@ struct ConfidenceDetailSheet: View {
                     .physiqueOSFont(PhysiqueOSTypography.sheetSectionHeading)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
 
-                if !detail.summary.isEmpty {
+                if let why = detail.whyConfidence, !why.isEmpty {
+                    narrativeSection(title: "Why confidence is here", text: why)
+                } else if !detail.summary.isEmpty {
                     Text(detail.summary)
                         .physiqueOSFont(PhysiqueOSTypography.sheetBody)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
 
-                factorGroup(systemImage: "arrow.left.arrow.right.circle.fill", title: "What changed", items: detail.movementFactors)
-                factorGroup(systemImage: "checkmark.circle.fill", title: "What supports confidence", items: detail.supportingFactors)
-                factorGroup(systemImage: "questionmark.circle.fill", title: "What limits confidence", items: detail.limitingFactors)
-                factorGroup(systemImage: "chart.line.uptrend.xyaxis", title: "What will make confidence clearer", items: detail.clarifyingFactors)
+                if detail.schemaVersion == "home_confidence_presentation_v3" {
+                    factorGroup(systemImage: "arrow.up.right.circle.fill", title: "What increased it", items: detail.whatIncreasedIt)
+                    factorGroup(systemImage: "checkmark.circle.fill", title: "What supports it now", items: detail.whatSupportsItNow)
+                    factorGroup(systemImage: "exclamationmark.circle.fill", title: "What is holding it back", items: detail.whatIsHoldingItBack)
+                    factorGroup(systemImage: "chart.line.uptrend.xyaxis", title: "What could raise it", items: detail.whatCouldRaiseIt)
+                    factorGroup(systemImage: "chart.line.downtrend.xyaxis", title: "What could lower it", items: detail.whatCouldLowerIt)
+                    if let nextEvidence = detail.nextEvidence, !nextEvidence.isEmpty {
+                        narrativeSection(title: "Next evidence", text: nextEvidence)
+                    }
+                    if let coachTake = detail.coachTake, !coachTake.isEmpty {
+                        narrativeSection(title: "Coach's take", text: coachTake)
+                    }
+                    factorGroup(systemImage: "info.circle.fill", title: "Assumptions", items: detail.assumptions)
+                } else {
+                    factorGroup(systemImage: "arrow.left.arrow.right.circle.fill", title: "What changed", items: detail.movementFactors)
+                    factorGroup(systemImage: "checkmark.circle.fill", title: "What supports confidence", items: detail.supportingFactors)
+                    factorGroup(systemImage: "questionmark.circle.fill", title: "What limits confidence", items: detail.limitingFactors)
+                    factorGroup(systemImage: "chart.line.uptrend.xyaxis", title: "What will make confidence clearer", items: detail.clarifyingFactors)
+                }
 
-                if !detail.uncertaintyStatement.isEmpty {
+                if detail.schemaVersion != "home_confidence_presentation_v3",
+                   !detail.uncertaintyStatement.isEmpty {
                     Text(detail.uncertaintyStatement)
                         .physiqueOSFont(PhysiqueOSTypography.sheetBody)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -51,6 +69,17 @@ struct ConfidenceDetailSheet: View {
         .background(PhysiqueOSTheme.surfaceElevated)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    private func narrativeSection(title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .physiqueOSFont(PhysiqueOSTypography.sheetSectionHeading)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text(text)
+                .physiqueOSFont(PhysiqueOSTypography.sheetBody)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }
     }
 
     @ViewBuilder

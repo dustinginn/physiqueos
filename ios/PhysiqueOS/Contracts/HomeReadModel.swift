@@ -95,11 +95,30 @@ struct ConfidenceDetail: Codable, Equatable {
     var uncertaintyStatement: String
     var movementFactors: [String] = []
     var summary: String = ""
+    /// Additive fields from the Server-owned Home Confidence V3
+    /// presentation. They remain optional so Build 40/V2 artifacts keep
+    /// decoding exactly as published; Native only lays out this copy and
+    /// never derives Confidence or interprets evidence from it.
+    var schemaVersion: String? = nil
+    var whyConfidence: String? = nil
+    var whatIncreasedIt: [String] = []
+    var whatSupportsItNow: [String] = []
+    var whatIsHoldingItBack: [String] = []
+    var whatCouldRaiseIt: [String] = []
+    var whatCouldLowerIt: [String] = []
+    var nextEvidence: String? = nil
+    var coachTake: String? = nil
+    var assumptions: [String] = []
 
     init(
         qualitativeLevel: String, supportingFactors: [String], limitingFactors: [String],
         clarifyingFactors: [String], uncertaintyStatement: String,
-        movementFactors: [String] = [], summary: String = ""
+        movementFactors: [String] = [], summary: String = "",
+        schemaVersion: String? = nil, whyConfidence: String? = nil,
+        whatIncreasedIt: [String] = [], whatSupportsItNow: [String] = [],
+        whatIsHoldingItBack: [String] = [], whatCouldRaiseIt: [String] = [],
+        whatCouldLowerIt: [String] = [], nextEvidence: String? = nil,
+        coachTake: String? = nil, assumptions: [String] = []
     ) {
         self.qualitativeLevel = qualitativeLevel
         self.supportingFactors = supportingFactors
@@ -108,6 +127,16 @@ struct ConfidenceDetail: Codable, Equatable {
         self.uncertaintyStatement = uncertaintyStatement
         self.movementFactors = movementFactors
         self.summary = summary
+        self.schemaVersion = schemaVersion
+        self.whyConfidence = whyConfidence
+        self.whatIncreasedIt = whatIncreasedIt
+        self.whatSupportsItNow = whatSupportsItNow
+        self.whatIsHoldingItBack = whatIsHoldingItBack
+        self.whatCouldRaiseIt = whatCouldRaiseIt
+        self.whatCouldLowerIt = whatCouldLowerIt
+        self.nextEvidence = nextEvidence
+        self.coachTake = coachTake
+        self.assumptions = assumptions
     }
 
     // A prior revision relied on Swift's synthesized `Decodable`, which
@@ -125,6 +154,16 @@ struct ConfidenceDetail: Codable, Equatable {
         uncertaintyStatement = try container.decode(String.self, forKey: .uncertaintyStatement)
         movementFactors = try container.decodeIfPresent([String].self, forKey: .movementFactors) ?? []
         summary = try container.decodeIfPresent(String.self, forKey: .summary) ?? ""
+        schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+        whyConfidence = try container.decodeIfPresent(String.self, forKey: .whyConfidence)
+        whatIncreasedIt = try container.decodeIfPresent([String].self, forKey: .whatIncreasedIt) ?? []
+        whatSupportsItNow = try container.decodeIfPresent([String].self, forKey: .whatSupportsItNow) ?? []
+        whatIsHoldingItBack = try container.decodeIfPresent([String].self, forKey: .whatIsHoldingItBack) ?? []
+        whatCouldRaiseIt = try container.decodeIfPresent([String].self, forKey: .whatCouldRaiseIt) ?? []
+        whatCouldLowerIt = try container.decodeIfPresent([String].self, forKey: .whatCouldLowerIt) ?? []
+        nextEvidence = try container.decodeIfPresent(String.self, forKey: .nextEvidence)
+        coachTake = try container.decodeIfPresent(String.self, forKey: .coachTake)
+        assumptions = try container.decodeIfPresent([String].self, forKey: .assumptions) ?? []
     }
 }
 

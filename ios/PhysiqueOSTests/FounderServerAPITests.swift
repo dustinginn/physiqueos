@@ -1425,6 +1425,64 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(log.processingEvidenceReviews?.map(\.id), ["review-nutrition"])
     }
 
+    func testAcceptedTrainingReviewCannotReappearAsReadyWhileQueueProjectionCatchesUp() async throws {
+        let queue = productionEnvelope(
+            resource: "evidence-review-queue",
+            data: #"{"localDate":"2026-09-18","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null,"processing":false},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null,"processing":false},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null,"processing":false}]},"pendingEvidenceReviews":[{"id":"review-training","date":"Friday, September 18","title":"Training ready to review","summary":"1 session","likelyDuplicate":false}],"processingEvidenceReviews":[]}"#
+        )
+        let review = productionEnvelope(
+            resource: "evidence-review",
+            data: #"{"review":{"id":"review-training","status":"pending","createdAt":"2026-09-18T12:00:00Z","version":2,"interpretedEvidence":{"evidence_objects":[]}},"presentation":{"items":[],"summary":{"text":"","excludedText":""}}}"#
+        )
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": queue,
+                "evidence-review": review,
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        await native.acknowledgeAcceptedEvidenceReviewProcessing(.init(
+            id: "review-training", localDate: "2026-09-18", domain: "training", label: "Training"
+        ))
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+        XCTAssertTrue(log.pendingEvidenceReviews.isEmpty)
+        XCTAssertEqual(log.processingEvidenceReviews?.map(\.id), ["review-training"])
+        let training = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
+        XCTAssertEqual(training.summary, "Training processing")
+        XCTAssertEqual(training.context, "Confirmation accepted · No action required")
+        XCTAssertEqual(training.processing, true)
+        XCTAssertNil(training.destination)
+    }
+
+    func testAcceptedReviewTerminalFailureRestoresReadyAndRetrySemantics() async throws {
+        let queue = productionEnvelope(
+            resource: "evidence-review-queue",
+            data: #"{"localDate":"2026-09-18","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[{"id":"review-training","date":"Friday, September 18","title":"Training needs another look","summary":"Retry available","likelyDuplicate":false}],"processingEvidenceReviews":[]}"#
+        )
+        let review = productionEnvelope(
+            resource: "evidence-review",
+            data: #"{"review":{"id":"review-training","status":"commit_failed","createdAt":"2026-09-18T12:00:00Z","version":3,"interpretedEvidence":{"evidence_objects":[]}},"presentation":{"items":[],"summary":{"text":"","excludedText":""}}}"#
+        )
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["evidence-review-queue": queue, "evidence-review": review, "weight": productionWeightForLogJSON(date: nil, value: nil)]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        await native.acknowledgeAcceptedEvidenceReviewProcessing(.init(
+            id: "review-training", localDate: "2026-09-18", domain: "training", label: "Training"
+        ))
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+        XCTAssertEqual(log.pendingEvidenceReviews.map(\.id), ["review-training"])
+        XCTAssertTrue(log.processingEvidenceReviews?.isEmpty == true)
+        XCTAssertEqual(log.pendingEvidenceReviews.first?.destination, .evidenceReview(reviewId: "review-training"))
+    }
+
     /// The architectural defect was that `logAPI` could never have
     /// switched with authority no matter what either implementation
     /// returned — this confirms the property itself is now authority-
@@ -2276,6 +2334,27 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.midweek?.training?.watch?.exercise, "Back Squat")
         XCTAssertEqual(result.midweek?.coachRecommendation, "Use the full week.")
         XCTAssertEqual(result.attribution.phaseName, "Foundation")
+    }
+
+    func testProductionMidweekUsesCompleteCanonicalNarrativeV3WithoutExpandingCadence() async throws {
+        let json = productionEnvelope(
+            resource: "briefing",
+            data: #"{"schemaVersion":"1","artifact":{"artifactId":"midweek-v3","artifactType":"scheduled","cadence":"midweek","version":3,"evidenceWindow":{"id":"window","startDate":"2026-09-13","endDate":"2026-09-15","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-16T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal","phaseId":"phase"},"historical":{"frozen":true,"artifactBound":true},"presentation":{"presentationModel":"canonical_narrative_v3","hero":{"verdict":"Canonical V3 headline.","summary":"Canonical V3 meaning."},"narrativeV3":{"summary":"Canonical V3 headline.","detail":"Canonical V3 detail.","sections":{"result":"Canonical V3 result.","meaning":"Canonical V3 meaning.","action":"Canonical V3 action.","watch":"Canonical V3 watch.","confidence":"Canonical V3 confidence."},"coachTake":"Canonical V3 coach take."},"coachTake":{"biggestTakeaway":"Canonical V3 coach take.","recommendation":"Canonical V3 action."},"goalConfidence":{"score":79,"band":"high","priorScore":79,"delta":0,"movementDirection":"held","presentationExplanation":"Canonical V3 confidence.","movementLabel":"No meaningful change","assessmentContext":{"goalId":"goal","phaseId":"phase"},"source":"canonical_pi_snapshot"},"activeGoal":{"id":"goal","name":"Build Lean Mass"},"activePhase":{"id":"phase","name":"Lean Mass Build"},"prioritiesThroughSunday":[]}}"#
+        )
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["briefing": json]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionBriefingAPI(api: native).fetchBriefing(artifactId: "midweek-v3")
+        let result = try XCTUnwrap(fetched)
+        let narrative = try XCTUnwrap(result.midweek?.narrativeV3)
+        XCTAssertEqual(narrative.summary, "Canonical V3 headline.")
+        XCTAssertEqual(narrative.result, "Canonical V3 result.")
+        XCTAssertEqual(narrative.action, "Canonical V3 action.")
+        XCTAssertEqual(narrative.coachTake, "Canonical V3 coach take.")
+        XCTAssertEqual(result.confidence?.score, 79)
     }
 
     func testProductionBriefingRejectsLocalConfidenceFallbackWhenCanonicalPresentationIsMissing() async throws {
@@ -3517,7 +3596,7 @@ final class FounderServerAPITests: XCTestCase {
 
     private func isUUIDv7(_ value: String) -> Bool {
         guard let uuid = UUID(uuidString: value) else { return false }
-        var bytes = withUnsafeBytes(of: uuid.uuid) { Array($0) }
+        let bytes = withUnsafeBytes(of: uuid.uuid) { Array($0) }
         return (bytes[6] & 0xF0) == 0x70 && (bytes[8] & 0xC0) == 0x80
     }
 

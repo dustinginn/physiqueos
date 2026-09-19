@@ -533,6 +533,7 @@ final class TrainingReadModelTests: XCTestCase {
 
     // MARK: - Training Day fidelity (Stage 2)
 
+    @MainActor
     func testCompactDateFormattingMatchesTheFounderSpecifiedForm() {
         XCTAssertEqual(TrainingDayView.formatCompactDate("2026-08-26"), "Aug 26, 2026")
         XCTAssertEqual(TrainingDayView.formatCompactDate("2026-01-05"), "Jan 5, 2026")
@@ -839,7 +840,7 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertEqual(model.records.first?.achievedValue, 2000)
     }
 
-    func testPerformanceRecordsPreserveDistinctLoadFamiliesWithoutLatestNTruncation() {
+    func testPerformanceRecordsCollapseDistinctLoadsToOneCurrentRepsAtLoadType() {
         let events = (1...7).map { index in
             performanceEvent(
                 id: "event-\(index)", eventType: .repsAtLoadPR,
@@ -848,9 +849,10 @@ final class TrainingReadModelTests: XCTestCase {
             )
         }
         let model = TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: events)
-        XCTAssertEqual(model?.records.count, 7)
-        XCTAssertEqual(model?.visibleCount, 7)
-        XCTAssertEqual(model?.totalCount, 7)
+        XCTAssertEqual(model?.records.count, 1)
+        XCTAssertEqual(model?.records.first?.workoutDate, "2026-08-07")
+        XCTAssertEqual(model?.visibleCount, 1)
+        XCTAssertEqual(model?.totalCount, 1)
         XCTAssertEqual(model?.hiddenCount, 0)
         XCTAssertNil(model?.countLabel)
     }
@@ -864,8 +866,33 @@ final class TrainingReadModelTests: XCTestCase {
             performanceEvent(id: "load-distinct", eventType: .repsAtLoadPR, workoutDate: "2026-08-02", load: 140, loadUnit: "lb", reps: 18),
         ]
         let model = try XCTUnwrap(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: events))
-        XCTAssertEqual(Set(model.records.map(\.value)), ["10,800 lb", "15 reps at 180 lb", "18 reps at 140 lb"])
+        XCTAssertEqual(Set(model.records.map(\.value)), ["10,800 lb", "15 reps at 180 lb"])
+        XCTAssertEqual(Set(model.records.map(\.achievementType)), [.sessionVolumePR, .repsAtLoadPR])
         XCTAssertEqual(model.hiddenCount, 0)
+    }
+
+    func testProductionRecordNormalizationKeepsOneTypeAndPreservesLegitimateTypes() throws {
+        let source = try XCTUnwrap(TrainingPerformanceRecordsCalculator.recordsReadModel(
+            canonicalExerciseId: "x",
+            events: [
+                performanceEvent(id: "volume", eventType: .sessionVolumePR, workoutDate: "2026-09-10", unit: "lb", sessionVolume: 5000),
+                performanceEvent(id: "latest-load", eventType: .repsAtLoadPR, workoutDate: "2026-09-11", load: 70, loadUnit: "lb", reps: 12),
+            ]
+        ))
+        var duplicated = source
+        let latest = try XCTUnwrap(source.records.first { $0.achievementType == .repsAtLoadPR })
+        var staleLoadFamily = latest
+        staleLoadFamily.id = "training_library_record_stale-load"
+        staleLoadFamily.sourceEventId = "stale-load"
+        staleLoadFamily.workoutDate = "2026-09-01"
+        staleLoadFamily.value = "18 reps at 40 lb"
+        staleLoadFamily.achievedValue = 18
+        duplicated.records.append(staleLoadFamily)
+
+        let normalized = try XCTUnwrap(TrainingPerformanceRecordsCalculator.normalizedCurrentDisplay(duplicated))
+        XCTAssertEqual(normalized.records.count, 2)
+        XCTAssertEqual(normalized.records.filter { $0.achievementType == .repsAtLoadPR }.map(\.workoutDate), ["2026-09-11"])
+        XCTAssertEqual(Set(normalized.records.map(\.achievementType)), [.sessionVolumePR, .repsAtLoadPR])
     }
 
     func testPerformanceRecordsCalculatorReturnsNilForEmptyOrMismatchedEvents() {

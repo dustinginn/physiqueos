@@ -761,18 +761,69 @@ struct ProductionLogAPI: LogAPI {
         }
         rows.append(Self.weightRow(weightPayload, localDate: payload.localDate))
 
+        var pending = payload.pendingEvidenceReviews.map { review in
+            PendingEvidenceReview(
+                id: review.id, title: review.title, date: review.date,
+                summary: review.summary, likelyDuplicate: review.likelyDuplicate,
+                destination: .evidenceReview(reviewId: review.id)
+            )
+        }
+        var processing = payload.processingEvidenceReviews ?? []
+        let acknowledgments = await api.acceptedEvidenceReviewProcessingAcknowledgments()
+        for acknowledgment in acknowledgments {
+            if processing.contains(where: { $0.id == acknowledgment.id }) { continue }
+            guard pending.contains(where: { $0.id == acknowledgment.id }) else {
+                await api.clearAcceptedEvidenceReviewProcessing(reviewId: acknowledgment.id)
+                continue
+            }
+
+            let status = try? await ProductionEvidenceReviewAPI(api: api)
+                .fetchReview(reviewId: acknowledgment.id)?.status
+            if ["commit_failed", "partially_committed"].contains(status) {
+                await api.clearAcceptedEvidenceReviewProcessing(reviewId: acknowledgment.id)
+                continue
+            }
+            if status == "confirmed" {
+                pending.removeAll { $0.id == acknowledgment.id }
+                await api.clearAcceptedEvidenceReviewProcessing(reviewId: acknowledgment.id)
+                continue
+            }
+
+            // A durable accepted receipt makes another review action false.
+            // Until the Server queue catches up, project the honest interim
+            // lifecycle state and keep canonical completion unresolved.
+            pending.removeAll { $0.id == acknowledgment.id }
+            let localDate = acknowledgment.localDate ?? payload.localDate
+            processing.append(.init(
+                id: acknowledgment.id, localDate: localDate,
+                domain: acknowledgment.domain, label: acknowledgment.label,
+                status: status ?? "accepted_processing"
+            ))
+            Self.overlayProcessingRow(
+                domain: acknowledgment.domain, localDate: localDate,
+                today: payload.localDate, rows: &rows
+            )
+        }
+
         return LogReadModel(
             localDate: payload.localDate,
             loggedToday: rows,
-            pendingEvidenceReviews: payload.pendingEvidenceReviews.map { review in
-                PendingEvidenceReview(
-                    id: review.id, title: review.title, date: review.date,
-                    summary: review.summary, likelyDuplicate: review.likelyDuplicate,
-                    destination: .evidenceReview(reviewId: review.id)
-                )
-            },
-            processingEvidenceReviews: payload.processingEvidenceReviews ?? []
+            pendingEvidenceReviews: pending,
+            processingEvidenceReviews: processing
         )
+    }
+
+    private static func overlayProcessingRow(
+        domain: String, localDate: String, today: String,
+        rows: inout [LoggedTodayRow]
+    ) {
+        guard localDate == today,
+              let kind = LoggedTodayRowKind(rawValue: domain),
+              let index = rows.firstIndex(where: { $0.kind == kind && $0.destination == nil })
+        else { return }
+        rows[index].summary = "\(kind.label) processing"
+        rows[index].context = "Confirmation accepted · No action required"
+        rows[index].processing = true
     }
 
     /// `recordId` is the real canonical record the row is about — Training
@@ -1024,7 +1075,7 @@ struct ProductionTrainingAPI: TrainingAPI {
             ],
             scope: payload.timeline.scope(allLabel: "All Training"),
             benchmark: TrainingExerciseHistoryCalculator.benchmark(for: occurrences),
-            performanceRecords: payload.exerciseRecords,
+            performanceRecords: TrainingPerformanceRecordsCalculator.normalizedCurrentDisplay(payload.exerciseRecords),
             lastSession: occurrences.first,
             history: Array(occurrences.prefix(10))
         )

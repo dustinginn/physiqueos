@@ -386,6 +386,21 @@ struct MidweekBriefingContent: Codable, Equatable {
     /// "Priorities Through Sunday" — verified plain, non-navigable
     /// numbered list (max 3 on the real product).
     var prioritiesThroughSunday: [String]
+    /// Present only for a newly published canonical Narrative V3 Midweek.
+    /// Historical V2 artifacts leave this nil and retain their immutable
+    /// legacy section layout.
+    var narrativeV3: CanonicalNarrativeV3ReadModel? = nil
+}
+
+struct CanonicalNarrativeV3ReadModel: Codable, Equatable {
+    var summary: String
+    var detail: String
+    var result: String
+    var meaning: String
+    var action: String
+    var watch: String
+    var confidence: String
+    var coachTake: String
 }
 
 // MARK: - Monthly content (verified section list: Hero, optional Goal

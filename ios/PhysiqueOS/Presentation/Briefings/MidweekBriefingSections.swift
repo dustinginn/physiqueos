@@ -1,16 +1,14 @@
 import SwiftUI
 
-/// Midweek Briefing's complete verified section order — genuinely distinct
-/// from Weekly, NOT a reskinned template (verified: own service, own
-/// screen, its own smaller surface): Hero Verdict/Summary → Energy Balance
-/// → Weight Context → Training Response → Body Composition → Coach's Take.
-/// No Photos section, nothing navigable but the shared back-to-history
-/// link in the Detail header above this content. Confidence here is a pure
-/// read-through passthrough of whatever is already current (verified:
-/// Midweek never computes or refreshes it) — Native renders it exactly as
-/// received, same as every other cadence, with no special-cased logic.
+/// Midweek remains the short briefing cadence. Canonical V3 artifacts render
+/// the Server-owned narrative as Integrated Lead → Canonical Narrative →
+/// Coach's Take. Frozen historical V2 artifacts retain their original,
+/// denser Energy → Weight → Training → Body Composition presentation.
+/// Confidence is always a read-through passthrough; Native never computes or
+/// refreshes it.
 struct MidweekBriefingSections: View {
     static let sectionInventory = ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"]
+    static let canonicalV3SectionInventory = ["Integrated Lead", "Canonical Narrative", "Coach's Take"]
     static let heroTypeLabel = "MIDWEEK BRIEFING"
     let content: MidweekBriefingContent
     let confidence: BriefingConfidenceReadModel?
@@ -18,19 +16,24 @@ struct MidweekBriefingSections: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             hero
-            if let energy = content.energy { WeeklyEnergyCard(section: energy, showsDailySemanticRows: true) }
-            if let weight = content.weight {
-                weeklyWeightCard(weight)
-            } else if let weightContextNarrative = content.weightContextNarrative {
-                narrativeCard(title: "Weight Context", text: weightContextNarrative)
+            if let narrative = content.narrativeV3 {
+                canonicalNarrativeCard(narrative)
+                canonicalCoachTakeCard(narrative.coachTake)
+            } else {
+                if let energy = content.energy { WeeklyEnergyCard(section: energy, showsDailySemanticRows: true) }
+                if let weight = content.weight {
+                    weeklyWeightCard(weight)
+                } else if let weightContextNarrative = content.weightContextNarrative {
+                    narrativeCard(title: "Weight Context", text: weightContextNarrative)
+                }
+                if let training = content.training {
+                    BriefingTrainingResponseCard(training: training)
+                } else if let trainingResponseNarrative = content.trainingResponseNarrative {
+                    narrativeCard(title: "Training Response", text: trainingResponseNarrative)
+                }
+                if let bodyComposition = content.bodyComposition { bodyCompositionCard(bodyComposition) }
+                coachTakeCard
             }
-            if let training = content.training {
-                BriefingTrainingResponseCard(training: training)
-            } else if let trainingResponseNarrative = content.trainingResponseNarrative {
-                narrativeCard(title: "Training Response", text: trainingResponseNarrative)
-            }
-            if let bodyComposition = content.bodyComposition { bodyCompositionCard(bodyComposition) }
-            coachTakeCard
         }
     }
 
@@ -38,10 +41,46 @@ struct MidweekBriefingSections: View {
         BriefingLeadCard(
             eyebrow: Self.heroTypeLabel,
             rangeLabel: BriefingDateFormatting.humanizedPeriodLabel(content.reportingRangeLabel),
-            headline: content.heroVerdict,
-            narrative: content.heroSummary,
+            headline: content.narrativeV3?.summary ?? content.heroVerdict,
+            narrative: content.narrativeV3?.detail ?? content.heroSummary,
             confidence: confidence
         )
+    }
+
+    private func canonicalNarrativeCard(_ narrative: CanonicalNarrativeV3ReadModel) -> some View {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+            VStack(alignment: .leading, spacing: 16) {
+                canonicalNarrativeSection("Result", narrative.result)
+                canonicalNarrativeSection("What It Means", narrative.meaning)
+                canonicalNarrativeSection("What To Do", narrative.action)
+                canonicalNarrativeSection("What To Watch", narrative.watch)
+                canonicalNarrativeSection("Confidence", narrative.confidence)
+            }
+        }
+    }
+
+    private func canonicalNarrativeSection(_ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.accent)
+            Text(text)
+                .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }
+    }
+
+    private func canonicalCoachTakeCard(_ text: String) -> some View {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("COACH'S TAKE")
+                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                Text(text)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            }
+        }
     }
 
     private func narrativeCard(title: String, text: String) -> some View {

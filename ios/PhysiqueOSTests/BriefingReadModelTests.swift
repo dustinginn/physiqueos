@@ -54,8 +54,19 @@ final class BriefingReadModelTests: XCTestCase {
     func testEveryBriefingKeepsItsCompleteEditorialSectionInventory() {
         XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"])
         XCTAssertEqual(MidweekBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"])
+        XCTAssertEqual(MidweekBriefingSections.canonicalV3SectionInventory, ["Integrated Lead", "Canonical Narrative", "Coach's Take"])
         XCTAssertEqual(Array(DEXABriefingSections.sectionInventory.suffix(4)), ["What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"])
         XCTAssertEqual(PhotoBriefingSections.sectionInventory, ["Hero", "Snapshot", "Progress", "Interpretation", "Coach's Insight", "Completion Decision"])
+    }
+
+    func testConfidenceDetailDecodesServerOwnedV3WithoutRequiringV2OnlyFields() throws {
+        let data = #"{"schemaVersion":"home_confidence_presentation_v3","qualitativeLevel":"High","supportingFactors":["compat"],"limitingFactors":[],"clarifyingFactors":[],"uncertaintyStatement":"Canonical uncertainty.","whyConfidence":"The plan is working.","whatIncreasedIt":["A decisive result."],"whatSupportsItNow":["Execution is consistent."],"whatIsHoldingItBack":["Persistence is emerging."],"whatCouldRaiseIt":["The next scan confirms progress."],"whatCouldLowerIt":["Progress stalls."],"nextEvidence":"The next DEXA scan.","coachTake":"Hold the plan.","assumptions":["Continued execution."]}"#.data(using: .utf8)!
+        let detail = try JSONDecoder().decode(ConfidenceDetail.self, from: data)
+        XCTAssertEqual(detail.schemaVersion, "home_confidence_presentation_v3")
+        XCTAssertEqual(detail.whyConfidence, "The plan is working.")
+        XCTAssertEqual(detail.whatIncreasedIt, ["A decisive result."])
+        XCTAssertEqual(detail.nextEvidence, "The next DEXA scan.")
+        XCTAssertEqual(detail.coachTake, "Hold the plan.")
     }
 
     func testMonthlyCompositionRemainsADistinctLongFormZineNotAWeeklyReskin() {

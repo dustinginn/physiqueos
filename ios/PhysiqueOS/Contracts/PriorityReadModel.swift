@@ -164,6 +164,19 @@ struct PriorityCompletionContext: Codable, Equatable {
     var protocolId: String? = nil
 }
 
+/// Presentation-only simplification for Priority Detail. The canonical
+/// section payload and completion context remain intact; Native omits only
+/// the two redundant informational cards while retaining execution fields
+/// such as Dose, Preparation, timing, protocol changes, and notes.
+enum PriorityDetailPresentation {
+    static func visibleSections(_ sections: [PrioritySectionReadModel]) -> [PrioritySectionReadModel] {
+        sections.filter { section in
+            let title = section.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return title != "related goals" && title != "completion" && title != "appointment completion"
+        }
+    }
+}
+
 struct PrioritySessionItem: Codable, Equatable, Identifiable {
     var id: String
     var label: String
@@ -216,8 +229,10 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     /// though not every variant sends every section — `getPriorityDetail`
     /// never guarantees a fixed set). `nil` under Sandbox, which has no
     /// wire equivalent to decode from and keeps using `metadata` directly.
-    /// Native renders every section verbatim rather than assuming a fixed
-    /// four-section shape or re-deriving any of it (a section's own
+    /// Native renders all execution-relevant sections verbatim, filtering
+    /// only the globally retired Related Goals and informational Completion
+    /// cards rather than assuming a fixed shape or re-deriving any content
+    /// (a section's own
     /// `label`/`detail` already carries the server's fully-formatted text
     /// — including any real scheduled clock time — so Native never
     /// invents a time from a daypart word like "Tonight").

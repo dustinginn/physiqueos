@@ -99,17 +99,9 @@ struct PriorityDetailView: View {
                     morningWeightCard(morningCheckIn)
                 }
                 if let sections = priority.detailSections, !sections.isEmpty {
-                    ForEach(sections) { section in sectionCard(section) }
+                    ForEach(PriorityDetailPresentation.visibleSections(sections)) { section in sectionCard(section) }
                 } else {
                     whatCard(priority)
-                    if let attribution = priority.attributedScope {
-                        CardContainer {
-                            VStack(alignment: .leading, spacing: 4) {
-                                SectionHeading("Related Goal")
-                                EvidenceScopeAttributionChip(attribution: attribution)
-                            }
-                        }
-                    }
                 }
                 actionSection(priority)
             }
@@ -117,9 +109,9 @@ struct PriorityDetailView: View {
     }
 
     /// Founder Production's real, complete information hierarchy —
-    /// renders every `sections[]` entry the `priority` resource sends
-    /// verbatim (What/When/Why it matters/Related Goals/Completion, though
-    /// not every priority type sends every section). A section's own
+    /// renders the execution-relevant `sections[]` entries the `priority`
+    /// resource sends, omitting only Related Goals and Completion cards.
+    /// Completion commands still use the untouched canonical context. A section's own
     /// `label`/`detail` text already carries whatever the server decided
     /// to say — including a real scheduled clock time when one exists —
     /// so this never re-derives or guesses at timing.

@@ -137,8 +137,8 @@ enum TrainingPerformanceEventValidator {
 /// (`TrainingLibraryExerciseRecordsService.js`) field-for-field: select a
 /// canonical exercise, deduplicate by durable event id, reject unsupported
 /// schema/category/type or malformed values, preserve variant/relationship
-/// context, select the current strongest event for each canonical record
-/// family, sort deterministically, and return `nil` when no qualifying
+/// context, select one current display record for each supported record
+/// type, sort deterministically, and return `nil` when no qualifying
 /// record remains. Historical events stay canonical; this is summary
 /// selection only. PR detection itself stays server-owned.
 enum TrainingPerformanceRecordsCalculator {
@@ -152,23 +152,14 @@ enum TrainingPerformanceRecordsCalculator {
         guard let selectedId = clean(canonicalExerciseId) else { return nil }
 
         var seenEventIds: Set<String> = []
-        var activeByFamily: [String: TrainingPerformanceRecord] = [:]
+        var candidates: [TrainingPerformanceRecord] = []
         for event in events {
             guard seenEventIds.insert(event.id).inserted else { continue }
             guard let record = toRecord(event, selectedId: selectedId) else { continue }
-            let family = activeRecordFamilyKey(event)
-            if let current = activeByFamily[family] {
-                if record.achievedValue > current.achievedValue ||
-                    (record.achievedValue == current.achievedValue && isOrderedBefore(record, current)) {
-                    activeByFamily[family] = record
-                }
-            } else {
-                activeByFamily[family] = record
-            }
+            candidates.append(record)
         }
 
-        var records = Array(activeByFamily.values)
-        records.sort(by: isOrderedBefore)
+        let records = currentDisplayRecords(candidates)
         guard let first = records.first else { return nil }
 
         return TrainingPerformanceRecordsReadModel(
@@ -184,23 +175,51 @@ enum TrainingPerformanceRecordsCalculator {
         )
     }
 
-    private static func activeRecordFamilyKey(_ event: TrainingPerformanceEvent) -> String {
-        let variant = event.executionVariant?.key ?? "ordinary"
-        let relationship: String
-        if let context = event.relationshipContext {
-            relationship = "\(context.relationshipType):" + context.orderedPartners
-                .map { $0.canonicalExerciseId }
-                .sorted()
-                .joined(separator: ",")
-        } else {
-            relationship = "standalone"
+    /// Applies the same invariant to Server-projected records. Canonical
+    /// events and training history are untouched; this only reconciles the
+    /// current Exercise Detail card to one row per achievement type.
+    static func normalizedCurrentDisplay(
+        _ model: TrainingPerformanceRecordsReadModel?
+    ) -> TrainingPerformanceRecordsReadModel? {
+        guard var model else { return nil }
+        let matching = model.records.filter { $0.canonicalExerciseId == model.canonicalExerciseId }
+        let records = currentDisplayRecords(matching)
+        guard !records.isEmpty else { return nil }
+        model.records = records
+        model.visibleCount = records.count
+        model.totalCount = records.count
+        model.hiddenCount = 0
+        model.countLabel = nil
+        return model
+    }
+
+    private static func currentDisplayRecords(
+        _ candidates: [TrainingPerformanceRecord]
+    ) -> [TrainingPerformanceRecord] {
+        var selected: [TrainingPerformanceEventType: TrainingPerformanceRecord] = [:]
+        for candidate in candidates {
+            guard let current = selected[candidate.achievementType] else {
+                selected[candidate.achievementType] = candidate
+                continue
+            }
+            let shouldReplace: Bool
+            switch candidate.achievementType {
+            case .sessionVolumePR:
+                shouldReplace = candidate.achievedValue > current.achievedValue ||
+                    (candidate.achievedValue == current.achievedValue && isOrderedBefore(candidate, current))
+            case .repsAtLoadPR:
+                // Loads/variants are context on the canonical event, not
+                // separate display record types. The latest published PR
+                // is the one current reps-at-load row for this exercise.
+                shouldReplace = candidate.workoutDate > current.workoutDate ||
+                    (candidate.workoutDate == current.workoutDate && (
+                        candidate.achievedValue > current.achievedValue ||
+                        (candidate.achievedValue == current.achievedValue && candidate.sourceEventId < current.sourceEventId)
+                    ))
+            }
+            if shouldReplace { selected[candidate.achievementType] = candidate }
         }
-        if event.eventType == TrainingPerformanceEventType.repsAtLoadPR.rawValue {
-            let load = event.load.map { String($0) } ?? ""
-            return [event.eventType, load, event.loadUnit ?? "", variant, relationship]
-                .joined(separator: "|")
-        }
-        return [event.eventType, event.unit ?? "", variant, relationship].joined(separator: "|")
+        return selected.values.sorted(by: isOrderedBefore)
     }
 
     /// `toItem`: intentionally validates the same boundary the web read

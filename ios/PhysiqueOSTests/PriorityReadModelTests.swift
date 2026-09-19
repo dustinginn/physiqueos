@@ -13,6 +13,30 @@ import XCTest
 /// is also a Sunday. 2026-08-29 (the "yesterday" used for Morning Check-In
 /// tests below) is a Saturday.
 final class PriorityReadModelTests: XCTestCase {
+    func testPriorityDetailGloballyOmitsRelatedGoalsAndCompletionButKeepsExecutionFields() {
+        let sections = [
+            PrioritySectionReadModel(title: "What", items: [.init(label: "Protocol", detail: "Retatrutide")]),
+            PrioritySectionReadModel(title: "When", items: [.init(label: "Schedule", detail: "Thursday")]),
+            PrioritySectionReadModel(title: "Dose", items: [.init(label: "Dose", detail: "4 mg")]),
+            PrioritySectionReadModel(title: "Preparation", items: [.init(label: "Site", detail: "Rotate")]),
+            PrioritySectionReadModel(title: "Why It Matters", items: [.init(label: "Purpose", detail: "Execution")]),
+            PrioritySectionReadModel(title: "Related Goals", items: [.init(label: "Goal", detail: "Build Lean Mass")]),
+            PrioritySectionReadModel(title: "Completion", items: [.init(label: "Method", detail: "Manual confirmation")]),
+            PrioritySectionReadModel(title: "Appointment completion", items: [.init(label: "Method", detail: "DEXA evidence")]),
+            PrioritySectionReadModel(title: "Next Execution Change", items: [.init(label: "Change", detail: "Next week")]),
+        ]
+
+        let visible = PriorityDetailPresentation.visibleSections(sections)
+        XCTAssertEqual(visible.map(\.title), ["What", "When", "Dose", "Preparation", "Why It Matters", "Next Execution Change"])
+    }
+
+    func testPriorityDetailSimplificationDoesNotAlterDoseAwareCompletionContext() {
+        let context = PriorityCompletionContext(occurrenceDate: "2026-09-18", dose: "4 mg", protocolId: "retatrutide")
+        let sections = [PrioritySectionReadModel(title: "Completion", items: [.init(label: "Dose", detail: "4 mg")])]
+        XCTAssertTrue(PriorityDetailPresentation.visibleSections(sections).isEmpty)
+        XCTAssertEqual(context, .init(occurrenceDate: "2026-09-18", dose: "4 mg", protocolId: "retatrutide"))
+    }
+
     func testMorningWeighInRoutesToMorningCheckInInsteadOfGenericPriorityDetail() throws {
         let store = try LoggingSandboxStore()
         let occurrence = try XCTUnwrap(
