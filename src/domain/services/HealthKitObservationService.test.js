@@ -18,6 +18,15 @@ describe("HealthKitObservationService V1 compatibility", () => {
     expect(first.occurrence.startedAt).toBe("2026-09-12T17:00:00.000Z");
   });
 
+  it("keeps V1 identity unchanged across purposes while separating semantic replay", () => {
+    const operational = normalize("batch-one", [workout()]).observations[0];
+    const validation = normalize("batch-two", [{ ...workout(), ingestionPurpose: "validation_only" }]).observations[0];
+    expect(validation.id).toBe("healthkit_observation_f3a630737d38ac946c4de2991a09b31f879cc701ed3caa6c535380f9d62a9221");
+    expect(validation.id).toBe(operational.id);
+    expect(validation.semanticFingerprint).not.toBe(operational.semanticFingerprint);
+    expect(validation.ingestionPurpose).toBe("validation_only");
+  });
+
   it("keeps different immutable external IDs distinct even when time and values match", () => {
     const observations = normalize("batch-one", [
       workout({ externalId: "hk-workout-001" }),

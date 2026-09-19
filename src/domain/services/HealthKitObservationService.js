@@ -4,6 +4,12 @@ import { assessWorkoutDuplicatePair } from "./WorkoutDuplicateIdentityService.js
 export const HEALTHKIT_OBSERVATION_SCHEMA_VERSION = "healthkit-source-observation-v1";
 export const HEALTHKIT_INGESTION_CONTRACT_VERSION = "healthkit-ingestion-v1";
 export const HEALTHKIT_MAX_OBSERVATIONS_PER_BATCH = 100;
+export const HEALTHKIT_ACTIVITY_ACTIVATION_POLICY_RECORD_ID = "healthkit_activity_activation_policy";
+
+export const HealthKitIngestionPurpose = Object.freeze({
+  OPERATIONAL: "operational",
+  VALIDATION_ONLY: "validation_only",
+});
 
 export const HealthKitObservationType = Object.freeze({
   ACTIVITY_SUMMARY: "activity_summary",
@@ -14,6 +20,9 @@ export const HealthKitObservationType = Object.freeze({
 export const HealthKitReconciliationState = Object.freeze({
   SOURCE_ONLY: "source_only",
   ACTIVITY_DAY_CANONICALIZED: "activity_day_canonicalized",
+  ACTIVITY_CANONICALIZATION_PENDING: "activity_canonicalization_pending",
+  ACTIVITY_CANONICALIZATION_DEFERRED: "activity_canonicalization_deferred",
+  ACTIVITY_VALIDATION_ONLY: "activity_validation_only",
   ACTIVITY_SUMMARY_SUPERSEDED: "activity_summary_superseded",
   WORKOUT_CANONICALIZATION_DEFERRED: "workout_canonicalization_deferred",
   TRAINING_MATCH_CANDIDATE: "training_match_candidate",
@@ -55,6 +64,13 @@ export function normalizeHealthKitObservationBatch({
       index,
     });
     const existing = byId.get(observation.id);
+    if (existing && existing.ingestionPurpose !== observation.ingestionPurpose) {
+      throw new HealthKitObservationError(
+        "HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE",
+        "One HealthKit source identity cannot be reused under a different ingestion purpose.",
+        `observations[${index}].ingestionPurpose`
+      );
+    }
     if (existing && existing.semanticFingerprint !== observation.semanticFingerprint) {
       throw new HealthKitObservationError(
         "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
@@ -84,6 +100,7 @@ export function createHealthKitObservationRecord({
     observationType: observation.observationType,
     externalId: observation.externalId,
     semanticFingerprint: observation.semanticFingerprint,
+    ingestionPurpose: observation.ingestionPurpose,
     occurredAt: observation.occurrence.startedAt ?? observation.occurrence.localDate,
     occurrenceDate: observation.occurrence.localDate,
     occurrence: structuredClone(observation.occurrence),
@@ -135,6 +152,66 @@ export function createHealthKitActivityDayPayload(observation) {
     },
     provenance: { source_observation_ids: [observation.id] },
   });
+}
+
+export function resolveHealthKitActivityActivationPolicy(record) {
+  if (!record) {
+    return Object.freeze({ enabled: false, effectiveLocalDate: null, source: "not_configured" });
+  }
+  const enabled = record.status === "enabled";
+  const effectiveLocalDate = record.effectiveLocalDate == null
+    ? null
+    : calendarDate(record.effectiveLocalDate, "healthKitActivityActivationPolicy.effectiveLocalDate");
+  if (enabled && !effectiveLocalDate) {
+    throw invalid(
+      "healthKitActivityActivationPolicy.effectiveLocalDate",
+      "Enabled HealthKit Activity activation requires an explicit effective local date."
+    );
+  }
+  return Object.freeze({
+    enabled: enabled && Boolean(effectiveLocalDate),
+    effectiveLocalDate,
+    source: "server_owned_configuration",
+  });
+}
+
+export function assessHealthKitActivityCanonicalization({ observation, activationPolicy } = {}) {
+  if (observation?.observationType !== HealthKitObservationType.ACTIVITY_SUMMARY) {
+    return Object.freeze({ eligible: false, reason: "not_activity_summary" });
+  }
+  if (observation.ingestionPurpose === HealthKitIngestionPurpose.VALIDATION_ONLY) {
+    return Object.freeze({
+      eligible: false,
+      permanent: true,
+      reason: "validation_only_permanently_raw",
+    });
+  }
+  const policy = resolveHealthKitActivityActivationPolicy(activationPolicy);
+  if (!policy.enabled) {
+    return Object.freeze({ eligible: false, permanent: false, reason: "activity_activation_not_configured" });
+  }
+  if (observation.occurrence.localDate < policy.effectiveLocalDate) {
+    return Object.freeze({
+      eligible: false,
+      permanent: true,
+      reason: "activity_before_activation_date",
+      effectiveLocalDate: policy.effectiveLocalDate,
+    });
+  }
+  return Object.freeze({
+    eligible: true,
+    permanent: false,
+    reason: "activity_on_or_after_activation_date",
+    effectiveLocalDate: policy.effectiveLocalDate,
+  });
+}
+
+export function isCompatibleHealthKitReplay(existing, incoming) {
+  const existingPurpose = existing?.ingestionPurpose ?? HealthKitIngestionPurpose.OPERATIONAL;
+  if (existingPurpose !== incoming?.ingestionPurpose) return false;
+  if (existing?.semanticFingerprint === incoming?.semanticFingerprint) return true;
+  return existingPurpose === HealthKitIngestionPurpose.OPERATIONAL &&
+    existing?.semanticFingerprint === incoming?.legacySemanticFingerprint;
 }
 
 export function reconcileHealthKitWorkoutObservation({
@@ -237,6 +314,13 @@ function normalizeObservation(value, { batchId, principalDeviceId, index }) {
     Object.values(HealthKitObservationType),
     `observations[${index}].observationType`
   );
+  const ingestionPurpose = value.ingestionPurpose == null
+    ? HealthKitIngestionPurpose.OPERATIONAL
+    : requiredEnum(
+      value.ingestionPurpose,
+      Object.values(HealthKitIngestionPurpose),
+      `observations[${index}].ingestionPurpose`
+    );
   const externalId = requiredText(value.externalId, `observations[${index}].externalId`);
   const source = normalizeSource(value.source, index);
   const occurrence = normalizeOccurrence(value.occurrence, observationType, index);
@@ -247,7 +331,24 @@ function normalizeObservation(value, { batchId, principalDeviceId, index }) {
   }
   // V1 compatibility boundary: this NUL separator is deliberately preserved.
   const id = `healthkit_observation_${digest(identityParts.join("\u0000"))}`;
-  const semantic = { observationType, externalId, source, occurrence, measurement };
+  const legacySemantic = {
+    observationType,
+    externalId,
+    source: compact({
+      bundleIdentifier: source.bundleIdentifier,
+      productType: source.productType,
+      deviceModel: source.deviceModel,
+      operatingSystemVersion: source.operatingSystemVersion,
+    }),
+    occurrence: compact({
+      localDate: occurrence.localDate,
+      timeZone: occurrence.timeZone,
+      startedAt: occurrence.startedAt,
+      endedAt: occurrence.endedAt,
+    }),
+    measurement,
+  };
+  const semantic = { observationType, externalId, source, occurrence, measurement, ingestionPurpose };
   return Object.freeze({
     id,
     observationType,
@@ -256,6 +357,8 @@ function normalizeObservation(value, { batchId, principalDeviceId, index }) {
     occurrence: Object.freeze(occurrence),
     measurement: Object.freeze(measurement),
     semanticFingerprint: `sha256_${digest(stable(semantic))}`,
+    legacySemanticFingerprint: `sha256_${digest(stable(legacySemantic))}`,
+    ingestionPurpose,
     ingestion: Object.freeze({ batchId, deliveryDeviceId: principalDeviceId }),
   });
 }
@@ -266,9 +369,12 @@ function normalizeSource(source, index) {
   }
   return compact({
     bundleIdentifier: requiredText(source.bundleIdentifier, `observations[${index}].source.bundleIdentifier`),
+    sourceName: optionalText(source.sourceName),
+    sourceRevision: optionalText(source.sourceRevision),
     productType: optionalText(source.productType),
     deviceModel: optionalText(source.deviceModel),
     operatingSystemVersion: optionalText(source.operatingSystemVersion),
+    privacySafeDeviceProvenance: optionalText(source.privacySafeDeviceProvenance),
   });
 }
 
@@ -286,7 +392,10 @@ function normalizeOccurrence(occurrence, observationType, index) {
   if (endedAt && Date.parse(endedAt) < Date.parse(startedAt)) {
     throw invalid(`observations[${index}].occurrence.endedAt`, "Occurrence end must not precede its start.");
   }
-  return compact({ localDate, timeZone, startedAt, endedAt });
+  const utcOffsetSeconds = occurrence.utcOffsetSeconds == null
+    ? null
+    : boundedInteger(occurrence.utcOffsetSeconds, -86400, 86400, `observations[${index}].occurrence.utcOffsetSeconds`);
+  return compact({ localDate, timeZone, utcOffsetSeconds, startedAt, endedAt });
 }
 
 function normalizeMeasurement(value, observationType, index) {
@@ -408,6 +517,13 @@ function optionalFinite(value, field) { return value == null ? null : requiredFi
 function positiveInteger(value, field) {
   const number = Number(value);
   if (!Number.isSafeInteger(number) || number < 1) throw invalid(field, `${field} must be a positive integer.`);
+  return number;
+}
+function boundedInteger(value, minimum, maximum, field) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < minimum || number > maximum) {
+    throw invalid(field, `${field} must be an integer from ${minimum} through ${maximum}.`);
+  }
   return number;
 }
 function requiredText(value, field) {

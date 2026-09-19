@@ -89,9 +89,9 @@
     "/native/read/{resource}": {
       "get": {
         "operationId": "readNativeResource",
-        "summary": "Read one allowlisted bounded canonical Native resource",
+        "summary": "Read one allowlisted bounded canonical or Founder-only diagnostic Native resource",
         "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "resource", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/Cursor" }],
+        "parameters": [{ "name": "resource", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/Cursor" }, { "$ref": "#/components/parameters/StartDate" }, { "$ref": "#/components/parameters/EndDate" }],
         "responses": { "200": { "description": "Canonical Native resource", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NativeResourceEnvelope" } } } }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" } }
       }
     },
@@ -143,6 +143,20 @@
         "in": "query",
         "required": false,
         "schema": { "type": "string" }
+      },
+      "StartDate": {
+        "name": "startDate",
+        "in": "query",
+        "required": false,
+        "description": "Required for bounded HealthKit Activity canary diagnostics.",
+        "schema": { "type": "string", "format": "date" }
+      },
+      "EndDate": {
+        "name": "endDate",
+        "in": "query",
+        "required": false,
+        "description": "Required for bounded HealthKit Activity canary diagnostics.",
+        "schema": { "type": "string", "format": "date" }
       }
     },
     "headers": {

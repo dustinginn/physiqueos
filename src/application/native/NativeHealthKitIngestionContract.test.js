@@ -364,6 +364,12 @@ function recordStore(canonicalEvidenceObjects = []) {
     user: [{ id: OWNER, timeZone: "America/Los_Angeles", version: 1 }],
     goals: [],
     healthKitObservations: [],
+    healthKitConfiguration: [{
+      id: "healthkit_activity_activation_policy",
+      status: "enabled",
+      effectiveLocalDate: "2026-09-12",
+      version: 1,
+    }],
     canonicalEvidenceObjects,
     evidencePackages: [],
   });

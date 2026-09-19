@@ -138,6 +138,10 @@ export function createNativeProductionContractService({
         case "training-exercise": data = await readers.training.getExercise({ context, currentDate, exerciseSlug: required(input.exerciseId, "exerciseId") }); break;
         case "nutrition": data = await readers.progress.getNutrition({ context, currentDate }); break;
         case "activity": data = await readers.progress.getActivity({ context, currentDate }); break;
+        case "healthkit-activity-canary": data = await readers.healthKitCanary.getActivityValidation({
+          startDate: required(input.startDate, "startDate"),
+          endDate: required(input.endDate, "endDate"),
+        }); break;
         case "energy": {
           // The raw progress read returns unreconciled source collections
           // (Activity/Nutrition days, DEXA scans). Native must not derive

@@ -68,6 +68,7 @@ function fixture(overrides = {}) {
       }),
       getDEXA: call({ report: {} }),
     },
+    healthKitCanary: { getActivityValidation: call({ boundedRange: {}, items: [] }) },
     photos: { getNativePhotosTimeline: call({ sessions: [], page: { limit: 12, count: 0, hasMore: false } }) },
     briefings: { listNativeHistory: call({ items: [], page: { limit: 20, hasMore: false, nextCursor: null } }), getNativeArtifact: call({ artifact: { artifactId: "briefing-1" } }), getDexaArtifact: call({ artifact: { id: "dexa-event-1" } }) },
     photoEvents: { getPhotoEvent: call({ artifact: { id: "photo-event-1" } }) },
@@ -94,6 +95,20 @@ function fixture(overrides = {}) {
   return { confirmEvidenceReview, evidenceIntake, executeCommand, openMedia, readers, service };
 }
 describe("Native production contract boundary", () => {
+  it("enforces owner-scoped bounded HealthKit canary diagnostics", async () => {
+    const current = fixture();
+    const result = await current.service.read({
+      request: request(), resource: "healthkit-activity-canary",
+      input: { startDate: "2026-09-01", endDate: "2026-09-07" },
+    });
+    expect(current.readers.healthKitCanary.getActivityValidation).toHaveBeenCalledWith({
+      startDate: "2026-09-01", endDate: "2026-09-07",
+    });
+    expect(result.resource).toBe("healthkit-activity-canary");
+    await expect(current.service.read({ request: request(), resource: "healthkit-activity-canary", input: {} }))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
   it("defaults Library to history/explicit membership and keeps All Exercises separate", async () => {
     const current = fixture();
     current.readers.core.getTrainingMyLibrary.mockResolvedValue(["performed", "added"]);
@@ -324,6 +339,7 @@ describe("Native production contract boundary", () => {
       "operating-plan-supplement-strategy-editor": { protocolId: "supplement-protocol" },
       "operating-plan-energy-strategy": { strategyId: "energy-protocol" },
       "operating-plan-coaching-updates": { strategyId: "coaching-protocol" },
+      "healthkit-activity-canary": { startDate: "2026-09-01", endDate: "2026-09-07" },
     };
     const results = new Map();
     for (const declaration of nativeProductionContractManifest.reads) {
@@ -555,6 +571,8 @@ describe("Native production contract boundary", () => {
       contractVersion: "healthkit-ingestion-v1",
       maximumBatchSize: 100,
       observationTypes: ["activity_summary", "workout", "quantity_sample"],
+      ingestionPurposes: ["operational", "validation_only"],
+      defaultIngestionPurpose: "operational",
       queryCursor: expect.stringMatching(/device-owned/),
       evidenceEligibility: "not assessed by ingestion",
     });

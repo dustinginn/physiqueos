@@ -16,6 +16,8 @@ Use `POST /api/v1/native/commands` with command type `healthkit.observations.ing
 
 Supported observation types are `activity_summary`, `workout`, and `quantity_sample`. Batches are bounded to 100 observations.
 
+Every observation has an immutable ingestion purpose. Omitted purpose preserves V1 compatibility as `operational`; the Founder canary sends `validation_only`. Purpose is part of semantic replay protection but is deliberately not part of the accepted V1 identity hash. Reusing an identity under another purpose fails closed with `HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE` and cannot promote or duplicate the raw record.
+
 `activity_summary` requires:
 
 - positive device-scoped `sourceRevision`;
@@ -37,9 +39,13 @@ The command receipt makes an exact HTTP retry replay-safe. Source-observation id
 
 Occurrence timestamps and intended local date are stored independently from first Server receipt time. Source bundle and device/product descriptors remain attached to the source observation.
 
-## Activity reconciliation
+## Activity reconciliation and activation
 
-An authoritative HealthKit daily total may update the existing one-per-local-date canonical ActivityDay. Precedence is deterministic:
+Canonical HealthKit Activity is disabled unless the Server-owned `healthKit_activity_activation_policy` configuration has been explicitly enabled with a Founder-approved effective local date. No date is supplied by default, inferred from authorization, or inferred from a canary range. Operational observations accepted before configuration remain raw and are not reconsidered later; there is no historical backfill.
+
+`validation_only` Activity is permanently raw regardless of its date or any later activation policy. Its reconciliation state records the permanent canonicalization bar. It cannot update ActivityDay, canonical Evidence, or strategic state.
+
+Once explicitly activated, an authoritative non-validation HealthKit daily total on or after the effective date may update the existing one-per-local-date canonical ActivityDay. Precedence is deterministic:
 
 1. `complete_day` outranks `partial_day`.
 2. Within equal coverage from the same authenticated delivery device, the newer source revision wins.
@@ -64,10 +70,14 @@ Ingestion never adds, changes, or removes exercises, sets, reps, load, variants,
 
 Raw observations use the application-only `healthKitObservations` collection in the existing `canonical_training_records` JSON table. They are excluded from the canonical Founder runtime import/export inventory and from canonical Evidence reads.
 
+The activation policy uses the application-only `healthKitConfiguration` collection in that same generic table. This follow-up exposes no activation mutation command and sets no activation date.
+
+Founder-authenticated Native clients can read validation-only Activity observations through `/api/v1/native/read/healthkit-activity-canary?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`. Both dates are required, inclusive, and limited to 31 local dates. The projection exposes normalized Activity values and bounded provenance only; it omits anchors and strategic fields and has no canonical authority.
+
 Atomic `putIfAbsent` uses the existing primary key and `ON CONFLICT ... DO NOTHING`; a losing concurrent caller reads the existing immutable record and verifies its semantic fingerprint.
 
 This foundation adds no table, column, index, migration, checkpoint table, infrastructure resource, SDK, or paid service. Current schema remains `000014_evidence_intake_text_provenance`.
 
 ## Deferred work
 
-Native authorization, entitlements, anchored queries, cursor storage, background delivery, deletion/tombstone convergence, Nutrition canonicalization, sleep, activation configuration, cardio canonical commitment, explicit strength confirmation/link mutation, and strategic Evidence eligibility are later stages.
+Native canary wiring, an explicitly Founder-authorized activation mutation path, background delivery, deletion/tombstone convergence, Nutrition canonicalization, sleep, cardio canonical commitment, explicit strength confirmation/link mutation, and strategic Evidence eligibility are later stages.
