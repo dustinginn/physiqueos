@@ -641,14 +641,13 @@ final class FounderServerAPITests: XCTestCase {
     }
 
     /// Daily Driver Write Build: the guard moved from a blanket authority
-    /// check to per-domain enablement — a real, contained mechanism ready
-    /// for whichever domains a future patch enables. But this task's own
-    /// The deployed canonical command boundary enables only the accepted
+    /// check to per-domain enablement. The deployed canonical command
+    /// boundary enables only the accepted
     /// Daily Driver write domains. Sandbox remains independently writable.
     func testFounderProductionWriteGuardEnablesOnlyTheAcceptedDailyDriverDomainsAndSandboxRemainsIsolated() throws {
         XCTAssertEqual(
             NativeProductWriteDomain.enabledUnderFounderProduction,
-            [.morningCheckInAndWeight, .workoutLogger, .nutrition, .activityEvidence, .evidenceReviewDismissal, .dexa, .priorityCompletion, .operatingPlan]
+            [.morningCheckInAndWeight, .workoutLogger, .nutrition, .activityEvidence, .evidenceReviewDismissal, .dexa, .progressPhotos, .priorityCompletion, .operatingPlan]
         )
         for domain in NativeProductWriteDomain.allCases {
             if NativeProductWriteDomain.enabledUnderFounderProduction.contains(domain) {
@@ -2121,6 +2120,9 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(review?.items.first?.sourceLabel, "Typed evidence")
         XCTAssertEqual(review?.items.first?.metrics.first, .init(label: "Weight", value: "170.4 lb"))
         XCTAssertFalse(review?.items[1].included ?? true)
+        XCTAssertEqual(review?.items[1].photoSession?.sessionId, "object-2")
+        XCTAssertEqual(review?.items[1].photoSession?.timeOfDay, "morning")
+        XCTAssertEqual(review?.items[1].photoSession?.photos.map(\.poseId), ["front-relaxed", "back-flexed"])
         XCTAssertEqual(review?.items[2].exercises.first?.name, "Bench Press")
         XCTAssertEqual(review?.items[2].exercises.first?.sets, ["8 reps @ 185 lb", "6 reps @ 195 lb"])
         XCTAssertEqual(review?.items[2].exercises.first?.variantLabel, "Paused")
@@ -3552,12 +3554,13 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(values.last, 1)
     }
 
-    func testProductionEvidenceIntakeGuardAcceptsEnabledActivityDEXAAndTrainingTypes() async throws {
+    func testProductionEvidenceIntakeGuardAcceptsEnabledActivityDEXATrainingAndProgressPhotosTypes() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(202, #"{"intakeId":"activity-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/activity"}"#),
             .json(202, #"{"intakeId":"dexa-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/dexa"}"#),
             .json(202, #"{"intakeId":"training-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/training"}"#),
+            .json(202, #"{"intakeId":"photo-intake","status":"processing","reviewId":null,"reviewUrl":null,"processingUrl":"/photos"}"#),
         ])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
         _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
@@ -3575,6 +3578,17 @@ final class FounderServerAPITests: XCTestCase {
             scope: "dexa-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "dexa_scan",
             files: [("scan.pdf", "application/pdf", Data([0x25, 0x50, 0x44, 0x46]))]
         )
+        let identities = #"[{"orientation":"front","contractionState":"relaxed","poseVariant":"standard","identityStatus":"confirmed","userConfirmedIdentity":true,"goalValidationRole":"primary","tags":[]}]"#
+        _ = try await pipeline.submitIntake(
+            scope: "photo-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "photo_session",
+            photoIdentitiesJSON: identities, photoSessionTimeOfDay: "morning",
+            photoSessionFasted: true, photoSessionPostWorkout: false, photoSessionPump: false,
+            originalUnedited: true,
+            // UTF-8 test bytes keep the multipart fixture inspectable; the
+            // production picker supplies real image bytes and the Server
+            // performs its independent signature validation.
+            files: [("progress-photo.jpg", "image/jpeg", Data("photo-fixture".utf8))]
+        )
         await XCTAssertThrowsErrorAsync(try await pipeline.submitIntake(
             scope: "unsupported-intake.2026-09-11", effectiveDate: "2026-09-11", expectedEvidenceType: "lab_panel",
             files: [("lab.png", "image/png", Data([1]))]
@@ -3582,7 +3596,13 @@ final class FounderServerAPITests: XCTestCase {
             XCTAssertEqual(error as? NativeWriteGuardError, .productionReadOnly(.evidenceReview))
         }
         let requestCount = await transport.requests.count
-        XCTAssertEqual(requestCount, 4)
+        XCTAssertEqual(requestCount, 5)
+        let requests = await transport.requests
+        let photoBody = try XCTUnwrap(requests[4].httpBody)
+        XCTAssertEqual(multipartField(named: "expectedEvidenceType", from: photoBody), "photo_session")
+        XCTAssertEqual(multipartField(named: "photoIdentitiesJson", from: photoBody), identities)
+        XCTAssertEqual(multipartField(named: "photoSessionTimeOfDay", from: photoBody), "morning")
+        XCTAssertEqual(multipartField(named: "originalUnedited", from: photoBody), "true")
     }
 
     func testProductionEvidenceReviewDismissUsesVersionAndStableIdempotency() async throws {
@@ -3595,8 +3615,7 @@ final class FounderServerAPITests: XCTestCase {
         _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
         let pipeline = ProductionEvidenceIntakePipeline(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
 
-        // A photo review maps to generic evidenceReview, whose confirmation
-        // remains disabled. Disposition has its own bounded authorization.
+        // Disposition remains independently versioned and replay-safe.
         try await pipeline.dismissReview(domain: .evidenceReview, reviewId: "review-1", expectedVersion: "1")
         try await pipeline.dismissReview(domain: .evidenceReview, reviewId: "review-1", expectedVersion: "1")
 
@@ -4447,7 +4466,7 @@ private let productionEvidenceReviewJSON = productionEnvelope(resource: "evidenc
     "interpreted_evidence": {
       "evidence_objects": [
         {"id": "object-1", "evidence_type": "weight", "observed_at": "2026-09-08"},
-        {"id": "object-2", "evidence_type": "photo_session", "date": "2026-09-07"},
+        {"id": "object-2", "evidence_type": "photo_session", "date": "2026-09-07", "capture_metadata":{"time_of_day":"morning"}, "goal_relationship":{"status":"resolved","goal_label":"Build Lean Mass"}, "photos":[{"id":"photo-front","pose_id":"front-relaxed","label":"Front Relaxed","orientation":"front","contraction_state":"relaxed","pose_variant":"standard"},{"id":"photo-rear","pose_id":"back-flexed","label":"Rear Flexed — Double Biceps","orientation":"rear","contraction_state":"flexed","pose_variant":"double_biceps"}]},
         {"id": "object-3", "evidence_type": "training", "observed_at": "2026-09-08", "exercises": [{"name":"Bench Press","sets":[{"reps":8,"weight":185},{"reps":6,"weight":195}]}]},
         {"id": "object-4", "evidence_type": "activity", "observed_at": "2026-09-11"},
         {"id": "object-5", "evidence_type": "nutrition", "observed_at": "2026-09-11"},

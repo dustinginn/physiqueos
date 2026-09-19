@@ -643,6 +643,12 @@ actor ProductionNativeAPI {
         targetTrainingDraftId: String? = nil,
         targetTrainingSessionCanonicalId: String? = nil,
         replacementForSubmissionIdentity: String? = nil,
+        photoIdentitiesJSON: String? = nil,
+        photoSessionTimeOfDay: String? = nil,
+        photoSessionFasted: Bool? = nil,
+        photoSessionPostWorkout: Bool? = nil,
+        photoSessionPump: Bool? = nil,
+        originalUnedited: Bool? = nil,
         files: [(filename: String, contentType: String, data: Data)],
         onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> ProductionEvidenceIntakeStatus {
@@ -676,6 +682,18 @@ actor ProductionNativeAPI {
                 value: Data(replacementForSubmissionIdentity.utf8),
                 boundary: boundary,
                 contentType: "text/plain"
+            )
+        }
+        for (name, value) in [
+            ("photoIdentitiesJson", photoIdentitiesJSON),
+            ("photoSessionTimeOfDay", photoSessionTimeOfDay),
+            ("photoSessionFasted", photoSessionFasted.map(String.init)),
+            ("photoSessionPostWorkout", photoSessionPostWorkout.map(String.init)),
+            ("photoSessionPump", photoSessionPump.map(String.init)),
+            ("originalUnedited", originalUnedited.map(String.init)),
+        ] where value != nil {
+            body.appendMultipartField(
+                name: name, value: Data(value!.utf8), boundary: boundary, contentType: "text/plain"
             )
         }
         for file in files {

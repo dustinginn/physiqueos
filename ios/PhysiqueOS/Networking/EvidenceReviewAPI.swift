@@ -38,6 +38,7 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
                     id: item.object?.id ?? raw?.id ?? UUID().uuidString,
                     type: item.type ?? raw?.evidenceType ?? "evidence",
                     date: item.date ?? raw?.observedAt ?? raw?.date,
+                    canonicalDate: raw?.observedAt ?? raw?.date,
                     title: item.title,
                     noun: item.noun,
                     sourceLabel: item.sourceLabel,
@@ -66,6 +67,7 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
                     sourceFiles: item.sourceFiles,
                     typedEvidence: item.typedEvidence,
                     reconciliation: item.reconciliation,
+                    photoSession: raw?.photoSession,
                     dexaMeasurements: raw?.dexaMeasurements ?? item.object?.dexaMeasurements
                 )
             }.ifEmpty {
@@ -74,12 +76,14 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
                         id: object.id ?? UUID().uuidString,
                         type: object.evidenceType ?? "evidence",
                         date: object.observedAt ?? object.date,
+                        canonicalDate: object.observedAt ?? object.date,
                         title: nil,
                         noun: nil,
                         sourceLabel: nil,
                         included: true,
                         metrics: object.fallbackMetrics,
                         exercises: object.fallbackExercises,
+                        photoSession: object.photoSession,
                         dexaMeasurements: object.dexaMeasurements
                     )
                 }
@@ -200,6 +204,10 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
         var metadata: [String: ProductionJSONValue]?
         var dailyTotals: [String: ProductionJSONValue]?
         var exercises: [RawExercise]?
+        var photos: [RawPhoto]?
+        var captureMetadata: PhotoCaptureMetadata?
+        var conditions: PhotoConditions?
+        var goalRelationship: PhotoGoalRelationship?
 
         struct RawExercise: Decodable {
             var name: String?
@@ -209,6 +217,33 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
             var reps: Double?
             var weight: Double?
             var load: Double?
+        }
+        struct RawPhoto: Decodable {
+            var id: String?
+            var poseId: String?
+            var label: String?
+            var orientation: String?
+            var contractionState: String?
+            var poseVariant: String?
+        }
+        struct PhotoCaptureMetadata: Decodable { var timeOfDay: String? }
+        struct PhotoConditions: Decodable { var timeOfDay: String? }
+        struct PhotoGoalRelationship: Decodable { var status: String?; var goalLabel: String? }
+
+        var photoSession: EvidenceReviewPhotoSession? {
+            guard ["photo_session", "progress_photo"].contains(evidenceType), let id else { return nil }
+            return .init(
+                sessionId: id,
+                timeOfDay: captureMetadata?.timeOfDay ?? conditions?.timeOfDay,
+                goalRelationship: goalRelationship?.goalLabel ?? goalRelationship?.status,
+                photos: (photos ?? []).enumerated().map { index, photo in
+                    .init(
+                        id: photo.id ?? "photo-\(index + 1)", poseId: photo.poseId, label: photo.label,
+                        orientation: photo.orientation, contractionState: photo.contractionState,
+                        poseVariant: photo.poseVariant
+                    )
+                }
+            )
         }
 
         /// `applyDexaReviewMeasurements`'s exact stored shape

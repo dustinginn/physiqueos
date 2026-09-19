@@ -290,6 +290,9 @@ struct EvidenceReviewDetailView: View {
                             if let measurements = item.dexaMeasurements, actionState != .editingMeasurements {
                                 dexaMeasurementSummary(measurements)
                             }
+                            if let photoSession = item.photoSession {
+                                photoSessionSummary(photoSession)
+                            }
                             }
                             .padding(.vertical, 8)
                         }
@@ -315,6 +318,23 @@ struct EvidenceReviewDetailView: View {
         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
         .foregroundStyle(PhysiqueOSTheme.textSecondary)
         .padding(.leading, 4)
+    }
+
+    private func photoSessionSummary(_ session: EvidenceReviewPhotoSession) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("PHOTO SESSION").physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.accent)
+            detailText("Session \(session.sessionId)")
+            if let time = session.timeOfDay { detailText("Time of day: \(time.capitalized)") }
+            if let goal = session.goalRelationship { detailText("Goal relationship: \(goal)") }
+            ForEach(session.photos) { photo in
+                let identity = photo.label ?? photo.poseId ?? [photo.orientation, photo.contractionState, photo.poseVariant]
+                    .compactMap { $0 }.joined(separator: " · ")
+                Label(identity.isEmpty ? "Pose needs review" : identity, systemImage: "photo")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            }
+        }
+        .padding(.top, 3)
     }
 
     @ViewBuilder
@@ -614,6 +634,7 @@ struct EvidenceReviewDetailView: View {
         case .nutrition: ("nutrition", "Nutrition")
         case .activityEvidence: ("activity", "Activity")
         case .dexa: ("dexa", "DEXA")
+        case .progressPhotos: ("photos", "Progress Photos")
         default: ("evidence", "Evidence")
         }
         await environment.productionNativeAPI.acknowledgeAcceptedEvidenceReviewProcessing(.init(
@@ -630,7 +651,7 @@ struct EvidenceReviewDetailView: View {
         review: EvidenceReviewDetailReadModel,
         domain: NativeProductWriteDomain
     ) async -> Bool {
-        guard let date = review.items.compactMap(\.date).first else { return false }
+        guard let date = review.items.compactMap({ $0.canonicalDate ?? $0.date }).first else { return false }
         switch domain {
         case .activityEvidence:
             await environment.productionNativeAPI.invalidateReadResources([
@@ -655,6 +676,14 @@ struct EvidenceReviewDetailView: View {
                 "dexa", "evidence-review-queue",
             ])
             return true
+        case .progressPhotos:
+            await environment.productionNativeAPI.invalidateReadResources([
+                "photos", "home", "briefing-history", "evidence-review-queue",
+            ])
+            guard let landing = try? await environment.photosAPI.fetchPhotosLanding(scope: .all) else {
+                return false
+            }
+            return landing.history.contains(where: { $0.date == date })
         default:
             await environment.productionNativeAPI.invalidateReadResources(["evidence-review-queue"])
             return true
@@ -726,6 +755,7 @@ struct EvidenceReviewDetailView: View {
         case "activity_day", "activity": .activityEvidence
         case "training": .workoutLogger
         case "dexa_scan", "dexa", "body_composition": .dexa
+        case "photo_session", "progress_photo", "photos": .progressPhotos
         default: .evidenceReview
         }
     }

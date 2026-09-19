@@ -58,10 +58,10 @@ enum NativeAPIEnvironment: String, CaseIterable, Identifiable, Sendable, Hashabl
 /// never be folded into this one. `.dexa` and `.progressPhotos` were split
 /// out of a single prior `dexaAndPhotos` case (never referenced by any real
 /// call site) so DEXA's screenshot/PDF evidence workflow can be enabled
-/// independently of Progress Photo writes, which remain out of scope this
-/// pass — there is no Photo capture/upload UI in Native yet, so this split
-/// is precautionary against a future Photos write feature silently
-/// inheriting DEXA's enablement.
+/// independently of Progress Photo writes. Build 42 enables the bounded
+/// Progress Photos intake/review path through the same Server-owned
+/// PhotoSession lifecycle as Web; it does not authorize any other Photos
+/// mutation or move photo analysis into Native.
 enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
     case morningCheckInAndWeight
     case priorityCompletion
@@ -117,6 +117,7 @@ enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
         .evidenceReviewDismissal,
         .operatingPlan,
         .dexa,
+        .progressPhotos,
     ]
 }
 

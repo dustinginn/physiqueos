@@ -46,6 +46,12 @@ struct ProductionEvidenceIntakePipeline {
         clientExtractedText: String? = nil,
         targetTrainingDraftId: String? = nil,
         targetTrainingSessionCanonicalId: String? = nil,
+        photoIdentitiesJSON: String? = nil,
+        photoSessionTimeOfDay: String? = nil,
+        photoSessionFasted: Bool? = nil,
+        photoSessionPostWorkout: Bool? = nil,
+        photoSessionPump: Bool? = nil,
+        originalUnedited: Bool? = nil,
         files: [(filename: String, contentType: String, data: Data)],
         onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> ProductionEvidenceIntakeStatus {
@@ -55,6 +61,7 @@ struct ProductionEvidenceIntakePipeline {
         case "activity", "activity_day": domain = .activityEvidence
         case "training": domain = .workoutLogger
         case "dexa", "dexa_scan": domain = .dexa
+        case "photo_session": domain = .progressPhotos
         default: domain = .evidenceReview
         }
         try NativeProductWriteGuard.authorize(domain, in: .founderProduction)
@@ -70,6 +77,12 @@ struct ProductionEvidenceIntakePipeline {
             } ?? "-",
             targetTrainingDraftId ?? "-",
             targetTrainingSessionCanonicalId ?? "-",
+            photoIdentitiesJSON ?? "-",
+            photoSessionTimeOfDay ?? "-",
+            photoSessionFasted.map(String.init) ?? "-",
+            photoSessionPostWorkout.map(String.init) ?? "-",
+            photoSessionPump.map(String.init) ?? "-",
+            originalUnedited.map(String.init) ?? "-",
         ])
         let submissionIdentity = idempotencyStore.resolvedKey(scope: scope, signature: signature)
         let replacementPredecessor = idempotencyStore.replacementPredecessor(
@@ -84,6 +97,12 @@ struct ProductionEvidenceIntakePipeline {
                 targetTrainingDraftId: targetTrainingDraftId,
                 targetTrainingSessionCanonicalId: targetTrainingSessionCanonicalId,
                 replacementForSubmissionIdentity: replacementPredecessor,
+                photoIdentitiesJSON: photoIdentitiesJSON,
+                photoSessionTimeOfDay: photoSessionTimeOfDay,
+                photoSessionFasted: photoSessionFasted,
+                photoSessionPostWorkout: photoSessionPostWorkout,
+                photoSessionPump: photoSessionPump,
+                originalUnedited: originalUnedited,
                 files: files,
                 onUploadProgress: onUploadProgress
             )
@@ -105,6 +124,12 @@ struct ProductionEvidenceIntakePipeline {
                 targetTrainingDraftId: targetTrainingDraftId,
                 targetTrainingSessionCanonicalId: targetTrainingSessionCanonicalId,
                 replacementForSubmissionIdentity: submissionIdentity,
+                photoIdentitiesJSON: photoIdentitiesJSON,
+                photoSessionTimeOfDay: photoSessionTimeOfDay,
+                photoSessionFasted: photoSessionFasted,
+                photoSessionPostWorkout: photoSessionPostWorkout,
+                photoSessionPump: photoSessionPump,
+                originalUnedited: originalUnedited,
                 files: files,
                 onUploadProgress: onUploadProgress
             )

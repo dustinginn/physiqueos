@@ -6,6 +6,11 @@ import UIKit
 import UniformTypeIdentifiers
 
 enum EvidenceAttachmentLoader {
+    struct ServerCompatiblePhoto {
+        var data: Data
+        var contentType: String
+        var fileExtension: String
+    }
     struct PhotoLoadRequest {
         var stableIdentifier: String?
         var contentTypeIdentifier: String?
@@ -77,6 +82,23 @@ enum EvidenceAttachmentLoader {
     static func previewImage(data: Data, maximumPixelSize: Int = 1_200) -> UIImage? {
         guard let image = downsampledCGImage(data: data, maximumPixelSize: maximumPixelSize) else { return nil }
         return UIImage(cgImage: image)
+    }
+
+    /// The Web/Server Progress Photos contract accepts JPEG, PNG, and WebP.
+    /// PhotosPicker may return an HEIC original on iPhone. Preserve accepted
+    /// bytes verbatim; only an unsupported Apple image representation is
+    /// decoded at full resolution and re-encoded as maximum-quality JPEG.
+    /// This never downsizes the canonical upload (preview downsampling is a
+    /// separate display-only path above).
+    static func serverCompatiblePhoto(data: Data, contentType: String?) -> ServerCompatiblePhoto? {
+        switch contentType?.lowercased() {
+        case "image/jpeg", "image/jpg": return .init(data: data, contentType: "image/jpeg", fileExtension: "jpg")
+        case "image/png": return .init(data: data, contentType: "image/png", fileExtension: "png")
+        case "image/webp": return .init(data: data, contentType: "image/webp", fileExtension: "webp")
+        default:
+            guard let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 1) else { return nil }
+            return .init(data: jpeg, contentType: "image/jpeg", fileExtension: "jpg")
+        }
     }
 
     static func downsampledCGImage(data: Data, maximumPixelSize: Int) -> CGImage? {

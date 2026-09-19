@@ -24,6 +24,10 @@ struct EvidenceReviewDetailItem: Equatable, Identifiable {
     var id: String
     var type: String
     var date: String?
+    /// Stable canonical date supplied by the raw interpreted object. The
+    /// presentation date may be localized for display and must not be used
+    /// as a durable readback key after confirmation.
+    var canonicalDate: String? = nil
     var title: String? = nil
     var noun: String? = nil
     var sourceLabel: String? = nil
@@ -34,10 +38,30 @@ struct EvidenceReviewDetailItem: Equatable, Identifiable {
     var sourceFiles: [String] = []
     var typedEvidence: String? = nil
     var reconciliation: String? = nil
+    /// Server-owned Progress Photos session identity and pose mapping. Native
+    /// renders this for confirmation but never creates a parallel PhotoSession
+    /// authority; the review id remains the only commit identity.
+    var photoSession: EvidenceReviewPhotoSession? = nil
     /// Non-nil only for a DEXA scan object — the exact fields
     /// `dexa-review.measurements.v1` requires Native to resend in full on
     /// every edit (the server replaces, never merges).
     var dexaMeasurements: DEXAScanMeasurements? = nil
+}
+
+struct EvidenceReviewPhotoSession: Equatable {
+    var sessionId: String
+    var timeOfDay: String?
+    var goalRelationship: String?
+    var photos: [EvidenceReviewPhotoIdentity]
+}
+
+struct EvidenceReviewPhotoIdentity: Equatable, Identifiable {
+    var id: String
+    var poseId: String?
+    var label: String?
+    var orientation: String?
+    var contractionState: String?
+    var poseVariant: String?
 }
 
 struct EvidenceReviewMetric: Equatable, Identifiable {

@@ -30,10 +30,10 @@ struct ProductionEvidenceUploadView: View {
         var label: String { self == .screenshot ? "Screenshot" : "Manual" }
     }
 
-    /// The four screenshot/PDF families Founder Production's evidence-intake endpoint
+    /// The screenshot/PDF/photo families Founder Production's evidence-intake endpoint
     /// actually accepts (`NativeEvidenceIntakeRequest.js`'s `TYPES` set).
     enum Scenario: String, CaseIterable, Identifiable {
-        case nutrition, activity, training, dexa
+        case nutrition, activity, training, dexa, progressPhotos
         var id: String { rawValue }
         var label: String {
             switch self {
@@ -41,6 +41,7 @@ struct ProductionEvidenceUploadView: View {
             case .activity: "Activity"
             case .training: "Training"
             case .dexa: "DEXA"
+            case .progressPhotos: "Progress Photos"
             }
         }
         var expectedEvidenceType: String {
@@ -49,6 +50,7 @@ struct ProductionEvidenceUploadView: View {
             case .activity: "activity_day"
             case .training: "training"
             case .dexa: "dexa_scan"
+            case .progressPhotos: "photo_session"
             }
         }
         var writeGuardDomain: NativeProductWriteDomain {
@@ -57,6 +59,7 @@ struct ProductionEvidenceUploadView: View {
             case .activity: .activityEvidence
             case .training: .workoutLogger
             case .dexa: .dexa
+            case .progressPhotos: .progressPhotos
             }
         }
     }
@@ -87,7 +90,8 @@ struct ProductionEvidenceUploadView: View {
             case .nutrition: .nutrition
             case .activity: .activity
             case .dexa: .dexa
-            case .training, .weight, .progressPhotos, .other: nil
+            case .progressPhotos: .progressPhotos
+            case .training, .weight, .other: nil
             }
         }
         /// Training and Weight already have their own accepted, purpose-
@@ -98,6 +102,7 @@ struct ProductionEvidenceUploadView: View {
             switch self {
             case .training: .trainingLogger
             case .weight: .manualWeighIn
+            case .progressPhotos: .photoUpload
             default: nil
             }
         }
@@ -108,7 +113,6 @@ struct ProductionEvidenceUploadView: View {
         /// unavailable rather than silently broken or faked.
         var unavailableReason: String? {
             switch self {
-            case .progressPhotos: "Progress Photo writes are not yet available in Founder Production."
             case .other: "General evidence has no canonical intake type yet — choose Nutrition, Activity, or DEXA."
             default: nil
             }
@@ -176,6 +180,8 @@ struct ProductionEvidenceUploadView: View {
     @State private var exerciseMinutesText = ""
     @State private var standHoursText = ""
     @State private var moveGoalText = ""
+    @State private var photoIdentities: [ProgressPhotoIdentityDraft] = []
+    @State private var photoSession = ProgressPhotoSessionDraft()
 
     private var effectiveScenario: Scenario? { fixedScenario ?? resolvedScenario }
 
@@ -201,7 +207,12 @@ struct ProductionEvidenceUploadView: View {
         .background(PhysiqueOSTheme.background)
         .navigationTitle("Add Evidence")
         .navigationBarTitleDisplayMode(.inline)
-        .photosPicker(isPresented: $isPhotosPickerPresented, selection: $photoItems, maxSelectionCount: 4, matching: .images)
+        .photosPicker(
+            isPresented: $isPhotosPickerPresented,
+            selection: $photoItems,
+            maxSelectionCount: effectiveScenario == .progressPhotos ? 0 : 4,
+            matching: .images
+        )
         .onChange(of: photoItems) {
             guard !photoItems.isEmpty else { return }
             let items = photoItems
@@ -219,6 +230,7 @@ struct ProductionEvidenceUploadView: View {
             automaticClassificationUnresolved = false
             attachmentScenarios = [:]
             unresolvedAttachmentIDs = []
+            syncPhotoIdentities()
         }
         .fileImporter(
             isPresented: $isFilePickerPresented,
@@ -231,7 +243,11 @@ struct ProductionEvidenceUploadView: View {
         }
         .onAppear {
             if let fixedScenario {
-                domainChoice = fixedScenario == .dexa ? .dexa : .nutrition
+                domainChoice = switch fixedScenario {
+                case .dexa: .dexa
+                case .progressPhotos: .progressPhotos
+                default: .nutrition
+                }
                 resolvedScenario = fixedScenario
             }
         }
@@ -240,7 +256,8 @@ struct ProductionEvidenceUploadView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("ADD EVIDENCE").physiqueOSFont(PhysiqueOSTypography.screenEyebrow).foregroundStyle(PhysiqueOSTheme.accent)
-            Text(fixedScenario == .dexa ? "DEXA Scan" : "Add Evidence").physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
+            Text(fixedScenario == .dexa ? "DEXA Scan" : fixedScenario == .progressPhotos ? "Progress Photos" : "Add Evidence")
+                .physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
         }
     }
 
@@ -251,7 +268,7 @@ struct ProductionEvidenceUploadView: View {
         if fixedScenario == nil {
             domainSelectorCard
         }
-        if let redirect = domainChoice.redirectDestination {
+        if fixedScenario == nil, let redirect = domainChoice.redirectDestination {
             CardContainer { VStack(alignment: .leading, spacing: 10) {
                 Text("\(domainChoice.label) has its own entry point.").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                 PrimaryActionButton(title: "Open \(domainChoice.label)") { onNavigate(redirect) }
@@ -298,7 +315,7 @@ struct ProductionEvidenceUploadView: View {
         CardContainer { VStack(alignment: .leading, spacing: 10) {
             DateField(date: $effectiveDate, maximumDate: Date(), label: "Date")
         } }
-        if domainChoice != .automatic, resolvedScenario != .dexa {
+        if domainChoice != .automatic, resolvedScenario != .dexa, resolvedScenario != .progressPhotos {
             CardContainer { VStack(alignment: .leading, spacing: 10) {
                 Picker("Entry method", selection: $captureMode) {
                     ForEach(CaptureMode.allCases) { Text($0.label).tag($0) }
@@ -316,6 +333,7 @@ struct ProductionEvidenceUploadView: View {
         } else {
             manualEntryContent
         }
+        if resolvedScenario == .progressPhotos { progressPhotoDetails }
         PrimaryActionButton(
             title: captureMode == .manual && domainChoice != .automatic ? "Save" : "Upload",
             tone: .accent,
@@ -327,10 +345,10 @@ struct ProductionEvidenceUploadView: View {
 
     private var attachmentCard: some View {
         CardContainer { VStack(alignment: .leading, spacing: 12) {
-            Text(resolvedScenario == .dexa ? "BodySpec PDF" : domainChoice == .automatic ? "Screenshots or PDF" : "Screenshots")
+            Text(resolvedScenario == .dexa ? "BodySpec PDF" : resolvedScenario == .progressPhotos ? "Photo set" : domainChoice == .automatic ? "Screenshots or PDF" : "Screenshots")
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
             if attachments.isEmpty {
-                Text(resolvedScenario == .dexa ? "Attach one BodySpec PDF report." : "Attach 1–4 screenshots.")
+                Text(resolvedScenario == .dexa ? "Attach one BodySpec PDF report." : resolvedScenario == .progressPhotos ? "Choose one or more original Progress Photos." : "Attach 1–4 screenshots.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
             } else {
                 ForEach(attachments) { attachment in
@@ -345,6 +363,15 @@ struct ProductionEvidenceUploadView: View {
                             Button { attachments.removeAll { $0.id == attachment.id } } label: {
                                 Image(systemName: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.textMuted)
                             }
+                        }
+                        if resolvedScenario == .progressPhotos,
+                           let data = attachment.data,
+                           let image = EvidenceAttachmentLoader.previewImage(data: data) {
+                            Image(uiImage: image)
+                                .resizable().scaledToFit()
+                                .frame(maxWidth: .infinity, maxHeight: 320)
+                                .background(Color.black.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         if domainChoice == .automatic, unresolvedAttachmentIDs.contains(attachment.id) {
                             Picker("Choose type for \(attachment.displayName)", selection: Binding(
@@ -384,11 +411,65 @@ struct ProductionEvidenceUploadView: View {
         // re-submitting would only reclassify the same bytes to the same
         // answer. The Founder has to pick a domain to move forward.
         if domainChoice == .automatic { return !attachments.isEmpty && !automaticClassificationUnresolved }
+        if resolvedScenario == .progressPhotos {
+            return !attachments.isEmpty && photoSession.timeOfDay != nil && photoSession.originalUnedited &&
+                photoIdentities.count == attachments.count && photoIdentities.allSatisfy { identity in
+                    identity.confirmed && identity.orientation != .unconfirmed && identity.contraction != .unconfirmed &&
+                        (identity.poseVariant != .other || !identity.customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+        }
         if resolvedScenario == .dexa || captureMode == .screenshot { return !attachments.isEmpty }
         switch resolvedScenario {
         case .nutrition: return [caloriesText, proteinText, carbsText, fatText, fiberText].contains { !$0.isEmpty }
         case .activity: return [activeCaloriesText, totalCaloriesText, exerciseMinutesText, standHoursText, moveGoalText].contains { !$0.isEmpty }
+        case .progressPhotos: return false
         case .training, .dexa, .none: return false
+        }
+    }
+
+    private var progressPhotoDetails: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(Array(photoIdentities.enumerated()), id: \.element.id) { index, identity in
+                CardContainer { VStack(alignment: .leading, spacing: 10) {
+                    Text("Photo \(index + 1) · \(identity.poseLabel)")
+                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    HStack(spacing: 8) {
+                        photoPicker("Orientation", selection: photoBinding(identity, \.orientation), values: ProgressPhotoOrientation.allCases)
+                        photoPicker("Condition", selection: photoBinding(identity, \.contraction), values: ProgressPhotoContraction.allCases)
+                    }
+                    photoPicker("Pose", selection: photoBinding(identity, \.poseVariant), values: ProgressPhotoPoseVariant.allCases)
+                    if identity.poseVariant == .other {
+                        TextField("Custom pose label", text: photoBinding(identity, \.customLabel)).textFieldStyle(.roundedBorder)
+                    }
+                    Picker("Goal role", selection: photoBinding(identity, \.goalRole)) {
+                        ForEach(ProgressPhotoGoalRole.allCases) { Text($0.label).tag($0) }
+                    }
+                    Button(identity.confirmed ? "Pose confirmed" : "Confirm pose") {
+                        updatePhoto(identity.id) { draft in
+                            draft.confirmed = draft.orientation != .unconfirmed && draft.contraction != .unconfirmed &&
+                                (draft.poseVariant != .other || !draft.customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent)
+                    .disabled(identity.orientation == .unconfirmed || identity.contraction == .unconfirmed)
+                } }
+            }
+            CardContainer { VStack(alignment: .leading, spacing: 10) {
+                Text("Session conditions").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                Picker("Time of day", selection: $photoSession.timeOfDay) {
+                    Text("Choose time").tag(ProgressPhotoTimeOfDay?.none)
+                    ForEach(ProgressPhotoTimeOfDay.allCases) { Text($0.label).tag(Optional($0)) }
+                }
+                triStatePicker("Fasted", value: $photoSession.fasted)
+                triStatePicker("Post-workout", value: $photoSession.postWorkout)
+                triStatePicker("Pump", value: $photoSession.pump)
+                Toggle("These are original, unedited photos.", isOn: $photoSession.originalUnedited)
+                    .tint(PhysiqueOSTheme.chartSuccess)
+                Text("Every pose and condition is sent to the Server-owned Progress Photos review. Confirmation creates the canonical PhotoSession and starts the existing Photo Briefing lifecycle.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            } }
         }
     }
 
@@ -629,6 +710,12 @@ struct ProductionEvidenceUploadView: View {
                 clientExtractedText: Self.activityExtractedText(
                     from: attachments, scenario: scenario
                 ),
+                photoIdentitiesJSON: scenario == .progressPhotos ? try Self.photoIdentitiesJSON(photoIdentities) : nil,
+                photoSessionTimeOfDay: scenario == .progressPhotos ? photoSession.timeOfDay?.rawValue : nil,
+                photoSessionFasted: scenario == .progressPhotos ? photoSession.fasted : nil,
+                photoSessionPostWorkout: scenario == .progressPhotos ? photoSession.postWorkout : nil,
+                photoSessionPump: scenario == .progressPhotos ? photoSession.pump : nil,
+                originalUnedited: scenario == .progressPhotos ? photoSession.originalUnedited : nil,
                 files: files,
                 onUploadProgress: { progress in
                     Task { @MainActor in transferProgress = progress }
@@ -729,7 +816,7 @@ struct ProductionEvidenceUploadView: View {
                 )
                 let refreshed = try await environment.activityAPI.fetchActivityLanding(scope: .all)
                 guard refreshed.activityHistory.contains(where: { $0.date == localDate }) else { throw ProductionNativeError.invalidResponse }
-            case .training, .dexa:
+            case .training, .dexa, .progressPhotos:
                 throw ProductionNativeError.invalidResponse
             }
             phase = .confirmed
@@ -761,10 +848,74 @@ struct ProductionEvidenceUploadView: View {
     }
 
     private static func files(from attachments: [SandboxAttachment], scenario: Scenario) -> [(filename: String, contentType: String, data: Data)] {
-        attachments.compactMap { attachment in
+        attachments.enumerated().compactMap { index, attachment in
             guard let data = attachment.data else { return nil }
+            if scenario == .progressPhotos,
+               let normalized = EvidenceAttachmentLoader.serverCompatiblePhoto(data: data, contentType: attachment.contentType) {
+                return ("progress-photo-\(index + 1).\(normalized.fileExtension)", normalized.contentType, normalized.data)
+            }
             return (attachment.displayName, attachment.contentType ?? (scenario == .dexa ? "application/pdf" : "image/jpeg"), data)
         }
+    }
+
+    private func syncPhotoIdentities() {
+        let existing = Dictionary(uniqueKeysWithValues: photoIdentities.map { ($0.attachmentId, $0) })
+        photoIdentities = EvidenceLocalInterpretation.defaultPhotoIdentities(for: attachments).map {
+            existing[$0.attachmentId] ?? $0
+        }
+    }
+
+    private func updatePhoto(_ id: String, mutation: (inout ProgressPhotoIdentityDraft) -> Void) {
+        guard let index = photoIdentities.firstIndex(where: { $0.id == id }) else { return }
+        mutation(&photoIdentities[index])
+    }
+
+    private func photoBinding<Value>(_ identity: ProgressPhotoIdentityDraft, _ keyPath: WritableKeyPath<ProgressPhotoIdentityDraft, Value>) -> Binding<Value> {
+        Binding(
+            get: { photoIdentities.first(where: { $0.id == identity.id })?[keyPath: keyPath] ?? identity[keyPath: keyPath] },
+            set: { value in updatePhoto(identity.id) { $0[keyPath: keyPath] = value; $0.confirmed = false } }
+        )
+    }
+
+    private func photoPicker<Value: Hashable & Identifiable & EvidenceLabeledChoice>(
+        _ label: String, selection: Binding<Value>, values: [Value]
+    ) -> some View {
+        Picker(label, selection: selection) { ForEach(values) { Text($0.label).tag($0) } }
+            .pickerStyle(.menu)
+    }
+
+    private func triStatePicker(_ label: String, value: Binding<Bool?>) -> some View {
+        Picker(label, selection: value) {
+            Text("Unknown").tag(Bool?.none)
+            Text("Yes").tag(Bool?.some(true))
+            Text("No").tag(Bool?.some(false))
+        }
+    }
+
+    private struct PhotoIdentityPayload: Encodable {
+        var orientation: String
+        var contractionState: String
+        var poseVariant: String
+        var customLabel: String?
+        var goalValidationRole: String
+        var tags: [String]
+        var identityStatus = "confirmed"
+        var userConfirmedIdentity = true
+    }
+
+    private static func photoIdentitiesJSON(_ identities: [ProgressPhotoIdentityDraft]) throws -> String {
+        let payload = identities.map { identity in
+            let customLabel = identity.customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+            return PhotoIdentityPayload(
+                orientation: identity.orientation.rawValue,
+                contractionState: identity.contraction.rawValue,
+                poseVariant: identity.poseVariant.rawValue,
+                customLabel: customLabel.isEmpty ? nil : customLabel,
+                goalValidationRole: identity.goalRole.rawValue,
+                tags: identity.tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            )
+        }
+        return String(decoding: try JSONEncoder().encode(payload), as: UTF8.self)
     }
 
     /// Apple Vision provides a no-network, deterministic first pass for the

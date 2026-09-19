@@ -70,7 +70,7 @@ struct AppDestinationRouterView: View {
             }
         case .photoUpload:
             if environment.nativeAuthority == .founderProduction {
-                DestinationPlaceholderView(destination: destination)
+                ProductionEvidenceUploadView(fixedScenario: .progressPhotos, onNavigate: onNavigate, onReturnToLog: onReturnToLog)
             } else {
                 EvidenceIntakeView(initialScenario: .progressPhotos, onNavigate: onNavigate)
             }
