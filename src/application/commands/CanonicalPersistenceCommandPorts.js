@@ -30,6 +30,20 @@ import {
   resolvePriorityExecutionContract,
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
 import {
+  HealthKitObservationError,
+  HealthKitObservationType,
+  HealthKitReconciliationState,
+  createHealthKitActivityDayPayload,
+  createHealthKitObservationRecord,
+  isHealthKitActivitySummarySuperseded,
+  normalizeHealthKitObservationBatch,
+  reconcileHealthKitWorkoutObservation,
+} from "../../domain/services/HealthKitObservationService.js";
+import {
+  getCanonicalActivitySemanticFingerprint,
+  selectActiveCanonicalActivityDays,
+} from "../../domain/services/CanonicalActivityDayService.js";
+import {
   createRecurringSupportManagementService,
   RecurringSupportOutcome,
 } from "../../domain/services/RecurringSupportManagementService.js";
@@ -78,6 +92,7 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "editProtocol", "editGoal", "transitionGoal", "createTrainingSession", "correctTrainingSession",
   "completeTrainingLogger", "confirmNutritionEvidence", "confirmPhotoEvidence", "confirmDexaEvidence",
   "upsertNutritionDay", "syncActivityDay", "commitTrainingSession", "upsertActivityDay",
+  "ingestHealthKitObservations",
   "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport", "saveNutritionStrategy",
   "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
   "saveSupplementSupport",
@@ -244,6 +259,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         },
       });
     },
+    ingestHealthKitObservations,
     commitTrainingSession,
     editDexaReview,
     requestEvidenceReviewConfirmation,
@@ -258,6 +274,149 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     changeSupplementLifecycle,
     saveCoachingUpdates,
   });
+
+  async function ingestHealthKitObservations(context) {
+    if (typeof records.putIfAbsent !== "function") {
+      throw new Error("HealthKit ingestion requires atomic create-if-absent record storage.");
+    }
+    let batch;
+    try {
+      batch = normalizeHealthKitObservationBatch({
+        batchId: context.payload.batchId,
+        observations: context.payload.observations,
+        principalDeviceId: context.principal.deviceId,
+      });
+    } catch (error) {
+      if (!(error instanceof HealthKitObservationError)) throw error;
+      throw problem(
+        error.code === "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION" ? 409 : 400,
+        error.code,
+        error.message,
+        error.field ? [{ field: error.field, code: "invalid", detail: error.message }] : []
+      );
+    }
+    const [existingObservations, canonicalObjects] = await Promise.all([
+      records.list({ ownerUserId: context.ownerUserId, collection: "healthKitObservations" }),
+      records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
+    ]);
+    const existingById = new Map(existingObservations.map((record) => [record.id, record]));
+    const activityRevisionHistory = [...existingObservations];
+    const results = [];
+    for (const observation of batch.observations) {
+      const existing = existingById.get(observation.id);
+      if (existing && existing.semanticFingerprint !== observation.semanticFingerprint) {
+        throw problem(
+          409,
+          "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+          "The HealthKit source identity already exists with different observation content."
+        );
+      }
+      let reconciliation;
+      if (observation.observationType === HealthKitObservationType.ACTIVITY_SUMMARY) {
+        const superseding = isHealthKitActivitySummarySuperseded(
+          activityRevisionHistory,
+          observation
+        );
+        if (superseding) {
+          reconciliation = {
+            state: HealthKitReconciliationState.ACTIVITY_SUMMARY_SUPERSEDED,
+            reason: superseding.measurement?.coverage === "complete_day" &&
+              observation.measurement.coverage === "partial_day"
+              ? "complete_day_summary_already_received"
+              : "newer_device_revision_already_received",
+            supersededBySourceObservationId: superseding.id,
+          };
+        } else if (existing?.reconciliation?.state === HealthKitReconciliationState.ACTIVITY_DAY_CANONICALIZED) {
+          reconciliation = structuredClone(existing.reconciliation);
+        } else {
+          const payload = createHealthKitActivityDayPayload(observation);
+          const canonicalActivityResult = await upsertCanonicalDay({
+            ...context,
+            payload: {
+              localDate: observation.occurrence.localDate,
+              sourceIdentity: observation.id,
+            },
+          }, {
+            evidenceType: "activity_day",
+            payload,
+            serverOwnedDayRevision: true,
+          });
+          reconciliation = {
+            state: HealthKitReconciliationState.ACTIVITY_DAY_CANONICALIZED,
+            canonicalId: canonicalActivityResult.result.canonicalId,
+            canonicalRevision: canonicalActivityResult.result.revision,
+            aggregationPolicy: "authoritative_daily_total_no_workout_addition",
+          };
+        }
+      } else if (observation.observationType === HealthKitObservationType.WORKOUT) {
+        reconciliation = reconcileHealthKitWorkoutObservation({ observation, canonicalObjects });
+      } else {
+        reconciliation = { state: HealthKitReconciliationState.SOURCE_ONLY };
+      }
+      const sourceRecord = existing ?? createHealthKitObservationRecord({
+        observation,
+        reconciliation,
+        ownerUserId: context.ownerUserId,
+        receivedAt: context.metadata.clientOccurredAt ?? now().toISOString(),
+      });
+      const reconciliationChanged = existing &&
+        comparableRecord(existing.reconciliation) !== comparableRecord(reconciliation);
+      const insertion = existing ? null : await records.putIfAbsent({
+        ownerUserId: context.ownerUserId,
+        collection: "healthKitObservations",
+        recordId: sourceRecord.id,
+        sourceIdentity: sourceRecord.id,
+        payload: sourceRecord,
+      });
+      const stored = reconciliationChanged
+        ? await records.put({
+            ownerUserId: context.ownerUserId,
+            collection: "healthKitObservations",
+            recordId: existing.id,
+            expectedVersion: existing.version,
+            sourceIdentity: existing.id,
+            payload: { ...existing, reconciliation },
+          })
+        : existing ?? insertion.record;
+      if (!stored || stored.semanticFingerprint !== observation.semanticFingerprint) {
+        throw problem(
+          409,
+          "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+          "The HealthKit source identity already exists with different observation content."
+        );
+      }
+      if (!existing && insertion.created) {
+        existingById.set(stored.id, stored);
+        activityRevisionHistory.push(stored);
+      }
+      results.push({
+        sourceObservationId: stored.id,
+        outcome: reconciliationChanged
+          ? "reconciled"
+          : existing || !insertion.created ? "matched" : "created",
+        observationType: stored.observationType,
+        occurredAt: stored.occurredAt,
+        reconciliation: stored.reconciliation,
+      });
+    }
+    return {
+      status: "committed",
+      result: {
+        status: results.every((item) => item.outcome === "matched") ? "matched" : "accepted",
+        batchId: batch.batchId,
+        acceptedCount: results.length,
+        createdCount: results.filter((item) => item.outcome === "created").length,
+        reconciledCount: results.filter((item) => item.outcome === "reconciled").length,
+        matchedCount: results.filter((item) => item.outcome === "matched").length,
+        activityDayCanonicalizedCount: results.filter((item) =>
+          item.reconciliation?.state === HealthKitReconciliationState.ACTIVITY_DAY_CANONICALIZED
+        ).length,
+        cursorResponsibility: "device",
+        observations: results,
+      },
+      outbox: [],
+    };
+  }
 
   async function saveCoachingUpdates(context) {
     if (!records.getRuntimeMetadata || !records.advanceRuntimeMetadata) {
@@ -1648,18 +1807,47 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     }
   }
 
-  async function upsertCanonicalDay(context, { evidenceType, payload }) {
+  async function upsertCanonicalDay(context, {
+    evidenceType,
+    payload,
+    serverOwnedDayRevision = false,
+  }) {
     const [existingCanonicalObjects, goals] = await Promise.all([
       records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
       records.list({ ownerUserId: context.ownerUserId, collection: "goals" }),
     ]);
+    let reconciledPayload = payload;
+    if (serverOwnedDayRevision && evidenceType === "activity_day") {
+      const selection = selectActiveCanonicalActivityDays(existingCanonicalObjects, {
+        date: context.payload.localDate,
+        userId: context.ownerUserId,
+      });
+      if (selection.diagnostics.length > 0) {
+        throw new Error(
+          `Activity canonical invariant failed for ${context.payload.localDate}: multiple active days require explicit historical repair.`
+        );
+      }
+      const existing = selection.records[0] ?? null;
+      reconciledPayload = {
+        ...payload,
+        reconciliation: {
+          ...(payload.reconciliation ?? {}),
+          activity: {
+            ...(payload.reconciliation?.activity ?? {}),
+            expectedPriorSemanticFingerprint: existing
+              ? getCanonicalActivitySemanticFingerprint(existing)
+              : null,
+          },
+        },
+      };
+    }
     const packageId = `${evidenceType}|native|${context.metadata.idempotencyKey}`;
     const evidencePackage = {
       id: packageId,
       package_id: packageId,
       userId: context.ownerUserId,
       source: { type: "native", deviceId: context.principal.deviceId },
-      evidence_objects: [payload],
+      evidence_objects: [reconciledPayload],
     };
     const reconciliation = reconcileConfirmedEvidencePackage({
       evidencePackage,
@@ -1785,8 +1973,8 @@ function finiteOrNull(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function problem(status, code, title) {
-  return new ApplicationProblem({ status, code, title });
+function problem(status, code, title, fieldErrors = []) {
+  return new ApplicationProblem({ status, code, title, fieldErrors });
 }
 
 function canonicalValidationProblem(error) {

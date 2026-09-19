@@ -27,6 +27,7 @@ export default defineConfig({
       "src/application/timeline/EvidenceTimelineReadService.test.js",
       "src/domain/services/CanonicalNutritionDayService.test.js",
       "src/domain/services/CanonicalActivityDayService.test.js",
+      "src/domain/services/HealthKitObservationService.test.js",
       "src/domain/services/EnergyEvidenceService.test.js",
       "src/domain/services/CanonicalEvidenceScopedReconciliation.test.js",
       "src/domain/services/WorkoutLoggerAppleHealthReconciliation.test.js",

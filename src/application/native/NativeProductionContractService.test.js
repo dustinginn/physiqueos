@@ -402,6 +402,20 @@ describe("Native production contract boundary", () => {
     expect(current.executeCommand).not.toHaveBeenCalled();
   });
 
+  it("authorizes the bounded V1 HealthKit observation command without enabling legacy Activity sync", async () => {
+    const current = fixture();
+    await current.service.command({
+      request: request(),
+      commandType: "healthkit.observations.ingest.v1",
+      metadata: { idempotencyKey: "healthkit-batch-one" },
+      payload: { batchId: "batch-one", observations: [{ observationType: "workout" }] },
+    });
+    expect(current.executeCommand).toHaveBeenCalledWith(expect.objectContaining({
+      principal,
+      commandType: "healthkit.observations.ingest.v1",
+    }));
+  });
+
   it("starts the real Evidence Review confirmation lifecycle after the canonical receipt commits", async () => {
     const current = fixture();
     current.executeCommand.mockResolvedValue({ outcome: "committed", receipt: { commandId: "command-7" } });
@@ -526,6 +540,7 @@ describe("Native production contract boundary", () => {
     expect(nativeProductionContractManifest.writes.map((item) => item.commandType)).toEqual([
       "weight.submit.v1", "check-in.submit.v1", "priority.complete.v1",
       "training-session.commit.v1", "nutrition-day.upsert.v1", "activity-day.upsert.v1",
+      "healthkit.observations.ingest.v1",
       "dexa-review.measurements.v1", "evidence-review.commit.v1", "evidence-review.dispose.v1",
       "operating-plan.recurring-support.save.v1", "operating-plan.nutrition-strategy.save.v1",
       "training-catalog.my-library.add.v1", "training-catalog.exercise.create.v1",
@@ -536,7 +551,14 @@ describe("Native production contract boundary", () => {
       "operating-plan.supplement-lifecycle.change.v1",
       "operating-plan.coaching-updates.save.v1",
     ]);
-    expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/HealthKit|activity-day\.sync/);
+    expect(nativeProductionContractManifest.healthKitIngestion).toMatchObject({
+      contractVersion: "healthkit-ingestion-v1",
+      maximumBatchSize: 100,
+      observationTypes: ["activity_summary", "workout", "quantity_sample"],
+      queryCursor: expect.stringMatching(/device-owned/),
+      evidenceEligibility: "not assessed by ingestion",
+    });
+    expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/activity-day\.sync/);
     expect(JSON.stringify(nativeProductionContractManifest)).not.toMatch(/storage_key|Spaces|databaseName|provider-authoritative/);
   });
 });

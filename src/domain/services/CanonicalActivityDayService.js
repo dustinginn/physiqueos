@@ -259,7 +259,28 @@ function choosePreferred(left, right) {
   if (leftAuthority.rank !== rightAuthority.rank) {
     return rightAuthority.rank > leftAuthority.rank ? right : left;
   }
+  const healthKitOrder = compareHealthKitDailySummaryOrder(left, right);
+  if (healthKitOrder !== 0) return healthKitOrder > 0 ? right : left;
   return evidenceRichness(right) >= evidenceRichness(left) ? right : left;
+}
+
+function compareHealthKitDailySummaryOrder(left = {}, right = {}) {
+  const leftCoverage = activityCoverageRank(left.metadata?.coverage);
+  const rightCoverage = activityCoverageRank(right.metadata?.coverage);
+  if (leftCoverage !== rightCoverage) return rightCoverage - leftCoverage;
+  const sameDevice = left.metadata?.source_device_id &&
+    left.metadata.source_device_id === right.metadata?.source_device_id;
+  if (!sameDevice) return 0;
+  const leftRevision = Number(left.metadata?.source_revision);
+  const rightRevision = Number(right.metadata?.source_revision);
+  if (!Number.isSafeInteger(leftRevision) || !Number.isSafeInteger(rightRevision)) return 0;
+  return rightRevision - leftRevision;
+}
+
+function activityCoverageRank(value) {
+  if (value === "complete_day") return 2;
+  if (value === "partial_day") return 1;
+  return 0;
 }
 
 function isExplicitCorrection(value = {}) {

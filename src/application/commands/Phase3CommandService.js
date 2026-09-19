@@ -25,6 +25,7 @@ export const Phase3Command = Object.freeze({
   SYNC_ACTIVITY_DAY: "activity-day.sync.v1",
   COMMIT_TRAINING_SESSION: "training-session.commit.v1",
   UPSERT_ACTIVITY_DAY: "activity-day.upsert.v1",
+  INGEST_HEALTHKIT_OBSERVATIONS: "healthkit.observations.ingest.v1",
   EDIT_DEXA_REVIEW: "dexa-review.measurements.v1",
   COMMIT_EVIDENCE_REVIEW: "evidence-review.commit.v1",
   SAVE_RECURRING_SUPPORT: "operating-plan.recurring-support.save.v1",
@@ -61,6 +62,7 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.SYNC_ACTIVITY_DAY]: define("syncActivityDay", ["localDate", "dailyActivity", "sourceIdentity"], false),
   [Phase3Command.COMMIT_TRAINING_SESSION]: define("commitTrainingSession", ["sessionId", "localDate", "exercises"], false),
   [Phase3Command.UPSERT_ACTIVITY_DAY]: define("upsertActivityDay", ["localDate", "dailyActivity", "sourceIdentity", "source"], false),
+  [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: define("ingestHealthKitObservations", ["batchId", "observations"], false),
   [Phase3Command.EDIT_DEXA_REVIEW]: define("editDexaReview", ["reviewId", "evidenceObjectId", "measurements"], true),
   [Phase3Command.COMMIT_EVIDENCE_REVIEW]: define("requestEvidenceReviewConfirmation", ["reviewId"], true),
   [Phase3Command.SAVE_RECURRING_SUPPORT]: define(
@@ -156,6 +158,7 @@ function validatePayload(commandType, payload) {
     throw validation("value", "Weight must be a positive number.");
   }
   if (payload.items != null && !Array.isArray(payload.items)) throw validation("items", "items must be an array.");
+  if (payload.observations != null && (!Array.isArray(payload.observations) || payload.observations.length === 0)) throw validation("observations", "observations must be a non-empty array.");
   if (payload.dailyTotals != null && (!payload.dailyTotals || typeof payload.dailyTotals !== "object" || Array.isArray(payload.dailyTotals))) throw validation("dailyTotals", "dailyTotals must be an object.");
   if (payload.dailyActivity != null && (!payload.dailyActivity || typeof payload.dailyActivity !== "object" || Array.isArray(payload.dailyActivity))) throw validation("dailyActivity", "dailyActivity must be an object.");
   if (payload.measurements != null && (!payload.measurements || typeof payload.measurements !== "object" || Array.isArray(payload.measurements))) throw validation("measurements", "measurements must be an object.");
@@ -170,7 +173,7 @@ function validatePayload(commandType, payload) {
   if (payload.draft != null && (!payload.draft || typeof payload.draft !== "object" || Array.isArray(payload.draft))) {
     throw validation("draft", "draft must be an object.");
   }
-  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId", "expectedCurrentVersionId", "canonicalExerciseId", "canonicalName", "primaryMuscleGroupId"]) {
+  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId", "expectedCurrentVersionId", "canonicalExerciseId", "canonicalName", "primaryMuscleGroupId", "batchId"]) {
     if (payload[field] != null && !String(payload[field]).trim()) throw validation(field, `${field} must be a non-empty identity.`);
   }
 }
