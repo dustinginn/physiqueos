@@ -2,6 +2,7 @@ import { register } from "node:module";
 import { createValidationPostgresPool } from "./validationPostgresPool.mjs";
 import {
   applyPhase4CommandParityFixtureOverlays,
+  createPhase4CommandParityCases,
   createPhase4CommandParityFixtureCollections,
   createPhase4CommandParityMemoryCollections,
 } from "./phase4CommandParityFixture.mjs";
@@ -44,7 +45,7 @@ try {
     createCanonicalPersistenceCommandPorts({ records: context.transaction.canonicalRecords, now })[name](context)]));
   const memory = createPhase3CommandService({ transactionRunner: createInMemoryFoundationTransactionStore(), ports: memoryPorts });
   const postgres = createPhase3CommandService({ transactionRunner: runner, ports: postgresPorts });
-  const cases = commandCases();
+  const cases = createPhase4CommandParityCases();
   const results = {};
   let index = 0;
   for (const testCase of cases) {
@@ -98,27 +99,6 @@ try {
   process.stdout.write(`${JSON.stringify({ commandParity: results, commandCount: Object.keys(results).length, replay: "pass", payloadDrift: "pass", transactionalOutbox: "pass", interruptedRollback: "pass", sameAggregateConcurrency: "pass", independentConcurrency: "pass", duplicateOccurrence: "pass", duplicateSourceIdentity: "pass", crossOwnerRead: "pass" })}\n`);
 } finally { await pool.end(); }
 
-function commandCases() {
-  return [
-    { commandType: Phase3Command.SUBMIT_WEIGHT, payload: { localDate: "2026-08-11", value: 180 } },
-    { commandType: Phase3Command.SUBMIT_CHECK_IN, payload: { localDate: "2026-08-11", energy: 4 } },
-    { commandType: Phase3Command.CREATE_EVIDENCE_INTAKE, payload: { submissionId: "synthetic-intake", sourceIdentity: "synthetic-intake-source" } },
-    { commandType: Phase3Command.EDIT_EVIDENCE_REVIEW, payload: { reviewId: "synthetic-review-edit", changes: { note: "corrected" } }, expectedVersion: "1" },
-    { commandType: Phase3Command.CONFIRM_EVIDENCE_REVIEW, payload: { reviewId: "synthetic-review-confirm" }, expectedVersion: "1" },
-    { commandType: Phase3Command.DISPOSE_EVIDENCE_REVIEW, payload: { reviewId: "synthetic-review-dispose", disposition: "rejected" }, expectedVersion: "1" },
-    { commandType: Phase3Command.COMPLETE_PRIORITY, payload: { priorityId: "synthetic-priority", occurrenceDate: "2026-08-11" }, expectedVersion: "1" },
-    { commandType: Phase3Command.RECONCILE_PREVIOUS_DAY, payload: { localDate: "2026-08-10", items: [{ id: "item", complete: true }] }, expectedVersion: "1" },
-    { commandType: Phase3Command.EDIT_PROTOCOL, payload: { protocolId: "synthetic-protocol", patch: { title: "updated" } }, expectedVersion: "1" },
-    { commandType: Phase3Command.EDIT_GOAL, payload: { goalId: "synthetic-goal", patch: { title: "updated" } }, expectedVersion: "1" },
-    { commandType: Phase3Command.TRANSITION_GOAL, payload: { goalId: "synthetic-transition-goal", transitionId: "synthetic-transition" }, expectedVersion: "1" },
-    { commandType: Phase3Command.CREATE_TRAINING_SESSION, payload: { sessionId: "synthetic-training-new", observedAt: "2026-08-11T18:00:00.000Z" } },
-    { commandType: Phase3Command.CORRECT_TRAINING_SESSION, payload: { sessionId: "synthetic-training-correct", corrections: [{ field: "load" }] }, expectedVersion: "1" },
-    { commandType: Phase3Command.COMPLETE_TRAINING_LOGGER, payload: { draftId: "synthetic-training-draft", localDate: "2026-08-11" }, expectedVersion: "1" },
-    { commandType: Phase3Command.CONFIRM_NUTRITION, payload: { reviewId: "synthetic-review-nutrition" }, expectedVersion: "1" },
-    { commandType: Phase3Command.CONFIRM_PHOTO, payload: { reviewId: "synthetic-review-photo" }, expectedVersion: "1" },
-    { commandType: Phase3Command.CONFIRM_DEXA, payload: { reviewId: "synthetic-review-dexa" }, expectedVersion: "1" },
-  ];
-}
 function commandId(index) { return `0198f100-0000-7000-8000-${String(index).padStart(12, "0")}`; }
 async function transactionalPut(runner, input) { return runner.run((transaction) => transaction.canonicalRecords.put(input)); }
 function assertSemanticEqual(left, right, label) { if (createPayloadHash(left) !== createPayloadHash(right)) throw new Error(`Command parity failed for ${label}.`); }

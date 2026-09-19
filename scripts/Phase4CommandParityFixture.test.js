@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPayloadHash } from "../src/contracts/v1/canonicalJson.js";
 import { createCanonicalPersistenceCommandPorts } from "../src/application/commands/CanonicalPersistenceCommandPorts.js";
-import { createPhase3CommandService, Phase3Command } from "../src/application/commands/Phase3CommandService.js";
+import {
+  createPhase3CommandService,
+  listPhase3CommandContracts,
+  Phase3Command,
+} from "../src/application/commands/Phase3CommandService.js";
 import {
   MORNING_CHECK_IN_BOUNDED_READ_COLLECTIONS,
 } from "../src/domain/services/MorningCheckInPersistenceService.js";
@@ -14,6 +18,7 @@ import {
 } from "../src/platform/migration/phase5SyntheticPackage.js";
 import {
   applyPhase4CommandParityFixtureOverlays,
+  createPhase4CommandParityCases,
   createPhase4CommandParityFixtureCollections,
   createPhase4CommandParityMemoryCollections,
 } from "./phase4CommandParityFixture.mjs";
@@ -58,6 +63,8 @@ describe("Phase 4 command-parity starting state", () => {
     expect(left.snapshot().goals).toEqual([...runtime.goals, ...fixtureCollections.goals]);
     expect(new Set(left.snapshot().goals.map((record) => record.id)).size)
       .toBe(left.snapshot().goals.length);
+    expect(left.snapshot().reminders.find((record) => record.id === "synthetic-priority"))
+      .toMatchObject({ userId: runtime.user.id, version: 1, completionHistory: [] });
   });
 
   it("preserves overlay source identity through the generic record-store boundary", async () => {
@@ -125,6 +132,104 @@ describe("Phase 4 command-parity starting state", () => {
     expect(leftResult.checkInId).toBe("daily_check_in_2026_08_11");
     expect(leftResult).toEqual(rightResult);
     expect(createPayloadHash(leftResult)).toBe(createPayloadHash(rightResult));
+  });
+
+  it("keeps every parity command fixture valid at the registered command-contract boundary", async () => {
+    const cases = createPhase4CommandParityCases();
+    const contracts = new Map(listPhase3CommandContracts().map((contract) => [contract.commandType, contract]));
+    const ports = new Proxy({}, {
+      get: () => async ({ payload }) => ({ result: { canonicalPayload: payload } }),
+    });
+    const service = createPhase3CommandService({
+      transactionRunner: createInMemoryFoundationTransactionStore(),
+      ports,
+    });
+
+    expect(cases).toHaveLength(17);
+    expect(new Set(cases.map((testCase) => testCase.commandType)).size).toBe(cases.length);
+    expect(cases.some((testCase) => testCase.commandType.startsWith("healthkit."))).toBe(false);
+    for (const [index, testCase] of cases.entries()) {
+      const contract = contracts.get(testCase.commandType);
+      expect(contract, testCase.commandType).toBeDefined();
+      for (const field of contract.requiredPayloadFields) {
+        expect(testCase.payload[field], `${testCase.commandType}.${field}`).not.toBeUndefined();
+        expect(testCase.payload[field], `${testCase.commandType}.${field}`).not.toBeNull();
+        expect(testCase.payload[field], `${testCase.commandType}.${field}`).not.toBe("");
+      }
+      expect(testCase.expectedVersion != null, testCase.commandType)
+        .toBe(contract.expectedVersionRequired);
+      const result = await service.execute({
+        commandType: testCase.commandType,
+        principal: parityPrincipal(PHASE5_SYNTHETIC_OWNER_ID),
+        metadata: parityMetadata(index + 1, testCase.expectedVersion, "contract"),
+        payload: testCase.payload,
+      });
+      expect(result.outcome, testCase.commandType).toBe("committed");
+    }
+  });
+
+  it("uses the accepted check-in contract and rejects the obsolete energy-only shape", async () => {
+    const checkIn = createPhase4CommandParityCases()
+      .find((testCase) => testCase.commandType === Phase3Command.SUBMIT_CHECK_IN);
+    expect(checkIn.payload).toEqual({ localDate: "2026-08-11", value: 180, energy: 4 });
+
+    const service = createPhase3CommandService({
+      transactionRunner: createInMemoryFoundationTransactionStore(),
+      ports: { submitCheckIn: vi.fn() },
+    });
+    await expect(service.execute({
+      commandType: Phase3Command.SUBMIT_CHECK_IN,
+      principal: parityPrincipal(PHASE5_SYNTHETIC_OWNER_ID),
+      metadata: parityMetadata(80, undefined, "obsolete-check-in"),
+      payload: { localDate: "2026-08-11", energy: 4 },
+    })).rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
+  });
+
+  it("executes the complete catalog against the synthetic package and parity prerequisites", async () => {
+    const runtime = createPhase5SyntheticRuntime({ recordsPerCollection: 3 });
+    const records = createInMemoryCanonicalRecordStore(createMemoryCollections(runtime));
+    const fixtureCollections = createPhase4CommandParityFixtureCollections(runtime.user.id);
+    await applyPhase4CommandParityFixtureOverlays({
+      records,
+      ownerUserId: runtime.user.id,
+      fixtureCollections,
+    });
+    const service = createPhase3CommandService({
+      transactionRunner: createInMemoryFoundationTransactionStore(),
+      ports: createCanonicalPersistenceCommandPorts({ records, now }),
+    });
+    const results = new Map();
+    for (const [index, testCase] of createPhase4CommandParityCases().entries()) {
+      const executed = await service.execute({
+        commandType: testCase.commandType,
+        principal: parityPrincipal(runtime.user.id),
+        metadata: parityMetadata(index + 1, testCase.expectedVersion, "prerequisite"),
+        payload: testCase.payload,
+      });
+      expect(executed.outcome, testCase.commandType).toBe("committed");
+      results.set(testCase.commandType, executed.receipt.result);
+    }
+
+    expect(results.get(Phase3Command.SUBMIT_CHECK_IN)).toEqual({
+      status: "unchanged",
+      weightId: null,
+      weightRevision: null,
+      checkInId: null,
+      checkInRevision: null,
+      analysisId: null,
+      intendedDate: "2026-08-11",
+      goalIds: [],
+      continuationWorkItemIds: [],
+    });
+    expect(results.get(Phase3Command.DISPOSE_EVIDENCE_REVIEW))
+      .toMatchObject({ status: "discarded", reviewId: "synthetic-review-dispose" });
+    expect(results.get(Phase3Command.COMPLETE_PRIORITY))
+      .toMatchObject({ status: "completed", priorityId: "synthetic-priority" });
+    expect(await records.get({
+      ownerUserId: runtime.user.id,
+      collection: "reminders",
+      recordId: "synthetic-priority",
+    })).toMatchObject({ version: 2 });
   });
 
   it("preserves RESOURCE_NOT_FOUND when the canonical owner is genuinely absent", async () => {
@@ -195,6 +300,19 @@ function commandContext(ownerUserId) {
       clientOccurredAt: "2026-08-12T04:00:00.000Z",
     },
     payload: { localDate: "2026-08-11", value: 180 },
+  };
+}
+
+function parityPrincipal(ownerUserId) {
+  return { userId: ownerUserId, deviceId: "phase4-device", sessionId: "phase4-session" };
+}
+
+function parityMetadata(index, expectedVersion, prefix) {
+  return {
+    commandId: `0198f100-0000-7000-8000-${String(index).padStart(12, "0")}`,
+    idempotencyKey: `phase4-parity-${prefix}-${String(index).padStart(3, "0")}`,
+    expectedVersion,
+    clientTimeZone: "America/Los_Angeles",
   };
 }
 
