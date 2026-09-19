@@ -6,22 +6,17 @@ import { runner as migrate } from "node-pg-migrate";
 import { createFoundationPostgresAdapters, createFoundationPostgresTransactionRunner } from "../src/platform/database/foundationPostgresComposition.js";
 import { createPostgresBackupTool } from "../src/platform/backup/PostgresBackupTool.js";
 import { createFounderAuthService } from "../src/platform/auth/FounderAuthService.js";
+import { createPhysiqueOSMigrationOptions } from "./physiqueOSMigrationDiscovery.mjs";
 
 const databaseUrl = String(process.env.PHYSIQUEOS_TEST_DATABASE_URL ?? "").trim();
 assertIsolatedDatabase(databaseUrl);
 requireExecutable("pg_dump");
 requireExecutable("pg_restore");
 
-const migrationOptions = {
+const migrationOptions = createPhysiqueOSMigrationOptions({
   databaseUrl,
-  dir: "db/migrations",
-  migrationsTable: "physiqueos_schema_migrations",
-  migrationsSchema: "physiqueos",
-  schema: "physiqueos",
-  createSchema: true,
-  createMigrationsSchema: true,
   log: () => undefined,
-};
+});
 
 await migrate({ ...migrationOptions, direction: "down", count: Number.POSITIVE_INFINITY }).catch((error) => {
   if (!/schema.*does not exist|relation.*does not exist/i.test(String(error?.message))) throw error;

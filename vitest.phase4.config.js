@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     include: [
       "src/platform/migration/phase4Schema.test.js",
+      "scripts/PhysiqueOSMigrationDiscovery.test.js",
       "src/platform/migration/phase4CanonicalExport.test.js",
       "src/platform/migration/migrationManifest.test.js",
       "src/platform/database/phase4PostgresComposition.test.js",

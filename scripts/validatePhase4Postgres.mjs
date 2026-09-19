@@ -4,6 +4,10 @@ import { spawnSync } from "node:child_process";
 import pg from "pg";
 import { runner as migrate } from "node-pg-migrate";
 import { register } from "node:module";
+import {
+  createPhysiqueOSMigrationOptions,
+  discoverPhysiqueOSMigrationFiles,
+} from "./physiqueOSMigrationDiscovery.mjs";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 const { importCanonicalPackage, validateCanonicalImport } = await import("../src/platform/migration/phase4CanonicalImport.js");
@@ -16,7 +20,7 @@ const objectRoot = path.resolve(process.env.PHYSIQUEOS_PHASE4_OBJECT_ROOT ?? pat
 assertGuarded(databaseUrl);
 if (![packageRoot, snapshotRoot, objectRoot].every((value) => value.startsWith(path.join(root, ".tmp") + path.sep))) throw new Error("Phase 4 PostgreSQL acceptance artifacts must remain under .tmp.");
 if (!fs.existsSync(path.join(packageRoot, "manifest.json"))) throw new Error("A deterministic Phase 4 package is required before PostgreSQL validation.");
-const migrationOptions = { databaseUrl, dir: "db/migrations", migrationsTable: "physiqueos_schema_migrations", migrationsSchema: "physiqueos", schema: "physiqueos", createSchema: true, createMigrationsSchema: true, log: () => undefined };
+const migrationOptions = createPhysiqueOSMigrationOptions({ databaseUrl, log: () => undefined });
 await migrate({ ...migrationOptions, direction: "down", count: Number.POSITIVE_INFINITY }).catch((error) => { if (!/schema.*does not exist|relation.*does not exist/i.test(String(error.message))) throw error; });
 await migrate({ ...migrationOptions, direction: "up" });
 let pool = new pg.Pool({ connectionString: databaseUrl, max: 2, allowExitOnIdle: true });
@@ -46,8 +50,7 @@ const finalImport = await importCanonicalPackage({ pool, packageRoot, resetTarge
 await validateCanonicalImport({ pool, packageRoot });
 const migrations = await pool.query("SELECT name FROM physiqueos.physiqueos_schema_migrations ORDER BY name");
 await pool.end();
-const expectedMigrations = fs.readdirSync(path.join(root, "db", "migrations"))
-  .filter((name) => /^\d+_.+\.cjs$/.test(name))
+const expectedMigrations = discoverPhysiqueOSMigrationFiles({ root })
   .map((name) => name.replace(/\.cjs$/, ""))
   .sort();
 const actualMigrations = migrations.rows.map((row) => row.name).sort();

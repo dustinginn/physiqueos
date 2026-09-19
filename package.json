@@ -44,9 +44,9 @@
     "build-storybook": "storybook build",
     "snap": "playwright test tests/home.spec.ts --project=chromium",
     "diff": "node scripts/diff.js",
-    "db:migrate:up": "node-pg-migrate up -d PHYSIQUEOS_DATABASE_URL -m db/migrations -t physiqueos_schema_migrations --schema physiqueos --create-schema --migrations-schema physiqueos --create-migrations-schema",
-    "db:migrate:down": "node-pg-migrate down -d PHYSIQUEOS_DATABASE_URL -m db/migrations -t physiqueos_schema_migrations --schema physiqueos --migrations-schema physiqueos",
-    "db:migrate:dry-run": "node-pg-migrate up -d PHYSIQUEOS_DATABASE_URL -m db/migrations -t physiqueos_schema_migrations --schema physiqueos --create-schema --migrations-schema physiqueos --create-migrations-schema --dry-run",
+    "db:migrate:up": "node scripts/runPhysiqueOSMigration.mjs up",
+    "db:migrate:down": "node scripts/runPhysiqueOSMigration.mjs down",
+    "db:migrate:dry-run": "node scripts/runPhysiqueOSMigration.mjs dry-run",
     "ops:root:check": "node scripts/checkRootOperations.mjs",
     "ops:logs:check": "node scripts/cleanupOperationsLogs.mjs",
     "ops:logs:clean": "node scripts/cleanupOperationsLogs.mjs --apply"
