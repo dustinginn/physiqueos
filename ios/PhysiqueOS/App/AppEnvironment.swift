@@ -241,6 +241,7 @@ final class AppEnvironment {
     /// app lifecycle never invokes the coordinator automatically.
     let healthKitFeatureGate: HealthKitFeatureGate
     let healthKitAuthorizationCoordinator: HealthKitAuthorizationCoordinator
+    let healthKitSynchronizationEngine: HealthKitSynchronizationEngine
 
     var weightEvidenceAPI: WeightEvidenceAPI {
         switch nativeAuthority {
@@ -533,7 +534,11 @@ final class AppEnvironment {
         productionNativeAPI: ProductionNativeAPI = ProductionNativeAPI(),
         founderPhotoMediaStore: FounderPhotoMediaStore? = nil,
         healthKitFeatureGate: HealthKitFeatureGate = .n0Disabled,
-        healthKitService: any HealthKitService = SystemHealthKitService()
+        healthKitService: any HealthKitService = SystemHealthKitService(),
+        healthKitQueryClient: any HealthKitAnchoredQueryClient = SystemHealthKitQueryClient(),
+        healthKitObserverClient: any HealthKitObserverClient = SystemHealthKitObserverClient(),
+        healthKitSynchronizationStore: any HealthKitSynchronizationStore = FileHealthKitSynchronizationStore(),
+        healthKitObservationUploader: (any HealthKitObservationUploader)? = nil
     ) {
         self.authoritySelectionStore = authoritySelectionStore
         self.nativeAuthority = nativeAuthority ?? authoritySelectionStore.load() ?? .sandbox
@@ -567,6 +572,13 @@ final class AppEnvironment {
         self.healthKitFeatureGate = healthKitFeatureGate
         self.healthKitAuthorizationCoordinator = HealthKitAuthorizationCoordinator(
             service: healthKitService,
+            featureGate: healthKitFeatureGate
+        )
+        self.healthKitSynchronizationEngine = HealthKitSynchronizationEngine(
+            queryClient: healthKitQueryClient,
+            observerClient: healthKitObserverClient,
+            store: healthKitSynchronizationStore,
+            uploader: healthKitObservationUploader ?? ProductionHealthKitObservationUploader(api: productionNativeAPI),
             featureGate: healthKitFeatureGate
         )
     }

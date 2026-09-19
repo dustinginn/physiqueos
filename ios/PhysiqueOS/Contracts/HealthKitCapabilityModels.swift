@@ -22,7 +22,7 @@ struct HealthKitFeatureGate: Equatable, Sendable {
     }
 }
 
-enum HealthKitAvailability: Equatable, Sendable {
+enum HealthKitAvailability: Equatable, Codable, Sendable {
     case unavailableOnDevice
     case availableAuthorizationNotRequested
     case authorizationRequestRequired
