@@ -114,7 +114,9 @@ final class EvidenceAttachmentContentTypeProbeTests: XCTestCase {
         XCTAssertEqual(accepted.contentType, "image/jpeg")
         XCTAssertFalse(accepted.requiresAnalysisDerivative)
 
-        let heic = Data([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63])
+        // A well-formed 24-byte ftyp box (size, "ftyp", major heic, minor 0, compatible mif1 heic):
+        // the detector validates box sizing exactly as the Server does, so the box must be real.
+        let heic = Data([0x00, 0x00, 0x00, 0x18]) + Data("ftypheic".utf8) + Data(count: 4) + Data("mif1heic".utf8) + Data(repeating: 0x11, count: 8)
         let preserved = try XCTUnwrap(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: heic))
         XCTAssertEqual(preserved.data, heic, "HEIC originals are staged verbatim, never re-encoded")
         XCTAssertEqual(preserved.contentType, "image/heic", "the container is read from the bytes, not a picker label")

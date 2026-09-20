@@ -53,9 +53,19 @@ struct StagedPhotoSessionDeclaration: Codable, Equatable, Sendable {
 struct StagedPhotoIntakePlan: Codable, Equatable, Sendable {
     static let currentSchemaVersion = 1
     static let expectedEvidenceType = "photo_session"
-    /// Mirrors the Server contract (`StagedEvidenceArtifactManifest.js`).
+    /// Mirrors the Server contract (`StagedEvidenceArtifactManifest.js`):
+    /// compressed originals (JPEG/PNG/WebP/HEIC/HEIF) at most 32 MiB, raw
+    /// originals (Apple ProRAW DNG) at most 48 MiB — the Server's
+    /// application-owned ceiling on the artifact PUT path with 8% headroom
+    /// over a 24 MP ProRAW — and derivatives at most 8 MiB.
     static let originalMaximumBytes = 32 * 1024 * 1024
+    static let rawOriginalMaximumBytes = 48 * 1024 * 1024
     static let derivativeMaximumBytes = 8 * 1024 * 1024
+
+    /// The transport ceiling for one original, by its container's size class.
+    static func originalMaximumBytes(for contentType: String) -> Int {
+        EvidenceAttachmentLoader.photoContainer(for: contentType)?.sizeClass == .raw ? rawOriginalMaximumBytes : originalMaximumBytes
+    }
     static let maximumOriginals = 24
     static let derivativeMaximumPixelSize = 2_048
     static let derivativeJPEGQuality = 0.9

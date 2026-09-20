@@ -28,16 +28,16 @@ final class StagedPhotoIntakeTests: XCTestCase {
 
     // MARK: - Representations
 
-    func testEveryAcceptedContainerIsStagedByteForByteAndOnlyHEIFNeedsADerivative() {
+    func testEveryAcceptedContainerIsStagedByteForByteAndOnlyNonConsumableOnesNeedADerivative() {
         let jpeg = jpegBytes(width: 40, height: 30)
         let png = pngBytes()
         let webp = Data([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 1, 2, 3])
         let heic = heicBytes
-        var heif = heicBytes
-        heif.replaceSubrange(8..<12, with: Data("mif1".utf8))
+        let heif = Self.isoBaseMediaFile(major: "mif1", compatible: ["heif"])
         for (data, expectedType, ext, derivative) in [
             (jpeg, "image/jpeg", "jpg", false), (png, "image/png", "png", false), (webp, "image/webp", "webp", false),
             (heic, "image/heic", "heic", true), (heif, "image/heif", "heif", true),
+            (Self.dngBytes, "image/x-adobe-dng", "dng", true), (Self.dngLittleEndianBytes, "image/x-adobe-dng", "dng", true),
         ] {
             let representation = EvidenceAttachmentLoader.stagedPhotoRepresentation(data: data)
             XCTAssertEqual(representation?.data, data, "\(expectedType) must be staged verbatim")
@@ -45,9 +45,13 @@ final class StagedPhotoIntakeTests: XCTestCase {
             XCTAssertEqual(representation?.fileExtension, ext)
             XCTAssertEqual(representation?.requiresAnalysisDerivative, derivative)
         }
-        for unsupported in [Data("GIF89a-not-a-progress-photo".utf8), Data("%PDF-1.7 trailer".utf8), Data(count: 4), Data()] {
+        for unsupported in [Data("GIF89a-not-a-progress-photo".utf8), Data("%PDF-1.7 trailer".utf8), Data(count: 4), Data(), Self.tiffWithoutDNGBytes] {
             XCTAssertNil(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: unsupported))
         }
+        XCTAssertEqual(EvidenceAttachmentLoader.photoContainers.map(\.mimeType), ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/x-adobe-dng"], "registry order and membership mirror the Server")
+        XCTAssertEqual(StagedPhotoIntakePlan.originalMaximumBytes(for: "image/x-adobe-dng"), 48 * 1024 * 1024)
+        XCTAssertEqual(StagedPhotoIntakePlan.originalMaximumBytes(for: "image/heic"), 32 * 1024 * 1024)
+        XCTAssertEqual(StagedPhotoIntakePlan.originalMaximumBytes(for: "image/jpeg"), 32 * 1024 * 1024)
     }
 
     /// The simulator walkthrough exposed this: with PhotosPicker's default
@@ -59,19 +63,50 @@ final class StagedPhotoIntakeTests: XCTestCase {
         XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(jpegBytes(width: 8, height: 8)), "image/jpeg")
         XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(pngBytes()), "image/png")
         XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(heicBytes), "image/heic")
-        for brand in ["heix", "hevc", "hevx"] {
-            var data = heicBytes
-            data.replaceSubrange(8..<12, with: Data(brand.utf8))
-            XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(data), "image/heic", brand)
+        // Server parity: the full HEIC/HEIF brand sets, on the major brand …
+        for brand in ["heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs"] {
+            XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(Self.isoBaseMediaFile(major: brand)), "image/heic", brand)
         }
-        for brand in ["mif1", "msf1", "heif", "avif"] {
-            var data = heicBytes
-            data.replaceSubrange(8..<12, with: Data(brand.utf8))
-            XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(data), "image/heif", brand)
+        for brand in ["mif1", "msf1", "heif", "avif", "avis"] {
+            XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(Self.isoBaseMediaFile(major: brand)), "image/heif", brand)
         }
-        var unknownBrand = heicBytes
-        unknownBrand.replaceSubrange(8..<12, with: Data("qt  ".utf8))
-        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(unknownBrand))
+        // … and on the compatible brands when the major brand is generic (Apple Camera writes `mif1` + `heic`).
+        XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(Self.isoBaseMediaFile(major: "mif1", compatible: ["heic", "MiPr"])), "image/heic")
+        XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(Self.isoBaseMediaFile(major: "MiHE", compatible: ["mif1", "heic"])), "image/heic")
+        XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(Self.isoBaseMediaFile(major: "isom", compatible: ["mif1"])), "image/heif")
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(Self.isoBaseMediaFile(major: "qt  ")))
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(Self.isoBaseMediaFile(major: "isom", compatible: ["mp42"])))
+        // Box sizing is validated exactly as the Server does it.
+        var oversizedClaim = Self.isoBaseMediaFile(major: "heic")
+        oversizedClaim.replaceSubrange(0..<4, with: Data([0x00, 0x00, 0x20, 0x00]))
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(oversizedClaim), "ftyp box larger than 4096 is refused")
+        var truncated = Self.isoBaseMediaFile(major: "heic", compatible: ["mif1"], trailing: 0)
+        truncated.replaceSubrange(0..<4, with: Data([0x00, 0x00, 0x00, UInt8(truncated.count + 8)]))
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(truncated), "ftyp box longer than the data is refused")
+        var tinyBox = Self.isoBaseMediaFile(major: "heic")
+        tinyBox.replaceSubrange(0..<4, with: Data([0, 0, 0, 12]))
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(tinyBox), "ftyp box under 16 bytes is refused")
+
+        // Apple ProRAW: a TIFF whose first IFD carries DNGVersion, either byte order, IFD anywhere.
+        XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(Self.dngBytes), "image/x-adobe-dng")
+        XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(Self.dngLittleEndianBytes), "image/x-adobe-dng")
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(Self.tiffWithoutDNGBytes), "plain TIFF is not a DNG")
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(Self.tiffFile(entries: [(50706, 3, 2, [0, 1, 0, 6])])), "DNGVersion of the wrong type/count is refused")
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(Self.tiffFile(entries: [(50706, 1, 4, [2, 0, 0, 0])])), "an unknown DNG major version is refused")
+        var beyond = Self.dngBytes; beyond.replaceSubrange(4..<8, with: Data([0x00, 0x10, 0x00, 0x00]))
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(beyond), "IFD offset past the data is refused")
+        var inHeader = Self.dngBytes; inHeader.replaceSubrange(4..<8, with: Data([0, 0, 0, 4]))
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(inHeader), "IFD offset inside the header is refused")
+        var absurd = Self.dngLittleEndianBytes; absurd.replaceSubrange(8..<10, with: Data([0xff, 0xff]))
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(absurd), "an absurd entry count is refused")
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(Self.dngBytes.prefix(18 + 2 + 12 + 5)), "an IFD truncated mid-entry is refused")
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(Data([0x49, 0x49, 0x00, 0x2a]) + Data(count: 64)), "mismatched byte order/magic is not TIFF")
+
+        // Unsupported bytes are described by signature family only, never by content.
+        XCTAssertEqual(EvidenceAttachmentLoader.describeUnsupportedImageBytes(Self.tiffWithoutDNGBytes), "tiff:no-dng-version")
+        XCTAssertEqual(EvidenceAttachmentLoader.describeUnsupportedImageBytes(Self.isoBaseMediaFile(major: "qt  ")), "iso-bmff:qt  ")
+        XCTAssertEqual(EvidenceAttachmentLoader.describeUnsupportedImageBytes(Data("%PDF-1.7 trailer".utf8)), "unknown:25504446")
+        XCTAssertEqual(EvidenceAttachmentLoader.describeUnsupportedImageBytes(Data(count: 3)), "too-short")
 
         let mislabelled = attachment("photo-a", "image/heic", jpegBytes(width: 8, height: 8))
         let representation = EvidenceAttachmentLoader.stagedPhotoRepresentation(data: mislabelled.data!)
@@ -152,16 +187,63 @@ final class StagedPhotoIntakeTests: XCTestCase {
         }
         await assertThrows(try await prepare([SandboxAttachment(id: "photo-x", displayName: "Photo 1", source: .photos, contentType: "image/jpeg", data: nil, loadError: "gone")]),
                            StagedPhotoIntakeError.photoUnavailable(attachmentId: "photo-x"))
-        await assertThrows(try await prepare([attachment("photo-x", "image/gif", Data("GIF89a-not-a-progress-photo".utf8))]), StagedPhotoIntakeError.unsupportedPhoto(attachmentId: "photo-x", contentType: "image/gif"))
+        // An unsupported photo is refused with a self-identifying diagnostic: which
+        // photo, what the picker called it, how many bytes, what the bytes are.
+        let gif = Data("GIF89a-not-a-progress-photo".utf8)
+        await assertThrows(try await prepare([attachment("photo-ok", "image/jpeg", jpeg), attachment("photo-x", "image/gif", gif)]),
+                           StagedPhotoIntakeError.unsupportedPhoto(attachmentId: "photo-x", diagnostic: .init(ordinal: 2, reportedContentType: "image/gif", byteLength: gif.count, classification: "unknown:47494638")))
+        let plainTiff = Self.tiffWithoutDNGBytes
+        let tiffError = StagedPhotoIntakeError.unsupportedPhoto(attachmentId: "photo-t", diagnostic: .init(ordinal: 1, reportedContentType: "image/tiff", byteLength: plainTiff.count, classification: "tiff:no-dng-version"))
+        await assertThrows(try await prepare([attachment("photo-t", "image/tiff", plainTiff)]), tiffError)
+        XCTAssertEqual(tiffError.errorDescription, "Photo 1 is a TIFF image without Apple ProRAW information, which PhysiqueOS can't accept. Progress Photos can be JPEG, PNG, WebP, HEIC/HEIF, or Apple ProRAW (DNG).")
+        XCTAssertFalse(tiffError.errorDescription!.contains("photo-t"), "no attachment identity or file name in Founder-facing copy")
+        // Ceilings follow the container's size class: 32 MiB compressed, 48 MiB raw.
         var oversize = Data([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01])
         oversize.append(Data(count: StagedPhotoIntakePlan.originalMaximumBytes + 1 - oversize.count))
-        await assertThrows(try await prepare([attachment("photo-x", "image/jpeg", oversize)]), StagedPhotoIntakeError.photoTooLarge(attachmentId: "photo-x", bytes: oversize.count))
+        await assertThrows(try await prepare([attachment("photo-x", "image/jpeg", oversize)]), StagedPhotoIntakeError.photoTooLarge(attachmentId: "photo-x", ordinal: 1, bytes: oversize.count, limit: StagedPhotoIntakePlan.originalMaximumBytes))
+        var oversizeDNG = Self.dngBytes
+        oversizeDNG.append(Data(count: StagedPhotoIntakePlan.rawOriginalMaximumBytes + 1 - oversizeDNG.count))
+        let dngError = StagedPhotoIntakeError.photoTooLarge(attachmentId: "photo-d", ordinal: 1, bytes: oversizeDNG.count, limit: StagedPhotoIntakePlan.rawOriginalMaximumBytes)
+        await assertThrows(try await prepare([attachment("photo-d", "image/x-adobe-dng", oversizeDNG)]), dngError)
+        XCTAssertEqual(dngError.errorDescription, "Photo 1 is 48 MB, larger than the 48 MB PhysiqueOS accepts for this kind of photo.")
         let many = (0..<(StagedPhotoIntakePlan.maximumOriginals + 1)).map { attachment("photo-\($0)", "image/jpeg", jpeg) }
         await assertThrows(try await prepare(many), StagedPhotoIntakeError.tooManyPhotos(count: many.count))
         let calls = await transport.calls
         XCTAssertTrue(calls.isEmpty, "local refusals never reach the Server")
         let noPlan = try await FileStagedPhotoIntakeStore(root: root).loadPlan()
         XCTAssertNil(noPlan)
+    }
+
+    /// The Founder's real Build 44 set is Apple ProRAW: a DNG is staged exactly
+    /// like any other non-consumable original — bytes verbatim, one linked
+    /// JPEG derivative, raw ceiling — with no format-specific branch anywhere.
+    func testProRawDNGIsStagedVerbatimWithALinkedDerivativeUnderTheRawCeiling() async throws {
+        let store = FileStagedPhotoIntakeStore(root: root)
+        let derivativeBytes = jpegBytes(width: 64, height: 48)
+        let coordinator = makeCoordinator(api: try await makeAPI(transport: StagedTransport { _, _ in (500, "") }), store: store, derivative: derivativeBytes)
+        // Larger than a compressed original may be, but within the raw ceiling.
+        var dng = Self.dngBytes
+        dng.append(Data(count: StagedPhotoIntakePlan.originalMaximumBytes + 1 - dng.count))
+        let jpeg = jpegBytes(width: 40, height: 30)
+        let attachments = [attachment("photo-a", "image/x-adobe-dng", dng), attachment("photo-b", "image/jpeg", jpeg)]
+        let identities = try await Self.identitiesJSON(for: attachments)
+        let plan = try await coordinator.prepare(scope: "progressPhotos-intake.2026-09-19", effectiveDate: "2026-09-19", attachments: attachments, photoIdentitiesJSON: identities, session: session)
+        XCTAssertEqual(plan.artifacts.map(\.role), [.original, .original, .analysisDerivative])
+        XCTAssertEqual(plan.artifacts.map(\.mimeType), ["image/x-adobe-dng", "image/jpeg", "image/jpeg"])
+        XCTAssertEqual(plan.artifacts.map(\.fileName), ["progress-photo-1.dng", "progress-photo-2.jpg", "progress-photo-1-analysis.jpg"])
+        XCTAssertEqual(plan.artifacts[0].byteLength, dng.count)
+        XCTAssertEqual(plan.artifacts[0].sha256, StagedPhotoIntakeCoordinator.sha256(dng))
+        XCTAssertEqual(plan.artifacts[2].derivativeOf, plan.artifacts[0].artifactId)
+        XCTAssertEqual(plan.artifacts[2].byteLength, derivativeBytes.count)
+        let stagedOriginal = try await store.readArtifact(plan.artifacts[0].artifactId)
+        XCTAssertEqual(stagedOriginal, dng, "the DNG original is staged byte for byte")
+        let stagedDerivative = try await store.readArtifact(plan.artifacts[2].artifactId)
+        XCTAssertEqual(stagedDerivative, derivativeBytes)
+        let wire = try plan.wireDeclaration()
+        XCTAssertEqual(wire.artifacts.map(\.mimeType), ["image/x-adobe-dng", "image/jpeg", "image/jpeg"])
+        // The same set again reuses the same identities: a retry never re-mints an original or a derivative.
+        let again = try await coordinator.prepare(scope: "progressPhotos-intake.2026-09-19", effectiveDate: "2026-09-19", attachments: attachments, photoIdentitiesJSON: identities, session: session)
+        XCTAssertEqual(again.artifacts.map(\.artifactId), plan.artifacts.map(\.artifactId))
     }
 
     // MARK: - Transfer lifecycle
@@ -423,6 +505,32 @@ final class StagedPhotoIntakeTests: XCTestCase {
     // MARK: - Fixtures
 
     private var heicBytes: Data { Data(base64Encoded: Self.tinyHEICBase64)! }
+
+    /// ISO base media `ftyp` box: size, "ftyp", major brand, minor version, compatible brands, filler.
+    static func isoBaseMediaFile(major: String, compatible: [String] = [], trailing: Int = 64) -> Data {
+        var brands = Data(major.utf8) + Data(count: 4)
+        for brand in compatible { brands += Data(brand.utf8) }
+        let size = UInt32(8 + brands.count)
+        return Data([UInt8(size >> 24), UInt8((size >> 16) & 0xff), UInt8((size >> 8) & 0xff), UInt8(size & 0xff)]) + Data("ftyp".utf8) + brands + Data(repeating: 0x11, count: trailing)
+    }
+
+    /// Minimal synthetic TIFF (no camera bytes): header, one IFD at `ifdOffset`
+    /// with `(tag, type, count, inline value)` entries, filler. Apple ProRAW is
+    /// big-endian with IFD0 at offset 18 and DNGVersion among the entries.
+    static func tiffFile(endian: String = "MM", entries: [(Int, Int, Int, [UInt8])], ifdOffset: Int = 8, trailing: Int = 64) -> Data {
+        let little = endian == "II"
+        func u16(_ v: Int) -> [UInt8] { little ? [UInt8(v & 0xff), UInt8(v >> 8)] : [UInt8(v >> 8), UInt8(v & 0xff)] }
+        func u32(_ v: Int) -> [UInt8] { little ? [UInt8(v & 0xff), UInt8((v >> 8) & 0xff), UInt8((v >> 16) & 0xff), UInt8(v >> 24)] : [UInt8(v >> 24), UInt8((v >> 16) & 0xff), UInt8((v >> 8) & 0xff), UInt8(v & 0xff)] }
+        var data = Data(endian.utf8) + Data(u16(42)) + Data(u32(ifdOffset)) + Data(repeating: 0xaa, count: max(0, ifdOffset - 8))
+        data += Data(u16(entries.count))
+        for (tag, type, count, value) in entries { data += Data(u16(tag)) + Data(u16(type)) + Data(u32(count)) + Data(value + [UInt8](repeating: 0, count: 4 - value.count)) }
+        return data + Data(count: 4) + Data(repeating: 0x22, count: trailing)
+    }
+    static let dngVersionEntry = (50706, 1, 4, [UInt8]([1, 6, 0, 0]))
+    static let imageWidthEntry = (256, 4, 1, [UInt8]([0, 0, 0x19, 0x26]))
+    static var dngBytes: Data { tiffFile(endian: "MM", entries: [imageWidthEntry, dngVersionEntry], ifdOffset: 18) }
+    static var dngLittleEndianBytes: Data { tiffFile(endian: "II", entries: [dngVersionEntry, imageWidthEntry]) }
+    static var tiffWithoutDNGBytes: Data { tiffFile(endian: "MM", entries: [imageWidthEntry]) }
 
     private var session: ProgressPhotoSessionDraft {
         ProgressPhotoSessionDraft(timeOfDay: .morning, fasted: true, postWorkout: nil, pump: false, originalUnedited: true)

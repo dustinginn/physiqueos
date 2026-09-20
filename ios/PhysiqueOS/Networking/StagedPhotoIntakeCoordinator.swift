@@ -1,10 +1,21 @@
 import CryptoKit
 import Foundation
+import os
+
+/// What Native could safely learn about a photo it refused: the selected
+/// ordinal, the picker's type label, the byte length, and the bytes'
+/// signature family. Never the pixels, never the file name.
+struct UnsupportedPhotoDiagnostic: Equatable, Sendable {
+    var ordinal: Int
+    var reportedContentType: String?
+    var byteLength: Int
+    var classification: String
+}
 
 enum StagedPhotoIntakeError: Error, Equatable, LocalizedError {
     case photoUnavailable(attachmentId: String)
-    case unsupportedPhoto(attachmentId: String, contentType: String?)
-    case photoTooLarge(attachmentId: String, bytes: Int)
+    case unsupportedPhoto(attachmentId: String, diagnostic: UnsupportedPhotoDiagnostic)
+    case photoTooLarge(attachmentId: String, ordinal: Int, bytes: Int, limit: Int)
     case derivativeUnavailable(attachmentId: String)
     case tooManyPhotos(count: Int)
     case noPendingIntake
@@ -14,9 +25,11 @@ enum StagedPhotoIntakeError: Error, Equatable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .photoUnavailable: "One of the selected photos could not be read. Remove it and choose it again."
-        case .unsupportedPhoto: "One of the selected photos is not a JPEG, PNG, WebP, or HEIC image."
-        case .photoTooLarge(_, let bytes): "One photo is \(bytes / 1_048_576) MB, larger than the 32 MB PhysiqueOS accepts per photo."
-        case .derivativeUnavailable: "One HEIC photo could not be prepared for review. Choose it again."
+        case .unsupportedPhoto(_, let diagnostic):
+            "Photo \(diagnostic.ordinal) is \(EvidenceAttachmentLoader.unsupportedPhotoDescription(diagnostic.classification)), which PhysiqueOS can't accept. Progress Photos can be \(EvidenceAttachmentLoader.supportedPhotoContainerSummary)."
+        case .photoTooLarge(_, let ordinal, let bytes, let limit):
+            "Photo \(ordinal) is \(bytes / 1_048_576) MB, larger than the \(limit / 1_048_576) MB PhysiqueOS accepts for this kind of photo."
+        case .derivativeUnavailable: "One HEIC or ProRAW photo could not be prepared for review. Choose it again."
         case .tooManyPhotos(let count): "\(count) photos were selected; PhysiqueOS accepts up to \(StagedPhotoIntakePlan.maximumOriginals) per session."
         case .noPendingIntake: "There is no photo upload waiting to resume."
         case .rejected(let code): "PhysiqueOS did not accept this photo set (\(code)). Discard it and upload again."
@@ -52,9 +65,12 @@ struct StagedPhotoIntakeCoordinator: Sendable {
         try? await store.discard()
     }
 
-    /// Stages the set: originals verbatim (HEIC/HEIF included, never
-    /// re-encoded or resized), one bounded JPEG derivative per HEIC/HEIF
-    /// original, and the plan whose identity every retry will reuse.
+    private static let logger = Logger(subsystem: "com.physiqueos.native", category: "ProgressPhotos")
+
+    /// Stages the set: originals verbatim (HEIC/HEIF and ProRAW DNG included,
+    /// never re-encoded or resized), one bounded JPEG derivative per original
+    /// whose container analysis cannot read directly, and the plan whose
+    /// identity every retry will reuse.
     func prepare(
         scope: String,
         effectiveDate: String,
@@ -67,13 +83,23 @@ struct StagedPhotoIntakeCoordinator: Sendable {
         guard images.count <= StagedPhotoIntakePlan.maximumOriginals else { throw StagedPhotoIntakeError.tooManyPhotos(count: images.count) }
         struct Staged { var attachment: SandboxAttachment; var original: EvidenceAttachmentLoader.StagedPhotoRepresentation; var derivative: Data? }
         var staged: [Staged] = []
-        for attachment in images {
+        for (index, attachment) in images.enumerated() {
+            let ordinal = index + 1
             guard let data = attachment.data, !data.isEmpty else { throw StagedPhotoIntakeError.photoUnavailable(attachmentId: attachment.id) }
             guard let representation = EvidenceAttachmentLoader.stagedPhotoRepresentation(data: data) else {
-                throw StagedPhotoIntakeError.unsupportedPhoto(attachmentId: attachment.id, contentType: attachment.contentType)
+                let diagnostic = UnsupportedPhotoDiagnostic(
+                    ordinal: ordinal, reportedContentType: attachment.contentType, byteLength: data.count,
+                    classification: EvidenceAttachmentLoader.describeUnsupportedImageBytes(data)
+                )
+                // Self-identifying without device-log extraction: ordinal, the
+                // picker's label, length, and signature family — never bytes.
+                Self.logger.error("progressPhotos.unsupported ordinal=\(diagnostic.ordinal, privacy: .public) reportedType=\(diagnostic.reportedContentType ?? "nil", privacy: .public) bytes=\(diagnostic.byteLength, privacy: .public) classification=\(diagnostic.classification, privacy: .public)")
+                throw StagedPhotoIntakeError.unsupportedPhoto(attachmentId: attachment.id, diagnostic: diagnostic)
             }
-            guard representation.data.count <= StagedPhotoIntakePlan.originalMaximumBytes else {
-                throw StagedPhotoIntakeError.photoTooLarge(attachmentId: attachment.id, bytes: representation.data.count)
+            let limit = StagedPhotoIntakePlan.originalMaximumBytes(for: representation.contentType)
+            guard representation.data.count <= limit else {
+                Self.logger.error("progressPhotos.tooLarge ordinal=\(ordinal, privacy: .public) type=\(representation.contentType, privacy: .public) bytes=\(representation.data.count, privacy: .public) limit=\(limit, privacy: .public)")
+                throw StagedPhotoIntakeError.photoTooLarge(attachmentId: attachment.id, ordinal: ordinal, bytes: representation.data.count, limit: limit)
             }
             var derivativeData: Data? = nil
             if representation.requiresAnalysisDerivative {
