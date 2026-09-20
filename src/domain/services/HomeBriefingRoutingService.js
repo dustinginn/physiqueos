@@ -23,7 +23,7 @@ export function resolveHomeBriefingSelection({
     coachingUpdates,
     monthlyEnabled: true,
   });
-  const activeEvent = isEventActiveForHome({ artifact: eventArtifact, localDate, timeZone });
+  const activeEvent = isEventActiveForHome({ artifact: eventArtifact, localDate, timeZone, now });
   if (activeEvent) {
     const isPhoto = ["progress_photo", "photo_session"].includes(eventArtifact.trigger?.evidenceType);
     const isDEXA = ["dexa", "dexa_scan"].includes(eventArtifact.trigger?.evidenceType);
@@ -97,11 +97,11 @@ export function isCadenceArtifactReady(artifact, cadence) {
   return true;
 }
 
-export function isEventActiveForHome({ artifact, localDate, timeZone }) {
+export function isEventActiveForHome({ artifact, localDate, timeZone, now = null }) {
   if (!artifact || artifact.lifecycle?.consumedAt) return false;
   if (!artifact.briefing || artifact.artifactType !== "event") return false;
   if (hasInvalidLifecycleStatus(artifact)) return false;
-  return isEventBriefingRelevantForHome({ artifact, localDate, timeZone });
+  return isEventBriefingRelevantForHome({ artifact, localDate, timeZone, now });
 }
 
 function cadenceSelection(artifact, cadence, localDate, reason) {

@@ -200,15 +200,52 @@ describe("artifact-backed Home briefing routing", () => {
       localDate: "2026-07-22",
       timeZone: "America/Los_Angeles",
     })).toBe(false);
+    const lateArtifact = {
+      ...photoEvent,
+      generatedAt: "2026-07-22T18:00:00Z",
+      briefing: { photoEventNarrative: { eventDate: "2026-07-20" } },
+    };
+    // The calendar-day rule alone (no read instant) still excludes it.
     expect(isEventActiveForHome({
-      artifact: {
-        ...photoEvent,
-        generatedAt: "2026-07-22T18:00:00Z",
-        briefing: { photoEventNarrative: { eventDate: "2026-07-20" } },
-      },
+      artifact: lateArtifact,
       localDate: "2026-07-22",
       timeZone: "America/Los_Angeles",
     })).toBe(false);
+    // A Photo Briefing published late receives its own full 24 hours of Home visibility.
+    expect(isEventActiveForHome({
+      artifact: lateArtifact,
+      localDate: "2026-07-22",
+      timeZone: "America/Los_Angeles",
+      now: new Date("2026-07-22T19:00:00Z"),
+    })).toBe(true);
+    expect(isEventActiveForHome({
+      artifact: lateArtifact,
+      localDate: "2026-07-23",
+      timeZone: "America/Los_Angeles",
+      now: new Date("2026-07-23T17:59:00Z"),
+    })).toBe(true);
+    expect(isEventActiveForHome({
+      artifact: lateArtifact,
+      localDate: "2026-07-23",
+      timeZone: "America/Los_Angeles",
+      now: new Date("2026-07-23T18:00:00Z"),
+    })).toBe(false);
+  });
+
+  it("routes a delayed Photo Briefing to Home for 24 hours after publication and not beyond", () => {
+    const delayed = {
+      ...photoEvent,
+      generatedAt: "2026-09-20T17:51:47.391Z",
+      trigger: { evidenceType: "photo_session", evidenceId: "photo_session_user_founder_001_2026-09-19" },
+      briefing: { photoEventNarrative: { eventDate: "2026-09-19" } },
+    };
+    const select = (now) => resolveHomeBriefingSelection({ eventArtifact: delayed, now: new Date(now) });
+    expect(select("2026-09-21T07:30:00Z")).toMatchObject({
+      briefingType: "event",
+      href: "/briefings/photo/photo_session_user_founder_001_2026-09-19",
+    });
+    expect(select("2026-09-21T17:51:47.390Z").briefingType).toBe("event");
+    expect(select("2026-09-21T17:51:47.391Z").briefingType).not.toBe("event");
   });
 
   it("keeps consumed Photo Events suppressed and bounds DEXA Home relevance", () => {
