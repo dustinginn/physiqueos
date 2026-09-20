@@ -241,7 +241,10 @@ vi.mock("../../../../application/runtime/ApplicationCanonicalRuntime", () => ({
   }),
 }));
 
-const { continueEvidenceReviewInBackground, abandonEvidenceReviewContinuation } = await import("./actions.js");
+const { continueEvidenceReviewInBackground } = await import("./actions.js");
+const { FounderRepositories } = await import("../../../../data/repositories/founderRepositories");
+const { abandonEvidenceReviewContinuation: abandonWithRepositories } = await import("../../../../application/evidence/EvidenceReviewContinuationAbandon");
+const abandonEvidenceReviewContinuation = (input) => abandonWithRepositories({ repositories: FounderRepositories, ...input });
 
 function photoObject() {
   return {

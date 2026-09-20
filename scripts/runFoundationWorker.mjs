@@ -130,10 +130,11 @@ const handlers = Object.freeze({
       return continueEvidenceReviewInBackground(input);
     },
     abandonReview: async (input) => {
-      const { abandonEvidenceReviewContinuation } = await import(
-        "../src/app/evidence/review/[reviewId]/actions.js"
-      );
-      return abandonEvidenceReviewContinuation(input);
+      const [{ abandonEvidenceReviewContinuation }, { FounderRepositories }] = await Promise.all([
+        import("../src/application/evidence/EvidenceReviewContinuationAbandon.js"),
+        import("../src/data/repositories/founderRepositories.js"),
+      ]);
+      return abandonEvidenceReviewContinuation({ repositories: FounderRepositories, ...input });
     },
   }),
   ...(evidenceIntakeStore ? {

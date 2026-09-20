@@ -154,42 +154,10 @@ export async function continueEvidenceReviewInBackground({
     mode: "background",
     continuationKey: String(continuationKey ?? ""),
     operationId: `evidence-review-background:${String(messageId ?? "")}`,
-    assertLease,
+    // Only the in-process worker can supply a lease check; a value that arrives
+    // through the server-action boundary is never a callable one.
+    assertLease: typeof assertLease === "function" ? assertLease : null,
   });
-}
-
-// Called by the worker when a continuation message is dead-lettered, either
-// because its handler kept failing or because the worker process kept dying
-// while it held the message. Without this the review would stay `committing`
-// (and Native would keep saying "Processing") with no message left to advance
-// it. Failing the claim turns the review into `partially_committed`, which is
-// observable and resumes through the existing idempotent path: completed steps
-// are skipped and the first incomplete step runs again.
-//
-// Only the operation that owns the active claim can fail it. If the review has
-// already moved on (another message advanced it, it was confirmed, or the claim
-// was released) the claim assertion rejects and this is a no-op, so a stale
-// dead-letter can never fail a healthy review.
-export async function abandonEvidenceReviewContinuation({
-  reviewId,
-  messageId,
-  errorCode = "OUTBOX_DEAD_LETTERED",
-}) {
-  const operationId = `evidence-review-background:${String(messageId ?? "")}`;
-  try {
-    await FounderRepositories.evidenceReviews.failEvidenceReviewCommit(String(reviewId ?? ""), {
-      operationId,
-      error: `Evidence review processing stopped after repeated interruptions (${errorCode}). ` +
-        "It resumes from the first incomplete step without repeating completed work.",
-      failedAt: new Date().toISOString(),
-    });
-    return Object.freeze({ state: "failed_observable", reviewId });
-  } catch (error) {
-    if (["COMMIT_CLAIM_LOST", "REVIEW_NOT_COMMITTING", "REVIEW_NOT_FOUND"].includes(error?.code)) {
-      return Object.freeze({ state: "not_applicable", reviewId, code: error.code });
-    }
-    throw error;
-  }
 }
 
 export async function beginNativeEvidenceReviewConfirmation({
