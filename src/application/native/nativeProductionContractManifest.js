@@ -1,12 +1,14 @@
 import { Phase3Command } from "../commands/Phase3CommandService.js";
-import { PHOTO_CONTAINER_MIME_TYPES } from "../../domain/services/ImageContainerDetection.js";
+import { ANALYSIS_DERIVATIVE_REQUIRED_MIME_TYPES, PHOTO_CONTAINER_MIME_TYPES } from "../../domain/services/ImageContainerDetection.js";
 import {
   STAGED_DERIVATIVE_MAXIMUM_BYTES,
   STAGED_DERIVATIVE_MIME_TYPE,
   STAGED_EVIDENCE_MANIFEST_VERSION,
   STAGED_MAXIMUM_ORIGINALS,
   STAGED_ORIGINAL_MAXIMUM_BYTES,
+  STAGED_RAW_ORIGINAL_MAXIMUM_BYTES,
   STAGED_SERVER_DERIVATIVE_GENERATION,
+  stagedOriginalMaximumBytes,
 } from "../../domain/services/StagedEvidenceArtifactManifest.js";
 
 export const NativeProductionResource = Object.freeze({
@@ -162,14 +164,17 @@ export const nativeProductionContractManifest = Object.freeze({
       originalTypes: Object.freeze([...PHOTO_CONTAINER_MIME_TYPES]),
       derivativeType: STAGED_DERIVATIVE_MIME_TYPE,
       originalMaximumBytes: STAGED_ORIGINAL_MAXIMUM_BYTES,
+      rawOriginalMaximumBytes: STAGED_RAW_ORIGINAL_MAXIMUM_BYTES,
+      originalMaximumBytesByType: Object.freeze(Object.fromEntries(PHOTO_CONTAINER_MIME_TYPES.map((type) => [type, stagedOriginalMaximumBytes(type)]))),
       derivativeMaximumBytes: STAGED_DERIVATIVE_MAXIMUM_BYTES,
       maximumOriginals: STAGED_MAXIMUM_ORIGINALS,
       heicDerivativeRequired: !STAGED_SERVER_DERIVATIVE_GENERATION,
+      derivativeRequiredTypes: Object.freeze([...ANALYSIS_DERIVATIVE_REQUIRED_MIME_TYPES]),
       serverDerivativeGeneration: STAGED_SERVER_DERIVATIVE_GENERATION,
       artifactIdentity: "artifact_{submissionIdentityWithoutDashes}_{ordinal}; ordinals are contiguous across originals and derivatives",
       idempotency: "declaration replay returns the same intake; an already stored artifact is acknowledged without a second object",
       completion: "media is stored only when every declared artifact is verified against its declaration; incomplete media never interprets",
-      originals: "preserved verbatim, HEIC/HEIF included; the canonical photo is always the original",
+      originals: "preserved verbatim, HEIC/HEIF and Apple ProRAW DNG included; the canonical photo is always the original",
     }),
   }),
   healthKitIngestion: Object.freeze({

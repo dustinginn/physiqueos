@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { HEIC_BYTES, JPEG_BYTES, PNG_BYTES, WEBP_BYTES } from "../../domain/services/ImageContainerDetection.test.js";
+import { DNG_BYTES, DNG_LITTLE_ENDIAN_BYTES, HEIC_BYTES, JPEG_BYTES, PNG_BYTES, TIFF_WITHOUT_DNG_BYTES, WEBP_BYTES } from "../../domain/services/ImageContainerDetection.test.js";
 
 const holder = vi.hoisted(() => ({ runtime: null }));
 vi.mock("../../platform/auth/nativeProductionContractRuntime.js", () => ({
@@ -16,7 +16,7 @@ import { createProviderCanonicalUploadService } from "../media/ProviderCanonical
 import { createPostgresEvidenceIntakeStore } from "../../platform/database/PostgresEvidenceIntakeStore.js";
 import { createEvidenceIntakeInterpretationWorkerHandler } from "../../platform/jobs/EvidenceIntakeInterpretationWorker.js";
 import { createAuthenticationPrincipal } from "../auth/principal.js";
-import { stagedArtifactId, STAGED_DERIVATIVE_MAXIMUM_BYTES, STAGED_ORIGINAL_MAXIMUM_BYTES } from "../../domain/services/StagedEvidenceArtifactManifest.js";
+import { stagedArtifactId, STAGED_DERIVATIVE_MAXIMUM_BYTES, STAGED_ORIGINAL_MAXIMUM_BYTES, STAGED_RAW_ORIGINAL_MAXIMUM_BYTES } from "../../domain/services/StagedEvidenceArtifactManifest.js";
 import { EVIDENCE_INTAKE_INTERPRETATION_PAYLOAD_VERSION } from "../../domain/services/EvidenceIntakeBackgroundWork.js";
 
 const OWNER = "user_founder_001";
@@ -366,6 +366,109 @@ describe("staged Progress Photos intake, end to end", () => {
     expect(replay).toMatchObject({ outcome: "completed" });
     expect(harness.canonical.filter((row) => row.collection === "evidenceReviews")).toHaveLength(1);
     expect(await json(await status(intakeId))).toMatchObject({ status: "ready", reviewId: review.id, mediaComplete: true });
+  });
+
+  // The Founder's real Build 44 set: five Apple ProRAW DNG originals (big-endian
+  // TIFF, DNGVersion in IFD0), each with its JPEG analysis derivative. Same
+  // lifecycle as HEIC — the container registry, not a format branch, decides
+  // that a DNG is preserved verbatim, bounded as a raw original, and paired
+  // with one derivative that analysis and display read instead.
+  function proRawSet() {
+    const originals = [1, 2, 3, 4, 5].map((n) => ({ bytes: pad(n === 3 ? DNG_LITTLE_ENDIAN_BYTES : DNG_BYTES, 4_000 + n), type: "image/x-adobe-dng", name: `progress-photo-${n}.dng`, role: "original" }));
+    const derivatives = [1, 2, 3, 4, 5].map((n) => ({ bytes: pad(JPEG_BYTES, 700 + n), type: "image/jpeg", name: `progress-photo-${n}-analysis.jpg`, of: n, role: "analysis_derivative" }));
+    return [...originals, ...derivatives].map((file, index) => ({ ...file, ordinal: index + 1, artifactId: stagedArtifactId(ID, index + 1), derivativeOf: file.of ? stagedArtifactId(ID, file.of) : null }));
+  }
+
+  it("carries a five-photo Apple ProRAW DNG set: originals verbatim, derivatives linked, canonical photos are the DNGs", async () => {
+    const set = proRawSet();
+    const declared = await json(await stage(declaration(set)));
+    expect(declared).toMatchObject({ mediaState: "receiving", mediaComplete: false, expectedArtifactCount: 10, storedArtifactCount: 0 });
+    for (const file of set) {
+      const response = await put(declared.intakeId, file.artifactId, file.bytes, { "content-type": file.type });
+      expect(response.status).toBe(200);
+    }
+    expect(await json(await status(declared.intakeId))).toMatchObject({ mediaComplete: true, mediaState: "stored", storedArtifactCount: 10 });
+    expect(harness.media).toHaveLength(10);
+    for (const file of set.filter((item) => item.role === "original")) {
+      const stored = harness.media.find((item) => item.provenance.artifactId === file.artifactId);
+      expect(stored.content_type).toBe("image/x-adobe-dng");
+      expect(stored.sha256).toBe(sha(file.bytes));
+      expect(Number(stored.byte_length)).toBe(file.bytes.length);
+    }
+    // Retry after acceptance: no second original, no second derivative.
+    for (const file of [set[0], set[5]]) {
+      expect((await json(await put(declared.intakeId, file.artifactId, file.bytes, { "content-type": file.type }))).artifactOutcome).toBe("already_stored");
+    }
+    expect(harness.media).toHaveLength(10);
+    expect(harness.outbox).toHaveLength(1);
+
+    const handler = createEvidenceIntakeInterpretationWorkerHandler({
+      store,
+      loadArtifact: createProviderEvidenceIntakeArtifactLoader({ pool: harness.pool, objectProvider: uploads.provider, fetchImpl: uploads.fetchImpl }),
+      now: () => new Date("2026-09-19T23:05:00.000Z"),
+    });
+    await handler({ messageId: "m1", workerId: "worker", payloadVersion: EVIDENCE_INTAKE_INTERPRETATION_PAYLOAD_VERSION, payload: harness.outbox[0].payload, assertLease: () => {} });
+    const review = harness.canonical.find((row) => row.collection === "evidenceReviews").payload;
+    const object = review.interpretedEvidence.evidence_objects.find((item) => item.evidence_type === "photo_session");
+    expect(object.photos).toHaveLength(5);
+    expect(object.photos.map((photo) => photo.mime_type)).toEqual(Array(5).fill("image/x-adobe-dng"));
+    for (const [index, photo] of object.photos.entries()) {
+      const original = harness.media.find((item) => item.provenance.artifactId === set[index].artifactId);
+      const derivative = harness.media.find((item) => item.provenance.artifactId === set[index + 5].artifactId);
+      expect(photo.storage_path).toBe(`media://${original.id}`);
+      expect(photo.source_hash).toBe(sha(set[index].bytes));
+      expect(photo.analysis_storage_path).toBe(`media://${derivative.id}`);
+      expect(photo.analysis_mime_type).toBe("image/jpeg");
+    }
+    expect(object.source.source_artifact_refs).toHaveLength(5);
+  });
+
+  it("bounds a DNG original at the raw ceiling, refuses bytes that are not a DNG, and keeps compressed originals at theirs", async () => {
+    const set = proRawSet();
+    const atLimit = declaration(set);
+    atLimit.artifacts[0].byteLength = STAGED_RAW_ORIGINAL_MAXIMUM_BYTES;
+    expect((await stage(atLimit)).status).toBe(202);
+    harness.receipts.length = 0;
+    const overLimit = declaration(set);
+    overLimit.artifacts[1].byteLength = STAGED_RAW_ORIGINAL_MAXIMUM_BYTES + 1;
+    const rejected = await json(await stage(overLimit));
+    expect(rejected.code).toBe("STAGED_ARTIFACT_TOO_LARGE");
+    expect(rejected.fieldErrors?.[0]?.field).toBe("artifacts[1].byteLength");
+    // A compressed original does not inherit the raw ceiling.
+    const heicTooLarge = declaration(founderSet());
+    heicTooLarge.artifacts[0].byteLength = STAGED_ORIGINAL_MAXIMUM_BYTES + 1;
+    expect((await json(await stage(heicTooLarge))).code).toBe("STAGED_ARTIFACT_TOO_LARGE");
+    // A DNG without its derivative is incomplete by declaration.
+    const missing = declaration(set);
+    missing.artifacts = missing.artifacts.slice(0, 5);
+    expect((await json(await stage(missing))).code).toBe("STAGED_DERIVATIVE_REQUIRED");
+    expect(harness.receipts).toHaveLength(0);
+
+    // Declared as DNG, but the bytes are plain TIFF (no DNGVersion) or a JPEG of the same length and hash.
+    const { intakeId } = await json(await stage(declaration(set)));
+    const plainTiff = pad(TIFF_WITHOUT_DNG_BYTES, set[0].bytes.length);
+    const disguised = proRawSet();
+    disguised[0].bytes = plainTiff;
+    const other = declaration(disguised, { submissionIdentity: OTHER_ID, artifacts: undefined });
+    other.artifacts = disguised.map((file, index) => ({ artifactId: stagedArtifactId(OTHER_ID, index + 1), ordinal: index + 1, role: file.role, derivativeOf: file.derivativeOf ? stagedArtifactId(OTHER_ID, file.of) : null, fileName: file.name, mimeType: file.type, byteLength: file.bytes.length, sha256: sha(file.bytes) }));
+    const otherIntake = (await json(await stage(other))).intakeId;
+    const tiff = await put(otherIntake, stagedArtifactId(OTHER_ID, 1), plainTiff, { "content-type": "image/x-adobe-dng" });
+    expect((await json(tiff)).code).toBe("EVIDENCE_INTAKE_ARTIFACT_CONTAINER_INVALID");
+    const wrongType = await put(intakeId, set[0].artifactId, set[0].bytes, { "content-type": "image/tiff" });
+    expect(wrongType.status).toBe(400);
+    expect(harness.media).toHaveLength(0);
+
+    // A raw-sized body is read only for a raw entry: the same length against a compressed original is refused before any read.
+    const compressed = founderSet();
+    const compressedIntake = (await json(await stage(declaration(compressed, { submissionIdentity: OTHER_ID, artifacts: compressed.map((file, index) => ({ artifactId: stagedArtifactId(OTHER_ID, index + 1), ordinal: index + 1, role: file.role, derivativeOf: file.derivativeOf ? stagedArtifactId(OTHER_ID, file.of) : null, fileName: file.name, mimeType: file.type, byteLength: file.bytes.length, sha256: sha(file.bytes) })) }), { idempotencyKey: OTHER_ID })));
+    void compressedIntake;
+    let pulled = 0;
+    const stream = new ReadableStream({ pull(controller) { pulled += 1; controller.enqueue(new Uint8Array(1024)); } });
+    const oversize = await artifactRoute(new Request(`${BASE}/${intakeId}/artifacts/${set[0].artifactId}`, {
+      method: "PUT", headers: { authorization, "content-type": "image/x-adobe-dng", "content-length": String(STAGED_RAW_ORIGINAL_MAXIMUM_BYTES + 1) }, body: stream, duplex: "half",
+    }), { params: Promise.resolve({ intakeId, artifactId: set[0].artifactId }) });
+    expect(oversize.status).toBe(413);
+    expect(pulled).toBeLessThanOrEqual(1);
   });
 
   it("keeps the aggregate multipart transport and its 4 KiB command reader untouched", async () => {

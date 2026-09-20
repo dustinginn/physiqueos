@@ -130,12 +130,18 @@ describe("staged intake contract service", () => {
       artifactMethod: "PUT",
       manifestVersion: STAGED_EVIDENCE_MANIFEST_VERSION,
       evidenceTypes: ["photo_session"],
-      originalTypes: ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
+      originalTypes: ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/x-adobe-dng"],
       derivativeType: "image/jpeg",
       originalMaximumBytes: 32 * 1024 * 1024,
+      rawOriginalMaximumBytes: 48 * 1024 * 1024,
+      originalMaximumBytesByType: {
+        "image/jpeg": 32 * 1024 * 1024, "image/png": 32 * 1024 * 1024, "image/webp": 32 * 1024 * 1024,
+        "image/heic": 32 * 1024 * 1024, "image/heif": 32 * 1024 * 1024, "image/x-adobe-dng": 48 * 1024 * 1024,
+      },
       derivativeMaximumBytes: 8 * 1024 * 1024,
       maximumOriginals: 24,
       heicDerivativeRequired: true,
+      derivativeRequiredTypes: ["image/heic", "image/heif", "image/x-adobe-dng"],
       serverDerivativeGeneration: false,
     });
     expect(nativeProductionContractManifest.evidenceIntake.createEndpoint).toBe("/api/v1/native/evidence/intakes");

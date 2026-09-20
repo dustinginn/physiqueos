@@ -3,7 +3,7 @@ import { readBoundedJsonRequest } from "../../platform/http/readBoundedJsonReque
 import { readBoundedBinaryRequest } from "../../platform/http/readBoundedBinaryRequest.js";
 import { normalizePhotoSessionContext } from "./NativeEvidenceIntakeRequest.js";
 import {
-  STAGED_ORIGINAL_MAXIMUM_BYTES,
+  STAGED_ARTIFACT_ABSOLUTE_MAXIMUM_BYTES,
   StagedArtifactRole,
   createStagedEvidenceArtifactManifest,
 } from "../../domain/services/StagedEvidenceArtifactManifest.js";
@@ -88,12 +88,13 @@ export function parseStagedArtifactPath({ intakeId, artifactId } = {}) {
 
 /**
  * Reads one artifact body. The caller supplies the entry-specific ceiling
- * once the manifest entry is known; the absolute ceiling is the original
- * bound so a derivative can never be read past its own smaller limit.
+ * once the manifest entry is known (by role and container size class); the
+ * absolute ceiling is the largest any artifact may be, so no entry can ever
+ * be read past its own smaller limit.
  */
-export function readStagedArtifactBody(request, { maximumBytes = STAGED_ORIGINAL_MAXIMUM_BYTES } = {}) {
+export function readStagedArtifactBody(request, { maximumBytes = STAGED_ARTIFACT_ABSOLUTE_MAXIMUM_BYTES } = {}) {
   return readBoundedBinaryRequest(request, {
-    maximumBytes: Math.min(maximumBytes, STAGED_ORIGINAL_MAXIMUM_BYTES),
+    maximumBytes: Math.min(maximumBytes, STAGED_ARTIFACT_ABSOLUTE_MAXIMUM_BYTES),
     contentType: PHOTO_CONTENT_TYPE,
     requireContentLength: true,
   });

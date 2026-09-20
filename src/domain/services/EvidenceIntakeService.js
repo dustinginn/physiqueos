@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { isHeifFamily } from "./ImageContainerDetection.js";
+import { requiresAnalysisDerivative } from "./ImageContainerDetection.js";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { interpretPdfEvidence } from "../interpreters/PdfInterpreter";
@@ -1321,10 +1321,10 @@ export function createStoredEvidenceArtifactDescriptor({
     : null;
   return {
     buffer,
-    // HEIC/HEIF bytes are not consumable by the vision interpreter, so no
-    // data URL is materialized for them; their linked analysis derivative
-    // (a bounded JPEG) is what analysis and browser display read instead.
-    dataUrl: isImageMimeType(mimeType) && !isHeifFamily(mimeType)
+    // A container the vision interpreter cannot consume (HEIC/HEIF, ProRAW
+    // DNG) gets no data URL; its linked analysis derivative (a bounded
+    // JPEG) is what analysis and browser display read instead.
+    dataUrl: isImageMimeType(mimeType) && !requiresAnalysisDerivative(mimeType)
       ? `data:${mimeType || "image/png"};base64,${buffer.toString("base64")}`
       : null,
     fileName: file.name || safeName,

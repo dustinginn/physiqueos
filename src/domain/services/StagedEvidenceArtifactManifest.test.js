@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  STAGED_ARTIFACT_ABSOLUTE_MAXIMUM_BYTES,
   STAGED_DERIVATIVE_MAXIMUM_BYTES,
   STAGED_EVIDENCE_MANIFEST_VERSION,
   STAGED_MAXIMUM_ORIGINALS,
   STAGED_ORIGINAL_MAXIMUM_BYTES,
+  STAGED_RAW_ORIGINAL_MAXIMUM_BYTES,
   createStagedEvidenceArtifactManifest,
   findStagedManifestEntry,
   stagedArtifactId,
   stagedArtifactMaximumBytes,
   stagedArtifactProgress,
   stagedManifestIsSatisfied,
+  stagedOriginalMaximumBytes,
 } from "./StagedEvidenceArtifactManifest.js";
 
 const ID = "01999999-9999-7999-8999-999999999999";
@@ -104,5 +107,31 @@ describe("staged evidence artifact manifest", () => {
       { artifactId: first.artifactId, ordinal: 1, role: "original", derivativeOf: null, state: "stored" },
       { artifactId: second.artifactId, ordinal: 2, role: "analysis_derivative", derivativeOf: first.artifactId, state: "expected" },
     ]);
+  });
+
+  it("treats an Apple ProRAW DNG original like any non-consumable container: raw ceiling, one derivative required and linked", () => {
+    const dng = (ordinal, overrides = {}) => original(ordinal, { fileName: `photo-${ordinal}.dng`, mimeType: "image/x-adobe-dng", ...overrides });
+    const manifest = build([dng(1), heic(2), original(3), derivative(4, 1), derivative(5, 2)]);
+    expect(manifest.originalCount).toBe(3);
+    expect(manifest.files[3].derivativeOf).toBe(stagedArtifactId(ID, 1));
+    expect(stagedArtifactMaximumBytes(manifest.files[0])).toBe(STAGED_RAW_ORIGINAL_MAXIMUM_BYTES);
+    expect(stagedArtifactMaximumBytes(manifest.files[1])).toBe(STAGED_ORIGINAL_MAXIMUM_BYTES);
+    expect(stagedArtifactMaximumBytes(manifest.files[2])).toBe(STAGED_ORIGINAL_MAXIMUM_BYTES);
+    expect(stagedArtifactMaximumBytes(manifest.files[3])).toBe(STAGED_DERIVATIVE_MAXIMUM_BYTES);
+    expect(stagedOriginalMaximumBytes("image/x-adobe-dng")).toBe(48 * 1024 * 1024);
+    expect(stagedOriginalMaximumBytes("image/heic")).toBe(32 * 1024 * 1024);
+    expect(STAGED_ARTIFACT_ABSOLUTE_MAXIMUM_BYTES).toBe(STAGED_RAW_ORIGINAL_MAXIMUM_BYTES);
+    // At the raw ceiling is accepted; one byte over is not; a compressed original never inherits the raw ceiling.
+    build([dng(1, { byteLength: STAGED_RAW_ORIGINAL_MAXIMUM_BYTES }), derivative(2, 1)]);
+    rejects([dng(1, { byteLength: STAGED_RAW_ORIGINAL_MAXIMUM_BYTES + 1 }), derivative(2, 1)], "STAGED_ARTIFACT_TOO_LARGE");
+    rejects([heic(1, { byteLength: STAGED_ORIGINAL_MAXIMUM_BYTES + 1 }), derivative(2, 1)], "STAGED_ARTIFACT_TOO_LARGE");
+    rejects([original(1, { byteLength: STAGED_RAW_ORIGINAL_MAXIMUM_BYTES })], "STAGED_ARTIFACT_TOO_LARGE");
+    // Derivative rules follow consumability, not format: required for DNG, forbidden for JPEG, at most one.
+    rejects([dng(1)], "STAGED_DERIVATIVE_REQUIRED");
+    rejects([original(1), derivative(2, 1)], "STAGED_DERIVATIVE_UNEXPECTED");
+    rejects([dng(1), derivative(2, 1), derivative(3, 1)], "STAGED_DERIVATIVE_DUPLICATE");
+    // The derivative itself must be JPEG; plain TIFF is not an accepted original.
+    rejects([dng(1), derivative(2, 1, { mimeType: "image/x-adobe-dng" })], "STAGED_ARTIFACT_MEDIA_UNSUPPORTED");
+    rejects([original(1, { mimeType: "image/tiff" })], "STAGED_ARTIFACT_MEDIA_UNSUPPORTED");
   });
 });

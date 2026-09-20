@@ -145,6 +145,11 @@ export function classifyPhotoTimeOfDay(hour) {
 
 function findExifTiffBuffer(buffer, mimeType) {
   const mime = String(mimeType).toLowerCase();
+  // A DNG (Apple ProRAW) is itself a TIFF: its first IFD and Exif sub-IFD are
+  // read in place by the same bounded walker, without copying the original.
+  const tiffLittle = buffer[0] === 0x49 && buffer[1] === 0x49 && buffer[2] === 0x2a && buffer[3] === 0x00;
+  const tiffBig = buffer[0] === 0x4d && buffer[1] === 0x4d && buffer[2] === 0x00 && buffer[3] === 0x2a;
+  if ((mime.includes("dng") || mime.includes("tiff")) && (tiffLittle || tiffBig)) return buffer;
   if (mime.includes("jpeg") || (buffer[0] === 0xff && buffer[1] === 0xd8)) {
     let offset = 2;
     while (offset + 4 <= buffer.length) {

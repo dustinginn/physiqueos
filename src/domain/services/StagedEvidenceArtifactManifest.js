@@ -1,4 +1,10 @@
-import { DIRECTLY_CONSUMABLE_IMAGE_MIME_TYPES, PHOTO_CONTAINER_MIME_TYPES, isHeifFamily } from "./ImageContainerDetection.js";
+import {
+  DIRECTLY_CONSUMABLE_IMAGE_MIME_TYPES,
+  PHOTO_CONTAINER_MIME_TYPES,
+  PhotoContainerSizeClass,
+  photoContainerSizeClass,
+  requiresAnalysisDerivative,
+} from "./ImageContainerDetection.js";
 
 /**
  * Staged-media manifest: the expected artifact set of one intake, declared
@@ -10,9 +16,10 @@ import { DIRECTLY_CONSUMABLE_IMAGE_MIME_TYPES, PHOTO_CONTAINER_MIME_TYPES, isHei
  *
  * Roles:
  *   original            the Founder's photo bytes, preserved verbatim
- *   analysis_derivative a bounded JPEG rendition of one HEIC/HEIF original
- *                       for browser display and the vision interpreter; the
- *                       original stays the canonical photo
+ *   analysis_derivative a bounded JPEG rendition of one original whose
+ *                       container display and analysis cannot read directly
+ *                       (HEIC/HEIF, Apple ProRAW DNG); the original stays
+ *                       the canonical photo
  */
 export const STAGED_EVIDENCE_MANIFEST_VERSION = "evidence-upload-manifest-staged-v1";
 export const StagedArtifactRole = Object.freeze({
@@ -22,30 +29,53 @@ export const StagedArtifactRole = Object.freeze({
 
 /**
  * Per-artifact HTTP ceilings, derived from what a current iPhone actually
- * produces rather than from the platform's 50 MB request ceiling:
+ * produces and from the request path this artifact PUT actually traverses:
  *
- *   original   48 MP is the largest sensor resolution an iPhone Camera
- *              writes. A 48 MP "Most Compatible" JPEG at the camera's
- *              quality lands around 9-18 MB; a 48 MP HEIF Max is 5-8 MB;
- *              24 MP defaults and 12 MP photos are smaller still. 32 MiB
- *              is ~1.8x the largest realistic original and stays clear of
- *              the 50 MB proxy/Server Action ceiling with room for headers.
- *   derivative a 2048 px longest-edge JPEG at quality 0.9 is ~1-2.5 MB.
- *              8 MiB is ~3x that.
+ *   compressed original (JPEG/PNG/WebP/HEIC/HEIF)
+ *              48 MP is the largest sensor resolution an iPhone Camera
+ *              writes. A 48 MP "Most Compatible" JPEG lands around 9-18 MB;
+ *              a 48 MP HEIF Max is 5-8 MB; 24 MP and 12 MP photos are
+ *              smaller still. 32 MiB is ~1.8x the largest realistic one.
+ *   raw original (Apple ProRAW DNG)
+ *              A 24 MP ProRAW from an iPhone 17 Pro measures 40.0-46.2 MB
+ *              (the Founder's real set). The binding ceiling on the PUT
+ *              path is application-owned: the object-storage gate
+ *              (`ProviderCanonicalUploadService` MAX_UPLOAD_BYTES, 50 MiB)
+ *              and this reader; DigitalOcean publishes no body limit (only
+ *              a 600 s upload timeout) and demonstrably passed a >51 MiB
+ *              multipart to the app in Build 43, and Next's proxy body
+ *              limit applies only when the proxy clones a body, which ours
+ *              never does. 48 MiB sits 2 MiB under the storage gate and
+ *              leaves 4.08 MiB (8.1%) over the largest real file. 48 MP
+ *              ProRAW Max (~75 MB) is deliberately outside this bound.
+ *   derivative a 2048 px longest-edge JPEG at quality 0.9 is ~0.6-2.5 MB.
+ *              8 MiB is >3x that.
  *
  * Bounds are enforced per request, never aggregated across a session, so a
- * five-photo set is five bounded transfers rather than one 100+ MB body.
+ * five-photo set is five bounded transfers rather than one 200+ MB body.
  */
 export const STAGED_ORIGINAL_MAXIMUM_BYTES = 32 * 1024 * 1024;
+export const STAGED_RAW_ORIGINAL_MAXIMUM_BYTES = 48 * 1024 * 1024;
 export const STAGED_DERIVATIVE_MAXIMUM_BYTES = 8 * 1024 * 1024;
+// The largest body any staged artifact request may carry; the reader's
+// absolute ceiling before the entry-specific one is known.
+export const STAGED_ARTIFACT_ABSOLUTE_MAXIMUM_BYTES = Math.max(STAGED_ORIGINAL_MAXIMUM_BYTES, STAGED_RAW_ORIGINAL_MAXIMUM_BYTES, STAGED_DERIVATIVE_MAXIMUM_BYTES);
 export const STAGED_MAXIMUM_ORIGINALS = 24;
 export const STAGED_DERIVATIVE_MIME_TYPE = "image/jpeg";
 
-// Server-side HEIC decoding is not available in this runtime (the bundled
-// libvips has libheif without an HEVC decoder), so an HEIC/HEIF original
-// must arrive with its analysis derivative. Directly consumable containers
-// must not: the original already serves display and analysis.
+// Server-side decoding of the non-consumable containers is not available in
+// this runtime (the bundled libvips has libheif without an HEVC decoder and
+// no RAW pipeline), so such an original must arrive with its analysis
+// derivative. Directly consumable containers must not: the original already
+// serves display and analysis.
 export const STAGED_SERVER_DERIVATIVE_GENERATION = false;
+
+/** The transport ceiling for one original, by its container's size class. */
+export function stagedOriginalMaximumBytes(mimeType) {
+  return photoContainerSizeClass(mimeType) === PhotoContainerSizeClass.RAW
+    ? STAGED_RAW_ORIGINAL_MAXIMUM_BYTES
+    : STAGED_ORIGINAL_MAXIMUM_BYTES;
+}
 
 export class StagedEvidenceManifestError extends Error {
   constructor(code, message, field = null) {
@@ -99,14 +129,14 @@ export function createStagedEvidenceArtifactManifest({ submissionIdentity, artif
     if (derivativesByOriginal.has(original.artifactId)) {
       throw invalid("STAGED_DERIVATIVE_DUPLICATE", "Each original accepts at most one analysis derivative.", `artifacts[${file.ordinal - 1}].derivativeOf`);
     }
-    if (!isHeifFamily(original.type)) {
-      throw invalid("STAGED_DERIVATIVE_UNEXPECTED", "Only an HEIC or HEIF original takes an analysis derivative.", `artifacts[${file.ordinal - 1}].derivativeOf`);
+    if (!requiresAnalysisDerivative(original.type)) {
+      throw invalid("STAGED_DERIVATIVE_UNEXPECTED", "Only an original that display and analysis cannot read directly (HEIC, HEIF, Apple ProRAW DNG) takes an analysis derivative.", `artifacts[${file.ordinal - 1}].derivativeOf`);
     }
     derivativesByOriginal.set(original.artifactId, file.artifactId);
   }
   for (const original of originals) {
-    if (isHeifFamily(original.type) && !derivativesByOriginal.has(original.artifactId) && !STAGED_SERVER_DERIVATIVE_GENERATION) {
-      throw invalid("STAGED_DERIVATIVE_REQUIRED", "An HEIC or HEIF original requires a JPEG analysis derivative.", `artifacts[${original.ordinal - 1}]`);
+    if (requiresAnalysisDerivative(original.type) && !derivativesByOriginal.has(original.artifactId) && !STAGED_SERVER_DERIVATIVE_GENERATION) {
+      throw invalid("STAGED_DERIVATIVE_REQUIRED", "An HEIC, HEIF, or Apple ProRAW DNG original requires a JPEG analysis derivative.", `artifacts[${original.ordinal - 1}]`);
     }
   }
   const seenHashes = new Set();
@@ -131,7 +161,7 @@ export function findStagedManifestEntry(manifest, artifactId) {
 }
 
 export function stagedArtifactMaximumBytes(entry) {
-  return entry?.role === StagedArtifactRole.ANALYSIS_DERIVATIVE ? STAGED_DERIVATIVE_MAXIMUM_BYTES : STAGED_ORIGINAL_MAXIMUM_BYTES;
+  return entry?.role === StagedArtifactRole.ANALYSIS_DERIVATIVE ? STAGED_DERIVATIVE_MAXIMUM_BYTES : stagedOriginalMaximumBytes(entry?.type);
 }
 
 /**
@@ -192,7 +222,7 @@ function normalizeEntry(entry, index, submissionIdentity) {
     throw invalid("STAGED_ARTIFACT_MEDIA_UNSUPPORTED", `Accepted photo types are ${PHOTO_CONTAINER_MIME_TYPES.join(", ")}.`, field("mimeType"));
   }
   const size = Number(entry.byteLength);
-  const maximum = role === StagedArtifactRole.ANALYSIS_DERIVATIVE ? STAGED_DERIVATIVE_MAXIMUM_BYTES : STAGED_ORIGINAL_MAXIMUM_BYTES;
+  const maximum = role === StagedArtifactRole.ANALYSIS_DERIVATIVE ? STAGED_DERIVATIVE_MAXIMUM_BYTES : stagedOriginalMaximumBytes(type);
   if (!Number.isSafeInteger(size) || size < 1) throw invalid("STAGED_ARTIFACT_INVALID", "Artifact byte length is required.", field("byteLength"));
   if (size > maximum) {
     throw invalid("STAGED_ARTIFACT_TOO_LARGE", `Each ${role === StagedArtifactRole.ORIGINAL ? "photo" : "analysis derivative"} must be ${Math.round(maximum / 1048576)} MiB or smaller.`, field("byteLength"));

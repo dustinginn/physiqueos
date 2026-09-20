@@ -1,6 +1,7 @@
 import { getProgressPhotoCategoryId, getProgressPhotoCategoryLabel } from "../models/progressPhotoPoseVocabulary";
 import { composeGalleryInterpretation } from "./GalleryInterpretationService";
 import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers";
+import { requiresAnalysisDerivative } from "./ImageContainerDetection.js";
 
 const POSE_ORDER = ["front-relaxed", "back-relaxed", "back-flexed", "side-relaxed", "left-side-relaxed", "right-side-relaxed", "front-flexed"];
 const INACTIVE = new Set(["duplicate", "superseded", "inactive"]);
@@ -408,10 +409,10 @@ function compareConditions(current, prior) { if(!prior)return[];return Object.ke
 function formatCondition(value) { if(value===true)return"yes";if(value===false)return"no";return String(value??"unknown").replaceAll("_"," "); }
 function nearestComparisonDate(views) { return views.map((view) => view.comparedAgainst).find((value) => value && value !== "Prior matching photo pending") ?? "Prior matching photo pending"; }
 function findWeight(weights, date) { return weights.find((item) => dateKey(item.measuredAt) === date) ?? null; }
-// Display and analysis read the linked JPEG derivative of an HEIC/HEIF
-// original (browsers and the interpreter cannot decode HEIF); the canonical
-// photo and its identity remain the original bytes.
-function displayReference(photo) { const analysis=photo.analysis_storage_path??photo.analysisStoragePath??null; const mime=String(photo.mime_type??photo.mimeType??"").toLowerCase(); return analysis&&(mime==="image/heic"||mime==="image/heif")?analysis:null; }
+// Display and analysis read the linked JPEG derivative of an original whose
+// container browsers and the interpreter cannot decode (HEIC/HEIF, ProRAW
+// DNG); the canonical photo and its identity remain the original bytes.
+function displayReference(photo) { const analysis=photo.analysis_storage_path??photo.analysisStoragePath??null; const mime=String(photo.mime_type??photo.mimeType??"").toLowerCase(); return analysis&&requiresAnalysisDerivative(mime)?analysis:null; }
 function resolveCanonicalAsset(photo, legacyPhotos) { const direct=displayReference(photo)??photo.storage_path??photo.imagePath??photo.sourcePath; if(direct)return{path:direct,url:privateHref(direct),sourceId:photo.sourceIds?.[0]??null};const sourceIds=new Set(photo.sourceIds??[]);const hashes=new Set(photo.sourceHashes??[]);const source=legacyPhotos.find((item)=>sourceIds.has(item.id)||hashes.has(item.sourceHash)||hashes.has(item.source_hash));return source?.imagePath?{path:source.imagePath,url:privateHref(source.imagePath),sourceId:source.id}:null; }
 function resolveVisibleEvidenceDate({payload,object,activePhotos,legacyPhotos}) { if(payload.captureDate)return dateKey(payload.captureDate);const paths=new Set(activePhotos.map((photo)=>resolveCanonicalAsset(photo,legacyPhotos)?.path).filter(Boolean));const matchedDates=legacyPhotos.filter((photo)=>paths.has(photo.imagePath)).map((photo)=>dateKey(photo.capturedAt??photo.date)).filter(Boolean);if(matchedDates.length)return mostCommon(matchedDates);return dateKey(payload.observed_at??object.lastObservedAt); }
 function createSessionFingerprint(assets) { const keys=assets.map((asset)=>stableAssetKey(asset?.path,asset?.hashes)).filter(Boolean).sort();return `photo-assets-${hashText(keys.join("|"))}`; }
