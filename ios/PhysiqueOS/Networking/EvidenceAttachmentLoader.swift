@@ -6,10 +6,15 @@ import UIKit
 import UniformTypeIdentifiers
 
 enum EvidenceAttachmentLoader {
-    struct ServerCompatiblePhoto {
+    /// A Progress Photo exactly as it will be staged: the original bytes,
+    /// untouched, with the Server MIME type they travel under. HEIC/HEIF
+    /// originals additionally need a bounded JPEG analysis derivative,
+    /// produced separately from the same bytes.
+    struct StagedPhotoRepresentation: Equatable {
         var data: Data
         var contentType: String
         var fileExtension: String
+        var requiresAnalysisDerivative: Bool
     }
     struct PhotoLoadRequest {
         var stableIdentifier: String?
@@ -84,20 +89,19 @@ enum EvidenceAttachmentLoader {
         return UIImage(cgImage: image)
     }
 
-    /// The Web/Server Progress Photos contract accepts JPEG, PNG, and WebP.
-    /// PhotosPicker may return an HEIC original on iPhone. Preserve accepted
-    /// bytes verbatim; only an unsupported Apple image representation is
-    /// decoded at full resolution and re-encoded as maximum-quality JPEG.
-    /// This never downsizes the canonical upload (preview downsampling is a
-    /// separate display-only path above).
-    static func serverCompatiblePhoto(data: Data, contentType: String?) -> ServerCompatiblePhoto? {
+    /// The staged Progress Photos contract accepts JPEG, PNG, WebP, HEIC, and
+    /// HEIF originals and preserves every one of them byte for byte. Nothing
+    /// is re-encoded, resized, or recompressed to satisfy transport: a photo
+    /// larger than the per-photo ceiling is refused with a clear message
+    /// rather than silently degraded. Any other representation is unsupported.
+    static func stagedPhotoRepresentation(data: Data, contentType: String?) -> StagedPhotoRepresentation? {
         switch contentType?.lowercased() {
-        case "image/jpeg", "image/jpg": return .init(data: data, contentType: "image/jpeg", fileExtension: "jpg")
-        case "image/png": return .init(data: data, contentType: "image/png", fileExtension: "png")
-        case "image/webp": return .init(data: data, contentType: "image/webp", fileExtension: "webp")
-        default:
-            guard let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 1) else { return nil }
-            return .init(data: jpeg, contentType: "image/jpeg", fileExtension: "jpg")
+        case "image/jpeg", "image/jpg": return .init(data: data, contentType: "image/jpeg", fileExtension: "jpg", requiresAnalysisDerivative: false)
+        case "image/png": return .init(data: data, contentType: "image/png", fileExtension: "png", requiresAnalysisDerivative: false)
+        case "image/webp": return .init(data: data, contentType: "image/webp", fileExtension: "webp", requiresAnalysisDerivative: false)
+        case "image/heic": return .init(data: data, contentType: "image/heic", fileExtension: "heic", requiresAnalysisDerivative: true)
+        case "image/heif": return .init(data: data, contentType: "image/heif", fileExtension: "heif", requiresAnalysisDerivative: true)
+        default: return nil
         }
     }
 

@@ -214,6 +214,17 @@ struct ProductionEvidenceIntakeStatus: Decodable, Equatable, Sendable {
     var acceptedAt: String?
     var interpretationStartedAt: String?
     var reviewReadyAt: String?
+    /// Staged-media progress (`mediaState`, per-artifact `expected`/`stored`);
+    /// absent on aggregate intakes. `status` alone never claims complete
+    /// media: incomplete media reads as `"processing"`.
+    var mediaState: String?
+    var mediaComplete: Bool?
+    var expectedArtifactCount: Int?
+    var storedArtifactCount: Int?
+    var artifacts: [ProductionEvidenceIntakeArtifactProgress]?
+    var artifactId: String?
+    var artifactOutcome: String?
+    var lastErrorCode: String?
 
     var isReady: Bool { status == "ready" }
     var isFailed: Bool { status == "processing_failed" }

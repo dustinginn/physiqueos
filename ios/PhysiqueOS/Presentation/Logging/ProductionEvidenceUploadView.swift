@@ -182,6 +182,10 @@ struct ProductionEvidenceUploadView: View {
     @State private var moveGoalText = ""
     @State private var photoIdentities: [ProgressPhotoIdentityDraft] = []
     @State private var photoSession = ProgressPhotoSessionDraft()
+    /// Staged Progress Photos transport state: live per-photo progress and a
+    /// durable plan left pending by a lost response, suspension, or relaunch.
+    @State private var stagedProgress: StagedPhotoIntakeProgress?
+    @State private var pendingStagedPlan: StagedPhotoIntakePlan?
 
     private var effectiveScenario: Scenario? { fixedScenario ?? resolvedScenario }
 
@@ -250,6 +254,7 @@ struct ProductionEvidenceUploadView: View {
                 }
                 resolvedScenario = fixedScenario
             }
+            Task { await refreshPendingStagedPlan() }
         }
     }
 
@@ -313,6 +318,7 @@ struct ProductionEvidenceUploadView: View {
 
     @ViewBuilder
     private var submittableContent: some View {
+        if resolvedScenario == .progressPhotos { pendingStagedPhotosCard }
         CardContainer { VStack(alignment: .leading, spacing: 10) {
             DateField(date: $effectiveDate, maximumDate: Date(), label: "Date")
         } }
@@ -554,7 +560,7 @@ struct ProductionEvidenceUploadView: View {
     private var uploadingContent: some View {
         CardContainer { VStack(alignment: .leading, spacing: 10) {
             ProgressView(value: transferProgress, total: 1).tint(PhysiqueOSTheme.accent)
-            Text(transferProgress < 1 ? "Transferring… \(Int(transferProgress * 100))%" : "Transfer complete. Waiting for durable acceptance…")
+            Text(stagedTransferCopy ?? (transferProgress < 1 ? "Transferring… \(Int(transferProgress * 100))%" : "Transfer complete. Waiting for durable acceptance…"))
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
         }.frame(maxWidth: .infinity, alignment: .leading) }
@@ -596,6 +602,13 @@ struct ProductionEvidenceUploadView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(PhysiqueOSTheme.destructive)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if let plan = pendingStagedPlan, plan.rejectedArtifacts.isEmpty {
+                // The staged set is still durable on this device and the
+                // Server already holds every acknowledged photo; resuming
+                // sends only what is missing.
+                PrimaryActionButton(title: "Resume upload", tone: .accent) { Task { await resumeStagedPhotos() } }
+                    .accessibilityIdentifier("productionEvidenceUpload.resumeStaged")
+            }
             PrimaryActionButton(title: "Try Again", tone: .accent) { phase = .picking }
         }
     }
@@ -720,6 +733,10 @@ struct ProductionEvidenceUploadView: View {
     /// hasn't, this falls back to exactly the prior behavior; nothing here
     /// waits longer than `fastFollowUpMaxWait` for that answer.
     private func submitIntake(scenario: Scenario) async {
+        if scenario == .progressPhotos {
+            await submitStagedPhotos()
+            return
+        }
         phase = .uploading
         transferProgress = 0
         let localDate = Self.localDateKey.string(from: effectiveDate)
@@ -878,14 +895,118 @@ struct ProductionEvidenceUploadView: View {
         }
     }
 
+    /// Aggregate multipart files for DEXA and screenshot intakes. Progress
+    /// Photos no longer pass through here: they use the staged transport
+    /// (`submitStagedPhotos`), which preserves every original byte for byte.
     private static func files(from attachments: [SandboxAttachment], scenario: Scenario) -> [(filename: String, contentType: String, data: Data)] {
-        attachments.enumerated().compactMap { index, attachment in
+        attachments.compactMap { attachment in
             guard let data = attachment.data else { return nil }
-            if scenario == .progressPhotos,
-               let normalized = EvidenceAttachmentLoader.serverCompatiblePhoto(data: data, contentType: attachment.contentType) {
-                return ("progress-photo-\(index + 1).\(normalized.fileExtension)", normalized.contentType, normalized.data)
-            }
             return (attachment.displayName, attachment.contentType ?? (scenario == .dexa ? "application/pdf" : "image/jpeg"), data)
+        }
+    }
+
+    // MARK: - Staged Progress Photos transport
+
+    /// Build 44: the full-resolution set travels one bounded request per
+    /// photo through a durable staged intake instead of one aggregate
+    /// multipart body (Build 43's real upload stopped at the aggregate
+    /// request ceiling). Originals are transferred verbatim; each HEIC/HEIF
+    /// original adds a bounded JPEG rendition for review and analysis. The
+    /// follow-up after durable acceptance is the same Server-driven Evidence
+    /// Review transition every intake uses; nothing here completes the
+    /// priority or writes canonical state.
+    private func submitStagedPhotos() async {
+        phase = .uploading
+        transferProgress = 0
+        stagedProgress = nil
+        let localDate = Self.localDateKey.string(from: effectiveDate)
+        let coordinator = environment.stagedPhotoIntakeCoordinator
+        let startedAt = Date()
+        do {
+            let plan = try await coordinator.prepare(
+                scope: "progressPhotos-intake.\(localDate)",
+                effectiveDate: localDate,
+                attachments: attachments,
+                photoIdentitiesJSON: try Self.photoIdentitiesJSON(photoIdentities),
+                session: photoSession
+            )
+            pendingStagedPlan = plan
+            let intake = try await coordinator.submit(plan: plan) { progress in
+                Task { @MainActor in
+                    stagedProgress = progress
+                    transferProgress = progress.fraction
+                }
+            }
+            pendingStagedPlan = nil
+            acceptanceSeconds = Date().timeIntervalSince(startedAt)
+            await followUpOnAcceptedIntakes([(.progressPhotos, intake)], effectiveDate: localDate)
+        } catch {
+            pendingStagedPlan = await coordinator.pendingPlan()
+            phase = .failed(Self.errorMessage(for: error))
+        }
+    }
+
+    private func resumeStagedPhotos() async {
+        guard let plan = pendingStagedPlan else { return }
+        phase = .uploading
+        transferProgress = 0
+        stagedProgress = nil
+        let coordinator = environment.stagedPhotoIntakeCoordinator
+        let startedAt = Date()
+        do {
+            let intake = try await coordinator.resume { progress in
+                Task { @MainActor in
+                    stagedProgress = progress
+                    transferProgress = progress.fraction
+                }
+            }
+            pendingStagedPlan = nil
+            acceptanceSeconds = Date().timeIntervalSince(startedAt)
+            await followUpOnAcceptedIntakes([(.progressPhotos, intake)], effectiveDate: plan.effectiveDate)
+        } catch {
+            pendingStagedPlan = await coordinator.pendingPlan()
+            phase = .failed(Self.errorMessage(for: error))
+        }
+    }
+
+    private func discardStagedPhotos() async {
+        await environment.stagedPhotoIntakeCoordinator.discardPending()
+        pendingStagedPlan = nil
+    }
+
+    private func refreshPendingStagedPlan() async {
+        guard effectiveScenario == .progressPhotos, environment.nativeAuthority == .founderProduction else { return }
+        pendingStagedPlan = await environment.stagedPhotoIntakeCoordinator.pendingPlan()
+    }
+
+    private var stagedTransferCopy: String? {
+        guard let progress = stagedProgress else { return nil }
+        if progress.mediaComplete { return "All \(progress.totalOriginals) photos received. Waiting for durable acceptance…" }
+        let current = min(progress.transferredOriginals + 1, max(progress.totalOriginals, 1))
+        return "Uploading photo \(current) of \(progress.totalOriginals)… \(Int(progress.fraction * 100))%"
+    }
+
+    @ViewBuilder
+    private var pendingStagedPhotosCard: some View {
+        if let plan = pendingStagedPlan {
+            CardContainer { VStack(alignment: .leading, spacing: 10) {
+                Label("Photo upload waiting", systemImage: "arrow.up.circle")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                Text(plan.rejectedArtifacts.isEmpty
+                    ? "\(plan.storedOriginalCount) of \(plan.originals.count) photos from \(plan.effectiveDate) reached PhysiqueOS. Resume to send the rest, or discard the set and choose again."
+                    : "PhysiqueOS did not accept this photo set (\(plan.lastErrorCode ?? "rejected")). Discard it and choose the photos again.")
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                HStack(spacing: 10) {
+                    if plan.rejectedArtifacts.isEmpty {
+                        PrimaryActionButton(title: "Resume upload", tone: .accent) { Task { await resumeStagedPhotos() } }
+                            .accessibilityIdentifier("productionEvidenceUpload.resumeStaged")
+                    }
+                    Button("Discard") { Task { await discardStagedPhotos() } }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("productionEvidenceUpload.discardStaged")
+                }
+            } }
         }
     }
 
@@ -1027,6 +1148,8 @@ struct ProductionEvidenceUploadView: View {
     }
 
     private static func errorMessage(for error: Error) -> String {
+        if let stagedError = error as? StagedPhotoIntakeError { return stagedError.errorDescription ?? "This photo set could not be uploaded." }
+        if error is StagedPhotoIntakeStoreError { return "The staged photos on this iPhone could not be read. Discard the set and choose the photos again." }
         if let productionError = error as? ProductionNativeError { return productionError.errorDescription ?? "This evidence could not be uploaded." }
         if let dailyError = error as? DailyEvidenceWriteError { return dailyError.errorDescription ?? "This evidence could not be saved." }
         return "This evidence could not be uploaded."

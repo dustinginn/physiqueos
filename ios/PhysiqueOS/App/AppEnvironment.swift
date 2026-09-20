@@ -242,6 +242,9 @@ final class AppEnvironment {
     /// Shared across every Production write domain — see
     /// `ProductionIdempotencyKeyStore`'s doc comment.
     let productionIdempotencyKeyStore: ProductionIdempotencyKeyStore
+    /// Durable staged Progress Photos transport state (plan + exact bytes)
+    /// that survives navigation, suspension, termination, and reboot.
+    let stagedPhotoIntakeStore: any StagedPhotoIntakeStore
     /// N0 capability shell. The default gate enables no operation, and the
     /// app lifecycle never invokes the coordinator automatically.
     let healthKitFeatureGate: HealthKitFeatureGate
@@ -417,6 +420,13 @@ final class AppEnvironment {
         ProductionEvidenceIntakePipeline(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
     }
 
+    /// Staged Progress Photos transport: one bounded request per photo with
+    /// durable, idempotent acknowledgement. Follow-up after acceptance goes
+    /// through `evidenceIntakePipeline` exactly like every other intake.
+    var stagedPhotoIntakeCoordinator: StagedPhotoIntakeCoordinator {
+        StagedPhotoIntakeCoordinator(api: productionNativeAPI, store: stagedPhotoIntakeStore, idempotencyStore: productionIdempotencyKeyStore)
+    }
+
     var homeAPI: HomeAPI {
         nativeAuthority == .founderProduction ? ProductionHomeAPI(api: productionNativeAPI) : sandboxHomeAPI
     }
@@ -548,7 +558,8 @@ final class AppEnvironment {
         healthKitQueryClient: any HealthKitAnchoredQueryClient = SystemHealthKitQueryClient(),
         healthKitObserverClient: any HealthKitObserverClient = SystemHealthKitObserverClient(),
         healthKitSynchronizationStore: any HealthKitSynchronizationStore = FileHealthKitSynchronizationStore(),
-        healthKitObservationUploader: (any HealthKitObservationUploader)? = nil
+        healthKitObservationUploader: (any HealthKitObservationUploader)? = nil,
+        stagedPhotoIntakeStore: (any StagedPhotoIntakeStore)? = nil
     ) {
         self.authoritySelectionStore = authoritySelectionStore
         self.nativeAuthority = nativeAuthority ?? authoritySelectionStore.load() ?? .sandbox
@@ -579,6 +590,7 @@ final class AppEnvironment {
         self.founderPhotoMediaStore = founderPhotoMediaStore ?? FounderPhotoMediaStore(api: founderServerAPI)
         self.founderProductionPhotoMediaStore = FounderProductionPhotoMediaStore(api: productionNativeAPI)
         self.productionIdempotencyKeyStore = ProductionIdempotencyKeyStore()
+        self.stagedPhotoIntakeStore = stagedPhotoIntakeStore ?? FileStagedPhotoIntakeStore()
         self.healthKitFeatureGate = healthKitFeatureGate
         self.healthKitAuthorizationCoordinator = HealthKitAuthorizationCoordinator(
             service: healthKitService,

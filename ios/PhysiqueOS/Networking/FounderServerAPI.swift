@@ -745,6 +745,59 @@ actor ProductionNativeAPI {
         try await authenticatedJSON(path: "\(configuration.routeFamily)/evidence/intakes/\(intakeId)", method: "GET")
     }
 
+    /// `POST /api/v1/native/evidence/intakes/staged` — declares a staged
+    /// Progress Photos intake (session details plus the expected artifact
+    /// set) without any photo bytes. Replaying the same declaration returns
+    /// the same intake with its current artifact progress; the Server
+    /// requires `Idempotency-Key` to equal `submissionIdentity`.
+    func declareStagedEvidenceIntake(
+        _ declaration: StagedPhotoIntakeWireDeclaration,
+        idempotencyKey: String
+    ) async throws -> ProductionEvidenceIntakeStatus {
+        let encoded: Data
+        do { encoded = try encoder.encode(declaration) }
+        catch { throw ProductionNativeError.invalidResponse }
+        let headers = ["Idempotency-Key": idempotencyKey]
+        let path = "\(configuration.routeFamily)/evidence/intakes/staged"
+        let token = try await validAccessToken()
+        var result = try await perform(path: path, method: "POST", body: encoded, bearer: token, accept: "application/json", headers: headers, timeoutInterval: 30)
+        if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
+            let refreshedToken = try await refreshAccessToken()
+            result = try await perform(path: path, method: "POST", body: encoded, bearer: refreshedToken, accept: "application/json", headers: headers, timeoutInterval: 30)
+        }
+        try validateHTTP(result.1, data: result.0)
+        do { return try decoder.decode(ProductionEvidenceIntakeStatus.self, from: result.0) }
+        catch { throw ProductionNativeError.invalidResponse }
+    }
+
+    /// `PUT /api/v1/native/evidence/intakes/{intakeId}/artifacts/{artifactId}`
+    /// — transfers exactly one declared artifact as a raw image body under
+    /// its declared content type. The Server verifies length, SHA-256, and
+    /// container against the declaration; an already stored artifact is
+    /// acknowledged as `already_stored` without a second object.
+    func uploadStagedEvidenceArtifact(
+        intakeId: String,
+        artifactId: String,
+        contentType: String,
+        data: Data,
+        onUploadProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> ProductionEvidenceIntakeStatus {
+        guard intakeId.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil,
+              artifactId.range(of: #"^artifact_[0-9a-f]{32}_[1-9][0-9]{0,2}$"#, options: .regularExpression) != nil
+        else { throw ProductionNativeError.invalidResponse }
+        let headers = ["Content-Type": contentType]
+        let path = "\(configuration.routeFamily)/evidence/intakes/\(intakeId)/artifacts/\(artifactId)"
+        let token = try await validAccessToken()
+        var result = try await performUpload(path: path, method: "PUT", body: data, bearer: token, accept: "application/json", headers: headers, onProgress: onUploadProgress)
+        if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
+            let refreshedToken = try await refreshAccessToken()
+            result = try await performUpload(path: path, method: "PUT", body: data, bearer: refreshedToken, accept: "application/json", headers: headers, onProgress: onUploadProgress)
+        }
+        try validateHTTP(result.1, data: result.0)
+        do { return try decoder.decode(ProductionEvidenceIntakeStatus.self, from: result.0) }
+        catch { throw ProductionNativeError.invalidResponse }
+    }
+
     private func validate<Payload>(_ envelope: ProductionResponseEnvelope<Payload>, expectedResource: String) throws {
         guard envelope.contractVersion == Self.contractVersion else {
             throw ProductionNativeError.incompatibleContractVersion(expected: Self.contractVersion, actual: envelope.contractVersion)

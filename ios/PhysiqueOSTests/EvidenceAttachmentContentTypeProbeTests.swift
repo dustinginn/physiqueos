@@ -103,20 +103,23 @@ final class EvidenceAttachmentContentTypeProbeTests: XCTestCase {
         XCTAssertEqual(EvidenceAttachmentLoader.preferredMIMEType(for: "public.png"), "image/png")
     }
 
-    func testProgressPhotoUploadKeepsAcceptedBytesAndNormalizesUnsupportedAppleImagesWithoutResizing() throws {
+    /// Build 44: every accepted Progress Photo representation is staged byte
+    /// for byte — HEIC/HEIF included. Build 43's maximum-quality JPEG
+    /// re-encode of HEIC no longer exists; it inflated originals past the
+    /// aggregate request ceiling and altered the canonical bytes.
+    func testProgressPhotoRepresentationsArePreservedByteForByteIncludingHEIC() throws {
         let jpeg = Data([0xff, 0xd8, 0xff, 0xd9])
-        let accepted = try XCTUnwrap(EvidenceAttachmentLoader.serverCompatiblePhoto(data: jpeg, contentType: "image/jpeg"))
+        let accepted = try XCTUnwrap(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: jpeg, contentType: "image/jpeg"))
         XCTAssertEqual(accepted.data, jpeg)
         XCTAssertEqual(accepted.contentType, "image/jpeg")
+        XCTAssertFalse(accepted.requiresAnalysisDerivative)
 
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 6))
-        let image = renderer.image { context in UIColor.systemBlue.setFill(); context.fill(CGRect(x: 0, y: 0, width: 8, height: 6)) }
-        let source = try XCTUnwrap(image.pngData())
-        let normalized = try XCTUnwrap(EvidenceAttachmentLoader.serverCompatiblePhoto(data: source, contentType: "image/heic"))
-        XCTAssertEqual(normalized.contentType, "image/jpeg")
-        let decoded = try XCTUnwrap(UIImage(data: normalized.data))
-        XCTAssertEqual(decoded.cgImage?.width, image.cgImage?.width)
-        XCTAssertEqual(decoded.cgImage?.height, image.cgImage?.height)
+        let heic = Data([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63])
+        let preserved = try XCTUnwrap(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: heic, contentType: "image/heic"))
+        XCTAssertEqual(preserved.data, heic, "HEIC originals are staged verbatim, never re-encoded")
+        XCTAssertEqual(preserved.contentType, "image/heic")
+        XCTAssertTrue(preserved.requiresAnalysisDerivative)
+        XCTAssertNil(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: heic, contentType: "application/pdf"))
     }
 
     // MARK: - The value that actually reaches the wire
