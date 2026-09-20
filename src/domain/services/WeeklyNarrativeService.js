@@ -1,3 +1,4 @@
+import { selectLiveTrainingPerformanceEvents } from "./TrainingPerformanceEventLiveness";
 import { createWeeklyEvidenceWindow, selectScheduledBriefingCadence } from "./BriefingEvidenceWindowService";
 import { createCoachingUpdatesReadService } from "./CoachingUpdatesReadService";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
@@ -447,7 +448,7 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
   const continuityPromise=loadLatestCadenceBriefingContinuity({
     repository:repositories.dailyBriefings,userId,cadence:"weekly",excludeArtifactId:artifactId,
   });
-  const [canonicalObjects,weights,dexaScans,artifacts,goal,activityTarget,continuity,progressPhotos,analyses,trainingPerformanceEvents]=await Promise.all([
+  const [canonicalObjects,weights,dexaScans,artifacts,goal,activityTarget,continuity,progressPhotos,analyses,durableTrainingPerformanceEvents]=await Promise.all([
     repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
     repositories.weights.listWeightEntries(userId),
     repositories.dexaScans?.listDEXAScans(userId)??[],
@@ -459,6 +460,8 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
     repositories.analyses?.listAnalyses?.()??[],
     repositories.trainingPerformanceEvents?.listTrainingPerformanceEvents?.()??[],
   ]);
+  // Durable events are immutable derived facts; only events whose source session is still an active canonical Training session are current achievements.
+  const trainingPerformanceEvents=selectLiveTrainingPerformanceEvents(durableTrainingPerformanceEvents,canonicalObjects);
   const existing=ignoreExisting?null:(artifacts.find((item)=>item.id===existingArtifactId)??artifacts.find((item)=>item.cadence==="weekly"&&item.evidenceWindow?.id===window.id)??null);
   const photoEvent=artifacts.filter((item)=>item.artifactType==="event"&&item.trigger?.evidenceType==="photo_session"&&String(item.briefing?.photoEventNarrative?.eventDate??"")>=window.startDate&&String(item.briefing?.photoEventNarrative?.eventDate??"")<=window.endDate).sort((a,b)=>String(b.generatedAt).localeCompare(String(a.generatedAt)))[0]??null;
   const generatedAt=now().toISOString();

@@ -1,3 +1,4 @@
+import { selectLiveTrainingPerformanceEvents } from "../../domain/services/TrainingPerformanceEventLiveness.js";
 import { createTrainingDayReadModel } from "./TrainingReadService.js";
 import {
   createTrainingLandingReports,
@@ -232,9 +233,11 @@ export function createTrainingNavigationReadService({
         return Object.freeze({
           report,
           timeline,
+          // Durable events are immutable derived facts; only those whose source
+          // session is still an active canonical session are current records.
           exerciseRecords: createTrainingLibraryExerciseRecordsReadModel({
             canonicalExerciseId: exerciseIdentity.canonicalExerciseId,
-            events,
+            events: selectLiveTrainingPerformanceEvents(events, canonicalEvidenceObjects),
           }),
         });
       });

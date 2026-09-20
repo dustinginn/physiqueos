@@ -1,3 +1,4 @@
+import { selectLiveTrainingPerformanceEvents } from "./TrainingPerformanceEventLiveness";
 import { composeMonthlyNarrativeModel } from "./MonthlyNarrativeCompositionService";
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 import { createCanonicalConfidenceReadService } from
@@ -1921,7 +1922,7 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
         dailyBriefings,
         goals,
         canonicalEvidenceObjects,
-        trainingPerformanceEvents,
+        durableTrainingPerformanceEvents,
       ] = await Promise.all([
         repositories.weights.listWeightEntries(userId),
         repositories.dexaScans.listDEXAScans(userId),
@@ -1933,6 +1934,12 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
         repositories.canonicalEvidence?.listCanonicalEvidenceObjects(userId) ?? [],
         repositories.trainingPerformanceEvents?.listTrainingPerformanceEvents() ?? [],
       ]);
+      // Durable events are immutable derived facts; only events whose source
+      // session is still an active canonical Training session are current.
+      const trainingPerformanceEvents = selectLiveTrainingPerformanceEvents(
+        durableTrainingPerformanceEvents,
+        canonicalEvidenceObjects,
+      );
 
       const activeGoal = selectCanonicalActiveGoal(goals, { ownerUserId: userId });
       const previewWindow = orchestration.previewWindow ?? PREVIEW_WINDOW;

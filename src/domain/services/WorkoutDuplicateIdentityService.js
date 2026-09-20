@@ -3,6 +3,24 @@ import { normalizeIdentityPart } from "./normalizeIdentityPart";
 const DUPLICATE_CONFIDENCE_THRESHOLD = 80;
 const POSSIBLE_DUPLICATE_CONFIDENCE_THRESHOLD = 50;
 const TEMPORAL_TOLERANCE_MINUTES = 5;
+// A bare display filename ("Apple Health Screenshot 2.jpg", "IMG_1688.png") is
+// only a label the uploading device chose. Native names every Health screenshot
+// with the same ordinal names on every day, so a filename alone can never
+// establish that two workouts are the same workout. It is weak, same-date,
+// contextual support that must be corroborated by real temporal, exercise or
+// telemetry evidence; it is ignored entirely across different workout dates.
+const WEAK_FILENAME_WEIGHT = 30;
+
+// Ordered identity evidence, strongest first. Only the first two tiers can
+// decide a duplicate by themselves.
+export const WORKOUT_IDENTITY_EVIDENCE = Object.freeze([
+  "strong_stable_artifact_identity",
+  "same_session_canonical_linkage",
+  "temporal_overlap",
+  "exercise_set_similarity",
+  "telemetry_similarity",
+  "bare_display_filename",
+]);
 
 const AUTHORITATIVE_ID_KEYS = [
   ["reconciliation", "canonical_id"],
@@ -36,6 +54,10 @@ export function assessWorkoutDuplicatePair(left = {}, right = {}) {
     leftIdentity.authoritativeIds,
     rightIdentity.authoritativeIds
   );
+  const sharedDisplayFilenames = intersectingValues(
+    leftIdentity.displayFilenames,
+    rightIdentity.displayFilenames
+  );
 
   if (sharedAuthoritativeIds.length > 0) {
     return {
@@ -44,6 +66,7 @@ export function assessWorkoutDuplicatePair(left = {}, right = {}) {
       reasons: sharedAuthoritativeIds.map((value) => `Shared authoritative identity: ${value}`),
       signals: {
         authoritative: sharedAuthoritativeIds,
+        displayFilenames: sharedDisplayFilenames,
         metricPoints: [],
         temporal: null,
       },
@@ -55,9 +78,15 @@ export function assessWorkoutDuplicatePair(left = {}, right = {}) {
     return {
       outcome: "not_duplicate",
       confidence: 0,
-      reasons: temporalFacts.reasons,
+      reasons: [
+        ...temporalFacts.reasons,
+        ...(sharedDisplayFilenames.length > 0
+          ? ["Shared display filename ignored across different workout dates"]
+          : []),
+      ],
       signals: {
         authoritative: [],
+        displayFilenames: sharedDisplayFilenames,
         metricPoints: [],
         temporal: temporalFacts,
       },
@@ -66,11 +95,18 @@ export function assessWorkoutDuplicatePair(left = {}, right = {}) {
 
   const metricPoints = scoreSupportingMetrics(leftIdentity, rightIdentity);
   const exercisePoints = scoreExerciseSupport(left, right);
+  const filenamePoints = sharedDisplayFilenames.length > 0
+    ? [{
+        reason: "Shared display filename on the same workout date is weak supporting context",
+        weight: WEAK_FILENAME_WEIGHT,
+      }]
+    : [];
   const confidence = Math.min(
     99,
     temporalFacts.score +
       metricPoints.reduce((sum, point) => sum + point.weight, 0) +
-      exercisePoints.reduce((sum, point) => sum + point.weight, 0)
+      exercisePoints.reduce((sum, point) => sum + point.weight, 0) +
+      filenamePoints.reduce((sum, point) => sum + point.weight, 0)
   );
   const outcome =
     confidence >= DUPLICATE_CONFIDENCE_THRESHOLD
@@ -82,11 +118,17 @@ export function assessWorkoutDuplicatePair(left = {}, right = {}) {
   return {
     outcome,
     confidence,
-    reasons: [...temporalFacts.reasons, ...metricPoints.map((point) => point.reason)],
+    reasons: [
+      ...temporalFacts.reasons,
+      ...metricPoints.map((point) => point.reason),
+      ...filenamePoints.map((point) => point.reason),
+    ],
     signals: {
       authoritative: [],
+      displayFilenames: sharedDisplayFilenames,
       metricPoints,
       exercisePoints,
+      filenamePoints,
       temporal: temporalFacts,
     },
   };
@@ -99,7 +141,16 @@ export function areWorkoutsLikelyDuplicates(left = {}, right = {}) {
 export function getWorkoutDuplicateIdentityKey(evidenceObject = {}) {
   const facts = getWorkoutIdentityFacts(evidenceObject);
   if (facts.authoritativeIds.length > 0) {
-    return ["training", "authoritative", ...facts.authoritativeIds].join("|");
+    // Stable identities keep their historical key shape, display filenames
+    // included, so an existing canonical record is still found by id.
+    return ["training", "authoritative", ...facts.legacyIdentityValues].join("|");
+  }
+
+  if (facts.displayFilenames.length > 0 && facts.dateKey) {
+    // A display filename repeats across days, so it can only scope an identity
+    // inside one workout date. Without the date the second day's upload would
+    // resolve to the first day's canonical id and merge into it.
+    return ["training", "filename", facts.dateKey, ...facts.displayFilenames].join("|");
   }
 
   if (facts.temporalKey) {
@@ -113,23 +164,27 @@ export function getWorkoutIdentityFacts(evidenceObject = {}) {
   const metadata = evidenceObject.metadata ?? {};
   const provenance = evidenceObject.provenance ?? {};
   const source = evidenceObject.source ?? {};
+  const explicitIdentityValues = AUTHORITATIVE_ID_KEYS.map(([scope, key]) => {
+    if (scope === "reconciliation") return evidenceObject.reconciliation?.[key];
+    if (scope === "source") return source?.[key];
+    if (scope === "metadata") return metadata?.[key];
+    return provenance?.[key];
+  });
+  const sourceRefs = [
+    ...(provenance.source_artifact_refs ?? []),
+    ...(source.source_artifact_refs ?? []),
+  ].filter(isAuthoritativeSourceArtifactRef);
   const authoritativeIds = uniqueStrings(
-    AUTHORITATIVE_ID_KEYS.map(([scope, key]) => {
-      if (scope === "reconciliation") return evidenceObject.reconciliation?.[key];
-      if (scope === "source") return source?.[key];
-      if (scope === "metadata") return metadata?.[key];
-      return provenance?.[key];
-    }).concat(
-      [
-        ...(provenance.source_artifact_refs ?? []),
-        ...(source.source_artifact_refs ?? []),
-      ].filter(isAuthoritativeSourceArtifactRef)
-    )
+    explicitIdentityValues.concat(sourceRefs.filter((ref) => !isBareDisplayFilename(ref)))
   );
+  const displayFilenames = uniqueStrings(sourceRefs.filter(isBareDisplayFilename));
+  const legacyIdentityValues = uniqueStrings(explicitIdentityValues.concat(sourceRefs));
   const temporal = getTemporalFacts(evidenceObject);
 
   return {
     authoritativeIds,
+    displayFilenames,
+    legacyIdentityValues,
     activityType: normalizeIdentityPart(metadata.activity_type),
     durationSeconds: toNumber(metadata.duration_seconds),
     distance: toNumber(metadata.distance),
@@ -368,6 +423,19 @@ function uniqueStrings(values = []) {
 
 function isAuthoritativeSourceArtifactRef(value) {
   return !/^typed_evidence_\d+$/i.test(String(value ?? "").trim());
+}
+
+// Refs scoped to one upload, package or draft are stable artifact identities
+// even when they end in an original filename
+// (`evidence_submission_..._images_file_4_IMG_2026.png`).
+const SCOPED_ARTIFACT_REF = /^(evidence_submission_|evidence_intake_|evidence_review_|training_logger_|artifact_|upload_|media:\/\/)/i;
+const FILE_EXTENSION = /\.[a-z0-9]{2,5}$/i;
+
+// A ref that is only a device-chosen file name: it has an extension and no
+// package, upload or draft scope.
+export function isBareDisplayFilename(value) {
+  const text = String(value ?? "").trim();
+  return FILE_EXTENSION.test(text) && !SCOPED_ARTIFACT_REF.test(text);
 }
 
 function toNumber(value) {

@@ -43,7 +43,7 @@ import {
 import { createPendingEvidenceReviewReprocessingService } from "../../../../domain/services/PendingEvidenceReviewReprocessingService";
 import { createApplicationStoredArtifactLoader } from "../../../../application/media/ApplicationUploadService";
 import { createPhotoAnalysisMediaLoader } from "../../../../application/media/PhotoAnalysisMediaLoader";
-import { produceTrainingPerformanceEvents } from "../../../../domain/services/TrainingPerformanceEventProducer";
+import { reconcileTrainingPerformanceEvents } from "../../../../application/training/TrainingPerformanceEventReconciliation";
 import {
   createTrainingPerformanceEventPersistenceService,
   TrainingPerformanceEventPersistenceOutcome,
@@ -55,13 +55,9 @@ import {
   createCanonicalEvidenceConfirmationCommitService,
 } from "../../../../domain/services/CanonicalEvidenceConfirmationCommitService";
 import {
-  createPILowerLevelConfidenceWorkEnqueueService,
   isPIEnergyConfidenceEnqueueEnabled,
   isPITrainingConfidenceEnqueueEnabled,
 } from "../../../../domain/services/PILowerLevelConfidenceWorkEnqueueService";
-import {
-  createPISemanticFingerprint,
-} from "../../../../domain/services/PILowerLevelConfidenceContracts";
 import { resolveConfirmedCanonicalTrainingSession } from "../../../../domain/services/ConfirmedCanonicalTrainingSessionResolver";
 import { assertValidDexaScan } from "../../../../domain/services/DEXAContract";
 import { toDexaReadModel, selectValidDexaScans } from "../../../../domain/services/DEXAReadModelAdapter";
@@ -915,112 +911,19 @@ function createHandlers({ evidencePackage, reviewId, user,
         }
         return { reviewItem: session, canonicalSession: resolution.canonicalSession };
       });
-      const events = resolvedTrainingSessions.flatMap(({ canonicalSession }) =>
-        produceTrainingPerformanceEvents({
-          canonicalTrainingSession: canonicalSession,
-          trainingAnalysis: analysisForEvents,
-          sourceReviewId: reviewId,
-          sourceEvidencePackageId: evidencePackage.package_id,
-        })
-      );
       const lowerLevelEnabled = isPITrainingConfidenceEnqueueEnabled();
-      const coordinator =
-        createPILowerLevelConfidenceWorkEnqueueService();
-      const eventIds = events.map((event) => event.id).sort();
-      const batchId = `training_event_batch|${createPISemanticFingerprint({
-        packageId: evidencePackage.package_id,
-        analysisId: analysisForEvents.id,
-        sessionIds: resolvedTrainingSessions.map((item) => item.canonicalSession.canonicalId).sort(),
-        eventIds,
-      }).slice(7)}`;
-      const batch = {
-        id: batchId,
-        status: "finalized",
-        sourceCommitId: "pending_source_commit",
-        sourceEvidencePackageId: evidencePackage.package_id,
+      const reconciliation = await reconcileTrainingPerformanceEvents({
+        canonicalSessions: resolvedTrainingSessions.map((item) => item.canonicalSession),
+        trainingAnalysis: analysisForEvents,
         sourceReviewId: reviewId,
-        finalizedReportId: analysisForEvents.id,
-        canonicalTrainingSessionIds:
-          resolvedTrainingSessions.map((item) => item.canonicalSession.canonicalId).sort(),
-        performanceEventIds: eventIds,
-        zeroEventCompletion: eventIds.length === 0,
-        finalizedAt: analysisForEvents.createdAt,
-      };
-      const persistence = await createTrainingPerformanceEventPersistenceService({
-        ...(await loadApplicationCanonicalCommitBindings()),
-      }).persistEventBatch(events, lowerLevelEnabled ? {
-        batchId,
-        batch,
-        mutateCandidate: (candidate) => {
-          for (const { reviewItem: session, canonicalSession } of resolvedTrainingSessions) {
-            const sessionEvents = events.filter((event) => event.sourceSessionId === session.id);
-            coordinator.stageTrainingFinalization(candidate, {
-              canonicalTrainingSessionId: canonicalSession.canonicalId,
-              finalizedTrainingReportId: analysisForEvents.id,
-              sourceTrainingEvidenceIds: [
-                canonicalSession.canonicalId,
-              ],
-              performanceEventBatchId: batchId,
-              performanceEventIds: sessionEvents.map((event) => event.id),
-              zeroEventCompletion: sessionEvents.length === 0,
-              categoryRollupFingerprint: createPISemanticFingerprint(
-                analysisForEvents.metadata?.trainingPerformance
-                  ?.categoryObservations ?? []
-              ),
-              sourceSemanticFingerprint: createPISemanticFingerprint({
-                canonicalSession,
-                finalizedReportId: analysisForEvents.id,
-                performanceEventIds:
-                  sessionEvents.map((event) => event.id).sort(),
-              }),
-              evidenceCutoff: `${String(session.observed_at).slice(0, 10)}T23:59:59.999Z`,
-            });
-          }
-        },
-        finalizeCandidate: ({ stagedState, commitId }) => {
-          stagedState.trainingPerformanceEventBatches =
-            (stagedState.trainingPerformanceEventBatches ?? []).map((item) =>
-              item.id === batchId ? { ...item, sourceCommitId: commitId } : item
-            );
-          stagedState.piTrainingConfidenceWorkItems =
-            (stagedState.piTrainingConfidenceWorkItems ?? []).map((work) => {
-              const sourceCommitLinks = (work.sourceCommitLinks ?? []).map(
-                (link) => link.commitId === "pending_source_commit"
-                  ? { ...link, commitId }
-                  : link
-              );
-              return sourceCommitLinks.some(
-                (link, index) => link !== work.sourceCommitLinks?.[index]
-              ) ? { ...work, sourceCommitLinks } : work;
-            });
-        },
-        validateFinalized: (candidate) =>
-          resolvedTrainingSessions.every(({ canonicalSession }) =>
-            candidate.piTrainingConfidenceWorkItems?.some(
-              (work) =>
-                work.canonicalTrainingSessionId === canonicalSession.canonicalId &&
-                work.performanceEventBatchId === batchId
-              )
-          ),
-        selectFinalized: (candidate) => ({
-          lowerLevelWorkIds: resolvedTrainingSessions.map(
-            ({ canonicalSession }) => candidate.piTrainingConfidenceWorkItems
-              ?.find((work) =>
-                work.canonicalTrainingSessionId === canonicalSession.canonicalId &&
-                work.performanceEventBatchId === batchId
-              )?.id
-          ).filter(Boolean),
+        sourceEvidencePackageId: evidencePackage.package_id,
+        lowerLevelEnabled,
+        persistence: createTrainingPerformanceEventPersistenceService({
+          ...(await loadApplicationCanonicalCommitBindings()),
         }),
-      } : {});
-      if (
-        [
-          TrainingPerformanceEventPersistenceOutcome.COLLISION,
-          TrainingPerformanceEventPersistenceOutcome.CONCURRENCY_CONFLICT,
-          TrainingPerformanceEventPersistenceOutcome.PERSISTENCE_FAILURE,
-          TrainingPerformanceEventPersistenceOutcome
-            .COMMITTED_PUBLICATION_FAILURE,
-        ].includes(persistence.outcome)
-      ) {
+      });
+      const persistence = reconciliation.persistence;
+      if (reconciliation.failed) {
         throw new Error(`Training performance-event persistence failed: ${persistence.outcome}`);
       }
       canonical = null;

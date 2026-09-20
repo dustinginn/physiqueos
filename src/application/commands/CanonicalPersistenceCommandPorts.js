@@ -10,6 +10,12 @@ import {
 } from "../../domain/services/MorningCheckInPersistenceService.js";
 import { createPILowerLevelCanonicalEvidenceCommitService } from "../../domain/services/PILowerLevelCanonicalEvidenceCommitService.js";
 import {
+  createCommittedTrainingPerformanceAnalysis,
+  reconcileTrainingPerformanceEvents,
+} from "../training/TrainingPerformanceEventReconciliation.js";
+import { createTrainingPerformanceEventPersistenceService } from "../../domain/services/TrainingPerformanceEventPersistenceService.js";
+import { isPITrainingConfidenceEnqueueEnabled } from "../../domain/services/PILowerLevelConfidenceWorkEnqueueService.js";
+import {
   buildTrainingLoggerEvidencePackage,
   createProductionAppleHealthReconciliation,
 } from "../../domain/services/TrainingLoggerAppleHealthService.js";
@@ -1344,6 +1350,16 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       throw problem(500, "TRAINING_SESSION_NOT_DURABLE", "The canonical Training session was not durable after commit.");
     }
 
+    // The Logger command bypasses the Evidence Review orchestrator, so its
+    // durable performance events are derived here, through the same idempotent
+    // reconciliation the review path uses. The TrainingSession is already
+    // durable: a derivation that cannot complete is deferred, never fatal.
+    await reconcileCommittedSessionPerformanceEvents(context, {
+      canonicalId,
+      evidencePackage: packageAndObject,
+      supportingReviewId: supportingReview?.id ?? null,
+    });
+
     // A legacy caller may still supply an already-interpreted supporting
     // review in the same command. Preserve it as an auditable confirmed
     // source after the exact canonical package commits; modern Native uses
@@ -1762,6 +1778,64 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           } : {}),
         })),
       },
+    };
+  }
+
+  async function reconcileCommittedSessionPerformanceEvents(context, {
+    canonicalId,
+    evidencePackage,
+    supportingReviewId,
+  }) {
+    const collections = [
+      "user", "goals", "canonicalEvidenceObjects", "trainingPerformanceEvents",
+      "trainingPerformanceEventBatches", "piTrainingConfidenceWorkItems",
+    ];
+    const { candidate, before } = await loadCandidate(collections, context.ownerUserId);
+    const canonicalSession = (candidate.canonicalEvidenceObjects ?? [])
+      .find((item) => item.canonicalId === canonicalId);
+    if (!canonicalSession || canonicalSession.quality?.status === "superseded") {
+      return { status: "skipped", reason: "session_not_active" };
+    }
+    let reconciliation;
+    try {
+      reconciliation = await reconcileTrainingPerformanceEvents({
+        canonicalSessions: [canonicalSession],
+        trainingAnalysis: createCommittedTrainingPerformanceAnalysis({
+          canonicalObjects: candidate.canonicalEvidenceObjects,
+          packageId: evidencePackage.package_id,
+          capturedAt: evidencePackage.captured_at,
+        }),
+        sourceReviewId: supportingReviewId ?? `training_logger_session|${context.payload.sessionId}`,
+        sourceEvidencePackageId: evidencePackage.package_id,
+        lowerLevelEnabled: isPITrainingConfidenceEnqueueEnabled(),
+        persistence: createTrainingPerformanceEventPersistenceService({
+          mutateCanonicalRuntime: (input) =>
+            mutateCandidateRuntime(candidate, context.metadata.commandId, input),
+          now,
+        }),
+        now,
+      });
+    } catch (error) {
+      // Derivation is pure until the in-memory candidate is mutated and nothing
+      // is written before `persistCandidateCollections`, so a producer or
+      // candidate failure leaves the durable TrainingSession untouched.
+      return { status: "deferred", outcome: "derivation_failed", errorCode: error?.code ?? null };
+    }
+    if (reconciliation.failed) {
+      return { status: "deferred", outcome: reconciliation.persistence.outcome };
+    }
+    await persistCandidateCollections({
+      before,
+      candidate,
+      collections: [
+        "trainingPerformanceEvents", "trainingPerformanceEventBatches", "piTrainingConfidenceWorkItems",
+      ],
+      ownerUserId: context.ownerUserId,
+    });
+    return {
+      status: "completed",
+      outcome: reconciliation.persistence.outcome,
+      eventIds: reconciliation.events.map((event) => event.id),
     };
   }
 

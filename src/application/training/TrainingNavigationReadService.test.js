@@ -306,7 +306,7 @@ describe("provider-native Training navigation", () => {
 
   it("loads only one exercise's occurrences and events with unchanged scoped ordering", async () => {
     const records = [training("older", "2026-08-20"), training("newer", "2026-08-26")];
-    const events = [performanceEvent("2026-08-26")];
+    const events = [performanceEvent("2026-08-26", { canonicalId: "newer", sessionId: "payload-newer" })];
     const store = navigationStore(records, events);
     const result = await createTrainingNavigationReadService({ store }).getExercise({
       context: "build-lean-mass",
@@ -321,6 +321,20 @@ describe("provider-native Training navigation", () => {
     expect(result.exerciseRecords).toMatchObject({ canonicalExerciseId: "ez_bar_curl", totalCount: 1 });
     expect(store.listCanonicalTrainingEvidenceByExercise).toHaveBeenCalledWith("ez_bar_curl");
     expect(store.listTrainingPerformanceEventsByExercise).toHaveBeenCalledWith("ez_bar_curl");
+  });
+
+  it("presents a durable record only while its source session is an active canonical session", async () => {
+    const active = training("newer", "2026-08-26");
+    const event = performanceEvent("2026-08-26", { canonicalId: "newer", sessionId: "payload-newer" });
+    const read = (records) => createTrainingNavigationReadService({ store: navigationStore(records, [event]) })
+      .getExercise({ context: "all", currentDate: new Date("2026-08-29T12:00:00Z"), exerciseSlug: "ez_bar_curl" });
+    expect((await read([active])).exerciseRecords).toMatchObject({ canonicalExerciseId: "ez_bar_curl", totalCount: 1 });
+
+    // The source session becomes superseded: the immutable event is not deleted
+    // but it can no longer override current Training truth.
+    const superseded = { ...active, quality: { status: "superseded", supersededBy: "elsewhere" } };
+    expect((await read([superseded])).exerciseRecords).toBeNull();
+    expect(event.sourceCanonicalTrainingId).toBe("newer");
   });
 
   it("keeps consecutive exercise requests request-local and free of broad timeline calls", async () => {
@@ -514,13 +528,13 @@ function training(id, observedAt, capturedAt = `${observedAt}T12:00:00Z`) {
   };
 }
 
-function performanceEvent(workoutDate) {
+function performanceEvent(workoutDate, { canonicalId = `canonical-${workoutDate}`, sessionId = `session-${workoutDate}` } = {}) {
   return createTrainingPerformanceEvent({
     eventType: "session_volume_pr",
     sourceReviewId: "review",
     sourceEvidencePackageId: "package",
-    sourceCanonicalTrainingId: `canonical-${workoutDate}`,
-    sourceSessionId: `session-${workoutDate}`,
+    sourceCanonicalTrainingId: canonicalId,
+    sourceSessionId: sessionId,
     sourceAnalysisId: "analysis",
     workoutDate,
     canonicalExerciseId: "ez_bar_curl",

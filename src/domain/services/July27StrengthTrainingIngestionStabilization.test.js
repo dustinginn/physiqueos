@@ -25,7 +25,7 @@ describe("July 27 Strength Training ingestion stabilization", () => {
       "duplicate"
     );
     expect(getWorkoutDuplicateIdentityKey(strength)).toBe(
-      "training|authoritative|IMG_1688.png"
+      "training|filename|2026-07-27|IMG_1688.png"
     );
 
     const first = reconcileConfirmedEvidencePackage({
@@ -34,7 +34,7 @@ describe("July 27 Strength Training ingestion stabilization", () => {
       userId: "founder",
     });
     expect(first.report.addedCanonicalIds).toEqual([
-      "training|authoritative|IMG_1688.png",
+      "training|filename|2026-07-27|IMG_1688.png",
     ]);
 
     const afterFirst = applyChangedObjects(
@@ -65,7 +65,7 @@ describe("July 27 Strength Training ingestion stabilization", () => {
     ).toHaveLength(1);
 
     const canonicalStrength = afterFirst.find(
-      (object) => object.canonicalId === "training|authoritative|IMG_1688.png"
+      (object) => object.canonicalId === "training|filename|2026-07-27|IMG_1688.png"
     );
     expect(canonicalStrength.payload).toMatchObject({
       observed_at: workoutDate,
@@ -105,6 +105,9 @@ describe("July 27 Strength Training ingestion stabilization", () => {
       now: () => new Date("2026-07-27T23:59:00.000Z"),
     });
 
+    // Event ids hash the canonical id, so their sort order is an accident of the
+    // id format; the legitimate PR set is what this contract pins.
+    const byRow = (left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right));
     expect(
       events.map((event) => [
         event.canonicalExerciseId,
@@ -112,7 +115,7 @@ describe("July 27 Strength Training ingestion stabilization", () => {
         event.currentValue,
         event.previousBaselineValue,
         event.load,
-      ])
+      ]).sort(byRow)
     ).toEqual([
       ["cable_machine_front_raise", "session_volume_pr", 6240, 5470, null],
       ["shoulder_press_machine", "reps_at_load_pr", 15, 10, 140],
@@ -120,7 +123,7 @@ describe("July 27 Strength Training ingestion stabilization", () => {
       ["shoulder_press_machine", "reps_at_load_pr", 11, 10, 140],
       ["cable_machine_front_raise", "reps_at_load_pr", 12, 10, 130],
       ["shoulder_press_machine", "session_volume_pr", 6390, 5960, null],
-    ]);
+    ].sort(byRow));
     expect(events.some((event) => event.canonicalExerciseId === "lateral_raise_machine")).toBe(
       false
     );

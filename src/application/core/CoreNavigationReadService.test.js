@@ -324,6 +324,37 @@ describe("provider-native core navigation reads", () => {
     const set = logger.initialHistorySessions
       .find((session) => session.id === "session-pull-up-2").exercises[0].sets[0];
     expect(set).toMatchObject({ weight: 25, weight_unit: "lb", load_type: "external_load" });
+    // Additive Server-owned set-level load semantics for Native's completion copy.
+    expect(set.load_semantics).toBe("weighted_bodyweight");
+  });
+
+  it("classifies historical bodyweight encodings and machine zeros with one Server-owned rule", async () => {
+    const { narrow, runtime } = services();
+    runtime.canonicalEvidenceObjects.push({
+      canonicalId: "training-mixed-encodings",
+      quality: { status: "complete" },
+      payload: {
+        id: "session-mixed-encodings",
+        evidence_type: "training",
+        observed_at: "2026-09-13",
+        exercises: [{
+          id: "hlr", canonicalExerciseId: "hanging_leg_raise", name: "Hanging Leg Raises",
+          sets: [
+            { reps: 18, weight: null, weight_unit: "bodyweight", load_type: "bodyweight" },
+            { reps: 20, weight: 0, weight_unit: "lb", load_type: "external_load" },
+          ],
+        }, {
+          id: "machine", canonicalExerciseId: "iso_lateral_high_row", name: "Iso-Lateral High Rows",
+          sets: [{ reps: 12, weight: 0, weight_unit: "lb", load_type: "external_load" }],
+        }],
+      },
+    });
+    const session = (await narrow.getTrainingLogger()).initialHistorySessions
+      .find((item) => item.id === "session-mixed-encodings");
+    expect(session.exercises[0].sets.map((set) => set.load_semantics)).toEqual(["bodyweight", "bodyweight"]);
+    expect(session.exercises[1].sets[0].load_semantics).toBe("external_load");
+    // Stored values are read, never rewritten.
+    expect(session.exercises[0].sets[1]).toMatchObject({ weight: 0, weight_unit: "lb", load_type: "external_load" });
   });
 
   it("computes My Library as performed history UNION explicit additions, without a membership record for performed-only exercises", async () => {

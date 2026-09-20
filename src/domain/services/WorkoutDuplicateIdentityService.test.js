@@ -355,7 +355,7 @@ describe("WorkoutDuplicateIdentityService", () => {
       "Different workout dates: 2026-07-17 vs 2026-07-27"
     );
     expect(getWorkoutDuplicateIdentityKey(julyTwentySeven)).toBe(
-      "training|authoritative|IMG_1688.png"
+      "training|filename|2026-07-27|IMG_1688.png"
     );
   });
 
@@ -378,7 +378,11 @@ describe("WorkoutDuplicateIdentityService", () => {
     const result = assessWorkoutDuplicatePair(firstUpload, retry);
 
     expect(result.outcome).toBe("duplicate");
-    expect(result.signals.authoritative).toEqual(["IMG_1688.png"]);
+    // A re-upload is recognised from corroborated same-date evidence, with the
+    // display filename as weak context rather than authoritative identity.
+    expect(result.signals.authoritative).toEqual([]);
+    expect(result.signals.displayFilenames).toEqual(["IMG_1688.png"]);
+    expect(result.signals.temporal.overlapping).toBe(true);
   });
 
   it("keeps different-day typed strength uploads as separate canonical sessions", () => {
@@ -414,8 +418,8 @@ describe("WorkoutDuplicateIdentityService", () => {
 
     expect(activeStrengthSessions).toHaveLength(2);
     expect(activeStrengthSessions.map((object) => object.canonicalId).sort()).toEqual([
-      "training|authoritative|IMG_1602.png",
-      "training|authoritative|IMG_1688.png",
+      "training|filename|2026-07-17|IMG_1602.png",
+      "training|filename|2026-07-27|IMG_1688.png",
     ]);
   });
 

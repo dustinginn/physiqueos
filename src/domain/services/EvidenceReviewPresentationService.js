@@ -393,16 +393,25 @@ const PHOTO_EVIDENCE_TYPES = new Set(["photo_session", "photo", "photos", "progr
  * Where the evidence actually came from, read from provenance and never from
  * the file format. An image is a Screenshot only when intake recorded it as
  * one (artifact kind `screenshot`) or its modality says so; a Progress Photo
- * (artifact kind `progress_photo`, photo modality, or a photo-session object)
- * is a photo whatever its container (JPEG, HEIC, DNG, ...), so a future photo
- * format can never become a screenshot. Legacy packages without a recorded
+ * (artifact kind `progress_photo` on photo evidence, photo modality, or a
+ * photo-session object) is a photo whatever its container (JPEG, HEIC, DNG,
+ * ...), so a future photo format can never become a screenshot. A
+ * `progress_photo` kind on non-photo evidence is a mislabel and reads as the
+ * document image it was submitted as. Legacy packages without a recorded
  * kind keep their earlier reading: an image is a Screenshot unless the
  * evidence itself is a photo session.
  */
 function classifySourceArtifact(item, photoEvidence) {
   const kind = String(item?.kind ?? "").toLowerCase();
   if (kind === "screenshot") return "screenshot";
-  if (kind === "progress_photo" || kind === "photo") return "photo";
+  if (kind === "progress_photo" || kind === "photo") {
+    // Evidence that is not a photo session was submitted as a document image.
+    // A `progress_photo` kind stamped by the earlier file-size heuristic on
+    // Training, Activity or Nutrition evidence is a mislabel: the object's own
+    // evidence type, not the stored kind, decides how its source reads.
+    const isImage = /image/i.test(String(item?.mime_type ?? item?.type ?? ""));
+    return !photoEvidence && isImage ? "screenshot" : "photo";
+  }
   if (kind === "pdf" || kind === "typed_evidence" || kind === "upload") return null;
   return /image|screenshot/i.test(`${item?.type ?? ""} ${item?.mime_type ?? ""}`) ? (photoEvidence ? "photo" : "screenshot") : null;
 }

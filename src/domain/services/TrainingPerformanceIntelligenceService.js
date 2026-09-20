@@ -1,3 +1,4 @@
+import { classifyTrainingSetLoad, getComparisonLoad } from "../models/trainingSetLoadSemantics";
 import {
   TRAINING_NAVIGATION_CATEGORIES,
   withPrimaryTrainingNavigationCategory,
@@ -152,7 +153,9 @@ function createExercisePerformanceEntry({ exercise = {}, session = {} }) {
       exercise.primary_muscle_groups,
     regionLabel: identity.exercise?.body_region ?? exercise.body_region,
   });
-  const sets = normalizeSets(exercise.sets);
+  const sets = normalizeSets(exercise.sets, {
+    defaultLoadType: identity.exercise?.default_load_type ?? null,
+  });
   const totalVolume = sumKnownVolume(sets);
   const bestSet = getBestSet(sets);
   const executionVariant = normalizeTrainingExecutionVariant(
@@ -180,7 +183,7 @@ function createExercisePerformanceEntry({ exercise = {}, session = {} }) {
   };
 }
 
-function normalizeSets(sets = []) {
+function normalizeSets(sets = [], { defaultLoadType = null } = {}) {
   return sets
     .map((set, index) => {
       const reps = toFiniteNumber(set.reps);
@@ -217,6 +220,11 @@ function normalizeSets(sets = []) {
         weight,
         weight_unit: set.weight_unit ?? (Number.isFinite(weight) ? "lb" : null),
         volume,
+        // Read-time load semantics. Bodyweight is the zero comparison baseline
+        // whatever its stored encoding, so a null-load set and a numeric
+        // `0 lb` set of a bodyweight exercise are the same performance.
+        load_semantics: classifyTrainingSetLoad(set, { defaultLoadType }).semantics,
+        comparison_load: getComparisonLoad(set, { defaultLoadType }),
       };
     })
     .filter(
@@ -361,21 +369,21 @@ function detectPrs({ lastSession, priorEntries = [] }) {
   }
 
   for (const set of lastSession.sets) {
-    if (!Number.isFinite(set.reps) || !Number.isFinite(set.weight)) continue;
-    const priorSameWeightReps = maxFinite(
+    if (!Number.isFinite(set.reps) || !Number.isFinite(set.comparison_load)) continue;
+    const priorSameLoadReps = maxFinite(
       priorSets
-        .filter((priorSet) => priorSet.weight === set.weight)
+        .filter((priorSet) => priorSet.comparison_load === set.comparison_load)
         .map((priorSet) => priorSet.reps)
     );
 
-    if (Number.isFinite(priorSameWeightReps) && set.reps > priorSameWeightReps) {
+    if (Number.isFinite(priorSameLoadReps) && set.reps > priorSameLoadReps) {
       prs.push({
         type: "reps_at_load",
         value: set.reps,
         unit: "reps",
-        load: set.weight,
-        load_unit: set.weight_unit ?? "lb",
-        previous_best: priorSameWeightReps,
+        load: set.comparison_load,
+        load_unit: set.weight_unit === "kg" ? "kg" : "lb",
+        previous_best: priorSameLoadReps,
       });
     }
   }

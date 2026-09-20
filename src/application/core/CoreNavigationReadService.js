@@ -1,3 +1,4 @@
+import { classifyTrainingSetLoad, resolveExerciseDefaultLoadType } from "../../domain/models/trainingSetLoadSemantics.js";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import { FOUNDATION_SOURCE_COLLECTIONS } from "../../platform/migration/foundationSourceCollections.js";
 import { createHomeBriefingService } from "../../domain/services/HomeBriefingService.js";
@@ -796,6 +797,11 @@ function projectTrainingHistorySession(record) {
         weight: set.weight ?? set.load,
         weight_unit: set.weight_unit ?? set.unit ??
           (set.load_type === "bodyweight" || set.loadType === "bodyweight" ? "bodyweight" : "lb"),
+        // Additive read-time contract: the Server-owned set-level load
+        // semantics (bodyweight, weighted_bodyweight, external_load, unknown).
+        load_semantics: classifyTrainingSetLoad(set, {
+          defaultLoadType: resolveExerciseDefaultLoadType(exercise),
+        }).semantics,
       })),
     })),
     exerciseRelationshipGroups: session.exerciseRelationshipGroups ?? [],

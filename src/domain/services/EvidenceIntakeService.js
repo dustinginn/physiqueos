@@ -309,6 +309,12 @@ async function createEvidencePackageFromStoredArtifacts({
   photoSessionContext = null,
   onStage = null,
 }) {
+  // The declared evidence type owns what an image IS. Tag every image with its
+  // semantic role once, so persisted provenance, modality and routing can never
+  // disagree with it because of a filename, format or file-size heuristic.
+  storedArtifacts = storedArtifacts.map((artifact) => isImageArtifact(artifact)
+    ? { ...artifact, evidenceRole: resolveImageArtifactRole(artifact, { expectedEvidenceType }) }
+    : artifact);
   const imageArtifacts = storedArtifacts.filter((artifact) => isImageArtifact(artifact));
   const pdfArtifacts = storedArtifacts.filter((artifact) => isPdfArtifact(artifact));
   const classifiedImages = classifyImageArtifacts(imageArtifacts, { expectedEvidenceType });
@@ -1467,7 +1473,7 @@ function toPersistedSourceArtifact(artifact) {
     kind: isPdfArtifact(artifact)
       ? "pdf"
       : isImageArtifact(artifact)
-        ? isLikelyProgressPhotoArtifact(artifact)
+        ? isProgressPhotoArtifact(artifact)
           ? "progress_photo"
           : "screenshot"
         : "upload",
@@ -1623,10 +1629,10 @@ function getPackageProvider(evidencePackage) {
 
 function getSourceModality(artifacts = []) {
   const hasProgressPhoto = artifacts.some(
-    (artifact) => isImageArtifact(artifact) && isLikelyProgressPhotoArtifact(artifact)
+    (artifact) => isImageArtifact(artifact) && isProgressPhotoArtifact(artifact)
   );
   const hasScreenshot = artifacts.some(
-    (artifact) => isImageArtifact(artifact) && !isLikelyProgressPhotoArtifact(artifact)
+    (artifact) => isImageArtifact(artifact) && !isProgressPhotoArtifact(artifact)
   );
   const hasPdf = artifacts.some(isPdfArtifact);
 
@@ -1640,21 +1646,36 @@ function getSourceModality(artifacts = []) {
   return "manual";
 }
 
+// Declared document evidence: an image submitted for one of these types is a
+// screenshot or scan of a document, never a body photograph, however large or
+// however it is encoded. Only a declared photo_session, or an undeclared
+// ("auto") submission whose file looks like a photograph, is a Progress Photo.
+const DOCUMENT_EVIDENCE_TYPES = new Set(["training", "activity_day", "nutrition", "dexa_scan"]);
+
+export function resolveImageArtifactRole(artifact = {}, { expectedEvidenceType = "auto" } = {}) {
+  if (expectedEvidenceType === "photo_session") return "progress_photo";
+  if (DOCUMENT_EVIDENCE_TYPES.has(expectedEvidenceType)) return "screenshot";
+  return isLikelyProgressPhotoArtifact(artifact) ? "progress_photo" : "screenshot";
+}
+
+// The role tagged at intake wins; artifacts that were never tagged (legacy or
+// directly constructed) fall back to the file heuristic.
+function isProgressPhotoArtifact(artifact = {}) {
+  return artifact.evidenceRole
+    ? artifact.evidenceRole === "progress_photo"
+    : isLikelyProgressPhotoArtifact(artifact);
+}
+
 export function classifyImageArtifacts(artifacts = [], { expectedEvidenceType = "auto" } = {}) {
-  // Explicit Workout Logger or Activity context is stronger than filename,
-  // encoding, or byte-size heuristics. A workout/Health screenshot can be a
-  // large JPEG or HEIC; those properties must never reroute it into body-photo
-  // review. Explicit context still does not certify OCR values — Activity's
-  // parser independently fails closed to visual interpretation.
-  if (["training", "activity_day"].includes(expectedEvidenceType)) {
-    return { progressPhotos: [], screenshots: [...artifacts] };
-  }
-  if (expectedEvidenceType === "photo_session") {
-    return { progressPhotos: [...artifacts], screenshots: [] };
-  }
+  // Explicit Workout Logger, Activity, Nutrition or DEXA context is stronger
+  // than filename, encoding, or byte-size heuristics. A workout/Health
+  // screenshot can be a large JPEG or HEIC; those properties must never reroute
+  // it into body-photo review. Explicit context still does not certify OCR
+  // values — Activity's parser independently fails closed to visual
+  // interpretation.
   return artifacts.reduce(
     (groups, artifact) => {
-      if (isLikelyProgressPhotoArtifact(artifact)) {
+      if (resolveImageArtifactRole(artifact, { expectedEvidenceType }) === "progress_photo") {
         groups.progressPhotos.push(artifact);
       } else {
         groups.screenshots.push(artifact);

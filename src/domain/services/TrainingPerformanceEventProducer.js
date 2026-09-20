@@ -1,4 +1,8 @@
 import {
+  getComparisonLoad,
+  resolveExerciseDefaultLoadType,
+} from "../models/trainingSetLoadSemantics";
+import {
   createTrainingPerformanceEvent,
   haveSameTrainingPerformanceEventSemantics,
   TRAINING_PERFORMANCE_EVENT_TYPES,
@@ -38,6 +42,17 @@ export function produceTrainingPerformanceEvents({
     !Array.isArray(report?.exerciseObservations)
   ) {
     throw new Error("Current-session Training performance-event inputs are incomplete.");
+  }
+
+  // Active canonical Training owns current truth. A session that is no longer
+  // authoritative can never become a source of new durable achievements.
+  if (
+    canonicalTrainingSession?.quality?.status === "superseded" ||
+    session.quality?.status === "superseded" ||
+    canonicalTrainingSession?.quality?.supersededBy ||
+    session.quality?.supersededBy
+  ) {
+    return [];
   }
 
   const workoutDate = String(session.observed_at ?? "").slice(0, 10);
@@ -164,7 +179,9 @@ function createEventFromDescriptor({
     (exercise.sets ?? []).some(
       (set) =>
         Number(set.reps) === descriptor.value &&
-        Number(set.weight) === descriptor.load
+        getComparisonLoad(set, {
+          defaultLoadType: resolveExerciseDefaultLoadType(exercise),
+        }) === descriptor.load
     )
   ) {
     return createTrainingPerformanceEvent({
