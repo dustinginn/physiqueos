@@ -123,7 +123,17 @@ export function createPostgresPhotoEventReadStore({
         const canonicalObjects = byCollection(evidenceRows, "canonicalEvidenceObjects");
         const legacyPhotos = byCollection(evidenceRows, "progressPhotos");
         const dexaScans = byCollection(evidenceRows, "dexaScans");
-        const goals = byCollection(goalRows, "goals");
+        // A Goal is handed to the Goal Contract V3 adapter, which derives its
+        // `contractVersion` from `goal.goalContractVersion ?? goal.version`. The
+        // stored Goal payload carries neither, and the repository read path has
+        // always given the adapter that exact shape (so it defaults to
+        // "canonical_v1"). Injecting the record's NUMERIC storage version here made
+        // `contractVersion` the number 1, which the adapter rejects with
+        // "contractVersion is required." and blocked the real Sep 19 Photo Event.
+        // Goals are read-only inputs to the Event, so they keep their stored shape.
+        const goals = goalRows
+          .filter((row) => row.collection_name === "goals")
+          .map((row) => Object.freeze({ ...row.payload }));
         const persistedGoalId = canonicalSession.goalId ??
           canonicalSession.goalPhaseAttribution?.goalId ?? null;
         const goal = goals.find((item) => item.id === persistedGoalId) ??

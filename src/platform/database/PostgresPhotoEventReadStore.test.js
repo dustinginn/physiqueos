@@ -39,6 +39,34 @@ describe("PostgresPhotoEventReadStore", () => {
     ]);
   });
 
+  it("hands the Goal Contract V3 adapter the Goal's stored shape, never the record's numeric storage version", async () => {
+    // Real production regression: the active Goal payload has no `version` and no
+    // `goalContractVersion`. The adapter derives contractVersion from
+    // `goal.goalContractVersion ?? goal.version ?? "canonical_v1"`; a numeric 1 injected
+    // from the row version made contractVersion the number 1 and the Photo Event
+    // failed with "contractVersion is required."
+    const store = createPostgresPhotoEventReadStore({ pool: fakePool(), ownerUserId: "user_founder_001" });
+    const { goal, goals } = await store.loadInputs({ userId: "user_founder_001", sessionId: "opaque-session-id" });
+    expect(goal.id).toBe("active-goal");
+    expect(goal.version).toBeUndefined();
+    expect(goals.every((item) => typeof item.version !== "number")).toBe(true);
+    expect(goal.goalContractVersion ?? goal.version ?? "canonical_v1").toBe("canonical_v1");
+  });
+
+  it("preserves a version the Goal payload itself carries", async () => {
+    const pool = fakePool();
+    const original = pool.query.getMockImplementation();
+    pool.query.mockImplementation(async (sql, values) => {
+      if (sql.includes("canonical_goal_records")) return { rows: [
+        row("goals", "active-goal", { id: "active-goal", userId: "user_founder_001", primary: true, status: "active", goalContractVersion: "goal_contract_v2" }),
+      ] };
+      return original(sql, values);
+    });
+    const store = createPostgresPhotoEventReadStore({ pool, ownerUserId: "user_founder_001" });
+    const { goal } = await store.loadInputs({ userId: "user_founder_001", sessionId: "opaque-session-id" });
+    expect(goal.goalContractVersion).toBe("goal_contract_v2");
+  });
+
   it("fails closed before querying for another owner", async () => {
     const pool = fakePool();
     const store = createPostgresPhotoEventReadStore({
