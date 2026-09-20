@@ -46,6 +46,9 @@ export function createPostConfirmationOrchestrator({ reviewService, handlers = {
           progress[step] = completed;
           executedSteps.push(step);
         } catch (error) {
+          // A worker that lost its outbox lease no longer owns the step. Recording
+          // "failed" would overwrite the progress of the attempt that now does.
+          if (error?.code === "OUTBOX_LEASE_LOST") throw error;
           const failure = { step, message: String(error?.message ?? error), retryable: true };
           retryableFailures.push(failure);
           await reviewService?.recordCommitProgress(context.reviewId, step, { ...started, status: "failed", failedAt: now().toISOString(), error: failure.message, retryable: true }, { operationId });

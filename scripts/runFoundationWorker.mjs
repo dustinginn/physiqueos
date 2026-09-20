@@ -129,6 +129,12 @@ const handlers = Object.freeze({
       );
       return continueEvidenceReviewInBackground(input);
     },
+    abandonReview: async (input) => {
+      const { abandonEvidenceReviewContinuation } = await import(
+        "../src/app/evidence/review/[reviewId]/actions.js"
+      );
+      return abandonEvidenceReviewContinuation(input);
+    },
   }),
   ...(evidenceIntakeStore ? {
     [EVIDENCE_INTAKE_INTERPRETATION_TOPIC]: createEvidenceIntakeInterpretationWorkerHandler({

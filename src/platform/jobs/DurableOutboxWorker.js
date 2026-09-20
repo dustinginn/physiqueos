@@ -16,20 +16,42 @@ export function createDurableOutboxWorker({ store, handlers, workerId = createUu
     if (!message) return Object.freeze({ outcome: "idle" });
     const handler = handlers[message.topic];
     if (typeof handler !== "function") return failMessage(message, new WorkerMessageError("OUTBOX_TOPIC_UNSUPPORTED", "No handler is registered for this outbox topic."), true);
+    // attempt_count already includes this claim. A message that has been claimed
+    // more than the maximum number of times without ever being acknowledged or
+    // failed is one whose handler keeps killing the worker process (a crashed
+    // process never calls fail()). Running it again would loop forever, so it is
+    // dead-lettered and its owner is told, exactly as for a handler that fails.
+    if (Number(message.attempt_count) > maximumAttempts) {
+      return failMessage(message, new WorkerMessageError("OUTBOX_ATTEMPTS_EXHAUSTED", "The message was claimed repeatedly without completing."), true, handler);
+    }
+    // Lease bookkeeping. The database lease is what other workers respect; the
+    // local expiry is the same value seen from this process, so a stalled event
+    // loop that could not renew is detected instead of assumed healthy.
+    let leaseValidUntilMs = now.getTime() + leaseMs;
     let leaseLost = false;
+    let renewing = false;
     const renew = store.renewLease ? setInterval(async () => {
-      const renewedAt = clock();
-      const renewed = await store.renewLease({
-        id: message.id,
-        workerId,
-        at: renewedAt,
-        leaseExpiresAt: new Date(renewedAt.getTime() + leaseMs),
-      }).catch(() => null);
-      if (!renewed) leaseLost = true;
+      if (renewing || leaseLost) return;
+      renewing = true;
+      try {
+        const renewedAt = clock();
+        const leaseExpiresAt = new Date(renewedAt.getTime() + leaseMs);
+        const renewed = await store.renewLease({ id: message.id, workerId, at: renewedAt, leaseExpiresAt });
+        // No row means another claim or an expired lease: ownership is gone.
+        if (renewed) leaseValidUntilMs = leaseExpiresAt.getTime();
+        else leaseLost = true;
+      } catch {
+        // A transient database error is not loss of ownership. The lease stays
+        // valid until its own expiry, and the next tick retries the renewal.
+      } finally {
+        renewing = false;
+      }
     }, Math.max(1_000, Math.floor(leaseMs / 3))) : null;
     renew?.unref?.();
     const assertLease = () => {
-      if (leaseLost) throw new WorkerMessageError("OUTBOX_LEASE_LOST", "The worker lost durable ownership before completion.");
+      if (leaseLost || (renew && clock().getTime() >= leaseValidUntilMs)) {
+        throw new WorkerMessageError("OUTBOX_LEASE_LOST", "The worker lost durable ownership before completion.");
+      }
     };
     try {
       await handler(Object.freeze({
@@ -48,18 +70,35 @@ export function createDurableOutboxWorker({ store, handlers, workerId = createUu
       logger?.info?.("outbox.succeeded", { messageId: message.id, topic: message.topic, attemptCount: message.attempt_count });
       return Object.freeze({ outcome: "succeeded", messageId: message.id });
     } catch (error) {
-      return failMessage(message, error, Number(message.attempt_count) >= maximumAttempts);
+      return failMessage(message, error, Number(message.attempt_count) >= maximumAttempts, handler);
     } finally {
       if (renew) clearInterval(renew);
     }
   }
 
-  async function failMessage(message, error, terminal) {
+  async function failMessage(message, error, terminal, handler = handlers[message.topic]) {
     const at = clock();
     const errorCode = safeErrorCode(error);
     const dueAt = new Date(at.getTime() + retryDelayMs(Number(message.attempt_count)));
     const failed = await store.fail({ id: message.id, workerId, at, dueAt, errorCode, errorDetail: "Outbox handler failed; inspect correlated protected logs.", terminal });
     logger?.error?.("outbox.failed", { messageId: message.id, topic: message.topic, errorCode, terminal, attemptCount: message.attempt_count });
+    // A dead-lettered message can never advance its owner again. Let the owner
+    // make that visible instead of waiting on a message that will not run. The
+    // hook is only called when this worker actually persisted the dead state.
+    if (terminal && failed && typeof handler?.onDead === "function") {
+      try {
+        await handler.onDead(Object.freeze({
+          messageId: message.id,
+          topic: message.topic,
+          userId: message.user_id ?? null,
+          payloadVersion: message.payload_version,
+          payload: structuredClone(message.payload),
+          errorCode,
+        }));
+      } catch (hookError) {
+        logger?.error?.("outbox.dead_hook_failed", { messageId: message.id, topic: message.topic, errorCode: safeErrorCode(hookError) });
+      }
+    }
     return Object.freeze({ outcome: terminal ? "dead" : "retry_scheduled", messageId: message.id, dueAt: terminal ? null : dueAt.toISOString(), persisted: Boolean(failed) });
   }
 

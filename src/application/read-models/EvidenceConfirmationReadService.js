@@ -1,4 +1,5 @@
 import { resolveEventBriefingPreferencesFromStore } from "../../domain/services/CoachingUpdatesReadService";
+import { resolvePhotoEventContext } from "../../domain/services/PhotoEventContextService";
 import { runRepositoryReadScope } from "./RepositoryReadScope";
 
 export function createEvidenceConfirmationReadService({ repositories } = {}) {
@@ -38,6 +39,22 @@ export function createEvidenceConfirmationReadService({ repositories } = {}) {
             protocolVersions: currentVersion ? [currentVersion] : [],
           });
         },
+      });
+    },
+    // PhotoEventContext issues four concurrent repository reads. Outside a read
+    // scope every concurrent read loads and clones the entire canonical runtime
+    // (about 150 MB retained each in production), so four at once exhaust the
+    // worker heap. Inside a scope they share one load.
+    async readPhotoEventContext({ userId, evidenceDate, evidenceAttribution = null }) {
+      return runRepositoryReadScope({
+        repositories,
+        readModel: "action.evidence-review-analysis-photo-context",
+        callback: () => resolvePhotoEventContext({
+          repositories,
+          userId,
+          evidenceDate,
+          evidenceAttribution,
+        }),
       });
     },
     async readTrainingPerformanceEventInputs(userId, analysisId) {

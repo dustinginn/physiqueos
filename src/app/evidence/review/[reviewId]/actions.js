@@ -35,8 +35,11 @@ import { filterEligibleEventBriefingTypes } from "../../../../domain/services/Co
 import { createEvidenceConfirmationReadService } from "../../../../application/read-models/EvidenceConfirmationReadService";
 import {
   createPhotoInterpreterGoalContext,
-  resolvePhotoEventContext,
 } from "../../../../domain/services/PhotoEventContextService";
+import {
+  createConfirmationAnalysisWriter,
+  createConfirmationProgressPhotoWriter,
+} from "../../../../application/evidence/ConfirmationBoundedWriters";
 import { createPendingEvidenceReviewReprocessingService } from "../../../../domain/services/PendingEvidenceReviewReprocessingService";
 import { createApplicationStoredArtifactLoader } from "../../../../application/media/ApplicationUploadService";
 import { createPhotoAnalysisMediaLoader } from "../../../../application/media/PhotoAnalysisMediaLoader";
@@ -143,6 +146,7 @@ export async function continueEvidenceReviewInBackground({
   reviewId,
   continuationKey,
   messageId,
+  assertLease = null,
 }) {
   const formData = new FormData();
   formData.set("reviewId", String(reviewId ?? ""));
@@ -150,7 +154,42 @@ export async function continueEvidenceReviewInBackground({
     mode: "background",
     continuationKey: String(continuationKey ?? ""),
     operationId: `evidence-review-background:${String(messageId ?? "")}`,
+    assertLease,
   });
+}
+
+// Called by the worker when a continuation message is dead-lettered, either
+// because its handler kept failing or because the worker process kept dying
+// while it held the message. Without this the review would stay `committing`
+// (and Native would keep saying "Processing") with no message left to advance
+// it. Failing the claim turns the review into `partially_committed`, which is
+// observable and resumes through the existing idempotent path: completed steps
+// are skipped and the first incomplete step runs again.
+//
+// Only the operation that owns the active claim can fail it. If the review has
+// already moved on (another message advanced it, it was confirmed, or the claim
+// was released) the claim assertion rejects and this is a no-op, so a stale
+// dead-letter can never fail a healthy review.
+export async function abandonEvidenceReviewContinuation({
+  reviewId,
+  messageId,
+  errorCode = "OUTBOX_DEAD_LETTERED",
+}) {
+  const operationId = `evidence-review-background:${String(messageId ?? "")}`;
+  try {
+    await FounderRepositories.evidenceReviews.failEvidenceReviewCommit(String(reviewId ?? ""), {
+      operationId,
+      error: `Evidence review processing stopped after repeated interruptions (${errorCode}). ` +
+        "It resumes from the first incomplete step without repeating completed work.",
+      failedAt: new Date().toISOString(),
+    });
+    return Object.freeze({ state: "failed_observable", reviewId });
+  } catch (error) {
+    if (["COMMIT_CLAIM_LOST", "REVIEW_NOT_COMMITTING", "REVIEW_NOT_FOUND"].includes(error?.code)) {
+      return Object.freeze({ state: "not_applicable", reviewId, code: error.code });
+    }
+    throw error;
+  }
 }
 
 export async function beginNativeEvidenceReviewConfirmation({
@@ -172,6 +211,7 @@ async function executeEvidenceReviewConfirmation(formData, {
   continuationKey = null,
   operationId: requestedOperationId = null,
   confirmedBy = null,
+  assertLease = null,
 }) {
   const background = mode === "background" || mode === "native";
   const nativeStart = mode === "native";
@@ -311,6 +351,7 @@ async function executeEvidenceReviewConfirmation(formData, {
         reviewId,
         user,
         canonicalCommitRecovery,
+        assertLease,
       }),
     });
     orchestrationResult = await orchestrator.run(
@@ -341,6 +382,10 @@ async function executeEvidenceReviewConfirmation(formData, {
       await service.confirm(reviewId, { evidencePackage, confirmedBy: user.id, operationId });
     }
   } catch (error) {
+    // A worker that lost its lease no longer owns this operation. A successor may
+    // already hold the same message and the same operation id, so failing the
+    // claim here would break the attempt that is actually running.
+    if (error?.code === "OUTBOX_LEASE_LOST") throw error;
     await service.failCommit(reviewId, error, { operationId });
     if (background) throw error;
     const canonicalSaveCompleted = isEvidenceReviewCanonicalSaveComplete(review) ||
@@ -714,8 +759,10 @@ function assertIncludedPhotoSessionsReady(evidencePackage) {
 }
 
 function createHandlers({ evidencePackage, reviewId, user,
-  canonicalCommitRecovery = null }) {
+  canonicalCommitRecovery = null, assertLease = null }) {
   const confirmationReads = createEvidenceConfirmationReadService({ repositories: FounderRepositories });
+  const persistAnalyses = createConfirmationAnalysisWriter({ repositories: FounderRepositories });
+  const persistProgressPhotos = createConfirmationProgressPhotoWriter({ repositories: FounderRepositories });
   const loadPhotoAnalysisMedia = createPhotoAnalysisMediaLoader({ userId: user.id });
   let canonical = null;
   let analyses = [];
@@ -810,7 +857,7 @@ function createHandlers({ evidencePackage, reviewId, user,
       // commitCompatibilityRepositories' DEXA branch calls canonical.find().
       // Load it the same way scheduled_completion and analysis already do.
       canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
-      return { status: "completed", records: await commitCompatibilityRepositories({ canonical, evidencePackage, user }) };
+      return { status: "completed", records: await commitCompatibilityRepositories({ canonical, evidencePackage, user, persistProgressPhotos }) };
     },
     scheduled_completion: async () => {
       canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
@@ -850,7 +897,10 @@ function createHandlers({ evidencePackage, reviewId, user,
     },
     analysis: async () => {
       canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
-      analyses = await runDomainAnalysis({ canonical, evidencePackage, user, loadPhotoAnalysisMedia });
+      analyses = await runDomainAnalysis({
+        canonical, evidencePackage, user, loadPhotoAnalysisMedia,
+        confirmationReads, persistAnalyses, assertLease,
+      });
       trainingAnalysis =
         analyses.find((analysis) => analysis.id === `analysis_training_${evidencePackage.package_id}`) ??
         null;
@@ -1020,7 +1070,7 @@ function createHandlers({ evidencePackage, reviewId, user,
         memoryProfile: persistence.memoryProfile ?? null,
       };
     },
-    goal_evaluation: async () => refreshGoalEvaluations({ evidencePackage, user, confirmationReads }),
+    goal_evaluation: async () => refreshGoalEvaluations({ evidencePackage, user, confirmationReads, persistAnalyses }),
     event_eligibility: async () => {
       const eventObjects = (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed && ["photo_session", "dexa", "dexa_scan", "body_composition"].includes(item.evidence_type));
       return { status: "completed", eligible: eventObjects.filter((item) => item.evidence_type !== "photo_session" || isCompletePhotoSession(item)).map((item) => item.evidence_type) };
@@ -1193,7 +1243,7 @@ function publishPostConfirmationRefreshes(orchestrationResult) {
   }
 }
 
-async function commitCompatibilityRepositories({ canonical, evidencePackage, user }) {
+async function commitCompatibilityRepositories({ canonical, evidencePackage, user, persistProgressPhotos }) {
   // Deliberately NOT defaulted to []. An empty list is not a safe stand-in
   // for "not loaded": the DEXA branch below looks up the just-committed
   // canonical record to carry its canonicalId, dexaRevision and
@@ -1240,14 +1290,15 @@ async function commitCompatibilityRepositories({ canonical, evidencePackage, use
     }
     if (object.evidence_type === "photo_session") {
       const date = resolveCanonicalEvidenceLocalDate(object);
-      const existing = await FounderRepositories.progressPhotos.getPhotosByDate(user.id, date);
+      const photoRecords = [];
       for (const photo of (object.photos ?? []).filter((item) => item.active !== false)) {
         const id = `progress_photo_${user.id}_${date}_${photo.view}_${photo.pose}`;
-        if (existing.some((item) => item.imagePath === photo.storage_path)) continue;
         const record = createProgressPhoto({ id, userId: user.id, date, capturedAt: object.captureMetadata?.capturedAt ?? date, uploadedAt: object.created_at ?? new Date().toISOString(), imagePath: photo.storage_path, relatedGoalIds: object.goalRelationship?.goalIds ?? [], view: photo.view, pose: photo.pose, conditions: { ...(object.conditions ?? {}), timeOfDay: object.captureMetadata?.timeOfDay ?? object.conditions?.timeOfDay ?? null }, source: { type: "manual", name: "Confirmed Photo Session", confidence: "high" }, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-        await FounderRepositories.progressPhotos.upsertPhoto(record);
-        records.push(id);
+        photoRecords.push(record);
       }
+      // One bounded write per session: the already-present check and every upsert
+      // run against the progress-photo collection only.
+      records.push(...await persistProgressPhotos({ userId: user.id, date, records: photoRecords }));
     }
   }
   return records;
@@ -1299,7 +1350,10 @@ function preserveCanonicalTimestamps(existing, candidate) {
   return { ...candidate, createdAt: existing.createdAt ?? candidate.createdAt };
 }
 
-async function runDomainAnalysis({ canonical, evidencePackage, user, loadPhotoAnalysisMedia }) {
+async function runDomainAnalysis({
+  canonical, evidencePackage, user, loadPhotoAnalysisMedia,
+  confirmationReads, persistAnalyses, assertLease = null,
+}) {
   const created = [];
   const completionIntent = evidencePackage.review_metadata?.confirmationIntent;
   for (const object of (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed)) {
@@ -1313,15 +1367,18 @@ async function runDomainAnalysis({ canonical, evidencePackage, user, loadPhotoAn
             .includes(evidencePackage.package_id))) ?? null;
       const sessionId = attributedSession?.canonicalId ??
         getStablePhotoSessionId({ userId: user.id, captureDate: evidenceDate });
-      const photoEventContext = await resolvePhotoEventContext({
-        repositories: FounderRepositories,
+      const photoEventContext = await confirmationReads.readPhotoEventContext({
         userId: user.id,
         evidenceDate,
         evidenceAttribution: attributedSession,
       });
       const photoGoalContext = createPhotoInterpreterGoalContext(photoEventContext, completionIntent);
       const perView = [];
+      const sessionAnalyses = [];
       for (const photo of (object.photos ?? []).filter((item) => item.active !== false)) {
+        // Stop before the next vision request if this worker no longer owns the
+        // message, instead of running minutes of duplicate provider work.
+        assertLease?.();
         const canonicalPhotoId = photo.canonicalPhotoId ?? `canonical_photo_${user.id}_${evidenceDate}_${stablePhotoIdentity(photo.id ?? photo.source_hash)}`;
         const prior = findPriorCanonicalPhoto(canonical, photo, evidenceDate);
         const currentInput = await photoInterpreterInput(photo, object, loadPhotoAnalysisMedia);
@@ -1332,13 +1389,18 @@ async function runDomainAnalysis({ canonical, evidencePackage, user, loadPhotoAn
         const structuredObservations = interpretation.structured_observations ?? normalizePhotoInterpretationToStructuredObservations(interpretation);
         const interpreterVersion = interpretation.interpreter_version ?? "photo-interpreter-production-v1";
         const analysis = createAnalysis({ id: stableAnalysisId([canonicalPhotoId, "v1", prior?.canonicalId ?? "baseline", interpreterVersion]), createdAt: new Date().toISOString(), title: `${photo.view} ${photo.pose} interpreted`, summary: interpretation.user_facing_summary, evidenceIds: [canonicalPhotoId], evidenceTypes: ["progress_photo"], findings: structuredObservations.map((item) => ({ title: item.region, detail: item.change })), metadata: { canonicalPhotoId, canonicalVersion: "v1", interpreterVersion, priorComparisonId: prior?.canonicalId ?? null, provider: interpretationResult.provider, warning: interpretationResult.warning, photoInterpretation: interpretation, structuredObservations } });
-        await FounderRepositories.analyses.createAnalysis(analysis); created.push(analysis); perView.push({ evidenceIds: analysis.evidenceIds, structuredObservations, analysisId: analysis.id });
+        sessionAnalyses.push(analysis); created.push(analysis); perView.push({ evidenceIds: analysis.evidenceIds, structuredObservations, analysisId: analysis.id });
       }
       if (perView.length === 0) throw new Error("PhotoSession synthesis requires at least one successful per-view analysis.");
       const synthesis = synthesizePhotoSessionObservations(perView);
       const synthesisId = stableAnalysisId([sessionId, "v1", ...perView.map((item) => item.analysisId).sort(), "synthesis-v1"]);
       const analysis = createAnalysis({ id: synthesisId, createdAt: new Date().toISOString(), title: "Photo Session Synthesis", summary: `Canonical multi-view synthesis completed from ${perView.length} production Photo Interpreter ${perView.length===1?"analysis":"analyses"}.`, evidenceIds: [sessionId], evidenceTypes: ["photo_session"], metadata: { photoSessionSynthesis: synthesis, sourceAnalysisIds: perView.map((item) => item.analysisId), synthesisVersion: "synthesis-v2" } });
-      await FounderRepositories.analyses.createAnalysis(analysis); created.push(analysis);
+      sessionAnalyses.push(analysis); created.push(analysis);
+      // One bounded write for the whole session. Each view is already durable in
+      // the provider result only once this succeeds, so a replay recomputes the
+      // views and replaces the same stable analysis ids.
+      assertLease?.();
+      await persistAnalyses(sessionAnalyses);
     } else if (["dexa", "dexa_scan", "body_composition"].includes(object.evidence_type)) {
       const canonicalScan = canonical.find((item) => ["dexa", "dexa_scan", "body_composition"].includes(item.evidence_type) && String(item.lastObservedAt).slice(0, 10) === String(object.observed_at).slice(0, 10));
       if (!canonicalScan) throw new Error("Confirmed canonical DEXA was not available for interpretation.");
@@ -1348,13 +1410,13 @@ async function runDomainAnalysis({ canonical, evidencePackage, user, loadPhotoAn
         .at(-1) ?? null;
       const priorScan = canonicalPrior ?? (legacyPrior ? { canonicalId: legacyPrior.canonicalId ?? legacyPrior.id, payload: legacyPrior } : null);
       const analysis = createDEXAInterpretation({ canonicalScan, priorScan });
-      await FounderRepositories.analyses.createAnalysis(analysis); created.push(analysis);
+      await persistAnalyses([analysis]); created.push(analysis);
     }
   }
   if ((evidencePackage.evidence_objects ?? []).some((item) => item.evidence_type === "training" && !item.removed)) {
     const report = createTrainingPerformanceIntelligenceReport({ canonicalObjects: canonical });
     const analysis = createAnalysis({ id: `analysis_training_${evidencePackage.package_id}`, createdAt: new Date().toISOString(), title: "Training Performance Refreshed", summary: report.summary, evidenceIds: canonical.filter((item) => item.evidence_type === "training").map((item) => item.canonicalId), evidenceTypes: ["training"], metadata: { trainingPerformance: report } });
-    await FounderRepositories.analyses.createAnalysis(analysis); created.push(analysis);
+    await persistAnalyses([analysis]); created.push(analysis);
   }
   return created;
 }
@@ -1428,13 +1490,13 @@ function getStableCanonicalId(object, userId) {
     : object?.id ?? `dexa_${userId}_${date}`;
 }
 
-async function refreshGoalEvaluations({ evidencePackage, user, confirmationReads }) {
+async function refreshGoalEvaluations({ evidencePackage, user, confirmationReads, persistAnalyses }) {
   const { goals, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext } =
     await confirmationReads.readGoalEvaluationInputs(user.id);
   const evaluations = GoalEvaluationService.getGoalEvaluations({ goals, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext });
   const versionId = `goal_evaluation_${evidencePackage.package_id}`;
   const record = createAnalysis({ id: versionId, createdAt: new Date().toISOString(), title: "Goal Evaluation Refreshed", summary: "Goal Evaluation recomputed from confirmed canonical-compatible evidence.", evidenceIds: (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed).map((item) => item.id), evidenceTypes: [...new Set((evidencePackage.evidence_objects ?? []).map((item) => item.evidence_type))], metadata: { evaluationVersion: versionId, evaluations, source: "GoalEvaluationService" } });
-  await FounderRepositories.analyses.createAnalysis(record);
+  await persistAnalyses([record]);
   return { status: "completed", evaluationVersionId: versionId, affectedGoalIds: evaluations.map((item) => item.goalId ?? item.id).filter(Boolean) };
 }
 

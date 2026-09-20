@@ -119,6 +119,217 @@ describe("durable outbox worker", () => {
   });
 });
 
+describe("durable outbox worker lease ownership under long-running work", () => {
+  it("keeps ownership of legitimate work that runs far longer than one 60 second lease", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(0));
+    try {
+      const store = durableStore([message()]);
+      let ownershipDuringWork = null;
+      const handler = vi.fn(async ({ assertLease }) => {
+        // Four minutes of real work: analysis of five photos, one at a time.
+        await new Promise((resolve) => setTimeout(resolve, 240_000));
+        assertLease();
+        ownershipDuringWork = store.state[0].claimed_by;
+      });
+      const worker = createDurableOutboxWorker({
+        store, handlers: { "synthetic.test": handler }, workerId: "worker", buildId: "build",
+        clock: () => new Date(Date.now()),
+      });
+      const result = worker.runOnce();
+      await vi.advanceTimersByTimeAsync(240_000);
+      await expect(result).resolves.toMatchObject({ outcome: "succeeded" });
+      expect(ownershipDuringWork).toBe("worker");
+      // Renewed every 20 seconds for four minutes, each time extending a full lease.
+      expect(store.renewals.length).toBeGreaterThanOrEqual(11);
+      expect(store.state[0]).toMatchObject({ status: "succeeded", attempt_count: 1 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops renewing as soon as the message completes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(0));
+    try {
+      const store = durableStore([message()]);
+      const worker = createDurableOutboxWorker({
+        store, handlers: { "synthetic.test": async () => { await new Promise((resolve) => setTimeout(resolve, 45_000)); } },
+        workerId: "worker", buildId: "build", clock: () => new Date(Date.now()),
+      });
+      const result = worker.runOnce();
+      await vi.advanceTimersByTimeAsync(45_000);
+      await result;
+      const renewalsAtCompletion = store.renewals.length;
+      await vi.advanceTimersByTimeAsync(300_000);
+      expect(store.renewals.length).toBe(renewalsAtCompletion);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not treat one transient renewal failure as loss of ownership", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(0));
+    try {
+      const store = durableStore([message()]);
+      const original = store.renewLease;
+      let calls = 0;
+      store.renewLease = async (input) => {
+        calls += 1;
+        if (calls === 1) throw new Error("connection reset");
+        return original(input);
+      };
+      const worker = createDurableOutboxWorker({
+        store, handlers: { "synthetic.test": async ({ assertLease }) => {
+          await new Promise((resolve) => setTimeout(resolve, 50_000));
+          assertLease();
+        } },
+        workerId: "worker", buildId: "build", clock: () => new Date(Date.now()),
+      });
+      const result = worker.runOnce();
+      await vi.advanceTimersByTimeAsync(50_000);
+      await expect(result).resolves.toMatchObject({ outcome: "succeeded" });
+      expect(calls).toBeGreaterThanOrEqual(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("detects authoritative loss: no renewal row means another claim or an expired lease", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(0));
+    try {
+      const store = durableStore([message()]);
+      store.renewLease = async () => null;
+      const worker = createDurableOutboxWorker({
+        store, handlers: { "synthetic.test": async ({ assertLease }) => {
+          await new Promise((resolve) => setTimeout(resolve, 25_000));
+          assertLease();
+        } },
+        workerId: "worker", buildId: "build", clock: () => new Date(Date.now()),
+      });
+      const result = worker.runOnce();
+      await vi.advanceTimersByTimeAsync(25_000);
+      await expect(result).resolves.toMatchObject({ outcome: "retry_scheduled" });
+      expect(store.state[0].last_error_code).toBe("OUTBOX_LEASE_LOST");
+      expect(store.state[0].status).not.toBe("succeeded");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("detects loss when the event loop could not renew and the local lease has lapsed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(0));
+    try {
+      const store = durableStore([message()]);
+      store.renewLease = async () => { throw new Error("pool exhausted"); };
+      const worker = createDurableOutboxWorker({
+        store, handlers: { "synthetic.test": async ({ assertLease }) => {
+          await new Promise((resolve) => setTimeout(resolve, 65_000));
+          assertLease();
+        } },
+        workerId: "worker", buildId: "build", clock: () => new Date(Date.now()),
+      });
+      const result = worker.runOnce();
+      await vi.advanceTimersByTimeAsync(65_000);
+      const outcome = await result;
+      expect(outcome.outcome).not.toBe("succeeded");
+      expect(store.state[0].status).not.toBe("succeeded");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never lets a second worker claim a message while the first still renews it", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(0));
+    try {
+      const store = durableStore([message()]);
+      let second = "unset";
+      const worker = createDurableOutboxWorker({
+        store, handlers: { "synthetic.test": async () => {
+          await new Promise((resolve) => setTimeout(resolve, 100_000));
+        } },
+        workerId: "first", buildId: "build", clock: () => new Date(Date.now()),
+      });
+      const result = worker.runOnce();
+      for (let elapsed = 0; elapsed < 100_000; elapsed += 10_000) {
+        await vi.advanceTimersByTimeAsync(10_000);
+        second = await store.claimNext({ workerId: "second", now: new Date(Date.now()), leaseExpiresAt: new Date(Date.now() + 60_000) });
+        expect(second).toBeNull();
+      }
+      await result;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("durable outbox worker bounded retry and dead-letter ownership", () => {
+  it("dead-letters a message claimed more than the maximum without running it and tells its owner", async () => {
+    // Three claims by a process that died each time: a crashed process never calls fail().
+    const store = durableStore([{ ...message({ status: "processing", claimed_by: "old", claim_expires_at: at(1) }), attempt_count: 3 }]);
+    const handler = vi.fn();
+    const onDead = vi.fn(async () => undefined);
+    handler.onDead = onDead;
+    const worker = createDurableOutboxWorker({ store, handlers: { "synthetic.test": handler }, workerId: "new", buildId: "build", maximumAttempts: 3, clock: () => at(10) });
+    await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "dead", persisted: true });
+    expect(handler).not.toHaveBeenCalled();
+    expect(store.state[0]).toMatchObject({ status: "dead", last_error_code: "OUTBOX_ATTEMPTS_EXHAUSTED", attempt_count: 4 });
+    expect(onDead).toHaveBeenCalledOnce();
+    expect(onDead.mock.calls[0][0]).toMatchObject({ messageId: "message-1", errorCode: "OUTBOX_ATTEMPTS_EXHAUSTED" });
+  });
+
+  it("still runs the final permitted attempt", async () => {
+    const store = durableStore([{ ...message({ status: "processing", claimed_by: "old", claim_expires_at: at(1) }), attempt_count: 2 }]);
+    const handler = vi.fn(async () => undefined);
+    const worker = createDurableOutboxWorker({ store, handlers: { "synthetic.test": handler }, workerId: "new", buildId: "build", maximumAttempts: 3, clock: () => at(10) });
+    await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "succeeded" });
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("keeps transient failures automatic and calls the owner only when the message actually dies", async () => {
+    const store = durableStore([message()]);
+    const onDead = vi.fn(async () => undefined);
+    const handler = Object.assign(async () => { throw Object.assign(new Error("boom"), { code: "SYNTHETIC_FAILURE" }); }, { onDead });
+    let now = at(0);
+    const worker = createDurableOutboxWorker({ store, handlers: { "synthetic.test": handler }, workerId: "w", buildId: "build", maximumAttempts: 3, clock: () => now });
+    await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "retry_scheduled" });
+    expect(onDead).not.toHaveBeenCalled();
+    now = at(3600);
+    await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "retry_scheduled" });
+    expect(onDead).not.toHaveBeenCalled();
+    now = at(7200);
+    await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "dead" });
+    expect(onDead).toHaveBeenCalledOnce();
+    expect(onDead.mock.calls[0][0]).toMatchObject({ errorCode: "SYNTHETIC_FAILURE" });
+  });
+
+  it("does not call the owner when this worker could not persist the dead state", async () => {
+    const store = durableStore([{ ...message(), attempt_count: 2 }]);
+    store.fail = async () => null;
+    const onDead = vi.fn();
+    const handler = Object.assign(async () => { throw new Error("boom"); }, { onDead });
+    const worker = createDurableOutboxWorker({ store, handlers: { "synthetic.test": handler }, workerId: "w", buildId: "build", maximumAttempts: 3, clock: () => at(0) });
+    await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "dead", persisted: false });
+    expect(onDead).not.toHaveBeenCalled();
+  });
+
+  it("survives an owner hook that throws", async () => {
+    const store = durableStore([{ ...message({ status: "processing", claimed_by: "old", claim_expires_at: at(1) }), attempt_count: 3 }]);
+    const errors = [];
+    const handler = Object.assign(vi.fn(), { onDead: async () => { throw new Error("hook failed"); } });
+    const worker = createDurableOutboxWorker({
+      store, handlers: { "synthetic.test": handler }, workerId: "w", buildId: "build", maximumAttempts: 3,
+      clock: () => at(10), logger: { error: (event, fields) => errors.push({ event, fields }), info() {} },
+    });
+    await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "dead" });
+    expect(errors.some((entry) => entry.event === "outbox.dead_hook_failed")).toBe(true);
+  });
+});
+
 function durableStore(seed) {
   const state = structuredClone(seed);
   const heartbeats = [];
