@@ -138,6 +138,20 @@ describe("Photo Briefing 24 hour Home publication window", () => {
     expect(relevant(artifact, "2026-09-21T17:51:47.390Z")).toBe(true);
   });
 
+  it("pins both edges of the publication window against the day rule", () => {
+    // A far-future local date disables the event-day rule so only the window decides.
+    const artifact = photo("2026-09-20T17:51:47.391Z", "2026-09-19");
+    const only = (now) => isEventBriefingRelevantForHome({ artifact, timeZone: TZ, localDate: "2026-12-25", now });
+    expect(only(new Date("2026-09-20T17:51:47.390Z"))).toBe(false);
+    expect(only(new Date("2026-09-20T17:51:47.391Z"))).toBe(true);
+    expect(only(new Date("2026-09-21T17:51:47.390Z"))).toBe(true);
+    expect(only(new Date("2026-09-21T17:51:47.391Z"))).toBe(false);
+    // An ISO string and epoch milliseconds are read the same as a Date.
+    expect(only("2026-09-21T12:00:00.000Z")).toBe(true);
+    expect(only(Date.parse("2026-09-21T12:00:00.000Z"))).toBe(true);
+    expect(only(Date.parse("2026-09-22T12:00:00.000Z"))).toBe(false);
+  });
+
   it("expires exactly 24 hours after generation once the ordinary window has also ended", () => {
     const artifact = photo("2026-09-20T17:51:47.391Z", "2026-09-19");
     expect(relevant(artifact, "2026-09-21T17:51:47.391Z")).toBe(false);

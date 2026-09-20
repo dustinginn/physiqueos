@@ -45,8 +45,8 @@ function isPhotoEventRelevant({ artifact, localDate, timeZone, now }) {
 // carries published narrative content.
 function isWithinPhotoPublicationWindow({ artifact, now }) {
   if (!artifact?.briefing?.photoEventNarrative) return false;
-  const generatedAt = Date.parse(artifact.generatedAt ?? "");
-  const current = now instanceof Date ? now.getTime() : Date.parse(now ?? "");
+  const generatedAt = instantMs(artifact.generatedAt);
+  const current = instantMs(now);
   if (!Number.isFinite(generatedAt) || !Number.isFinite(current)) return false;
   return current >= generatedAt &&
     current < generatedAt + PHOTO_EVENT_HOME_PUBLICATION_WINDOW_MS;
@@ -67,7 +67,7 @@ export function resolvePhotoEventHomeRelevanceEnd({
   const dayEnd = eventLocalDate
     ? startOfLocalDate(shiftDate(eventLocalDate, 2), timeZone)
     : null;
-  const generatedAt = Date.parse(artifact.generatedAt ?? "");
+  const generatedAt = instantMs(artifact.generatedAt);
   const publicationEnd = Number.isFinite(generatedAt)
     ? generatedAt + PHOTO_EVENT_HOME_PUBLICATION_WINDOW_MS
     : null;
@@ -79,6 +79,13 @@ export function resolvePhotoEventHomeRelevanceEnd({
         effectiveEnd: new Date(end).toISOString(),
       })
     : null;
+}
+
+// An instant given as a Date, an ISO string, or epoch milliseconds.
+function instantMs(value) {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  return Date.parse(value ?? "");
 }
 
 // Earliest instant whose local calendar date in `timeZone` is `localDate`.
