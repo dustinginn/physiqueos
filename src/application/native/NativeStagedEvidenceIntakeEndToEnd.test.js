@@ -70,7 +70,8 @@ function declaration(set, overrides = {}) {
       photoIdentities: originals.map((_, index) => ({
         orientation: ["front", "rear", "left_side", "right_side", "front"][index],
         contractionState: index === 4 ? "flexed" : "relaxed",
-        poseVariant: index === 4 ? "double_biceps" : "standard",
+        // Every declared identity must be a canonical combination: Front + Flexed is Front Flexed (standard).
+        poseVariant: "standard",
         goalValidationRole: "supporting",
         tags: [],
         identityStatus: "confirmed",
@@ -509,6 +510,25 @@ describe("staged Progress Photos intake, end to end", () => {
     expect(refused.status).toBe(400);
     expect((await json(refused)).code).toBe("STAGED_ARTIFACT_IDENTITY_INVALID");
     expect(harness.receipts).toHaveLength(1);
+  });
+
+  it("refuses a non-canonical pose at the declaration, before any intake, media, or interpretation exists", async () => {
+    const set = founderSet();
+    const bad = declaration(set);
+    // The Build 45 defect: Double Biceps declared with a Relaxed contraction.
+    bad.photoSession.photoIdentities[1] = { ...bad.photoSession.photoIdentities[1], orientation: "rear", contractionState: "relaxed", poseVariant: "double_biceps" };
+    const response = await stage(bad);
+    expect(response.status).toBe(400);
+    expect((await json(response)).code).toBe("PHOTO_IDENTITY_NON_CANONICAL");
+    expect(harness.receipts).toHaveLength(0);
+    expect(harness.media).toHaveLength(0);
+    expect(harness.outbox).toHaveLength(0);
+    // The corrected identity (Rear Flexed is Double Biceps) declares normally.
+    const good = declaration(set);
+    good.photoSession.photoIdentities[1] = { ...good.photoSession.photoIdentities[1], orientation: "rear", contractionState: "flexed", poseVariant: "double_biceps" };
+    expect((await stage(good)).status).toBe(202);
+    expect(harness.receipts).toHaveLength(1);
+    expect(harness.receipts[0].recovery_context.photoIdentities[1]).toMatchObject({ poseId: "back-flexed", contractionState: "flexed", poseVariant: "double_biceps" });
   });
 
   it("keeps the aggregate multipart transport and its 4 KiB command reader untouched", async () => {

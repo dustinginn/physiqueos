@@ -68,29 +68,68 @@ export function inferPhotoSessionCaptureMetadata(artifacts = [], { evidenceDate 
   };
 }
 
+/**
+ * Resolves which Goal a Progress Photos session belongs to, deterministically,
+ * so the Founder is not asked to pick one for a routine scheduled occurrence.
+ *
+ * Authority, in order:
+ *  1. The scheduled occurrence's current owner (`currentGoalIds` on the
+ *     Progress Photos execution item), restricted to Goals that can own
+ *     evidence on that date. One owner resolves; several owners resolve only
+ *     when exactly one is primary.
+ *  2. Only when the occurrence declares no eligible current owner: its linked
+ *     Goals under the same rule.
+ *  3. Only when there is no scheduled authority: the Goals active on the date.
+ *
+ * A Goal completed before the evidence date is historical context. It never
+ * competes for current evidence, whatever the reminder was once linked to,
+ * and historical associations never override the occurrence's owner. What
+ * cannot be decided this way stays `needs_review`, with only the genuine
+ * candidates offered.
+ */
 export function resolvePhotoSessionGoalRelationship({
   evidenceDate,
   executionItems = [],
   goals = [],
 } = {}) {
   const goalById = new Map(goals.filter((goal) => goal?.id).map((goal) => [goal.id, goal]));
-  const scheduledGoalIds = unique(executionItems
-    .filter((item) => isProgressPhotoOccurrence(item, evidenceDate))
-    .flatMap((item) => item.linkedGoalIds ?? []))
-    .filter((id) => goalById.has(id));
-  if (scheduledGoalIds.length === 1) {
-    return resolvedGoalRelationship(scheduledGoalIds[0], goalById, "scheduled_progress_photo_occurrence");
-  }
-  if (scheduledGoalIds.length > 1) {
-    return reviewableGoalRelationship(goals, "scheduled_occurrence_has_multiple_goals");
-  }
-  const applicable = goals.filter((goal) => goalAppliesOnDate(goal, evidenceDate));
+  const eligibleGoals = [...goalById.values()].filter((goal) => isGoalEligibleForEvidence(goal, evidenceDate));
+  const eligibleIds = new Set(eligibleGoals.map((goal) => goal.id));
+  const occurrences = executionItems.filter((item) => isProgressPhotoOccurrence(item, evidenceDate));
+  const eligibleFrom = (field) => unique(occurrences.flatMap((item) => item[field] ?? [])).filter((id) => eligibleIds.has(id));
+
+  const owners = decideGoal(eligibleFrom("currentGoalIds"), goalById);
+  if (owners.resolved) return resolvedGoalRelationship(owners.resolved, eligibleGoals, "scheduled_occurrence_current_goal");
+  if (owners.ambiguous) return reviewableGoalRelationship(owners.ambiguous.map((id) => goalById.get(id)), "scheduled_occurrence_has_multiple_current_goals");
+
+  const linked = decideGoal(eligibleFrom("linkedGoalIds"), goalById);
+  if (linked.resolved) return resolvedGoalRelationship(linked.resolved, eligibleGoals, "scheduled_progress_photo_occurrence");
+  if (linked.ambiguous) return reviewableGoalRelationship(linked.ambiguous.map((id) => goalById.get(id)), "scheduled_occurrence_has_multiple_goals");
+
+  const applicable = eligibleGoals.filter((goal) => goalAppliesOnDate(goal, evidenceDate));
   const primary = applicable.filter((goal) => goal.primary === true);
   const candidates = primary.length === 1 ? primary : applicable;
   if (candidates.length === 1) {
-    return resolvedGoalRelationship(candidates[0].id, goalById, "active_goal_on_evidence_date");
+    return resolvedGoalRelationship(candidates[0].id, eligibleGoals, "active_goal_on_evidence_date");
   }
-  return reviewableGoalRelationship(goals, candidates.length ? "multiple_applicable_goals" : "goal_context_unavailable");
+  return reviewableGoalRelationship(candidates.length ? candidates : eligibleGoals, candidates.length ? "multiple_applicable_goals" : "goal_context_unavailable");
+}
+
+/** One candidate resolves; several resolve only through exactly one primary; otherwise ambiguous. */
+function decideGoal(candidateIds, goalById) {
+  if (candidateIds.length === 0) return {};
+  if (candidateIds.length === 1) return { resolved: candidateIds[0] };
+  const primary = candidateIds.filter((id) => goalById.get(id)?.primary === true);
+  return primary.length === 1 ? { resolved: primary[0] } : { ambiguous: candidateIds };
+}
+
+/** Active Goals, and Goals completed on or after the evidence date; never Goals completed before it. */
+function isGoalEligibleForEvidence(goal, evidenceDate) {
+  if (!goalAppliesOnDate(goal, evidenceDate)) return false;
+  if (goal.status !== "completed") return true;
+  const date = String(evidenceDate ?? "").slice(0, 10);
+  const completed = String(goal.completedAt ?? goal.timeline?.endDate ?? goal.endDate ?? "").slice(0, 10);
+  return Boolean(completed) && Boolean(date) && date <= completed;
 }
 
 export function normalizeReviewedPhotoSessionMetadata({
@@ -277,15 +316,15 @@ function goalAppliesOnDate(goal, evidenceDate) {
   return ["active", "completed"].includes(goal.status) || (!goal.status && Boolean(goal.id));
 }
 
-function resolvedGoalRelationship(goalId, goalById, source) {
-  const goal = goalById.get(goalId);
+function resolvedGoalRelationship(goalId, optionGoals, source) {
+  const goal = optionGoals.find((item) => item.id === goalId);
   return {
     status: "resolved",
     goalIds: [goalId],
     goalLabel: goal?.title ?? null,
     source,
     reviewed: false,
-    options: [...goalById.values()].map(goalOption),
+    options: optionGoals.map(goalOption),
     limitations: [],
   };
 }

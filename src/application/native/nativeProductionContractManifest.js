@@ -1,4 +1,5 @@
 import { Phase3Command } from "../commands/Phase3CommandService.js";
+import { getProgressPhotoPoseContract } from "../../domain/models/progressPhotoPoseVocabulary.js";
 import { ANALYSIS_DERIVATIVE_REQUIRED_MIME_TYPES, PHOTO_CONTAINER_MIME_TYPES } from "../../domain/services/ImageContainerDetection.js";
 import {
   STAGED_DERIVATIVE_MAXIMUM_BYTES,
@@ -176,6 +177,10 @@ export const nativeProductionContractManifest = Object.freeze({
       completion: "media is stored only when every declared artifact is verified against its declaration; incomplete media never interprets",
       originals: "preserved verbatim, HEIC/HEIF and Apple ProRAW DNG included; the canonical photo is always the original",
     }),
+    // Orientation, contraction, and pose variant are not independent. Intake
+    // accepts only these combinations (`PHOTO_IDENTITY_NON_CANONICAL`
+    // otherwise), and clients derive their pose controls from this table.
+    poseContract: getProgressPhotoPoseContract(),
   }),
   healthKitIngestion: Object.freeze({
     commandType: Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS,

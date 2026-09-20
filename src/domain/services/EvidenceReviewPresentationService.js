@@ -387,7 +387,37 @@ function pluralize(noun) { return noun.endsWith("entry") ? `${noun.slice(0, -5)}
 function normalizeType(type) { if (["morning_weight", "weight"].includes(type)) return "weight"; if (["activity_day", "activity"].includes(type)) return "activity"; if (["dexa_scan", "dexa", "body_composition"].includes(type)) return "dexa"; if (["photo_session", "progress_photo"].includes(type)) return "photos"; return type; }
 function getSourceFiles(object, evidencePackage) { return unique([...(object.provenance?.source_artifact_refs ?? []), ...(object.metadata?.provenance ?? []), ...(evidencePackage.provenance?.source_artifacts ?? []).map((item) => item.file_name ?? item.filename ?? item.name).filter(Boolean)]); }
 function getTypedEvidence(evidencePackage) { return (evidencePackage.provenance?.source_artifacts ?? []).filter((item) => item.text && /text|typed/i.test(`${item.type ?? ""} ${item.kind ?? ""} ${item.mime_type ?? ""}`)).map((item) => item.text).join("\n\n") || null; }
-function formatSourceLabel({ evidencePackage, object }) { const artifacts = evidencePackage.provenance?.source_artifacts ?? []; const hasImage = artifacts.some((item) => /image|screenshot/i.test(`${item.type ?? ""} ${item.kind ?? ""} ${item.mime_type ?? ""}`)) || /screenshot|image/i.test(`${object.source?.modality ?? ""} ${object.metadata?.source ?? ""}`); const hasText = Boolean(getTypedEvidence(evidencePackage)); const correction = Boolean(object.correctionStatus || object.reviewStatus === "correction"); return [hasImage ? "Screenshot" : null, hasText ? "Typed evidence" : null, correction ? "Correction" : null].filter(Boolean).join(" + ") || labelize(object.metadata?.source ?? object.source?.name ?? "Submitted evidence"); }
+const PHOTO_EVIDENCE_TYPES = new Set(["photo_session", "photo", "photos", "progress_photo"]);
+
+/**
+ * Where the evidence actually came from, read from provenance and never from
+ * the file format. An image is a Screenshot only when intake recorded it as
+ * one (artifact kind `screenshot`) or its modality says so; a Progress Photo
+ * (artifact kind `progress_photo`, photo modality, or a photo-session object)
+ * is a photo whatever its container (JPEG, HEIC, DNG, ...), so a future photo
+ * format can never become a screenshot. Legacy packages without a recorded
+ * kind keep their earlier reading: an image is a Screenshot unless the
+ * evidence itself is a photo session.
+ */
+function classifySourceArtifact(item, photoEvidence) {
+  const kind = String(item?.kind ?? "").toLowerCase();
+  if (kind === "screenshot") return "screenshot";
+  if (kind === "progress_photo" || kind === "photo") return "photo";
+  if (kind === "pdf" || kind === "typed_evidence" || kind === "upload") return null;
+  return /image|screenshot/i.test(`${item?.type ?? ""} ${item?.mime_type ?? ""}`) ? (photoEvidence ? "photo" : "screenshot") : null;
+}
+function formatSourceLabel({ evidencePackage, object }) {
+  const artifacts = evidencePackage.provenance?.source_artifacts ?? [];
+  const modality = String(object.source?.modality ?? "");
+  const photoEvidence = PHOTO_EVIDENCE_TYPES.has(String(object.evidence_type ?? "")) || /^photo/i.test(modality);
+  const kinds = new Set(artifacts.map((item) => classifySourceArtifact(item, photoEvidence)).filter(Boolean));
+  if (/screenshot/i.test(modality) || /screenshot/i.test(String(object.metadata?.source ?? ""))) kinds.add("screenshot");
+  else if (/image/i.test(`${modality} ${object.metadata?.source ?? ""}`)) kinds.add(photoEvidence ? "photo" : "screenshot");
+  if (photoEvidence && kinds.size === 0 && artifacts.length > 0) kinds.add("photo");
+  const hasText = Boolean(getTypedEvidence(evidencePackage));
+  const correction = Boolean(object.correctionStatus || object.reviewStatus === "correction");
+  return [kinds.has("screenshot") ? "Screenshot" : null, kinds.has("photo") ? "Progress photos" : null, hasText ? "Typed evidence" : null, correction ? "Correction" : null].filter(Boolean).join(" + ") || labelize(object.metadata?.source ?? object.source?.name ?? "Submitted evidence");
+}
 function calories(value) { return unit(value, "cal"); }
 function unit(value, suffix) { const number = finite(value); return number == null ? null : `${formatNumber(number)} ${suffix}`; }
 function formatNumber(value) { return Number(value).toLocaleString("en-US", { maximumFractionDigits: 1 }); }

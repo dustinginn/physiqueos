@@ -10,7 +10,7 @@ import {
   projectNativeWeightRead,
 } from "./NativeReadProjectionService.js";
 import { Phase3Command } from "../commands/Phase3CommandService.js";
-import { assertEvidenceCanonicalCommitReady } from
+import { assertEvidenceCanonicalCommitReady, EvidenceCanonicalCommitReadinessCode } from
   "../../domain/services/EvidenceCanonicalCommitReadinessService.js";
 
 const RESOURCES = new Set(Object.values(NativeProductionResource));
@@ -236,7 +236,11 @@ export function createNativeProductionContractService({
         }
         if (commandType === Phase3Command.COMMIT_EVIDENCE_REVIEW) {
           try {
-            assertEvidenceCanonicalCommitReady(review.interpretedEvidence);
+            // Every readiness gate runs BEFORE the confirmation receipt is
+            // recorded. A receipt is a success record; a review that cannot
+            // proceed must be refused here, never acknowledged and then left
+            // pending by a later assertion.
+            assertEvidenceCanonicalCommitReady(review.interpretedEvidence, { itemDecisions: review.itemDecisions ?? {} });
           } catch (error) {
             throw new ApplicationProblem({
               status: 400,
@@ -297,6 +301,17 @@ export function createNativeProductionContractService({
           durable: confirmation?.state === "confirmed" || confirmation?.trainingSessionDurable === true,
         });
       } catch (error) {
+        if (Object.values(EvidenceCanonicalCommitReadinessCode).includes(error?.code)) {
+          // A readiness refusal is a genuine refusal, never a transient
+          // continuation problem: surface it instead of reporting the
+          // confirmation as accepted and processing.
+          throw new ApplicationProblem({
+            status: 400,
+            code: error.code,
+            title: "This Evidence Review needs a correction before it can be confirmed.",
+            detail: error.message,
+          });
+        }
         if (commandType === Phase3Command.COMMIT_TRAINING_SESSION) {
           throw new ApplicationProblem({ status: 503, code: "TRAINING_SESSION_NOT_DURABLE", title: "Your workout has not been confirmed yet.", detail: "Retry the same workout submission to check its saved result." });
         }

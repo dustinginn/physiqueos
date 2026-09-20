@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createNativeProductionContractService } from "./NativeProductionContractService.js";
 import { nativeProductionContractManifest } from "./nativeProductionContractManifest.js";
+import { createRealBuild45ExecutionItems, createRealBuild45Goals, createRealBuild45PendingReview } from "../../domain/services/RealBuild45PhotoReviewFixture.js";
+import { planPhotoSessionReviewRepair } from "../../domain/services/PhotoSessionReviewRepair.js";
+import { BUILD45_PROGRESS_PHOTOS_REVIEW_REPAIR_AUTHORIZATION } from "../../platform/operations/build45ProgressPhotosReviewRepairAuthorization.js";
 
 const OWNER = "user_founder_001";
 const principal = Object.freeze({
@@ -474,6 +477,79 @@ describe("Native production contract boundary", () => {
     });
     expect(current.executeCommand).not.toHaveBeenCalled();
     expect(current.confirmEvidenceReview).not.toHaveBeenCalled();
+  });
+
+  describe("photo confirmation readiness precedes the confirmation receipt", () => {
+    const commit = (current, key = "confirm-real-review") => current.service.command({
+      request: request(), commandType: "evidence-review.commit.v1",
+      metadata: { idempotencyKey: key, expectedVersion: "1" },
+      payload: { reviewId: "evidence_review_B5A63452E7B0469CA63438A08137716C" },
+    });
+    const repairedReview = () => planPhotoSessionReviewRepair({
+      review: createRealBuild45PendingReview(), authorization: BUILD45_PROGRESS_PHOTOS_REVIEW_REPAIR_AUTHORIZATION,
+      goals: createRealBuild45Goals(), executionItems: createRealBuild45ExecutionItems(),
+    }).updatedReview;
+
+    it("refuses the real review's unresolved pose before any receipt exists, and never reports acceptance", async () => {
+      const current = fixture();
+      current.readers.evidenceReview.getReview.mockResolvedValue({ review: createRealBuild45PendingReview() });
+      await expect(commit(current)).rejects.toMatchObject({ status: 400, code: "PHOTO_POSE_UNRESOLVED" });
+      expect(current.executeCommand).not.toHaveBeenCalled();
+      expect(current.confirmEvidenceReview).not.toHaveBeenCalled();
+    });
+
+    it("refuses an unresolved session Goal relationship the same way", async () => {
+      const current = fixture();
+      const review = repairedReview();
+      review.interpretedEvidence.evidence_objects[0].goalRelationship = createRealBuild45PendingReview().interpretedEvidence.evidence_objects[0].goalRelationship;
+      current.readers.evidenceReview.getReview.mockResolvedValue({ review });
+      await expect(commit(current)).rejects.toMatchObject({ status: 400, code: "PHOTO_SESSION_DETAILS_UNRESOLVED" });
+      expect(current.executeCommand).not.toHaveBeenCalled();
+    });
+
+    it("stays retryable with the same idempotency key once the review is corrected, recording exactly one receipt", async () => {
+      const current = fixture();
+      current.executeCommand.mockResolvedValue({ outcome: "committed", receipt: { commandId: "command-9" } });
+      current.readers.evidenceReview.getReview.mockResolvedValue({ review: createRealBuild45PendingReview() });
+      await expect(commit(current, "same-key")).rejects.toMatchObject({ code: "PHOTO_POSE_UNRESOLVED" });
+      expect(current.executeCommand).not.toHaveBeenCalled();
+      current.readers.evidenceReview.getReview.mockResolvedValue({ review: repairedReview() });
+      const result = await commit(current, "same-key");
+      expect(current.executeCommand).toHaveBeenCalledTimes(1);
+      expect(current.executeCommand).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ idempotencyKey: "same-key" }) }));
+      expect(result.confirmation).toMatchObject({ state: "processing", reviewId: "evidence_review_B5A63452E7B0469CA63438A08137716C" });
+    });
+
+    it("keeps a successful confirmation idempotent: a replay reaches the receipt layer with the same key and the same outcome", async () => {
+      const current = fixture();
+      current.readers.evidenceReview.getReview.mockResolvedValue({ review: repairedReview() });
+      current.executeCommand.mockResolvedValue({ outcome: "replayed", receipt: { commandId: "command-9" } });
+      const first = await commit(current, "idempotent-key");
+      const second = await commit(current, "idempotent-key");
+      expect(current.executeCommand).toHaveBeenCalledTimes(2);
+      expect(current.executeCommand.mock.calls.map(([input]) => input.metadata.idempotencyKey)).toEqual(["idempotent-key", "idempotent-key"]);
+      expect(second.confirmation).toEqual(first.confirmation);
+    });
+
+    it("does not swallow a readiness refusal raised during continuation as accepted, but still tolerates a transient continuation failure", async () => {
+      const current = fixture();
+      current.readers.evidenceReview.getReview.mockResolvedValue({ review: repairedReview() });
+      current.executeCommand.mockResolvedValue({ outcome: "committed", receipt: { commandId: "command-10" } });
+      current.confirmEvidenceReview.mockRejectedValueOnce(Object.assign(new Error("Choose a pose for the remaining photo before saving."), { code: "PHOTO_POSE_UNRESOLVED" }));
+      await expect(commit(current, "race-key")).rejects.toMatchObject({ status: 400, code: "PHOTO_POSE_UNRESOLVED" });
+      current.confirmEvidenceReview.mockRejectedValueOnce(new Error("connection reset"));
+      const transient = await commit(current, "transient-key");
+      expect(transient.confirmation).toMatchObject({ state: "processing", accepted: true });
+    });
+
+    it("does not hold an excluded photo session to the gate", async () => {
+      const current = fixture();
+      current.executeCommand.mockResolvedValue({ outcome: "committed", receipt: { commandId: "command-11" } });
+      const review = createRealBuild45PendingReview();
+      review.itemDecisions = { [review.interpretedEvidence.evidence_objects[0].id]: { included: false } };
+      current.readers.evidenceReview.getReview.mockResolvedValue({ review });
+      await expect(commit(current, "excluded-key")).resolves.toMatchObject({ confirmation: { state: "processing" } });
+    });
   });
 
   it("allows versioned photo dismissal and confirmation through the shared canonical lifecycle", async () => {

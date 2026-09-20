@@ -4,7 +4,7 @@ import {
   createEvidenceUploadArtifactManifest,
 } from "../../domain/services/EvidenceUploadArtifactManifest.js";
 import { validateDexaPdfUpload } from "../../domain/services/DexaPdfIntakeService.js";
-import { normalizePhotoViewIdentity } from "../../domain/models/progressPhotoPoseVocabulary.js";
+import { isCanonicalPoseIdentity, normalizePhotoViewIdentity } from "../../domain/models/progressPhotoPoseVocabulary.js";
 import { foundationLogger } from "../../platform/foundation/runtime.js";
 
 const TYPES = new Set(["dexa_scan", "nutrition", "activity_day", "training", "photo_session"]);
@@ -167,6 +167,14 @@ export function normalizePhotoSessionContext({
     const identity = normalizePhotoViewIdentity(candidate);
     if (identity.poseId === "unknown" || (identity.poseVariant === "other" && !identity.customLabel)) {
       throw problem(400, "PHOTO_IDENTITY_INVALID", `Photo ${index + 1} needs a valid pose identity.`);
+    }
+    // Orientation, contraction, and pose variant constrain each other. A
+    // combination outside the canonical table (for example a Relaxed Double
+    // Biceps) could never be confirmed: it would reach the review as "pose
+    // still to choose" with no way to fix it. Refuse it here, before media is
+    // stored or interpreted, using the same model every reader applies.
+    if (!isCanonicalPoseIdentity(identity)) {
+      throw problem(400, "PHOTO_IDENTITY_NON_CANONICAL", `Photo ${index + 1} uses a pose combination PhysiqueOS does not support (${identity.label}). Choose one of the supported poses.`);
     }
     return Object.freeze({
       ...identity,

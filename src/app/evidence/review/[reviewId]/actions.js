@@ -64,7 +64,6 @@ import { assertValidDexaScan } from "../../../../domain/services/DEXAContract";
 import { toDexaReadModel, selectValidDexaScans } from "../../../../domain/services/DEXAReadModelAdapter";
 import { arePhotoPoseIdentitiesCompatible } from "../../../../domain/models/progressPhotoPoseVocabulary";
 import { satisfyPhotoPriorityFromCanonicalSession } from "../../../../domain/services/PhotoPrioritySatisfactionService";
-import { getCanonicalProgressPhotoCategory } from "../../../../domain/models/progressPhotoPoseVocabulary";
 import {
   assertNoUnresolvedProvisionalExercises,
   canonicalDefinitionsPendingCreation,
@@ -90,7 +89,7 @@ import {
 } from "../../../../domain/services/CanonicalPhotoSessionIdentityService";
 import { resolveCanonicalEvidenceLocalDate } from
   "../../../../domain/services/CanonicalEvidenceDateService";
-import { assertEvidenceCanonicalCommitReady } from
+import { assertEvidenceCanonicalCommitReady, assertPhotoSessionsCommitReady } from
   "../../../../domain/services/EvidenceCanonicalCommitReadinessService";
 
 function uniqueStrings(values = []) {
@@ -711,18 +710,7 @@ function mergeAuthoritativeNutritionDays(
 }
 
 function assertIncludedPhotoSessionsReady(evidencePackage) {
-  for (const object of evidencePackage.evidence_objects ?? []) {
-    if (object.removed || object.evidence_type !== "photo_session") continue;
-    const unresolved = (object.photos ?? []).filter((photo) =>
-      photo.active !== false && !getCanonicalProgressPhotoCategory(photo)
-    );
-    if (unresolved.length) {
-      throw new Error(`Choose a pose for ${unresolved.length === 1 ? "the remaining photo" : `all ${unresolved.length} remaining photos`} before saving.`);
-    }
-    if (object.captureMetadata?.status === "needs_review" || object.goalRelationship?.status === "needs_review") {
-      throw new Error("Review the shared photo-session details before saving.");
-    }
-  }
+  assertPhotoSessionsCommitReady(evidencePackage);
 }
 
 function createHandlers({ evidencePackage, reviewId, user,

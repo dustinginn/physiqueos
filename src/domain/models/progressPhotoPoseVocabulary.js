@@ -16,6 +16,40 @@ export const CanonicalProgressPhotoCategories = Object.freeze([
   identity("front-flexed", "Front Flexed", "front", "flexed", "standard"),
 ]);
 
+/**
+ * The one explicit compatibility model for a Progress Photo pose. Orientation,
+ * contraction, and pose variant are NOT independent: only the combinations in
+ * `CanonicalProgressPhotoCategories` exist (for example Double Biceps is a
+ * Rear, Flexed pose, and there is no Flexed side pose). Everything that
+ * accepts, confirms, or offers a pose derives from this table, and clients
+ * consume it as `contracts/progress-photo-pose-contract.v1.json`, generated
+ * from it by `scripts/contracts/exportProgressPhotoPoseContract.mjs`. A
+ * combination outside this table can never be confirmed, so it is refused at
+ * intake instead of surviving to a review that says "pose still to choose".
+ */
+export const PROGRESS_PHOTO_POSE_CONTRACT_VERSION = "progress-photo-pose-contract-v1";
+
+export function getProgressPhotoPoseContract() {
+  return Object.freeze({
+    version: PROGRESS_PHOTO_POSE_CONTRACT_VERSION,
+    orientations: Object.freeze([...PhotoOrientations]),
+    contractionStates: Object.freeze([...PhotoContractionStates]),
+    poseVariants: Object.freeze([...new Set(CanonicalProgressPhotoCategories.map((item) => item.poseVariant))]),
+    combinations: Object.freeze(CanonicalProgressPhotoCategories.map((item) => Object.freeze({
+      id: item.id,
+      label: item.label,
+      orientation: item.orientation,
+      contractionState: item.contractionState,
+      poseVariant: item.poseVariant,
+    }))),
+  });
+}
+
+/** True only for a combination in the canonical table, after the same normalization every reader applies. */
+export function isCanonicalPoseIdentity(input = {}) {
+  return getCanonicalProgressPhotoCategory(input) !== null;
+}
+
 export const FOUNDER_ALPHA_PHOTO_SESSION_CONTRACT = Object.freeze({
   id: "founder-alpha-weekly-v2",
   requiredPoseIds: Object.freeze([]),
