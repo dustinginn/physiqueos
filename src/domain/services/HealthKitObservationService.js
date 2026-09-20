@@ -4,6 +4,15 @@ import { assessWorkoutDuplicatePair } from "./WorkoutDuplicateIdentityService.js
 export const HEALTHKIT_OBSERVATION_SCHEMA_VERSION = "healthkit-source-observation-v1";
 export const HEALTHKIT_INGESTION_CONTRACT_VERSION = "healthkit-ingestion-v1";
 export const HEALTHKIT_MAX_OBSERVATIONS_PER_BATCH = 100;
+// Field bounds. Every string and object the ingestion command accepts is
+// explicitly bounded so the maximum encoded request can be derived from the
+// contract (see nativeCommandRequestBounds.js) instead of being guessed.
+export const HEALTHKIT_MAX_TEXT_LENGTH = 300;
+export const HEALTHKIT_MAX_TIMESTAMP_LENGTH = 64;
+export const HEALTHKIT_MAX_NUMERIC_TEXT_LENGTH = 32;
+export const HEALTHKIT_MAX_DAILY_ACTIVITY_METRICS = 32;
+export const HEALTHKIT_MAX_DAILY_ACTIVITY_KEY_LENGTH = 64;
+export const HEALTHKIT_MAX_RING_COMPLETION_METRICS = 8;
 export const HEALTHKIT_ACTIVITY_ACTIVATION_POLICY_RECORD_ID = "healthkit_activity_activation_policy";
 
 export const HealthKitIngestionPurpose = Object.freeze({
@@ -369,12 +378,12 @@ function normalizeSource(source, index) {
   }
   return compact({
     bundleIdentifier: requiredText(source.bundleIdentifier, `observations[${index}].source.bundleIdentifier`),
-    sourceName: optionalText(source.sourceName),
-    sourceRevision: optionalText(source.sourceRevision),
-    productType: optionalText(source.productType),
-    deviceModel: optionalText(source.deviceModel),
-    operatingSystemVersion: optionalText(source.operatingSystemVersion),
-    privacySafeDeviceProvenance: optionalText(source.privacySafeDeviceProvenance),
+    sourceName: optionalText(source.sourceName, `observations[${index}].source.sourceName`),
+    sourceRevision: optionalText(source.sourceRevision, `observations[${index}].source.sourceRevision`),
+    productType: optionalText(source.productType, `observations[${index}].source.productType`),
+    deviceModel: optionalText(source.deviceModel, `observations[${index}].source.deviceModel`),
+    operatingSystemVersion: optionalText(source.operatingSystemVersion, `observations[${index}].source.operatingSystemVersion`),
+    privacySafeDeviceProvenance: optionalText(source.privacySafeDeviceProvenance, `observations[${index}].source.privacySafeDeviceProvenance`),
   });
 }
 
@@ -384,8 +393,8 @@ function normalizeOccurrence(occurrence, observationType, index) {
   }
   const localDate = calendarDate(occurrence.localDate, `observations[${index}].occurrence.localDate`);
   const timeZone = validTimeZone(occurrence.timeZone, `observations[${index}].occurrence.timeZone`);
-  const startedAt = occurrence.startedAt == null ? null : isoDateTime(occurrence.startedAt, `observations[${index}].occurrence.startedAt`);
-  const endedAt = occurrence.endedAt == null ? null : isoDateTime(occurrence.endedAt, `observations[${index}].occurrence.endedAt`);
+  const startedAt = occurrence.startedAt == null ? null : boundedIsoDateTime(occurrence.startedAt, `observations[${index}].occurrence.startedAt`);
+  const endedAt = occurrence.endedAt == null ? null : boundedIsoDateTime(occurrence.endedAt, `observations[${index}].occurrence.endedAt`);
   if (observationType !== HealthKitObservationType.ACTIVITY_SUMMARY && !startedAt) {
     throw invalid(`observations[${index}].occurrence.startedAt`, "Workout and sample occurrence time is required.");
   }
@@ -411,7 +420,7 @@ function normalizeMeasurement(value, observationType, index) {
       );
     }
     const sourceRevision = positiveInteger(summary.sourceRevision, `observations[${index}].activitySummary.sourceRevision`);
-    const dailyActivity = numericObject(summary.dailyActivity, `observations[${index}].activitySummary.dailyActivity`);
+    const dailyActivity = numericObject(summary.dailyActivity, `observations[${index}].activitySummary.dailyActivity`, { maximumEntries: HEALTHKIT_MAX_DAILY_ACTIVITY_METRICS });
     if (finite(dailyActivity.move_calories) == null) {
       throw invalid(`observations[${index}].activitySummary.dailyActivity.move_calories`, "HealthKit daily active calories are required.");
     }
@@ -433,7 +442,7 @@ function normalizeMeasurement(value, observationType, index) {
       activeCalories: optionalFinite(workout.activeCalories, `observations[${index}].workout.activeCalories`),
       totalCalories: optionalFinite(workout.totalCalories, `observations[${index}].workout.totalCalories`),
       distance: optionalFinite(workout.distance, `observations[${index}].workout.distance`),
-      distanceUnit: optionalText(workout.distanceUnit),
+      distanceUnit: optionalText(workout.distanceUnit, `observations[${index}].workout.distanceUnit`),
       averageHeartRate: optionalFinite(workout.averageHeartRate, `observations[${index}].workout.averageHeartRate`),
     });
   }
@@ -445,7 +454,7 @@ function normalizeMeasurement(value, observationType, index) {
     sampleType: requiredText(sample.sampleType, `observations[${index}].quantitySample.sampleType`),
     value: requiredFinite(sample.value, `observations[${index}].quantitySample.value`),
     unit: requiredText(sample.unit, `observations[${index}].quantitySample.unit`),
-    workoutExternalId: optionalText(sample.workoutExternalId),
+    workoutExternalId: optionalText(sample.workoutExternalId, `observations[${index}].quantitySample.workoutExternalId`),
   };
 }
 
@@ -500,38 +509,70 @@ function activityCoverageRank(value) {
   return 0;
 }
 
-function numericObject(value, field) {
+function numericObject(value, field, { maximumEntries, nested = false }) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid(field, `${field} must be an object.`);
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => {
-    if (key === "ring_completion") return [key, numericObject(item, `${field}.${key}`)];
+  const entries = Object.entries(value);
+  if (entries.length > maximumEntries) {
+    throw invalid(field, `${field} accepts at most ${maximumEntries} metrics.`);
+  }
+  return Object.fromEntries(entries.map(([key, item]) => {
+    if (key.length > HEALTHKIT_MAX_DAILY_ACTIVITY_KEY_LENGTH) {
+      throw invalid(field, `${field} metric names must be at most ${HEALTHKIT_MAX_DAILY_ACTIVITY_KEY_LENGTH} characters.`);
+    }
+    // ring_completion is the one nested metric group; it cannot nest further,
+    // so a nested object falls through to the numeric check and is rejected.
+    if (key === "ring_completion" && !nested) {
+      return [key, numericObject(item, `${field}.${key}`, {
+        maximumEntries: HEALTHKIT_MAX_RING_COMPLETION_METRICS,
+        nested: true,
+      })];
+    }
     return [key, requiredFinite(item, `${field}.${key}`)];
   }));
 }
 
+// A numeric field may arrive as a JSON number or a numeric string. Bound the
+// string form so its encoded size is derivable; a JSON number's canonical
+// encoding is already at most 24 bytes.
+function numericInput(value, field) {
+  if (typeof value === "string" && value.length > HEALTHKIT_MAX_NUMERIC_TEXT_LENGTH) {
+    throw invalid(field, `${field} must be a bounded number.`);
+  }
+  return value;
+}
+
 function requiredFinite(value, field) {
-  const number = finite(value);
+  const number = finite(numericInput(value, field));
   if (number == null || number < 0) throw invalid(field, `${field} must be a non-negative finite number.`);
   return number;
 }
 function optionalFinite(value, field) { return value == null ? null : requiredFinite(value, field); }
 function positiveInteger(value, field) {
-  const number = Number(value);
+  const number = Number(numericInput(value, field));
   if (!Number.isSafeInteger(number) || number < 1) throw invalid(field, `${field} must be a positive integer.`);
   return number;
 }
 function boundedInteger(value, minimum, maximum, field) {
-  const number = Number(value);
+  const number = Number(numericInput(value, field));
   if (!Number.isSafeInteger(number) || number < minimum || number > maximum) {
     throw invalid(field, `${field} must be an integer from ${minimum} through ${maximum}.`);
   }
   return number;
 }
 function requiredText(value, field) {
-  const text = String(value ?? "").trim();
-  if (!text || text.length > 300) throw invalid(field, `${field} must be a non-empty bounded string.`);
+  const raw = String(value ?? "");
+  // Bound the raw length: surrounding whitespace is trimmed but still travels
+  // in the request, so it must count toward the derivable request maximum.
+  if (raw.length > HEALTHKIT_MAX_TEXT_LENGTH) throw invalid(field, `${field} must be a non-empty bounded string.`);
+  const text = raw.trim();
+  if (!text) throw invalid(field, `${field} must be a non-empty bounded string.`);
   return text;
 }
-function optionalText(value) { const text = String(value ?? "").trim(); return text || null; }
+function optionalText(value, field) {
+  const raw = String(value ?? "");
+  if (raw.length > HEALTHKIT_MAX_TEXT_LENGTH) throw invalid(field, `${field} must be a bounded string.`);
+  return raw.trim() || null;
+}
 function requiredEnum(value, values, field) {
   const text = requiredText(value, field);
   if (!values.includes(text)) throw invalid(field, `${field} is unsupported.`);
@@ -552,6 +593,15 @@ function isoDateTime(value, field) {
   const time = Date.parse(String(value ?? ""));
   if (!Number.isFinite(time)) throw invalid(field, `${field} must be an ISO date-time.`);
   return new Date(time).toISOString();
+}
+// Observation timestamps travel in the request body, so their raw length is
+// bounded. The server receipt time (metadata.clientOccurredAt) keeps the
+// original unbounded check: it is not observation payload.
+function boundedIsoDateTime(value, field) {
+  if (String(value ?? "").length > HEALTHKIT_MAX_TIMESTAMP_LENGTH) {
+    throw invalid(field, `${field} must be an ISO date-time.`);
+  }
+  return isoDateTime(value, field);
 }
 function validTimeZone(value, field) {
   const timeZone = requiredText(value, field);

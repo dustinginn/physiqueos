@@ -29,6 +29,40 @@ Every observation has an immutable ingestion purpose. Omitted purpose preserves 
 
 Opaque `HKQueryAnchor` values are not part of authoritative Server state and are never persisted, advanced, or interpreted by ingestion. Native owns query cursors. The Server response explicitly reports `cursorResponsibility: "device"`.
 
+## Request size bound
+
+`POST /api/v1/native/commands` bounds every request body before parsing it. The command type is inside the body, so the route reads at most the largest declared bound, parses once, and then enforces the bound of the command that was actually named:
+
+| Command | Maximum HTTP body |
+| --- | --- |
+| every command except HealthKit ingestion | 4 KiB (unchanged) |
+| `healthkit.observations.ingest.v1` | 5 MiB (`HEALTHKIT_INGEST_MAXIMUM_REQUEST_BYTES`) |
+
+A malformed or unrecognizable body never receives the larger bound. Size is judged before validity: a body over its bound is `413 REQUEST_TOO_LARGE`; a body within its bound that is not a JSON object is `400 REQUEST_INVALID`. The body is read as a stream and cancelled the moment it passes the 5 MiB ceiling, with or without a `Content-Length`, so buffered memory is bounded by the ceiling; a declared `Content-Length` above it is refused before any body is read.
+
+The 4 KiB default made a valid eight-summary Activity batch fail with `413` before command handling, which Native reports as `healthkit_server_upload_unavailable` while the durable pending batch and cursor stay untouched.
+
+### Derivation
+
+`computeHealthKitIngestMaximumRequestBytes()` in `nativeCommandRequestBounds.js` derives the largest body a valid `healthkit-ingestion-v1` request can occupy: 100 observations, each at the largest of the three observation shapes, every bounded string at its maximum length and JSON-escaped at the worst case of six bytes per UTF-16 code unit, every optional field present, a maximal `dailyActivity`, plus a 4 KiB command envelope allowance. The result is about 4.52 MiB; the enforced constant is 5 MiB. A realistic 100-observation Activity batch is about 58 KB; the eight-day Founder canary batch is about 4.9 KB, just over the old 4 KiB limit.
+
+The derivation is built only from the `HEALTHKIT_OBSERVATION_WIRE_FIELDS` table, and a test records every property the normalizer reads and fails if any is missing from (or extra in) that table, so a new accepted field cannot be added without the bound accounting for it. `NativeCommandRequestBounds.test.js` also fails if the constant is smaller than the derivation (a legitimate batch would be rejected) or more than 15% larger (silent loosening), and it submits a real contract-valid maximum-size request through the route to prove the derivation is reachable rather than theoretical.
+
+### Field bounds
+
+The derivation is only meaningful because every accepted field is bounded. Before this bound existed, optional source text, timestamps (`Date.parse` ignores parenthesized text), numeric strings, whitespace padding around required text, and `dailyActivity` metric count and names were unbounded. They are now bounded, none of which any Native or Founder-canary payload approaches:
+
+- every string field: at most 300 UTF-16 code units, measured before trimming;
+- `startedAt` / `endedAt`: at most 64 characters;
+- a numeric field supplied as a string: at most 32 characters;
+- `dailyActivity`: at most 32 metrics, names at most 64 characters; `ring_completion` at most 8 metrics and no further nesting.
+
+Accepted payloads normalize to byte-identical observation identity and semantic fingerprints; only oversized or malformed input is newly rejected, with `400 HEALTHKIT_CONTRACT_INVALID` and a field-scoped error. Properties the contract does not define are still ignored by validation, are not persisted, and count against the same HTTP bound.
+
+The derivation is the maximum over canonical JSON encodings of valid values. A body padded with non-canonical encodings (needless array nesting around a scalar, or long digit runs in a number literal) cannot be bounded by validation, because parsing discards the literal length; the HTTP bound rejects such a body with `413` by design.
+
+Changing any bound above or adding a field to an observation shape requires updating the derivation and the reviewed constant together.
+
 ## Identity, retries, and provenance
 
 The Server derives source-observation identity from source bundle identifier, observation type, and immutable HealthKit external ID. Activity summary snapshots additionally include authenticated delivery device and device-scoped source revision because a daily snapshot legitimately changes.

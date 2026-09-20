@@ -2,12 +2,19 @@ import { executeApiRequest } from "../../../../../platform/http/apiResponse.js";
 import { readBoundedJsonRequest } from "../../../../../platform/http/readBoundedJsonRequest.js";
 import { foundationBuildIdentity, foundationLogger } from "../../../../../platform/foundation/runtime.js";
 import { getProductionNativeContractRuntime } from "../../../../../platform/auth/nativeProductionContractRuntime.js";
+import {
+  NATIVE_COMMAND_MAXIMUM_REQUEST_CEILING_BYTES,
+  nativeCommandRequestMaximumBytes,
+} from "../../../../../application/native/nativeCommandRequestBounds.js";
 
 export const runtime = "nodejs";
 
 export async function POST(request) {
   return executeApiRequest(request, async ({ requestId }) => {
-    const body = await readBoundedJsonRequest(request);
+    const body = await readBoundedJsonRequest(request, {
+      maximumBytes: NATIVE_COMMAND_MAXIMUM_REQUEST_CEILING_BYTES,
+      maximumBytesFor: nativeCommandRequestMaximumBytes,
+    });
     return (await getProductionNativeContractRuntime()).command({
       request,
       commandType: body.commandType,
