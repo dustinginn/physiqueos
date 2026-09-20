@@ -527,6 +527,34 @@ describe("exhausted continuation becomes observable instead of committing foreve
     expect(mockState.value.priorityCompletions).toBe(0);
   });
 
+  it("resumes the dead-lettered review through the same message once its budget is reset, repeating no completed work", async () => {
+    await abandonEvidenceReviewContinuation({ reviewId: REVIEW_ID, messageId: "aedcb3bc", errorCode: "OUTBOX_ATTEMPTS_EXHAUSTED" });
+    expect(mockState.value.review).toMatchObject({ status: "partially_committed" });
+    expect(mockState.value.review.commitClaim.status).toBe("failed");
+
+    // The recovery gives the spent message a fresh budget; the worker then runs the
+    // same message id, so the operation id is the one the failed claim still names.
+    const resumed = await continueEvidenceReviewInBackground({ reviewId: REVIEW_ID, continuationKey: "spent-message-key", messageId: "aedcb3bc" });
+    expect(resumed).toMatchObject({ state: "processing", completedStep: "analysis" });
+    await drain();
+
+    const review = mockState.value.review;
+    expect(review.status).toBe("confirmed");
+    expect(review.commitError).toBeNull();
+    // Nothing that had already completed ran again.
+    expect(review.commitProgress.canonical_commit.attempts).toBe(1);
+    expect(review.commitProgress.compatibility_writes.attempts).toBe(1);
+    expect(review.commitProgress.scheduled_completion.attempts).toBe(1);
+    expect(mockState.value.boundedWrites.filter((write) => write.operation === "evidence-confirmation-progress-photo-persistence")).toHaveLength(0);
+    expect(mockState.value.priorityCompletions).toBe(0);
+    expect(mockState.value.canonicalEvidenceObjects).toHaveLength(2);
+    // Analysis, Event, and Briefing were each produced exactly once.
+    expect(mockState.value.analyses.filter((item) => item.metadata?.photoSessionSynthesis)).toHaveLength(1);
+    expect(new Set(mockState.value.analyses.map((item) => item.id)).size).toBe(mockState.value.analyses.length);
+    expect(mockState.value.briefings).toEqual([`event_briefing_progress_photo_${SESSION_ID}`]);
+    expect(mockState.value.completeCalls).toBe(1);
+  });
+
   it("is a no-op for a stale message whose review already moved on", async () => {
     mockState.value.review.commitClaim = { ...mockState.value.review.commitClaim, operationId: "evidence-review-background:someone-else" };
     await expect(abandonEvidenceReviewContinuation({ reviewId: REVIEW_ID, messageId: "aedcb3bc" }))
