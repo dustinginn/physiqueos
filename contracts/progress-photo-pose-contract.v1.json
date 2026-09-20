@@ -1,0 +1,69 @@
+{
+  "version": "progress-photo-pose-contract-v1",
+  "orientations": [
+    "front",
+    "rear",
+    "left_side",
+    "right_side",
+    "side_unspecified"
+  ],
+  "contractionStates": [
+    "relaxed",
+    "flexed"
+  ],
+  "poseVariants": [
+    "standard",
+    "double_biceps"
+  ],
+  "combinations": [
+    {
+      "id": "front-relaxed",
+      "label": "Front Relaxed",
+      "orientation": "front",
+      "contractionState": "relaxed",
+      "poseVariant": "standard"
+    },
+    {
+      "id": "back-relaxed",
+      "label": "Rear Relaxed",
+      "orientation": "rear",
+      "contractionState": "relaxed",
+      "poseVariant": "standard"
+    },
+    {
+      "id": "back-flexed",
+      "label": "Rear Flexed — Double Biceps",
+      "orientation": "rear",
+      "contractionState": "flexed",
+      "poseVariant": "double_biceps"
+    },
+    {
+      "id": "side-relaxed",
+      "label": "Side Relaxed",
+      "orientation": "side_unspecified",
+      "contractionState": "relaxed",
+      "poseVariant": "standard"
+    },
+    {
+      "id": "left-side-relaxed",
+      "label": "Left Side Relaxed",
+      "orientation": "left_side",
+      "contractionState": "relaxed",
+      "poseVariant": "standard"
+    },
+    {
+      "id": "right-side-relaxed",
+      "label": "Right Side Relaxed",
+      "orientation": "right_side",
+      "contractionState": "relaxed",
+      "poseVariant": "standard"
+    },
+    {
+      "id": "front-flexed",
+      "label": "Front Flexed",
+      "orientation": "front",
+      "contractionState": "flexed",
+      "poseVariant": "standard"
+    }
+  ]
+}

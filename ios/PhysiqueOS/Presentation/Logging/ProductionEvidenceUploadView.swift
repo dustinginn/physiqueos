@@ -186,6 +186,8 @@ struct ProductionEvidenceUploadView: View {
     /// durable plan left pending by a lost response, suspension, or relaunch.
     @State private var stagedProgress: StagedPhotoIntakeProgress?
     @State private var pendingStagedPlan: StagedPhotoIntakePlan?
+    /// One plain-language line per photo when choosing a pose moved a dependent choice (for example Double Biceps sets Flexed).
+    @State private var poseNotices: [String: String] = [:]
 
     private var effectiveScenario: Scenario? { fixedScenario ?? resolvedScenario }
 
@@ -426,8 +428,7 @@ struct ProductionEvidenceUploadView: View {
         if resolvedScenario == .progressPhotos {
             return !attachments.isEmpty && photoSession.timeOfDay != nil && photoSession.originalUnedited &&
                 photoIdentities.count == attachments.count && photoIdentities.allSatisfy { identity in
-                    identity.confirmed && identity.orientation != .unconfirmed && identity.contraction != .unconfirmed &&
-                        (identity.poseVariant != .other || !identity.customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    identity.confirmed && identity.isCanonicalPose
                 }
         }
         if resolvedScenario == .dexa || captureMode == .screenshot { return !attachments.isEmpty }
@@ -479,23 +480,26 @@ struct ProductionEvidenceUploadView: View {
                                 .background((identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent).opacity(0.16))
                                 .clipShape(Capsule())
                         }
+                        // Orientation, contraction, and pose are not independent: the
+                        // choices offered, and the adjustment when one is changed, come
+                        // from the Server's canonical pose contract.
                         HStack(spacing: 8) {
-                            photoPicker("Orientation", selection: photoBinding(identity, \.orientation), values: ProgressPhotoOrientation.allCases)
-                            photoPicker("Contraction", selection: photoBinding(identity, \.contraction), values: ProgressPhotoContraction.allCases)
+                            photoPicker("Orientation", selection: poseBinding(identity, \.orientation) { .orientation($0) }, values: ProgressPhotoPoseContract.selectableOrientations)
+                            photoPicker("Contraction", selection: poseBinding(identity, \.contraction) { .contraction($0) }, values: ProgressPhotoPoseContract.selectableContractions(for: identity.orientation))
                         }
-                        photoPicker("Pose", selection: photoBinding(identity, \.poseVariant), values: ProgressPhotoPoseVariant.allCases)
-                        if identity.poseVariant == .other {
-                            TextField("Custom pose label", text: photoBinding(identity, \.customLabel)).textFieldStyle(.roundedBorder)
+                        photoPicker("Pose", selection: poseBinding(identity, \.poseVariant) { .variant($0) }, values: ProgressPhotoPoseContract.selectableVariants(for: identity.orientation))
+                        if let notice = poseNotices[identity.id] {
+                            Text(notice)
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .accessibilityIdentifier("productionEvidenceUpload.poseNotice.\(index + 1)")
                         }
                         Button(identity.confirmed ? "Pose confirmed" : "Confirm pose") {
-                            updatePhoto(identity.id) { draft in
-                                draft.confirmed = draft.orientation != .unconfirmed && draft.contraction != .unconfirmed &&
-                                    (draft.poseVariant != .other || !draft.customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            }
+                            updatePhoto(identity.id) { draft in draft.confirmed = draft.isCanonicalPose }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent)
-                        .disabled(identity.orientation == .unconfirmed || identity.contraction == .unconfirmed)
+                        .disabled(!identity.isCanonicalPose)
                     }
                 }
             }
@@ -1027,6 +1031,24 @@ struct ProductionEvidenceUploadView: View {
         mutation(&photoIdentities[index])
     }
 
+    private func applyPoseChange(_ identityId: String, _ change: ProgressPhotoPoseContract.Change) {
+        guard let index = photoIdentities.firstIndex(where: { $0.id == identityId }) else { return }
+        let adjustment = ProgressPhotoPoseContract.applying(change, to: photoIdentities[index])
+        photoIdentities[index] = adjustment.draft
+        poseNotices[identityId] = adjustment.notice
+    }
+
+    private func poseBinding<Value>(
+        _ identity: ProgressPhotoIdentityDraft,
+        _ keyPath: KeyPath<ProgressPhotoIdentityDraft, Value>,
+        _ change: @escaping (Value) -> ProgressPhotoPoseContract.Change
+    ) -> Binding<Value> {
+        Binding(
+            get: { photoIdentities.first(where: { $0.id == identity.id })?[keyPath: keyPath] ?? identity[keyPath: keyPath] },
+            set: { applyPoseChange(identity.id, change($0)) }
+        )
+    }
+
     private func photoBinding<Value>(_ identity: ProgressPhotoIdentityDraft, _ keyPath: WritableKeyPath<ProgressPhotoIdentityDraft, Value>) -> Binding<Value> {
         Binding(
             get: { photoIdentities.first(where: { $0.id == identity.id })?[keyPath: keyPath] ?? identity[keyPath: keyPath] },
@@ -1116,13 +1138,22 @@ struct ProductionEvidenceUploadView: View {
     /// feedback), but the intake contract still carries the field, so every
     /// identity keeps the established `supporting` default. Internal rather
     /// than private so that default is covered by a regression test.
+    ///
+    /// Every identity must be a canonical pose, and is serialized in the
+    /// contract's own spelling, so a combination the Server refuses (or could
+    /// never confirm) can never be sent, whatever the controls allowed.
     static func photoIdentitiesJSON(_ identities: [ProgressPhotoIdentityDraft]) throws -> String {
-        let payload = identities.map { identity in
+        let payload = try identities.enumerated().map { index, identity in
+            guard let pose = identity.canonicalPose,
+                  let orientation = pose.orientation.contractValue,
+                  let contraction = pose.contraction.contractValue else {
+                throw ProgressPhotoIdentityError.nonCanonicalPose(photo: index + 1)
+            }
             let customLabel = identity.customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
             return PhotoIdentityPayload(
-                orientation: identity.orientation.rawValue,
-                contractionState: identity.contraction.rawValue,
-                poseVariant: identity.poseVariant.rawValue,
+                orientation: orientation,
+                contractionState: contraction,
+                poseVariant: pose.variant.contractValue,
                 customLabel: customLabel.isEmpty ? nil : customLabel,
                 goalValidationRole: identity.goalRole.rawValue,
                 tags: identity.tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
@@ -1154,6 +1185,7 @@ struct ProductionEvidenceUploadView: View {
 
     private static func errorMessage(for error: Error) -> String {
         if let stagedError = error as? StagedPhotoIntakeError { return stagedError.errorDescription ?? "This photo set could not be uploaded." }
+        if let identityError = error as? ProgressPhotoIdentityError { return identityError.errorDescription ?? "A photo pose is not supported." }
         if error is StagedPhotoIntakeStoreError { return "The staged photos on this iPhone could not be read. Discard the set and choose the photos again." }
         if let productionError = error as? ProductionNativeError { return productionError.errorDescription ?? "This evidence could not be uploaded." }
         if let dailyError = error as? DailyEvidenceWriteError { return dailyError.errorDescription ?? "This evidence could not be saved." }

@@ -51,8 +51,23 @@ struct EvidenceReviewDetailItem: Equatable, Identifiable {
 struct EvidenceReviewPhotoSession: Equatable {
     var sessionId: String
     var timeOfDay: String?
+    /// Founder-facing text only: the resolved Goal's name, or a plain-language
+    /// state. Never a raw wire enum such as `needs_review`.
     var goalRelationship: String?
     var photos: [EvidenceReviewPhotoIdentity]
+
+    /// The Goal's own name when the session resolved to one; otherwise the
+    /// plain-language state. A resolved scheduled session shows its Goal, and
+    /// only a genuinely unresolved session says it needs review.
+    static func goalRelationshipText(goalLabel: String?, status: String?) -> String? {
+        if let label = goalLabel?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty { return label }
+        switch status {
+        case "resolved": return "Linked goal"
+        case "needs_review": return "Needs session review"
+        case "unrelated": return "No goal linked"
+        default: return nil
+        }
+    }
 }
 
 struct EvidenceReviewPhotoIdentity: Equatable, Identifiable {

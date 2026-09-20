@@ -764,7 +764,10 @@ struct EvidenceReviewDetailView: View {
         value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 
-    private static func errorMessage(for error: Error) -> String {
+    /// What the Founder reads when the Server refuses a confirmation. A refusal
+    /// is a failure, never an acknowledgement: the review stays pending and the
+    /// message says why and what to do.
+    nonisolated static func errorMessage(for error: Error) -> String {
         if let productionError = error as? ProductionNativeError {
             let problem: ProductionProblemDetails? = switch productionError {
             case .validation(let value), .failedPrecondition(let value),
@@ -780,6 +783,10 @@ struct EvidenceReviewDetailView: View {
                 } ?? []
                 let fieldCopy = fields.isEmpty ? "one or more totals" : fields.joined(separator: ", ")
                 return "The meal sum conflicts with the daily total for \(fieldCopy). Dismiss this review, correct the source totals, and upload it again."
+            }
+            if let code = problem?.code, ["PHOTO_POSE_UNRESOLVED", "PHOTO_SESSION_DETAILS_UNRESOLVED"].contains(code) {
+                let reason = problem?.detail ?? problem?.title ?? "It needs a correction before it can be confirmed."
+                return "This photo review can't be confirmed yet. \(reason) Dismiss it and upload the photos again."
             }
             return productionError.errorDescription ?? "This review could not be updated."
         }

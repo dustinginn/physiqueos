@@ -1674,11 +1674,12 @@ final class LoggingSandboxTests: XCTestCase {
         var identities = EvidenceLocalInterpretation.defaultPhotoIdentities(for: attachments)
         XCTAssertEqual(identities.map(\.goalRole), [.supporting, .supporting])
 
-        identities[0].orientation = .front
-        identities[0].contraction = .relaxed
+        // Double Biceps is a Rear, Flexed pose; the serializer refuses any other combination.
+        identities[0].orientation = .rear
+        identities[0].contraction = .flexed
         identities[0].poseVariant = .doubleBiceps
         identities[0].confirmed = true
-        identities[1].orientation = .rear
+        identities[1].orientation = .front
         identities[1].contraction = .flexed
         identities[1].confirmed = true
         XCTAssertEqual(identities.map(\.goalRole), [.supporting, .supporting])
@@ -1693,10 +1694,10 @@ final class LoggingSandboxTests: XCTestCase {
             XCTAssertEqual(entry["identityStatus"] as? String, "confirmed")
             XCTAssertEqual(entry["userConfirmedIdentity"] as? Bool, true)
         }
-        XCTAssertEqual(decoded[0]["orientation"] as? String, "front")
-        XCTAssertEqual(decoded[0]["contractionState"] as? String, "relaxed")
+        XCTAssertEqual(decoded[0]["orientation"] as? String, "rear")
+        XCTAssertEqual(decoded[0]["contractionState"] as? String, "flexed")
         XCTAssertEqual(decoded[0]["poseVariant"] as? String, "double_biceps")
-        XCTAssertEqual(decoded[1]["orientation"] as? String, "rear")
+        XCTAssertEqual(decoded[1]["orientation"] as? String, "front")
         XCTAssertEqual(decoded[1]["contractionState"] as? String, "flexed")
     }
 

@@ -235,7 +235,7 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
             return .init(
                 sessionId: id,
                 timeOfDay: captureMetadata?.timeOfDay ?? conditions?.timeOfDay,
-                goalRelationship: goalRelationship?.goalLabel ?? goalRelationship?.status,
+                goalRelationship: EvidenceReviewPhotoSession.goalRelationshipText(goalLabel: goalRelationship?.goalLabel, status: goalRelationship?.status),
                 photos: (photos ?? []).enumerated().map { index, photo in
                     .init(
                         id: photo.id ?? "photo-\(index + 1)", poseId: photo.poseId, label: photo.label,

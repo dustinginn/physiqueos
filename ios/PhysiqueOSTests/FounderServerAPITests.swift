@@ -3630,6 +3630,68 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(affected.contains("evidence-review-queue"))
     }
 
+    /// The Server refuses a photo review that cannot proceed with a 400 BEFORE it
+    /// records a confirmation receipt. Native must treat that as a failure (never
+    /// "Confirmation accepted"), and once the review is corrected the same
+    /// Idempotency-Key retries cleanly because the refusal recorded nothing.
+    func testPhotoReviewReadinessRefusalIsAFailureAndTheSameKeyRetriesAfterCorrection() async throws {
+        let refusal = #"{"problemVersion":"1","type":"https://physiqueos.app/problems/photo-pose-unresolved","title":"This Evidence Review needs a correction before it can be confirmed.","status":400,"code":"PHOTO_POSE_UNRESOLVED","detail":"Choose a pose for the remaining photo before saving.","instance":"/api/v1/native/commands","requestId":"request-1","fieldErrors":[],"recovery":null}"#
+        let accepted = productionCommandOutcomeJSON(result: #"{"status":"confirmation_requested","reviewId":"review-photo","revision":1}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(400, refusal), .json(200, accepted),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let pipeline = ProductionEvidenceIntakePipeline(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        do {
+            _ = try await pipeline.commitReview(domain: .progressPhotos, reviewId: "review-photo", expectedVersion: "1")
+            XCTFail("a Server readiness refusal must not look like an accepted confirmation")
+        } catch let error as ProductionNativeError {
+            guard case .validation(let problem) = error else { return XCTFail("expected a validation failure, got \(error)") }
+            XCTAssertEqual(problem.code, "PHOTO_POSE_UNRESOLVED")
+            XCTAssertFalse(ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error))
+            let copy = EvidenceReviewDetailView.errorMessage(for: error)
+            XCTAssertTrue(copy.contains("can't be confirmed yet"))
+            XCTAssertFalse(copy.lowercased().contains("accepted"))
+        }
+
+        // After correction, the successful path is unchanged and reuses the stable key.
+        _ = try await pipeline.commitReview(domain: .progressPhotos, reviewId: "review-photo", expectedVersion: "1")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 3, "pair, the refused confirmation, and the corrected retry")
+        let keys = requests.dropFirst().compactMap { $0.value(forHTTPHeaderField: "Idempotency-Key") }
+        XCTAssertEqual(keys.count, 2)
+        XCTAssertEqual(Set(keys).count, 1, "the retry after a recorded-nothing refusal keeps the same idempotency identity")
+    }
+
+    /// A resolved scheduled session shows its Goal; only a genuinely unresolved
+    /// one says it needs review, and no raw wire enum ever reaches the screen.
+    func testProductionReviewShowsTheResolvedGoalAndNeverARawEnum() async throws {
+        func reviewJSON(goal: String) -> String {
+            productionEnvelope(resource: "evidence-review", data: """
+            {"review":{"id":"review-photo","status":"pending","version":1,"createdAt":"2026-09-20T13:50:00.000Z","interpreted_evidence":{"evidence_objects":[
+              {"id":"session-1","evidence_type":"photo_session","capture_metadata":{"time_of_day":"afternoon"},"goal_relationship":\(goal),"photos":[{"id":"p1","pose_id":"front-relaxed","label":"Front Relaxed"}]}
+            ]}},"presentation":{"summary":{"text":"1 evidence item detected"},"items":[]}}
+            """)
+        }
+        for (goal, expected) in [
+            (#"{"status":"resolved","goal_label":"Build Lean Mass"}"#, "Build Lean Mass"),
+            (#"{"status":"resolved","goal_label":null}"#, "Linked goal"),
+            (#"{"status":"needs_review","goal_label":null}"#, "Needs session review"),
+            (#"{"status":"unrelated","goal_label":null}"#, "No goal linked"),
+        ] {
+            let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["evidence-review": reviewJSON(goal: goal)])
+            let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+            _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+            let review = try await ProductionEvidenceReviewAPI(api: native).fetchReview(reviewId: "review-photo")
+            let text = try XCTUnwrap(review?.items.first?.photoSession?.goalRelationship)
+            XCTAssertEqual(text, expected)
+            XCTAssertFalse(text.contains("needs_review") || text.contains("resolved"), text)
+            XCTAssertEqual(review?.items.first?.photoSession?.timeOfDay, "afternoon")
+        }
+    }
+
     func testTrainingSupportingReviewConfirmationCarriesExactCanonicalSessionTarget() async throws {
         let response = productionCommandOutcomeJSON(result: #"{"status":"confirmation_requested","reviewId":"review-training","revision":2}"#)
         let transport = SequencedFounderTransport([
