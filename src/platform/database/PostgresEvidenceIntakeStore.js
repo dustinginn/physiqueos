@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { canonicalJson } from "../../contracts/v1/canonicalJson.js";
 import { createEvidenceIntakeInterpretationMessage } from "../../domain/services/EvidenceIntakeBackgroundWork.js";
+import {
+  findStagedManifestEntry,
+  isStagedEvidenceManifest,
+  stagedManifestIsSatisfied,
+} from "../../domain/services/StagedEvidenceArtifactManifest.js";
 
 const UPLOAD_LEASE_MS = 15 * 60_000;
 const INTERPRETATION_LEASE_MS = 20 * 60_000;
@@ -115,22 +120,120 @@ export function createPostgresEvidenceIntakeStore({
         )).rows[0];
         assertUploadClaim(row, claimToken, at);
         assertArtifactCompleteness(row);
-        const updated = (await client.query(
-          `UPDATE physiqueos.evidence_intake_receipts SET media_state='stored',
-             interpretation_state=CASE WHEN interpretation_state='waiting_for_media' THEN 'pending' ELSE interpretation_state END,
-             upload_claimed_by=NULL,upload_claim_expires_at=NULL,version=version+1,updated_at=$3
-           WHERE id=$1 AND owner_user_id=$2 RETURNING *`, [receiptId, ownerUserId, at],
-        )).rows[0];
-        const message = createEvidenceIntakeInterpretationMessage(mapReceipt(updated), { createId });
-        await client.query(
-          `INSERT INTO physiqueos.outbox_messages
-            (id,user_id,operation_id,topic,dedupe_key,payload_version,payload,due_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)
-           ON CONFLICT (topic,dedupe_key) DO NOTHING`,
-          [message.id, message.userId, message.operationId, message.topic, message.dedupeKey,
-            message.payloadVersion, JSON.stringify(message.payload), at],
+        return mapReceipt(await markMediaStored(client, { ownerUserId, receiptId, at, createId }));
+      });
+    },
+
+    /**
+     * Staged media: declares the intake and its expected artifact set without
+     * any bytes. Replaying the identical declaration returns the same receipt
+     * with its current artifact progress; a different declaration under the
+     * same identity is an identity conflict. No upload lease is taken because
+     * artifacts arrive in independent requests, possibly across app relaunches.
+     */
+    async stageIntake(input) {
+      if (!isStagedEvidenceManifest(input?.artifactManifest)) throw intakeError("EVIDENCE_UPLOAD_MANIFEST_INVALID");
+      return transaction(pool, async (client) => {
+        const at = now();
+        const id = `evidence_intake_${input.submissionIdentity}`;
+        await claimAuthority(client, authorityStore, migrationOperationId, `evidence-intake:stage:${id}`);
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:intake:${ownerUserId}:${input.submissionIdentity}`]);
+        await validateReplacementLineage(client, { ownerUserId, input: withReplacementContext(input) });
+        const manifestSha256 = digest(input.artifactManifest);
+        const inserted = await client.query(
+          `INSERT INTO physiqueos.evidence_intake_receipts
+            (id,submission_identity,owner_user_id,effective_date,expected_evidence_type,source,
+             artifact_manifest,manifest_sha256,typed_evidence,typed_evidence_sha256,evidence_text_kind,recovery_context,
+             media_state,upload_claimed_by,upload_claim_expires_at,interpretation_state)
+           VALUES ($1,$2,$3,$4::date,$5,$6,$7::jsonb,$8,NULL,NULL,NULL,$9::jsonb,
+             'receiving',NULL,NULL,'waiting_for_media')
+           ON CONFLICT (owner_user_id,submission_identity) DO NOTHING RETURNING *`,
+          [id, input.submissionIdentity, ownerUserId, input.effectiveDate,
+            input.expectedEvidenceType ?? "auto", input.source ?? "universal_intake",
+            JSON.stringify(input.artifactManifest), manifestSha256, JSON.stringify(input.recoveryContext ?? null)],
         );
-        return mapReceipt(updated);
+        let row = inserted.rows[0];
+        const created = Boolean(row);
+        if (!row) {
+          row = (await client.query(
+            `SELECT * FROM physiqueos.evidence_intake_receipts
+              WHERE owner_user_id=$1 AND submission_identity=$2 FOR UPDATE`,
+            [ownerUserId, input.submissionIdentity],
+          )).rows[0];
+          if (await receiptHasReplaceableReview(client, { ownerUserId, row })) {
+            throw intakeError("EVIDENCE_INTAKE_REPLACEMENT_REQUIRED");
+          }
+          assertSameSubmission(row, { input, manifestSha256, typedSha256: null, evidenceTextKind: null });
+          if (!isStagedEvidenceManifest(row.artifact_manifest)) throw intakeError("EVIDENCE_INTAKE_TRANSPORT_CONFLICT");
+          if (row.media_state === "failed") {
+            row = (await client.query(
+              `UPDATE physiqueos.evidence_intake_receipts SET media_state='receiving',last_error_code=NULL,
+                 upload_claimed_by=NULL,upload_claim_expires_at=NULL,version=version+1,updated_at=$3
+               WHERE id=$1 AND owner_user_id=$2 RETURNING *`, [row.id, ownerUserId, at],
+            )).rows[0];
+          }
+        }
+        row = await reconcileStagedRow(client, { ownerUserId, row, at, createId });
+        return Object.freeze({ receipt: mapReceipt(row), created });
+      });
+    },
+
+    /**
+     * The durable truth about one declared artifact, reconciled against the
+     * media catalog first so an object that was committed before a lost
+     * acknowledgement counts as stored. Also finalizes media when every
+     * declared artifact is already present (lost acknowledgement on the last
+     * artifact).
+     */
+    async loadStagedArtifactState({ receiptId, artifactId }) {
+      return transaction(pool, async (client) => {
+        let row = (await client.query(
+          `SELECT * FROM physiqueos.evidence_intake_receipts
+            WHERE id=$1 AND owner_user_id=$2 FOR UPDATE`, [receiptId, ownerUserId],
+        )).rows[0];
+        if (!row) return null;
+        if (!isStagedEvidenceManifest(row.artifact_manifest)) throw intakeError("EVIDENCE_INTAKE_TRANSPORT_CONFLICT");
+        row = await reconcileStagedRow(client, { ownerUserId, row, at: now(), createId });
+        const entry = findStagedManifestEntry(row.artifact_manifest, artifactId);
+        const stored = (row.stored_artifacts ?? []).find((artifact) => artifact.id === artifactId) ?? null;
+        return Object.freeze({ receipt: mapReceipt(row), entry, stored });
+      });
+    },
+
+    /**
+     * Records one verified, catalogued artifact against its manifest entry.
+     * Media flips to `stored` (and interpretation to `pending`, exactly once,
+     * through the outbox dedupe key) only when the whole declared set is
+     * present and every stored artifact matches its declaration.
+     */
+    async recordStagedArtifact({ receiptId, artifact }) {
+      return transaction(pool, async (client) => {
+        const at = now();
+        await claimAuthority(client, authorityStore, migrationOperationId, `evidence-intake:artifact:${receiptId}:${artifact.ordinal}`);
+        let row = (await client.query(
+          `SELECT * FROM physiqueos.evidence_intake_receipts
+            WHERE id=$1 AND owner_user_id=$2 FOR UPDATE`, [receiptId, ownerUserId],
+        )).rows[0];
+        if (!row) throw intakeError("EVIDENCE_INTAKE_NOT_FOUND");
+        if (!isStagedEvidenceManifest(row.artifact_manifest)) throw intakeError("EVIDENCE_INTAKE_TRANSPORT_CONFLICT");
+        const entry = findStagedManifestEntry(row.artifact_manifest, artifact.id);
+        if (!entry) throw intakeError("EVIDENCE_INTAKE_ARTIFACT_UNKNOWN");
+        if (!artifactMatchesEntry(artifact, entry)) throw intakeError("EVIDENCE_UPLOAD_STORAGE_MISMATCH");
+        const existing = (row.stored_artifacts ?? []).find((item) => item.id === artifact.id);
+        if (existing && existing.sha256 !== artifact.sha256) throw intakeError("EVIDENCE_UPLOAD_STORAGE_MISMATCH");
+        if (row.media_state === "stored") {
+          return Object.freeze({ receipt: mapReceipt(row), completed: false, alreadyStored: Boolean(existing) });
+        }
+        const artifacts = upsertArtifact(row.stored_artifacts, artifact);
+        row = (await client.query(
+          `UPDATE physiqueos.evidence_intake_receipts SET stored_artifacts=$3::jsonb,media_state='receiving',
+             last_error_code=NULL,version=version+1,updated_at=$4
+           WHERE id=$1 AND owner_user_id=$2 RETURNING *`,
+          [receiptId, ownerUserId, JSON.stringify(artifacts), at],
+        )).rows[0];
+        const before = row.media_state;
+        row = await finalizeStagedMediaIfComplete(client, { ownerUserId, row, at, createId });
+        return Object.freeze({ receipt: mapReceipt(row), completed: before !== "stored" && row.media_state === "stored", alreadyStored: false });
       });
     },
 
@@ -144,10 +247,22 @@ export function createPostgresEvidenceIntakeStore({
     },
 
     async getReceipt(receiptId) {
-      return mapReceipt((await pool.query(
+      const row = (await pool.query(
         "SELECT * FROM physiqueos.evidence_intake_receipts WHERE id=$1 AND owner_user_id=$2",
         [receiptId, ownerUserId],
-      )).rows[0]);
+      )).rows[0];
+      if (!row || row.media_state === "stored" || !isStagedEvidenceManifest(row.artifact_manifest)) return mapReceipt(row);
+      // A staged receipt still receiving is reconciled against the media
+      // catalog on read, so a client resuming after a lost acknowledgement
+      // sees every artifact that was actually catalogued.
+      return transaction(pool, async (client) => {
+        const locked = (await client.query(
+          `SELECT * FROM physiqueos.evidence_intake_receipts
+            WHERE id=$1 AND owner_user_id=$2 FOR UPDATE`, [receiptId, ownerUserId],
+        )).rows[0];
+        if (!locked) return null;
+        return mapReceipt(await reconcileStagedRow(client, { ownerUserId, row: locked, at: now(), createId }));
+      });
     },
 
     async claimInterpretation({ receiptId, workerId }) {
@@ -244,17 +359,80 @@ async function reconcileCatalogArtifacts(client, row) {
       ORDER BY created_at,id`, [row.owner_user_id, row.id],
   );
   let artifacts = [...(row.stored_artifacts ?? [])];
+  const staged = isStagedEvidenceManifest(row.artifact_manifest);
   for (const media of result.rows) {
     const artifactId = String(media.provenance?.artifactId ?? "");
-    const ordinal = Number(media.provenance?.ordinal ?? artifactId.split("_").at(-1));
+    const entry = staged ? findStagedManifestEntry(row.artifact_manifest, artifactId) : null;
+    if (staged && !entry) continue;
+    const ordinal = Number(entry?.ordinal ?? media.provenance?.ordinal ?? artifactId.split("_").at(-1));
     if (!artifactId || !Number.isInteger(ordinal) || ordinal < 1) continue;
     artifacts = upsertArtifact(artifacts, {
       ordinal, id: artifactId, objectId: media.id, storagePath: `media://${media.id}`,
       fileName: media.original_filename, mimeType: media.content_type,
       byteLength: Number(media.byte_length), sha256: media.sha256, uploadedAt: iso(media.created_at),
+      ...(entry ? { role: entry.role, derivativeOf: entry.derivativeOf } : {}),
     });
   }
   return { artifacts, changed: canonicalJson(artifacts) !== canonicalJson(row.stored_artifacts ?? []) };
+}
+
+async function markMediaStored(client, { ownerUserId, receiptId, at, createId }) {
+  const updated = (await client.query(
+    `UPDATE physiqueos.evidence_intake_receipts SET media_state='stored',
+       interpretation_state=CASE WHEN interpretation_state='waiting_for_media' THEN 'pending' ELSE interpretation_state END,
+       upload_claimed_by=NULL,upload_claim_expires_at=NULL,version=version+1,updated_at=$3
+     WHERE id=$1 AND owner_user_id=$2 RETURNING *`, [receiptId, ownerUserId, at],
+  )).rows[0];
+  const message = createEvidenceIntakeInterpretationMessage(mapReceipt(updated), { createId });
+  await client.query(
+    `INSERT INTO physiqueos.outbox_messages
+      (id,user_id,operation_id,topic,dedupe_key,payload_version,payload,due_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)
+     ON CONFLICT (topic,dedupe_key) DO NOTHING`,
+    [message.id, message.userId, message.operationId, message.topic, message.dedupeKey,
+      message.payloadVersion, JSON.stringify(message.payload), at],
+  );
+  return updated;
+}
+
+// Catalog reconciliation plus completion, shared by every staged entry point
+// so a receipt observed through any of them reflects the same durable truth.
+async function reconcileStagedRow(client, { ownerUserId, row, at, createId }) {
+  const reconciled = await reconcileCatalogArtifacts(client, row);
+  let current = row;
+  if (reconciled.changed) {
+    current = (await client.query(
+      `UPDATE physiqueos.evidence_intake_receipts SET stored_artifacts=$3::jsonb,
+         version=version+1,updated_at=$4 WHERE id=$1 AND owner_user_id=$2 RETURNING *`,
+      [row.id, ownerUserId, JSON.stringify(reconciled.artifacts), at],
+    )).rows[0];
+  }
+  return finalizeStagedMediaIfComplete(client, { ownerUserId, row: current, at, createId });
+}
+
+async function finalizeStagedMediaIfComplete(client, { ownerUserId, row, at, createId }) {
+  if (row.media_state === "stored") return row;
+  if (!stagedManifestIsSatisfied(row.artifact_manifest, row.stored_artifacts)) return row;
+  return markMediaStored(client, { ownerUserId, receiptId: row.id, at, createId });
+}
+
+function artifactMatchesEntry(artifact, entry) {
+  return Number(artifact.ordinal) === entry.ordinal &&
+    artifact.fileName === entry.name &&
+    Number(artifact.byteLength) === entry.size &&
+    String(artifact.mimeType).toLowerCase() === entry.type &&
+    String(artifact.sha256).toLowerCase() === entry.sha256 &&
+    (artifact.role ?? entry.role) === entry.role;
+}
+
+// The staged transport keeps a dismissed predecessor as `replacement` inside
+// the photo session context; lineage validation reads the same shape the
+// multipart transport stores at the top level.
+function withReplacementContext(input) {
+  const replacement = input.recoveryContext?.replacement;
+  return replacement?.kind === "dismissed_evidence_replacement"
+    ? { ...input, recoveryContext: replacement }
+    : input;
 }
 
 function assertSameSubmission(row, { input, manifestSha256, typedSha256, evidenceTextKind }) {

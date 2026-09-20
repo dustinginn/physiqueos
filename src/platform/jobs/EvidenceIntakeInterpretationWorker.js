@@ -47,7 +47,7 @@ export function createEvidenceIntakeInterpretationWorkerHandler({
         evidenceDate: receipt.effectiveDate,
         expectedEvidenceType: receipt.expectedEvidenceType,
         loadArtifact: (input) => loadArtifact({ ...input, receipt }),
-        sourceArtifacts: receipt.storedArtifacts,
+        sourceArtifacts: interpretableSourceArtifacts(receipt.storedArtifacts),
         submissionId: `evidence_submission_${receipt.submissionIdentity.replaceAll("-", "")}`,
         typedEvidence: receipt.typedEvidence,
         clientExtractedText: receipt.clientExtractedText,
@@ -121,6 +121,20 @@ export function createEvidenceIntakeInterpretationWorkerHandler({
       throw error;
     }
   };
+}
+
+// Analysis derivatives are companions, not evidence: interpretation sees only
+// original artifacts, each carrying a reference to its derivative when one
+// exists, so photo counts, identities, and hashes come from originals alone.
+function interpretableSourceArtifacts(storedArtifacts = []) {
+  const derivatives = new Map(storedArtifacts
+    .filter((artifact) => artifact.role === "analysis_derivative" && artifact.derivativeOf)
+    .map((artifact) => [artifact.derivativeOf, artifact]));
+  return storedArtifacts
+    .filter((artifact) => artifact.role !== "analysis_derivative")
+    .map((artifact) => derivatives.has(artifact.id)
+      ? { ...artifact, analysisArtifact: derivatives.get(artifact.id) }
+      : artifact);
 }
 
 function elapsed(clock, startedAt) {

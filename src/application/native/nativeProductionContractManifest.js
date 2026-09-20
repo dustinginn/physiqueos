@@ -1,4 +1,13 @@
 import { Phase3Command } from "../commands/Phase3CommandService.js";
+import { PHOTO_CONTAINER_MIME_TYPES } from "../../domain/services/ImageContainerDetection.js";
+import {
+  STAGED_DERIVATIVE_MAXIMUM_BYTES,
+  STAGED_DERIVATIVE_MIME_TYPE,
+  STAGED_EVIDENCE_MANIFEST_VERSION,
+  STAGED_MAXIMUM_ORIGINALS,
+  STAGED_ORIGINAL_MAXIMUM_BYTES,
+  STAGED_SERVER_DERIVATIVE_GENERATION,
+} from "../../domain/services/StagedEvidenceArtifactManifest.js";
 
 export const NativeProductionResource = Object.freeze({
   PROFILE: "profile",
@@ -140,6 +149,28 @@ export const nativeProductionContractManifest = Object.freeze({
     idempotency: "Idempotency-Key equals submissionIdentity; durable receipt replay",
     authority: "founder-production",
     auth: "founder-device-bearer",
+    // Staged media: one bounded JSON declaration, then one bounded request per
+    // artifact. Media is complete only when every declared artifact is stored
+    // and verified; interpretation waits for complete media.
+    stagedMedia: Object.freeze({
+      createEndpoint: "/api/v1/native/evidence/intakes/staged",
+      createContentType: "application/json",
+      artifactEndpoint: "/api/v1/native/evidence/intakes/{intakeId}/artifacts/{artifactId}",
+      artifactMethod: "PUT",
+      manifestVersion: STAGED_EVIDENCE_MANIFEST_VERSION,
+      evidenceTypes: Object.freeze(["photo_session"]),
+      originalTypes: Object.freeze([...PHOTO_CONTAINER_MIME_TYPES]),
+      derivativeType: STAGED_DERIVATIVE_MIME_TYPE,
+      originalMaximumBytes: STAGED_ORIGINAL_MAXIMUM_BYTES,
+      derivativeMaximumBytes: STAGED_DERIVATIVE_MAXIMUM_BYTES,
+      maximumOriginals: STAGED_MAXIMUM_ORIGINALS,
+      heicDerivativeRequired: !STAGED_SERVER_DERIVATIVE_GENERATION,
+      serverDerivativeGeneration: STAGED_SERVER_DERIVATIVE_GENERATION,
+      artifactIdentity: "artifact_{submissionIdentityWithoutDashes}_{ordinal}; ordinals are contiguous across originals and derivatives",
+      idempotency: "declaration replay returns the same intake; an already stored artifact is acknowledged without a second object",
+      completion: "media is stored only when every declared artifact is verified against its declaration; incomplete media never interprets",
+      originals: "preserved verbatim, HEIC/HEIF included; the canonical photo is always the original",
+    }),
   }),
   healthKitIngestion: Object.freeze({
     commandType: Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS,

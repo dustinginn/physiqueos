@@ -1456,8 +1456,17 @@ function findPriorCanonicalPhoto(canonical, photo, observedAt) {
     .sort((left, right) => String(right.lastObservedAt).localeCompare(String(left.lastObservedAt)))[0] ?? null;
 }
 
+// An HEIC/HEIF original carries a linked JPEG analysis derivative; the
+// interpreter reads that rendition while the canonical photo stays original.
+function analysisMediaReference(photo) {
+  if (photo?.analysis_storage_path) {
+    return { reference: photo.analysis_storage_path, contentType: photo.analysis_mime_type ?? "image/jpeg" };
+  }
+  return null;
+}
+
 async function photoInterpreterInput(photo, session, loadPhotoAnalysisMedia) {
-  const media = await loadPhotoAnalysisMedia({
+  const media = await loadPhotoAnalysisMedia(analysisMediaReference(photo) ?? {
     reference: photo.storage_path ?? photo.imagePath,
     contentType: photo.mime_type ?? photo.mimeType ?? null,
   });
@@ -1468,7 +1477,7 @@ async function canonicalPhotoInterpreterInput(canonical, loadPhotoAnalysisMedia)
   const photo = canonical.payload ?? {};
   const sourcePath = photo.storage_path ?? photo.imagePath ?? photo.sourcePath;
   if (!sourcePath) return null;
-  const media = await loadPhotoAnalysisMedia({
+  const media = await loadPhotoAnalysisMedia(analysisMediaReference(photo) ?? {
     reference: sourcePath,
     contentType: photo.mime_type ?? photo.mimeType ?? null,
   });

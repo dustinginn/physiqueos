@@ -112,6 +112,48 @@
         "parameters": [{ "name": "mediaId", "in": "path", "required": true, "schema": { "type": "string" } }],
         "responses": { "200": { "description": "Private image or PDF" }, "404": { "$ref": "#/components/responses/Problem" } }
       }
+    },
+    "/native/evidence/intakes": {
+      "post": {
+        "operationId": "acceptNativeEvidenceIntake",
+        "summary": "Aggregate multipart evidence intake (DEXA PDF, 1-4 screenshots, or a photo set in one bounded request); stores verified artifacts and returns a durable processing receipt",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": {} } },
+        "responses": { "202": { "description": "Durable intake receipt; interpretation continues asynchronously" }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "413": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/native/evidence/intakes/{intakeId}": {
+      "get": {
+        "operationId": "readNativeEvidenceIntakeStatus",
+        "summary": "Owner-scoped intake status; staged intakes also report media completion and per-artifact progress",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "intakeId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Intake status" }, "401": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/native/evidence/intakes/staged": {
+      "post": {
+        "operationId": "stageNativeEvidenceIntake",
+        "summary": "Declare a staged-media Progress Photos intake and its expected artifact set (no bytes)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StagedEvidenceIntakeDeclaration" } } } },
+        "responses": { "202": { "description": "Durable intake receipt with artifact progress; replaying the same declaration returns the same intake" }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "413": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/native/evidence/intakes/{intakeId}/artifacts/{artifactId}": {
+      "put": {
+        "operationId": "storeNativeStagedEvidenceArtifact",
+        "summary": "Transfer exactly one declared artifact as a bounded raw image body; already stored artifacts are acknowledged without a second object",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "intakeId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "artifactId", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^artifact_[0-9a-f]{32}_[1-9][0-9]{0,2}$" } }
+        ],
+        "requestBody": { "required": true, "content": { "image/jpeg": {}, "image/png": {}, "image/webp": {}, "image/heic": {}, "image/heif": {} } },
+        "responses": { "200": { "description": "Intake receipt with updated artifact progress; mediaComplete becomes true only when every declared artifact is verified" }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "411": { "$ref": "#/components/responses/Problem" }, "413": { "$ref": "#/components/responses/Problem" } }
+      }
     }
   },
   "components": {
@@ -170,6 +212,18 @@
       }
     },
     "schemas": {
+      "StagedEvidenceIntakeDeclaration": {
+        "type": "object",
+        "required": ["submissionIdentity", "effectiveDate", "expectedEvidenceType", "photoSession", "artifacts"],
+        "properties": {
+          "submissionIdentity": { "type": "string", "format": "uuid" },
+          "effectiveDate": { "type": "string", "format": "date" },
+          "expectedEvidenceType": { "type": "string", "enum": ["photo_session"] },
+          "replacementForSubmissionIdentity": { "type": "string", "format": "uuid" },
+          "photoSession": { "type": "object", "required": ["originalUnedited", "timeOfDay", "photoIdentities"], "properties": { "originalUnedited": { "type": "boolean" }, "timeOfDay": { "type": "string", "enum": ["morning", "afternoon", "evening"] }, "fasted": { "type": ["boolean", "null"] }, "postWorkout": { "type": ["boolean", "null"] }, "pump": { "type": ["boolean", "null"] }, "photoIdentities": { "type": "array", "items": { "type": "object" } } } },
+          "artifacts": { "type": "array", "minItems": 1, "maxItems": 48, "items": { "type": "object", "required": ["artifactId", "ordinal", "role", "fileName", "mimeType", "byteLength", "sha256"], "properties": { "artifactId": { "type": "string" }, "ordinal": { "type": "integer", "minimum": 1 }, "role": { "type": "string", "enum": ["original", "analysis_derivative"] }, "derivativeOf": { "type": ["string", "null"] }, "fileName": { "type": "string" }, "mimeType": { "type": "string", "enum": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"] }, "byteLength": { "type": "integer", "minimum": 1, "maximum": 33554432 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } } } }
+        }
+      },
       "UuidV7": { "type": "string", "format": "uuid", "pattern": "^[0-9a-fA-F-]{36}$" },
       "AggregateVersion": { "type": "string", "pattern": "^[1-9][0-9]*$" },
       "CommandMetadata": {

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { isHeifFamily } from "./ImageContainerDetection.js";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { interpretPdfEvidence } from "../interpreters/PdfInterpreter";
@@ -874,6 +875,13 @@ function createProgressPhotoEvidencePackage({
         pose: reviewedIdentity?.contractionState ?? inferProgressPhotoPose(artifact.fileName, view),
         source_artifact_ref: artifact.id,
         storage_path: artifact.relativePath,
+        // Present only for an HEIC/HEIF original: the bounded JPEG rendition
+        // that display and the vision interpreter consume. The canonical
+        // photo, its hash, and its provenance remain the original.
+        ...(artifact.analysisRelativePath ? {
+          analysis_storage_path: artifact.analysisRelativePath,
+          analysis_mime_type: artifact.analysisMimeType ?? "image/jpeg",
+        } : {}),
         source_hash: artifact.sourceHash,
         view,
       };
@@ -1305,13 +1313,18 @@ export function createStoredEvidenceArtifactDescriptor({
   observedDate,
   relativePath,
   safeName = "upload.bin",
+  analysisRelativePath = null,
+  analysisMimeType = null,
 }) {
   const originalCaptureMetadata = isImageMimeType(mimeType)
     ? extractOriginalImageCaptureMetadata(buffer, { mimeType })
     : null;
   return {
     buffer,
-    dataUrl: isImageMimeType(mimeType)
+    // HEIC/HEIF bytes are not consumable by the vision interpreter, so no
+    // data URL is materialized for them; their linked analysis derivative
+    // (a bounded JPEG) is what analysis and browser display read instead.
+    dataUrl: isImageMimeType(mimeType) && !isHeifFamily(mimeType)
       ? `data:${mimeType || "image/png"};base64,${buffer.toString("base64")}`
       : null,
     fileName: file.name || safeName,
@@ -1320,6 +1333,7 @@ export function createStoredEvidenceArtifactDescriptor({
     observedDate,
     originalCaptureMetadata,
     relativePath,
+    ...(analysisRelativePath ? { analysisRelativePath, analysisMimeType: analysisMimeType ?? "image/jpeg" } : {}),
     sourceHash: createHash("sha256").update(buffer).digest("hex"),
     text: isPdfArtifact({ mimeType }) ? "" : buffer.toString("utf8").slice(0, 20000),
     uploadedAt: capturedAt,
@@ -1459,6 +1473,10 @@ function toPersistedSourceArtifact(artifact) {
         : "upload",
     file_name: artifact.fileName,
     mime_type: artifact.mimeType,
+    ...(artifact.analysisRelativePath ? {
+      analysis_storage_path: artifact.analysisRelativePath,
+      analysis_mime_type: artifact.analysisMimeType ?? "image/jpeg",
+    } : {}),
     observed_date: normalizeDateKey(artifact.observedDate),
     original_capture_metadata: artifact.originalCaptureMetadata ?? null,
     storage_path: artifact.relativePath,

@@ -323,6 +323,24 @@ export function createNativeProductionContractService({
       return evidenceIntake.accept({ ...input, ownerUserId: principal.userId });
     },
 
+    // Staged media: declaration and per-artifact transfer. The bearer is
+    // authorized before any artifact byte is read.
+    async stageEvidenceIntake({ request, input }) {
+      const principal = await authorize(request, "founder:write");
+      if (!evidenceIntake?.stage) throw unavailableResource();
+      return evidenceIntake.stage({ ...input, ownerUserId: principal.userId });
+    },
+
+    async storeStagedEvidenceArtifact({ request, intakeId, artifactId, readBody }) {
+      await authorize(request, "founder:write");
+      if (!evidenceIntake?.storeStagedArtifact || typeof readBody !== "function") throw unavailableResource();
+      return evidenceIntake.storeStagedArtifact({
+        intakeId: required(intakeId, "intakeId"),
+        artifactId: required(artifactId, "artifactId"),
+        readBody,
+      });
+    },
+
     async evidenceIntakeStatus({ request, intakeId }) {
       await authorize(request, "founder:read");
       if (!evidenceIntake?.getStatus) throw unavailableResource();

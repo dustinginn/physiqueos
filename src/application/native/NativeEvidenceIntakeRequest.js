@@ -113,7 +113,7 @@ function parsePhotoSessionContext(formData, files) {
     throw problem(400, "PHOTO_ORIGINAL_CONFIRMATION_REQUIRED", "Confirm that every progress photo is original and unedited.");
   }
   const timeOfDay = String(formData.get("photoSessionTimeOfDay") ?? "").trim();
-  if (!["morning", "afternoon", "evening"].includes(timeOfDay)) {
+  if (!PHOTO_SESSION_TIMES.includes(timeOfDay)) {
     throw problem(400, "PHOTO_SESSION_TIME_REQUIRED", "Choose Morning, Afternoon, or Evening for this photo session.");
   }
   let requested;
@@ -122,10 +122,45 @@ function parsePhotoSessionContext(formData, files) {
   } catch {
     throw problem(400, "PHOTO_IDENTITIES_INVALID", "Progress Photo identities are invalid.");
   }
-  if (!Array.isArray(requested) || requested.length !== files.length) {
+  return normalizePhotoSessionContext({
+    originalUnedited: true,
+    timeOfDay,
+    fasted: triState(formData.get("photoSessionFasted")),
+    postWorkout: triState(formData.get("photoSessionPostWorkout")),
+    pump: triState(formData.get("photoSessionPump")),
+    photoIdentities: requested,
+    photoCount: files.length,
+  });
+}
+
+const PHOTO_SESSION_TIMES = Object.freeze(["morning", "afternoon", "evening"]);
+
+/**
+ * Shared Progress Photos session normalization for every intake transport.
+ * The multipart path extracts these values from form fields; the staged
+ * media path receives them as JSON. Both produce the identical frozen
+ * recovery context the interpretation worker consumes, so transport choice
+ * can never change what a photo session means.
+ */
+export function normalizePhotoSessionContext({
+  originalUnedited,
+  timeOfDay,
+  fasted = null,
+  postWorkout = null,
+  pump = null,
+  photoIdentities,
+  photoCount,
+} = {}) {
+  if (originalUnedited !== true) {
+    throw problem(400, "PHOTO_ORIGINAL_CONFIRMATION_REQUIRED", "Confirm that every progress photo is original and unedited.");
+  }
+  if (!PHOTO_SESSION_TIMES.includes(String(timeOfDay ?? ""))) {
+    throw problem(400, "PHOTO_SESSION_TIME_REQUIRED", "Choose Morning, Afternoon, or Evening for this photo session.");
+  }
+  if (!Array.isArray(photoIdentities) || photoIdentities.length !== photoCount) {
     throw problem(400, "PHOTO_IDENTITIES_INVALID", "Confirm one identity for every Progress Photo.");
   }
-  const photoIdentities = requested.map((candidate, index) => {
+  const identities = photoIdentities.map((candidate, index) => {
     if (candidate?.identityStatus !== "confirmed" || candidate?.userConfirmedIdentity !== true) {
       throw problem(400, "PHOTO_IDENTITY_UNCONFIRMED", `Confirm the identity for photo ${index + 1}.`);
     }
@@ -149,14 +184,18 @@ function parsePhotoSessionContext(formData, files) {
     kind: "progress_photo_session",
     timeOfDay,
     originalUnedited: true,
-    photoIdentities,
+    photoIdentities: identities,
     conditions: Object.freeze({
       timeOfDay,
-      fasted: triState(formData.get("photoSessionFasted")),
-      postWorkout: triState(formData.get("photoSessionPostWorkout")),
-      pump: triState(formData.get("photoSessionPump")),
+      fasted: booleanOrNull(fasted),
+      postWorkout: booleanOrNull(postWorkout),
+      pump: booleanOrNull(pump),
     }),
   });
+}
+
+function booleanOrNull(value) {
+  return value === true ? true : value === false ? false : null;
 }
 
 function triState(value) {

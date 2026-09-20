@@ -60,7 +60,12 @@ describe("Phase 1 application contracts", () => {
   it("keeps OpenAPI limited to implemented foundation and Native routes", () => {
     const document = JSON.parse(fs.readFileSync(path.join(process.cwd(), "openapi", "physiqueos-v1.json"), "utf8"));
     expect(document.openapi).toBe("3.1.0");
-    const routes = ["capabilities", "health/live", "health/ready", "native/commands", "native/contracts", "native/media/{mediaId}", "native/profile", "native/read/{resource}", "platform"];
+    const routes = [
+      "capabilities", "health/live", "health/ready", "native/commands", "native/contracts",
+      "native/evidence/intakes", "native/evidence/intakes/staged", "native/evidence/intakes/{intakeId}",
+      "native/evidence/intakes/{intakeId}/artifacts/{artifactId}",
+      "native/media/{mediaId}", "native/profile", "native/read/{resource}", "platform",
+    ];
     expect(Object.keys(document.paths).sort()).toEqual(routes.map((route) => `/${route}`));
     expect(document.components.schemas.CommandMetadata.properties.expectedVersion).toBeDefined();
     for (const route of routes) {
