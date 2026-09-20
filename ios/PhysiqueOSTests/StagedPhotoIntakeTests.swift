@@ -33,20 +33,50 @@ final class StagedPhotoIntakeTests: XCTestCase {
         let png = pngBytes()
         let webp = Data([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 1, 2, 3])
         let heic = heicBytes
-        for (data, type, expectedType, ext, derivative) in [
-            (jpeg, "image/jpeg", "image/jpeg", "jpg", false), (jpeg, "image/jpg", "image/jpeg", "jpg", false),
-            (png, "image/png", "image/png", "png", false), (webp, "image/webp", "image/webp", "webp", false),
-            (heic, "image/heic", "image/heic", "heic", true), (heic, "image/heif", "image/heif", "heif", true),
+        var heif = heicBytes
+        heif.replaceSubrange(8..<12, with: Data("mif1".utf8))
+        for (data, expectedType, ext, derivative) in [
+            (jpeg, "image/jpeg", "jpg", false), (png, "image/png", "png", false), (webp, "image/webp", "webp", false),
+            (heic, "image/heic", "heic", true), (heif, "image/heif", "heif", true),
         ] {
-            let representation = EvidenceAttachmentLoader.stagedPhotoRepresentation(data: data, contentType: type)
-            XCTAssertEqual(representation?.data, data, "\(type) must be staged verbatim")
+            let representation = EvidenceAttachmentLoader.stagedPhotoRepresentation(data: data)
+            XCTAssertEqual(representation?.data, data, "\(expectedType) must be staged verbatim")
             XCTAssertEqual(representation?.contentType, expectedType)
             XCTAssertEqual(representation?.fileExtension, ext)
             XCTAssertEqual(representation?.requiresAnalysisDerivative, derivative)
         }
-        XCTAssertNil(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: jpeg, contentType: "image/gif"))
-        XCTAssertNil(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: jpeg, contentType: "application/pdf"))
-        XCTAssertNil(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: jpeg, contentType: nil))
+        for unsupported in [Data("GIF89a-not-a-progress-photo".utf8), Data("%PDF-1.7 trailer".utf8), Data(count: 4), Data()] {
+            XCTAssertNil(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: unsupported))
+        }
+    }
+
+    /// The simulator walkthrough exposed this: with PhotosPicker's default
+    /// encoding policy a HEIC asset arrived labelled and transcoded as JPEG.
+    /// The declaration must describe the bytes actually transferred — the
+    /// Server verifies the container against them — so the label never
+    /// decides, and a JPEG never gets a derivative it does not need.
+    func testDeclaredContainerComesFromTheBytesNotThePickerLabel() {
+        XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(jpegBytes(width: 8, height: 8)), "image/jpeg")
+        XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(pngBytes()), "image/png")
+        XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(heicBytes), "image/heic")
+        for brand in ["heix", "hevc", "hevx"] {
+            var data = heicBytes
+            data.replaceSubrange(8..<12, with: Data(brand.utf8))
+            XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(data), "image/heic", brand)
+        }
+        for brand in ["mif1", "msf1", "heif", "avif"] {
+            var data = heicBytes
+            data.replaceSubrange(8..<12, with: Data(brand.utf8))
+            XCTAssertEqual(EvidenceAttachmentLoader.detectImageContainer(data), "image/heif", brand)
+        }
+        var unknownBrand = heicBytes
+        unknownBrand.replaceSubrange(8..<12, with: Data("qt  ".utf8))
+        XCTAssertNil(EvidenceAttachmentLoader.detectImageContainer(unknownBrand))
+
+        let mislabelled = attachment("photo-a", "image/heic", jpegBytes(width: 8, height: 8))
+        let representation = EvidenceAttachmentLoader.stagedPhotoRepresentation(data: mislabelled.data!)
+        XCTAssertEqual(representation?.contentType, "image/jpeg")
+        XCTAssertEqual(representation?.requiresAnalysisDerivative, false)
     }
 
     func testAnalysisDerivativeIsABoundedJPEGAndNeverReplacesTheOriginal() throws {
@@ -64,7 +94,7 @@ final class StagedPhotoIntakeTests: XCTestCase {
             throw XCTSkip("This simulator cannot decode HEVC; the derivative path is covered by the JPEG source above.")
         }
         XCTAssertEqual(Array(heicDerivative.prefix(3)), [0xff, 0xd8, 0xff])
-        XCTAssertEqual(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: heicBytes, contentType: "image/heic")?.data, heicBytes)
+        XCTAssertEqual(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: heicBytes)?.data, heicBytes)
     }
 
     // MARK: - Plan identity and durability
@@ -122,8 +152,9 @@ final class StagedPhotoIntakeTests: XCTestCase {
         }
         await assertThrows(try await prepare([SandboxAttachment(id: "photo-x", displayName: "Photo 1", source: .photos, contentType: "image/jpeg", data: nil, loadError: "gone")]),
                            StagedPhotoIntakeError.photoUnavailable(attachmentId: "photo-x"))
-        await assertThrows(try await prepare([attachment("photo-x", "image/gif", jpeg)]), StagedPhotoIntakeError.unsupportedPhoto(attachmentId: "photo-x", contentType: "image/gif"))
-        let oversize = Data(count: StagedPhotoIntakePlan.originalMaximumBytes + 1)
+        await assertThrows(try await prepare([attachment("photo-x", "image/gif", Data("GIF89a-not-a-progress-photo".utf8))]), StagedPhotoIntakeError.unsupportedPhoto(attachmentId: "photo-x", contentType: "image/gif"))
+        var oversize = Data([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01])
+        oversize.append(Data(count: StagedPhotoIntakePlan.originalMaximumBytes + 1 - oversize.count))
         await assertThrows(try await prepare([attachment("photo-x", "image/jpeg", oversize)]), StagedPhotoIntakeError.photoTooLarge(attachmentId: "photo-x", bytes: oversize.count))
         let many = (0..<(StagedPhotoIntakePlan.maximumOriginals + 1)).map { attachment("photo-\($0)", "image/jpeg", jpeg) }
         await assertThrows(try await prepare(many), StagedPhotoIntakeError.tooManyPhotos(count: many.count))

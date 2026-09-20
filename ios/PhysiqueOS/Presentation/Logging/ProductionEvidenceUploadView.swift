@@ -215,7 +215,12 @@ struct ProductionEvidenceUploadView: View {
             isPresented: $isPhotosPickerPresented,
             selection: $photoItems,
             maxSelectionCount: effectiveScenario == .progressPhotos ? 0 : 4,
-            matching: .images
+            matching: .images,
+            // The default `.automatic` policy offers a HEIC asset as its
+            // compatible JPEG transcode first, which would replace the
+            // original before staging ever sees it. `.current` delivers the
+            // asset's own bytes; the staged transport preserves them verbatim.
+            preferredItemEncoding: .current
         )
         .onChange(of: photoItems) {
             guard !photoItems.isEmpty else { return }

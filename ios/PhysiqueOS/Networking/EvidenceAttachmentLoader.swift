@@ -94,15 +94,39 @@ enum EvidenceAttachmentLoader {
     /// is re-encoded, resized, or recompressed to satisfy transport: a photo
     /// larger than the per-photo ceiling is refused with a clear message
     /// rather than silently degraded. Any other representation is unsupported.
-    static func stagedPhotoRepresentation(data: Data, contentType: String?) -> StagedPhotoRepresentation? {
-        switch contentType?.lowercased() {
-        case "image/jpeg", "image/jpg": return .init(data: data, contentType: "image/jpeg", fileExtension: "jpg", requiresAnalysisDerivative: false)
+    ///
+    /// The container is read from the bytes, never from a type label. The
+    /// Server verifies the same signatures against every transferred
+    /// artifact, so a declaration derived from anything else could disagree
+    /// with what is actually sent; PhotosPicker's label in particular names
+    /// the variant the system offered first, not necessarily the bytes.
+    static func stagedPhotoRepresentation(data: Data) -> StagedPhotoRepresentation? {
+        switch detectImageContainer(data) {
+        case "image/jpeg": return .init(data: data, contentType: "image/jpeg", fileExtension: "jpg", requiresAnalysisDerivative: false)
         case "image/png": return .init(data: data, contentType: "image/png", fileExtension: "png", requiresAnalysisDerivative: false)
         case "image/webp": return .init(data: data, contentType: "image/webp", fileExtension: "webp", requiresAnalysisDerivative: false)
         case "image/heic": return .init(data: data, contentType: "image/heic", fileExtension: "heic", requiresAnalysisDerivative: true)
         case "image/heif": return .init(data: data, contentType: "image/heif", fileExtension: "heif", requiresAnalysisDerivative: true)
         default: return nil
         }
+    }
+
+    /// Mirrors the Server's `ImageContainerDetection`: JPEG SOI, the PNG
+    /// signature, RIFF/WEBP, and ISO BMFF `ftyp` major brands (HEIC family
+    /// vs. the generic HEIF/AVIF brands). Anything else is not a photo this
+    /// transport carries.
+    static func detectImageContainer(_ data: Data) -> String? {
+        guard data.count >= 12 else { return nil }
+        let bytes = [UInt8](data.prefix(12))
+        if bytes[0] == 0xff, bytes[1] == 0xd8, bytes[2] == 0xff { return "image/jpeg" }
+        if Array(bytes[0..<8]) == [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] { return "image/png" }
+        if Array(bytes[0..<4]) == [0x52, 0x49, 0x46, 0x46], Array(bytes[8..<12]) == [0x57, 0x45, 0x42, 0x50] { return "image/webp" }
+        if Array(bytes[4..<8]) == [0x66, 0x74, 0x79, 0x70] {
+            let brand = String(decoding: bytes[8..<12], as: UTF8.self).lowercased()
+            if ["heic", "heix", "hevc", "hevx"].contains(brand) { return "image/heic" }
+            if ["mif1", "msf1", "heif", "avif"].contains(brand) { return "image/heif" }
+        }
+        return nil
     }
 
     static func downsampledCGImage(data: Data, maximumPixelSize: Int) -> CGImage? {

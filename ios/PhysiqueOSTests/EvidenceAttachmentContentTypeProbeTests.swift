@@ -108,18 +108,18 @@ final class EvidenceAttachmentContentTypeProbeTests: XCTestCase {
     /// re-encode of HEIC no longer exists; it inflated originals past the
     /// aggregate request ceiling and altered the canonical bytes.
     func testProgressPhotoRepresentationsArePreservedByteForByteIncludingHEIC() throws {
-        let jpeg = Data([0xff, 0xd8, 0xff, 0xd9])
-        let accepted = try XCTUnwrap(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: jpeg, contentType: "image/jpeg"))
+        let jpeg = Data([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xff, 0xd9])
+        let accepted = try XCTUnwrap(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: jpeg))
         XCTAssertEqual(accepted.data, jpeg)
         XCTAssertEqual(accepted.contentType, "image/jpeg")
         XCTAssertFalse(accepted.requiresAnalysisDerivative)
 
         let heic = Data([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63])
-        let preserved = try XCTUnwrap(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: heic, contentType: "image/heic"))
+        let preserved = try XCTUnwrap(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: heic))
         XCTAssertEqual(preserved.data, heic, "HEIC originals are staged verbatim, never re-encoded")
-        XCTAssertEqual(preserved.contentType, "image/heic")
+        XCTAssertEqual(preserved.contentType, "image/heic", "the container is read from the bytes, not a picker label")
         XCTAssertTrue(preserved.requiresAnalysisDerivative)
-        XCTAssertNil(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: heic, contentType: "application/pdf"))
+        XCTAssertNil(EvidenceAttachmentLoader.stagedPhotoRepresentation(data: pdfBytes), "a non-photo container is refused, whatever it was labelled")
     }
 
     // MARK: - The value that actually reaches the wire

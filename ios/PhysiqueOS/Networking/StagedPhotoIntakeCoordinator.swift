@@ -69,7 +69,7 @@ struct StagedPhotoIntakeCoordinator: Sendable {
         var staged: [Staged] = []
         for attachment in images {
             guard let data = attachment.data, !data.isEmpty else { throw StagedPhotoIntakeError.photoUnavailable(attachmentId: attachment.id) }
-            guard let representation = EvidenceAttachmentLoader.stagedPhotoRepresentation(data: data, contentType: attachment.contentType) else {
+            guard let representation = EvidenceAttachmentLoader.stagedPhotoRepresentation(data: data) else {
                 throw StagedPhotoIntakeError.unsupportedPhoto(attachmentId: attachment.id, contentType: attachment.contentType)
             }
             guard representation.data.count <= StagedPhotoIntakePlan.originalMaximumBytes else {
