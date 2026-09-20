@@ -225,6 +225,9 @@ describe("durable outbox worker lease ownership under long-running work", () => 
     try {
       const store = durableStore([message()]);
       store.renewLease = async () => { throw new Error("pool exhausted"); };
+      // An acknowledge that ignores expiry would let the work "succeed" unless the
+      // worker itself notices its lease lapsed locally.
+      store.acknowledge = async ({ id }) => { const item = store.state.find((entry) => entry.id === id); item.status = "succeeded"; return structuredClone(item); };
       const worker = createDurableOutboxWorker({
         store, handlers: { "synthetic.test": async ({ assertLease }) => {
           await new Promise((resolve) => setTimeout(resolve, 65_000));
@@ -235,8 +238,10 @@ describe("durable outbox worker lease ownership under long-running work", () => 
       const result = worker.runOnce();
       await vi.advanceTimersByTimeAsync(65_000);
       const outcome = await result;
-      expect(outcome.outcome).not.toBe("succeeded");
-      expect(store.state[0].status).not.toBe("succeeded");
+      // The lapsed lease also blocks the failure write, so the message stays for its
+      // next claimant; what matters is that it was never acknowledged as succeeded.
+      expect(outcome).toMatchObject({ outcome: "retry_scheduled", persisted: false });
+      expect(store.state[0].status).toBe("processing");
     } finally {
       vi.useRealTimers();
     }
@@ -317,16 +322,29 @@ describe("durable outbox worker bounded retry and dead-letter ownership", () => 
     expect(onDead).not.toHaveBeenCalled();
   });
 
-  it("survives an owner hook that throws", async () => {
-    const store = durableStore([{ ...message({ status: "processing", claimed_by: "old", claim_expires_at: at(1) }), attempt_count: 3 }]);
+  it("retries an owner hook that fails transiently and survives one that never succeeds", async () => {
     const errors = [];
-    const handler = Object.assign(vi.fn(), { onDead: async () => { throw new Error("hook failed"); } });
-    const worker = createDurableOutboxWorker({
-      store, handlers: { "synthetic.test": handler }, workerId: "w", buildId: "build", maximumAttempts: 3,
-      clock: () => at(10), logger: { error: (event, fields) => errors.push({ event, fields }), info() {} },
+    const logger = { error: (event, fields) => errors.push({ event, fields }), info() {} };
+    const flaky = vi.fn()
+      .mockRejectedValueOnce(new Error("connection reset"))
+      .mockResolvedValueOnce(undefined);
+    const storeA = durableStore([{ ...message({ status: "processing", claimed_by: "old", claim_expires_at: at(1) }), attempt_count: 3 }]);
+    const workerA = createDurableOutboxWorker({
+      store: storeA, handlers: { "synthetic.test": Object.assign(vi.fn(), { onDead: flaky }) }, workerId: "w", buildId: "build",
+      maximumAttempts: 3, clock: () => at(10), logger, deadHookRetryDelayMs: 0,
     });
-    await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "dead" });
-    expect(errors.some((entry) => entry.event === "outbox.dead_hook_failed")).toBe(true);
+    await expect(workerA.runOnce()).resolves.toMatchObject({ outcome: "dead" });
+    expect(flaky).toHaveBeenCalledTimes(2);
+
+    const never = vi.fn(async () => { throw new Error("hook failed"); });
+    const storeB = durableStore([{ ...message({ status: "processing", claimed_by: "old", claim_expires_at: at(1) }), attempt_count: 3 }]);
+    const workerB = createDurableOutboxWorker({
+      store: storeB, handlers: { "synthetic.test": Object.assign(vi.fn(), { onDead: never }) }, workerId: "w", buildId: "build",
+      maximumAttempts: 3, clock: () => at(10), logger, deadHookRetryDelayMs: 0,
+    });
+    await expect(workerB.runOnce()).resolves.toMatchObject({ outcome: "dead" });
+    expect(never).toHaveBeenCalledTimes(3);
+    expect(errors.filter((entry) => entry.event === "outbox.dead_hook_failed" && entry.fields.final)).toHaveLength(1);
   });
 });
 

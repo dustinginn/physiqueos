@@ -34,7 +34,7 @@ export function createPhotoAnalysisMediaLoader({
       ...(contentType ? { mime_type: contentType } : {}),
     };
     const loaded = await loadArtifact({ artifact });
-    const resolvedContentType = String(loaded?.contentType ?? contentType ?? "").trim();
+    const resolvedContentType = normalizeMimeType(loaded?.contentType ?? contentType ?? "");
     if (!Buffer.isBuffer(loaded?.buffer) || !isVisionMimeType(resolvedContentType)) {
       throw unsupported();
     }
@@ -52,8 +52,15 @@ export function createPhotoAnalysisMediaLoader({
   };
 }
 
+// A stored hint may carry parameters or the common `image/jpg` spelling. Accept
+// the same renditions the vision provider does, under one canonical name.
+function normalizeMimeType(value) {
+  const base = String(value ?? "").split(";")[0].trim().toLowerCase();
+  return base === "image/jpg" ? "image/jpeg" : base;
+}
+
 function isVisionMimeType(value) {
-  return PHOTO_ANALYSIS_VISION_MIME_TYPES.includes(String(value ?? "").trim().toLowerCase());
+  return PHOTO_ANALYSIS_VISION_MIME_TYPES.includes(normalizeMimeType(value));
 }
 
 function unsupported() {

@@ -3,7 +3,7 @@ import { createUuidV7 } from "../../contracts/v1/identifiers.js";
 const DEFAULT_MAX_ATTEMPTS = 8;
 const DEFAULT_LEASE_MS = 60_000;
 
-export function createDurableOutboxWorker({ store, handlers, workerId = createUuidV7(), buildId, clock = () => new Date(), logger, maximumAttempts = DEFAULT_MAX_ATTEMPTS, leaseMs = DEFAULT_LEASE_MS }) {
+export function createDurableOutboxWorker({ store, handlers, workerId = createUuidV7(), buildId, clock = () => new Date(), logger, maximumAttempts = DEFAULT_MAX_ATTEMPTS, leaseMs = DEFAULT_LEASE_MS, deadHookAttempts = 3, deadHookRetryDelayMs = 1_000 }) {
   if (!store?.claimNext || !store?.acknowledge || !store?.fail) throw new Error("A durable outbox store is required.");
   if (!buildId) throw new Error("A worker build identity is required.");
   let stopping = false;
@@ -86,17 +86,24 @@ export function createDurableOutboxWorker({ store, handlers, workerId = createUu
     // make that visible instead of waiting on a message that will not run. The
     // hook is only called when this worker actually persisted the dead state.
     if (terminal && failed && typeof handler?.onDead === "function") {
-      try {
-        await handler.onDead(Object.freeze({
-          messageId: message.id,
-          topic: message.topic,
-          userId: message.user_id ?? null,
-          payloadVersion: message.payload_version,
-          payload: structuredClone(message.payload),
-          errorCode,
-        }));
-      } catch (hookError) {
-        logger?.error?.("outbox.dead_hook_failed", { messageId: message.id, topic: message.topic, errorCode: safeErrorCode(hookError) });
+      const event = Object.freeze({
+        messageId: message.id,
+        topic: message.topic,
+        userId: message.user_id ?? null,
+        payloadVersion: message.payload_version,
+        payload: structuredClone(message.payload),
+        errorCode,
+      });
+      // The message is dead and will never be claimed again, so this is the only
+      // chance to make the owner visible. Retry a transient failure a few times.
+      for (let attempt = 1; attempt <= deadHookAttempts; attempt += 1) {
+        try {
+          await handler.onDead(event);
+          break;
+        } catch (hookError) {
+          logger?.error?.("outbox.dead_hook_failed", { messageId: message.id, topic: message.topic, errorCode: safeErrorCode(hookError), attempt, final: attempt === deadHookAttempts });
+          if (attempt < deadHookAttempts && deadHookRetryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, deadHookRetryDelayMs));
+        }
       }
     }
     return Object.freeze({ outcome: terminal ? "dead" : "retry_scheduled", messageId: message.id, dueAt: terminal ? null : dueAt.toISOString(), persisted: Boolean(failed) });

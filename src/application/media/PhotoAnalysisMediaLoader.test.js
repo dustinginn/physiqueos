@@ -101,4 +101,15 @@ describe("photo analysis media loader excludes canonical originals from the visi
         .resolves.toMatchObject({ mimeType: "image/jpeg" });
     }
   });
+
+  it("normalizes a stored hint with parameters or the image/jpg spelling instead of refusing it", async () => {
+    for (const contentType of ["image/jpg", "IMAGE/JPEG; charset=binary"]) {
+      const load = createPhotoAnalysisMediaLoader({
+        userId: "founder",
+        loadArtifact: vi.fn(async () => ({ buffer: Buffer.from("x"), contentType })),
+      });
+      await expect(load({ reference: "media://a", contentType }))
+        .resolves.toMatchObject({ mimeType: "image/jpeg", dataUrl: expect.stringMatching(/^data:image\/jpeg;base64,/) });
+    }
+  });
 });
