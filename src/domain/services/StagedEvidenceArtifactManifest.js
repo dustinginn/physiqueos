@@ -91,9 +91,17 @@ export function isStagedEvidenceManifest(manifest) {
   return manifest?.version === STAGED_EVIDENCE_MANIFEST_VERSION;
 }
 
-/** Deterministic, intake-bound artifact identity. Ordinals are unique across roles. */
+/**
+ * Deterministic, intake-bound artifact identity. Ordinals are unique across
+ * roles. The identity has exactly one canonical form: the submission UUID
+ * with its dashes removed and its hex lowercased. Clients emit UUIDs in
+ * either case (Foundation's `UUID().uuidString` is uppercase), and the
+ * artifact PUT path already lowercases the identity it resolves, so the
+ * declaration must derive the same lowercase form or an uppercase UUID could
+ * never declare an artifact the Server itself can later find.
+ */
 export function stagedArtifactId(submissionIdentity, ordinal) {
-  return `artifact_${String(submissionIdentity).replaceAll("-", "")}_${ordinal}`;
+  return `artifact_${String(submissionIdentity).replaceAll("-", "").toLowerCase()}_${ordinal}`;
 }
 
 /**

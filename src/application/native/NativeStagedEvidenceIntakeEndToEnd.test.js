@@ -471,6 +471,46 @@ describe("staged Progress Photos intake, end to end", () => {
     expect(pulled).toBeLessThanOrEqual(1);
   });
 
+  // The Build 45 physical failure, end to end: the Founder's plan carries an
+  // uppercase Foundation UUID and lowercase artifact ids. The declaration
+  // must accept exactly that, and every PUT must resolve to the same ids.
+  it("declares the Build 45 ProRAW plan under an uppercase Foundation UUID with lowercase canonical ids, and resolves every transfer", async () => {
+    const FOUNDATION_ID = "B5A63452-E7B0-469C-A634-38A08137716C";
+    const lower = "artifact_b5a63452e7b0469ca63438a08137716c_";
+    const set = proRawSet().map((file) => ({ ...file, artifactId: `${lower}${file.ordinal}`, derivativeOf: file.of ? `${lower}${file.of}` : null }));
+    expect(set.map((file) => file.artifactId)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `${lower}${n}`));
+
+    const response = await stage(declaration(set, { submissionIdentity: FOUNDATION_ID }), { idempotencyKey: FOUNDATION_ID });
+    expect(response.status).toBe(202);
+    const body = await json(response);
+    expect(body).toMatchObject({ intakeId: `evidence_intake_${FOUNDATION_ID}`, status: "processing", mediaState: "receiving", expectedArtifactCount: 10, storedArtifactCount: 0 });
+    expect(body.artifacts.map((item) => item.artifactId)).toEqual(set.map((file) => file.artifactId));
+    expect(body.artifacts.slice(5).map((item) => item.derivativeOf)).toEqual([1, 2, 3, 4, 5].map((n) => `${lower}${n}`));
+
+    // A DNG original and its derivative transfer under the ids Native sends; an uppercase path spelling names the same artifact.
+    const first = await put(body.intakeId, `${lower}1`, set[0].bytes, { "content-type": "image/x-adobe-dng" });
+    expect(first.status).toBe(200);
+    expect(await json(first)).toMatchObject({ artifactId: `${lower}1`, artifactOutcome: "stored", storedArtifactCount: 1 });
+    const sixth = await put(body.intakeId, `${lower}6`, set[5].bytes);
+    expect(await json(sixth)).toMatchObject({ artifactId: `${lower}6`, artifactOutcome: "stored", storedArtifactCount: 2 });
+    const spelledUpper = await put(body.intakeId, `${lower}1`.toUpperCase().replace("ARTIFACT_", "artifact_"), set[0].bytes, { "content-type": "image/x-adobe-dng" });
+    expect(await json(spelledUpper)).toMatchObject({ artifactId: `${lower}1`, artifactOutcome: "already_stored", storedArtifactCount: 2 });
+    expect(harness.media).toHaveLength(2);
+    for (const file of set.slice(1, 5).concat(set.slice(6))) {
+      expect((await put(body.intakeId, file.artifactId, file.bytes, { "content-type": file.type })).status, file.artifactId).toBe(200);
+    }
+    expect(harness.receipts[0]).toMatchObject({ media_state: "stored" });
+    expect(harness.receipts[0].stored_artifacts.map((item) => item.id)).toEqual(set.map((file) => file.artifactId));
+
+    // The pre-fix derivation (case preserved) is refused before any intake exists — the exact physical failure.
+    const OTHER_FOUNDATION_ID = "C5A63452-E7B0-469C-A634-38A08137716C";
+    const upperIds = proRawSet().map((file) => ({ ...file, artifactId: `artifact_C5A63452E7B0469CA63438A08137716C_${file.ordinal}`, derivativeOf: file.of ? `artifact_C5A63452E7B0469CA63438A08137716C_${file.of}` : null }));
+    const refused = await stage(declaration(upperIds, { submissionIdentity: OTHER_FOUNDATION_ID }), { idempotencyKey: OTHER_FOUNDATION_ID });
+    expect(refused.status).toBe(400);
+    expect((await json(refused)).code).toBe("STAGED_ARTIFACT_IDENTITY_INVALID");
+    expect(harness.receipts).toHaveLength(1);
+  });
+
   it("keeps the aggregate multipart transport and its 4 KiB command reader untouched", async () => {
     const { POST: aggregateRoute } = await import("../../app/api/v1/native/evidence/intakes/route.js");
     const boundary = "PhysiqueOSNativeIntakeTest";

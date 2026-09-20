@@ -96,6 +96,26 @@ describe("staged intake declaration parsing", () => {
     expect(() => parseStagedArtifactPath({ intakeId: `evidence_intake_${ID}`, artifactId: "../../etc/passwd" })).toThrowError(expect.objectContaining({ status: 404, code: "EVIDENCE_INTAKE_ARTIFACT_UNKNOWN" }));
     expect(() => parseStagedArtifactPath({ intakeId: `evidence_intake_${ID}`, artifactId: "artifact_01999999999979998999999999999999_0" })).toThrowError(expect.objectContaining({ status: 404 }));
   });
+
+  it("declares under an uppercase Foundation UUID with the lowercase ids Native sends, and the PUT path resolves the same ids", async () => {
+    const FOUNDATION_ID = "B5A63452-E7B0-469C-A634-38A08137716C";
+    const lower = "artifact_b5a63452e7b0469ca63438a08137716c_";
+    const artifacts = [
+      { artifactId: `${lower}1`, ordinal: 1, role: "original", fileName: "progress-photo-1.dng", mimeType: "image/x-adobe-dng", byteLength: 46_247_587, sha256: SHA },
+      { artifactId: `${lower}2`, ordinal: 2, role: "analysis_derivative", derivativeOf: `${lower}1`, fileName: "progress-photo-1-analysis.jpg", mimeType: "image/jpeg", byteLength: 648_223, sha256: "b".repeat(64) },
+    ];
+    const parsed = await parseNativeStagedEvidenceIntakeRequest(jsonRequest(stagedBody({ submissionIdentity: FOUNDATION_ID, artifacts }), { "idempotency-key": FOUNDATION_ID }));
+    expect(parsed.submissionIdentity).toBe(FOUNDATION_ID);
+    expect(parsed.artifactManifest.files.map((file) => [file.artifactId, file.derivativeOf])).toEqual([[`${lower}1`, null], [`${lower}2`, `${lower}1`]]);
+    // Intake identity stays case-preserving; only the artifact segment is canonical lowercase.
+    const intakeId = `evidence_intake_${FOUNDATION_ID}`;
+    expect(parseStagedArtifactPath({ intakeId, artifactId: `${lower}2` })).toEqual({ intakeId, artifactId: `${lower}2` });
+    expect(parseStagedArtifactPath({ intakeId, artifactId: `${lower}2`.toUpperCase() })).toEqual({ intakeId, artifactId: `${lower}2` });
+    // The pre-fix derivation (case preserved) is refused with the exact Build 45 failure code.
+    const upper = artifacts.map((entry) => ({ ...entry, artifactId: entry.artifactId.toUpperCase().replace("ARTIFACT_", "artifact_"), derivativeOf: entry.derivativeOf?.toUpperCase().replace("ARTIFACT_", "artifact_") ?? entry.derivativeOf }));
+    const problem = toEvidenceIntakeProblem(await parseNativeStagedEvidenceIntakeRequest(jsonRequest(stagedBody({ submissionIdentity: FOUNDATION_ID, artifacts: upper }), { "idempotency-key": FOUNDATION_ID })).catch((error) => error));
+    expect(problem).toMatchObject({ status: 400, code: "STAGED_ARTIFACT_IDENTITY_INVALID" });
+  });
 });
 
 describe("staged intake contract service", () => {

@@ -134,4 +134,43 @@ describe("staged evidence artifact manifest", () => {
     rejects([dng(1), derivative(2, 1, { mimeType: "image/x-adobe-dng" })], "STAGED_ARTIFACT_MEDIA_UNSUPPORTED");
     rejects([original(1, { mimeType: "image/tiff" })], "STAGED_ARTIFACT_MEDIA_UNSUPPORTED");
   });
+
+  // Build 45 physical failure: Foundation's `UUID().uuidString` is uppercase,
+  // Native declares lowercase ids, and the Server compared them against a
+  // case-preserving derivation. The identity has one canonical form.
+  it("canonicalizes the identity to lowercase hex for any UUID case, and accepts no other spelling", () => {
+    const FOUNDATION_ID = "B5A63452-E7B0-469C-A634-38A08137716C";
+    const lower = "artifact_b5a63452e7b0469ca63438a08137716c_";
+    // Pinned literals, never derived through stagedArtifactId.
+    expect(stagedArtifactId(FOUNDATION_ID, 1)).toBe(`${lower}1`);
+    expect(stagedArtifactId(FOUNDATION_ID, 6)).toBe(`${lower}6`);
+    expect(stagedArtifactId(FOUNDATION_ID, 10)).toBe(`${lower}10`);
+    expect(stagedArtifactId(FOUNDATION_ID.toLowerCase(), 1)).toBe(`${lower}1`);
+    expect(stagedArtifactId("b5a63452-e7b0-469c-a634-38a08137716c", 7)).toBe(`${lower}7`);
+    expect(stagedArtifactId(ID, 3)).toBe("artifact_01999999999979998999999999999999_3");
+
+    // The exact Build 45 shape: five DNG originals, five JPEG derivatives, lowercase ids under the uppercase identity.
+    const dngOriginal = (n) => ({ artifactId: `${lower}${n}`, ordinal: n, role: "original", derivativeOf: null, fileName: `progress-photo-${n}.dng`, mimeType: "image/x-adobe-dng", byteLength: 40_000_000 + n, sha256: SHA(n) });
+    const jpegDerivative = (n, of) => ({ artifactId: `${lower}${n}`, ordinal: n, role: "analysis_derivative", derivativeOf: `${lower}${of}`, fileName: `progress-photo-${of}-analysis.jpg`, mimeType: "image/jpeg", byteLength: 600_000 + n, sha256: SHA(100 + n) });
+    const set = [1, 2, 3, 4, 5].map(dngOriginal).concat([6, 7, 8, 9, 10].map((n) => jpegDerivative(n, n - 5)));
+    const manifest = createStagedEvidenceArtifactManifest({ submissionIdentity: FOUNDATION_ID, artifacts: set });
+    expect(manifest.originalCount).toBe(5);
+    expect(manifest.files.map((file) => file.artifactId)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `${lower}${n}`));
+    expect(manifest.files.slice(5).map((file) => file.derivativeOf)).toEqual([1, 2, 3, 4, 5].map((n) => `${lower}${n}`));
+    // The PUT path lowercases what it routes; the manifest resolves exactly that spelling and no other.
+    expect(findStagedManifestEntry(manifest, `${lower}1`)?.ordinal).toBe(1);
+    expect(findStagedManifestEntry(manifest, `${lower}10`)?.role).toBe("analysis_derivative");
+    expect(findStagedManifestEntry(manifest, "artifact_B5A63452E7B0469CA63438A08137716C_1")).toBeNull();
+
+    // The pre-fix Server derivation (case preserved) is not a second accepted representation.
+    const upper = (entry) => ({ ...entry, artifactId: entry.artifactId.replace("b5a63452e7b0469ca63438a08137716c", "B5A63452E7B0469CA63438A08137716C") });
+    const rejectsFor = (artifacts, code) => expect(() => createStagedEvidenceArtifactManifest({ submissionIdentity: FOUNDATION_ID, artifacts })).toThrowError(expect.objectContaining({ code, status: 400 }));
+    rejectsFor([upper(set[0]), ...set.slice(1)], "STAGED_ARTIFACT_IDENTITY_INVALID");
+    rejectsFor(set.map(upper), "STAGED_ARTIFACT_IDENTITY_INVALID");
+    rejectsFor([...set.slice(0, 5), { ...set[5], derivativeOf: "artifact_B5A63452E7B0469CA63438A08137716C_1" }, ...set.slice(6)], "STAGED_DERIVATIVE_TARGET_INVALID");
+    // Malformed and foreign identities still fail closed.
+    rejectsFor([{ ...set[0], artifactId: "artifact_custom_1" }, ...set.slice(1)], "STAGED_ARTIFACT_IDENTITY_INVALID");
+    rejectsFor([{ ...set[0], artifactId: `${lower}2` }, ...set.slice(1)], "STAGED_ARTIFACT_IDENTITY_INVALID");
+    rejectsFor([{ ...set[0], artifactId: "artifact_01999999999979998999999999999999_1" }, ...set.slice(1)], "STAGED_ARTIFACT_IDENTITY_INVALID");
+  });
 });
