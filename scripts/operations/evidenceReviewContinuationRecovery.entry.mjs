@@ -14,11 +14,18 @@
 // Executing this is a separate, explicitly authorized act. Nothing here runs it.
 import { createRequire } from "node:module";
 import { runEvidenceReviewContinuationRecovery } from "../../src/platform/operations/EvidenceReviewContinuationRecovery.js";
-import { BUILD46_PHOTO_CONTINUATION_RECOVERY_AUTHORIZATION as AUTHORIZATION } from "../../src/platform/operations/build46PhotoContinuationRecoveryAuthorization.js";
+import {
+  BUILD46_PHOTO_BRIEFING_RECOVERY_AUTHORIZATION,
+  BUILD46_PHOTO_CONTINUATION_RECOVERY_AUTHORIZATION,
+} from "../../src/platform/operations/build46PhotoContinuationRecoveryAuthorization.js";
 
 const EXPECTED_GIT_SHA = typeof __EXPECTED_GIT_SHA__ === "undefined" ? "" : __EXPECTED_GIT_SHA__;
 const MODE = typeof __MODE__ === "undefined" ? "dry-run" : __MODE__;
 const AUTHORIZATION_REFERENCE = typeof __AUTHORIZATION_REFERENCE__ === "undefined" ? "" : __AUTHORIZATION_REFERENCE__;
+const AUTHORIZATION_NAME = typeof __AUTHORIZATION_NAME__ === "undefined" ? "analysis" : __AUTHORIZATION_NAME__;
+const AUTHORIZATION = AUTHORIZATION_NAME === "briefing"
+  ? BUILD46_PHOTO_BRIEFING_RECOVERY_AUTHORIZATION
+  : BUILD46_PHOTO_CONTINUATION_RECOVERY_AUTHORIZATION;
 const MARKER = typeof __MARKER__ === "undefined" ? "PHYSIQUEOS_CONTINUATION_RECOVERY_SUCCESS" : __MARKER__;
 const REQUIRE_ROOT = "/app/server.js";
 const SSL_URL_PARAMETERS = Object.freeze(["ssl", "sslmode", "sslcert", "sslkey", "sslrootcert", "sslnegotiation", "uselibpqcompat"]);
@@ -31,6 +38,7 @@ function stop(code, status = 1) {
 const sanitizedCode = (error) => (/^[A-Za-z0-9_]{3,60}$/.test(String(error?.code ?? "")) ? String(error.code) : "RECOVERY_ERROR");
 
 if (!["dry-run", "apply"].includes(MODE)) stop("MODE_INVALID");
+if (!["analysis", "briefing"].includes(AUTHORIZATION_NAME)) stop("AUTHORIZATION_NAME_INVALID");
 if (MODE === "apply" && !AUTHORIZATION_REFERENCE.trim()) stop("AUTHORIZATION_REFERENCE_REQUIRED");
 if (!/^[0-9a-f]{40}$/.test(EXPECTED_GIT_SHA)) stop("EXPECTED_GIT_SHA_REQUIRED");
 if (String(process.env.PHYSIQUEOS_GIT_SHA ?? "") !== EXPECTED_GIT_SHA) stop("RUNTIME_SHA_MISMATCH");

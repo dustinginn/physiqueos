@@ -26,3 +26,24 @@ export const BUILD46_PHOTO_CONTINUATION_RECOVERY_AUTHORIZATION = Object.freeze({
   authorizedBy: "founder",
   basis: "Founder instruction: recover the existing real review exactly once after the corrected Server is verified; do not ask the Founder to reconfirm.",
 });
+
+/**
+ * The second, separately authorized recovery for the same review. The first recovery
+ * resumed analysis, training events, goal evaluation, and event eligibility on the corrected
+ * worker. The briefing step then failed on a distinct, since-corrected defect (the Photo
+ * Event read store injected a numeric storage version onto the Goal, which the Goal Contract
+ * V3 adapter rejected), exhausted its attempt budget, and left the review `partially_committed`.
+ * Everything before the briefing step is durable and correct, so recovery again only gives the
+ * one spent continuation message a fresh attempt budget.
+ */
+export const BUILD46_PHOTO_BRIEFING_RECOVERY_AUTHORIZATION = Object.freeze({
+  ...BUILD46_PHOTO_CONTINUATION_RECOVERY_AUTHORIZATION,
+  recoveryId: "progress-photos-build46-briefing-recovery-v1",
+  messageId: "3d4a3a41-f347-4a08-89c6-f6aa7816bb83",
+  expectedCompletedSteps: Object.freeze([
+    "canonical_commit", "compatibility_writes", "scheduled_completion",
+    "analysis", "training_performance_events", "goal_evaluation", "event_eligibility",
+  ]),
+  expectedPhotoAnalyses: 6,
+  basis: "Founder instruction: recover the existing real review exactly once after the corrected Server is verified; do not ask the Founder to reconfirm.",
+});

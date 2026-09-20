@@ -38,8 +38,8 @@ export function planEvidenceReviewContinuationRecovery({ facts, authorization, n
 
   const progress = payload.commitProgress ?? {};
   const completed = POST_CONFIRMATION_STEP_ORDER.filter((step) => progress[step]?.status === "completed");
-  if (progress.analysis?.status === "completed" && completed.length > authorization.expectedCompletedSteps.length) {
-    return Object.freeze({ outcome: "already_progressed", detail: "Analysis has already completed; nothing to recover.", completedSteps: completed });
+  if (completed.length > authorization.expectedCompletedSteps.length) {
+    return Object.freeze({ outcome: "already_progressed", detail: "The review is already past the authorized checkpoint; nothing to recover.", completedSteps: completed });
   }
   if (JSON.stringify(completed) !== JSON.stringify(authorization.expectedCompletedSteps)) {
     return refuse("COMPLETED_STEPS_UNEXPECTED", `Completed steps are ${completed.join(",") || "none"}.`);
@@ -57,7 +57,12 @@ export function planEvidenceReviewContinuationRecovery({ facts, authorization, n
     return refuse("CANONICAL_PHOTO_COUNT_UNEXPECTED", `Canonical photo count is ${counts.canonicalPhotos}.`);
   }
   if (counts.priorityCompletions !== 1) return refuse("PRIORITY_COMPLETION_NOT_SINGLETON", `Sep 19 priority completion count is ${counts.priorityCompletions}.`);
-  if (counts.photoAnalyses !== 0) return refuse("ANALYSIS_ALREADY_EXISTS", `${counts.photoAnalyses} photo analyses already exist for this session.`);
+  // Analysis is idempotent by stable id, so the count is either zero (analysis has
+  // not run) or exactly the completed set (five per-view analyses plus the synthesis).
+  const expectedAnalyses = authorization.expectedPhotoAnalyses ?? 0;
+  if (counts.photoAnalyses !== expectedAnalyses) {
+    return refuse(expectedAnalyses === 0 ? "ANALYSIS_ALREADY_EXISTS" : "ANALYSIS_COUNT_UNEXPECTED", `${counts.photoAnalyses} photo analyses exist for this session; expected ${expectedAnalyses}.`);
+  }
   if (counts.eventBriefings !== 0) return refuse("PHOTO_BRIEFING_ALREADY_EXISTS", "A Photo Event briefing already exists for this session.");
 
   const forReview = (messages ?? []).filter((message) => message.topic === EVIDENCE_REVIEW_CONTINUATION_TOPIC && message.reviewId === authorization.reviewId);

@@ -3,7 +3,10 @@ import {
   planEvidenceReviewContinuationRecovery,
   runEvidenceReviewContinuationRecovery,
 } from "./EvidenceReviewContinuationRecovery.js";
-import { BUILD46_PHOTO_CONTINUATION_RECOVERY_AUTHORIZATION as AUTH } from "./build46PhotoContinuationRecoveryAuthorization.js";
+import {
+  BUILD46_PHOTO_BRIEFING_RECOVERY_AUTHORIZATION,
+  BUILD46_PHOTO_CONTINUATION_RECOVERY_AUTHORIZATION as AUTH,
+} from "./build46PhotoContinuationRecoveryAuthorization.js";
 
 const NOW = new Date("2026-09-20T18:00:00.000Z");
 const completed = (extra = {}) => ({ status: "completed", attempts: 1, ...extra });
@@ -159,5 +162,45 @@ describe("evidence review continuation recovery runner", () => {
     const result = await runEvidenceReviewContinuationRecovery({ query, authorization: AUTH, apply: true, now: () => NOW });
     expect(result).toMatchObject({ outcome: "already_armed" });
     expect(writes(statements)).toEqual([]);
+  });
+});
+
+describe("briefing-stage recovery authorization", () => {
+  const BR = BUILD46_PHOTO_BRIEFING_RECOVERY_AUTHORIZATION;
+  const done = (extra = {}) => ({ status: "completed", attempts: 1, ...extra });
+  const briefingReview = (overrides = {}) => {
+    const review = reviewRow({ commitClaim: { operationId: `evidence-review-background:${BR.messageId}`, status: "failed" }, ...overrides });
+    review.payload.commitProgress = {
+      canonical_commit: done(), compatibility_writes: done({ attempts: 4 }), scheduled_completion: done(),
+      analysis: done({ attempts: 22 }), training_performance_events: done(), goal_evaluation: done(), event_eligibility: done(),
+      briefing: { status: "failed", attempts: 3, error: "contractVersion is required." },
+    };
+    return review;
+  };
+  const briefingFacts = (overrides = {}) => ({
+    review: briefingReview(), messages: [message({ id: BR.messageId, status: "dead", attemptCount: 3, lastErrorCode: "OUTBOX_HANDLER_FAILED" })],
+    counts: { canonicalSessions: 1, canonicalPhotos: 5, priorityCompletions: 1, photoAnalyses: 6, eventBriefings: 0 },
+    ...overrides,
+  });
+  const planBriefing = (overrides) => planEvidenceReviewContinuationRecovery({ facts: briefingFacts(overrides), authorization: BR, now: NOW });
+
+  it("resets exactly the dead briefing message when analysis is complete and no Event exists", () => {
+    expect(planBriefing()).toMatchObject({ outcome: "reset_message", messageId: BR.messageId, before: { status: "dead", attemptCount: 3 } });
+  });
+
+  it("requires exactly the completed set of six photo analyses", () => {
+    expect(planBriefing({ counts: { ...briefingFacts().counts, photoAnalyses: 0 } })).toMatchObject({ outcome: "refused", code: "ANALYSIS_COUNT_UNEXPECTED" });
+    expect(planBriefing({ counts: { ...briefingFacts().counts, photoAnalyses: 7 } })).toMatchObject({ outcome: "refused", code: "ANALYSIS_COUNT_UNEXPECTED" });
+  });
+
+  it("refuses when the Photo Event already exists and is a no-op once the briefing step completed", () => {
+    expect(planBriefing({ counts: { ...briefingFacts().counts, eventBriefings: 1 } })).toMatchObject({ outcome: "refused", code: "PHOTO_BRIEFING_ALREADY_EXISTS" });
+    const review = briefingReview();
+    review.payload.commitProgress.briefing = done();
+    expect(planBriefing({ review })).toMatchObject({ outcome: "already_progressed" });
+  });
+
+  it("does not accept the analysis-stage message under the briefing authorization", () => {
+    expect(planBriefing({ messages: [message({ status: "dead" })] })).toMatchObject({ outcome: "refused", code: "MESSAGE_MISSING" });
   });
 });
