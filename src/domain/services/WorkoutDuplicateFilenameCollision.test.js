@@ -166,6 +166,27 @@ describe("cross-date display filename collisions", () => {
     ]);
   });
 
+  it("still reconciles a same-date re-ingest against a legacy-shape filename canonical id", () => {
+    const evidence = () => ({
+      id: "strength-july-27", evidence_type: "training", observed_at: "2026-07-27",
+      source: { modality: "screenshot", application: "Apple Fitness", source_artifact_refs: ["IMG_1688.png"] },
+      provenance: { source_artifact_refs: ["IMG_1688.png"] },
+      metadata: { activity_type: "Traditional Strength Training", start_time: "07:09", end_time: "08:00", duration_seconds: 3053, active_calories: 215 },
+      exercises: [],
+    });
+    const legacyId = "training|authoritative|IMG_1688.png";
+    const legacy = {
+      canonicalId: legacyId, evidence_type: "training", userId: "founder", quality: { status: "active" },
+      provenance: { source_artifact_refs: ["IMG_1688.png"] }, payload: evidence(),
+    };
+    const result = reconcileEvidencePackageIntoCanonicalHistory({
+      evidencePackage: { package_id: "package_reingest", evidence_objects: [evidence()], provenance: { source_artifacts: [] } },
+      existingCanonicalObjects: [legacy], userId: "founder",
+    });
+    // The legacy record is corroborated (same window, duration, calories) and merged, never forked.
+    expect(result.filter((object) => object.quality?.status !== "superseded")).toHaveLength(1);
+  });
+
   it("uses a same-date shared filename only as weak support that needs corroboration", () => {
     const morning = appleTelemetry({
       date: "2026-09-21", refs: [REPEATING_FILENAME],

@@ -28,6 +28,18 @@ export function createTrainingNavigationReadService({
   const readRegistry = readCanonicalExerciseRegistry ??
     hydrateCanonicalExerciseRegistry;
 
+  // Durable events are immutable derived facts; only events whose source
+  // session is still an active canonical session are current records. The
+  // exercise-scoped query matches the STORED exercise id, so an event whose
+  // session stores a legacy or name-only identity can miss it; any event that
+  // is not live there is checked once against the full Training list before it
+  // is treated as no longer authoritative.
+  async function selectLiveEvents(events, scopedCanonicalObjects) {
+    const live = selectLiveTrainingPerformanceEvents(events, scopedCanonicalObjects);
+    if (live.length === events.length || typeof store.listCanonicalTrainingEvidenceObjects !== "function") return live;
+    return selectLiveTrainingPerformanceEvents(events, await store.listCanonicalTrainingEvidenceObjects());
+  }
+
   // Production injects one canonical registry access path. All Training reads enter it,
   // including Day and Session, so no caller or page-order side effect owns hydration.
   async function ensureCanonicalExerciseRegistry() {
@@ -237,7 +249,7 @@ export function createTrainingNavigationReadService({
           // session is still an active canonical session are current records.
           exerciseRecords: createTrainingLibraryExerciseRecordsReadModel({
             canonicalExerciseId: exerciseIdentity.canonicalExerciseId,
-            events: selectLiveTrainingPerformanceEvents(events, canonicalEvidenceObjects),
+            events: await selectLiveEvents(events, canonicalEvidenceObjects),
           }),
         });
       });

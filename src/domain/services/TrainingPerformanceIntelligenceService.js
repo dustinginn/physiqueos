@@ -382,7 +382,10 @@ function detectPrs({ lastSession, priorEntries = [] }) {
         value: set.reps,
         unit: "reps",
         load: set.comparison_load,
-        load_unit: set.weight_unit === "kg" ? "kg" : "lb",
+        // Historic event identity: a stored numeric-weight set keeps its stored
+        // unit (`bodyweight` included). A null-load bodyweight set had no
+        // comparable load before, so it reads as the zero baseline in lb.
+        load_unit: Number.isFinite(set.weight) ? (set.weight_unit ?? "lb") : "lb",
         previous_best: priorSameLoadReps,
       });
     }

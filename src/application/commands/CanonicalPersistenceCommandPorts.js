@@ -1352,8 +1352,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
 
     // The Logger command bypasses the Evidence Review orchestrator, so its
     // durable performance events are derived here, through the same idempotent
-    // reconciliation the review path uses. The TrainingSession is already
-    // durable: a derivation that cannot complete is deferred, never fatal.
+    // reconciliation the review path uses, inside this command's transaction.
+    // A derivation that cannot complete (a producer error or an event identity
+    // collision) is deferred and never blocks the session. A store failure while
+    // writing the events fails the whole command atomically, so the client's
+    // idempotent retry re-derives them; a partial event batch is never left.
     await reconcileCommittedSessionPerformanceEvents(context, {
       canonicalId,
       evidencePackage: packageAndObject,
@@ -1786,15 +1789,29 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     evidencePackage,
     supportingReviewId,
   }) {
-    const collections = [
-      "user", "goals", "canonicalEvidenceObjects", "trainingPerformanceEvents",
-      "trainingPerformanceEventBatches", "piTrainingConfidenceWorkItems",
+    // Bounded load: only Training canonical objects (read, never mutated) and the
+    // three event collections this step may write. The report needs the active
+    // Training history, not the rest of the canonical runtime.
+    const lowerLevelEnabled = isPITrainingConfidenceEnqueueEnabled();
+    const writeCollections = [
+      "trainingPerformanceEvents", "trainingPerformanceEventBatches", "piTrainingConfidenceWorkItems",
     ];
-    const { candidate, before } = await loadCandidate(collections, context.ownerUserId);
-    const canonicalSession = (candidate.canonicalEvidenceObjects ?? [])
-      .find((item) => item.canonicalId === canonicalId);
+    const canonicalObjects = (await records.list({
+      ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects",
+    })).filter((item) => (item.payload ?? item).evidence_type === "training");
+    const canonicalSession = canonicalObjects.find((item) => item.canonicalId === canonicalId);
     if (!canonicalSession || canonicalSession.quality?.status === "superseded") {
       return { status: "skipped", reason: "session_not_active" };
+    }
+    const candidate = { canonicalEvidenceObjects: canonicalObjects };
+    const before = new Map();
+    for (const collection of writeCollections) {
+      const values = await records.list({ ownerUserId: context.ownerUserId, collection });
+      before.set(collection, structuredClone(values));
+      candidate[collection] = structuredClone(values);
+    }
+    if (lowerLevelEnabled) {
+      candidate.goals = structuredClone(await records.list({ ownerUserId: context.ownerUserId, collection: "goals" }));
     }
     let reconciliation;
     try {
@@ -1807,7 +1824,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         }),
         sourceReviewId: supportingReviewId ?? `training_logger_session|${context.payload.sessionId}`,
         sourceEvidencePackageId: evidencePackage.package_id,
-        lowerLevelEnabled: isPITrainingConfidenceEnqueueEnabled(),
+        lowerLevelEnabled,
         persistence: createTrainingPerformanceEventPersistenceService({
           mutateCanonicalRuntime: (input) =>
             mutateCandidateRuntime(candidate, context.metadata.commandId, input),
@@ -1827,9 +1844,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     await persistCandidateCollections({
       before,
       candidate,
-      collections: [
-        "trainingPerformanceEvents", "trainingPerformanceEventBatches", "piTrainingConfidenceWorkItems",
-      ],
+      collections: writeCollections,
       ownerUserId: context.ownerUserId,
     });
     return {

@@ -337,6 +337,23 @@ describe("provider-native Training navigation", () => {
     expect(event.sourceCanonicalTrainingId).toBe("newer");
   });
 
+  it("does not hide a valid record whose session stores a legacy exercise id the scoped query cannot match", async () => {
+    // The session stores a legacy id; the event carries the identity-resolved id.
+    const legacy = training("legacy-session", "2026-08-26");
+    legacy.payload.exercises[0] = { id: "exercise-entry", name: "Seated Hip Adductions", canonicalExerciseId: "seated_abductions", sets: [{ reps: 10, weight: 65, weight_unit: "lb" }] };
+    const event = {
+      ...performanceEvent("2026-08-26", { canonicalId: "legacy-session", sessionId: "payload-legacy-session" }),
+      canonicalExerciseId: "seated_hip_adductions", canonicalExerciseName: "Seated Hip Adductions",
+    };
+    const store = navigationStore([legacy], [event]);
+    store.listCanonicalTrainingEvidenceByExercise = vi.fn(async () => []);
+    const result = await createTrainingNavigationReadService({ store }).getExercise({
+      context: "all", currentDate: new Date("2026-08-29T12:00:00Z"), exerciseSlug: "seated_hip_adductions",
+    });
+    expect(result.exerciseRecords).toMatchObject({ canonicalExerciseId: "seated_hip_adductions", totalCount: 1 });
+    expect(store.listCanonicalTrainingEvidenceObjects).toHaveBeenCalled();
+  });
+
   it("keeps consecutive exercise requests request-local and free of broad timeline calls", async () => {
     const store = navigationStore([training("session-a", "2026-08-26")]);
     const service = createTrainingNavigationReadService({ store });

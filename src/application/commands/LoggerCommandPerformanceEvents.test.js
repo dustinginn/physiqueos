@@ -196,6 +196,33 @@ describe("Logger command performance events", () => {
     expect(summary(eventsOf(records)).filter(([, , type]) => type === "reps_at_load_pr")).toEqual([]);
   });
 
+  it("defers, and never blocks the durable session, when an event identity collides", async () => {
+    const records = store();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await founderPullUpHistory(ports);
+    const seeded = eventsOf(records);
+    expect(seeded).toHaveLength(2);
+    // The same event identity already exists with a different baseline (a semantic collision).
+    const collided = { ...seeded[0], previousBaselineValue: seeded[0].previousBaselineValue - 1, improvement: seeded[0].improvement + 1 };
+    await records.put({ ownerUserId, collection: "trainingPerformanceEvents", recordId: collided.id, payload: collided, expectedVersion: 1 });
+    const replay = await logSession(ports, { localDate: "2026-09-13", sessionId: "session-2026-09-13-3", sets: four(weighted, 6, 7, 7, 7) });
+    expect(replay.result).toMatchObject({ status: "durable", trainingSessionDurable: true });
+    const after = eventsOf(records);
+    expect(after).toHaveLength(2);
+    expect(after.find((event) => event.id === collided.id).previousBaselineValue).toBe(collided.previousBaselineValue);
+  });
+
+  it("reads a numeric bodyweight unit and a null-load bodyweight set at one zero baseline with a stable event identity", async () => {
+    const records = store();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    // A null-load bodyweight prior that OUTRANKS the numeric-zero prior is the true best.
+    await logSession(ports, { localDate: "2026-08-02", exerciseId: "hanging_leg_raise", sets: four(bodyweight, 22, 22, 22, 22) });
+    await logSession(ports, { localDate: "2026-08-16", exerciseId: "hanging_leg_raise", sets: four((reps) => ({ reps, load: 0, loadType: "external_load", unit: "lb" }), 15, 15, 15, 15) });
+    await logSession(ports, { localDate: "2026-09-13", exerciseId: "hanging_leg_raise", sets: four((reps) => ({ reps, load: 0, loadType: "external_load", unit: "lb" }), 20, 20, 20, 20) });
+    // 20 does not beat the prior best of 22 reps, however that prior was encoded.
+    expect(eventsOf(records)).toEqual([]);
+  });
+
   it("keeps a session that is no longer authoritative from producing events", async () => {
     const records = store();
     const ports = createCanonicalPersistenceCommandPorts({ records, now });

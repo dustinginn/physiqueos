@@ -7,6 +7,7 @@ import {
   TRAINING_FALSE_SUPERSESSION_CORRECTION_TYPE,
 } from "./TrainingFalseSupersessionCorrectionService";
 import { assessWorkoutDuplicatePair } from "./WorkoutDuplicateIdentityService";
+import { reconcileConfirmedEvidencePackage } from "./CanonicalEvidenceService";
 import {
   resolveTrainingPerformanceEventLiveness,
   TrainingPerformanceEventLiveness,
@@ -168,6 +169,17 @@ describe("Training false-supersession correction", () => {
     expect(replay.predicted.createdCanonicalIds).toEqual([]);
     expect(await applyTrainingFalseSupersessionCorrection({ plan: replay, authorization, persist })).toEqual({ applied: false, idempotent: true, records: [] });
     expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits through the canonical reconciler once and leaves zero changes on an identical replay", () => {
+    const canonicalObjects = fixture();
+    const plan = planTrainingFalseSupersessionCorrection({ canonicalObjects, userId: USER });
+    const first = reconcileConfirmedEvidencePackage({ evidencePackage: plan.correctionPackage, existingCanonicalObjects: canonicalObjects, userId: USER });
+    expect(first.changedObjects.map((object) => object.canonicalId)).toEqual([plan.correctedCanonicalId]);
+    const afterFirst = canonicalObjects.concat(first.changedObjects);
+    const replay = reconcileConfirmedEvidencePackage({ evidencePackage: plan.correctionPackage, existingCanonicalObjects: afterFirst, userId: USER });
+    expect(replay.changedObjects).toEqual([]);
+    expect(replay.report.supersededCanonicalIds).toEqual([]);
   });
 
   it("refuses to write without an explicit authorization bound to the exact target", async () => {

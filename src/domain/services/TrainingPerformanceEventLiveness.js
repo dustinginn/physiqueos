@@ -82,9 +82,12 @@ function toSession(object) {
     sessionId: String(payload.id ?? ""),
     date: dateKey(payload.observed_at ?? object?.lastObservedAt),
     active: status !== "superseded" && !object?.quality?.supersededBy && !payload.quality?.supersededBy,
-    exerciseIds: new Set((payload.exercises ?? []).map((exercise) =>
-      String(resolveTrainingExerciseOccurrenceIdentity(exercise).canonicalExerciseId ?? exercise?.canonicalExerciseId ?? "")
-    )),
+    // Both the stored id and the identity-resolved id count: events are keyed by
+    // the resolved id while a session may still store a legacy or name-only one.
+    exerciseIds: new Set((payload.exercises ?? []).flatMap((exercise) => [
+      String(exercise?.canonicalExerciseId ?? ""),
+      String(resolveTrainingExerciseOccurrenceIdentity(exercise).canonicalExerciseId ?? ""),
+    ]).filter(Boolean)),
   };
 }
 

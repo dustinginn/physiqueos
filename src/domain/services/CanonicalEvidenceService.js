@@ -1180,13 +1180,20 @@ export function reconcileExplicitWorkoutLoggerAppleSupportPair({
     ...[...byId.values()].filter((record) => record.payload.evidence_type === "activity_day")];
 }
 
+const IMMUTABLE_TRAINING_CORRECTION_TYPES = new Set([
+  "canonical_exercise_identity_correction",
+  "training_false_supersession_correction",
+]);
+
 function isCompatibleTrainingPayload(left = {}, right = {}) {
   if (!isTrainingSession(left) || !isTrainingSession(right)) return false;
   return assessWorkoutDuplicatePair(left, right).outcome === "duplicate";
 }
 
 function mergeTrainingPayload(existingPayload, candidate, { evidencePackage = null } = {}) {
-  if (evidencePackage?.correction?.type === "canonical_exercise_identity_correction") {
+  // Immutable correction revisions carry their own authoritative exercises, so a
+  // replay of the same correction can never reorder or merge them.
+  if (IMMUTABLE_TRAINING_CORRECTION_TYPES.has(evidencePackage?.correction?.type)) {
     return {
       ...existingPayload,
       ...candidate,
