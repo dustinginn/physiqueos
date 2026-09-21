@@ -7,9 +7,11 @@ const POSE_ORDER = ["front-relaxed", "back-relaxed", "back-flexed", "side-relaxe
 const INACTIVE = new Set(["duplicate", "superseded", "inactive"]);
 
 export function createPhotoSessionReadModels({ canonicalObjects = [], legacyPhotos = [], weights = [], analyses = [] } = {}) {
-  const canonicalCandidates = canonicalObjects
-    .filter((item) => item.evidence_type === "photo_session" && item.quality?.status !== "superseded")
+  const canonicalPhotoObjects = canonicalObjects
+    .filter((item) => item.evidence_type === "photo_session" && item.quality?.status !== "superseded");
+  const canonicalCandidates = canonicalPhotoObjects
     .map((item) => buildCanonicalSession(item, { canonicalObjects, legacyPhotos, weights, analyses }));
+  const originalAssetKeysBySessionId = new Map(canonicalPhotoObjects.map((item) => [item.canonicalId, canonicalOriginalAssetKeys(item, legacyPhotos)]));
   const canonicalByFingerprint = new Map();
   canonicalCandidates.forEach((session) => {
     const key = session.sessionFingerprint;
@@ -31,7 +33,7 @@ export function createPhotoSessionReadModels({ canonicalObjects = [], legacyPhot
   });
   const canonicalSessions = [...canonicalByFingerprint.values()];
   const ownedSourceIds = new Set(canonicalSessions.flatMap((session)=>[...(session.inactiveSourceReferences??[]),...session.views.flatMap((view)=>view.provenance?.sourceIds??[])]));
-  const canonicalAssetKeys = new Set([...canonicalSessions.flatMap((session)=>session.views.map((view)=>stableAssetKey(view.imageReference,[]))),...legacyPhotos.filter((photo)=>ownedSourceIds.has(photo.id)).map((photo)=>stableAssetKey(photo.imagePath,[]))]);
+  const canonicalAssetKeys = new Set([...canonicalSessions.flatMap((session)=>session.views.map((view)=>stableAssetKey(view.imageReference,[]))),...canonicalSessions.flatMap((session)=>originalAssetKeysBySessionId.get(session.id)??[]),...legacyPhotos.filter((photo)=>ownedSourceIds.has(photo.id)).map((photo)=>stableAssetKey(photo.imagePath,[]))]);
   const legacySessions = buildLegacySessions(legacyPhotos.filter((photo) => !canonicalAssetKeys.has(stableAssetKey(photo.imagePath,[])) && isUsableLegacyPhoto(photo)), weights, analyses);
   return finalizeComparisons([...canonicalSessions, ...legacySessions].sort((left, right) =>
     right.captureDate.localeCompare(left.captureDate) ||
@@ -100,10 +102,24 @@ function buildCanonicalLandingSession(object, legacyPhotos) {
       ...(payload.duplicateRetrySourceReferences ?? []),
       ...inactivePhotos.flatMap((photo) => photo.sourceIds ?? []),
     ]),
-    assetKeys: activePhotos.map((photo) =>
-      stableAssetKey(resolveCanonicalAsset(photo, legacyPhotos)?.path, [])
-    ),
+    assetKeys: [
+      ...activePhotos.map((photo) =>
+        stableAssetKey(resolveCanonicalAsset(photo, legacyPhotos)?.path, [])
+      ),
+      ...canonicalOriginalAssetKeys(object, legacyPhotos),
+    ],
   };
+}
+
+// A canonical photo may DISPLAY a linked JPEG derivative of its original (HEIC and
+// ProRAW DNG), while the compatibility projection written at confirmation stores the
+// ORIGINAL as a legacy progress photo's imagePath. Ownership must therefore cover the
+// original asset as well as the display asset, or the legacy rows are adapted into a
+// duplicate same-date session. Active photos of non-superseded canonical sessions only.
+function canonicalOriginalAssetKeys(object, legacyPhotos) {
+  return uniqueActivePhotos(object.payload?.photos ?? [], legacyPhotos)
+    .map((photo) => stableAssetKey(photo.storage_path ?? photo.imagePath ?? photo.sourcePath ?? null, []))
+    .filter(Boolean);
 }
 
 export function reconcilePhotoSessionComparisons(sessions = []) {

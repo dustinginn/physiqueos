@@ -79,6 +79,38 @@ describe("provider-native Progress Photos reads", () => {
     });
   });
 
+  it("projects the canonical DNG session, not a duplicate legacy session, as the Native latest set", async () => {
+    const original = "media-3fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e59";
+    const derivative = "media-4fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e5a";
+    const canonical = photoSession("photo_session_user_founder_001_2026-09-19", "2026-09-19", "photo-dng", original, 1);
+    Object.assign(canonical.payload.photos[0], {
+      mime_type: "image/x-adobe-dng",
+      analysis_mime_type: "image/jpeg",
+      analysis_storage_path: `media://${derivative}`,
+    });
+    // The evidence-review confirmation projection stores the ORIGINAL as the legacy imagePath.
+    const legacyOnOriginal = { id: "progress_photo_2026-09-19_front_relaxed", date: "2026-09-19", capturedAt: "2026-09-19", view: "front", pose: "relaxed", imagePath: `media://${original}` };
+    const store = {
+      run: vi.fn((_name, callback) => callback()),
+      getUser: vi.fn(async () => ({ id: "u", timezone: "America/Los_Angeles" })),
+      listGoals: vi.fn(async () => []),
+      listWeightEntries: vi.fn(async () => []),
+      getPhotoInputs: vi.fn(async () => ({ canonicalEvidenceObjects: [canonical], progressPhotos: [legacyOnOriginal] })),
+      listPhotoAnalyses: vi.fn(async () => []),
+      listPhotoBriefings: vi.fn(async () => []),
+      listMediaObjects: vi.fn(async () => [
+        { id: original, state: "verified", evidence_record_id: "photo-dng" },
+        { id: derivative, state: "verified", evidence_record_id: "photo-dng" },
+      ]),
+    };
+    const result = await createProgressPhotosReadService({ store })
+      .getNativePhotosTimeline({ context: "all", limit: 5 });
+    expect(result.sessions.map((session) => session.sessionId)).toEqual(["photo_session_user_founder_001_2026-09-19"]);
+    expect(result.sessions[0].photos).toHaveLength(1);
+    expect(result.sessions[0].photos[0].mediaReference).toBe(`/api/private-evidence/media/${derivative}`);
+    expect(result.page).toMatchObject({ count: 1, hasMore: false });
+  });
+
   it("removes compatibility runtime composition from the route", () => {
     const route = fs.readFileSync("src/app/progress/photos/page.js", "utf8");
     expect(route).toContain("getProductionProgressPhotosReadService");
