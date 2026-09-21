@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import PhysiqueOS
 
@@ -201,6 +202,41 @@ final class BriefingV3PresentationTests: XCTestCase {
         XCTAssertEqual(v3.activeViews, v2.activeViews)
         XCTAssertEqual(v3.heroTitle, v2.heroTitle)
         XCTAssertEqual(v3.coachInsightBody, "V3 photo coach take.")
+    }
+
+    // MARK: Rendering
+
+    /// Draws the real Weekly, Midweek and Monthly V3 views from Server-shaped payloads.
+    /// Asserts they produce visible content and the Server's own text, and attaches the
+    /// renders (also written to `PHYSIQUEOS_RENDER_DIR` when set) for visual acceptance.
+    @MainActor
+    func testCanonicalV3SurfacesRenderServerTextWithoutBalanceColorVerdicts() throws {
+        let weekly = try map(weeklyV3Envelope())
+        let midweek = try map(midweekV3Envelope(includeDetail: true, includeUncertainty: true))
+        let monthly = try map(monthlyEnvelope(v3: true))
+        let surfaces: [(String, AnyView)] = [
+            ("weekly-v3", AnyView(WeeklyBriefingSections(content: try XCTUnwrap(weekly.weekly), confidence: weekly.confidence))),
+            ("midweek-v3", AnyView(MidweekBriefingSections(content: try XCTUnwrap(midweek.midweek), confidence: midweek.confidence))),
+            ("monthly-v3", AnyView(MonthlyBriefingSections(content: try XCTUnwrap(monthly.monthly), confidence: monthly.confidence))),
+        ]
+        for (name, view) in surfaces {
+            let renderer = ImageRenderer(content: view
+                .padding(16)
+                .frame(width: 390)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(PhysiqueOSTheme.background)
+                .environment(\.colorScheme, .dark))
+            renderer.scale = 2
+            let image = try XCTUnwrap(renderer.uiImage, "\(name) failed to render")
+            XCTAssertGreaterThan(image.size.height, 400, "\(name) rendered no substantive content")
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            if let directory = ProcessInfo.processInfo.environment["PHYSIQUEOS_RENDER_DIR"], let png = image.pngData() {
+                try png.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
+            }
+        }
     }
 
     // MARK: Helpers
