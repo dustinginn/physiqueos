@@ -1,65 +1,58 @@
 {
  "schema_version": 1,
- "generated_at_utc": "2026-09-21T19:50:00Z",
+ "generated_at_utc": "2026-09-21T19:58:52Z",
  "task": {
-  "id": "healthkit-activity-nutrition-canonical-testday-20260921",
-  "title": "HealthKit Activity and Nutrition canonical test day",
+  "id": "healthkit-testday-first-sync-audit-20260921",
+  "title": "Audit first HealthKit canonical test-day sync",
   "agent": "claude",
   "status": "completed"
  },
  "repository": "dustinginn/physiqueos",
  "authority": {
-  "base_sha": "ba250af13e66b967a4dc8add09c5c5942b0606dd",
-  "final_sha": "a40c0b53c49240d5666d2a3475d48541cfd5f57e",
+  "base_sha": "a40c0b53c49240d5666d2a3475d48541cfd5f57e",
+  "final_sha": null,
   "production_server_sha": "a40c0b53c49240d5666d2a3475d48541cfd5f57e",
   "production_deployment": "dda84642-c713-4091-a3a2-126e02345d3b",
   "native_sha": "2bfbf54ad105a3a18189e811f06afc421741a7da",
   "native_build": 49
  },
  "result": {
-  "summary": "Server a40c0b53 deployed (deployment dda84642, zero-write audit identical) and the controlled canonical test day is ACTIVATED for 2026-09-21: Activity + Nutrition daily totals canonicalize into a separate quarantined healthKitCanonicalDays store, never strategic Evidence; V3, Confidence and briefings eligibility OFF, no historical backfill, deactivation preserves history. Build 48 could not do operational sync and had no Nutrition daily totals, so Native Build 49 (2bfbf54a) was built, reviewed, archived and uploaded (VALID, delivery 67a72613). Founder: install Build 49, enable the canary, tap Sync test day now for 2026-09-21, then tap once more after midnight (date 2026-09-21) for the complete-day revision. Server unit 8326 tests with the same 298 pre-existing failures as base and zero new; all phase gates equal base; Native 1244 tests green; independent review approved after fixes. Follow-up read-only acceptance audit needs a new task id.",
+  "summary": "GREEN. Read-only audit of the first real Build 49 sync (12:49 PM, test day 2026-09-21): policy is exactly Activity + Nutrition for that one date, quarantined, no backfill, one audit row. Each observation was accepted once (operational, revision 1, partial_day, observed date 2026-09-21) and canonicalized to exactly one canonical day per domain (Activity: move energy about 710 kcal, exercise 98 min, stand 6 h, 5321 steps; Nutrition: about 1948 kcal, 170 g protein, 116 g carbs, 87 g fat, zero meal objects). Canonical values match the submitted observations exactly; no screenshot or MFP data exists yet for the day so coexistence is no_other_source. In-memory replay of the production domain code shows an identical replay is a no-op and every later revision (including the complete-day one) updates the same canonical day. Strategic quarantine holds: only 5 HealthKit-collection digests changed versus baseline; goals, Confidence, all 52 briefings, plans, protocols, all Evidence (Training, DEXA, Photo), outbox and cadence operations are identical; zero HealthKit-derived strategic Evidence; V3 eligible HealthKit Activity and Nutrition are both 0. Not appearing in Log or Evidence Hub is expected (separate quarantined store); the future step is a display-only projection adapter, with V3 eligibility gated separately. Ready for one completed-day sync of 2026-09-21 after midnight or tomorrow morning, with the date set back to 2026-09-21.",
   "success": true,
-  "production_mutated": true,
-  "deployed": true,
-  "testflight_uploaded": true
+  "production_mutated": false,
+  "deployed": false,
+  "testflight_uploaded": false
  },
  "validation": {
   "tests": {
-   "status": "passed",
-   "summary": "Server unit 8326 (+80 new) with 298 failures identical to pristine base, zero new; phase2/3/4/5/6/6.photo/6.training/access-gate/foundation/migration-safety equal to base; ESLint, diff check and exact-SHA production build clean; Native 1244 tests, 0 failures."
+   "status": "not_run",
+   "summary": "Audit only; no code changes. Replay and revision behavior was verified by running the production domain code in memory against the stored state."
   },
   "review": {
-   "status": "approved",
-   "summary": "Fresh-context review: Server APPROVE on a40c0b53; Native blocker (coverage not in daily fingerprint) and identity/surfacing findings fixed and re-reviewed, APPROVE with non-blocking follow-ups on f5735476; later delta is the Build 49 metadata bump and a view guard, full Native suite re-run green."
+   "status": "not_applicable",
+   "summary": "Read-only audit; no code to review."
   },
   "zero_write_audit": {
    "status": "passed",
-   "summary": "Bounded read-only baseline before and after the Server deploy: zero differing sections. Post-activation acceptance audit: only the policy and audit rows were added; strategic collections unchanged; zero HealthKit-derived strategic Evidence."
+   "summary": "All queries ran in READ ONLY REPEATABLE READ transactions with transaction_read_only verified on and explicit rollback. Post-sync digests versus the pre-sync baseline differ only in the three HealthKit collections; no strategic table was written since activation."
   }
  },
  "decisions_required": [
-  "After the Founder's test-day syncs, authorize a new read-only acceptance-audit task, then decide whether to deactivate the activation policy (reversible, keeps canonical history) or authorize the next slice.",
-  "Decide whether a second proving day should cross a 03:00 briefing (for example Tue 2026-09-22 with a sync between 00:00 and 02:59 on Wed 2026-09-23); that needs a deactivate and a new exact-window activation, never an in-place widening.",
-  "Decide when to add a durable revision floor and background delivery (reviewer follow-ups) before any wider HealthKit rollout."
+  "After the completed-day sync, authorize the completed-day audit task, then decide whether to deactivate the policy or authorize the next slice (display-only Log/Evidence Hub projection, background delivery, or a second proving day crossing a 03:00 briefing)."
  ],
  "blockers": [],
  "unexpected_findings": [
-  "Build 48 canary was hard-wired to validation_only and could not perform operational sync; Nutrition had no daily-total path, so a new TestFlight build was required.",
-  "The legacy non-Native activity-day.sync.v1 alias defaulted to a HealthKit source and wrote strategic Evidence; it is now refused.",
-  "The activation policy record id changed to healthkit_canonical_daily_activation_policy; the id named in the previous handoff is not read.",
-  "A spec-stamp deployment again built the stale commit; a force-rebuild deployment produced the correct one.",
-  "The phase7B reference-index unit test fails identically on the production base."
+  "After midnight the Build 49 test-day date defaults to the new day; the Founder must set it back to 2026-09-21 for the completed-day sync (another date would be stored raw and permanently barred).",
+  "Inbox routing initially failed validation because chat_preference used a non-schema value; it was corrected and the task then passed the gate."
  ],
  "backlog": [
-  "HealthKit acceptance audit and policy decision after the test day",
+  "HealthKit completed-day audit and policy decision",
+  "Display-only Log/Evidence Hub projection of canonical HealthKit days (V3 eligibility stays separately gated)",
   "HealthKit background delivery and durable Native revision floor",
-  "HealthKit follow-ups FU-1 pre-auth parse cost and FU-2 Native HTTP 400 permanence",
-  "Workout Logger draft survival across termination and TestFlight update",
-  "Photo Briefing real-production Tap to expand mismatch",
-  "Coaching Updates editor delivery-time control cleanup"
+  "HealthKit follow-ups FU-1 pre-auth parse cost and FU-2 Native HTTP 400 permanence"
  ],
- "recommended_next_step": "Founder installs Build 49 and performs the two syncs for 2026-09-21; then publish a read-only acceptance-audit task with a new task id.",
- "full_report_path": "agent-handoffs/reports/20260921T195000Z-healthkit-activity-nutrition-canonical-testday.md",
+ "recommended_next_step": "Founder syncs test day 2026-09-21 once more (date set back to 2026-09-21) after logging is final; then publish the completed-day acceptance audit task with a new task id.",
+ "full_report_path": "agent-handoffs/reports/20260921T195852Z-healthkit-testday-first-sync-audit.md",
  "safety": {
   "contains_secrets": false,
   "contains_credentials": false,
