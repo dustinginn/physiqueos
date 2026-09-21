@@ -1,3 +1,4 @@
+import { resolveOperatingStateFromGoalPhase } from "../strategy/CurrentStrategyAuthority.js";
 import { createMidweekEvidenceWindow, selectScheduledBriefingCadence } from "./BriefingEvidenceWindowService";
 import { composeMidweekBriefingPreview, MIDWEEK_BRIEFING_TYPE, MIDWEEK_BRIEFING_VERSION } from "./MidweekBriefingPreviewService";
 import { createMidweekPIShadowResult } from "./MidweekBriefingPIShadowService";
@@ -265,7 +266,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
             artifact,
             activeGoal: goal,
             activePhase,
-            operatingState: goal?.openingApproach?.value ??
+            operatingState: resolveOperatingStateFromGoalPhase({ goal, phase: activePhase })?.value ??
               goal?.operatingState?.value ?? goal?.operatingState,
             piEnvelope: authoritative,
             reason,
@@ -397,7 +398,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
           artifact: prepared.artifact, activeGoal: prepared.activeGoal,
           activePhase: prepared.activePhase,
           operatingState: prepared.operatingState ??
-            prepared.activeGoal?.openingApproach?.value ??
+            resolveOperatingStateFromGoalPhase({ goal: prepared.activeGoal, phase: prepared.activePhase })?.value ??
             prepared.activeGoal?.operatingState?.value,
           piEnvelope: prepared.piEnvelope ?? null, reason: prepared.reason,
           replacementAuthorized: true,

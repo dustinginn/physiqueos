@@ -1,0 +1,1116 @@
+{
+ "artifactType": "event",
+ "briefing": {
+  "dexaEventNarrative": {
+   "artifactId": "dexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+   "coachInsight": {
+    "biggestWin": "Measured lean tissue increased while body fat stayed within the range you chose.",
+    "next": "Continue the current phase and see whether the same direction appears in a later comparable scan. This result has not changed your phase.",
+    "protect": "Keep scan preparation consistent and protect productive training while we see whether this direction continues.",
+    "watch": "Watch whether training and a later comparable scan confirm that lean tissue is continuing to increase while body fat stays controlled."
+   },
+   "context": {
+    "activeGoal": {
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "semanticType": "lean_mass_gain",
+     "status": "active",
+     "title": "Build Lean Mass"
+    },
+    "activePhase": {
+     "ageDays": 28,
+     "ageWeeks": 4,
+     "completionDecisionRequired": true,
+     "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+     "name": "Lean Mass Build",
+     "order": 1,
+     "plannedReviewAt": null,
+     "reviewMilestone": null,
+     "reviewState": "not_required",
+     "revision": 1,
+     "startDate": "2026-08-15",
+     "status": "active"
+    },
+    "activeProtocols": [
+     {
+      "category": "peptide",
+      "id": "protocol_retatrutide_founder",
+      "name": "Retatrutide"
+     },
+     {
+      "category": "peptide",
+      "id": "protocol_tesamorelin_founder",
+      "name": "Tesamorelin"
+     },
+     {
+      "category": "supplement",
+      "id": "protocol_tongkat_ali_founder",
+      "name": "Tongkat Ali"
+     },
+     {
+      "category": "supplement",
+      "id": "protocol_fadogia_agrestis_founder",
+      "name": "Fadogia Agrestis"
+     },
+     {
+      "category": "supplement",
+      "id": "protocol_multivitamin_founder",
+      "name": "Multivitamin"
+     },
+     {
+      "category": "supplement",
+      "id": "protocol_electrolytes_founder",
+      "name": "Electrolytes"
+     },
+     {
+      "category": "training",
+      "id": "protocol_training_founder_maintenance",
+      "name": "Maintenance Training Strategy"
+     },
+     {
+      "category": "energy",
+      "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_energy_c3_review_virtual_energy",
+      "name": "Maintenance Calibration with weekly review and gradual adjustments."
+     },
+     {
+      "category": "nutrition",
+      "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_nutrition_founder_cut_ol_nutrition_founder_cut",
+      "name": "167 g protein with intake coordinated to calibration."
+     },
+     {
+      "category": "activity",
+      "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_activity_founder_cut_col_activity_founder_cut",
+      "name": "Flexible weekly activity that supports calibration, training, and recovery."
+     },
+     {
+      "category": "recovery",
+      "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_recovery__review_virtual_recovery",
+      "name": "Foam Rolling"
+     },
+     {
+      "category": "weight",
+      "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_weight_c3_review_virtual_weight",
+      "name": "Daily morning weights interpreted through the weekly trend."
+     },
+     {
+      "category": "photos",
+      "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_photos_c3_review_virtual_photos",
+      "name": "Weekly on Saturday afternoon."
+     },
+     {
+      "category": "dexa",
+      "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_dexa_fbc3_review_virtual_dexa",
+      "name": "DEXA every four weeks to measure lean mass, fat mass, and body-fat percentage."
+     },
+     {
+      "category": "briefings",
+      "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_briefings_review_virtual_briefings",
+      "name": "Twice weekly on Wednesday and Sunday."
+     }
+    ],
+    "baselineRoles": {
+     "goalBaselineDexaId": "evidence_submission_20260718144114116_pdf_1_2026_07_18",
+     "immediatePriorDexaId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+     "phaseBaselineDexaId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15"
+    },
+    "bodyFatGuardrail": {
+     "lowerBound": 8,
+     "metric": "body_fat_percentage",
+     "source": "canonical_goal_guardrail_text",
+     "unit": "%",
+     "upperBound": 9
+    },
+    "completedPriorGoal": {
+     "completedAt": "2026-07-21T04:53:31.756Z",
+     "id": "goal_visible_abs_at_rest",
+     "title": "Visible abs at rest"
+    },
+    "currentGoalMeasures": {
+     "contextual": [
+      "activity",
+      "adherence",
+      "calories",
+      "macros",
+      "progress_photos",
+      "protein",
+      "recovery",
+      "scale_weight",
+      "sleep"
+     ],
+     "guardrail": [
+      "body_fat_percentage",
+      "dexa_body_fat",
+      "dexa_fat_mass",
+      "recovery",
+      "scale_weight",
+      "training_performance"
+     ],
+     "primary": [
+      "dexa_body_fat",
+      "dexa_fat_mass",
+      "dexa_lean_mass",
+      "lean_mass",
+      "progressive_overload",
+      "training_trend"
+     ]
+    },
+    "decisionContext": {
+     "integrationEnabled": false,
+     "limitation": "dexa_event_decision_context_shadow_only",
+     "mutationEnabled": false,
+     "status": "advisory"
+    },
+    "evidenceDate": "2026-09-12",
+    "futureMilestone": null,
+    "operatingState": {
+     "accepted": true,
+     "label": null,
+     "value": "calibration"
+    },
+    "piStatus": "ready",
+    "schemaVersion": "dexa_event_context_v1",
+    "status": "ready",
+    "uncertainty": {
+     "limitations": [],
+     "state": "comparison_available"
+    }
+   },
+   "daysBetweenScans": 28,
+   "eventId": "dexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+   "evidenceBinding": {
+    "current": {
+     "bodyFatPercentage": 8.1,
+     "boneMineralContent": 7.2,
+     "fatMass": 14.2,
+     "leanMass": 153.3,
+     "measuredAt": "2026-09-12",
+     "restingMetabolicRate": 1847,
+     "revision": 1,
+     "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+     "sourceFileId": "9-12-26-DEXA.pdf",
+     "totalMass": 174.7
+    },
+    "prior": {
+     "bodyFatPercentage": 7.6,
+     "boneMineralContent": 7.2,
+     "fatMass": 12.8,
+     "leanMass": 148.3,
+     "measuredAt": "2026-08-15",
+     "restingMetabolicRate": 1803,
+     "revision": 1,
+     "scanId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+     "sourceFileId": "dexa_submission_20260815181333895-1786817613898.pdf",
+     "totalMass": 168.3
+    }
+   },
+   "futureMilestone": null,
+   "generatedAt": "2026-09-13T06:28:58.012Z",
+   "goalCompletionHandoff": null,
+   "goalConfidence": {
+    "assessmentContext": {
+     "goalContractId": "goal_contract|goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass|f0f507f5ac9212b14a19a8322ad1d0faca551a8c2f75763c82d2a05d0a7e04fd",
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "assessmentId": "confidence_assessment_v2|d43df01f645e30a08890680f10a2f6c37dd41a73993382bb9959ad59abb3fb19",
+    "assessmentTimestamp": "2026-09-13T06:29:01.369Z",
+    "authoritativeEvidenceRole": "comparison",
+    "band": "moderate",
+    "canonicalDEXAId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "captureSemantics": "canonical_v2_assessment_at_atomic_publication",
+    "capturedAt": "2026-09-13T06:29:01.487Z",
+    "delta": 0,
+    "evidenceCutoff": "2026-09-13T06:59:59.999Z",
+    "limitingReasons": [
+     "An accepted boundary requires continued observation.",
+     "The current strategy is still being calibrated."
+    ],
+    "modelVersion": "canonical_confidence_assessment_v2",
+    "movementDirection": "held",
+    "movementMagnitude": "none",
+    "originatingArtifactId": "dexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "originatingPublisher": "dexa_event_briefing",
+    "piVersion": "confidence_v2",
+    "presentationExplanation": "Confidence remained stable. The available assessment quality is adequate. An accepted boundary requires continued observation.",
+    "primaryReason": "Confidence remained stable. The available assessment quality is adequate. An accepted boundary requires continued observation.",
+    "priorScore": 62,
+    "score": 62,
+    "source": "canonical_confidence_v2_snapshot",
+    "supportingReasons": [
+     "The available signals have moderate agreement.",
+     "The Goal remains on its expected path."
+    ],
+    "temporalCutoff": "2026-09-13T06:59:59.999Z",
+    "unresolvedUncertainty": [
+     {
+      "affectedConclusionRefs": [
+       "guardrail:goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_recovery"
+      ],
+      "kind": "goal_semantics_missing",
+      "materiality": "moderate",
+      "reducibility": "unknown",
+      "sourceUncertaintyId": "interpretation_uncertainty|3da3afaac6b02d3b0eaf0de2922317d0905699e80412cc4b6e75afb95c9b059a",
+      "text": "Required success criteria remain undefined.",
+      "translationStatus": "translated"
+     },
+     {
+      "affectedConclusionRefs": [
+       "guardrail:goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_gradual_gain"
+      ],
+      "kind": "goal_semantics_missing",
+      "materiality": "moderate",
+      "reducibility": "unknown",
+      "sourceUncertaintyId": "interpretation_uncertainty|4b1f9d5e73b9ad0a314b4f289d669b8289690db72f01ae992635a6750ea9b7a9",
+      "text": "Required success criteria remain undefined.",
+      "translationStatus": "translated"
+     },
+     {
+      "affectedConclusionRefs": [
+       "guardrail:goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_strength"
+      ],
+      "kind": "goal_semantics_missing",
+      "materiality": "moderate",
+      "reducibility": "unknown",
+      "sourceUncertaintyId": "interpretation_uncertainty|4b3a6d9def95b7fd3e4354394e55c792552c97eb23bc2dcbe0e54c577ba5291e",
+      "text": "Required success criteria remain undefined.",
+      "translationStatus": "translated"
+     }
+    ]
+   },
+   "hero": {
+    "body": "Measured lean tissue increased 5.0 lb since the last scan, while body fat moved from 7.6% to 8.1%. The useful question is whether you are adding muscle without letting body fat move beyond the range you chose.",
+    "results": [
+     {
+      "context": "Primary goal measure",
+      "emoji": "\ud83d\udcaa",
+      "label": "Lean Tissue",
+      "value": "+5.0 lb"
+     },
+     {
+      "context": "Near guardrail boundary",
+      "emoji": "\u25c8",
+      "label": "Body Fat",
+      "value": "8.1%"
+     },
+     {
+      "context": "Context, not proof of tissue gain",
+      "emoji": "\u2696\ufe0f",
+      "label": "DEXA Weight",
+      "value": "+6.4 lb"
+     },
+     {
+      "context": "Since the last scan",
+      "emoji": "\u25c7",
+      "label": "Fat Mass",
+      "value": "+1.4 lb"
+     }
+    ],
+    "title": "Lean mass increased while body fat stayed controlled."
+   },
+   "interpretation": {
+    "fatLoss": "Body fat remains near the edge of your chosen 8\u20139% range after changing +0.50 percentage points. Small DEXA changes still need a comparable follow-up before we overinterpret them.",
+    "goalProgress": "Measured lean tissue increased 5.0 lb. Lean tissue moved up while body fat stayed within the range you chose. That is encouraging, but one scan cannot prove how much of the change is new muscle.",
+    "guardrailStatus": "Body fat remains near the edge of your chosen 8\u20139% range after changing +0.50 percentage points. Small DEXA changes still need a comparable follow-up before we overinterpret them.",
+    "leanMass": "Measured lean tissue increased 5.0 lb. Prepare for the next scan the same way so we can see whether the direction holds.",
+    "opening": "Measured lean tissue increased 5.0 lb. Lean tissue moved up while body fat stayed within the range you chose. That is encouraging, but one scan cannot prove how much of the change is new muscle.",
+    "phaseMeaning": "This result helps us judge the current phase, but one scan is not enough to move into the next one.",
+    "regional": "Trunk had the largest measured fat-mass change at +0.80 lb. Trunk had the largest measured lean-tissue change at +2.8 lb. Regional DEXA changes remain measurements, not isolated tissue diagnoses.",
+    "stoodOut": null,
+    "supportingEvidence": "The scan matches the broader journey: scale weight continued moving with the body-composition trend, training stayed productive, nutrition remained consistent enough to support the phase, and recent photos showed the same tightening pattern.",
+    "uncertainty": "One scan cannot prove that every change in lean tissue is new muscle. Hydration, glycogen, food, and scan preparation can all affect the number, so training, weight, nutrition, recovery, and progress photos still matter."
+   },
+   "milestones": [],
+   "pi": {
+    "decisionAdvisoryOnly": true,
+    "decisionStatus": "advisory",
+    "failure": null,
+    "observationIds": [
+     "pi|dexa|dexa_body_fat_percentage_change|body_fat_percentage|scan_to_scan",
+     "pi|dexa|dexa_fat_mass_change|fat_mass|scan_to_scan",
+     "pi|dexa|dexa_lean_mass_change|lean_mass|scan_to_scan",
+     "pi|dexa|dexa_measurement_snapshot|scan:evidence_submission_44462abb3969473da82fbf2b46a504ef_pdf_1_2026_09_12|event:evidence_submission_44462abb3969473da82fbf2b46a504ef_pdf_1_2026_09_12",
+     "pi|dexa|dexa_rmr_change|resting_metabolic_rate|scan_to_scan",
+     "pi|dexa|dexa_total_weight_change|body_weight|scan_to_scan"
+    ],
+    "status": "ready"
+   },
+   "presentationVersion": "dexa_event_presentation_v1_6_0",
+   "preview": false,
+   "priorScanDate": "2026-08-15",
+   "priorScanId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+   "progress": {
+    "headline": [
+     {
+      "current": 174.7,
+      "delta": 6.4,
+      "displayUnit": "lb",
+      "label": "DEXA Weight",
+      "precision": 1,
+      "previous": 168.3,
+      "unit": "lb"
+     },
+     {
+      "current": 8.1,
+      "delta": 0.5,
+      "displayUnit": "%",
+      "label": "Body Fat",
+      "precision": 1,
+      "previous": 7.6,
+      "unit": "pts"
+     },
+     {
+      "current": 14.2,
+      "delta": 1.4,
+      "displayUnit": "lb",
+      "label": "Fat Mass",
+      "precision": 1,
+      "previous": 12.8,
+      "unit": "lb"
+     },
+     {
+      "current": 153.3,
+      "delta": 5,
+      "displayUnit": "lb",
+      "label": "Lean Tissue",
+      "precision": 1,
+      "previous": 148.3,
+      "unit": "lb"
+     }
+    ],
+    "regionalFat": [
+     {
+      "current": 5.6,
+      "delta": 0.8,
+      "label": "Trunk",
+      "previous": 4.8,
+      "region": "trunk",
+      "unit": "lb"
+     },
+     {
+      "current": 5.3,
+      "delta": 0.5,
+      "label": "Legs",
+      "previous": 4.8,
+      "region": "legs",
+      "unit": "lb"
+     },
+     {
+      "current": 2.1,
+      "delta": 0.4,
+      "label": "Gynoid",
+      "previous": 1.7,
+      "region": "gynoid",
+      "unit": "lb"
+     },
+     {
+      "current": 0.7,
+      "delta": 0.1,
+      "label": "Android",
+      "previous": 0.6,
+      "region": "android",
+      "unit": "lb"
+     },
+     {
+      "current": 1.5,
+      "delta": 0,
+      "label": "Arms",
+      "previous": 1.5,
+      "region": "arms",
+      "unit": "lb"
+     }
+    ],
+    "regionalLean": [
+     {
+      "current": 70.2,
+      "delta": 2.8,
+      "label": "Trunk",
+      "previous": 67.4,
+      "region": "trunk",
+      "unit": "lb"
+     },
+     {
+      "current": 52.6,
+      "delta": 1.1,
+      "label": "Legs",
+      "previous": 51.5,
+      "region": "legs",
+      "unit": "lb"
+     },
+     {
+      "current": 23.6,
+      "delta": 1.1,
+      "label": "Arms",
+      "previous": 22.5,
+      "region": "arms",
+      "unit": "lb"
+     },
+     {
+      "current": 10.8,
+      "delta": 0.8,
+      "label": "Android",
+      "previous": 10,
+      "region": "android",
+      "unit": "lb"
+     },
+     {
+      "current": 24.4,
+      "delta": 0.5,
+      "label": "Gynoid",
+      "previous": 23.9,
+      "region": "gynoid",
+      "unit": "lb"
+     }
+    ],
+    "supplemental": [
+     {
+      "current": 0.2,
+      "delta": 0.1,
+      "displayUnit": "lb",
+      "label": "Visceral Fat",
+      "precision": 2,
+      "previous": 0.1,
+      "unit": "lb"
+     },
+     {
+      "current": 0.73,
+      "delta": -0.07,
+      "displayUnit": "",
+      "label": "A/G Ratio",
+      "precision": 2,
+      "previous": 0.8,
+      "unit": ""
+     },
+     {
+      "current": 1847,
+      "delta": 44,
+      "displayUnit": "cal/day",
+      "label": "RMR",
+      "precision": 0,
+      "previous": 1803,
+      "unit": "cal/day"
+     }
+    ],
+    "timeline": {
+     "available": true,
+     "baselineDate": "2026-08-15",
+     "currentDate": "2026-09-12",
+     "elapsedDays": 28,
+     "metrics": [
+      {
+       "delta": 6.4,
+       "key": "weight",
+       "label": "DEXA Weight",
+       "points": [
+        {
+         "date": "2026-08-15",
+         "scanId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+         "value": 168.3
+        },
+        {
+         "date": "2026-09-12",
+         "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+         "value": 174.7
+        }
+       ],
+       "unit": "lb"
+      },
+      {
+       "delta": 0.5,
+       "key": "bodyFat",
+       "label": "Body Fat",
+       "points": [
+        {
+         "date": "2026-08-15",
+         "scanId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+         "value": 7.6
+        },
+        {
+         "date": "2026-09-12",
+         "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+         "value": 8.1
+        }
+       ],
+       "unit": "%"
+      },
+      {
+       "delta": 1.4,
+       "key": "fatMass",
+       "label": "Fat Mass",
+       "points": [
+        {
+         "date": "2026-08-15",
+         "scanId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+         "value": 12.8
+        },
+        {
+         "date": "2026-09-12",
+         "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+         "value": 14.2
+        }
+       ],
+       "unit": "lb"
+      },
+      {
+       "delta": 5,
+       "key": "leanMass",
+       "label": "Lean Tissue",
+       "points": [
+        {
+         "date": "2026-08-15",
+         "scanId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+         "value": 148.3
+        },
+        {
+         "date": "2026-09-12",
+         "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+         "value": 153.3
+        }
+       ],
+       "unit": "lb"
+      }
+     ],
+     "scans": [
+      {
+       "date": "2026-08-15",
+       "scanId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15"
+      },
+      {
+       "date": "2026-09-12",
+       "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+      }
+     ],
+     "simulated": false,
+     "summary": {
+      "bodyFat": {
+       "current": 8.1,
+       "delta": 0.5,
+       "previous": 7.6
+      },
+      "fatMass": {
+       "current": 14.2,
+       "delta": 1.4,
+       "previous": 12.8
+      },
+      "leanMass": {
+       "current": 153.3,
+       "delta": 5,
+       "previous": 148.3
+      },
+      "weight": {
+       "current": 174.7,
+       "delta": 6.4,
+       "previous": 168.3
+      }
+     }
+    },
+    "timelineLabel": "Since Starting Lean Mass Build"
+   },
+   "provenance": {
+    "canonicalScanIds": [
+     "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+     "dexa_submission_20260815181333895_review_pdf_1_2026_08_15"
+    ],
+    "contextVersion": "dexa_event_context_v1",
+    "currentScanSourceFileId": "9-12-26-DEXA.pdf",
+    "externalModelUsed": false,
+    "presentationVersion": "dexa_event_presentation_v1_6_0",
+    "priorScanSourceFileId": "dexa_submission_20260815181333895-1786817613898.pdf",
+    "simulatedTimeline": false,
+    "version": "dexa_event_v1_6_0"
+   },
+   "references": [
+    "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+    "evidence_submission_20260718144114116_pdf_1_2026_07_18",
+    "goal_visible_abs_at_rest",
+    "morning_weight|user_founder_001|2026-08-15",
+    "dexa_scan|2026-08-15|dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+    "training|authoritative|apple_workout_1ngooi3|training_logger_draft_training_logger_5debee6f-9844-4182-b4b3-d975bf4c0f5e|IMG_1904.png",
+    "training|authoritative|apple_workout_gp7exf|IMG_1905.png",
+    "training|authoritative|apple_workout_hl7hwx|evidence_submission_20260816012355890_images_file_3_IMG_1903.png",
+    "nutrition|2026-08-15|nutrition-day",
+    "activity_day|2026-08-15",
+    "morning_weight|user_founder_001|2026-08-16",
+    "training|authoritative|IMG_1919.png",
+    "training|authoritative|IMG_1918.png",
+    "activity_day|2026-08-16",
+    "nutrition|2026-08-16|nutrition-day",
+    "recovery|sleep_duration|2026-08-28|manual_check_in|daily_check_in_2026_08_28_sleep_duration_v1|whole_body",
+    "training|authoritative|apple_workout_1xvvvjw|training_logger_draft_training_logger_92945e07-d3d2-42f2-b34a-3220116068ee|IMG_2045.png",
+    "training|authoritative|apple_workout_1brqgeo|IMG_2046.png",
+    "training|authoritative|apple_workout_18te0cn|IMG_2044.png",
+    "morning_weight|user_founder_001|2026-08-28",
+    "nutrition|2026-08-28|nutrition-day",
+    "activity_day|2026-08-28",
+    "morning_weight|user_founder_001|2026-08-27",
+    "training|authoritative|IMG_2028.png",
+    "training|authoritative|IMG_2027.png",
+    "training|authoritative|IMG_2025.png",
+    "training|authoritative|evidence_submission_20260829062048593_images_file_4_IMG_2026.png",
+    "training|authoritative|apple_workout_xvsxoh|training_logger_draft_training_logger_7e68f16c-3639-48f2-bb0a-34f9b4c484a2|IMG_2076.png",
+    "training|authoritative|apple_workout_at0aqq|IMG_2077.png",
+    "training|authoritative|apple_workout_1u682bw|IMG_2075.png",
+    "nutrition|2026-08-27|nutrition-day",
+    "activity_day|2026-08-27",
+    "morning_weight|user_founder_001|2026-08-26",
+    "morning_weight|user_founder_001|2026-08-29",
+    "nutrition|2026-08-26|nutrition-day",
+    "activity_day|2026-08-26",
+    "training|authoritative|IMG_2016.png",
+    "training|authoritative|IMG_2015.png",
+    "training|authoritative|IMG_2014.png",
+    "morning_weight|user_founder_001|2026-08-25",
+    "morning_weight|user_founder_001|2026-08-24",
+    "nutrition|2026-08-25|nutrition-day",
+    "activity_day|2026-08-25",
+    "training|authoritative|IMG_2011.png",
+    "training|authoritative|IMG_2010.png",
+    "training|authoritative|IMG_2009.png",
+    "nutrition|2026-08-24|nutrition-day",
+    "activity_day|2026-08-24",
+    "nutrition|2026-08-29|nutrition-day",
+    "activity_day|2026-08-29",
+    "morning_weight|user_founder_001|2026-08-23",
+    "nutrition|2026-08-23|nutrition-day",
+    "activity_day|2026-08-23",
+    "training|authoritative|apple_workout_1j4a6fc|training_logger_draft_training_logger_12f85ccb-4b58-4bf9-b9c0-6a72badd183f|IMG_1998.png",
+    "training|authoritative|apple_workout_1h9oqbv|IMG_1997.png",
+    "training|authoritative|apple_workout_3aieat|training_logger_draft_training_logger_18a637ae-70cc-4ec8-8b6d-223740292314|IMG_2039.png",
+    "training|authoritative|apple_workout_15dzfux|IMG_2040.png",
+    "training|authoritative|apple_workout_bajwap|IMG_2038.png",
+    "morning_weight|user_founder_001|2026-08-30",
+    "morning_weight|user_founder_001|2026-08-22",
+    "training|authoritative|IMG_1988.png",
+    "training|authoritative|IMG_1987.png",
+    "training|authoritative|IMG_1986.png",
+    "training|authoritative|IMG_1985.png",
+    "nutrition|2026-08-22|nutrition-day",
+    "activity_day|2026-08-22",
+    "morning_weight|user_founder_001|2026-08-21",
+    "training|authoritative|IMG_1979.png",
+    "training|authoritative|IMG_1978.png",
+    "training|authoritative|IMG_1977.png",
+    "nutrition|2026-08-21|nutrition-day",
+    "activity_day|2026-08-21",
+    "morning_weight|user_founder_001|2026-08-20",
+    "training|authoritative|IMG_1971.png",
+    "training|authoritative|IMG_1970.png",
+    "training|authoritative|IMG_1969.png",
+    "nutrition|2026-08-20|nutrition-day",
+    "activity_day|2026-08-20",
+    "morning_weight|user_founder_001|2026-08-19",
+    "training|authoritative|IMG_1962.png",
+    "training|authoritative|IMG_1961.png",
+    "training|authoritative|IMG_1960.png",
+    "nutrition|2026-08-19|nutrition-day",
+    "activity_day|2026-08-19",
+    "morning_weight|user_founder_001|2026-08-18",
+    "training|authoritative|apple_workout_vrtrhq|training_logger_draft_training_logger_17557b63-1957-478f-b6ed-c8aafd7ef67e|IMG_1940.png",
+    "training|authoritative|apple_workout_1pszrk2|IMG_1941.png",
+    "training|authoritative|apple_workout_thi7uc|IMG_1939.png",
+    "nutrition|2026-08-18|nutrition-day",
+    "activity_day|2026-08-18",
+    "morning_weight|user_founder_001|2026-08-17",
+    "training|authoritative|IMG_1927.png",
+    "training|authoritative|IMG_1926.png",
+    "training|authoritative|IMG_1925.png",
+    "nutrition|2026-08-17|nutrition-day",
+    "activity_day|2026-08-17",
+    "photo_session|2026-08-22|artifact_evidence_submission_20260830224216601_1|artifact_evidence_submission_20260830224216601_2|artifact_evidence_submission_20260830224216601_3|artifact_evidence_submission_20260830224216601_4|artifact_evidence_submission_20260830224216601_5",
+    "photo_session_user_founder_001_2026-08-22",
+    "canonical_photo_user_founder_001_2026-08-22_back_flexed",
+    "canonical_photo_user_founder_001_2026-08-22_back_relaxed",
+    "canonical_photo_user_founder_001_2026-08-22_right_side_relaxed",
+    "canonical_photo_user_founder_001_2026-08-22_front_relaxed",
+    "canonical_photo_user_founder_001_2026-08-22_front_flexed",
+    "training|authoritative|apple_workout_1gxq26w|training_logger_draft_training_logger_8c96a904-0762-4452-a0c6-9c1daa5e7eb3|IMG_2132.png",
+    "training|authoritative|apple_workout_1ae3m7n|IMG_2131.png",
+    "training|authoritative|apple_workout_1qwdvej|IMG_2133.png",
+    "nutrition|2026-08-30|nutrition-day",
+    "activity_day|2026-08-30",
+    "morning_weight|user_founder_001|2026-08-31",
+    "training|authoritative|apple_workout_1j50lcu|training_logger_draft_training_logger_10008f5d-f5e7-418b-8fff-1d3731c77e60|IMG_2165.png",
+    "training|authoritative|apple_workout_1j01wcw|IMG_2166.png",
+    "training|authoritative|apple_workout_1mb1x8m|IMG_2164.png",
+    "nutrition|2026-08-31|nutrition-day",
+    "activity_day|2026-08-31",
+    "morning_weight|user_founder_001|2026-09-01",
+    "training|authoritative|apple_workout_7mof8q|training_logger_draft_training_logger_cf4f9855-bb5f-4dda-9b41-33dc29da1bf3|IMG_2234.png",
+    "training|authoritative|apple_workout_1qxl2nk|IMG_2235.png",
+    "training|authoritative|apple_workout_1xbx3w4|IMG_2233.png",
+    "nutrition|2026-09-01|nutrition-day",
+    "activity_day|2026-09-01",
+    "morning_weight|user_founder_001|2026-09-02",
+    "training|authoritative|apple_workout_tf1btf|training_logger_draft_training_logger_66cb30d7-aa96-48db-b441-8380ce000699|IMG_2260.png",
+    "training|authoritative|apple_workout_1u0xi0y|IMG_2261.png",
+    "training|authoritative|apple_workout_ai4wjd|IMG_2259.png",
+    "nutrition|2026-09-02|nutrition-day",
+    "activity_day|2026-09-02",
+    "morning_weight|user_founder_001|2026-09-03",
+    "training|authoritative|apple_workout_1twp5e7|training_logger_draft_training_logger_93ffdbd4-1a3f-44ba-b488-3929490bd778|IMG_2287.png",
+    "training|authoritative|apple_workout_10a5m8s|evidence_submission_20260904180242470_images_file_1",
+    "training|authoritative|apple_workout_g7g7hn|IMG_2286.png",
+    "nutrition|2026-09-03|nutrition-day",
+    "activity_day|2026-09-03",
+    "training|authoritative|apple_workout_1tu4qf0|training_logger_draft_training_logger_bbcc16e4-ba96-4596-a2b5-83c8ab02cd31|IMG_2295.png",
+    "training|authoritative|apple_workout_1qljtka|IMG_2294.png",
+    "morning_weight|user_founder_001|2026-09-04",
+    "morning_weight|user_founder_001|2026-09-05",
+    "morning_weight|user_founder_001|2026-09-07",
+    "nutrition|2026-09-07|nutrition-day",
+    "activity_day|2026-09-07",
+    "morning_weight|user_founder_001|2026-09-08",
+    "nutrition|2026-09-06|nutrition-day",
+    "nutrition|2026-09-05|nutrition-day",
+    "training|authoritative|apple_workout_8dlico|training_logger_draft_training_logger_4ff00451-71fb-467c-9c76-8ce8f523ecf4|IMG_2515.png",
+    "training|authoritative|apple_workout_itxqt3|IMG_2516.png",
+    "training|authoritative|apple_workout_15c1516|IMG_2514.png",
+    "nutrition|2026-09-08|nutrition-day",
+    "activity_day|2026-09-08",
+    "morning_weight|user_founder_001|2026-09-09",
+    "activity_day|2026-09-06",
+    "activity_day|2026-09-05",
+    "nutrition|2026-09-04|nutrition-day",
+    "activity_day|2026-09-04",
+    "training|authoritative|apple_workout_1akchry|training_logger_draft_training_logger_dc4e0ad0-2a13-4e28-a2ed-b37497d7b80a|IMG_2527.png",
+    "training|authoritative|IMG_2528.png",
+    "training|authoritative|IMG_2526.png",
+    "nutrition|2026-09-09|nutrition-day",
+    "activity_day|2026-09-09",
+    "morning_weight|user_founder_001|2026-09-10",
+    "training|authoritative|apple_workout_1h8uwex|training_logger_draft_training_logger_19cef2a9-5024-4dea-ab24-b751116b4296|IMG_2555.png",
+    "training|authoritative|IMG_2557.png",
+    "training|authoritative|IMG_2556.png",
+    "nutrition|2026-09-10|nutrition-day",
+    "activity_day|2026-09-10",
+    "morning_weight|user_founder_001|2026-09-11",
+    "nutrition|2026-09-11|nutrition-day",
+    "activity_day|2026-09-11",
+    "morning_weight|user_founder_001|2026-09-12",
+    "training|authoritative|apple_workout_t8iakx|training_logger_draft_B6700D45-E885-4BA6-9364-9538263A9312|evidence_submission_5F45F4FA05474911832C371B9E9E26C3_images_file_2",
+    "dexa_scan|user_founder_001|2026-09-12"
+   ],
+   "regionalChanges": {
+    "fat": [
+     {
+      "current": 5.6,
+      "delta": 0.8,
+      "label": "Trunk",
+      "previous": 4.8,
+      "region": "trunk",
+      "unit": "lb"
+     },
+     {
+      "current": 5.3,
+      "delta": 0.5,
+      "label": "Legs",
+      "previous": 4.8,
+      "region": "legs",
+      "unit": "lb"
+     },
+     {
+      "current": 2.1,
+      "delta": 0.4,
+      "label": "Gynoid",
+      "previous": 1.7,
+      "region": "gynoid",
+      "unit": "lb"
+     },
+     {
+      "current": 0.7,
+      "delta": 0.1,
+      "label": "Android",
+      "previous": 0.6,
+      "region": "android",
+      "unit": "lb"
+     },
+     {
+      "current": 1.5,
+      "delta": 0,
+      "label": "Arms",
+      "previous": 1.5,
+      "region": "arms",
+      "unit": "lb"
+     }
+    ],
+    "lean": [
+     {
+      "current": 70.2,
+      "delta": 2.8,
+      "label": "Trunk",
+      "previous": 67.4,
+      "region": "trunk",
+      "unit": "lb"
+     },
+     {
+      "current": 52.6,
+      "delta": 1.1,
+      "label": "Legs",
+      "previous": 51.5,
+      "region": "legs",
+      "unit": "lb"
+     },
+     {
+      "current": 23.6,
+      "delta": 1.1,
+      "label": "Arms",
+      "previous": 22.5,
+      "region": "arms",
+      "unit": "lb"
+     },
+     {
+      "current": 10.8,
+      "delta": 0.8,
+      "label": "Android",
+      "previous": 10,
+      "region": "android",
+      "unit": "lb"
+     },
+     {
+      "current": 24.4,
+      "delta": 0.5,
+      "label": "Gynoid",
+      "previous": 23.9,
+      "region": "gynoid",
+      "unit": "lb"
+     }
+    ]
+   },
+   "scanDate": "2026-09-12",
+   "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+   "semanticGoalType": "lean_mass_gain",
+   "snapshot": {
+    "bodyFat": 8.1,
+    "daysBetweenScans": 28,
+    "fatMass": 14.2,
+    "leanMass": 153.3,
+    "rmr": 1847,
+    "scanDate": "2026-09-12",
+    "weight": 174.7
+   },
+   "supportingEvidence": {
+    "activityDays": 28,
+    "evidenceIds": [
+     "morning_weight|user_founder_001|2026-08-15",
+     "dexa_scan|2026-08-15|dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+     "training|authoritative|apple_workout_1ngooi3|training_logger_draft_training_logger_5debee6f-9844-4182-b4b3-d975bf4c0f5e|IMG_1904.png",
+     "training|authoritative|apple_workout_gp7exf|IMG_1905.png",
+     "training|authoritative|apple_workout_hl7hwx|evidence_submission_20260816012355890_images_file_3_IMG_1903.png",
+     "nutrition|2026-08-15|nutrition-day",
+     "activity_day|2026-08-15",
+     "morning_weight|user_founder_001|2026-08-16",
+     "training|authoritative|IMG_1919.png",
+     "training|authoritative|IMG_1918.png",
+     "activity_day|2026-08-16",
+     "nutrition|2026-08-16|nutrition-day",
+     "recovery|sleep_duration|2026-08-28|manual_check_in|daily_check_in_2026_08_28_sleep_duration_v1|whole_body",
+     "training|authoritative|apple_workout_1xvvvjw|training_logger_draft_training_logger_92945e07-d3d2-42f2-b34a-3220116068ee|IMG_2045.png",
+     "training|authoritative|apple_workout_1brqgeo|IMG_2046.png",
+     "training|authoritative|apple_workout_18te0cn|IMG_2044.png",
+     "morning_weight|user_founder_001|2026-08-28",
+     "nutrition|2026-08-28|nutrition-day",
+     "activity_day|2026-08-28",
+     "morning_weight|user_founder_001|2026-08-27",
+     "training|authoritative|IMG_2028.png",
+     "training|authoritative|IMG_2027.png",
+     "training|authoritative|IMG_2025.png",
+     "training|authoritative|evidence_submission_20260829062048593_images_file_4_IMG_2026.png",
+     "training|authoritative|apple_workout_xvsxoh|training_logger_draft_training_logger_7e68f16c-3639-48f2-bb0a-34f9b4c484a2|IMG_2076.png",
+     "training|authoritative|apple_workout_at0aqq|IMG_2077.png",
+     "training|authoritative|apple_workout_1u682bw|IMG_2075.png",
+     "nutrition|2026-08-27|nutrition-day",
+     "activity_day|2026-08-27",
+     "morning_weight|user_founder_001|2026-08-26",
+     "morning_weight|user_founder_001|2026-08-29",
+     "nutrition|2026-08-26|nutrition-day",
+     "activity_day|2026-08-26",
+     "training|authoritative|IMG_2016.png",
+     "training|authoritative|IMG_2015.png",
+     "training|authoritative|IMG_2014.png",
+     "morning_weight|user_founder_001|2026-08-25",
+     "morning_weight|user_founder_001|2026-08-24",
+     "nutrition|2026-08-25|nutrition-day",
+     "activity_day|2026-08-25",
+     "training|authoritative|IMG_2011.png",
+     "training|authoritative|IMG_2010.png",
+     "training|authoritative|IMG_2009.png",
+     "nutrition|2026-08-24|nutrition-day",
+     "activity_day|2026-08-24",
+     "nutrition|2026-08-29|nutrition-day",
+     "activity_day|2026-08-29",
+     "morning_weight|user_founder_001|2026-08-23",
+     "nutrition|2026-08-23|nutrition-day",
+     "activity_day|2026-08-23",
+     "training|authoritative|apple_workout_1j4a6fc|training_logger_draft_training_logger_12f85ccb-4b58-4bf9-b9c0-6a72badd183f|IMG_1998.png",
+     "training|authoritative|apple_workout_1h9oqbv|IMG_1997.png",
+     "training|authoritative|apple_workout_3aieat|training_logger_draft_training_logger_18a637ae-70cc-4ec8-8b6d-223740292314|IMG_2039.png",
+     "training|authoritative|apple_workout_15dzfux|IMG_2040.png",
+     "training|authoritative|apple_workout_bajwap|IMG_2038.png",
+     "morning_weight|user_founder_001|2026-08-30",
+     "morning_weight|user_founder_001|2026-08-22",
+     "training|authoritative|IMG_1988.png",
+     "training|authoritative|IMG_1987.png",
+     "training|authoritative|IMG_1986.png",
+     "training|authoritative|IMG_1985.png",
+     "nutrition|2026-08-22|nutrition-day",
+     "activity_day|2026-08-22",
+     "morning_weight|user_founder_001|2026-08-21",
+     "training|authoritative|IMG_1979.png",
+     "training|authoritative|IMG_1978.png",
+     "training|authoritative|IMG_1977.png",
+     "nutrition|2026-08-21|nutrition-day",
+     "activity_day|2026-08-21",
+     "morning_weight|user_founder_001|2026-08-20",
+     "training|authoritative|IMG_1971.png",
+     "training|authoritative|IMG_1970.png",
+     "training|authoritative|IMG_1969.png",
+     "nutrition|2026-08-20|nutrition-day",
+     "activity_day|2026-08-20",
+     "morning_weight|user_founder_001|2026-08-19",
+     "training|authoritative|IMG_1962.png",
+     "training|authoritative|IMG_1961.png",
+     "training|authoritative|IMG_1960.png",
+     "nutrition|2026-08-19|nutrition-day",
+     "activity_day|2026-08-19",
+     "morning_weight|user_founder_001|2026-08-18",
+     "training|authoritative|apple_workout_vrtrhq|training_logger_draft_training_logger_17557b63-1957-478f-b6ed-c8aafd7ef67e|IMG_1940.png",
+     "training|authoritative|apple_workout_1pszrk2|IMG_1941.png",
+     "training|authoritative|apple_workout_thi7uc|IMG_1939.png",
+     "nutrition|2026-08-18|nutrition-day",
+     "activity_day|2026-08-18",
+     "morning_weight|user_founder_001|2026-08-17",
+     "training|authoritative|IMG_1927.png",
+     "training|authoritative|IMG_1926.png",
+     "training|authoritative|IMG_1925.png",
+     "nutrition|2026-08-17|nutrition-day",
+     "activity_day|2026-08-17",
+     "photo_session|2026-08-22|artifact_evidence_submission_20260830224216601_1|artifact_evidence_submission_20260830224216601_2|artifact_evidence_submission_20260830224216601_3|artifact_evidence_submission_20260830224216601_4|artifact_evidence_submission_20260830224216601_5",
+     "photo_session_user_founder_001_2026-08-22",
+     "canonical_photo_user_founder_001_2026-08-22_back_flexed",
+     "canonical_photo_user_founder_001_2026-08-22_back_relaxed",
+     "canonical_photo_user_founder_001_2026-08-22_right_side_relaxed",
+     "canonical_photo_user_founder_001_2026-08-22_front_relaxed",
+     "canonical_photo_user_founder_001_2026-08-22_front_flexed",
+     "training|authoritative|apple_workout_1gxq26w|training_logger_draft_training_logger_8c96a904-0762-4452-a0c6-9c1daa5e7eb3|IMG_2132.png",
+     "training|authoritative|apple_workout_1ae3m7n|IMG_2131.png",
+     "training|authoritative|apple_workout_1qwdvej|IMG_2133.png",
+     "nutrition|2026-08-30|nutrition-day",
+     "activity_day|2026-08-30",
+     "morning_weight|user_founder_001|2026-08-31",
+     "training|authoritative|apple_workout_1j50lcu|training_logger_draft_training_logger_10008f5d-f5e7-418b-8fff-1d3731c77e60|IMG_2165.png",
+     "training|authoritative|apple_workout_1j01wcw|IMG_2166.png",
+     "training|authoritative|apple_workout_1mb1x8m|IMG_2164.png",
+     "nutrition|2026-08-31|nutrition-day",
+     "activity_day|2026-08-31",
+     "morning_weight|user_founder_001|2026-09-01",
+     "training|authoritative|apple_workout_7mof8q|training_logger_draft_training_logger_cf4f9855-bb5f-4dda-9b41-33dc29da1bf3|IMG_2234.png",
+     "training|authoritative|apple_workout_1qxl2nk|IMG_2235.png",
+     "training|authoritative|apple_workout_1xbx3w4|IMG_2233.png",
+     "nutrition|2026-09-01|nutrition-day",
+     "activity_day|2026-09-01",
+     "morning_weight|user_founder_001|2026-09-02",
+     "training|authoritative|apple_workout_tf1btf|training_logger_draft_training_logger_66cb30d7-aa96-48db-b441-8380ce000699|IMG_2260.png",
+     "training|authoritative|apple_workout_1u0xi0y|IMG_2261.png",
+     "training|authoritative|apple_workout_ai4wjd|IMG_2259.png",
+     "nutrition|2026-09-02|nutrition-day",
+     "activity_day|2026-09-02",
+     "morning_weight|user_founder_001|2026-09-03",
+     "training|authoritative|apple_workout_1twp5e7|training_logger_draft_training_logger_93ffdbd4-1a3f-44ba-b488-3929490bd778|IMG_2287.png",
+     "training|authoritative|apple_workout_10a5m8s|evidence_submission_20260904180242470_images_file_1",
+     "training|authoritative|apple_workout_g7g7hn|IMG_2286.png",
+     "nutrition|2026-09-03|nutrition-day",
+     "activity_day|2026-09-03",
+     "training|authoritative|apple_workout_1tu4qf0|training_logger_draft_training_logger_bbcc16e4-ba96-4596-a2b5-83c8ab02cd31|IMG_2295.png",
+     "training|authoritative|apple_workout_1qljtka|IMG_2294.png",
+     "morning_weight|user_founder_001|2026-09-04",
+     "morning_weight|user_founder_001|2026-09-05",
+     "morning_weight|user_founder_001|2026-09-07",
+     "nutrition|2026-09-07|nutrition-day",
+     "activity_day|2026-09-07",
+     "morning_weight|user_founder_001|2026-09-08",
+     "nutrition|2026-09-06|nutrition-day",
+     "nutrition|2026-09-05|nutrition-day",
+     "training|authoritative|apple_workout_8dlico|training_logger_draft_training_logger_4ff00451-71fb-467c-9c76-8ce8f523ecf4|IMG_2515.png",
+     "training|authoritative|apple_workout_itxqt3|IMG_2516.png",
+     "training|authoritative|apple_workout_15c1516|IMG_2514.png",
+     "nutrition|2026-09-08|nutrition-day",
+     "activity_day|2026-09-08",
+     "morning_weight|user_founder_001|2026-09-09",
+     "activity_day|2026-09-06",
+     "activity_day|2026-09-05",
+     "nutrition|2026-09-04|nutrition-day",
+     "activity_day|2026-09-04",
+     "training|authoritative|apple_workout_1akchry|training_logger_draft_training_logger_dc4e0ad0-2a13-4e28-a2ed-b37497d7b80a|IMG_2527.png",
+     "training|authoritative|IMG_2528.png",
+     "training|authoritative|IMG_2526.png",
+     "nutrition|2026-09-09|nutrition-day",
+     "activity_day|2026-09-09",
+     "morning_weight|user_founder_001|2026-09-10",
+     "training|authoritative|apple_workout_1h8uwex|training_logger_draft_training_logger_19cef2a9-5024-4dea-ab24-b751116b4296|IMG_2555.png",
+     "training|authoritative|IMG_2557.png",
+     "training|authoritative|IMG_2556.png",
+     "nutrition|2026-09-10|nutrition-day",
+     "activity_day|2026-09-10",
+     "morning_weight|user_founder_001|2026-09-11",
+     "nutrition|2026-09-11|nutrition-day",
+     "activity_day|2026-09-11",
+     "morning_weight|user_founder_001|2026-09-12",
+     "training|authoritative|apple_workout_t8iakx|training_logger_draft_B6700D45-E885-4BA6-9364-9538263A9312|evidence_submission_5F45F4FA05474911832C371B9E9E26C3_images_file_2",
+     "dexa_scan|user_founder_001|2026-09-12"
+    ],
+    "nutritionDays": 28,
+    "photoSessions": 1,
+    "total": 166,
+    "trainingDays": 25,
+    "weightDays": 28
+   },
+   "uncertainties": [
+    "One scan cannot prove that every change in lean tissue is new muscle. Hydration, glycogen, food, and scan preparation can all affect the number, so training, weight, nutrition, recovery, and progress photos still matter."
+   ],
+   "version": "dexa_event_v1_6_0"
+  },
+  "presentationVersion": "dexa_event_presentation_v1_6_0",
+  "version": "dexa_event_v1_6_0"
+ },
+ "cadence": "event",
+ "confidencePublication": {
+  "assessmentId": "confidence_assessment_v2|d43df01f645e30a08890680f10a2f6c37dd41a73993382bb9959ad59abb3fb19",
+  "intelligenceRunId": "pi-execution|intelligence_lifecycle_identity_v1|user_founder_001|dexa_event_briefing|goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass|goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78|dexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12|dexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12|dexa_event%7Cevidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12|2026-09-13T06%3A59%3A59.999Z|confidence_v2%7Cdexa%7Cdexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+  "originatingBriefingId": "dexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+  "publicationCutoff": "2026-09-13T06:59:59.999Z",
+  "publisherType": "dexa_event_briefing",
+  "schemaVersion": "briefing_confidence_binding_v2"
+ },
+ "createdAt": "2026-09-13T06:28:58.012Z",
+ "evidenceWindow": null,
+ "fieldProvenance": {
+  "computed": [
+   "briefing"
+  ],
+  "imported": [
+   "trigger"
+  ]
+ },
+ "generatedAt": "2026-09-13T06:28:58.012Z",
+ "id": "dexa_event_evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+ "lifecycle": {
+  "consumedAt": null,
+  "generatedAt": "2026-09-13T06:28:58.012Z",
+  "openedAt": null
+ },
+ "source": {
+  "confidence": "medium",
+  "externalId": null,
+  "importedAt": null,
+  "name": "PhysiqueOS",
+  "notes": "",
+  "type": "computed"
+ },
+ "trigger": {
+  "evidenceId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+  "evidenceType": "dexa",
+  "occurredAt": "2026-09-12"
+ },
+ "updatedAt": "2026-09-13T06:28:58.012Z",
+ "userId": "user_founder_001",
+ "version": 5
+}

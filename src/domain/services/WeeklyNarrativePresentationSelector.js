@@ -98,6 +98,79 @@ export function selectWeeklyNarrativePresentation({
   });
 }
 
+// Canonical V3 selection. Every interpretive statement comes from the stored V3
+// narrative; only factual domain cards (counts, coverage, values) remain
+// structured facts. No legacy assessment is consulted.
+export const WEEKLY_CANONICAL_V3_SELECTOR_VERSION = "weekly_narrative_presentation_selector_v3_canonical";
+
+export function selectCanonicalV3WeeklyPresentation({
+  narrativeV3,
+  facts = {},
+  confidence = null,
+  period = null,
+  navigation = null,
+  assessmentId = null,
+} = {}) {
+  const sections = narrativeV3?.sections ?? {};
+  const uncertainty = Array.isArray(narrativeV3?.uncertainty) ? narrativeV3.uncertainty : [];
+  const energyText = text(narrativeV3?.energy?.statement);
+  return Object.freeze({
+    schemaVersion: WEEKLY_CANONICAL_V3_SELECTOR_VERSION,
+    presentationModel: "canonical_narrative_v3",
+    assessmentId,
+    completeness: uncertainty.some((item) => item.surfaced || item.materiality === "high")
+      ? "partial" : "available",
+    limitations: uncertainty,
+    hero: {
+      headline: text(narrativeV3.summary),
+      summary: text(sections.meaning ?? sections.result ?? narrativeV3.summary),
+      confidenceExplanation: "",
+      cards: DOMAIN_ORDER.map((domain) => selectDomainCard(null, facts?.domains?.[domain] ?? {})),
+    },
+    training: {
+      conclusion: "",
+      status: null,
+      direction: null,
+      strength: null,
+      limitations: [],
+      provenance: { claimReferences: [], evidenceBasis: [] },
+      needsAttention: [],
+      priorityCategories: selectTrainingPriorities(null, facts?.training),
+    },
+    interpretation: {
+      opening: "",
+      items: energyText ? [{
+        key: "energy", domain: "energy", label: "Energy", text: energyText,
+        status: null, direction: null, strength: null, limitations: [],
+        provenance: { claimReferences: [], evidenceBasis: [] }, lifecycle: null,
+      }] : [],
+      synthesis: "",
+    },
+    coachInsight: {
+      biggestWin: text(sections.result ?? narrativeV3.summary),
+      keepBuilding: text(narrativeV3.coachTake ?? sections.action),
+      watchNextWeek: text(sections.watch),
+      actionItems: stringsInOrder([sections.action, sections.watch]),
+    },
+    bodyComposition: null,
+    confidence: {
+      reference: confidence ?? null,
+      alignment: { status: "canonical_v3", narrativePrimaryDomain: null, context: "" },
+    },
+    period: period ?? null,
+    navigation: navigation ?? null,
+    provenance: {
+      assessmentId,
+      modelVersion: "canonical_narrative_v3",
+      sourceObservationIds: [],
+      sourceClaimIds: [],
+      evidenceCutoff: confidence?.evidenceCutoff ?? period?.endDate ?? null,
+      confidenceAssessmentId: assessmentId,
+      selectorVersion: WEEKLY_CANONICAL_V3_SELECTOR_VERSION,
+    },
+  });
+}
+
 export function selectTrainingPriorities(conclusion, trainingFacts) {
   const categories = Array.isArray(trainingFacts?.categories)
     ? trainingFacts.categories

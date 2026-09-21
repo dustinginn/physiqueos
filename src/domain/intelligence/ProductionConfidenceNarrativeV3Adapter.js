@@ -1,4 +1,8 @@
 import { deriveCanonicalGoalProgress } from "../confidence/GoalProgressContextService.js";
+import { adaptEnergyObservationsV3 } from "./CadenceEnergyObservationsV3.js";
+import { createV3EvidenceUniverse } from "./V3EvidenceUniverse.js";
+import { resolveCurrentStrategyAuthority } from
+  "../strategy/CurrentStrategyAuthority.js";
 import { createTrainingPerformanceIntelligenceReport } from
   "../services/TrainingPerformanceIntelligenceService.js";
 import { adaptTrainingPerformanceReportToPIObservations } from
@@ -26,11 +30,14 @@ export function buildProductionConfidenceNarrativeV3Input({
   store,
   evidenceCutoff,
 } = {}) {
+  // One consistent, cutoff-bounded, goal-owned evidence universe for every
+  // publisher, regardless of the shape of the store it hands to V3.
+  const universe = createV3EvidenceUniverse({ store, goal, phase, evidenceCutoff });
   const goalContract = buildGoalContractV3FromCanonical({
-    goal, phase, store, evidenceCutoff,
+    goal, phase, store: universe, evidenceCutoff,
   });
   const observations = createCanonicalEvidenceObservationsV3({
-    goalContract, goal, phase, store, evidenceCutoff,
+    goalContract, goal, phase, store: universe, evidenceCutoff,
   });
   return Object.freeze({ goalContract, observations });
 }
@@ -175,6 +182,7 @@ export function buildGoalContractV3FromCanonical({
     strategy: {
       strategyRevisionId,
       label: phase.strategyLabel ?? goal.strategyLabel ?? "the current plan",
+      ...currentStrategyContractFields({ goal, phase, store }),
       adequateExposure: {
         minimumDays: number(phase.minimumStrategyExposureDays ??
           goal.minimumStrategyExposureDays) ?? 0,
@@ -527,9 +535,21 @@ export function adaptCadenceEvidenceObservationsV3({
 } = {}) {
   const rawValues = piEnvelope?.observations ?? piEnvelope?.shadow?.observations ??
     artifact?.briefing?.weeklyNarrative?.context?.pi?.observations ?? [];
-  const values = selectRepresentativeCadenceObservationsV3(rawValues);
+  const richEnergy = hasRichEnergyObservationsV3(rawValues);
+  const values = selectRepresentativeCadenceObservationsV3(rawValues, {
+    excludeEnergy: richEnergy,
+  });
   const cutoff = timestamp(evidenceCutoff, "evidenceCutoff");
-  return values.filter((item) => item?.id && item?.domain).flatMap((item) => {
+  const energyObservations = richEnergy
+    ? adaptEnergyObservationsV3({
+      observations: rawValues,
+      goalContract,
+      phase,
+      artifactId: artifact?.id,
+      evidenceCutoff: cutoff,
+      fallbackWindow: artifact?.evidenceWindow ?? null,
+    }) : [];
+  return [...energyObservations, ...values.filter((item) => item?.id && item?.domain).flatMap((item) => {
     const capability = cadenceCapabilityV3(item);
     if (!capability) return [];
     const observed = timestamp(item.evidenceWindow?.endDate ?? cutoff,
@@ -578,10 +598,17 @@ export function adaptCadenceEvidenceObservationsV3({
       limitations: item.confidence?.limitations ?? [],
       sourceReferences: references,
     })];
-  });
+  })];
 }
 
-function selectRepresentativeCadenceObservationsV3(values) {
+function hasRichEnergyObservationsV3(values) {
+  return Array.isArray(values) && values.some((item) =>
+    item?.domain === "energy" && item.kind === "energy_balance" &&
+    Number.isFinite(Number(item.explanationData?.currentAverage)) &&
+    item.explanationData?.currentAverage !== null);
+}
+
+function selectRepresentativeCadenceObservationsV3(values, { excludeEnergy = false } = {}) {
   if (!Array.isArray(values)) return [];
   const selected = [
     selectCadenceObservationV3(values, "training", [
@@ -589,7 +616,7 @@ function selectRepresentativeCadenceObservationsV3(values) {
       (item) => item.kind === "training_performance" &&
         item.subject?.type === "overall",
     ]),
-    selectCadenceObservationV3(values, "energy", [
+    excludeEnergy ? null : selectCadenceObservationV3(values, "energy", [
       (item) => item.kind === "energy_balance",
     ]),
     selectCadenceObservationV3(values, "nutrition", [
@@ -992,6 +1019,19 @@ function adaptCanonicalWeightEntries({ goalContract, entries = [], cutoff }) {
   }).filter(Boolean);
 }
 
+function currentStrategyContractFields({ goal, phase, store }) {
+  const authority = resolveCurrentStrategyAuthority({
+    goal, phase,
+    phaseStrategies: store?.phaseStrategies ?? [],
+    protocols: store?.protocols ?? [],
+    protocolVersions: store?.protocolVersions ?? [],
+  });
+  return {
+    ...(authority.energyStrategy ? { energyStrategy: authority.energyStrategy } : {}),
+    ...(authority.phaseStrategy ? { operatingState: authority.operatingState } : {}),
+  };
+}
+
 function resolveStrategyRevisionId(goal, phase) {
   return goal.currentStrategyRevision?.id ?? goal.strategyRevisionId ??
     goal.timeline?.activePhaseStrategyId ?? phase.activePhaseStrategyId ??
@@ -1237,6 +1277,37 @@ function minimumIndexGuardrail(input, capabilityId, confidenceImpact) {
   };
 }
 
+// Energy execution evidence relative to the current Energy Strategy. These are
+// narrative/attribution context: they inform what V3 can say and how firmly it
+// can recommend, and never change the Confidence percentage by themselves.
+function energyStrategyEvidencePoliciesV3(strategyRevisionId) {
+  const policy = (capabilityPattern, suffix, semanticClass, vocabularyKey, group, extra = {}) => ({
+    policyId: `strategy_${suffix}|${strategyRevisionId}`,
+    subjectType: "execution",
+    subjectId: strategyRevisionId,
+    capabilityPattern,
+    role: "contextual",
+    semanticClass,
+    vocabularyKey,
+    reconciliationGroup: group,
+    minimumQuality: "limited",
+    participation: "NARRATIVE_CONTEXT_ONLY",
+    usableFor: ["narrative", "attribution", "execution"],
+    signalRules: directionSignalRules("minor"),
+    ...extra,
+  });
+  return [
+    policy("execution.energy_intake", "energy_intake", "EXECUTION_SUPPORT",
+      "energy_intake_execution", "energy_intake_plan"),
+    policy("execution.energy_activity", "energy_activity", "EXECUTION_SUPPORT",
+      "energy_activity_execution", "energy_activity_plan"),
+    policy("execution.energy_pairing", "energy_pairing", "CONTEXTUAL_EVIDENCE",
+      "energy_pairing_quality", "energy_pairing", { usableFor: ["narrative", "attribution"] }),
+    policy("strategy.energy_outcome_tension", "energy_outcome_tension", "DERIVED_ESTIMATE",
+      "energy_outcome_tension", "energy_outcome_tension", { usableFor: ["narrative", "attribution"] }),
+  ];
+}
+
 function supportingEvidencePoliciesV3({ strategyRevisionId, guardrails }) {
   const policies = [{
     policyId: `strategy_training_support|${strategyRevisionId}`,
@@ -1281,6 +1352,18 @@ function supportingEvidencePoliciesV3({ strategyRevisionId, guardrails }) {
     participation: "NARRATIVE_CONTEXT_ONLY",
     usableFor: ["narrative", "attribution"],
     signalRules: directionSignalRules("minor"),
+  }, ...energyStrategyEvidencePoliciesV3(strategyRevisionId), {
+    policyId: `strategy_monthly_evidence_matrix|${strategyRevisionId}`,
+    subjectType: "attribution",
+    subjectId: strategyRevisionId,
+    capabilityPattern: "monthly.evidence.*",
+    role: "contextual",
+    semanticClass: "CONTEXTUAL_EVIDENCE",
+    vocabularyKey: "monthly_evidence_matrix",
+    reconciliationGroup: "monthly_evidence_matrix",
+    minimumQuality: "limited",
+    participation: "NARRATIVE_CONTEXT_ONLY",
+    usableFor: ["narrative", "attribution"],
   }, {
     policyId: `strategy_activity_context|${strategyRevisionId}`,
     subjectType: "execution",

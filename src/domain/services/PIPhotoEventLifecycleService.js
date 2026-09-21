@@ -1,3 +1,4 @@
+import { withStructuredPhotoObservationsV3 } from "../intelligence/PhotoEventStructuredObservationsV3.js";
 import { createCanonicalConfidenceReadService } from
   "../confidence/CanonicalConfidenceReadService";
 import {
@@ -79,7 +80,7 @@ export function createPIPhotoEventLifecycleService({ publicationService,
         evidenceWindowClosed: true,
         buildAdditionalObservations: ({ goalContract }) =>
           adaptCanonicalPhotoObservations({ goalContract, phase,
-            store: { photoAnalyses: [{ ...session, interpretation: narrative }] },
+            store: { photoAnalyses: [{ ...session, interpretation: withStructuredPhotoObservationsV3(narrative) }] },
             cutoff }),
         previousCanonicalAssessment: current.assessment,
         evidenceCutoff: cutoff, finalizedAt: now().toISOString(),

@@ -53,7 +53,8 @@ export function createPostgresPhotoEventReadStore({
         const eventDate = canonicalSessionDate(canonicalSession);
         const windowStart = shiftDate(eventDate, -6);
         const [evidenceRows, weightRows, goalRows, executionRows,
-          confidenceRows, briefingRows, metadataRows] = await Promise.all([
+          confidenceRows, briefingRows, metadataRows, protocolRows,
+          priorCadenceRows] = await Promise.all([
           query(
             `SELECT collection_name,record_id,payload,version
                FROM physiqueos.canonical_evidence_records
@@ -116,6 +117,23 @@ export function createPostgresPhotoEventReadStore({
                FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1`,
             [ownerUserId],
           ),
+          // Read-only V3 evidence-universe inputs. These are bounded reads and
+          // are never part of a writable collection (see v3ReadOnlyEvidence).
+          query(
+            `SELECT collection_name,payload,version FROM physiqueos.canonical_protocol_records
+              WHERE owner_user_id=$1 AND collection_name IN ('protocols','protocolVersions')
+              ORDER BY collection_name,record_id`,
+            [ownerUserId],
+          ),
+          query(
+            `SELECT payload,version FROM physiqueos.canonical_briefing_records
+              WHERE owner_user_id=$1 AND collection_name='dailyBriefings'
+                AND payload->>'cadence' IN ('weekly','midweek')
+                AND payload#>>'{evidenceWindow,cutoff}' IS NOT NULL
+                AND payload#>>'{evidenceWindow,cutoff}' <= $2
+              ORDER BY payload#>>'{evidenceWindow,cutoff}' DESC LIMIT 2`,
+            [ownerUserId, `${shiftDate(eventDate, 2)}T00:00:00.000Z`],
+          ),
         ]);
 
         const byCollection = (rows, name) => payloads(rows.filter((row) =>
@@ -157,6 +175,17 @@ export function createPostgresPhotoEventReadStore({
           goalTransitionDrafts: byCollection(goalRows, "goalTransitionDrafts"),
           phaseReviewDecisions: byCollection(goalRows, "phaseReviewDecisions"),
           dexaScans,
+          // V3 reads one shared evidence universe for every publisher. The extra
+          // evidence lives in a read-only namespace so the writable publication
+          // collections above stay exactly as narrow as before.
+          v3ReadOnlyEvidence: Object.freeze({
+            weightEntries: canonicalWeightEntries(payloads(weightRows)),
+            protocols: byCollection(protocolRows, "protocols"),
+            protocolVersions: byCollection(protocolRows, "protocolVersions"),
+            dailyBriefings: payloads(priorCadenceRows),
+            canonicalEvidenceObjects: canonicalObjects,
+            analyses,
+          }),
         });
         return Object.freeze({
           canonicalObjects,

@@ -16,7 +16,7 @@ describe("PostgresPhotoEventReadStore", () => {
       sessionId: "opaque-session-id",
     });
 
-    expect(pool.query).toHaveBeenCalledTimes(8);
+    expect(pool.query).toHaveBeenCalledTimes(10);
     expect(result.canonicalObjects.map((item) => item.id)).toEqual([
       "photo-session", "training-support",
     ]);
@@ -26,9 +26,15 @@ describe("PostgresPhotoEventReadStore", () => {
       revision: 29,
       lastCommitId: "prior-command",
     });
+    // Additional V3 evidence is read-only and never a writable collection.
+    expect(result.publicationStore.v3ReadOnlyEvidence.protocols.map((item) => item.id))
+      .toEqual(["energy-protocol"]);
+    expect(Array.isArray(result.publicationStore.v3ReadOnlyEvidence.weightEntries)).toBe(true);
+    expect(Object.keys(result.publicationStore)).not.toContain("weightEntries");
+    expect(Object.keys(result.publicationStore)).not.toContain("protocols");
     expect(diagnostics).toHaveBeenCalledWith(expect.objectContaining({
       readModel: "photo-event",
-      queryCount: 8,
+      queryCount: 10,
       compatibilityRuntimeLoadCount: 0,
       pool: { totalCount: 2, idleCount: 2, waitingCount: 0 },
     }));
@@ -117,6 +123,10 @@ function fakePool() {
     if (sql.includes("canonical_confidence_records")) return { rows: [
       row("goalConfidenceSnapshots", "snapshot", { id: "snapshot" }),
       row("goalConfidenceHistory", "history", { id: "history" }),
+    ] };
+    if (sql.includes("canonical_protocol_records")) return { rows: [
+      row("protocols", "energy-protocol", { id: "energy-protocol", category: "energy", status: "active" }),
+      row("protocolVersions", "energy-protocol-v2", { id: "energy-protocol-v2", protocolId: "energy-protocol" }),
     ] };
     if (sql.includes("canonical_briefing_records")) return { rows: [] };
     if (sql.includes("canonical_runtime_metadata")) return { rows: [{

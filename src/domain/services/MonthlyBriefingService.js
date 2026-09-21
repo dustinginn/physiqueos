@@ -3,6 +3,11 @@ import {
   resolveStableConfidenceReplacementPredecessor,
 } from "./CanonicalBriefingConfidencePublicationService";
 import { createCanonicalConfidenceReadService } from "../confidence/CanonicalConfidenceReadService";
+import {
+  adaptMonthlyIntelligenceObservationsV3,
+  createMonthlyEvidenceIntelligenceForProduction,
+  summarizeMonthlyIntelligenceV3,
+} from "../intelligence/MonthlyEvidenceIntelligenceProductionV3.js";
 import { adaptCadenceEvidenceObservationsV3 } from
   "../intelligence/ProductionConfidenceNarrativeV3Adapter";
 import { applyNarrativeV3ToBriefingArtifact,
@@ -268,9 +273,18 @@ async function prepareMonthlyOccurrence({
     error.code = "canonical_predecessor_required";
     throw error;
   }
+  // Production consumer of the Monthly evidence intelligence: built from the
+  // same canonical evidence the Monthly already resolved, then carried into V3
+  // as evidence and stored (bounded) with the artifact.
+  const monthlyIntelligence = createMonthlyEvidenceIntelligenceForProduction({
+    window: { ...window, cutoffDate: String(window.cutoff ?? window.endDate).slice(0, 10) },
+    goal,
+    evidenceFixture: narrative.evidenceFixture,
+    currentConfidence: current.assessment.currentPercentage ?? null,
+  });
   return {
     artifact, activePhase, baseline, current, existing, generatedAt, goal,
-    piEnvelope,
+    piEnvelope, monthlyIntelligence,
     userId, window,
   };
 }
@@ -279,7 +293,7 @@ async function publishMonthlyOccurrence({
   prepared, publicationService, now, operation, reason, dryRun = false,
 }) {
   const { artifact, activePhase, baseline, current, existing, generatedAt,
-    goal, piEnvelope, userId, window } = prepared;
+    goal, piEnvelope, monthlyIntelligence, userId, window } = prepared;
   const replacement = operation === "regenerate";
   const replacedAssessmentId = replacement
     ? existing?.confidencePublication?.assessmentId ?? null : null;
@@ -327,9 +341,14 @@ async function publishMonthlyOccurrence({
     store: baseline.store,
     evidenceWindowId: window.id,
     evidenceWindowClosed: window.closed,
-    buildAdditionalObservations: ({ goalContract }) =>
-      adaptCadenceEvidenceObservationsV3({ goalContract, phase: activePhase,
+    buildAdditionalObservations: ({ goalContract }) => [
+      ...adaptCadenceEvidenceObservationsV3({ goalContract, phase: activePhase,
         artifact, piEnvelope, evidenceCutoff: window.cutoff }),
+      ...adaptMonthlyIntelligenceObservationsV3({
+        intelligence: monthlyIntelligence, goalContract, phase: activePhase,
+        artifactId: artifact.id, window,
+      }),
+    ],
     previousCanonicalAssessment: confidencePredecessor,
     evidenceCutoff: window.cutoff, finalizedAt: generatedAt,
     idempotencyKey: replacement
@@ -373,6 +392,7 @@ async function publishMonthlyOccurrence({
       });
       candidate.briefing.monthlyNarrative.confidence = block;
       candidate.briefing.confidenceAssessmentId = block.assessmentId;
+      candidate.briefing.monthlyIntelligenceV3 = summarizeMonthlyIntelligenceV3(monthlyIntelligence);
       if (candidate.briefing.monthlyPresentation?.hero) {
         candidate.briefing.monthlyPresentation.hero.confidence = block;
       }

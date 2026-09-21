@@ -2,6 +2,11 @@ import { reduceCoachingStateV3 } from "./CoachingStateV3.js";
 import { evaluateGoalContract, findingMeetsCriterion } from "./DeclarativeGoalEvaluator.js";
 import { resolveGoalRelativeAuthority } from "./GoalRelativeAuthorityResolver.js";
 import { synthesizeCrossDomainEvidenceV3 } from "./CrossDomainEvidenceSynthesisV3.js";
+import {
+  applyEnergyAmbiguityToRecommendation,
+  deriveEnergyExecutionV3,
+  toUncertaintyProfileEntries,
+} from "./EnergyAmbiguityV3.js";
 import { selectSpecificCoachingObservationsV3 } from
   "./SpecificCoachingObservationV3.js";
 import {
@@ -43,12 +48,14 @@ export function createStrategicInterpretationV3({
     priorInterpretation,
   });
   const evidenceSignals = crossDomainSynthesis.signals;
+  const energyExecution = deriveEnergyExecutionV3({ goalContract, observations });
   const uncertaintyProfile = createUncertaintyProfile({
     goalContract,
     observations,
     evaluatedGoal,
     strategyEffectiveness,
     authorityBindings,
+    energyExecution,
   });
   const answerEvidenceIds = uniqueStrings([
     ...evaluatedGoal.objectiveFindings.filter((item) => item.changedThisEvaluation)
@@ -68,14 +75,14 @@ export function createStrategicInterpretationV3({
       answerEvidenceIds,
     },
   });
-  const recommendation = resolveRecommendation({
+  const recommendation = applyEnergyAmbiguityToRecommendation(resolveRecommendation({
     goalContract,
     evaluatedGoal,
     strategyEffectiveness,
     phaseTransitionReady,
     coachingState,
     crossDomainSynthesis,
-  });
+  }), energyExecution);
   const coachingObservationSelection = selectSpecificCoachingObservationsV3({
     goalContract,
     observations,
@@ -120,6 +127,13 @@ export function createStrategicInterpretationV3({
     strategyEffectiveness,
     phaseTransitionReady,
     uncertaintyProfile,
+    ...(energyExecution.estimate || energyExecution.findings.length || energyExecution.ambiguity.length
+      ? { energyExecution: {
+        energyStrategy: energyExecution.energyStrategy,
+        estimate: energyExecution.estimate,
+        findings: energyExecution.findings,
+        ambiguityIds: energyExecution.ambiguity.map((item) => item.uncertaintyId),
+      } } : {}),
     evidenceSignals,
     crossDomainSynthesis,
     coachingObservationSelection,
@@ -271,7 +285,7 @@ function evaluateStrategy({ goalContract, authorityBindings, evaluatedGoal, prio
   };
 }
 
-function createUncertaintyProfile({ goalContract, observations, evaluatedGoal, strategyEffectiveness, authorityBindings }) {
+function createUncertaintyProfile({ goalContract, observations, evaluatedGoal, strategyEffectiveness, authorityBindings, energyExecution = null }) {
   const uncertainties = [];
   const limited = observations.filter((item) => ["limited", "insufficient"].includes(item.quality.status));
   if (limited.length) uncertainties.push(uncertainty("measurement_coverage", "high", limited.flatMap((item) => item.limitations), limited.map((item) => item.observationId)));
@@ -284,6 +298,7 @@ function createUncertaintyProfile({ goalContract, observations, evaluatedGoal, s
   if (unassessedGuardrails.length) uncertainties.push(uncertainty("guardrail", "moderate", unassessedGuardrails.map((item) => `unassessed:${item.guardrailId}`), []));
   const objectiveAuthority = authorityBindings.filter((item) => item.subjectType === "objective");
   if (!objectiveAuthority.length && !evaluatedGoal.objectiveFindings.some((item) => item.freshness === "carried_forward")) uncertainties.push(uncertainty("objective_measurement", "high", ["objective_evidence_unavailable"], []));
+  uncertainties.push(...toUncertaintyProfileEntries(energyExecution));
   return uncertainties;
 }
 

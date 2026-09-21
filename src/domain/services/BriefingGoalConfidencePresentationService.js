@@ -1,3 +1,5 @@
+import { buildCanonicalNarrativeV3Extensions, projectV3CoachInsight, projectV3Hero } from "./BriefingV3Projection.js";
+
 export function createBriefingGoalConfidenceBlock(confidence, {
   capturedAt = null,
 } = {}) {
@@ -257,6 +259,9 @@ export function applyNarrativeV3ToBriefingArtifact({
 } = {}) {
   const candidate = structuredClone(artifact);
   const sections = narrativePlan?.composition?.sections ?? {};
+  const extensions = buildCanonicalNarrativeV3Extensions({
+    strategicInterpretation, narrativePlan,
+  });
   const canonical = {
     summary: narrativePlan?.composition?.headline ?? null,
     detail: narrativePlan?.composition?.finalNarrative ?? null,
@@ -269,6 +274,10 @@ export function applyNarrativeV3ToBriefingArtifact({
     recommendation: structuredClone(
       strategicInterpretation?.recommendation ?? null),
     strategicInterpretationId: strategicInterpretation?.id ?? null,
+    // Structured V3 additions: every uncertainty with plain-language text and
+    // explicit surfacing/suppression, and the Energy Strategy execution.
+    uncertainty: extensions.uncertainty,
+    ...(extensions.energy ? { energy: extensions.energy } : {}),
   };
   candidate.briefing ??= {};
   candidate.briefing.narrativeV3 = canonical;
@@ -290,9 +299,10 @@ export function applyNarrativeV3ToBriefingArtifact({
     weekly.goalMeaning = sections.meaning ?? null;
     weekly.coachDirection = sections.action ?? null;
     weekly.nextWeekFocus = sections.watch ?? null;
+    const v3Hero = projectV3Hero(canonical);
     if (weekly.cards?.hero) {
-      weekly.cards.hero.title = canonical.summary;
-      weekly.cards.hero.body = sections.meaning ?? sections.result ?? canonical.summary;
+      weekly.cards.hero.title = v3Hero.headline;
+      weekly.cards.hero.body = v3Hero.summary;
     }
     if (weekly.cards?.coachInsight) {
       weekly.cards.coachInsight.celebration = sections.result ?? null;
@@ -303,15 +313,11 @@ export function applyNarrativeV3ToBriefingArtifact({
     weekly.narrativePresentationSelection ??= {};
     weekly.narrativePresentationSelection.hero = {
       ...(weekly.narrativePresentationSelection.hero ?? {}),
-      headline: canonical.summary,
-      summary: sections.meaning ?? sections.result ?? canonical.summary,
+      ...v3Hero,
     };
     weekly.narrativePresentationSelection.coachInsight = {
       ...(weekly.narrativePresentationSelection.coachInsight ?? {}),
-      biggestWin: sections.result ?? canonical.summary,
-      keepBuilding: canonical.coachTake ?? sections.action ?? null,
-      watchNextWeek: sections.watch ?? null,
-      actionItems: [sections.action, sections.watch].filter(Boolean),
+      ...projectV3CoachInsight(canonical),
     };
     candidate.briefing.weeklyNarrative = weekly;
   } else if (publicationType === "monthly") {
@@ -337,6 +343,8 @@ export function applyNarrativeV3ToBriefingArtifact({
       watch: sections.watch ?? null,
       confidence: sections.confidence ?? null,
       coachTake: canonical.coachTake,
+      uncertainty: canonical.uncertainty,
+      ...(canonical.energy ? { energy: canonical.energy } : {}),
     };
     if (publicationType === "dexa") {
       event.coachInsight = {

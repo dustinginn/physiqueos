@@ -50,22 +50,42 @@ describe("NutritionDay evidence structure", () => {
     }));
   });
 
-  it("flags a materially conflicting full-day summary while projecting canonical meal sums", () => {
+  it("keeps a coherent full-day summary authoritative over partial meal detail", () => {
     const result = reconcileNutritionDayEvidence({
       dailyTotals: { calories: 1930, protein_g: 171 },
       dailyTotalsScope: "full_day_summary",
       meals: [{ name: "Dinner", totals: { calories: 813, protein_g: 60 } }],
     });
 
-    expect(result.status).toBe("needs_review");
+    expect(result.authoritative_source).toBe("source_full_day_summary");
+    expect(result.meal_detail_state).toBe("partial");
+    expect(result.status).toBe("reconciled");
+    expect(result.conflicting_fields).toEqual([]);
     expect(result.canonical_totals).toEqual(expect.objectContaining({
-      calories: 813,
-      protein_g: 60,
+      calories: 1930,
+      protein_g: 171,
     }));
+    expect(result.meal_sums).toEqual(expect.objectContaining({ calories: 813 }));
     expect(result.differences).toEqual(expect.objectContaining({
       calories: 1117,
       protein_g: 111,
     }));
+  });
+
+  it("preserves a conflict when meals exceed a full-day summary instead of overriding silently", () => {
+    const result = reconcileNutritionDayEvidence({
+      dailyTotals: { calories: 1496, protein_g: 59 },
+      dailyTotalsScope: "full_day_summary",
+      meals: [
+        { name: "Breakfast", totals: { calories: 400, protein_g: 61 } },
+        { name: "Dinner", totals: { calories: 2084, protein_g: 47 } },
+      ],
+    });
+
+    expect(result.status).toBe("needs_review");
+    expect(result.authoritative_source).toBe("canonical_meal_sums");
+    expect(result.conflicting_fields).toContain("calories");
+    expect(result.canonical_totals.calories).toBe(2484);
   });
 
   it("derives the concrete four-meal aggregate without a separate day summary", () => {

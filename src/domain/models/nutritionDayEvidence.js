@@ -215,27 +215,66 @@ export function reconcileNutritionDayEvidence({
   const computedFields = NUTRITION_DAILY_TOTAL_FIELDS.filter(
     (key) => mealSums[key] !== null
   );
-  const preservedSourceFields = NUTRITION_DAILY_TOTAL_FIELDS.filter(
-    (key) => mealSums[key] === null && finiteNumber(dailyTotals[key]) !== null
+  // Approved precedence: a coherent full-day source assertion outranks
+  // meal-derived totals. Meals never override a trustworthy full-day total;
+  // they only enrich it. A full-day claim that is smaller than its own meals
+  // is self-contradicted, so it is preserved as a conflict and the larger
+  // meal-derived total stays canonical (never a silent override).
+  const fullDayAssertion =
+    normalizeDailyTotalsScope(dailyTotalsScope) ===
+      NutritionDailyTotalsScope.FULL_DAY_SUMMARY &&
+    finiteNumber(dailyTotals.calories) !== null;
+  const mealsExceedAssertion = fullDayAssertion && comparableKeys.some(
+    (key) => key in mealSums && finiteNumber(mealSums[key]) !== null &&
+      finiteNumber(dailyTotals[key]) !== null &&
+      mealSums[key] - dailyTotals[key] > (tolerance[key] ?? 0)
   );
+  const mealDetailPartial = fullDayAssertion && !mealsExceedAssertion &&
+    comparableKeys.some(
+      (key) => finiteNumber(mealSums[key]) !== null &&
+        dailyTotals[key] - mealSums[key] > (tolerance[key] ?? 0)
+    );
+  // Only a material shortfall of the meals against a coherent full-day total
+  // changes authority; when both agree within tolerance nothing is overridden.
+  const sourceIsAuthoritative = mealDetailPartial;
+  const authoritativeComputedFields = sourceIsAuthoritative
+    ? NUTRITION_DAILY_TOTAL_FIELDS.filter(
+      (key) => finiteNumber(dailyTotals[key]) === null && mealSums[key] !== null
+    )
+    : computedFields;
+  const preservedSourceFields = sourceIsAuthoritative
+    ? NUTRITION_DAILY_TOTAL_FIELDS.filter(
+      (key) => finiteNumber(dailyTotals[key]) !== null
+    )
+    : NUTRITION_DAILY_TOTAL_FIELDS.filter(
+      (key) => mealSums[key] === null && finiteNumber(dailyTotals[key]) !== null
+    );
   const canonicalTotals = Object.fromEntries(
     NUTRITION_DAILY_TOTAL_FIELDS.map((key) => [
       key,
-      mealSums[key] ?? finiteNumber(dailyTotals[key]),
+      sourceIsAuthoritative
+        ? finiteNumber(dailyTotals[key]) ?? mealSums[key]
+        : mealSums[key] ?? finiteNumber(dailyTotals[key]),
     ])
   );
   const materialConflicts = dailyTotalsScope ===
     NutritionDailyTotalsScope.PARTIAL_MEAL_SUBTOTAL
     ? []
-    : conflictingKeys;
+    : sourceIsAuthoritative
+      ? []
+      : conflictingKeys;
 
   return {
-    authoritative_source:
-      computedFields.length > 0 && preservedSourceFields.length > 0
+    authoritative_source: sourceIsAuthoritative
+      ? "source_full_day_summary"
+      : computedFields.length > 0 && preservedSourceFields.length > 0
         ? "canonical_meal_sums_with_source_fallback"
         : computedFields.length > 0
           ? "canonical_meal_sums"
           : "source_daily_totals",
+    meal_detail_state: mealDetailPartial
+      ? "partial"
+      : normalizedMeals.length > 0 ? "consistent" : "none",
     status:
       materialConflicts.length > 0
         ? "needs_review"
@@ -245,7 +284,7 @@ export function reconcileNutritionDayEvidence({
             ? "derived_from_meals"
             : "not_comparable",
     canonical_totals: canonicalTotals,
-    computed_fields: computedFields,
+    computed_fields: authoritativeComputedFields,
     conflicting_fields: materialConflicts,
     daily_totals_scope: normalizeDailyTotalsScope(dailyTotalsScope),
     tolerance: { ...tolerance },

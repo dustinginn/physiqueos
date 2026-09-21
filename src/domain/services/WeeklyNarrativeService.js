@@ -519,7 +519,18 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
   }
   return existing??artifact;
 }
-async function getWeeklyActivityTarget(repositories,userId){const protocol=await repositories.protocols?.getActiveProtocolByType?.(userId,"activity");const version=protocol?await repositories.protocolVersions?.getCurrentVersion?.(protocol.id):null;return version?.evaluationWindows?.find((item)=>item.cadence==="weekly")?.target??DEFAULT_WEEKLY_ACTIVITY_TARGET;}
+async function getWeeklyActivityTarget(repositories,userId){
+  // The current Energy protocol revision owns the activity target (kcal/day).
+  // Only when it provides none does the legacy activity protocol window, and
+  // finally the historical default, apply.
+  const energyProtocol=await repositories.protocols?.getActiveProtocolByType?.(userId,"energy");
+  const energyVersion=energyProtocol?await repositories.protocolVersions?.getCurrentVersion?.(energyProtocol.id):null;
+  const daily=energyVersion?.change?.reviewedChanges?.activityExpenditureTarget;
+  if(energyVersion?.status==="active"&&Number.isFinite(daily?.value)&&daily.unit==="kcal/day")return Math.round(daily.value*7);
+  const protocol=await repositories.protocols?.getActiveProtocolByType?.(userId,"activity");
+  const version=protocol?await repositories.protocolVersions?.getCurrentVersion?.(protocol.id):null;
+  return version?.evaluationWindows?.find((item)=>item.cadence==="weekly")?.target??DEFAULT_WEEKLY_ACTIVITY_TARGET;
+}
 async function findExisting(repositories,userId,weekId){return repositories.dailyBriefings.getBriefingByEvidenceWindow(userId,weekId);}
 function isResistanceTrainingSession(item={}){return item.evidence_type==="training"&&((item.exercises??[]).length>0||/strength|resistance|lifting|weights?/i.test(item.metadata?.activity_type??""));}
 function isCompleteActivityDay(item={}){return item.evidence_type==="activity_day"&&item.quality?.status!=="incomplete"&&Number.isFinite(Number(item.daily_activity?.move_calories));}

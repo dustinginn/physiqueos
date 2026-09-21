@@ -1,0 +1,286 @@
+{
+ "assessmentId": "confidence_assessment_v3|8ce9649a61d60d06dfc0761712111071ee565264ab26544022503b462591047a",
+ "currentPercentage": 79,
+ "eligibleObservationIds": [
+  "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|activity|coverage",
+  "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|energy|derived_balance_estimate",
+  "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|nutrition|coverage",
+  "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|recovery|coverage",
+  "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|weight|average_change",
+  "cadence_v3|weekly_briefing_2026-09-13_2026-09-19|performance|overall|resistance",
+  "cadence_v3|weekly_briefing_2026-09-13_2026-09-19|pi|energy|energy_balance|estimated_energy_balance|weekly.balance",
+  "cadence_v3|weekly_briefing_2026-09-13_2026-09-19|pi|recovery|recovery_state|whole_body|weekly.composite",
+  "cadence_v3|weekly_briefing_2026-09-13_2026-09-19|pi|weight|weight_average_change|body_weight|weekly.average_comparison",
+  "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+  "weight_2026_07_13"
+ ],
+ "energyObservation": {
+  "canonicalRecordId": "pi|energy|energy_balance|estimated_energy_balance|weekly.balance",
+  "capabilities": [
+   {
+    "capabilityId": "strategy.energy_balance_estimate",
+    "change": null,
+    "comparisonAt": null,
+    "comparisonValue": null,
+    "factualSummary": null,
+    "index": 0,
+    "metadata": {
+     "signalDirection": "neutral"
+    },
+    "unit": null,
+    "value": 0
+   }
+  ],
+  "coachingDetails": null,
+  "directness": "behavioral",
+  "displayLabel": "energy",
+  "evidenceWindow": {
+   "comparisonEndDate": "2026-09-12",
+   "comparisonStartDate": "2026-09-06",
+   "endDate": "2026-09-19",
+   "startDate": "2026-09-13"
+  },
+  "exposureDays": 0,
+  "highSalienceEvent": false,
+  "limitations": [
+   "expenditure_is_estimated_rmr_plus_active_calories",
+   "some_days_lack_complete_paired_energy_evidence"
+  ],
+  "observationId": "cadence_v3|weekly_briefing_2026-09-13_2026-09-19|pi|energy|energy_balance|estimated_energy_balance|weekly.balance",
+  "observedAt": "2026-09-19T00:00:00.000Z",
+  "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+  "quality": {
+   "comparability": "comparable",
+   "completeness": "reported",
+   "coverageRatio": null,
+   "precision": "derived",
+   "provenance": "energy_pi_observation_service",
+   "status": "adequate"
+  },
+  "relatedGoalIds": [
+   "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+  ],
+  "schemaVersion": "evidence_observation_v3",
+  "semanticFingerprint": "sha256_5d864f5f0c71342b87b8696d97dbc540a6e07b372f9f8301307b8d18583cb168",
+  "sourceReferences": [
+   "activity_day|2026-09-06",
+   "activity_day|2026-09-07",
+   "activity_day|2026-09-08",
+   "activity_day|2026-09-09",
+   "activity_day|2026-09-10",
+   "activity_day|2026-09-11",
+   "activity_day|2026-09-12",
+   "activity_day|2026-09-13",
+   "activity_day|2026-09-14",
+   "activity_day|2026-09-15",
+   "activity_day|2026-09-16",
+   "activity_day|2026-09-17",
+   "activity_day|2026-09-18",
+   "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+   "nutrition|2026-09-06|nutrition-day",
+   "nutrition|2026-09-07|nutrition-day",
+   "nutrition|2026-09-08|nutrition-day",
+   "nutrition|2026-09-09|nutrition-day",
+   "nutrition|2026-09-10|nutrition-day",
+   "nutrition|2026-09-11|nutrition-day",
+   "nutrition|2026-09-12|nutrition-day",
+   "nutrition|2026-09-13|nutrition-day",
+   "nutrition|2026-09-14|nutrition-day",
+   "nutrition|2026-09-15|nutrition-day",
+   "nutrition|2026-09-16|nutrition-day",
+   "nutrition|2026-09-17|nutrition-day",
+   "nutrition|2026-09-18|nutrition-day"
+  ],
+  "sourceType": "canonical_energy_observation",
+  "status": "active",
+  "strategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+  "strategyScopeEligible": true
+ },
+ "evidenceSignals": [
+  {
+   "capabilityId": "body_composition.lean_mass",
+   "direction": "indeterminate",
+   "factualSummary": "Lean tissue measured 153.3 lb, a change of 5 lb.",
+   "limitations": [],
+   "observationId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+   "participation": "DIRECT_CONFIDENCE_INPUT",
+   "quality": "robust",
+   "role": "decisive"
+  },
+  {
+   "capabilityId": "performance.training_support_index",
+   "direction": "supports",
+   "factualSummary": null,
+   "limitations": [],
+   "observationId": "cadence_v3|weekly_briefing_2026-09-13_2026-09-19|performance|overall|resistance",
+   "participation": "PERSISTENCE_CONFIRMATION_INPUT",
+   "quality": "adequate",
+   "role": "supporting"
+  },
+  {
+   "capabilityId": "execution.nutrition",
+   "direction": "indeterminate",
+   "factualSummary": "Nutrition evidence covered 1 of 3 days in the briefing window.",
+   "limitations": [
+    "nutrition_coverage_incomplete"
+   ],
+   "observationId": "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|nutrition|coverage",
+   "participation": "NARRATIVE_CONTEXT_ONLY",
+   "quality": "limited",
+   "role": "supporting"
+  },
+  {
+   "capabilityId": "strategy.energy_balance_estimate",
+   "direction": "indeterminate",
+   "factualSummary": null,
+   "limitations": [
+    "expenditure_is_estimated_rmr_plus_active_calories",
+    "some_days_lack_complete_paired_energy_evidence"
+   ],
+   "observationId": "cadence_v3|weekly_briefing_2026-09-13_2026-09-19|pi|energy|energy_balance|estimated_energy_balance|weekly.balance",
+   "participation": "NARRATIVE_CONTEXT_ONLY",
+   "quality": "adequate",
+   "role": "contextual"
+  },
+  {
+   "capabilityId": "body_mass.level",
+   "direction": "indeterminate",
+   "factualSummary": null,
+   "limitations": [],
+   "observationId": "cadence_v3|weekly_briefing_2026-09-13_2026-09-19|pi|weight|weight_average_change|body_weight|weekly.average_comparison",
+   "participation": "NARRATIVE_CONTEXT_ONLY",
+   "quality": "adequate",
+   "role": "contextual"
+  },
+  {
+   "capabilityId": "execution.activity",
+   "direction": "indeterminate",
+   "factualSummary": "Activity evidence covered 3 of 3 days in the briefing window.",
+   "limitations": [],
+   "observationId": "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|activity|coverage",
+   "participation": "NARRATIVE_CONTEXT_ONLY",
+   "quality": "adequate",
+   "role": "contextual"
+  },
+  {
+   "capabilityId": "body_mass.level",
+   "direction": "indeterminate",
+   "factualSummary": "Average scale weight was 171.6 lb, 0.4 lb higher than the prior comparable average.",
+   "limitations": [],
+   "observationId": "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|weight|average_change",
+   "participation": "NARRATIVE_CONTEXT_ONLY",
+   "quality": "adequate",
+   "role": "contextual"
+  },
+  {
+   "capabilityId": "body_mass.level",
+   "direction": "indeterminate",
+   "factualSummary": "Scale weight measured 165.6 lb, a change of 1.6 lb.",
+   "limitations": [],
+   "observationId": "weight_2026_07_13",
+   "participation": "NARRATIVE_CONTEXT_ONLY",
+   "quality": "adequate",
+   "role": "contextual"
+  },
+  {
+   "capabilityId": "strategy.energy_balance_estimate",
+   "direction": "contradicts",
+   "factualSummary": "Reported intake minus estimated expenditure averaged -454.5 kcal/day across 2 comparable days, with limited coverage.",
+   "limitations": [
+    "Nutrition coverage is incomplete for the Sunday\u2013Tuesday window.",
+    "expenditure_is_estimated"
+   ],
+   "observationId": "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|energy|derived_balance_estimate",
+   "participation": "NARRATIVE_CONTEXT_ONLY",
+   "quality": "limited",
+   "role": "contextual"
+  }
+ ],
+ "narrativeSections": {
+  "action": "Keep executing consistently. Keep the current setup in place.",
+  "confidence": "Confidence \u00b7 79% \u2014\nConfidence holds. This progress supports the current approach, but one update does not change the overall goal outlook.",
+  "meaning": "Training is still moving in the direction this build needs between DEXA checks.",
+  "result": "Cable crunches moved down 24.8% from the previous comparable exposure, from 8,960 to 6,740 lb of session volume.",
+  "watch": "The next DEXA will show whether this kind of progress continues while body fat stays in a good place."
+ },
+ "note": "Original stored V3 excerpt (historical defect baseline). Not regenerated.",
+ "recommendation": {
+  "action": "continue_current_strategy",
+  "nextEvidencePurpose": "confirm_persistence",
+  "reason": "strategy_supported",
+  "urgency": "routine"
+ },
+ "sourceCutoff": "2026-09-20T06:59:59.999Z",
+ "uncertaintyProfile": [
+  {
+   "evidenceIds": [
+    "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|energy|derived_balance_estimate",
+    "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|nutrition|coverage",
+    "cadence_v3|midweek_briefing_user_founder_001_20260913_20260915|recovery|coverage",
+    "cadence_v3|weekly_briefing_2026-09-13_2026-09-19|pi|recovery|recovery_state|whole_body|weekly.composite"
+   ],
+   "materiality": "high",
+   "reasons": [
+    "Nutrition coverage is incomplete for the Sunday\u2013Tuesday window.",
+    "expenditure_is_estimated",
+    "nutrition_coverage_incomplete",
+    "recovery_cadence_threshold_not_met",
+    "recovery_comparison_unavailable",
+    "recovery_coverage_incomplete",
+    "recovery_evidence_coverage_partial",
+    "recovery_evidence_unavailable"
+   ],
+   "type": "measurement_coverage",
+   "uncertaintyId": "uncertainty|measurement_coverage|9b5cebc6d8f86106"
+  },
+  {
+   "evidenceIds": [],
+   "materiality": "high",
+   "reasons": [
+    "repeat_qualifying_response_required"
+   ],
+   "type": "persistence",
+   "uncertaintyId": "uncertainty|persistence|3ef7d1ce8162ef26"
+  },
+  {
+   "evidenceIds": [],
+   "materiality": "moderate",
+   "reasons": [
+    "causal_contribution_not_fully_resolved"
+   ],
+   "type": "causal_attribution",
+   "uncertaintyId": "uncertainty|causal_attribution|ed024df86b0e8926"
+  },
+  {
+   "evidenceIds": [],
+   "materiality": "moderate",
+   "reasons": [
+    "unassessed:goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_recovery"
+   ],
+   "type": "guardrail",
+   "uncertaintyId": "uncertainty|guardrail|d117208ae5dc8b78"
+  }
+ ],
+ "uncertaintyTypes": [
+  {
+   "materiality": "high",
+   "surfaced": false,
+   "type": "measurement_coverage"
+  },
+  {
+   "materiality": "high",
+   "surfaced": false,
+   "type": "persistence"
+  },
+  {
+   "materiality": "moderate",
+   "surfaced": false,
+   "type": "causal_attribution"
+  },
+  {
+   "materiality": "moderate",
+   "surfaced": false,
+   "type": "guardrail"
+  }
+ ]
+}

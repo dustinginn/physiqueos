@@ -1,6 +1,7 @@
 import { resolveBodyFatGuardrail } from "./DEXAEventContextService";
 import { createPIGoalContext } from "./PIObservationGoalContextService";
 import { resolvePhotoEventFutureMilestone } from "./PhotoEventContextService";
+import { resolveOperatingStateFromGoalPhase } from "../strategy/CurrentStrategyAuthority.js";
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 
 export const WEEKLY_BRIEFING_CONTEXT_VERSION = "weekly_briefing_context_v1";
@@ -50,11 +51,9 @@ export async function resolveWeeklyBriefingContext({
       reviewState: activePhase.effectiveReviewState ?? activePhase.reviewState ?? null, ageDays: goalContext.phaseAgeDays,
       ageWeeks: goalContext.phaseAgeWeeks, ageBand: goalContext.phaseAgeBand,
     } : null,
-    operatingState: activeGoal?.openingApproach ? {
-      value: activeGoal.openingApproach.value ?? null,
-      label: activeGoal.openingApproach.label ?? null,
-      accepted: activeGoal.openingApproach.accepted !== false,
-    } : null,
+    // Current operating state follows the active phase strategy. The Goal's
+    // opening approach is preserved below as historical context only.
+    operatingState: resolveOperatingStateFromGoalPhase({ goal: activeGoal, phase: activePhase }),
     openingApproach: activeGoal?.openingApproach ?? null,
     currentGoalMeasures: {
       primary: goalContext.primaryOutcomeMeasures,

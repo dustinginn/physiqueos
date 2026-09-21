@@ -1,0 +1,2274 @@
+{
+ "artifactId": "weekly_briefing_2026-09-13_2026-09-19",
+ "evidenceCutoff": "2026-09-20T06:59:59.999Z",
+ "evidenceWindow": {
+  "briefingDate": "2026-09-20",
+  "cadence": "weekly",
+  "closed": true,
+  "cutoff": "2026-09-20T06:59:59.999Z",
+  "date": "2026-09-19",
+  "end": "2026-09-19T23:59:59.999",
+  "endDate": "2026-09-19",
+  "id": "weekly:2026-09-13:2026-09-19:America/Los_Angeles",
+  "relativeLabel": "this completed week",
+  "sameDayEvidenceExcluded": true,
+  "start": "2026-09-13T00:00:00",
+  "startDate": "2026-09-13",
+  "timeZone": "America/Los_Angeles"
+ },
+ "generatedAt": "2026-09-20T12:34:05.415Z",
+ "observations": [
+  {
+   "confidence": {
+    "factors": [],
+    "level": "moderate",
+    "limitations": [],
+    "method": "training_session_count",
+    "reasons": [],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "positive",
+   "domain": "training",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "cadenceWindow": {
+     "authoritativeEligible": true,
+     "cadence": "weekly",
+     "comparisonEvidenceIds": [
+      "training_2026-09-08_outdoor_walk_1",
+      "training_2026-09-09_outdoor_walk_1",
+      "training_2026-09-09_outdoorwalk_0657",
+      "training_2026-09-10_outdoor-walk_0723-0740_img2557",
+      "training_2026-09-10_outdoorwalk_837-854_costa-mesa",
+      "training_2026-09-12_stair_stepper_0826-0840",
+      "training_20260908_outdoor_walk_1",
+      "training_20260912_0952_stair_stepper_01",
+      "training_logger_session_43879E84-ACB7-4415-BD5D-D8B39DE0C9AA",
+      "training_logger_session_B6700D45-E885-4BA6-9364-9538263A9312",
+      "training_logger_session_training_logger_19cef2a9-5024-4dea-ab24-b751116b4296",
+      "training_logger_session_training_logger_4ff00451-71fb-467c-9c76-8ce8f523ecf4",
+      "training_logger_session_training_logger_dc4e0ad0-2a13-4e28-a2ed-b37497d7b80a"
+     ],
+     "comparisonWindow": {
+      "endDate": "2026-09-12",
+      "startDate": "2026-09-06"
+     },
+     "comparisonWindowSessionCount": 13,
+     "currentWindowSessionCount": 22,
+     "eligibleSessionCount": 234,
+     "evidenceIds": [
+      "TrainingSession_2026-09-15_OutdoorWalk_0",
+      "training_2026-09-14_Outdoor_Walk_Costa_Mesa_0844-0900",
+      "training_2026-09-14_outdoor_walk_0728_to_0745",
+      "training_2026-09-14_traditional_strength_training_0745",
+      "training_2026-09-15_outdoorwalk_001",
+      "training_2026-09-16_0711-0826_traditional_strength_training_1",
+      "training_2026-09-16_outdoor_walk_0.96mi",
+      "training_2026-09-16_outdoor_walk_0826",
+      "training_2026-09-17_outdoor_walk_01",
+      "training_2026-09-17_outdoor_walk_1",
+      "training_2026-09-18_OutdoorWalk_001",
+      "training_2026-09-18_outdoorwalk_0803",
+      "training_2026-09-19_outdoorwalk_001",
+      "training_20260919_outdoor_walk_0.92mi_1642-1638",
+      "training_logger_session_20A8DDEE-E0E8-42DD-8A27-0CB180743F40",
+      "training_logger_session_2C581293-030A-4A9F-8D39-B4947098C7E8",
+      "training_logger_session_42B1C76E-D584-4791-B688-286DDF892229",
+      "training_logger_session_7FE48FA0-B4E5-445D-BBC3-0A0313B15B79",
+      "training_logger_session_A5936FA6-FEE7-4BAA-9D84-9E0034BDC8A6",
+      "training_logger_session_ABB72390-C0D9-46B5-9F3F-939BA2820487",
+      "training_logger_session_E017D899-55F6-4983-8F14-022AD7DBE809"
+     ],
+     "evidenceWindow": {
+      "endDate": "2026-09-19",
+      "startDate": "2026-09-13"
+     },
+     "limitations": [],
+     "sourceWindow": {
+      "endDate": "2026-09-19",
+      "startDate": "2026-07-04"
+     },
+     "windowTimeZone": "America/Los_Angeles"
+    },
+    "summary": {
+     "categories_trained": 9,
+     "exercises_improving": 21,
+     "exercises_plateauing": 10,
+     "exercises_regressing": 5,
+     "exercises_tracked": 48,
+     "exercises_trained_last_30_days": 36,
+     "exercises_with_insufficient_data": 12,
+     "most_improved_exercise": "Leg Press High And Narrow Feet",
+     "needs_attention": [
+      "Bench Press",
+      "Bicep Curl Machine",
+      "Cable Machine Front Raises",
+      "Chest Fly Machine",
+      "Glute Squats",
+      "Hanging Leg Raises",
+      "Iso-Lateral High Rows",
+      "Lateral Raises Machine",
+      "Pull-Ups",
+      "Romanian Deadlifts",
+      "Seated Cable Rows",
+      "Seated Hip Adductions",
+      "Single-Leg Leg Press",
+      "Skull Crushers",
+      "Spider Curls"
+     ],
+     "recent_pr_count": 17,
+     "resistance_sessions_last_30_days": 28,
+     "resistance_sessions_last_7_days": 8
+    }
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": null,
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable",
+     "training_kind_not_directly_mapped_to_progress"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": true,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "performance|overall|resistance",
+   "kind": "training_performance",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "legacy_training_performance_observation",
+    "generatedAt": null,
+    "producer": "training_performance_intelligence_service",
+    "producerVersion": "training_performance_v1",
+    "sourceEvidenceIds": [
+     "TrainingSession_2026-08-16_TraditionalStrengthTraining_1",
+     "apple_fitness_training_2026-07-30_0647_traditional_strength_training_1",
+     "applefitness_training_2026-08-24_0728",
+     "evidence_correction_20260706232319355_training_2026_07_06_traditional_strength_training_3361_237_training_correction",
+     "evidence_correction_20260706232453352_training_2026_07_05_traditional_strength_training_3909_454_training_correction",
+     "training_2026-07-07_traditional_strength_training",
+     "training_2026-07-08_tradstrengthtraining_0802_0919_typed_reprocess",
+     "training_2026-07-09_CoreTraining_14:43",
+     "training_2026-07-10_traditional_strength_training_06-48",
+     "training_2026-07-11_1455_traditional_strength_training",
+     "training_2026-07-12_16-58_costa_mesa",
+     "training_2026-07-13_0802_traditional_strength_training",
+     "training_2026-07-14_traditional_strength_training_1702-1801",
+     "training_2026-07-16_traditional_strength_training_0718_0825",
+     "training_2026-07-17_0639_traditional_strength_training",
+     "training_2026-07-18_traditional_strength_training_0854",
+     "training_2026-07-19_14-51_strength_training",
+     "training_2026-07-21_traditional_strength_training",
+     "training_2026-07-22_traditional_strength_training_0803",
+     "training_2026-07-24_traditional_strength_training",
+     "training_2026-07-25_traditional_strength_training_1",
+     "training_2026-07-26_traditionalstrengthtraining_1047am",
+     "training_2026-07-27_traditional_strength_training",
+     "training_2026-07-28_traditional_strength_training_0739",
+     "training_2026-07-31_traditional_strength_training_1",
+     "training_2026-08-01_traditional_strength_training_1108-1236_costa_mesa",
+     "training_2026-08-02_15-10_traditional_strength_training_1",
+     "training_2026-08-03_TraditionalStrengthTraining_0650",
+     "training_2026-08-04_0759_traditional_strength_training_001",
+     "training_2026-08-05_traditional_strength_training_0633_1",
+     "training_2026-08-06_0652_traditional_strength_training",
+     "training_2026-08-08_TraditionalStrengthTraining_1438",
+     "training_2026-08-09_1534_traditional_strength_training",
+     "training_2026-08-14_traditional_strength_training_0734-0844",
+     "training_2026-08-17_0809_traditional_strength_training_01",
+     "training_2026-08-19_15-58_traditional_strength_training",
+     "training_2026-08-20_traditional_strength_training_1",
+     "training_2026-08-21_traditional_strength_training_1703_1759",
+     "training_2026-08-22_traditional_strength_training_0734-0848",
+     "training_2026-08-25_traditional_strength_training_0659",
+     "training_2026-08-26_traditional_strength_training_0807-0926_IMG_2027.png",
+     "training_2026-09-16_0711-0826_traditional_strength_training_1",
+     "training_20260709_4",
+     "training_20260715_0801_traditional_strength_training_1",
+     "training_20260723_tradstr_training_0646_0804",
+     "training_20260810_0721_traditional_strength_training",
+     "training_applefitness_2026-07-29_0825_traditional_strength_training",
+     "training_logger_session_20A8DDEE-E0E8-42DD-8A27-0CB180743F40",
+     "training_logger_session_2C581293-030A-4A9F-8D39-B4947098C7E8",
+     "training_logger_session_42B1C76E-D584-4791-B688-286DDF892229",
+     "training_logger_session_43879E84-ACB7-4415-BD5D-D8B39DE0C9AA",
+     "training_logger_session_7FE48FA0-B4E5-445D-BBC3-0A0313B15B79",
+     "training_logger_session_A5936FA6-FEE7-4BAA-9D84-9E0034BDC8A6",
+     "training_logger_session_B6700D45-E885-4BA6-9364-9538263A9312",
+     "training_logger_session_E017D899-55F6-4983-8F14-022AD7DBE809",
+     "training_logger_session_training_logger_10008f5d-f5e7-418b-8fff-1d3731c77e60",
+     "training_logger_session_training_logger_12f85ccb-4b58-4bf9-b9c0-6a72badd183f",
+     "training_logger_session_training_logger_17557b63-1957-478f-b6ed-c8aafd7ef67e",
+     "training_logger_session_training_logger_18a637ae-70cc-4ec8-8b6d-223740292314",
+     "training_logger_session_training_logger_19cef2a9-5024-4dea-ab24-b751116b4296",
+     "training_logger_session_training_logger_4ff00451-71fb-467c-9c76-8ce8f523ecf4",
+     "training_logger_session_training_logger_5debee6f-9844-4182-b4b3-d975bf4c0f5e",
+     "training_logger_session_training_logger_5e867109-0b79-4ef8-b100-804d51935b02",
+     "training_logger_session_training_logger_66cb30d7-aa96-48db-b441-8380ce000699",
+     "training_logger_session_training_logger_737c6733-c7d3-45df-a068-fb27ef11c67f",
+     "training_logger_session_training_logger_7e68f16c-3639-48f2-bb0a-34f9b4c484a2",
+     "training_logger_session_training_logger_8c96a904-0762-4452-a0c6-9c1daa5e7eb3",
+     "training_logger_session_training_logger_92945e07-d3d2-42f2-b34a-3220116068ee",
+     "training_logger_session_training_logger_93ffdbd4-1a3f-44ba-b488-3929490bd778",
+     "training_logger_session_training_logger_bbcc16e4-ba96-4596-a2b5-83c8ab02cd31",
+     "training_logger_session_training_logger_cf4f9855-bb5f-4dda-9b41-33dc29da1bf3",
+     "training_logger_session_training_logger_dc4e0ad0-2a13-4e28-a2ed-b37497d7b80a",
+     "training_logger_session_training_logger_dd88d9b2-2a3e-4de0-aaee-f3c7ba75a68a",
+     "training_session_2026-08-07_traditional_strength_training_0746",
+     "training_traditional_strength_197cal_today"
+    ],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "improving",
+   "subject": {
+    "id": "resistance",
+    "label": "Resistance training",
+    "semanticKey": null,
+    "type": "training_scope"
+   },
+   "supportingEvidenceIds": [
+    "TrainingSession_2026-08-16_TraditionalStrengthTraining_1",
+    "apple_fitness_training_2026-07-30_0647_traditional_strength_training_1",
+    "applefitness_training_2026-08-24_0728",
+    "evidence_correction_20260706232319355_training_2026_07_06_traditional_strength_training_3361_237_training_correction",
+    "evidence_correction_20260706232453352_training_2026_07_05_traditional_strength_training_3909_454_training_correction",
+    "training_2026-07-07_traditional_strength_training",
+    "training_2026-07-08_tradstrengthtraining_0802_0919_typed_reprocess",
+    "training_2026-07-09_CoreTraining_14:43",
+    "training_2026-07-10_traditional_strength_training_06-48",
+    "training_2026-07-11_1455_traditional_strength_training",
+    "training_2026-07-12_16-58_costa_mesa",
+    "training_2026-07-13_0802_traditional_strength_training",
+    "training_2026-07-14_traditional_strength_training_1702-1801",
+    "training_2026-07-16_traditional_strength_training_0718_0825",
+    "training_2026-07-17_0639_traditional_strength_training",
+    "training_2026-07-18_traditional_strength_training_0854",
+    "training_2026-07-19_14-51_strength_training",
+    "training_2026-07-21_traditional_strength_training",
+    "training_2026-07-22_traditional_strength_training_0803",
+    "training_2026-07-24_traditional_strength_training",
+    "training_2026-07-25_traditional_strength_training_1",
+    "training_2026-07-26_traditionalstrengthtraining_1047am",
+    "training_2026-07-27_traditional_strength_training",
+    "training_2026-07-28_traditional_strength_training_0739",
+    "training_2026-07-31_traditional_strength_training_1",
+    "training_2026-08-01_traditional_strength_training_1108-1236_costa_mesa",
+    "training_2026-08-02_15-10_traditional_strength_training_1",
+    "training_2026-08-03_TraditionalStrengthTraining_0650",
+    "training_2026-08-04_0759_traditional_strength_training_001",
+    "training_2026-08-05_traditional_strength_training_0633_1",
+    "training_2026-08-06_0652_traditional_strength_training",
+    "training_2026-08-08_TraditionalStrengthTraining_1438",
+    "training_2026-08-09_1534_traditional_strength_training",
+    "training_2026-08-14_traditional_strength_training_0734-0844",
+    "training_2026-08-17_0809_traditional_strength_training_01",
+    "training_2026-08-19_15-58_traditional_strength_training",
+    "training_2026-08-20_traditional_strength_training_1",
+    "training_2026-08-21_traditional_strength_training_1703_1759",
+    "training_2026-08-22_traditional_strength_training_0734-0848",
+    "training_2026-08-25_traditional_strength_training_0659",
+    "training_2026-08-26_traditional_strength_training_0807-0926_IMG_2027.png",
+    "training_2026-09-16_0711-0826_traditional_strength_training_1",
+    "training_20260709_4",
+    "training_20260715_0801_traditional_strength_training_1",
+    "training_20260723_tradstr_training_0646_0804",
+    "training_20260810_0721_traditional_strength_training",
+    "training_applefitness_2026-07-29_0825_traditional_strength_training",
+    "training_logger_session_20A8DDEE-E0E8-42DD-8A27-0CB180743F40",
+    "training_logger_session_2C581293-030A-4A9F-8D39-B4947098C7E8",
+    "training_logger_session_42B1C76E-D584-4791-B688-286DDF892229",
+    "training_logger_session_43879E84-ACB7-4415-BD5D-D8B39DE0C9AA",
+    "training_logger_session_7FE48FA0-B4E5-445D-BBC3-0A0313B15B79",
+    "training_logger_session_A5936FA6-FEE7-4BAA-9D84-9E0034BDC8A6",
+    "training_logger_session_B6700D45-E885-4BA6-9364-9538263A9312",
+    "training_logger_session_E017D899-55F6-4983-8F14-022AD7DBE809",
+    "training_logger_session_training_logger_10008f5d-f5e7-418b-8fff-1d3731c77e60",
+    "training_logger_session_training_logger_12f85ccb-4b58-4bf9-b9c0-6a72badd183f",
+    "training_logger_session_training_logger_17557b63-1957-478f-b6ed-c8aafd7ef67e",
+    "training_logger_session_training_logger_18a637ae-70cc-4ec8-8b6d-223740292314",
+    "training_logger_session_training_logger_19cef2a9-5024-4dea-ab24-b751116b4296",
+    "training_logger_session_training_logger_4ff00451-71fb-467c-9c76-8ce8f523ecf4",
+    "training_logger_session_training_logger_5debee6f-9844-4182-b4b3-d975bf4c0f5e",
+    "training_logger_session_training_logger_5e867109-0b79-4ef8-b100-804d51935b02",
+    "training_logger_session_training_logger_66cb30d7-aa96-48db-b441-8380ce000699",
+    "training_logger_session_training_logger_737c6733-c7d3-45df-a068-fb27ef11c67f",
+    "training_logger_session_training_logger_7e68f16c-3639-48f2-bb0a-34f9b4c484a2",
+    "training_logger_session_training_logger_8c96a904-0762-4452-a0c6-9c1daa5e7eb3",
+    "training_logger_session_training_logger_92945e07-d3d2-42f2-b34a-3220116068ee",
+    "training_logger_session_training_logger_93ffdbd4-1a3f-44ba-b488-3929490bd778",
+    "training_logger_session_training_logger_bbcc16e4-ba96-4596-a2b5-83c8ab02cd31",
+    "training_logger_session_training_logger_cf4f9855-bb5f-4dda-9b41-33dc29da1bf3",
+    "training_logger_session_training_logger_dc4e0ad0-2a13-4e28-a2ed-b37497d7b80a",
+    "training_logger_session_training_logger_dd88d9b2-2a3e-4de0-aaee-f3c7ba75a68a",
+    "training_session_2026-08-07_traditional_strength_training_0746",
+    "training_traditional_strength_197cal_today"
+   ]
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "moderate",
+    "limitations": [
+     "expenditure_is_estimated_rmr_plus_active_calories",
+     "some_days_lack_complete_paired_energy_evidence"
+    ],
+    "method": "energy_evidence_sufficiency",
+    "reasons": [
+     "6_supported_energy_days"
+    ],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "falling",
+   "domain": "energy",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "absoluteChange": -628,
+    "calculationHorizon": "weekly",
+    "calculationMethod": "energy_period_average",
+    "comparisonAverage": 339,
+    "comparisonSampleCount": 7,
+    "currentAverage": -289,
+    "currentSampleCount": 6,
+    "limitations": [
+     "expenditure_is_estimated_rmr_plus_active_calories",
+     "some_days_lack_complete_paired_energy_evidence"
+    ],
+    "rmrSources": [
+     {
+      "scanDate": "2026-09-12",
+      "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+      "unit": "kcal_per_day",
+      "value": 1847
+     }
+    ],
+    "unit": "kcal"
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": null,
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|energy|energy_balance|estimated_energy_balance|weekly.balance",
+   "kind": "energy_balance",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "energy_period_average",
+    "generatedAt": null,
+    "producer": "energy_pi_observation_service",
+    "producerVersion": "energy_pi_v1",
+    "sourceEvidenceIds": [
+     "activity_day|2026-09-06",
+     "activity_day|2026-09-07",
+     "activity_day|2026-09-08",
+     "activity_day|2026-09-09",
+     "activity_day|2026-09-10",
+     "activity_day|2026-09-11",
+     "activity_day|2026-09-12",
+     "activity_day|2026-09-13",
+     "activity_day|2026-09-14",
+     "activity_day|2026-09-15",
+     "activity_day|2026-09-16",
+     "activity_day|2026-09-17",
+     "activity_day|2026-09-18",
+     "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+     "nutrition|2026-09-06|nutrition-day",
+     "nutrition|2026-09-07|nutrition-day",
+     "nutrition|2026-09-08|nutrition-day",
+     "nutrition|2026-09-09|nutrition-day",
+     "nutrition|2026-09-10|nutrition-day",
+     "nutrition|2026-09-11|nutrition-day",
+     "nutrition|2026-09-12|nutrition-day",
+     "nutrition|2026-09-13|nutrition-day",
+     "nutrition|2026-09-14|nutrition-day",
+     "nutrition|2026-09-15|nutrition-day",
+     "nutrition|2026-09-16|nutrition-day",
+     "nutrition|2026-09-17|nutrition-day",
+     "nutrition|2026-09-18|nutrition-day"
+    ],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "observed",
+   "subject": {
+    "id": "estimated_energy_balance",
+    "label": "estimated energy balance",
+    "semanticKey": null,
+    "type": "energy_metric"
+   },
+   "supportingEvidenceIds": [
+    "activity_day|2026-09-06",
+    "activity_day|2026-09-07",
+    "activity_day|2026-09-08",
+    "activity_day|2026-09-09",
+    "activity_day|2026-09-10",
+    "activity_day|2026-09-11",
+    "activity_day|2026-09-12",
+    "activity_day|2026-09-13",
+    "activity_day|2026-09-14",
+    "activity_day|2026-09-15",
+    "activity_day|2026-09-16",
+    "activity_day|2026-09-17",
+    "activity_day|2026-09-18",
+    "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "nutrition|2026-09-06|nutrition-day",
+    "nutrition|2026-09-07|nutrition-day",
+    "nutrition|2026-09-08|nutrition-day",
+    "nutrition|2026-09-09|nutrition-day",
+    "nutrition|2026-09-10|nutrition-day",
+    "nutrition|2026-09-11|nutrition-day",
+    "nutrition|2026-09-12|nutrition-day",
+    "nutrition|2026-09-13|nutrition-day",
+    "nutrition|2026-09-14|nutrition-day",
+    "nutrition|2026-09-15|nutrition-day",
+    "nutrition|2026-09-16|nutrition-day",
+    "nutrition|2026-09-17|nutrition-day",
+    "nutrition|2026-09-18|nutrition-day"
+   ]
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "moderate",
+    "limitations": [
+     "expenditure_is_estimated_rmr_plus_active_calories"
+    ],
+    "method": "energy_evidence_sufficiency",
+    "reasons": [
+     "6_supported_energy_days"
+    ],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "rising",
+   "domain": "energy",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "absoluteChange": 184,
+    "calculationHorizon": "weekly",
+    "calculationMethod": "energy_period_average",
+    "comparisonAverage": 2561,
+    "comparisonSampleCount": 7,
+    "currentAverage": 2745,
+    "currentSampleCount": 6,
+    "limitations": [
+     "expenditure_is_estimated_rmr_plus_active_calories"
+    ],
+    "rmrSources": [
+     {
+      "scanDate": "2026-09-12",
+      "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+      "unit": "kcal_per_day",
+      "value": 1847
+     }
+    ],
+    "unit": "kcal"
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": null,
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|energy|energy_expenditure|estimated_expenditure|weekly.expenditure",
+   "kind": "energy_expenditure",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "energy_period_average",
+    "generatedAt": null,
+    "producer": "energy_pi_observation_service",
+    "producerVersion": "energy_pi_v1",
+    "sourceEvidenceIds": [
+     "activity_day|2026-09-06",
+     "activity_day|2026-09-07",
+     "activity_day|2026-09-08",
+     "activity_day|2026-09-09",
+     "activity_day|2026-09-10",
+     "activity_day|2026-09-11",
+     "activity_day|2026-09-12",
+     "activity_day|2026-09-13",
+     "activity_day|2026-09-14",
+     "activity_day|2026-09-15",
+     "activity_day|2026-09-16",
+     "activity_day|2026-09-17",
+     "activity_day|2026-09-18",
+     "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+     "nutrition|2026-09-06|nutrition-day",
+     "nutrition|2026-09-07|nutrition-day",
+     "nutrition|2026-09-08|nutrition-day",
+     "nutrition|2026-09-09|nutrition-day",
+     "nutrition|2026-09-10|nutrition-day",
+     "nutrition|2026-09-11|nutrition-day",
+     "nutrition|2026-09-12|nutrition-day",
+     "nutrition|2026-09-13|nutrition-day",
+     "nutrition|2026-09-14|nutrition-day",
+     "nutrition|2026-09-15|nutrition-day",
+     "nutrition|2026-09-16|nutrition-day",
+     "nutrition|2026-09-17|nutrition-day",
+     "nutrition|2026-09-18|nutrition-day"
+    ],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "observed",
+   "subject": {
+    "id": "estimated_expenditure",
+    "label": "estimated expenditure",
+    "semanticKey": null,
+    "type": "energy_metric"
+   },
+   "supportingEvidenceIds": [
+    "activity_day|2026-09-06",
+    "activity_day|2026-09-07",
+    "activity_day|2026-09-08",
+    "activity_day|2026-09-09",
+    "activity_day|2026-09-10",
+    "activity_day|2026-09-11",
+    "activity_day|2026-09-12",
+    "activity_day|2026-09-13",
+    "activity_day|2026-09-14",
+    "activity_day|2026-09-15",
+    "activity_day|2026-09-16",
+    "activity_day|2026-09-17",
+    "activity_day|2026-09-18",
+    "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "nutrition|2026-09-06|nutrition-day",
+    "nutrition|2026-09-07|nutrition-day",
+    "nutrition|2026-09-08|nutrition-day",
+    "nutrition|2026-09-09|nutrition-day",
+    "nutrition|2026-09-10|nutrition-day",
+    "nutrition|2026-09-11|nutrition-day",
+    "nutrition|2026-09-12|nutrition-day",
+    "nutrition|2026-09-13|nutrition-day",
+    "nutrition|2026-09-14|nutrition-day",
+    "nutrition|2026-09-15|nutrition-day",
+    "nutrition|2026-09-16|nutrition-day",
+    "nutrition|2026-09-17|nutrition-day",
+    "nutrition|2026-09-18|nutrition-day"
+   ]
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "high",
+    "limitations": [],
+    "method": "energy_evidence_sufficiency",
+    "reasons": [
+     "7_supported_energy_days"
+    ],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "falling",
+   "domain": "energy",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "absoluteChange": -444,
+    "calculationHorizon": "weekly",
+    "calculationMethod": "energy_period_average",
+    "comparisonAverage": 2901,
+    "comparisonSampleCount": 7,
+    "currentAverage": 2457,
+    "currentSampleCount": 7,
+    "limitations": [],
+    "rmrSources": [
+     {
+      "scanDate": "2026-09-12",
+      "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+      "unit": "kcal_per_day",
+      "value": 1847
+     }
+    ],
+    "unit": "kcal"
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": null,
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|energy|energy_intake|caloric_intake|weekly.intake",
+   "kind": "energy_intake",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "energy_period_average",
+    "generatedAt": null,
+    "producer": "energy_pi_observation_service",
+    "producerVersion": "energy_pi_v1",
+    "sourceEvidenceIds": [
+     "activity_day|2026-09-06",
+     "activity_day|2026-09-07",
+     "activity_day|2026-09-08",
+     "activity_day|2026-09-09",
+     "activity_day|2026-09-10",
+     "activity_day|2026-09-11",
+     "activity_day|2026-09-12",
+     "activity_day|2026-09-13",
+     "activity_day|2026-09-14",
+     "activity_day|2026-09-15",
+     "activity_day|2026-09-16",
+     "activity_day|2026-09-17",
+     "activity_day|2026-09-18",
+     "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+     "nutrition|2026-09-06|nutrition-day",
+     "nutrition|2026-09-07|nutrition-day",
+     "nutrition|2026-09-08|nutrition-day",
+     "nutrition|2026-09-09|nutrition-day",
+     "nutrition|2026-09-10|nutrition-day",
+     "nutrition|2026-09-11|nutrition-day",
+     "nutrition|2026-09-12|nutrition-day",
+     "nutrition|2026-09-13|nutrition-day",
+     "nutrition|2026-09-14|nutrition-day",
+     "nutrition|2026-09-15|nutrition-day",
+     "nutrition|2026-09-16|nutrition-day",
+     "nutrition|2026-09-17|nutrition-day",
+     "nutrition|2026-09-18|nutrition-day",
+     "nutrition|2026-09-19|nutrition-day"
+    ],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "observed",
+   "subject": {
+    "id": "caloric_intake",
+    "label": "caloric intake",
+    "semanticKey": null,
+    "type": "energy_metric"
+   },
+   "supportingEvidenceIds": [
+    "activity_day|2026-09-06",
+    "activity_day|2026-09-07",
+    "activity_day|2026-09-08",
+    "activity_day|2026-09-09",
+    "activity_day|2026-09-10",
+    "activity_day|2026-09-11",
+    "activity_day|2026-09-12",
+    "activity_day|2026-09-13",
+    "activity_day|2026-09-14",
+    "activity_day|2026-09-15",
+    "activity_day|2026-09-16",
+    "activity_day|2026-09-17",
+    "activity_day|2026-09-18",
+    "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "nutrition|2026-09-06|nutrition-day",
+    "nutrition|2026-09-07|nutrition-day",
+    "nutrition|2026-09-08|nutrition-day",
+    "nutrition|2026-09-09|nutrition-day",
+    "nutrition|2026-09-10|nutrition-day",
+    "nutrition|2026-09-11|nutrition-day",
+    "nutrition|2026-09-12|nutrition-day",
+    "nutrition|2026-09-13|nutrition-day",
+    "nutrition|2026-09-14|nutrition-day",
+    "nutrition|2026-09-15|nutrition-day",
+    "nutrition|2026-09-16|nutrition-day",
+    "nutrition|2026-09-17|nutrition-day",
+    "nutrition|2026-09-18|nutrition-day",
+    "nutrition|2026-09-19|nutrition-day"
+   ]
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "moderate",
+    "limitations": [
+     "nutrition_without_activity",
+     "expenditure_is_estimated_rmr_plus_active_calories"
+    ],
+    "method": "energy_evidence_sufficiency",
+    "reasons": [
+     "4_supported_energy_days"
+    ],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "not_applicable",
+   "domain": "energy",
+   "evidenceWindow": {
+    "comparisonEndDate": null,
+    "comparisonStartDate": null,
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "activityDays": 6,
+    "activityOnlyDays": 0,
+    "calculationHorizon": "weekly",
+    "completePairedDays": 4,
+    "estimatedExpenditureDays": 6,
+    "evidenceDays": 7,
+    "limitations": [
+     "nutrition_without_activity",
+     "expenditure_is_estimated_rmr_plus_active_calories"
+    ],
+    "missingRmrDays": 0,
+    "nutritionDays": 7,
+    "nutritionOnlyDays": 1,
+    "partialDays": 2,
+    "rmrSources": [
+     {
+      "scanDate": "2026-09-12",
+      "scanId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+      "unit": "kcal_per_day",
+      "value": 1847
+     }
+    ]
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": null,
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|energy|paired_day_coverage|paired_day_coverage|weekly.paired_day_coverage",
+   "kind": "paired_day_coverage",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "energy_paired_day_coverage",
+    "generatedAt": null,
+    "producer": "energy_pi_observation_service",
+    "producerVersion": "energy_pi_v1",
+    "sourceEvidenceIds": [
+     "activity_day|2026-09-13",
+     "activity_day|2026-09-14",
+     "activity_day|2026-09-15",
+     "activity_day|2026-09-16",
+     "activity_day|2026-09-17",
+     "activity_day|2026-09-18",
+     "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+     "nutrition|2026-09-13|nutrition-day",
+     "nutrition|2026-09-14|nutrition-day",
+     "nutrition|2026-09-15|nutrition-day",
+     "nutrition|2026-09-16|nutrition-day",
+     "nutrition|2026-09-17|nutrition-day",
+     "nutrition|2026-09-18|nutrition-day",
+     "nutrition|2026-09-19|nutrition-day"
+    ],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "observed",
+   "subject": {
+    "id": "paired_day_coverage",
+    "label": "Paired energy evidence",
+    "semanticKey": null,
+    "type": "energy_evidence"
+   },
+   "supportingEvidenceIds": [
+    "activity_day|2026-09-13",
+    "activity_day|2026-09-14",
+    "activity_day|2026-09-15",
+    "activity_day|2026-09-16",
+    "activity_day|2026-09-17",
+    "activity_day|2026-09-18",
+    "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "nutrition|2026-09-13|nutrition-day",
+    "nutrition|2026-09-14|nutrition-day",
+    "nutrition|2026-09-15|nutrition-day",
+    "nutrition|2026-09-16|nutrition-day",
+    "nutrition|2026-09-17|nutrition-day",
+    "nutrition|2026-09-18|nutrition-day",
+    "nutrition|2026-09-19|nutrition-day"
+   ]
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "unevaluated",
+    "limitations": [
+     "recovery_cadence_threshold_not_met",
+     "recovery_comparison_unavailable",
+     "recovery_evidence_coverage_partial",
+     "recovery_evidence_unavailable"
+    ],
+    "method": "recovery_evidence_threshold",
+    "reasons": [],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "not_applicable",
+   "domain": "recovery",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "coveredDayCount": 0,
+    "expectedDayCount": 7,
+    "limitations": [
+     "recovery_cadence_threshold_not_met",
+     "recovery_comparison_unavailable",
+     "recovery_evidence_coverage_partial",
+     "recovery_evidence_unavailable"
+    ],
+    "threshold": {
+     "minimumCurrentDates": 2,
+     "normalConfidenceDates": 3
+    }
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": "recovery_progress_supporting_context",
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|recovery|recovery_insufficient_evidence|coverage|weekly.evidence_sufficiency",
+   "kind": "recovery_insufficient_evidence",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "evidence_sufficiency",
+    "generatedAt": null,
+    "producer": "recovery_pi_observation_service",
+    "producerVersion": "recovery_pi_observation_v1",
+    "sourceEvidenceIds": [],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "insufficient_data",
+   "subject": {
+    "id": "coverage",
+    "label": "Recovery evidence coverage",
+    "semanticKey": null,
+    "type": "recovery_evidence"
+   },
+   "supportingEvidenceIds": []
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "unevaluated",
+    "limitations": [
+     "sleep_duration_comparison_unavailable",
+     "sleep_duration_unavailable",
+     "weekly_sleep_duration_threshold_not_met"
+    ],
+    "method": "recovery_coverage_comparison_freshness",
+    "reasons": [],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "not_applicable",
+   "domain": "recovery",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "causalInference": false,
+    "comparisonRecordCount": 0,
+    "comparisonValue": null,
+    "completeness": "missing",
+    "currentRecordCount": 0,
+    "currentValue": null,
+    "freshness": "missing",
+    "limitations": [
+     "sleep_duration_comparison_unavailable",
+     "sleep_duration_unavailable",
+     "weekly_sleep_duration_threshold_not_met"
+    ],
+    "metric": "sleep_duration",
+    "physiologicalDiagnosis": false,
+    "protocolConclusion": null
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": "recovery_progress_supporting_context",
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|recovery|recovery_sleep_duration_change|sleep_duration|weekly.sleep_duration",
+   "kind": "recovery_sleep_duration_change",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "metric_assessment",
+    "generatedAt": null,
+    "producer": "recovery_pi_observation_service",
+    "producerVersion": "recovery_pi_observation_v1",
+    "sourceEvidenceIds": [],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "insufficient_data",
+   "subject": {
+    "id": "sleep_duration",
+    "label": "sleep duration",
+    "semanticKey": null,
+    "type": "recovery_metric"
+   },
+   "supportingEvidenceIds": []
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "unevaluated",
+    "limitations": [
+     "soreness_comparison_unavailable",
+     "soreness_unavailable",
+     "weekly_soreness_threshold_not_met"
+    ],
+    "method": "recovery_coverage_comparison_freshness",
+    "reasons": [],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "not_applicable",
+   "domain": "recovery",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "causalInference": false,
+    "comparisonRecordCount": 0,
+    "comparisonValue": null,
+    "completeness": "missing",
+    "currentRecordCount": 0,
+    "currentValue": null,
+    "freshness": "missing",
+    "limitations": [
+     "soreness_comparison_unavailable",
+     "soreness_unavailable",
+     "weekly_soreness_threshold_not_met"
+    ],
+    "metric": "soreness",
+    "physiologicalDiagnosis": false,
+    "protocolConclusion": null
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": "recovery_progress_supporting_context",
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|recovery|recovery_soreness_change|soreness|weekly.soreness",
+   "kind": "recovery_soreness_change",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "metric_assessment",
+    "generatedAt": null,
+    "producer": "recovery_pi_observation_service",
+    "producerVersion": "recovery_pi_observation_v1",
+    "sourceEvidenceIds": [],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "insufficient_data",
+   "subject": {
+    "id": "soreness",
+    "label": "soreness",
+    "semanticKey": null,
+    "type": "recovery_metric"
+   },
+   "supportingEvidenceIds": []
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "unevaluated",
+    "limitations": [
+     "recovery_cadence_threshold_not_met",
+     "recovery_comparison_unavailable",
+     "recovery_evidence_coverage_partial",
+     "recovery_evidence_unavailable"
+    ],
+    "method": "recovery_weaker_metric_ceiling",
+    "reasons": [],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "not_applicable",
+   "domain": "recovery",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "causalInference": false,
+    "completeness": "missing",
+    "compositeState": "insufficient",
+    "conflictState": "none",
+    "coveredDayCount": 0,
+    "expectedDayCount": 7,
+    "freshness": "missing",
+    "limitations": [
+     "recovery_cadence_threshold_not_met",
+     "recovery_comparison_unavailable",
+     "recovery_evidence_coverage_partial",
+     "recovery_evidence_unavailable"
+    ],
+    "physiologicalDiagnosis": false
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": "recovery_progress_supporting_context",
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|recovery|recovery_state|whole_body|weekly.composite",
+   "kind": "recovery_state",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "composite_assessment",
+    "generatedAt": null,
+    "producer": "recovery_pi_observation_service",
+    "producerVersion": "recovery_pi_observation_v1",
+    "sourceEvidenceIds": [],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "insufficient_data",
+   "subject": {
+    "id": "whole_body",
+    "label": "Recovery evidence",
+    "semanticKey": null,
+    "type": "recovery_scope"
+   },
+   "supportingEvidenceIds": []
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "unevaluated",
+    "limitations": [
+     "subjective_recovery_comparison_unavailable",
+     "subjective_recovery_unavailable",
+     "weekly_subjective_recovery_threshold_not_met"
+    ],
+    "method": "recovery_coverage_comparison_freshness",
+    "reasons": [],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "not_applicable",
+   "domain": "recovery",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "causalInference": false,
+    "comparisonRecordCount": 0,
+    "comparisonValue": null,
+    "completeness": "missing",
+    "currentRecordCount": 0,
+    "currentValue": null,
+    "freshness": "missing",
+    "limitations": [
+     "subjective_recovery_comparison_unavailable",
+     "subjective_recovery_unavailable",
+     "weekly_subjective_recovery_threshold_not_met"
+    ],
+    "metric": "subjective_recovery",
+    "physiologicalDiagnosis": false,
+    "protocolConclusion": null
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": "recovery_progress_supporting_context",
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|recovery|recovery_subjective_state_change|subjective_recovery|weekly.subjective_recovery",
+   "kind": "recovery_subjective_state_change",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "metric_assessment",
+    "generatedAt": null,
+    "producer": "recovery_pi_observation_service",
+    "producerVersion": "recovery_pi_observation_v1",
+    "sourceEvidenceIds": [],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "insufficient_data",
+   "subject": {
+    "id": "subjective_recovery",
+    "label": "subjective recovery",
+    "semanticKey": null,
+    "type": "recovery_metric"
+   },
+   "supportingEvidenceIds": []
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "moderate",
+    "limitations": [],
+    "method": "weight_evidence_sufficiency",
+    "reasons": [
+     "13_weight_entries"
+    ],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "rising",
+   "domain": "weight",
+   "evidenceWindow": {
+    "comparisonEndDate": "2026-09-12",
+    "comparisonStartDate": "2026-09-06",
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "absoluteChange": 0.4,
+    "calculationHorizon": "weekly",
+    "calculationMethod": "comparison_window_average_change",
+    "comparisonAverage": 171.8,
+    "comparisonSampleCount": 6,
+    "currentAverage": 172.2,
+    "currentSampleCount": 7,
+    "unit": "lb"
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": null,
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|weight|weight_average_change|body_weight|weekly.average_comparison",
+   "kind": "weight_average_change",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "comparison_window_average_change",
+    "generatedAt": null,
+    "producer": "weight_pi_observation_service",
+    "producerVersion": "weight_pi_v1",
+    "sourceEvidenceIds": [
+     "weight_2026_09_07",
+     "weight_2026_09_08",
+     "weight_2026_09_09",
+     "weight_2026_09_10",
+     "weight_2026_09_11",
+     "weight_2026_09_12",
+     "weight_2026_09_13",
+     "weight_2026_09_14",
+     "weight_2026_09_15",
+     "weight_2026_09_16",
+     "weight_2026_09_17",
+     "weight_2026_09_18",
+     "weight_2026_09_19"
+    ],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "observed",
+   "subject": {
+    "id": "body_weight",
+    "label": "Body weight",
+    "semanticKey": null,
+    "type": "whole_body_metric"
+   },
+   "supportingEvidenceIds": [
+    "weight_2026_09_07",
+    "weight_2026_09_08",
+    "weight_2026_09_09",
+    "weight_2026_09_10",
+    "weight_2026_09_11",
+    "weight_2026_09_12",
+    "weight_2026_09_13",
+    "weight_2026_09_14",
+    "weight_2026_09_15",
+    "weight_2026_09_16",
+    "weight_2026_09_17",
+    "weight_2026_09_18",
+    "weight_2026_09_19"
+   ]
+  },
+  {
+   "confidence": {
+    "factors": [],
+    "level": "moderate",
+    "limitations": [],
+    "method": "weight_evidence_sufficiency",
+    "reasons": [
+     "7_weight_entries"
+    ],
+    "score": null
+   },
+   "contradictingEvidenceIds": [],
+   "direction": "rising",
+   "domain": "weight",
+   "evidenceWindow": {
+    "comparisonEndDate": null,
+    "comparisonStartDate": null,
+    "endDate": "2026-09-19",
+    "startDate": "2026-09-13"
+   },
+   "explanationData": {
+    "absoluteChange": 0.2,
+    "calculationHorizon": "weekly",
+    "calculationMethod": "first_to_last_weight_change",
+    "currentValue": 172.7,
+    "priorValue": 172.5,
+    "sampleCount": 7,
+    "unit": "lb"
+   },
+   "goalContext": {
+    "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "conflicts": [],
+    "contextualDomains": [
+     "activity",
+     "nutrition",
+     "photos",
+     "protocols",
+     "weight"
+    ],
+    "contextualMeasures": [
+     "activity",
+     "adherence",
+     "calories",
+     "macros",
+     "progress_photos",
+     "protein",
+     "recovery",
+     "scale_weight",
+     "sleep"
+    ],
+    "evidencePurpose": null,
+    "goalPhase": "lean_mass_build",
+    "goalStartDate": "2026-07-19",
+    "goalStatus": "active",
+    "goalType": "build_lean_mass",
+    "guardrailDomains": [
+     "dexa",
+     "training",
+     "weight"
+    ],
+    "guardrailMeasures": [
+     "body_fat_percentage",
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "recovery",
+     "scale_weight",
+     "training_performance"
+    ],
+    "guardrailRelevance": false,
+    "limitations": [
+     "body_fat_guardrail_range_unavailable"
+    ],
+    "observationRole": "context",
+    "phaseAgeBand": "week_5_to_8",
+    "phaseAgeDays": 35,
+    "phaseAgeWeeks": 5,
+    "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+    "phaseStartDate": "2026-08-15",
+    "primaryOutcomeDomains": [
+     "dexa",
+     "training"
+    ],
+    "primaryOutcomeMeasures": [
+     "dexa_body_fat",
+     "dexa_fat_mass",
+     "dexa_lean_mass",
+     "lean_mass",
+     "progressive_overload",
+     "training_trend"
+    ],
+    "primaryOutcomeRelevance": false,
+    "provenance": {
+     "mappingMethod": "canonical_goal_phase_measurement_mapping",
+     "resolver": "pi_observation_goal_context_service",
+     "resolverVersion": "pi_goal_context_v1",
+     "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "sourceGoalIds": [
+     "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+    ],
+    "sourceProtocolIds": [],
+    "targetRanges": []
+   },
+   "id": "pi|weight|weight_short_window_change|body_weight|weekly.short_window",
+   "kind": "weight_short_window_change",
+   "lifecycle": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "materiality": {
+    "basis": [],
+    "level": "unevaluated",
+    "method": null,
+    "score": null
+   },
+   "novelty": {
+    "method": null,
+    "state": "unevaluated"
+   },
+   "provenance": {
+    "calculationMethod": "first_to_last_weight_change",
+    "generatedAt": null,
+    "producer": "weight_pi_observation_service",
+    "producerVersion": "weight_pi_v1",
+    "sourceEvidenceIds": [
+     "weight_2026_09_13",
+     "weight_2026_09_14",
+     "weight_2026_09_15",
+     "weight_2026_09_16",
+     "weight_2026_09_17",
+     "weight_2026_09_18",
+     "weight_2026_09_19"
+    ],
+    "sourceObservationIds": []
+   },
+   "schemaVersion": "pi_observation_v1",
+   "status": "observed",
+   "subject": {
+    "id": "body_weight",
+    "label": "Body weight",
+    "semanticKey": null,
+    "type": "whole_body_metric"
+   },
+   "supportingEvidenceIds": [
+    "weight_2026_09_13",
+    "weight_2026_09_14",
+    "weight_2026_09_15",
+    "weight_2026_09_16",
+    "weight_2026_09_17",
+    "weight_2026_09_18",
+    "weight_2026_09_19"
+   ]
+  }
+ ]
+}

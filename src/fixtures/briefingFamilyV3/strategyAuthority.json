@@ -1,0 +1,1374 @@
+{
+ "goal": {
+  "activatedAt": "2026-07-21T04:53:31.759Z",
+  "activationMetadata": {
+   "activateOnlyAfterInvariantValidation": true,
+   "state": "prepared"
+  },
+  "activationState": "active",
+  "activeExpectedTrajectoryId": "phase_expected_trajectory|8a895bfe8cbcca5a3e276163|v1",
+  "activePhaseStrategyId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+  "coachingCadenceReference": {
+   "days": [
+    "wednesday",
+    "sunday"
+   ],
+   "recommendationReason": "Lean-mass progress is better interpreted across several days than through daily fluctuations. Event Briefings remain independent.",
+   "type": "twice_weekly"
+  },
+  "coachingPreferences": {},
+  "createdFromTransitionId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3",
+  "currentPhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+  "guardrails": [
+   {
+    "accepted": true,
+    "description": null,
+    "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_body_fat",
+    "metric": null,
+    "operator": null,
+    "planningScope": "overall_goal",
+    "planningSource": "legacy_goal",
+    "recommendationSource": "legacy_goal",
+    "text": "Maintain approximately 8\u20139% body fat.",
+    "unit": null,
+    "value": null
+   },
+   {
+    "accepted": true,
+    "description": null,
+    "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_gradual_gain",
+    "metric": null,
+    "operator": null,
+    "planningScope": "overall_goal",
+    "planningSource": "legacy_goal",
+    "recommendationSource": "legacy_goal",
+    "text": "Keep weight gain gradual.",
+    "unit": null,
+    "value": null
+   },
+   {
+    "accepted": true,
+    "description": null,
+    "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_recovery",
+    "metric": null,
+    "operator": null,
+    "planningScope": "overall_goal",
+    "planningSource": "legacy_goal",
+    "recommendationSource": "legacy_goal",
+    "text": "Maintain recovery quality.",
+    "unit": null,
+    "value": null
+   },
+   {
+    "accepted": true,
+    "description": null,
+    "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_strength",
+    "metric": null,
+    "operator": null,
+    "planningScope": "overall_goal",
+    "planningSource": "legacy_goal",
+    "recommendationSource": "legacy_goal",
+    "text": "Avoid sustained strength regression.",
+    "unit": null,
+    "value": null
+   }
+  ],
+  "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+  "openingApproach": {
+   "accepted": true,
+   "known": [
+    "Current body composition",
+    "Recent cut intake",
+    "Recent activity target",
+    "Recent training structure",
+    "Protein adherence history"
+   ],
+   "recommendationReason": "We know the starting body composition, but true maintenance intake, productive surplus, and sustainable activity are still unknown.",
+   "unknown": [
+    "True maintenance intake",
+    "Productive calorie surplus",
+    "Optimal cardio reduction",
+    "Expected rate of weight gain"
+   ],
+   "value": "calibration"
+  },
+  "phases": [
+   {
+    "completedAt": "2026-08-16T07:10:44.450Z",
+    "completionDecisionId": "phase-review-decision|dexa_event_dexa_submission_20260815181333895_review_pdf_1_2026_08_15|1786864244084",
+    "completionDecisionRequired": true,
+    "createdAt": "2026-07-22T00:52:33.469Z",
+    "duration": null,
+    "extensionCount": 0,
+    "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "guardrails": [],
+    "id": "goal_phase_7ab0d230-ea5b-485b-8368-0e695224de08",
+    "lastReviewedAt": "2026-08-16T07:10:44.450Z",
+    "name": "Establish Maintenance",
+    "order": 0,
+    "plannedReviewAt": "2026-08-15",
+    "purpose": "Establish a sustainable maintenance baseline before beginning the dedicated lean-mass build.",
+    "reviewMilestone": {
+     "consumed": true,
+     "decisionRequired": true,
+     "designatedArtifactIdentity": null,
+     "designatedEvidenceIdentity": null,
+     "earliestEligibleDate": "2026-08-15",
+     "earlyReviewPolicy": "prohibited",
+     "eligibleArtifactTypes": [
+      "dexa_event"
+     ],
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "latestEligibleDate": null,
+     "lineage": [
+      {
+       "id": "canonical_phase_review_mutation_baseline_v1|dexa_event_dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+       "type": "canonical_phase_review_mutation_projection"
+      }
+     ],
+     "milestoneId": "phase_review_milestone|goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass|goal_phase_7ab0d230-ea5b-485b-8368-0e695224de08|2026-08-15",
+     "milestoneType": "planned_phase_review",
+     "phaseId": "goal_phase_7ab0d230-ea5b-485b-8368-0e695224de08",
+     "recommendationRequired": true,
+     "requiredEvidence": [],
+     "resolvedReviewId": "phase-review-decision|dexa_event_dexa_submission_20260815181333895_review_pdf_1_2026_08_15|1786864244084",
+     "reviewRequired": true,
+     "reviewType": "phase_completion_review",
+     "revision": 1,
+     "schemaVersion": "phase_review_milestone_v1",
+     "unresolvedReviewId": "phase_review|goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass|goal_phase_7ab0d230-ea5b-485b-8368-0e695224de08|2026-08-15"
+    },
+    "reviewState": "decision_committed",
+    "revision": 1,
+    "startDate": "2026-07-19",
+    "startedAt": "2026-07-19",
+    "status": "completed",
+    "successCriteria": [
+     {
+      "key": "intent_criterion_1",
+      "label": "A usable maintenance range has been established"
+     },
+     {
+      "key": "intent_criterion_2",
+      "label": "Training performance supports continued progression"
+     },
+     {
+      "key": "intent_criterion_3",
+      "label": "Enough evidence exists to review the transition"
+     }
+    ],
+    "targetDate": null,
+    "timingMode": "completion_criteria",
+    "transitionPolicy": "evidence_review",
+    "updatedAt": "2026-08-16T07:10:44.450Z"
+   },
+   {
+    "automaticStrategyAdjustmentAllowed": false,
+    "completedAt": null,
+    "completionDecisionRequired": true,
+    "createdAt": "2026-07-22T00:52:50.731Z",
+    "duration": null,
+    "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "guardrails": [],
+    "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+    "monitoringCadence": "weekly",
+    "name": "Lean Mass Build",
+    "order": 1,
+    "projectedNextPhaseStart": null,
+    "purpose": "Build meaningful lean mass from the newly established maintenance baseline while protecting body composition.",
+    "reviewState": "not_required",
+    "revision": 1,
+    "startDate": "2026-08-15",
+    "startedAt": "2026-08-15",
+    "status": "active",
+    "strategicReviewAnchor": "dexa_body_composition",
+    "strategicReviewCadence": "monthly",
+    "successCriteria": [
+     {
+      "key": "intent_criterion_1",
+      "label": "Measurable progress toward the lean-mass target"
+     },
+     {
+      "key": "intent_criterion_2",
+      "label": "Training performance supports continued progression"
+     },
+     {
+      "key": "intent_criterion_3",
+      "label": "Body-composition evidence remains compatible with the overall guardrail"
+     }
+    ],
+    "targetDate": "2026-10-31",
+    "timingMode": "target_date",
+    "transitionPolicy": "manual_review",
+    "updatedAt": "2026-08-16T07:10:44.450Z"
+   }
+  ],
+  "primary": true,
+  "primaryOutcome": "Build 10 lb of lean mass",
+  "progressMeasurement": {
+   "explanatorySignals": [
+    {
+     "accepted": true,
+     "evidenceType": "calories",
+     "explanation": "Helps explain why outcome and performance measures changed.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_calories",
+     "importance": "contextual",
+     "label": "Calorie intake",
+     "role": "explanatory"
+    },
+    {
+     "accepted": true,
+     "evidenceType": "protein",
+     "explanation": "Helps explain why outcome and performance measures changed.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_protein",
+     "importance": "contextual",
+     "label": "Protein intake",
+     "role": "explanatory"
+    },
+    {
+     "accepted": true,
+     "evidenceType": "macros",
+     "explanation": "Helps explain why outcome and performance measures changed.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_macros",
+     "importance": "contextual",
+     "label": "Carbohydrate and fat intake",
+     "role": "explanatory"
+    },
+    {
+     "accepted": true,
+     "evidenceType": "activity",
+     "explanation": "Helps explain why outcome and performance measures changed.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_activity",
+     "importance": "contextual",
+     "label": "Activity expenditure",
+     "role": "explanatory"
+    },
+    {
+     "accepted": true,
+     "evidenceType": "recovery",
+     "explanation": "Helps explain why outcome and performance measures changed.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_recovery",
+     "importance": "contextual",
+     "label": "Recovery",
+     "role": "explanatory"
+    },
+    {
+     "accepted": true,
+     "evidenceType": "sleep",
+     "explanation": "Helps explain why outcome and performance measures changed.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_sleep",
+     "importance": "contextual",
+     "label": "Sleep",
+     "role": "explanatory"
+    },
+    {
+     "accepted": true,
+     "evidenceType": "adherence",
+     "explanation": "Helps explain why outcome and performance measures changed.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_adherence",
+     "importance": "contextual",
+     "label": "Protocol adherence",
+     "role": "explanatory"
+    }
+   ],
+   "outcomeMeasures": [
+    {
+     "accepted": true,
+     "evidenceType": "dexa_lean_mass",
+     "explanation": "Directly measures whether the primary objective is occurring.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_dexa_lean_mass",
+     "importance": "defining",
+     "label": "DEXA lean mass",
+     "operator": null,
+     "planningScope": "overall_goal",
+     "planningSource": "legacy_goal",
+     "role": "outcome",
+     "unit": null,
+     "value": null
+    },
+    {
+     "accepted": true,
+     "evidenceType": "dexa_fat_mass",
+     "explanation": "Tests whether gain remains inside the body-fat guardrail.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_dexa_fat_mass",
+     "importance": "defining",
+     "label": "DEXA fat mass",
+     "operator": null,
+     "planningScope": "overall_goal",
+     "planningSource": "legacy_goal",
+     "role": "outcome",
+     "unit": null,
+     "value": null
+    },
+    {
+     "accepted": true,
+     "evidenceType": "dexa_body_fat",
+     "explanation": "Keeps the composition boundary visible.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_dexa_body_fat",
+     "importance": "defining",
+     "label": "DEXA body-fat percentage",
+     "operator": null,
+     "planningScope": "overall_goal",
+     "planningSource": "legacy_goal",
+     "role": "outcome",
+     "unit": null,
+     "value": null
+    }
+   ],
+   "predictiveSignals": [
+    {
+     "accepted": true,
+     "evidenceType": "progressive_overload",
+     "explanation": "Productive training progression should precede measurable tissue gain.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_progressive_overload",
+     "importance": "strong",
+     "label": "Progressive overload",
+     "role": "predictive"
+    },
+    {
+     "accepted": true,
+     "evidenceType": "training_trend",
+     "explanation": "Multi-session performance matters more than isolated PRs.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_training_trend",
+     "importance": "strong",
+     "label": "Training-performance trend",
+     "role": "predictive"
+    },
+    {
+     "accepted": true,
+     "evidenceType": "scale_weight",
+     "explanation": "Weight alone cannot distinguish lean gain from fat gain.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_scale_weight",
+     "importance": "supporting",
+     "label": "Scale-weight trend",
+     "role": "predictive"
+    },
+    {
+     "accepted": true,
+     "evidenceType": "progress_photos",
+     "explanation": "Photos add shape and proportion context between DEXA scans.",
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_evidence_progress_photos",
+     "importance": "supporting",
+     "label": "Progress photos",
+     "role": "predictive"
+    }
+   ]
+  },
+  "projectedNextPhaseId": null,
+  "purpose": null,
+  "sourceGoalId": "goal_visible_abs_at_rest",
+  "status": "active",
+  "target": {
+   "amount": 10,
+   "baselineValue": null,
+   "description": "Build 10 lb of lean mass",
+   "direction": "increase",
+   "metric": "lean_mass",
+   "targetDate": "2026-10-31",
+   "targetValue": null,
+   "type": "numeric_change",
+   "unit": "lb"
+  },
+  "timeline": {
+   "activeExpectedTrajectoryId": "phase_expected_trajectory|8a895bfe8cbcca5a3e276163|v1",
+   "activePhaseStrategyId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+   "ambition": null,
+   "currentPhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+   "currentPhaseStartedAt": "2026-08-15",
+   "duration": null,
+   "eventDate": null,
+   "flexibility": null,
+   "mode": "target_date",
+   "nextMilestoneAt": null,
+   "plannedReviewAt": null,
+   "projectedNextPhaseStart": null,
+   "startDate": "2026-07-19",
+   "targetDate": "2026-10-31"
+  },
+  "title": "Build Lean Mass",
+  "type": "build_lean_mass",
+  "updatedAt": "2026-08-16T07:10:44.450Z",
+  "userId": "user_founder_001"
+ },
+ "note": "Founder production records as of the 2026-09-20T12:34:05Z Weekly cutoff; stale openingApproach and protocol display names intentionally preserved.",
+ "phaseStrategy": {
+  "acceptanceId": "phase_activation_acceptance|phase_strategy|ba790d5efced3109354c8f54|v1|phase-review|dexa_event_dexa_submission_20260815181333895_review_pdf_1_2026_08_15|1786864244084",
+  "acceptanceIdempotencyKey": "phase-review|dexa_event_dexa_submission_20260815181333895_review_pdf_1_2026_08_15|1786864244084",
+  "acceptedAt": "2026-08-16T07:10:44.450Z",
+  "acceptedBy": "user_founder_001",
+  "acceptedRevision": 1,
+  "contentFingerprint": "sha256_64ee02a3742c34bb3d39e86bbdde73ca262af6fb15a52b44900bd543ffecbf5b",
+  "createdAt": "2026-08-16T07:10:44.450Z",
+  "domains": {
+   "activity": {
+    "executionTargetOwnedBy": "energy_protocol",
+    "intent": "hold_a_reviewable_expenditure_baseline"
+   },
+   "coaching": {
+    "authorizationBoundary": "user_authorizes_strategy_changes",
+    "intent": "monitor_and_recommend_adjustments"
+   },
+   "energy": {
+    "adjustmentAuthorization": "user_required",
+    "adjustmentLogic": "reviewed_changes_only",
+    "automaticAdjustmentAllowed": false,
+    "fixedCaloriePrescription": false,
+    "intent": "execute_user_authorized_phase_targets",
+    "monitoringCadence": "weekly",
+    "strategicReviewAnchor": "dexa_body_composition",
+    "strategicReviewCadence": "monthly"
+   },
+   "guardrailResponse": {
+    "acceptedBodyFatRange": {
+     "approximate": true,
+     "max": 9,
+     "min": 8,
+     "unit": "percent"
+    },
+    "automaticChangeAllowed": false,
+    "exactMembershipPreserved": true,
+    "responseRule": "recommend_review_if_pressure_worsens"
+   },
+   "nutrition": {
+    "executionTargetOwnedBy": "energy_protocol",
+    "intent": "support_phase_objective"
+   },
+   "peptides": {
+    "intent": "retain_separately_authorized_protocols"
+   },
+   "recovery": {
+    "intent": "preserve_adaptation_capacity",
+    "interpretationRule": "context_not_outcome_proof"
+   },
+   "supplements": {
+    "intent": "retain_separately_authorized_protocols"
+   },
+   "training": {
+    "intent": "progress_toward_phase_objective",
+    "interpretationRule": "multi_session_evidence_required"
+   }
+  },
+  "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+  "id": "phase_strategy|ba790d5efced3109354c8f54|v1",
+  "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+  "purpose": {
+   "avoidUnnecessarilyAggressiveSurplus": true,
+   "preserveGoalRunway": true,
+   "protectBodyFatGuardrail": true,
+   "supportLeanMassGain": true
+  },
+  "rejectedAt": null,
+  "rejectedBy": null,
+  "revision": 1,
+  "schemaVersion": "phase_strategy_v1",
+  "sourceLineage": [
+   {
+    "classification": "authorized_phase_transition",
+    "field": "purpose",
+    "path": "goal.target",
+    "sourceId": "phase-review-decision|dexa_event_dexa_submission_20260815181333895_review_pdf_1_2026_08_15|1786864244084",
+    "sourceRevision": "1",
+    "sourceType": "phase_review_decision"
+   },
+   {
+    "classification": "authorized_phase_transition",
+    "field": "domains",
+    "path": "user_authorized_phase_establishment",
+    "sourceId": "phase-review-decision|dexa_event_dexa_submission_20260815181333895_review_pdf_1_2026_08_15|1786864244084",
+    "sourceRevision": "1",
+    "sourceType": "phase_review_decision"
+   },
+   {
+    "classification": "authorized_phase_transition",
+    "field": "strategyHypothesis",
+    "path": "nextPhase.purpose",
+    "sourceId": "phase-review-decision|dexa_event_dexa_submission_20260815181333895_review_pdf_1_2026_08_15|1786864244084",
+    "sourceRevision": "1",
+    "sourceType": "phase_review_decision"
+   }
+  ],
+  "status": "accepted",
+  "strategyHypothesis": {
+   "expectedResponses": [
+    {
+     "responseId": "objective_trend_moves_in_intended_direction"
+    },
+    {
+     "responseId": "training_and_recovery_remain_supportive"
+    }
+   ],
+   "falsificationConditions": [
+    "material_guardrail_pressure",
+    "sustained_unfavorable_objective_or_training_trend"
+   ],
+   "hypothesisId": "strategy_hypothesis|phase_strategy|ba790d5efced3109354c8f54|v1",
+   "statement": "the_authorized_energy_and_activity_targets_support_the_phase_objective_while_guardrails_are_monitored",
+   "validationConditions": [
+    "repeat_objective_evidence",
+    "supporting_execution_trends"
+   ]
+  },
+  "strategyId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+  "supersededAt": null,
+  "supersededBy": null,
+  "supersedesId": null
+ },
+ "protocolVersions": [
+  {
+   "author": {
+    "displayName": "Founder",
+    "id": "user_founder_001",
+    "type": "user"
+   },
+   "calculationSnapshot": {
+    "activityTarget": 1000,
+    "calculatedAt": "2026-07-11T15:56:01.977Z",
+    "calorieRange": {
+     "max": 2150,
+     "min": 1900
+    },
+    "confidence": "moderate",
+    "currentWeight": 165.1,
+    "deficitRange": {
+     "max": 883,
+     "min": 633
+    },
+    "expenditureRange": {
+     "max": 3061,
+     "min": 2505
+    },
+    "limitations": [
+     "RMR and active calories are estimates; actual expenditure changes over time."
+    ],
+    "proteinRule": {
+     "basis": "body_weight",
+     "currentTranslatedTarget": 165,
+     "evaluationType": "minimum",
+     "ratio": 1,
+     "unit": "g_per_lb",
+     "weightDate": "2026-07-11",
+     "weightSource": "Morning Check-In"
+    },
+    "rmr": {
+     "evidenceId": "dexa_2026_06_20",
+     "observedDate": "2026-06-20",
+     "source": "BodySpec",
+     "value": 1783
+    },
+    "selectedPace": "moderate",
+    "translatedProteinGrams": 165,
+    "weeklyLossRange": {
+     "max": 1.8,
+     "min": 1.3
+    },
+    "weightDate": "2026-07-11",
+    "weightSource": "Morning Check-In"
+   },
+   "change": {
+    "changedFields": [],
+    "previousVersionId": "protocol_activity_founder_cut_v1",
+    "reason": "Create the Activity lever within the linked Cut Energy Strategy."
+   },
+   "coachingPolicy": {
+    "dailyBriefingMateriality": "weekly_outlook_only",
+    "dailyNoisePolicy": "ignore_expected_variation",
+    "evaluationPriority": "weekly_trajectory",
+    "pushAlertsEnabled": false,
+    "recoverableWeekPolicy": "stay_quiet",
+    "sundayWeeklyReview": "full_review_later",
+    "surfaceWhen": "meaningfully_trending_to_miss"
+   },
+   "confirmation": {
+    "authority": "founder_confirmation",
+    "confirmedAt": "2026-07-11T15:56:01.977Z",
+    "confirmedByUser": true,
+    "protocolConfidence": "high",
+    "statement": "The recent Activity pattern represents the strategy followed throughout the cut."
+   },
+   "createdAt": "2026-07-11T15:56:01.977Z",
+   "dependencies": [
+    "goal",
+    "goal_phase",
+    "recovery_trend",
+    "weight_trend",
+    "dexa"
+   ],
+   "effectiveAt": "2026-07-11",
+   "endedAt": null,
+   "evaluationWindows": [
+    {
+     "cadence": "weekly",
+     "dailyVariationPolicy": "expected",
+     "derivation": {
+      "dailyTarget": 1000,
+      "days": 7,
+      "type": "daily_target_times_days"
+     },
+     "evaluationMode": "trajectory",
+     "id": "weekly_active_calories",
+     "target": 7000,
+     "unit": "active_kcal",
+     "weekStartsOn": "monday"
+    }
+   ],
+   "evidenceBasis": {
+    "directEvidenceConfidence": "moderate",
+    "directEvidenceWindow": {
+     "approximateDays": 7
+    },
+    "evidenceTypes": [
+     "activity_day"
+    ],
+    "historicalClaimPolicy": "Do not attribute broader cut progress to the recent Activity evidence.",
+    "limitations": [
+     "Direct Activity evidence currently covers only the recent period."
+    ]
+   },
+   "expectations": [
+    {
+     "cadence": "daily",
+     "id": "daily_active_calories",
+     "includedEvidenceTypes": [
+      "activity_day",
+      "training_session"
+     ],
+     "metric": "apple_watch_active_calories",
+     "operator": "approximately",
+     "target": 1000,
+     "unit": "active_kcal"
+    }
+   ],
+   "goalLinks": [
+    {
+     "goalId": "goal_visible_abs_at_rest",
+     "relationship": "supports"
+    }
+   ],
+   "id": "protocol_activity_founder_cut_v2",
+   "intent": {
+    "summary": "Sustain approximately 1,000 active calories per day while preserving recovery."
+   },
+   "phaseContext": {
+    "confirmedByUser": true,
+    "id": "late_stage_cut",
+    "label": "Late-stage cut"
+   },
+   "protocolId": "protocol_activity_founder_cut",
+   "reviewTriggers": [
+    {
+     "type": "goal_transition"
+    },
+    {
+     "type": "sustained_recovery_concern"
+    },
+    {
+     "type": "persistent_execution_change"
+    }
+   ],
+   "selectedPace": "moderate",
+   "status": "active",
+   "strategyLinkId": "energy_strategy_founder_cut",
+   "versionNumber": 2
+  },
+  {
+   "author": {
+    "displayName": "Founder",
+    "id": "user_founder_001",
+    "type": "user"
+   },
+   "calculationSnapshot": {
+    "activityTarget": 1000,
+    "calculatedAt": "2026-07-11T15:56:01.977Z",
+    "calorieRange": {
+     "max": 2150,
+     "min": 1900
+    },
+    "confidence": "moderate",
+    "currentWeight": 165.1,
+    "deficitRange": {
+     "max": 883,
+     "min": 633
+    },
+    "expenditureRange": {
+     "max": 3061,
+     "min": 2505
+    },
+    "limitations": [
+     "RMR and active calories are estimates; actual expenditure changes over time."
+    ],
+    "proteinRule": {
+     "basis": "body_weight",
+     "currentTranslatedTarget": 165,
+     "evaluationType": "minimum",
+     "ratio": 1,
+     "unit": "g_per_lb",
+     "weightDate": "2026-07-11",
+     "weightSource": "Morning Check-In"
+    },
+    "rmr": {
+     "evidenceId": "dexa_2026_06_20",
+     "observedDate": "2026-06-20",
+     "source": "BodySpec",
+     "value": 1783
+    },
+    "selectedPace": "moderate",
+    "translatedProteinGrams": 165,
+    "weeklyLossRange": {
+     "max": 1.8,
+     "min": 1.3
+    },
+    "weightDate": "2026-07-11",
+    "weightSource": "Morning Check-In"
+   },
+   "change": {
+    "changedFields": [],
+    "previousVersionId": null,
+    "reason": "Create the Nutrition lever within the linked Cut Energy Strategy."
+   },
+   "coachingPolicy": {
+    "proteinIsMinimum": true,
+    "pushAlertsEnabled": false,
+    "weeklyPattern": true
+   },
+   "confirmation": {
+    "authority": "founder_confirmation",
+    "confirmedAt": "2026-07-11T15:56:01.977Z",
+    "confirmedByUser": true,
+    "protocolConfidence": "high"
+   },
+   "createdAt": "2026-07-11T15:56:01.977Z",
+   "dependencies": [
+    "goal",
+    "goal_phase",
+    "rmr",
+    "body_weight",
+    "activity_protocol",
+    "activity_evidence",
+    "weight_trend",
+    "recovery",
+    "training_performance"
+   ],
+   "effectiveAt": "2026-07-11",
+   "endedAt": null,
+   "evaluationWindows": [
+    {
+     "cadence": "weekly",
+     "evaluationMode": "joint_energy_pattern"
+    }
+   ],
+   "evidenceBasis": {
+    "directEvidenceConfidence": "moderate"
+   },
+   "expectations": [
+    {
+     "cadence": "daily",
+     "id": "daily_calorie_range",
+     "includedEvidenceTypes": [
+      "nutrition_day"
+     ],
+     "max": 2150,
+     "metric": "calorie_intake",
+     "min": 1900,
+     "operator": "between",
+     "unit": "kcal"
+    },
+    {
+     "cadence": "daily",
+     "id": "daily_protein_minimum",
+     "metric": "protein",
+     "operator": "minimum",
+     "rule": {
+      "basis": "body_weight",
+      "currentTranslatedTarget": 165,
+      "evaluationType": "minimum",
+      "ratio": 1,
+      "unit": "g_per_lb",
+      "weightDate": "2026-07-11",
+      "weightSource": "Morning Check-In"
+     },
+     "target": 165,
+     "unit": "g",
+     "weightDate": "2026-07-11",
+     "weightSource": "Morning Check-In"
+    }
+   ],
+   "goalLinks": [
+    {
+     "goalId": "goal_visible_abs_at_rest",
+     "relationship": "supports"
+    }
+   ],
+   "id": "protocol_nutrition_founder_cut_v1",
+   "intent": {
+    "summary": "Support continued fat loss while preserving lean mass and recovery."
+   },
+   "phaseContext": {
+    "id": "late_stage_cut",
+    "label": "Late-stage cut"
+   },
+   "protocolId": "protocol_nutrition_founder_cut",
+   "reviewTriggers": [
+    {
+     "type": "rmr_change"
+    },
+    {
+     "type": "activity_strategy_change"
+    },
+    {
+     "type": "weight_trend_mismatch"
+    },
+    {
+     "type": "recovery_or_performance_change"
+    },
+    {
+     "type": "goal_transition"
+    }
+   ],
+   "selectedPace": "moderate",
+   "status": "active",
+   "strategyLinkId": "energy_strategy_founder_cut",
+   "versionNumber": 1
+  },
+  {
+   "author": {
+    "displayName": "Founder",
+    "id": "user_founder_001",
+    "type": "user"
+   },
+   "change": {
+    "changedFields": [],
+    "previousVersionId": null,
+    "reason": "Formalize the activity strategy supporting the current cut."
+   },
+   "coachingPolicy": {
+    "dailyBriefingMateriality": "weekly_outlook_only",
+    "dailyNoisePolicy": "ignore_expected_variation",
+    "evaluationPriority": "weekly_trajectory",
+    "pushAlertsEnabled": false,
+    "recoverableWeekPolicy": "stay_quiet",
+    "sundayWeeklyReview": "full_review_later",
+    "surfaceWhen": "meaningfully_trending_to_miss"
+   },
+   "confirmation": {
+    "authority": "founder_confirmation",
+    "confirmedAt": "2026-07-11T01:16:16.953Z",
+    "confirmedByUser": true,
+    "protocolConfidence": "high",
+    "statement": "The recent Activity pattern represents the strategy followed throughout the cut."
+   },
+   "createdAt": "2026-07-11T01:16:16.953Z",
+   "effectiveAt": "2026-07-11",
+   "endedAt": "2026-07-11T15:50:28.488Z",
+   "evaluationWindows": [
+    {
+     "cadence": "weekly",
+     "dailyVariationPolicy": "expected",
+     "derivation": {
+      "dailyTarget": 1000,
+      "days": 7,
+      "type": "daily_target_times_days"
+     },
+     "evaluationMode": "trajectory",
+     "id": "weekly_active_calories",
+     "target": 7000,
+     "unit": "active_kcal",
+     "weekStartsOn": "monday"
+    }
+   ],
+   "evidenceBasis": {
+    "directEvidenceConfidence": "moderate",
+    "directEvidenceWindow": {
+     "approximateDays": 7
+    },
+    "evidenceTypes": [
+     "activity_day"
+    ],
+    "historicalClaimPolicy": "Do not attribute broader cut progress to the recent Activity evidence.",
+    "limitations": [
+     "Direct Activity evidence currently covers only the recent period."
+    ]
+   },
+   "expectations": [
+    {
+     "cadence": "daily",
+     "id": "daily_active_calories",
+     "includedEvidenceTypes": [
+      "activity_day",
+      "training_session"
+     ],
+     "metric": "apple_watch_active_calories",
+     "operator": "approximately",
+     "target": 1000,
+     "unit": "active_kcal"
+    }
+   ],
+   "goalLinks": [
+    {
+     "goalId": "goal_visible_abs_at_rest",
+     "relationship": "supports"
+    }
+   ],
+   "id": "protocol_activity_founder_cut_v1",
+   "intent": {
+    "summary": "Sustain approximately 1,000 active calories per day while preserving recovery."
+   },
+   "phaseContext": {
+    "confirmedByUser": true,
+    "id": "late_stage_cut",
+    "label": "Late-stage cut"
+   },
+   "protocolId": "protocol_activity_founder_cut",
+   "reviewTriggers": [
+    {
+     "type": "goal_transition"
+    },
+    {
+     "type": "sustained_recovery_concern"
+    },
+    {
+     "type": "persistent_execution_change"
+    }
+   ],
+   "status": "superseded",
+   "versionNumber": 1
+  },
+  {
+   "activatedAt": "2026-07-23T16:54:00.550Z",
+   "change": {
+    "previousVersionId": null,
+    "reason": "Activate update disposition for the new goal.",
+    "reviewedChanges": {
+     "activityStrategy": "reduce_slightly",
+     "adjustmentSize": "small",
+     "calorieStrategy": "increase_gradually",
+     "evaluationCadence": "Weekly",
+     "mode": "Maintenance Calibration",
+     "signals": [
+      "Weight trend",
+      "Training performance",
+      "Recovery",
+      "Progress photos"
+     ],
+     "uncertainty": "True maintenance intake is not known yet"
+    }
+   },
+   "confirmation": {
+    "authority": "accepted_goal_transition"
+   },
+   "effectiveAt": "2026-07-21T04:53:31.757Z",
+   "endedAt": "2026-08-15",
+   "goalLinks": [
+    {
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "relationship": "supports"
+    }
+   ],
+   "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_energy_c3_review_virtual_energy_v1",
+   "protocolId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_energy_c3_review_virtual_energy",
+   "status": "superseded",
+   "supersededByVersionId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_energy_c3_review_virtual_energy_v2",
+   "versionNumber": 1
+  },
+  {
+   "change": {
+    "previousVersionId": "protocol_nutrition_founder_cut_v1",
+    "reason": "Activate update disposition for the new goal.",
+    "reviewedChanges": {
+     "calorieStrategy": "increase_gradually",
+     "carbohydrateStrategy": "performance",
+     "fatStrategy": "sustainable_minimum",
+     "fixedProtein": 180,
+     "proteinBasis": "body_weight",
+     "proteinRatio": 1,
+     "proteinTarget": 167,
+     "restDayFlexibility": true,
+     "trainingDayFlexibility": true
+    }
+   },
+   "confirmation": {
+    "authority": "accepted_goal_transition"
+   },
+   "effectiveAt": "2026-07-21T04:53:31.757Z",
+   "goalLinks": [
+    {
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "relationship": "supports"
+    }
+   ],
+   "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_nutrition_founder_cut_ol_nutrition_founder_cut_v1",
+   "protocolId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_nutrition_founder_cut_ol_nutrition_founder_cut",
+   "status": "active",
+   "versionNumber": 1
+  },
+  {
+   "activatedAt": "2026-07-23T16:54:00.550Z",
+   "change": {
+    "previousVersionId": "protocol_activity_founder_cut_v2",
+    "reason": "Activate update disposition for the new goal.",
+    "reviewedChanges": {
+     "activityStrategy": "reduce_slightly",
+     "adjustmentSignals": [
+      "Weight trend",
+      "Training performance",
+      "Recovery"
+     ],
+     "cardioDuration": "flexible",
+     "cardioFrequency": "as_needed"
+    }
+   },
+   "confirmation": {
+    "authority": "accepted_goal_transition"
+   },
+   "effectiveAt": "2026-07-21T04:53:31.757Z",
+   "goalLinks": [
+    {
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "relationship": "supports"
+    }
+   ],
+   "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_activity_founder_cut_col_activity_founder_cut_v1",
+   "protocolId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_activity_founder_cut_col_activity_founder_cut",
+   "status": "active",
+   "versionNumber": 1
+  },
+  {
+   "activatedAt": "2026-08-16T07:10:44.450Z",
+   "change": {
+    "previousVersionId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_energy_c3_review_virtual_energy_v1",
+    "reason": "Activate user-authorized phase execution targets.",
+    "reviewedChanges": {
+     "activityExpenditureTarget": {
+      "unit": "kcal/day",
+      "value": 800
+     },
+     "adjustmentAuthorization": "user_required",
+     "adjustmentMethod": "user_authorized_reviewed_changes",
+     "automaticAdjustmentAllowed": false,
+     "caloricIntakeTarget": {
+      "unit": "kcal/day",
+      "value": 2500
+     },
+     "evaluationCadence": "monthly",
+     "mode": "Phase Execution",
+     "monitoringCadence": "weekly",
+     "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+     "phaseStrategyId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+     "signals": [
+      "Weight trend",
+      "Nutrition",
+      "Activity",
+      "Training performance",
+      "Recovery",
+      "Body composition"
+     ],
+     "strategicReviewAnchor": "dexa_body_composition",
+     "strategicReviewCadence": "monthly",
+     "uncertainty": "The targets remain reviewable as new evidence arrives"
+    }
+   },
+   "confirmation": {
+    "authority": "authorized_phase_review",
+    "decisionId": "phase-review-decision|dexa_event_dexa_submission_20260815181333895_review_pdf_1_2026_08_15|1786864244084"
+   },
+   "effectiveAt": "2026-08-15",
+   "goalLinks": [
+    {
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "relationship": "supports"
+    }
+   ],
+   "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_energy_c3_review_virtual_energy_v2",
+   "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+   "protocolId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_energy_c3_review_virtual_energy",
+   "status": "active",
+   "strategyId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+   "versionNumber": 2
+  }
+ ],
+ "protocols": [
+  {
+   "category": "lifestyle",
+   "createdAt": "2026-07-11T15:56:01.977Z",
+   "currentGoalIds": [],
+   "currentVersionId": "protocol_activity_founder_cut_v2",
+   "dose": {
+    "unit": "",
+    "value": null
+   },
+   "doseHistory": [],
+   "doseUnit": "",
+   "endDate": null,
+   "fieldProvenance": {
+    "computed": [],
+    "imported": []
+   },
+   "frequency": {
+    "daysOfWeek": [],
+    "interval": null,
+    "unit": ""
+   },
+   "historicalGoalIds": [
+    "goal_visible_abs_at_rest"
+   ],
+   "id": "protocol_activity_founder_cut",
+   "lifecycle": {
+    "status": "superseded",
+    "supersededAt": "2026-07-23T16:54:00.550Z",
+    "supersededBy": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_activity_founder_cut_col_activity_founder_cut"
+   },
+   "name": "Cut Activity",
+   "notes": "",
+   "protocolType": "activity",
+   "reconciliation": {
+    "action": "superseded",
+    "migrationId": "visible_abs_to_build_lean_mass_protocol_reconciliation_v1",
+    "reconciledAt": "2026-07-23T16:54:00.550Z"
+   },
+   "relatedGoalIds": [],
+   "schedule": {
+    "nextScheduledAt": null,
+    "type": ""
+   },
+   "source": {
+    "confidence": "medium",
+    "externalId": null,
+    "importedAt": null,
+    "name": "PhysiqueOS",
+    "notes": "",
+    "type": "manual"
+   },
+   "startDate": "",
+   "status": "archived",
+   "supersededByProtocolId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_activity_founder_cut_col_activity_founder_cut",
+   "updatedAt": "2026-07-23T16:54:00.550Z",
+   "userId": "user_founder_001"
+  },
+  {
+   "category": "nutrition",
+   "createdAt": "2026-07-11T15:56:01.977Z",
+   "currentGoalIds": [],
+   "currentVersionId": "protocol_nutrition_founder_cut_v1",
+   "dose": {
+    "unit": "",
+    "value": null
+   },
+   "doseHistory": [],
+   "doseUnit": "",
+   "endDate": null,
+   "fieldProvenance": {
+    "computed": [],
+    "imported": []
+   },
+   "frequency": {
+    "daysOfWeek": [],
+    "interval": null,
+    "unit": ""
+   },
+   "historicalGoalIds": [
+    "goal_visible_abs_at_rest"
+   ],
+   "id": "protocol_nutrition_founder_cut",
+   "lifecycle": {
+    "status": "superseded",
+    "supersededAt": "2026-07-23T16:54:00.550Z",
+    "supersededBy": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_nutrition_founder_cut_ol_nutrition_founder_cut"
+   },
+   "name": "Cut Nutrition",
+   "notes": "",
+   "protocolType": "nutrition",
+   "reconciliation": {
+    "action": "superseded",
+    "migrationId": "visible_abs_to_build_lean_mass_protocol_reconciliation_v1",
+    "reconciledAt": "2026-07-23T16:54:00.550Z"
+   },
+   "relatedGoalIds": [],
+   "schedule": {
+    "nextScheduledAt": null,
+    "type": ""
+   },
+   "source": {
+    "confidence": "medium",
+    "externalId": null,
+    "importedAt": null,
+    "name": "PhysiqueOS",
+    "notes": "",
+    "type": "manual"
+   },
+   "startDate": "",
+   "status": "archived",
+   "supersededByProtocolId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_nutrition_founder_cut_ol_nutrition_founder_cut",
+   "updatedAt": "2026-07-23T16:54:00.550Z",
+   "userId": "user_founder_001"
+  },
+  {
+   "activatedAt": "2026-07-23T16:54:00.550Z",
+   "activationIdentity": {
+    "reviewId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_review_virtual_energy",
+    "sourceProtocolId": "virtual_energy",
+    "transitionId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3"
+   },
+   "activationProvenance": {
+    "ownershipTransferred": false,
+    "provenanceSourceType": "virtual_plan",
+    "sourceProtocolId": "virtual_energy",
+    "sourceVersionId": null
+   },
+   "category": "energy",
+   "currentGoalIds": [
+    "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+   ],
+   "currentVersionId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_energy_c3_review_virtual_energy_v2",
+   "disposition": "update",
+   "effectiveStrategy": {
+    "activityExpenditureTarget": {
+     "unit": "kcal/day",
+     "value": 800
+    },
+    "adjustmentAuthorization": "user_required",
+    "adjustmentMethod": "user_authorized_reviewed_changes",
+    "automaticAdjustmentAllowed": false,
+    "caloricIntakeTarget": {
+     "unit": "kcal/day",
+     "value": 2500
+    },
+    "evaluationCadence": "monthly",
+    "mode": "Phase Execution",
+    "monitoringCadence": "weekly",
+    "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+    "phaseStrategyId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+    "signals": [
+     "Weight trend",
+     "Nutrition",
+     "Activity",
+     "Training performance",
+     "Recovery",
+     "Body composition"
+    ],
+    "strategicReviewAnchor": "dexa_body_composition",
+    "strategicReviewCadence": "monthly",
+    "uncertainty": "The targets remain reviewable as new evidence arrives"
+   },
+   "historicalGoalIds": [],
+   "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_virtual_energy_c3_review_virtual_energy",
+   "name": "Maintenance Calibration with weekly review and gradual adjustments.",
+   "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+   "phaseStrategyId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+   "predecessorProtocolId": null,
+   "protocolType": "energy",
+   "reconciliation": {
+    "action": "promoted",
+    "migrationId": "visible_abs_to_build_lean_mass_protocol_reconciliation_v1",
+    "reconciledAt": "2026-07-23T16:54:00.550Z"
+   },
+   "relatedGoalIds": [
+    "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+   ],
+   "reviewId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_review_virtual_energy",
+   "sourceProtocolId": "virtual_energy",
+   "status": "active",
+   "updatedAt": "2026-08-16T07:10:44.450Z",
+   "userId": "user_founder_001"
+  },
+  {
+   "activatedAt": "2026-07-23T16:54:00.550Z",
+   "activationIdentity": {
+    "reviewId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_review_protocol_nutrition_founder_cut",
+    "sourceProtocolId": "protocol_nutrition_founder_cut",
+    "transitionId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3"
+   },
+   "activationProvenance": {
+    "ownershipTransferred": false,
+    "provenanceSourceType": "historical_protocol",
+    "sourceProtocolId": "protocol_nutrition_founder_cut",
+    "sourceVersionId": "protocol_nutrition_founder_cut_v1"
+   },
+   "category": "nutrition",
+   "currentGoalIds": [
+    "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+   ],
+   "currentVersionId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_nutrition_founder_cut_ol_nutrition_founder_cut_v1",
+   "disposition": "update",
+   "effectiveStrategy": {
+    "calorieStrategy": "increase_gradually",
+    "carbohydrateStrategy": "performance",
+    "fatStrategy": "sustainable_minimum",
+    "fixedProtein": 180,
+    "proteinBasis": "body_weight",
+    "proteinRatio": 1,
+    "proteinTarget": 167,
+    "restDayFlexibility": true,
+    "trainingDayFlexibility": true
+   },
+   "historicalGoalIds": [
+    "goal_visible_abs_at_rest"
+   ],
+   "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_nutrition_founder_cut_ol_nutrition_founder_cut",
+   "name": "167 g protein with intake coordinated to calibration.",
+   "predecessorProtocolId": "protocol_nutrition_founder_cut",
+   "protocolType": "nutrition",
+   "reconciliation": {
+    "action": "promoted",
+    "migrationId": "visible_abs_to_build_lean_mass_protocol_reconciliation_v1",
+    "reconciledAt": "2026-07-23T16:54:00.550Z"
+   },
+   "relatedGoalIds": [
+    "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+   ],
+   "reviewId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_review_protocol_nutrition_founder_cut",
+   "sourceProtocolId": "protocol_nutrition_founder_cut",
+   "status": "active",
+   "updatedAt": "2026-07-23T16:54:00.550Z",
+   "userId": "user_founder_001"
+  },
+  {
+   "activatedAt": "2026-07-23T16:54:00.550Z",
+   "activationIdentity": {
+    "reviewId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_review_protocol_activity_founder_cut",
+    "sourceProtocolId": "protocol_activity_founder_cut",
+    "transitionId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3"
+   },
+   "activationProvenance": {
+    "ownershipTransferred": false,
+    "provenanceSourceType": "historical_protocol",
+    "sourceProtocolId": "protocol_activity_founder_cut",
+    "sourceVersionId": "protocol_activity_founder_cut_v2"
+   },
+   "category": "activity",
+   "currentGoalIds": [
+    "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+   ],
+   "currentVersionId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_activity_founder_cut_col_activity_founder_cut_v1",
+   "disposition": "update",
+   "effectiveStrategy": {
+    "activityStrategy": "reduce_slightly",
+    "adjustmentSignals": [
+     "Weight trend",
+     "Training performance",
+     "Recovery"
+    ],
+    "cardioDuration": "flexible",
+    "cardioFrequency": "as_needed"
+   },
+   "historicalGoalIds": [
+    "goal_visible_abs_at_rest"
+   ],
+   "id": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_future_protocol_activity_founder_cut_col_activity_founder_cut",
+   "name": "Flexible weekly activity that supports calibration, training, and recovery.",
+   "predecessorProtocolId": "protocol_activity_founder_cut",
+   "protocolType": "activity",
+   "reconciliation": {
+    "action": "promoted",
+    "migrationId": "visible_abs_to_build_lean_mass_protocol_reconciliation_v1",
+    "reconciledAt": "2026-07-23T16:54:00.550Z"
+   },
+   "relatedGoalIds": [
+    "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+   ],
+   "reviewId": "protocol_transition_goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_review_protocol_activity_founder_cut",
+   "sourceProtocolId": "protocol_activity_founder_cut",
+   "status": "active",
+   "updatedAt": "2026-07-23T16:54:00.550Z",
+   "userId": "user_founder_001"
+  }
+ ]
+}

@@ -1,0 +1,1092 @@
+{
+ "artifactType": "event",
+ "briefing": {
+  "narrativeV3": {
+   "coachTake": "You are more than halfway to the 10 lb lean-mass goal. The last DEXA still supports the plan. The plan is working. Stay consistent. Keep executing. The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered.",
+   "confidenceExplanation": {
+    "assumptions": [
+     "The outlook depends on appropriate continued execution.",
+     "The forecast uses a reduced recent rate, not an assumption that the latest result repeats exactly.",
+     "Consistent execution supports the outlook, but any progress since the last outcome check is still unconfirmed.",
+     "This is a coaching outlook, not a measured statistical probability."
+    ],
+    "nextEvidence": "The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered.",
+    "whatCouldLowerIt": [
+     "Meaningful missed work or persistent departures from the plan.",
+     "Body fat moving outside the intended range of 8\u20139.",
+     "Training performance materially declining.",
+     "Progress stalling or a new result contradicting the current outlook.",
+     "Falling far enough behind that there is no longer enough time to finish the goal."
+    ],
+    "whatCouldRaiseIt": [
+     "Consistent execution can strengthen confidence before the next DEXA.",
+     "The next DEXA showing that the progress continues.",
+     "Reaching the goal."
+    ],
+    "whatIncreasedIt": [
+     "You added 5.0 lb of lean mass since August 15.",
+     "Body fat stayed controlled at 8.1%."
+    ],
+    "whatIsHoldingItBack": [
+     "One excellent response does not guarantee the same result until the next DEXA."
+    ],
+    "whatSupportsItNow": [
+     "4.2 lb remain with 49 days left."
+    ],
+    "why": "You are more than halfway to the 10 lb lean-mass goal. The build plan is clearly working. There is enough time to finish ahead of schedule if this level of progress continues."
+   },
+   "detail": "Nothing in the current evidence calls for a change. The next DEXA already established that the build plan is working.\n\nYou are more than halfway to the 10 lb lean-mass goal. The build plan is working, and nothing here changes that conclusion.\n\nStay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.\n\nThe next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered.\n\nConfidence \u00b7 79% \u2014\nConfidence holds. Nothing new changes the outlook for the goal.",
+   "recommendation": {
+    "action": "continue_current_strategy",
+    "nextEvidencePurpose": "confirm_persistence",
+    "reason": "strategy_supported",
+    "urgency": "routine"
+   },
+   "sections": {
+    "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+    "confidence": "Confidence \u00b7 79% \u2014\nConfidence holds. Nothing new changes the outlook for the goal.",
+    "meaning": "You are more than halfway to the 10 lb lean-mass goal. The build plan is working, and nothing here changes that conclusion.",
+    "result": "Nothing in the current evidence calls for a change. The next DEXA already established that the build plan is working.",
+    "watch": "The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered."
+   },
+   "strategicInterpretationId": "strategic_interpretation_v3|0fef1c5834486ba57dde34bb3275726515d560cea5ca072edb671bbc886caba5",
+   "strategicQuestion": {
+    "answerCode": null,
+    "answeredAt": null,
+    "answeredByEvidenceIds": [],
+    "evidencePurpose": "confirm_persistence",
+    "kind": "persistence",
+    "priority": 40,
+    "questionId": "question|phase_strategy|ba790d5efced3109354c8f54|v1|persistence",
+    "raisedAt": "2026-09-18T19:52:00.000Z",
+    "status": "open",
+    "strategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1",
+    "text": "Has the qualifying result repeated or held?"
+   },
+   "summary": "Nothing in the current evidence calls for a change."
+  },
+  "photoEventNarrative": {
+   "activeViews": [
+    {
+     "analysisQuality": "vision_backed",
+     "baselineNarrative": null,
+     "comparisonMode": "historical_comparison",
+     "comparisonStatus": "comparable",
+     "contributesToGoalValidation": true,
+     "establishesBaseline": false,
+     "findings": [
+      "Shoulder muscles appear fuller and more rounded with clearer separation.",
+      "Arms show increased fullness and more visible vascularity indicating muscle development.",
+      "Waist line appears slightly more tapered and less soft than before.",
+      "Upper abdominal muscles and obliques show slightly clearer definition and reduced softness."
+     ],
+     "goalRelevance": "primary",
+     "headline": "Waist line appears slightly more tapered and less soft than before.",
+     "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+     "imageHref": "/api/private-evidence/media/01a0bf14-a31b-72f8-95e8-b9fb829018b6",
+     "label": "Front relaxed",
+     "poseId": "front-relaxed",
+     "previousDate": "2026-08-22",
+     "previousImageHref": "/api/private-evidence/media/01a054d6-a9c5-700e-8ae9-cb449a0fab36",
+     "supportingObservations": [
+      "Shoulder muscles appear fuller and more rounded with clearer separation.",
+      "Arms show increased fullness and more visible vascularity indicating muscle development."
+     ]
+    },
+    {
+     "analysisQuality": "vision_backed",
+     "baselineNarrative": null,
+     "comparisonMode": "historical_comparison",
+     "comparisonStatus": "comparable",
+     "contributesToGoalValidation": false,
+     "establishesBaseline": false,
+     "findings": [
+      "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+      "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+      "Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning."
+     ],
+     "goalRelevance": "supporting",
+     "headline": "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+     "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+     "imageHref": "/api/private-evidence/media/01a0bf14-9d04-75eb-8287-517e90003a79",
+     "label": "Rear relaxed",
+     "poseId": "back-relaxed",
+     "previousDate": "2026-08-22",
+     "previousImageHref": "/api/private-evidence/media/01a054d6-a884-744d-ac0c-307fb604ea52",
+     "supportingObservations": [
+      "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+      "Shoulder and upper back width maintained with no visible reduction in muscle fullness."
+     ]
+    },
+    {
+     "analysisQuality": "vision_backed",
+     "baselineNarrative": null,
+     "comparisonMode": "historical_comparison",
+     "comparisonStatus": "comparable",
+     "contributesToGoalValidation": false,
+     "establishesBaseline": false,
+     "findings": [
+      "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+      "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+     ],
+     "goalRelevance": "supporting",
+     "headline": "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.",
+     "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+     "imageHref": "/api/private-evidence/media/01a0bf14-9f0e-722a-b374-b97e883af143",
+     "label": "Rear flexed \u2014 double biceps",
+     "poseId": "back-flexed",
+     "previousDate": "2026-08-22",
+     "previousImageHref": "/api/private-evidence/media/01a054d6-a827-766f-9546-dc4874c6f357",
+     "supportingObservations": [
+      "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+      "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+     ]
+    },
+    {
+     "analysisQuality": "vision_backed",
+     "baselineNarrative": null,
+     "comparisonMode": "historical_comparison",
+     "comparisonStatus": "comparable",
+     "contributesToGoalValidation": false,
+     "establishesBaseline": false,
+     "findings": [
+      "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+      "Shoulders maintain size and visible muscle fullness without apparent loss or gain.",
+      "Arm muscle fullness and shape are consistent between photos indicating retained muscularity."
+     ],
+     "goalRelevance": "supporting",
+     "headline": "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+     "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+     "imageHref": "/api/private-evidence/media/01a0bf14-a130-765d-9727-bb61af16011a",
+     "label": "Right side relaxed",
+     "poseId": "right-side-relaxed",
+     "previousDate": "2026-08-22",
+     "previousImageHref": "/api/private-evidence/media/01a054d6-a92d-7160-a2a4-dc63a64ac249",
+     "supportingObservations": [
+      "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+      "Shoulders maintain size and visible muscle fullness without apparent loss or gain."
+     ]
+    },
+    {
+     "analysisQuality": "vision_backed",
+     "baselineNarrative": null,
+     "comparisonMode": "historical_comparison",
+     "comparisonStatus": "comparable",
+     "contributesToGoalValidation": false,
+     "establishesBaseline": false,
+     "findings": [
+      "Waistline appears visibly tighter and less soft compared to previous photo.",
+      "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+      "Chest and shoulders maintain muscle fullness and definition without visible loss."
+     ],
+     "goalRelevance": "supporting",
+     "headline": "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+     "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+     "imageHref": "/api/private-evidence/media/01a0bf14-9afe-713a-a000-bb9f706cdf22",
+     "label": "Front flexed",
+     "poseId": "front-flexed",
+     "previousDate": "2026-08-22",
+     "previousImageHref": "/api/private-evidence/media/01a054d6-a941-77ce-b8c9-b8d063017a3d",
+     "supportingObservations": [
+      "Waistline appears visibly tighter and less soft compared to previous photo.",
+      "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging."
+     ]
+    }
+   ],
+   "cardContent": {
+    "coachInsight": {
+     "body": "You are more than halfway to the 10 lb lean-mass goal. The last DEXA still supports the plan. The plan is working. Stay consistent. Keep executing. The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered.",
+     "id": "photo_event_narrative_photo_session_user_founder_001_2026-09-19_coach",
+     "title": "Coach\u2019s Insight"
+    },
+    "hero": {
+     "body": "The matched views support maintenance of your recent lean condition and provide an early baseline for the current phase.",
+     "id": "photo_event_narrative_photo_session_user_founder_001_2026-09-19_hero",
+     "title": "Today\u2019s photos show your recent condition is holding steady."
+    },
+    "interpretation": {
+     "id": "photo_event_narrative_photo_session_user_founder_001_2026-09-19_interpretation",
+     "paragraphs": [
+      "Across the matched views, your current physique remains lean and upper-body muscularity appears maintained. These photos are most useful as an early maintenance and lean-gain baseline, not proof of new tissue gain.",
+      "The continued weight trend reinforces the visual pattern, with the latest DEXA serving as the body-composition baseline.",
+      "The matching poses make broad visual changes easier to judge. Interpret small changes cautiously over this short interval. DEXA on Friday, Oct 9 at 7:00 AM will give us the next body-composition comparison."
+     ],
+     "support": [
+      "172.7 lb",
+      "Latest DEXA: 8.1% body fat"
+     ],
+     "title": "What the complete evidence means"
+    },
+    "progress": {
+     "body": "Matching historical views show what changed and what remained stable.",
+     "comparisons": [
+      {
+       "analysisQuality": "vision_backed",
+       "baselineNarrative": null,
+       "comparisonMode": "historical_comparison",
+       "comparisonStatus": "comparable",
+       "contributesToGoalValidation": true,
+       "establishesBaseline": false,
+       "findings": [
+        "Shoulder muscles appear fuller and more rounded with clearer separation.",
+        "Arms show increased fullness and more visible vascularity indicating muscle development.",
+        "Waist line appears slightly more tapered and less soft than before.",
+        "Upper abdominal muscles and obliques show slightly clearer definition and reduced softness."
+       ],
+       "goalRelevance": "primary",
+       "headline": "Waist line appears slightly more tapered and less soft than before.",
+       "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+       "imageHref": "/api/private-evidence/media/01a0bf14-a31b-72f8-95e8-b9fb829018b6",
+       "label": "Front relaxed",
+       "poseId": "front-relaxed",
+       "previousDate": "2026-08-22",
+       "previousImageHref": "/api/private-evidence/media/01a054d6-a9c5-700e-8ae9-cb449a0fab36",
+       "supportingObservations": [
+        "Shoulder muscles appear fuller and more rounded with clearer separation.",
+        "Arms show increased fullness and more visible vascularity indicating muscle development."
+       ]
+      },
+      {
+       "analysisQuality": "vision_backed",
+       "baselineNarrative": null,
+       "comparisonMode": "historical_comparison",
+       "comparisonStatus": "comparable",
+       "contributesToGoalValidation": false,
+       "establishesBaseline": false,
+       "findings": [
+        "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+        "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+        "Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning."
+       ],
+       "goalRelevance": "supporting",
+       "headline": "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+       "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+       "imageHref": "/api/private-evidence/media/01a0bf14-9d04-75eb-8287-517e90003a79",
+       "label": "Rear relaxed",
+       "poseId": "back-relaxed",
+       "previousDate": "2026-08-22",
+       "previousImageHref": "/api/private-evidence/media/01a054d6-a884-744d-ac0c-307fb604ea52",
+       "supportingObservations": [
+        "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+        "Shoulder and upper back width maintained with no visible reduction in muscle fullness."
+       ]
+      },
+      {
+       "analysisQuality": "vision_backed",
+       "baselineNarrative": null,
+       "comparisonMode": "historical_comparison",
+       "comparisonStatus": "comparable",
+       "contributesToGoalValidation": false,
+       "establishesBaseline": false,
+       "findings": [
+        "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+        "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+       ],
+       "goalRelevance": "supporting",
+       "headline": "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.",
+       "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+       "imageHref": "/api/private-evidence/media/01a0bf14-9f0e-722a-b374-b97e883af143",
+       "label": "Rear flexed \u2014 double biceps",
+       "poseId": "back-flexed",
+       "previousDate": "2026-08-22",
+       "previousImageHref": "/api/private-evidence/media/01a054d6-a827-766f-9546-dc4874c6f357",
+       "supportingObservations": [
+        "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+        "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+       ]
+      },
+      {
+       "analysisQuality": "vision_backed",
+       "baselineNarrative": null,
+       "comparisonMode": "historical_comparison",
+       "comparisonStatus": "comparable",
+       "contributesToGoalValidation": false,
+       "establishesBaseline": false,
+       "findings": [
+        "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+        "Shoulders maintain size and visible muscle fullness without apparent loss or gain.",
+        "Arm muscle fullness and shape are consistent between photos indicating retained muscularity."
+       ],
+       "goalRelevance": "supporting",
+       "headline": "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+       "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+       "imageHref": "/api/private-evidence/media/01a0bf14-a130-765d-9727-bb61af16011a",
+       "label": "Right side relaxed",
+       "poseId": "right-side-relaxed",
+       "previousDate": "2026-08-22",
+       "previousImageHref": "/api/private-evidence/media/01a054d6-a92d-7160-a2a4-dc63a64ac249",
+       "supportingObservations": [
+        "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+        "Shoulders maintain size and visible muscle fullness without apparent loss or gain."
+       ]
+      },
+      {
+       "analysisQuality": "vision_backed",
+       "baselineNarrative": null,
+       "comparisonMode": "historical_comparison",
+       "comparisonStatus": "comparable",
+       "contributesToGoalValidation": false,
+       "establishesBaseline": false,
+       "findings": [
+        "Waistline appears visibly tighter and less soft compared to previous photo.",
+        "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+        "Chest and shoulders maintain muscle fullness and definition without visible loss."
+       ],
+       "goalRelevance": "supporting",
+       "headline": "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+       "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+       "imageHref": "/api/private-evidence/media/01a0bf14-9afe-713a-a000-bb9f706cdf22",
+       "label": "Front flexed",
+       "poseId": "front-flexed",
+       "previousDate": "2026-08-22",
+       "previousImageHref": "/api/private-evidence/media/01a054d6-a941-77ce-b8c9-b8d063017a3d",
+       "supportingObservations": [
+        "Waistline appears visibly tighter and less soft compared to previous photo.",
+        "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging."
+       ]
+      }
+     ],
+     "id": "photo_event_narrative_photo_session_user_founder_001_2026-09-19_progress",
+     "newBaselines": [],
+     "title": "What visibly changed"
+    },
+    "snapshot": {
+     "conditions": "Taken after your workout, after eating.",
+     "id": "photo_event_narrative_photo_session_user_founder_001_2026-09-19_snapshot",
+     "poses": [
+      "Front relaxed",
+      "Rear relaxed",
+      "Rear flexed \u2014 double biceps",
+      "Right side relaxed",
+      "Front flexed"
+     ],
+     "title": "This photo session"
+    }
+   },
+   "coachingDirection": "No strategy change is warranted from these photos. Continue the current approach and keep photo conditions consistent. Use DEXA on Friday, Oct 9 at 7:00 AM as the next useful comparison.",
+   "comparisonGroups": {
+    "comparedWithPriorPhotos": [
+     "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+     "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+     "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+     "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+     "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+    ],
+    "newBaselineViews": []
+   },
+   "completion": "5 confirmed views",
+   "completionExperience": null,
+   "conditionLimitations": [
+    "The matching poses make broad visual changes easier to judge."
+   ],
+   "confidence": "The matching poses make broad visual changes easier to judge.",
+   "eventDate": "2026-09-19",
+   "eventId": "event_briefing_progress_photo_photo_session_user_founder_001_2026-09-19",
+   "evidenceBinding": {
+    "photoSessionId": "photo_session_user_founder_001_2026-09-19",
+    "photos": [
+     {
+      "mediaReference": "media://01a0bf14-9f0e-722a-b374-b97e883af143",
+      "photoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+      "poseId": "back-flexed",
+      "priorMediaReference": "media://01a054d6-a827-766f-9546-dc4874c6f357",
+      "priorPhotoId": "canonical_photo_user_founder_001_2026-08-22_back_flexed",
+      "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22"
+     },
+     {
+      "mediaReference": "media://01a0bf14-9d04-75eb-8287-517e90003a79",
+      "photoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+      "poseId": "back-relaxed",
+      "priorMediaReference": "media://01a054d6-a884-744d-ac0c-307fb604ea52",
+      "priorPhotoId": "canonical_photo_user_founder_001_2026-08-22_back_relaxed",
+      "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22"
+     },
+     {
+      "mediaReference": "media://01a0bf14-9afe-713a-a000-bb9f706cdf22",
+      "photoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+      "poseId": "front-flexed",
+      "priorMediaReference": "media://01a054d6-a941-77ce-b8c9-b8d063017a3d",
+      "priorPhotoId": "canonical_photo_user_founder_001_2026-08-22_front_flexed",
+      "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22"
+     },
+     {
+      "mediaReference": "media://01a0bf14-a31b-72f8-95e8-b9fb829018b6",
+      "photoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+      "poseId": "front-relaxed",
+      "priorMediaReference": "media://01a054d6-a9c5-700e-8ae9-cb449a0fab36",
+      "priorPhotoId": "canonical_photo_user_founder_001_2026-08-22_front_relaxed",
+      "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22"
+     },
+     {
+      "mediaReference": "media://01a0bf14-a130-765d-9727-bb61af16011a",
+      "photoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+      "poseId": "right-side-relaxed",
+      "priorMediaReference": "media://01a054d6-a92d-7160-a2a4-dc63a64ac249",
+      "priorPhotoId": "canonical_photo_user_founder_001_2026-08-22_right_side_relaxed",
+      "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22"
+     }
+    ],
+    "sessionRevision": 1
+   },
+   "evidenceReferences": [
+    "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+    "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+    "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+    "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+    "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+   ],
+   "generatedAt": "2026-09-20T17:51:47.391Z",
+   "goalCompletionHandoff": null,
+   "goalConfidence": {
+    "assessmentContext": {
+     "goalAchievement": "in_progress",
+     "goalContractId": "goal_contract_v3|5300087fcac0ddd1960fe4c4a8d3983b820c10b865fb09b54af1eb9623eb0dea",
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+     "strategyRevisionId": "phase_strategy|ba790d5efced3109354c8f54|v1"
+    },
+    "assessmentDate": "2026-09-20T17:51:47.485Z",
+    "assessmentId": "confidence_assessment_v3|0ff19ae2e832816992efdebb2c09d8db51394289e78e75972b56c69cf2c6c1b1",
+    "assessmentTimestamp": "2026-09-20T17:51:47.485Z",
+    "band": "moderate",
+    "canonicalPhotoSessionId": "photo_session_user_founder_001_2026-09-19",
+    "captureSemantics": "canonical_v3_assessment_at_atomic_publication",
+    "capturedAt": "2026-09-20T17:51:47.579Z",
+    "coachTake": "You are more than halfway to the 10 lb lean-mass goal. The last DEXA still supports the plan. The plan is working. Stay consistent. Keep executing. The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered.",
+    "delta": 0,
+    "evidenceCutoff": "2026-09-20T06:59:59.999Z",
+    "explanationModel": {
+     "band": "moderate",
+     "limitingFactors": [
+      "One excellent response does not guarantee the same result until the next DEXA.",
+      "Meaningful missed work or persistent departures from the plan.",
+      "Body fat moving outside the intended range of 8\u20139."
+     ],
+     "movement": "no_meaningful_change",
+     "movementLabel": "No meaningful change",
+     "movementMagnitude": "none",
+     "nextDecisiveEvidence": [
+      {
+       "capabilityAlternatives": [
+        [
+         "body_composition.lean_mass",
+         "body_composition.body_fat_percentage"
+        ]
+       ],
+       "displayName": "DEXA",
+       "grammaticalNumber": "singular",
+       "namedFromBinding": true,
+       "purpose": "confirm_persistence",
+       "requestIds": [
+        "evidence_request|phase_strategy|ba790d5efced3109354c8f54|v1|confirm_persistence"
+       ],
+       "timing": {
+        "cadenceDays": null,
+        "scheduledAt": null
+       }
+      }
+     ],
+     "score": 79,
+     "sourceAssessmentId": "confidence_assessment_v3|0ff19ae2e832816992efdebb2c09d8db51394289e78e75972b56c69cf2c6c1b1",
+     "sourceCutoff": "2026-09-20T06:59:59.999Z",
+     "sourcePublisher": "photo_event_briefing",
+     "summary": "Confidence holds. Nothing new changes the outlook for the goal.",
+     "supportingFactors": [
+      "You added 5.0 lb of lean mass since August 15.",
+      "Body fat stayed controlled at 8.1%.",
+      "4.2 lb remain with 49 days left."
+     ]
+    },
+    "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "latestMeaningfulMovement": {
+     "assessmentId": "confidence_assessment_v3|7ebdf0a5df96a6e3b90e0d7f2b438aafb2baff5873aa3b11727977e821d4cf8a",
+     "delta": 17,
+     "movement": "increase",
+     "percentage": 79
+    },
+    "limitingReasons": [
+     "One excellent response does not guarantee the same result until the next DEXA.",
+     "Meaningful missed work or persistent departures from the plan.",
+     "Body fat moving outside the intended range of 8\u20139."
+    ],
+    "modelVersion": "canonical_confidence_assessment_v3",
+    "movementDirection": "held",
+    "movementLabel": "No meaningful change",
+    "movementMagnitude": "none",
+    "narrativeDetail": "Nothing in the current evidence calls for a change. The next DEXA already established that the build plan is working.\n\nYou are more than halfway to the 10 lb lean-mass goal. The build plan is working, and nothing here changes that conclusion.\n\nStay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.\n\nThe next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered.\n\nConfidence \u00b7 79% \u2014\nConfidence holds. Nothing new changes the outlook for the goal.",
+    "narrativePresentationV3": {
+     "assumptions": [
+      "The outlook depends on appropriate continued execution.",
+      "The forecast uses a reduced recent rate, not an assumption that the latest result repeats exactly.",
+      "Consistent execution supports the outlook, but any progress since the last outcome check is still unconfirmed.",
+      "This is a coaching outlook, not a measured statistical probability."
+     ],
+     "coachTake": "You are more than halfway to the 10 lb lean-mass goal. The last DEXA still supports the plan. The plan is working. Stay consistent. Keep executing. The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered.",
+     "latestMeaningfulMovement": {
+      "assessmentId": "confidence_assessment_v3|7ebdf0a5df96a6e3b90e0d7f2b438aafb2baff5873aa3b11727977e821d4cf8a",
+      "delta": 17,
+      "movement": "increase",
+      "percentage": 79
+     },
+     "nextEvidence": "The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered.",
+     "schemaVersion": "confidence_narrative_presentation_v3",
+     "sections": {
+      "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+      "confidence": "Confidence \u00b7 79% \u2014\nConfidence holds. Nothing new changes the outlook for the goal.",
+      "meaning": "You are more than halfway to the 10 lb lean-mass goal. The build plan is working, and nothing here changes that conclusion.",
+      "result": "Nothing in the current evidence calls for a change. The next DEXA already established that the build plan is working.",
+      "watch": "The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered."
+     },
+     "whatCouldLowerIt": [
+      "Meaningful missed work or persistent departures from the plan.",
+      "Body fat moving outside the intended range of 8\u20139.",
+      "Training performance materially declining.",
+      "Progress stalling or a new result contradicting the current outlook.",
+      "Falling far enough behind that there is no longer enough time to finish the goal."
+     ],
+     "whatCouldRaiseIt": [
+      "Consistent execution can strengthen confidence before the next DEXA.",
+      "The next DEXA showing that the progress continues.",
+      "Reaching the goal."
+     ],
+     "whatIncreasedIt": [
+      "You added 5.0 lb of lean mass since August 15.",
+      "Body fat stayed controlled at 8.1%."
+     ],
+     "whatIsHoldingItBack": [
+      "One excellent response does not guarantee the same result until the next DEXA."
+     ],
+     "whatSupportsItNow": [
+      "4.2 lb remain with 49 days left."
+     ],
+     "whyConfidence": "You are more than halfway to the 10 lb lean-mass goal. The build plan is clearly working. There is enough time to finish ahead of schedule if this level of progress continues."
+    },
+    "narrativeSections": {
+     "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+     "confidence": "Confidence \u00b7 79% \u2014\nConfidence holds. Nothing new changes the outlook for the goal.",
+     "meaning": "You are more than halfway to the 10 lb lean-mass goal. The build plan is working, and nothing here changes that conclusion.",
+     "result": "Nothing in the current evidence calls for a change. The next DEXA already established that the build plan is working.",
+     "watch": "The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered."
+    },
+    "narrativeSummary": "Nothing in the current evidence calls for a change.",
+    "originatingArtifactId": "event_briefing_progress_photo_photo_session_user_founder_001_2026-09-19",
+    "originatingPublisher": "photo_event_briefing",
+    "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+    "piVersion": "confidence_v3",
+    "presentationExplanation": "Confidence holds. Nothing new changes the outlook for the goal.",
+    "presentationMovementLabel": "No meaningful change",
+    "primaryReason": "Confidence holds. Nothing new changes the outlook for the goal.",
+    "priorScore": 79,
+    "score": 79,
+    "source": "canonical_confidence_v3_snapshot",
+    "supportingReasons": [
+     "You added 5.0 lb of lean mass since August 15.",
+     "Body fat stayed controlled at 8.1%.",
+     "4.2 lb remain with 49 days left."
+    ],
+    "temporalCutoff": "2026-09-20T06:59:59.999Z",
+    "unresolvedUncertainty": [
+     {
+      "evidenceIds": [],
+      "materiality": "high",
+      "reasons": [
+       "repeat_qualifying_response_required"
+      ],
+      "type": "persistence",
+      "uncertaintyId": "uncertainty|persistence|3ef7d1ce8162ef26"
+     },
+     {
+      "evidenceIds": [],
+      "materiality": "moderate",
+      "reasons": [
+       "causal_contribution_not_fully_resolved"
+      ],
+      "type": "causal_attribution",
+      "uncertaintyId": "uncertainty|causal_attribution|ed024df86b0e8926"
+     },
+     {
+      "evidenceIds": [],
+      "materiality": "moderate",
+      "reasons": [
+       "unassessed:goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_recovery"
+      ],
+      "type": "guardrail",
+      "uncertaintyId": "uncertainty|guardrail|d117208ae5dc8b78"
+     }
+    ]
+   },
+   "goalContext": {
+    "activeGoal": {
+     "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "status": "active",
+     "title": "Build Lean Mass"
+    },
+    "activePhase": {
+     "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+     "name": "Lean Mass Build",
+     "plannedReviewAt": "2026-10-31",
+     "reviewState": "not_required",
+     "startedAt": "2026-08-15",
+     "status": "active"
+    },
+    "completedPriorGoal": {
+     "id": "goal_visible_abs_at_rest",
+     "status": "completed",
+     "title": "Visible abs at rest"
+    },
+    "evidenceDate": "2026-09-19",
+    "futureMilestone": {
+     "date": "2026-10-09",
+     "id": "execution_next_dexa",
+     "label": "DEXA on Friday, Oct 9 at 7:00 AM",
+     "source": "execution_item"
+    },
+    "latestCompletedDexa": {
+     "androidFatPercentage": 5.8,
+     "androidGynoidRatio": 0.73,
+     "bodyFatPercentage": 8.1,
+     "boneDensity": {
+      "tScore": 0.3,
+      "totalBMD": 1.235,
+      "totalBMDUnit": "g/cm2",
+      "zScore": 0.3
+     },
+     "boneMineralContent": {
+      "unit": "lb",
+      "value": 7.2
+     },
+     "canonicalId": "dexa_scan|user_founder_001|2026-09-12",
+     "canonicalLifecycleStatus": "current",
+     "captured_at": "2026-09-13T02:08:43.147Z",
+     "confidence": {
+      "extraction": "high",
+      "interpretation": "high"
+     },
+     "createdAt": "2026-09-13T02:08:43.147Z",
+     "dexaRevision": {
+      "logicalScanKey": "dexa_scan|user_founder_001|2026-09-12",
+      "priorSemanticFingerprint": null,
+      "revisedAt": null,
+      "revision": 1,
+      "schemaVersion": "canonical-dexa-scan-revision-v1",
+      "semanticFingerprint": "sha256_d06c092bd2dada5fcf78fa6c00ff25c0070ec701912b5109bb8a5d893047b029",
+      "sourceEvidenceObjectId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+      "sourceEvidencePackageId": "dexa_package_2026-09-12",
+      "sourceReviewId": "evidence_review_44462ABB3969473DA82FBF2B46A504EF"
+     },
+     "evidence_type": "dexa_scan",
+     "fatMass": {
+      "unit": "lb",
+      "value": 14.2
+     },
+     "fieldProvenance": {
+      "regionalAssessment": "9-12-26-DEXA.pdf",
+      "summary": "9-12-26-DEXA.pdf",
+      "supplementalMetrics": "9-12-26-DEXA.pdf"
+     },
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "goalPhaseAttribution": {
+      "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+      "source": "legacy_effective_date_fallback"
+     },
+     "gynoidFatPercentage": 7.9,
+     "id": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+     "leanMass": {
+      "unit": "lb",
+      "value": 153.3
+     },
+     "measuredAt": "2026-09-12",
+     "muscleBalance": {
+      "leftArm": null,
+      "leftLeg": null,
+      "rightArm": null,
+      "rightLeg": null
+     },
+     "observed_at": "2026-09-12",
+     "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+     "provenance": {
+      "extraction_engine": "pdfjs-dist",
+      "extraction_engine_version": "pdfjs-dist@6.1.200",
+      "fixture": false,
+      "interpreter_version": "bodyspec-pdf-v4",
+      "source_artifact_refs": [
+       "9-12-26-DEXA.pdf"
+      ]
+     },
+     "provider": "BodySpec",
+     "quality": {
+      "limitations": [],
+      "status": "rich"
+     },
+     "rawReportPath": "9-12-26-DEXA.pdf",
+     "reconciliation": {
+      "duplicate_detection_identity": "BodySpec|2026-09-12|174.7|8.1|14.2|153.3|7.2",
+      "duplicate_of_existing_scan": false,
+      "historical_tables_ignored_for_evidence_creation": true
+     },
+     "regionalAssessment": {
+      "android": {
+       "bodyFatPercentage": 5.8,
+       "boneMineralContent": {
+        "unit": "lb",
+        "value": 0.2
+       },
+       "fatMass": {
+        "unit": "lb",
+        "value": 0.7
+       },
+       "leanMass": {
+        "unit": "lb",
+        "value": 10.8
+       },
+       "totalMass": {
+        "unit": "lb",
+        "value": 11.6
+       }
+      },
+      "arms": {
+       "bodyFatPercentage": 5.9,
+       "boneMineralContent": {
+        "unit": "lb",
+        "value": 1.1
+       },
+       "fatMass": {
+        "unit": "lb",
+        "value": 1.5
+       },
+       "leanMass": {
+        "unit": "lb",
+        "value": 23.6
+       },
+       "totalMass": {
+        "unit": "lb",
+        "value": 26.3
+       }
+      },
+      "gynoid": {
+       "bodyFatPercentage": 7.9,
+       "boneMineralContent": {
+        "unit": "lb",
+        "value": 0.7
+       },
+       "fatMass": {
+        "unit": "lb",
+        "value": 2.1
+       },
+       "leanMass": {
+        "unit": "lb",
+        "value": 24.4
+       },
+       "totalMass": {
+        "unit": "lb",
+        "value": 27.2
+       }
+      },
+      "legs": {
+       "bodyFatPercentage": 8.7,
+       "boneMineralContent": {
+        "unit": "lb",
+        "value": 2.8
+       },
+       "fatMass": {
+        "unit": "lb",
+        "value": 5.3
+       },
+       "leanMass": {
+        "unit": "lb",
+        "value": 52.6
+       },
+       "totalMass": {
+        "unit": "lb",
+        "value": 60.7
+       }
+      },
+      "total": {
+       "bodyFatPercentage": 8.1,
+       "boneMineralContent": {
+        "unit": "lb",
+        "value": 7.2
+       },
+       "fatMass": {
+        "unit": "lb",
+        "value": 14.2
+       },
+       "leanMass": {
+        "unit": "lb",
+        "value": 153.3
+       },
+       "totalMass": {
+        "unit": "lb",
+        "value": 174.7
+       }
+      },
+      "trunk": {
+       "bodyFatPercentage": 7.2,
+       "boneMineralContent": {
+        "unit": "lb",
+        "value": 2
+       },
+       "fatMass": {
+        "unit": "lb",
+        "value": 5.6
+       },
+       "leanMass": {
+        "unit": "lb",
+        "value": 70.2
+       },
+       "totalMass": {
+        "unit": "lb",
+        "value": 77.8
+       }
+      }
+     },
+     "relatedGoalIds": [
+      "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+     ],
+     "removed": false,
+     "restingMetabolicRate": {
+      "unit": "kcal/day",
+      "value": 1847
+     },
+     "source": {
+      "application": "BodySpec",
+      "confidence": "high",
+      "modality": "pdf",
+      "name": "BodySpec",
+      "source_artifact_refs": [
+       "9-12-26-DEXA.pdf"
+      ],
+      "type": "dexa"
+     },
+     "sourceFileId": "9-12-26-DEXA.pdf",
+     "totalMass": {
+      "unit": "lb",
+      "value": 174.7
+     },
+     "updatedAt": "2026-09-13T05:51:51.983Z",
+     "userId": "user_founder_001",
+     "version": 1,
+     "visceralAdiposeTissue": {
+      "mass": {
+       "unit": "lb",
+       "value": 0.2
+      },
+      "volume": {
+       "unit": "in3",
+       "value": 5.83
+      }
+     },
+     "visceralFat": null
+    },
+    "operatingState": {
+     "label": null,
+     "value": "calibration"
+    }
+   },
+   "goalMeaning": "The photos fit what we would expect while you settle into maintenance. One week is far too soon to claim new muscle.",
+   "hero": {
+    "body": "Nothing in the current evidence calls for a change. The next DEXA already established that the build plan is working.",
+    "title": "Nothing in the current evidence calls for a change."
+   },
+   "id": "photo_event_narrative_photo_session_user_founder_001_2026-09-19",
+   "keyVisibleChanges": [
+    "Shoulder muscles appear fuller and more rounded with clearer separation.",
+    "Arms show increased fullness and more visible vascularity indicating muscle development.",
+    "Waist line appears slightly more tapered and less soft than before.",
+    "Upper abdominal muscles and obliques show slightly clearer definition and reduced softness."
+   ],
+   "nextMilestone": {
+    "date": "2026-10-09",
+    "id": "execution_next_dexa",
+    "label": "DEXA on Friday, Oct 9 at 7:00 AM",
+    "source": "execution_item"
+   },
+   "overallSummary": "Waist line appears slightly more tapered and less soft than before.",
+   "photoSessionId": "photo_session_user_founder_001_2026-09-19",
+   "poseInterpretations": [
+    {
+     "comparisonMode": "historical_comparison",
+     "confidence": "moderate",
+     "contributesToGoalValidation": true,
+     "currentPhotoSessionId": "photo_session_user_founder_001_2026-09-19",
+     "currentViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+     "establishesBaseline": false,
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "goalRelevance": "primary",
+     "limitingFactors": [],
+     "observations": [
+      "Shoulder muscles appear fuller and more rounded with clearer separation.",
+      "Arms show increased fullness and more visible vascularity indicating muscle development.",
+      "Waist line appears slightly more tapered and less soft than before.",
+      "Upper abdominal muscles and obliques show slightly clearer definition and reduced softness."
+     ],
+     "poseIdentity": {
+      "contractionState": "relaxed",
+      "customLabel": null,
+      "label": "Front Relaxed",
+      "orientation": "front",
+      "poseId": "front-relaxed",
+      "poseVariant": "standard"
+     },
+     "priorMatchFound": true,
+     "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22",
+     "priorViewId": "canonical_photo_user_founder_001_2026-08-22_front_relaxed"
+    },
+    {
+     "comparisonMode": "historical_comparison",
+     "confidence": "moderate",
+     "contributesToGoalValidation": false,
+     "currentPhotoSessionId": "photo_session_user_founder_001_2026-09-19",
+     "currentViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+     "establishesBaseline": false,
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "goalRelevance": "supporting",
+     "limitingFactors": [],
+     "observations": [
+      "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+      "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+      "Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning."
+     ],
+     "poseIdentity": {
+      "contractionState": "relaxed",
+      "customLabel": null,
+      "label": "Rear Relaxed",
+      "orientation": "rear",
+      "poseId": "back-relaxed",
+      "poseVariant": "standard"
+     },
+     "priorMatchFound": true,
+     "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22",
+     "priorViewId": "canonical_photo_user_founder_001_2026-08-22_back_relaxed"
+    },
+    {
+     "comparisonMode": "historical_comparison",
+     "confidence": "moderate",
+     "contributesToGoalValidation": false,
+     "currentPhotoSessionId": "photo_session_user_founder_001_2026-09-19",
+     "currentViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+     "establishesBaseline": false,
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "goalRelevance": "supporting",
+     "limitingFactors": [],
+     "observations": [
+      "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+      "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+     ],
+     "poseIdentity": {
+      "contractionState": "flexed",
+      "customLabel": null,
+      "label": "Rear Flexed \u2014 Double Biceps",
+      "orientation": "rear",
+      "poseId": "back-flexed",
+      "poseVariant": "double_biceps"
+     },
+     "priorMatchFound": true,
+     "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22",
+     "priorViewId": "canonical_photo_user_founder_001_2026-08-22_back_flexed"
+    },
+    {
+     "comparisonMode": "historical_comparison",
+     "confidence": "moderate",
+     "contributesToGoalValidation": false,
+     "currentPhotoSessionId": "photo_session_user_founder_001_2026-09-19",
+     "currentViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+     "establishesBaseline": false,
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "goalRelevance": "supporting",
+     "limitingFactors": [],
+     "observations": [
+      "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+      "Shoulders maintain size and visible muscle fullness without apparent loss or gain.",
+      "Arm muscle fullness and shape are consistent between photos indicating retained muscularity."
+     ],
+     "poseIdentity": {
+      "contractionState": "relaxed",
+      "customLabel": null,
+      "label": "Right Side Relaxed",
+      "orientation": "right_side",
+      "poseId": "right-side-relaxed",
+      "poseVariant": "standard"
+     },
+     "priorMatchFound": true,
+     "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22",
+     "priorViewId": "canonical_photo_user_founder_001_2026-08-22_right_side_relaxed"
+    },
+    {
+     "comparisonMode": "historical_comparison",
+     "confidence": "moderate",
+     "contributesToGoalValidation": false,
+     "currentPhotoSessionId": "photo_session_user_founder_001_2026-09-19",
+     "currentViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+     "establishesBaseline": false,
+     "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "goalRelevance": "supporting",
+     "limitingFactors": [],
+     "observations": [
+      "Waistline appears visibly tighter and less soft compared to previous photo.",
+      "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+      "Chest and shoulders maintain muscle fullness and definition without visible loss."
+     ],
+     "poseIdentity": {
+      "contractionState": "flexed",
+      "customLabel": null,
+      "label": "Front Flexed",
+      "orientation": "front",
+      "poseId": "front-flexed",
+      "poseVariant": "standard"
+     },
+     "priorMatchFound": true,
+     "priorPhotoSessionId": "photo_session_user_founder_001_2026-08-22",
+     "priorViewId": "canonical_photo_user_founder_001_2026-08-22_front_flexed"
+    }
+   ],
+   "previousSessions": [
+    "2026-08-22"
+   ],
+   "provenance": {
+    "synthesisId": "analysis_photo_session_user_founder_001_2026_09_19_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1_v1_canonical_photo_user_founder_001_2026_08_22_front_flexed_photo_interpreter_production_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2_v1_canonical_photo_user_founder_001_2026_08_22_back_relaxed_photo_interpreter_production_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3_v1_canonical_photo_user_founder_001_2026_08_22_back_flexed_photo_interpreter_production_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4_v1_canonical_photo_user_founder_001_2026_08_22_right_side_relaxed_photo_interpreter_production_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5_v1_canonical_photo_user_founder_001_2026_08_22_front_relaxed_photo_interpreter_production_v1_synthesis_v1",
+    "synthesisSource": "persisted_analysis",
+    "version": "photo_event_v4_0_0"
+   },
+   "sourceMode": "canonical_photo_session",
+   "stableSignals": [
+    "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+   ],
+   "strategicMeaningV3": {
+    "action": "Stay the course. There is no reason to change the plan right now. Keep executing consistently. Reconsider only if something meaningful changes.",
+    "coachTake": "You are more than halfway to the 10 lb lean-mass goal. The last DEXA still supports the plan. The plan is working. Stay consistent. Keep executing. The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered.",
+    "confidence": "Confidence \u00b7 79% \u2014\nConfidence holds. Nothing new changes the outlook for the goal.",
+    "meaning": "You are more than halfway to the 10 lb lean-mass goal. The build plan is working, and nothing here changes that conclusion.",
+    "result": "Nothing in the current evidence calls for a change. The next DEXA already established that the build plan is working.",
+    "watch": "The next DEXA is about whether this kind of progress continues while body fat stays in a good place\u2014not whether the plan works. That question has been answered."
+   },
+   "supportingEvidence": {
+    "dexa": "Latest DEXA: 8.1% body fat",
+    "weight": "172.7 lb"
+   }
+  },
+  "version": "photo_event_v4_0_0"
+ },
+ "cadence": "event",
+ "confidencePublication": {
+  "assessmentId": "confidence_assessment_v3|0ff19ae2e832816992efdebb2c09d8db51394289e78e75972b56c69cf2c6c1b1",
+  "intelligenceRunId": "confidence_v3|photo|event_briefing_progress_photo_photo_session_user_founder_001_2026-09-19",
+  "originatingBriefingId": "event_briefing_progress_photo_photo_session_user_founder_001_2026-09-19",
+  "publicationCutoff": "2026-09-20T06:59:59.999Z",
+  "publisherType": "photo_event_briefing",
+  "schemaVersion": "briefing_confidence_binding_v3"
+ },
+ "generatedAt": "2026-09-20T17:51:47.391Z",
+ "id": "event_briefing_progress_photo_photo_session_user_founder_001_2026-09-19",
+ "lifecycle": {
+  "consumedAt": null,
+  "openedAt": null
+ },
+ "trigger": {
+  "evidenceId": "photo_session_user_founder_001_2026-09-19",
+  "evidenceType": "photo_session"
+ },
+ "userId": "user_founder_001",
+ "version": 1
+}

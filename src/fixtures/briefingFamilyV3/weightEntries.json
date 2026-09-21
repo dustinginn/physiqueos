@@ -1,0 +1,5410 @@
+[
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-06-29T13:32:32.386Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_29",
+  "measuredAt": "2026-06-29",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-06-29T13:32:32.386Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 167.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-06-30T12:52:43.903Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_30",
+  "measuredAt": "2026-06-30",
+  "notes": "Sleeping deeply the last couple nights but only got about 7 hours the last 2 nights.",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-06-30T12:52:43.903Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 166.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "correctionHistory": [
+   {
+    "correctedAt": "2026-07-04T16:38:48.285Z",
+    "previousEntry": {
+     "context": {
+      "conditions": [],
+      "confidence": "high",
+      "intakeState": "before_food_water",
+      "isDefault": true,
+      "notes": null,
+      "nutritionState": "fasted",
+      "scale": "normal_home_scale",
+      "timing": "morning"
+     },
+     "createdAt": "2026-07-04T16:33:12.344Z",
+     "fieldProvenance": {
+      "computed": [],
+      "imported": [
+       "measuredAt",
+       "weight.value",
+       "weight.unit",
+       "relatedGoalIds",
+       "context",
+       "notes"
+      ]
+     },
+     "id": "weight_2026_07_04",
+     "measuredAt": "2026-07-04",
+     "notes": "need to correct this morning's weight that logged as 166.7. I punched it in wrong.",
+     "relatedGoalIds": [
+      "goal_maintain_8_9_body_fat",
+      "goal_visible_abs_at_rest"
+     ],
+     "reliability": "high",
+     "source": {
+      "confidence": "high",
+      "externalId": null,
+      "importedAt": null,
+      "name": "Morning Check-In",
+      "notes": "Manual morning weight overrides imported weight for the same day.",
+      "type": "manual"
+     },
+     "updatedAt": "2026-07-04T16:33:12.344Z",
+     "userId": "user_founder_001",
+     "weight": {
+      "unit": "lb",
+      "value": 167.5
+     }
+    },
+    "reason": "Same-day authoritative weight correction."
+   },
+   {
+    "correctedAt": "2026-07-04T17:07:28.920Z",
+    "previousEntry": {
+     "context": {
+      "conditions": [],
+      "confidence": "high",
+      "intakeState": "before_food_water",
+      "isDefault": true,
+      "notes": null,
+      "nutritionState": "fasted",
+      "scale": "normal_home_scale",
+      "timing": "morning"
+     },
+     "correctionHistory": [
+      {
+       "correctedAt": "2026-07-04T16:38:48.285Z",
+       "previousEntry": {
+        "context": {
+         "conditions": [],
+         "confidence": "high",
+         "intakeState": "before_food_water",
+         "isDefault": true,
+         "notes": null,
+         "nutritionState": "fasted",
+         "scale": "normal_home_scale",
+         "timing": "morning"
+        },
+        "createdAt": "2026-07-04T16:33:12.344Z",
+        "fieldProvenance": {
+         "computed": [],
+         "imported": [
+          "measuredAt",
+          "weight.value",
+          "weight.unit",
+          "relatedGoalIds",
+          "context",
+          "notes"
+         ]
+        },
+        "id": "weight_2026_07_04",
+        "measuredAt": "2026-07-04",
+        "notes": "need to correct this morning's weight that logged as 166.7. I punched it in wrong.",
+        "relatedGoalIds": [
+         "goal_maintain_8_9_body_fat",
+         "goal_visible_abs_at_rest"
+        ],
+        "reliability": "high",
+        "source": {
+         "confidence": "high",
+         "externalId": null,
+         "importedAt": null,
+         "name": "Morning Check-In",
+         "notes": "Manual morning weight overrides imported weight for the same day.",
+         "type": "manual"
+        },
+        "updatedAt": "2026-07-04T16:33:12.344Z",
+        "userId": "user_founder_001",
+        "weight": {
+         "unit": "lb",
+         "value": 167.5
+        }
+       },
+       "reason": "Same-day authoritative weight correction."
+      }
+     ],
+     "createdAt": "2026-07-04T16:48:22.716Z",
+     "fieldProvenance": {
+      "computed": [],
+      "imported": [
+       "measuredAt",
+       "weight.value",
+       "weight.unit",
+       "relatedGoalIds",
+       "context",
+       "notes"
+      ]
+     },
+     "id": "weight_2026_07_04",
+     "measuredAt": "2026-07-04",
+     "notes": "Validation correction: preserve one authoritative morning weight.",
+     "relatedGoalIds": [
+      "goal_maintain_8_9_body_fat",
+      "goal_visible_abs_at_rest"
+     ],
+     "reliability": "high",
+     "source": {
+      "confidence": "high",
+      "externalId": null,
+      "importedAt": null,
+      "name": "Morning Check-In",
+      "notes": "Manual morning weight overrides imported weight for the same day.",
+      "type": "manual"
+     },
+     "updatedAt": "2026-07-04T16:48:22.716Z",
+     "userId": "user_founder_001",
+     "weight": {
+      "unit": "lb",
+      "value": 166.8
+     }
+    },
+    "reason": "Same-day authoritative weight correction."
+   }
+  ],
+  "createdAt": "2026-07-04T17:07:28.920Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_04",
+  "measuredAt": "2026-07-04",
+  "notes": "Correction validation: authoritative morning weight is 167.5 lb.",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-04T17:07:28.920Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 167.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-05T14:05:37.479Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_05",
+  "measuredAt": "2026-07-05",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-05T14:05:37.479Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 166.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-06T13:53:32.404Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_06",
+  "measuredAt": "2026-07-06",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-06T13:53:32.404Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 166.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-07T13:32:22.452Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_07",
+  "measuredAt": "2026-07-07",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-07T13:32:22.452Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-08T13:26:45.960Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_08",
+  "measuredAt": "2026-07-08",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-08T13:26:45.960Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-09T13:10:12.629Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_09",
+  "measuredAt": "2026-07-09",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-09T13:10:12.629Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-10T12:47:03.530Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_10",
+  "measuredAt": "2026-07-10",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-10T12:47:03.530Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.7
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-11T14:20:32.060Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_11",
+  "measuredAt": "2026-07-11",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-11T14:20:32.060Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.1
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-12T16:27:03.718Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_12",
+  "measuredAt": "2026-07-12",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-12T16:27:03.718Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-13T13:22:02.462Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": []
+  },
+  "id": "weight_2026_07_13",
+  "measuredAt": "2026-07-13",
+  "notes": null,
+  "relatedGoalIds": [],
+  "reliability": "confirmed",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "PhysiqueOS",
+   "notes": "",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-13T13:22:02.462Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-14T13:58:42.679Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_14",
+  "measuredAt": "2026-07-14",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-14T13:58:42.679Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-15T13:38:08.628Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_15",
+  "measuredAt": "2026-07-15",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-15T13:38:08.628Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 163.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-16T13:07:30.679Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_16",
+  "measuredAt": "2026-07-16",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-16T13:07:30.679Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.7
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-17T12:56:35.457Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_17",
+  "measuredAt": "2026-07-17",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-17T12:56:35.457Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-18T13:33:50.034Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_18",
+  "measuredAt": "2026-07-18",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-18T13:33:50.034Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-19T14:40:31.299Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_19",
+  "measuredAt": "2026-07-19",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-19T14:40:31.299Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-20T14:11:00.228Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_20",
+  "measuredAt": "2026-07-20",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-20T14:11:00.228Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-21T14:55:06.669Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_21",
+  "measuredAt": "2026-07-21",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-21T14:55:06.669Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-22T13:42:53.108Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_22",
+  "measuredAt": "2026-07-22",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-22T13:42:53.108Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 163.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-23T13:11:01.090Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_23",
+  "measuredAt": "2026-07-23",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-23T13:11:01.090Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-24T13:37:21.202Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_24",
+  "measuredAt": "2026-07-24",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-24T13:37:21.202Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-25T16:25:19.546Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_25",
+  "measuredAt": "2026-07-25",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-25T16:25:19.546Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-26T14:17:47.093Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_26",
+  "measuredAt": "2026-07-26",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-26T14:17:47.093Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-27T12:59:05.500Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_27",
+  "measuredAt": "2026-07-27",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-27T12:59:05.500Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-28T13:41:22.308Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_28",
+  "measuredAt": "2026-07-28",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-28T13:41:22.308Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-30T03:48:21.252Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_29",
+  "measuredAt": "2026-07-29",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-30T03:48:21.252Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-30T12:52:59.507Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_30",
+  "measuredAt": "2026-07-30",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-30T12:52:59.507Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-07-31T14:08:26.514Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_31",
+  "measuredAt": "2026-07-31",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-07-31T14:08:26.514Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 166
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-01T14:17:02.786Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_01",
+  "measuredAt": "2026-08-01",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-01T14:17:02.786Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 167.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-02T15:24:17.685Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_02",
+  "measuredAt": "2026-08-02",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-02T15:24:17.685Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-03T23:56:42.304Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_03",
+  "measuredAt": "2026-08-03",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-03T23:56:42.304Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.7
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-04T14:25:33.769Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_04",
+  "measuredAt": "2026-08-04",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-04T14:25:33.769Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-05T12:25:04.226Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_05",
+  "measuredAt": "2026-08-05",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-05T12:25:04.226Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-06T13:00:41.413Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_06",
+  "measuredAt": "2026-08-06",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-06T13:00:41.413Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 166.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-07T13:42:38.626Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_07",
+  "measuredAt": "2026-08-07",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-07T13:42:38.626Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.1
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-08T21:17:39.150Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_08",
+  "measuredAt": "2026-08-08",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-08T21:17:39.150Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 164.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-10T01:39:23.377Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_09",
+  "measuredAt": "2026-08-09",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-10T01:39:23.377Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 166.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-10T13:23:26.487Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_10",
+  "measuredAt": "2026-08-10",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-10T13:23:26.487Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-11T13:46:05.401Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_11",
+  "measuredAt": "2026-08-11",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-11T13:46:05.401Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-12T13:07:01.163Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_12",
+  "measuredAt": "2026-08-12",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-12T13:07:01.163Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-13T12:57:50.072Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_13",
+  "measuredAt": "2026-08-13",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-13T12:57:50.072Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 166.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-14T13:29:49.957Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_14",
+  "measuredAt": "2026-08-14",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-14T13:29:49.957Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 166.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-15T14:29:35.543Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_15",
+  "measuredAt": "2026-08-15",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-15T14:29:35.543Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-16T19:07:18.500Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_16",
+  "measuredAt": "2026-08-16",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-16T19:07:18.500Z",
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 165.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-29T02:32:41.682Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_28",
+  "measuredAt": "2026-08-28",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-29T02:32:41.682Z",
+  "userId": "user_founder_001",
+  "version": 25,
+  "weight": {
+   "unit": "lb",
+   "value": 169.1
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-29T06:08:51.104Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_27",
+  "measuredAt": "2026-08-27",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-29T06:08:51.104Z",
+  "userId": "user_founder_001",
+  "version": 24,
+  "weight": {
+   "unit": "lb",
+   "value": 168.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-29T23:23:07.437Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_26",
+  "measuredAt": "2026-08-26",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-29T23:23:07.437Z",
+  "userId": "user_founder_001",
+  "version": 23,
+  "weight": {
+   "unit": "lb",
+   "value": 168.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-29T23:27:04.629Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_29",
+  "measuredAt": "2026-08-29",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-29T23:27:04.629Z",
+  "userId": "user_founder_001",
+  "version": 22,
+  "weight": {
+   "unit": "lb",
+   "value": 168.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T01:33:36.470Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_25",
+  "measuredAt": "2026-08-25",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T01:33:36.470Z",
+  "userId": "user_founder_001",
+  "version": 21,
+  "weight": {
+   "unit": "lb",
+   "value": 168.7
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T01:35:04.775Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_24",
+  "measuredAt": "2026-08-24",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T01:35:04.775Z",
+  "userId": "user_founder_001",
+  "version": 20,
+  "weight": {
+   "unit": "lb",
+   "value": 169
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T06:29:52.415Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_23",
+  "measuredAt": "2026-08-23",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T06:29:52.415Z",
+  "userId": "user_founder_001",
+  "version": 19,
+  "weight": {
+   "unit": "lb",
+   "value": 170.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T15:38:01.331Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_30",
+  "measuredAt": "2026-08-30",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T15:38:01.331Z",
+  "userId": "user_founder_001",
+  "version": 18,
+  "weight": {
+   "unit": "lb",
+   "value": 168.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T18:47:52.020Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_22",
+  "measuredAt": "2026-08-22",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T18:47:52.020Z",
+  "userId": "user_founder_001",
+  "version": 17,
+  "weight": {
+   "unit": "lb",
+   "value": 167.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T18:55:14.955Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_21",
+  "measuredAt": "2026-08-21",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T18:55:14.955Z",
+  "userId": "user_founder_001",
+  "version": 16,
+  "weight": {
+   "unit": "lb",
+   "value": 166.7
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T20:20:34.477Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_20",
+  "measuredAt": "2026-08-20",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T20:20:34.477Z",
+  "userId": "user_founder_001",
+  "version": 15,
+  "weight": {
+   "unit": "lb",
+   "value": 167.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T20:36:18.559Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_19",
+  "measuredAt": "2026-08-19",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T20:36:18.559Z",
+  "userId": "user_founder_001",
+  "version": 14,
+  "weight": {
+   "unit": "lb",
+   "value": 166.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T20:44:28.185Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_18",
+  "measuredAt": "2026-08-18",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T20:44:28.185Z",
+  "userId": "user_founder_001",
+  "version": 13,
+  "weight": {
+   "unit": "lb",
+   "value": 165.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-30T21:11:44.706Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_17",
+  "measuredAt": "2026-08-17",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-30T21:11:44.706Z",
+  "userId": "user_founder_001",
+  "version": 12,
+  "weight": {
+   "unit": "lb",
+   "value": 165.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-08-31T14:00:01.554Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_08_31",
+  "measuredAt": "2026-08-31",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-08-31T14:00:01.554Z",
+  "userId": "user_founder_001",
+  "version": 11,
+  "weight": {
+   "unit": "lb",
+   "value": 167.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-01T14:12:16.938Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_01",
+  "measuredAt": "2026-09-01",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-01T14:12:16.938Z",
+  "userId": "user_founder_001",
+  "version": 10,
+  "weight": {
+   "unit": "lb",
+   "value": 167.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-02T12:44:51.301Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_02",
+  "measuredAt": "2026-09-02",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-02T12:44:51.301Z",
+  "userId": "user_founder_001",
+  "version": 9,
+  "weight": {
+   "unit": "lb",
+   "value": 167.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-03T13:08:09.159Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_03",
+  "measuredAt": "2026-09-03",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-03T13:08:09.159Z",
+  "userId": "user_founder_001",
+  "version": 8,
+  "weight": {
+   "unit": "lb",
+   "value": 170
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-05T16:56:41.626Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_04",
+  "measuredAt": "2026-09-04",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-05T16:56:41.626Z",
+  "userId": "user_founder_001",
+  "version": 7,
+  "weight": {
+   "unit": "lb",
+   "value": 170.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-05T17:06:27.677Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_05",
+  "measuredAt": "2026-09-05",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-05T17:06:27.677Z",
+  "userId": "user_founder_001",
+  "version": 6,
+  "weight": {
+   "unit": "lb",
+   "value": 172.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-07T16:29:20.009Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_07",
+  "measuredAt": "2026-09-07",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-07T16:29:20.009Z",
+  "userId": "user_founder_001",
+  "version": 5,
+  "weight": {
+   "unit": "lb",
+   "value": 172.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-08T13:52:06.093Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_08",
+  "measuredAt": "2026-09-08",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-08T13:52:06.093Z",
+  "userId": "user_founder_001",
+  "version": 4,
+  "weight": {
+   "unit": "lb",
+   "value": 170.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-09T12:43:03.116Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_09",
+  "measuredAt": "2026-09-09",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-09T12:43:03.116Z",
+  "userId": "user_founder_001",
+  "version": 3,
+  "weight": {
+   "unit": "lb",
+   "value": 171.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-10T13:15:41.696Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_10",
+  "measuredAt": "2026-09-10",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-10T13:15:41.696Z",
+  "userId": "user_founder_001",
+  "version": 2,
+  "weight": {
+   "unit": "lb",
+   "value": 172.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-11T14:11:06.398Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_11",
+  "measuredAt": "2026-09-11",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-11T14:11:06.398Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "weight": {
+   "unit": "lb",
+   "value": 172.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-12T13:52:29.362Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_12",
+  "measuredAt": "2026-09-12",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-12T13:52:29.362Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "weight": {
+   "unit": "lb",
+   "value": 171.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-13T16:26:20.156Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_13",
+  "measuredAt": "2026-09-13",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-13T16:26:20.156Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "weight": {
+   "unit": "lb",
+   "value": 172.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-14T13:21:31.442Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_14",
+  "measuredAt": "2026-09-14",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-14T13:21:31.442Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "weight": {
+   "unit": "lb",
+   "value": 171.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-15T13:38:14.873Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_15",
+  "measuredAt": "2026-09-15",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-15T13:38:14.873Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "weight": {
+   "unit": "lb",
+   "value": 171.1
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-16T12:56:58.413Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_16",
+  "measuredAt": "2026-09-16",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-16T12:56:58.413Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "weight": {
+   "unit": "lb",
+   "value": 172.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-17T13:31:49.729Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_17",
+  "measuredAt": "2026-09-17",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-17T13:31:49.729Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "weight": {
+   "unit": "lb",
+   "value": 172.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-18T13:53:16.486Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_18",
+  "measuredAt": "2026-09-18",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-18T13:53:16.486Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "weight": {
+   "unit": "lb",
+   "value": 173
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": "2026-09-19T14:54:19.955Z",
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_09_19",
+  "measuredAt": "2026-09-19",
+  "notes": null,
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Morning Check-In",
+   "notes": "Manual morning weight overrides imported weight for the same day.",
+   "type": "manual"
+  },
+  "updatedAt": "2026-09-19T14:54:19.955Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "weight": {
+   "unit": "lb",
+   "value": 172.7
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_13",
+  "measuredAt": "2026-06-13",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 171.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_14",
+  "measuredAt": "2026-06-14",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 171.7
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_15",
+  "measuredAt": "2026-06-15",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 171.6
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_16",
+  "measuredAt": "2026-06-16",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 170.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_17",
+  "measuredAt": "2026-06-17",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 170.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_18",
+  "measuredAt": "2026-06-18",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 170.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_20",
+  "measuredAt": "2026-06-20",
+  "notes": "DEXA scan performed the same day. Morning home scale reading. Do not replace the DEXA body weight contained in the scan.",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 169.7
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_21",
+  "measuredAt": "2026-06-21",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 170.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_04",
+  "measuredAt": "2026-06-04",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 175.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_07",
+  "measuredAt": "2026-06-07",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 174.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_05",
+  "measuredAt": "2026-06-05",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 175.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_06",
+  "measuredAt": "2026-06-06",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 175
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_08",
+  "measuredAt": "2026-06-08",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 173.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_02",
+  "measuredAt": "2026-06-02",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 176.1
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_09",
+  "measuredAt": "2026-06-09",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 172.4
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_10",
+  "measuredAt": "2026-06-10",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 172.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_03",
+  "measuredAt": "2026-06-03",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 174.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_12",
+  "measuredAt": "2026-06-12",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 173.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_22",
+  "measuredAt": "2026-06-22",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 168.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_23",
+  "measuredAt": "2026-06-23",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 169.2
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_24",
+  "measuredAt": "2026-06-24",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 168.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_25",
+  "measuredAt": "2026-06-25",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 170.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_26",
+  "measuredAt": "2026-06-26",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 168.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_27",
+  "measuredAt": "2026-06-27",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 167.9
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_28",
+  "measuredAt": "2026-06-28",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 167.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_11",
+  "measuredAt": "2026-06-11",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 171.7
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_19",
+  "measuredAt": "2026-06-19",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 170.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_01",
+  "measuredAt": "2026-07-01",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 167.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_02",
+  "measuredAt": "2026-07-02",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 166.3
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_07_03",
+  "measuredAt": "2026-07-03",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 167.5
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_05_21",
+  "measuredAt": "2026-05-21",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 178
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_05_29",
+  "measuredAt": "2026-05-29",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 176.8
+  }
+ },
+ {
+  "context": {
+   "conditions": [],
+   "confidence": "high",
+   "intakeState": "before_food_water",
+   "isDefault": true,
+   "notes": null,
+   "nutritionState": "fasted",
+   "scale": "normal_home_scale",
+   "timing": "morning"
+  },
+  "createdAt": null,
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "weight.value",
+    "weight.unit",
+    "relatedGoalIds",
+    "context",
+    "notes"
+   ]
+  },
+  "id": "weight_2026_06_01",
+  "measuredAt": "2026-06-01",
+  "notes": "",
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_visible_abs_at_rest"
+  ],
+  "reliability": "high",
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "Founder",
+   "notes": "Verified founder manual morning weight history.",
+   "type": "manual"
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 26,
+  "weight": {
+   "unit": "lb",
+   "value": 177.1
+  }
+ }
+]

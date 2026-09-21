@@ -1,0 +1,4488 @@
+[
+ {
+  "androidFatPercentage": 19.4,
+  "androidGynoidRatio": 1.11,
+  "bodyFatPercentage": 17.6,
+  "boneDensity": {
+   "ageMatchedZScore": 0.6,
+   "tScore": null,
+   "totalBMD": 1.259,
+   "youngAdultZScore": 0.6,
+   "zScore": 0.6
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "createdAt": null,
+  "date": "2024-06-10",
+  "fatMass": {
+   "unit": "lb",
+   "value": 34.5
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 17.5,
+  "id": "dexa_2024_06_10",
+  "leanMass": {
+   "unit": "lb",
+   "value": 153.7
+  },
+  "measuredAt": "2024-06-10",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 13.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 14.2
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 16.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 26.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 33.9
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 16.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 14.8
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 16,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 28.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 35.4
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 19.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.6
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13.3
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 14.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 29
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 17.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 31.4
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 16.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 11.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 55.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 69.3
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 17.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.3
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 34.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 153.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 195.5
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 19.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 16.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 67.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 86.8
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1852
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2024-06-10-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 195.5
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.61
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 17.94
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 13.7,
+  "androidGynoidRatio": 0.99,
+  "bodyFatPercentage": 13.9,
+  "boneDensity": {
+   "ageMatchedZScore": 0.6,
+   "tScore": null,
+   "totalBMD": 1.257,
+   "youngAdultZScore": 0.6,
+   "zScore": 0.6
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.4
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.4
+  },
+  "createdAt": null,
+  "date": "2024-08-18",
+  "fatMass": {
+   "unit": "lb",
+   "value": 26.2
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 13.9,
+  "id": "dexa_2024_08_18",
+  "leanMass": {
+   "unit": "lb",
+   "value": 155.4
+  },
+  "measuredAt": "2024-08-18",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 10.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13.6
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 12.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 30.9
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 11.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13.6
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 13.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 26.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 32.4
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 13.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.9
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 11,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 27.2
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 13.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 30.1
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 12.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 8.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 52.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 63.3
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 13.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 26.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 155.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 188.9
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 14.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 13.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 72.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 88.3
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1867
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2024-08-18-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 188.9
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 1.08
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 31.63
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 21,
+  "androidGynoidRatio": 0.99,
+  "bodyFatPercentage": 19.8,
+  "boneDensity": {
+   "ageMatchedZScore": 0.7,
+   "tScore": null,
+   "totalBMD": 1.269,
+   "youngAdultZScore": 0.7,
+   "zScore": 0.7
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.4
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.4
+  },
+  "createdAt": null,
+  "date": "2025-08-08",
+  "fatMass": {
+   "unit": "lb",
+   "value": 37
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 21.2,
+  "id": "dexa_2025_08_08",
+  "leanMass": {
+   "unit": "lb",
+   "value": 142.8
+  },
+  "measuredAt": "2025-08-08",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 11.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.3
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 20.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 6.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 24.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 32.2
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 13.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13.2
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 19.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 6.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 34
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 21,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.6
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 9.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.5
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 12.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 21.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25.4
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 21.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 6
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 22.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 29.2
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 20.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 3
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 13.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 49.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 66.2
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 19.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 37
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 142.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 187.2
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 21.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 18.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 64
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 84.6
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1755
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2025-08-08-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 187.2
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.39
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 11.44
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 21.5,
+  "androidGynoidRatio": 1.14,
+  "bodyFatPercentage": 18.8,
+  "boneDensity": {
+   "ageMatchedZScore": 0.7,
+   "tScore": null,
+   "totalBMD": 1.274,
+   "youngAdultZScore": 0.7,
+   "zScore": 0.7
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.4
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.4
+  },
+  "createdAt": null,
+  "date": "2025-09-07",
+  "fatMass": {
+   "unit": "lb",
+   "value": 34.9
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 18.8,
+  "id": "dexa_2025_09_07",
+  "leanMass": {
+   "unit": "lb",
+   "value": 143.9
+  },
+  "measuredAt": "2025-09-07",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 12.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.6
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.8
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 16.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 24.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 31.6
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 13,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 16.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 32.8
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 21.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 9.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.7
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 12.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 21.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25.9
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 18.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 22.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 29
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 16.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.9
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 10.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 50.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 64.3
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 18.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 34.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 143.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 186.2
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 22.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 18.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 64
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 85
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1765
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2025-09-07-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 186.2
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.76
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 22.34
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 17.6,
+  "androidGynoidRatio": 0.97,
+  "bodyFatPercentage": 16.7,
+  "boneDensity": {
+   "ageMatchedZScore": 0.7,
+   "tScore": null,
+   "totalBMD": 1.27,
+   "youngAdultZScore": 0.7,
+   "zScore": 0.7
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "createdAt": null,
+  "date": "2025-10-08",
+  "fatMass": {
+   "unit": "lb",
+   "value": 30.7
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 18.2,
+  "id": "dexa_2025_10_08",
+  "leanMass": {
+   "unit": "lb",
+   "value": 145.9
+  },
+  "measuredAt": "2025-10-08",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 12.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.6
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 15.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 31.5
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 12.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.6
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.7
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 15.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 26
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 32.4
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 17.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 9.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 11.9
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 12.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 21.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25.3
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 18.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 28.9
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 15.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 9.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 51.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 63.9
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 16.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.3
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 30.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 145.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 183.9
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 18.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 15.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 66.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 83.9
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1782
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2025-10-08-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 183.9
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.81
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 23.84
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 17.5,
+  "androidGynoidRatio": 0.94,
+  "bodyFatPercentage": 16.7,
+  "boneDensity": {
+   "ageMatchedZScore": 0.5,
+   "tScore": null,
+   "totalBMD": 1.254,
+   "youngAdultZScore": 0.5,
+   "zScore": 0.5
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "createdAt": null,
+  "date": "2025-11-09",
+  "fatMass": {
+   "unit": "lb",
+   "value": 30.8
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 18.7,
+  "id": "dexa_2025_11_09",
+  "leanMass": {
+   "unit": "lb",
+   "value": 146.5
+  },
+  "measuredAt": "2025-11-09",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 11.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.7
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 15.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 31.7
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 12.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.6
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13.1
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 15.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 26.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 32.7
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 17.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 9.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.1
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 11.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 21.6
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25.8
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 18.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 22.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 28.9
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 15.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 10
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 51.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 64.3
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 16.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.3
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 30.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 146.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 184.7
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 18.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 15.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 65.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 83.8
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1788
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2025-11-09-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 184.7
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.84
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 24.52
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 11.7,
+  "androidGynoidRatio": 0.72,
+  "bodyFatPercentage": 14.1,
+  "boneDensity": {
+   "ageMatchedZScore": 0.6,
+   "tScore": null,
+   "totalBMD": 1.261,
+   "youngAdultZScore": 0.6,
+   "zScore": 0.6
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "createdAt": null,
+  "date": "2025-12-10",
+  "fatMass": {
+   "unit": "lb",
+   "value": 25.4
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 16.3,
+  "id": "dexa_2025_12_10",
+  "leanMass": {
+   "unit": "lb",
+   "value": 147.3
+  },
+  "measuredAt": "2025-12-10",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 10.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.6
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.4
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 14.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 24.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 30.8
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 11.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.8
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 14.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 31.6
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 11.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 11.6
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 11,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 21.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25.1
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 16.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 22.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 27.9
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 14.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.9
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 9.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 50.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 62.3
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 14.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.3
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 25.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 147.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 179.9
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 14,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 11.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 68.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 81.7
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1794
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2025-12-10-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 179.9
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.8
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 23.51
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 11.5,
+  "androidGynoidRatio": 0.81,
+  "bodyFatPercentage": 12.8,
+  "boneDensity": {
+   "ageMatchedZScore": 0.6,
+   "tScore": null,
+   "totalBMD": 1.259,
+   "youngAdultZScore": 0.6,
+   "zScore": 0.6
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "createdAt": null,
+  "date": "2026-01-16",
+  "fatMass": {
+   "unit": "lb",
+   "value": 23
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 14.2,
+  "id": "dexa_2026_01_16",
+  "leanMass": {
+   "unit": "lb",
+   "value": 149.4
+  },
+  "measuredAt": "2026-01-16",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 8.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.4
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 12.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 24.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 30.1
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 10,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.5
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 12.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 26.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 32.4
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 11.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 11.5
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 9.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 21.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 14.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 22.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 27.4
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 12.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 51.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 62.5
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 12.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.3
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 23
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 149.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 179.6
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 13.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 10.6
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 68.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 81.3
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1813
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2026-01-16-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 179.6
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.56
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 16.45
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 11.7,
+  "androidGynoidRatio": 0.86,
+  "bodyFatPercentage": 12.6,
+  "boneDensity": {
+   "ageMatchedZScore": 0.6,
+   "tScore": null,
+   "totalBMD": 1.262,
+   "youngAdultZScore": 0.6,
+   "zScore": 0.6
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.2
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.2
+  },
+  "createdAt": null,
+  "date": "2026-03-04",
+  "fatMass": {
+   "unit": "lb",
+   "value": 22.7
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 13.6,
+  "id": "dexa_2026_03_04",
+  "leanMass": {
+   "unit": "lb",
+   "value": 149.7
+  },
+  "measuredAt": "2026-03-04",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 7.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 0.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.7
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 12.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 26
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 31.2
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 9.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.9
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 12.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 27.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 32.8
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 11.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 11.9
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 8.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 22.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25.6
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 13.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 27.6
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 12.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.9
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 53.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 64
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 12.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 22.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 149.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 179.5
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 13.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 10.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 67
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 79.5
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1815
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2026-03-04-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 179.5
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.73
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 21.32
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 11.8,
+  "androidGynoidRatio": 0.86,
+  "bodyFatPercentage": 12.8,
+  "boneDensity": {
+   "ageMatchedZScore": 0.3,
+   "tScore": null,
+   "totalBMD": 1.235,
+   "youngAdultZScore": 0.3,
+   "zScore": 0.3
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.3
+  },
+  "createdAt": null,
+  "date": "2026-04-05",
+  "fatMass": {
+   "unit": "lb",
+   "value": 23.3
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 13.8,
+  "id": "dexa_2026_04_05",
+  "leanMass": {
+   "unit": "lb",
+   "value": 151
+  },
+  "measuredAt": "2026-04-05",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 8.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13.1
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 13.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 30.9
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13.2
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 12.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 26.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 32.1
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 11.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 11.5
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 8.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 26.4
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 13.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 27.3
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 12.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.9
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 8.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 52
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 63
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 12.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.3
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 23.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 151
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 181.5
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 13.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 10.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 68.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 81.3
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1827
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2026-04-05-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 181.5
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.71
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 20.69
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 10.6,
+  "androidGynoidRatio": 0.83,
+  "bodyFatPercentage": 12.1,
+  "boneDensity": {
+   "ageMatchedZScore": 0.6,
+   "tScore": null,
+   "totalBMD": 1.259,
+   "youngAdultZScore": 0.6,
+   "zScore": 0.6
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.2
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.2
+  },
+  "createdAt": null,
+  "date": "2026-04-28",
+  "fatMass": {
+   "unit": "lb",
+   "value": 21.7
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 12.8,
+  "id": "dexa_2026_04_28",
+  "leanMass": {
+   "unit": "lb",
+   "value": 151.4
+  },
+  "measuredAt": "2026-04-28",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 8.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.8
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 12.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 30.5
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.9
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 12.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 26.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 31.5
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 10.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 11.4
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 8.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 22.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25.7
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 12.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 27.1
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 12.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 7.6
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 51.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 62
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 12.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 21.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 151.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 180.3
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 12.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 9.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 69.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 81.9
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1830
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2026-04-28-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 180.3
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.56
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 16.52
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 14.4,
+  "androidGynoidRatio": 1.1,
+  "bodyFatPercentage": 13.6,
+  "boneDensity": {
+   "ageMatchedZScore": 0.6,
+   "tScore": null,
+   "totalBMD": 1.264,
+   "youngAdultZScore": 0.6,
+   "zScore": 0.6
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.2
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.2
+  },
+  "createdAt": null,
+  "date": "2026-05-24",
+  "fatMass": {
+   "unit": "lb",
+   "value": 24.7
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 13.1,
+  "id": "dexa_2026_05_24",
+  "leanMass": {
+   "unit": "lb",
+   "value": 149.1
+  },
+  "measuredAt": "2026-05-24",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 9.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 12.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 30.5
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 9.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 11.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 13.1
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 12.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 31.4
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 14.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 11.9
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 9.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 22.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 26.1
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 13.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 27.8
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 12.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 7.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 51.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 61.9
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 13.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 24.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 149.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 180.9
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 15,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 12.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 68.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 82.7
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1809
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2026-05-24-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 180.9
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.95
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 27.88
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 8.5,
+  "androidGynoidRatio": 0.82,
+  "bodyFatPercentage": 10.7,
+  "boneDensity": {
+   "ageMatchedZScore": 0.6,
+   "tScore": null,
+   "totalBMD": 1.261,
+   "youngAdultZScore": 0.6,
+   "zScore": 0.6
+  },
+  "boneMass": {
+   "unit": "lb",
+   "value": 7.1
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.1
+  },
+  "createdAt": null,
+  "date": "2026-06-20",
+  "fatMass": {
+   "unit": "lb",
+   "value": 18.4
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": [
+    "measuredAt",
+    "date",
+    "relatedGoalIds",
+    "provider",
+    "totalMass",
+    "bodyFatPercentage",
+    "fatMass",
+    "leanMass",
+    "boneMineralContent",
+    "restingMetabolicRate",
+    "visceralAdiposeTissue",
+    "androidFatPercentage",
+    "gynoidFatPercentage",
+    "androidGynoidRatio",
+    "regionalAssessment",
+    "muscleBalance",
+    "boneDensity",
+    "sourceFileId"
+   ]
+  },
+  "gynoidFatPercentage": 10.4,
+  "id": "dexa_2026_06_20",
+  "leanMass": {
+   "unit": "lb",
+   "value": 146.2
+  },
+  "measuredAt": "2026-06-20",
+  "muscleBalance": {
+   "leftArm": {
+    "bodyFatPercentage": 7.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.5
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 0.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.1
+    }
+   },
+   "leftLeg": {
+    "bodyFatPercentage": 10.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 29.5
+    }
+   },
+   "rightArm": {
+    "bodyFatPercentage": 9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 12.6
+    }
+   },
+   "rightLeg": {
+    "bodyFatPercentage": 11,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.4
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 3.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 25
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 29.7
+    }
+   }
+  },
+  "provider": "BodySpec",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 8.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 0.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.1
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 11.1
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 8.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 21.6
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 24.7
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 10.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 26.3
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 10.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 6.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 50
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 59.2
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 10.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 18.4
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 146.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 171.7
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 10.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 8.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 67.7
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 77.9
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1783
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "BodySpec",
+   "notes": "Verified BodySpec DEXA report.",
+   "type": "dexa"
+  },
+  "sourceFileId": "2026-06-20-bodyspec-dexa.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 171.7
+  },
+  "updatedAt": null,
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.57
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 16.75
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 5.4,
+  "androidGynoidRatio": 0.73,
+  "bodyFatPercentage": 7.7,
+  "boneDensity": {
+   "tScore": 0.4,
+   "totalBMD": 1.238,
+   "totalBMDUnit": "g/cm2",
+   "zScore": 0.4
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.1
+  },
+  "canonicalId": "dexa_scan|2026-07-18|evidence_submission_20260718144114116_pdf_1_2026_07_18",
+  "canonicalLifecycleStatus": "current",
+  "confidence": {
+   "extraction": "high",
+   "interpretation": "high"
+  },
+  "createdAt": "2026-07-18T14:41:14.116Z",
+  "fatMass": {
+   "unit": "lb",
+   "value": 12.8
+  },
+  "fieldProvenance": {
+   "regionalAssessment": "7-18-26-DEXA.pdf",
+   "summary": "7-18-26-DEXA.pdf",
+   "supplementalMetrics": "7-18-26-DEXA.pdf"
+  },
+  "gynoidFatPercentage": 7.4,
+  "id": "evidence_submission_20260718144114116_pdf_1_2026_07_18",
+  "leanMass": {
+   "unit": "lb",
+   "value": 147.5
+  },
+  "measuredAt": "2026-07-18",
+  "muscleBalance": {
+   "leftArm": null,
+   "leftLeg": null,
+   "rightArm": null,
+   "rightLeg": null
+  },
+  "provenance": {
+   "extraction_engine": "pdfjs-dist",
+   "fixture": false,
+   "source_artifact_refs": [
+    "7-18-26-DEXA.pdf"
+   ]
+  },
+  "provider": "BodySpec",
+  "quality": {
+   "limitations": [],
+   "status": "rich"
+  },
+  "rawReportPath": "7-18-26-DEXA.pdf",
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 5.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 10.7
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 5.5,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 21.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 24.3
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 7.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25.8
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 8.3,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.9
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 51
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 58.7
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 7.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 12.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 147.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 167.4
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 6.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 67.6
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 74.4
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1794
+  },
+  "source": {
+   "application": "BodySpec",
+   "confidence": "high",
+   "modality": "pdf",
+   "name": "BodySpec",
+   "source_artifact_refs": [
+    "7-18-26-DEXA.pdf"
+   ],
+   "type": "dexa"
+  },
+  "sourceFileId": "7-18-26-DEXA.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 167.4
+  },
+  "updatedAt": "2026-07-18T17:55:16.788Z",
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.15
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 4.51
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": null,
+  "androidGynoidRatio": null,
+  "bodyFatPercentage": null,
+  "boneDensity": {
+   "ageMatchedZScore": null,
+   "tScore": null,
+   "totalBMD": null,
+   "youngAdultZScore": null,
+   "zScore": null
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": null
+  },
+  "canonicalLifecycleStatus": "superseded",
+  "createdAt": "2026-07-18T14:41:26.660Z",
+  "fatMass": {
+   "unit": "lb",
+   "value": null
+  },
+  "fieldProvenance": {
+   "computed": [],
+   "imported": []
+  },
+  "gynoidFatPercentage": null,
+  "id": "evidence_submission_20260718144114116_pdf_1_2026_06_20",
+  "leanMass": {
+   "unit": "lb",
+   "value": null
+  },
+  "measuredAt": "2026-06-20",
+  "muscleBalance": {
+   "leftArm": null,
+   "leftLeg": null,
+   "rightArm": null,
+   "rightLeg": null
+  },
+  "provider": "BodySpec",
+  "recovery": {
+   "reason": "Null compatibility mapping.",
+   "supersededAt": "2026-07-18T17:55:16.788Z",
+   "supersededBy": "evidence_submission_20260718144114116_pdf_1_2026_07_18"
+  },
+  "regionalAssessment": {
+   "android": null,
+   "arms": null,
+   "gynoid": null,
+   "legs": null,
+   "total": null,
+   "trunk": null
+  },
+  "relatedGoalIds": [],
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": null
+  },
+  "source": {
+   "confidence": "high",
+   "externalId": null,
+   "importedAt": null,
+   "name": "PhysiqueOS",
+   "notes": "",
+   "type": "dexa"
+  },
+  "totalMass": {
+   "unit": "lb",
+   "value": null
+  },
+  "updatedAt": "2026-07-18T14:41:26.660Z",
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": null
+   },
+   "volume": {
+    "unit": "in3",
+    "value": null
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 5.4,
+  "androidGynoidRatio": 0.8,
+  "bodyFatPercentage": 7.6,
+  "boneDensity": {
+   "tScore": 0.3,
+   "totalBMD": 1.235,
+   "totalBMDUnit": "g/cm2",
+   "zScore": 0.3
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.2
+  },
+  "canonicalId": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+  "canonicalLifecycleStatus": "current",
+  "captured_at": "2026-08-15T19:00:05.436Z",
+  "confidence": {
+   "extraction": "high",
+   "interpretation": "high"
+  },
+  "createdAt": "2026-08-15T19:00:05.436Z",
+  "evidence_type": "dexa_scan",
+  "fatMass": {
+   "unit": "lb",
+   "value": 12.8
+  },
+  "fieldProvenance": {
+   "regionalAssessment": "dexa_submission_20260815181333895-1786817613898.pdf",
+   "summary": "dexa_submission_20260815181333895-1786817613898.pdf",
+   "supplementalMetrics": "dexa_submission_20260815181333895-1786817613898.pdf"
+  },
+  "gynoidFatPercentage": 6.7,
+  "id": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+  "leanMass": {
+   "unit": "lb",
+   "value": 148.3
+  },
+  "measuredAt": "2026-08-15",
+  "muscleBalance": {
+   "leftArm": null,
+   "leftLeg": null,
+   "rightArm": null,
+   "rightLeg": null
+  },
+  "observed_at": "2026-08-15",
+  "provenance": {
+   "extraction_engine": "pdfjs-dist",
+   "extraction_engine_version": "pdfjs-dist@6.1.200",
+   "fixture": false,
+   "interpreter_version": "bodyspec-pdf-v4",
+   "source_artifact_refs": [
+    "dexa_submission_20260815181333895-1786817613898.pdf"
+   ]
+  },
+  "provider": "BodySpec",
+  "quality": {
+   "limitations": [],
+   "status": "rich"
+  },
+  "rawReportPath": "dexa_submission_20260815181333895-1786817613898.pdf",
+  "reconciliation": {
+   "duplicate_detection_identity": "BodySpec|2026-08-15|168.3|7.6|12.8|148.3|7.2",
+   "duplicate_of_existing_scan": false,
+   "historical_tables_ignored_for_evidence_creation": true
+  },
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 5.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 0.6
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 10.7
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 5.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 22.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 25.2
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 6.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23.9
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 26.3
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 8.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.9
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 51.5
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 59.1
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 7.6,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 12.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 148.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 168.3
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 6.4,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 4.8
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 67.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 74.2
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_maintain_8_9_body_fat",
+   "goal_preserve_lean_mass",
+   "goal_visible_abs_at_rest"
+  ],
+  "removed": false,
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1803
+  },
+  "source": {
+   "application": "BodySpec",
+   "confidence": "high",
+   "modality": "pdf",
+   "name": "BodySpec",
+   "source_artifact_refs": [
+    "dexa_submission_20260815181333895-1786817613898.pdf"
+   ],
+   "type": "dexa"
+  },
+  "sourceFileId": "dexa_submission_20260815181333895-1786817613898.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 168.3
+  },
+  "updatedAt": "2026-08-15T19:02:52.508Z",
+  "userId": "user_founder_001",
+  "version": 2,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.1
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 2.89
+   }
+  },
+  "visceralFat": null
+ },
+ {
+  "androidFatPercentage": 5.8,
+  "androidGynoidRatio": 0.73,
+  "bodyFatPercentage": 8.1,
+  "boneDensity": {
+   "tScore": 0.3,
+   "totalBMD": 1.235,
+   "totalBMDUnit": "g/cm2",
+   "zScore": 0.3
+  },
+  "boneMineralContent": {
+   "unit": "lb",
+   "value": 7.2
+  },
+  "canonicalId": "dexa_scan|user_founder_001|2026-09-12",
+  "canonicalLifecycleStatus": "current",
+  "captured_at": "2026-09-13T02:08:43.147Z",
+  "confidence": {
+   "extraction": "high",
+   "interpretation": "high"
+  },
+  "createdAt": "2026-09-13T02:08:43.147Z",
+  "dexaRevision": {
+   "logicalScanKey": "dexa_scan|user_founder_001|2026-09-12",
+   "priorSemanticFingerprint": null,
+   "revisedAt": null,
+   "revision": 1,
+   "schemaVersion": "canonical-dexa-scan-revision-v1",
+   "semanticFingerprint": "sha256_d06c092bd2dada5fcf78fa6c00ff25c0070ec701912b5109bb8a5d893047b029",
+   "sourceEvidenceObjectId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+   "sourceEvidencePackageId": "dexa_package_2026-09-12",
+   "sourceReviewId": "evidence_review_44462ABB3969473DA82FBF2B46A504EF"
+  },
+  "evidence_type": "dexa_scan",
+  "fatMass": {
+   "unit": "lb",
+   "value": 14.2
+  },
+  "fieldProvenance": {
+   "regionalAssessment": "9-12-26-DEXA.pdf",
+   "summary": "9-12-26-DEXA.pdf",
+   "supplementalMetrics": "9-12-26-DEXA.pdf"
+  },
+  "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+  "goalPhaseAttribution": {
+   "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+   "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+   "source": "legacy_effective_date_fallback"
+  },
+  "gynoidFatPercentage": 7.9,
+  "id": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+  "leanMass": {
+   "unit": "lb",
+   "value": 153.3
+  },
+  "measuredAt": "2026-09-12",
+  "muscleBalance": {
+   "leftArm": null,
+   "leftLeg": null,
+   "rightArm": null,
+   "rightLeg": null
+  },
+  "observed_at": "2026-09-12",
+  "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+  "provenance": {
+   "extraction_engine": "pdfjs-dist",
+   "extraction_engine_version": "pdfjs-dist@6.1.200",
+   "fixture": false,
+   "interpreter_version": "bodyspec-pdf-v4",
+   "source_artifact_refs": [
+    "9-12-26-DEXA.pdf"
+   ]
+  },
+  "provider": "BodySpec",
+  "quality": {
+   "limitations": [],
+   "status": "rich"
+  },
+  "rawReportPath": "9-12-26-DEXA.pdf",
+  "reconciliation": {
+   "duplicate_detection_identity": "BodySpec|2026-09-12|174.7|8.1|14.2|153.3|7.2",
+   "duplicate_of_existing_scan": false,
+   "historical_tables_ignored_for_evidence_creation": true
+  },
+  "regionalAssessment": {
+   "android": {
+    "bodyFatPercentage": 5.8,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 10.8
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 11.6
+    }
+   },
+   "arms": {
+    "bodyFatPercentage": 5.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 1.1
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 1.5
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 23.6
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 26.3
+    }
+   },
+   "gynoid": {
+    "bodyFatPercentage": 7.9,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 0.7
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 2.1
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 24.4
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 27.2
+    }
+   },
+   "legs": {
+    "bodyFatPercentage": 8.7,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2.8
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.3
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 52.6
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 60.7
+    }
+   },
+   "total": {
+    "bodyFatPercentage": 8.1,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 7.2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 14.2
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 153.3
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 174.7
+    }
+   },
+   "trunk": {
+    "bodyFatPercentage": 7.2,
+    "boneMineralContent": {
+     "unit": "lb",
+     "value": 2
+    },
+    "fatMass": {
+     "unit": "lb",
+     "value": 5.6
+    },
+    "leanMass": {
+     "unit": "lb",
+     "value": 70.2
+    },
+    "totalMass": {
+     "unit": "lb",
+     "value": 77.8
+    }
+   }
+  },
+  "relatedGoalIds": [
+   "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+  ],
+  "removed": false,
+  "restingMetabolicRate": {
+   "unit": "kcal/day",
+   "value": 1847
+  },
+  "source": {
+   "application": "BodySpec",
+   "confidence": "high",
+   "modality": "pdf",
+   "name": "BodySpec",
+   "source_artifact_refs": [
+    "9-12-26-DEXA.pdf"
+   ],
+   "type": "dexa"
+  },
+  "sourceFileId": "9-12-26-DEXA.pdf",
+  "totalMass": {
+   "unit": "lb",
+   "value": 174.7
+  },
+  "updatedAt": "2026-09-13T05:51:51.983Z",
+  "userId": "user_founder_001",
+  "version": 1,
+  "visceralAdiposeTissue": {
+   "mass": {
+    "unit": "lb",
+    "value": 0.2
+   },
+   "volume": {
+    "unit": "in3",
+    "value": 5.83
+   }
+  },
+  "visceralFat": null
+ }
+]

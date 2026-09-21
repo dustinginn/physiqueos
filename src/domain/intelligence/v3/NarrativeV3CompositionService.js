@@ -1,3 +1,4 @@
+import { ENERGY_AMBIGUITY_CLAUSES_V3 } from "./AmbiguityVocabularyV3.js";
 import { V3_SCHEMA, deepFreeze, round, semanticFingerprint } from "./V3Runtime.js";
 import {
   configuredNarrativeCapitalizationTerms,
@@ -95,6 +96,23 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   assertDistinctSectionComposition({ context, sections, coachTake });
   assertNarrativeV3Voice(`${finalNarrative}\n${coachTake}\n${JSON.stringify(confidenceDeepExplanation)}`);
 
+  const uncertaintyTypes = interpretation.uncertaintyProfile.map((item) => {
+    const surfacing = resolveUncertaintySurfacing(item, interpretation, context);
+    return {
+      type: item.type,
+      materiality: item.materiality,
+      ...(item.uncertaintyId ? { uncertaintyId: item.uncertaintyId } : {}),
+      ...surfacing,
+    };
+  });
+  // Material uncertainty is never silently dropped: it is surfaced in the
+  // narrative or it carries an explicit suppression reason.
+  const silent = uncertaintyTypes.filter((item) =>
+    ["high", "moderate"].includes(item.materiality) && !item.surfaced && !item.suppressionReason);
+  if (silent.length) {
+    throw new Error(`Narrative V3 dropped material uncertainty without a reason: ${silent.map((item) => item.type).join(", ")}`);
+  }
+
   const semantic = {
     schemaVersion: V3_SCHEMA.narrativePlan,
     surface,
@@ -151,11 +169,7 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
       guardrailId: item.guardrailId,
       status: item.status,
     })),
-    uncertaintyTypes: interpretation.uncertaintyProfile.map((item) => ({
-      type: item.type,
-      materiality: item.materiality,
-      surfaced: shouldSurfaceUncertainty(item, interpretation),
-    })),
+    uncertaintyTypes: uncertaintyTypes,
     questionTransitions: interpretation.questionTransitions,
     recommendation: interpretation.recommendation,
     nextEvidencePurpose: interpretation.nextCoachingQuestion?.evidencePurpose ?? null,
@@ -163,6 +177,7 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
     vocabularyBindings: structuredClone(goalContract.vocabulary),
     composition: {
       headline, sections, paragraphs, finalNarrative, coachTake,
+      energyAmbiguity: context.energyAmbiguityText ?? null,
       sectionPurposes: NARRATIVE_V3_SECTION_PURPOSES,
       sectionAllocations: context.sectionPlan.allocations,
     },
@@ -302,8 +317,10 @@ function allocateNarrativeSections(context) {
   const energySignal = context.operatingSignals.find((item) =>
     item.semanticClass === "DERIVED_ESTIMATE" &&
     /energy/iu.test(`${item.capabilityId} ${item.vocabularyKey}`));
+  // Energy-family evidence speaks through the Energy branch (estimate and
+  // ambiguity), never as the week's "result" signal.
   const operatingSignal = context.operatingSignals.find((item) =>
-    item !== energySignal && item.factualSummary);
+    item !== energySignal && item.factualSummary && !isEnergyFamilySignal(item));
   const signalClauses = coachingClauses(operatingSignal?.factualSummary);
   const resultText = resultObservation
     ? realizeCoachingObservation(resultObservation, "result")
@@ -317,7 +334,10 @@ function allocateNarrativeSections(context) {
   });
   const actionText = recurringAction(context);
   const energyText = translateEnergyForCoaching(context, energySignal);
-  const watchText = energyText ?? recurringNextCheck(context);
+  const ambiguityText = translateEnergyAmbiguityForCoaching(context);
+  context.energyAmbiguityText = ambiguityText;
+  const watchText = [ambiguityText, energyText ?? recurringNextCheck(context)]
+    .filter(Boolean).join(" ") || null;
   const coachText = coachObservation
     ? realizeCoachingObservation(coachObservation, "coach_take")
     : signalClauses[1]
@@ -329,7 +349,8 @@ function allocateNarrativeSections(context) {
     meaning: allocation("goal_relative_implication", "goal_implication"),
     action: allocation("current_coaching_action", "recommendation"),
     watch: allocation("specific_bounded_attention",
-      energyText ? energySignal?.signalId : "next_assessment"),
+      ambiguityText ? "energy_ambiguity"
+        : energyText ? energySignal?.signalId : "next_assessment"),
     confidence: allocation("goal_outlook_movement", "confidence_movement"),
     coachTake: allocation("highest_value_remaining_coaching_point",
       coachObservation?.topicKey ?? (signalClauses[1]
@@ -476,6 +497,11 @@ function realizeCoachingObservation(candidate, purpose) {
   return sentence(candidate.narrativeText);
 }
 
+function isEnergyFamilySignal(signal) {
+  return /^(?:execution\.energy_|strategy\.energy_|execution\.nutrition|execution\.activity)/u
+    .test(String(signal?.capabilityId ?? ""));
+}
+
 function translateEnergyForCoaching(context, signal) {
   if (!signal) return null;
   const tension = context.reconciliationTensions.some((item) =>
@@ -497,6 +523,21 @@ function translateEnergyForCoaching(context, signal) {
     return "The energy trend is running low enough to watch. If progress or training starts to stall, revisit the current intake setup.";
   }
   return null;
+}
+
+// Energy ambiguity branch. The sentence is derived from the structured
+// ambiguity types and their reasons (see AmbiguityVocabularyV3), never from
+// fixed copy for a single week.
+function translateEnergyAmbiguityForCoaching(context) {
+  const items = context.interpretation.uncertaintyProfile.filter((item) =>
+    item.domain === "energy" && item.recommendationEffect === "temper" &&
+    ENERGY_AMBIGUITY_CLAUSES_V3[item.type]);
+  if (!items.length) return null;
+  const clauses = items.map((item) => ENERGY_AMBIGUITY_CLAUSES_V3[item.type](item));
+  const guidance = context.interpretation.recommendation.nonAction?.includes(
+    "no_energy_target_change_on_the_estimate_alone")
+    ? " Keep calorie targets where they are unless something more than the estimate calls for a change." : "";
+  return `Treat the calorie estimate as directional: ${naturalList(clauses)}.${guidance}`;
 }
 
 function phaseReference(context) {
@@ -1005,6 +1046,40 @@ function formatCoachingMeasurement(value, unit) {
   return `${Number(value).toLocaleString("en-US", {
     maximumFractionDigits: 2,
   })}${unit === "%" ? "%" : unit ? ` ${unit}` : ""}`;
+}
+
+function resolveUncertaintySurfacing(item, interpretation, context) {
+  if (item.domain === "energy") {
+    if (item.recommendationEffect === "temper") {
+      return context.energyAmbiguityText
+        ? { surfaced: true, surfacedIn: "watch", suppressionReason: null }
+        : { surfaced: false, suppressionReason: "energy_context_unavailable_for_narrative" };
+    }
+    return { surfaced: false, suppressionReason: "low_materiality_no_recommendation_effect" };
+  }
+  if (shouldSurfaceUncertainty(item, interpretation)) {
+    return { surfaced: true, surfacedIn: "watch", suppressionReason: null };
+  }
+  return { surfaced: false, suppressionReason: legacySuppressionReason(item, interpretation) };
+}
+
+function legacySuppressionReason(item, interpretation) {
+  if (item.type === "persistence" && interpretation.nextCoachingQuestion?.evidencePurpose === "confirm_persistence") {
+    return "covered_by_next_evidence_purpose";
+  }
+  if (item.type === "guardrail") return "guardrail_not_relevant_to_current_recommendation";
+  if (item.type === "causal_attribution") return "attribution_is_not_the_next_evidence_purpose";
+  if (item.type === "measurement" && interpretation.strategyEffectiveness.feasibility === "demonstrated") {
+    return "strategy_feasibility_already_demonstrated";
+  }
+  if (item.type === "strategy_feasibility" && interpretation.strategyEffectiveness.continuity?.inherited) {
+    return "strategy_state_inherited_from_prior_evaluation";
+  }
+  if (["measurement_coverage", "objective_measurement"].includes(item.type) &&
+      interpretation.strategyEffectiveness.feasibility === "demonstrated") {
+    return "strategy_feasibility_demonstrated_measurement_gap_not_decision_relevant";
+  }
+  return "not_decision_relevant_for_recurring_narrative";
 }
 
 function shouldSurfaceUncertainty(item, interpretation) {

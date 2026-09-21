@@ -5,6 +5,11 @@ import {
   resolveHistoricalRmr,
 } from "./EnergyDailyReconciliationService";
 import {
+  NutritionAssertionTier,
+  resolveNutritionDayAuthority,
+  summarizeNutritionAuthorityCoverage,
+} from "../models/nutritionDayAuthority.js";
+import {
   resolveActivityEvidenceCompleteness,
   resolveNutritionEvidenceCompleteness,
   resolvePairedEnergyDayCompleteness,
@@ -55,6 +60,12 @@ export function createCadenceEnergyAssessment({
   const selectedRmr = rmrStrategy === CADENCE_RMR_STRATEGIES.LATEST_ELIGIBLE_FOR_WINDOW
     ? resolveHistoricalRmr(createHistoricalRmrIndex(dexaScans, timeZone), normalizedWindow.endDate)
     : null;
+  const nutritionAuthorityByDate = new Map(
+    nutrition.map((item) => [getCanonicalLocalDate(item.date, timeZone), item.authority])
+  );
+  const activitySourceByDate = new Map(
+    activity.map((item) => [getCanonicalLocalDate(item.date, timeZone), item.sourceDescriptor])
+  );
   const nutritionStateByDate = new Map(
     nutrition.map((item) => [getCanonicalLocalDate(item.date, timeZone), item.evidenceCompleteness])
   );
@@ -77,6 +88,8 @@ export function createCadenceEnergyAssessment({
         nutritionCompleteness,
         activityCompleteness
       ),
+      nutritionAuthority: compactAuthority(nutritionAuthorityByDate.get(row.date)),
+      activitySource: activitySourceByDate.get(row.date) ?? null,
       eligibility: {
         nutrition: row.calorieIntake != null,
         activity: row.activeCalories != null,
@@ -254,6 +267,12 @@ function buildAssessment({
         ? (pairedComplete + pairedPartial * 0.5) / dailyRecords.length
         : 0,
     },
+    intakeEvidenceQuality: summarizeNutritionAuthorityCoverage(
+      dailyRecords.map((row) => row.nutritionAuthority)
+        .filter(Boolean)
+        .map(expandAuthority)
+    ),
+    activityEvidenceQuality: summarizeActivitySources(dailyRecords),
     dailyRecords,
     supportingEvidenceIds: ids([...nutritionIds, ...activityIds, ...rmrIds]),
     limitations: ids([
@@ -314,13 +333,78 @@ function normalizeNutrition(item) {
   const payload = item?.payload ?? item;
   const date = payload.date ?? payload.observed_at ?? item?.lastObservedAt;
   if (!date) return null;
+  const authority = resolveNutritionDayAuthority(item);
+  const trusted = [
+    NutritionAssertionTier.FULL_DAY_ASSERTED,
+    NutritionAssertionTier.MEAL_DERIVED_UNVERIFIED,
+  ].includes(authority.assertion.tier) && authority.energyUsable;
   return {
     id: item?.canonicalId ?? item?.id ?? payload.id ?? null,
     date,
-    totals: payload.totals ?? payload.daily_totals,
+    // The authoritative daily total, not a meal sum that overrides it.
+    totals: trusted ? authority.dailyTotals : payload.totals ?? payload.daily_totals,
     daily_totals: payload.daily_totals,
     sourceEvidence: payload.sourceEvidence ?? [],
     evidenceCompleteness: resolveNutritionEvidenceCompleteness(item),
+    authority,
+  };
+}
+
+function compactAuthority(authority) {
+  if (!authority) return null;
+  return {
+    tier: authority.assertion.tier,
+    origin: authority.assertion.origin,
+    scope: authority.assertion.scope,
+    reliability: authority.reliability,
+    captureMethod: authority.sourceCoverage.captureMethod,
+    mealDetailCompleteness: authority.mealDetail.completeness,
+    reconciliationState: authority.reconciliation.state,
+    ambiguity: [...authority.ambiguity],
+    energyUsable: authority.energyUsable,
+  };
+}
+
+function expandAuthority(compact) {
+  return {
+    assertion: { tier: compact.tier },
+    reliability: compact.reliability,
+    ambiguity: compact.ambiguity,
+    energyUsable: compact.energyUsable,
+    mealDetail: { completeness: compact.mealDetailCompleteness },
+  };
+}
+
+// Activity expenditure from a consumer wearable/OCR summary is an estimate.
+// The semantics are source-neutral: how the value was captured, not who
+// supplied it.
+function describeActivitySource(payload = {}) {
+  const source = payload.source ?? {};
+  const modality = String(source.modality ?? "").toLowerCase();
+  const device = ["device", "integration", "api", "wearable"].includes(modality);
+  return {
+    captureMethod: device ? "device_aggregate"
+      : ["screenshot", "photo", "image"].includes(modality) ? "ocr_screenshot"
+        : modality === "manual" ? "manual_entry" : "unknown",
+    application: source.application ?? null,
+    measurementType: "wearable_estimate",
+    reliability: device ? "high" : "moderate",
+  };
+}
+
+function summarizeActivitySources(dailyRecords) {
+  const present = dailyRecords.filter((row) => row.activitySource);
+  const byMethod = {};
+  for (const row of present) {
+    const method = row.activitySource.captureMethod;
+    byMethod[method] = (byMethod[method] ?? 0) + 1;
+  }
+  return {
+    dayCount: present.length,
+    byCaptureMethod: byMethod,
+    measurementType: present.length ? "wearable_estimate" : null,
+    weakestReliability: present.some((row) => row.activitySource.reliability === "moderate")
+      ? "moderate" : present.length ? "high" : "none",
   };
 }
 
@@ -334,6 +418,7 @@ function normalizeActivity(item) {
     activeCalories:
       payload.activeCalories ?? payload.daily_activity?.move_calories,
     evidenceCompleteness: resolveActivityEvidenceCompleteness(item),
+    sourceDescriptor: describeActivitySource(payload),
   };
 }
 

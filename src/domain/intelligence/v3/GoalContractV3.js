@@ -173,10 +173,40 @@ function normalizePhase(input = {}) {
   };
 }
 
+function normalizeEnergyStrategy(input) {
+  if (!input || typeof input !== "object") return null;
+  const target = (value) => Number.isFinite(value?.value)
+    ? { value: Number(value.value), unit: value.unit ?? "kcal/day" } : null;
+  return {
+    mode: input.mode ?? null,
+    intent: input.intent ?? null,
+    adjustmentAuthorization: input.adjustmentAuthorization ?? null,
+    automaticAdjustmentAllowed: input.automaticAdjustmentAllowed === true,
+    fixedCaloriePrescription: input.fixedCaloriePrescription === true,
+    monitoringCadence: input.monitoringCadence ?? null,
+    intakeTarget: target(input.intakeTarget),
+    activityTarget: target(input.activityTarget),
+    phaseStrategyId: input.phaseStrategyId ?? null,
+    protocolId: input.protocolId ?? null,
+    protocolVersionId: input.protocolVersionId ?? null,
+    protocolVersionNumber: input.protocolVersionNumber ?? null,
+    confirmationAuthority: input.confirmationAuthority ?? null,
+    source: input.source ?? null,
+  };
+}
+
 function normalizeStrategy(input = {}) {
+  const energyStrategy = normalizeEnergyStrategy(input.energyStrategy);
   return {
     strategyRevisionId: requiredText(input.strategyRevisionId, "strategy.strategyRevisionId"),
     label: input.label ?? "current strategy",
+    // Current Energy Strategy resolved from the accepted phase strategy and the
+    // Energy protocol's current revision. Absent when no current revision exists.
+    ...(energyStrategy ? { energyStrategy } : {}),
+    ...(input.operatingState ? { operatingState: {
+      value: input.operatingState.value ?? null,
+      source: input.operatingState.source ?? null,
+    } } : {}),
     adequateExposure: {
       minimumDays: Math.max(0, finiteOr(input.adequateExposure?.minimumDays, 0)),
     },

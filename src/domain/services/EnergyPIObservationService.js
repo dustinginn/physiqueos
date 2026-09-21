@@ -406,6 +406,15 @@ function createMetricObservation({
       calculationMethod: "energy_period_average",
       unit: "kcal",
       ...(rmrSources.length > 0 ? { rmrSources } : {}),
+      ...(metric.key === "expenditure"
+        ? { componentAverages: {
+          rmr: averageOrNull(currentRows.map((day) => day.rmr).filter((value) => value != null)),
+          activeCalories: averageOrNull(currentRows.map((day) => day.activeCalories).filter((value) => value != null)),
+        } } : {}),
+      ...(["intake", "balance"].includes(metric.key)
+        ? { intakeEvidence: summarizeIntakeEvidence(current) } : {}),
+      ...(metric.key !== "intake"
+        ? { activityEvidence: summarizeActivityEvidence(current) } : {}),
       limitations,
     },
     provenance: provenance("energy_period_average", sourceEvidenceIds),
@@ -424,7 +433,12 @@ function createCoverageObservation({
   const audit = auditDays(current);
   const sourceEvidenceIds = evidenceIds(current);
   const insufficient = audit.completePairedDays === 0;
-  const limitations = coverageLimitations(audit);
+  const limitations = [...new Set([
+    ...coverageLimitations(audit),
+    ...current.flatMap((day) => day.nutritionAuthority?.ambiguity ?? []),
+    ...(current.some((day) => day.activitySource?.measurementType === "wearable_estimate")
+      ? ["active_expenditure_is_wearable_estimated"] : []),
+  ])];
   const rmrSources = getRmrSources(current);
 
   return createPIObservation({
@@ -451,6 +465,15 @@ function createCoverageObservation({
       activityOnlyDays: audit.activityOnlyDays,
       missingRmrDays: audit.missingRmrDays,
       estimatedExpenditureDays: audit.estimatedExpenditureDays,
+      eligibleDayCount: current.length,
+      pairedDayCount: audit.pairedDays,
+      // Paired share of the window, and the completeness-weighted variant.
+      pairedCoverageRatio: current.length ? audit.pairedDays / current.length : 0,
+      completenessWeightedCoverageRatio: current.length
+        ? (audit.completePairedDays + audit.partialPairedDays * 0.5) / current.length : 0,
+      partialPairedDays: audit.partialPairedDays,
+      intakeEvidence: summarizeIntakeEvidence(current),
+      activityEvidence: summarizeActivityEvidence(current),
       calculationHorizon: semanticHorizon,
       ...(rmrSources.length > 0 ? { rmrSources } : {}),
       limitations,
@@ -548,6 +571,9 @@ function auditDays(days) {
     estimatedExpenditureDays: days.filter(
       (day) => day.expenditureKind === "estimated_rmr_plus_active"
     ).length,
+    pairedDays: days.filter((day) => day.energyBalance != null).length,
+    partialPairedDays: days.filter((day) =>
+      day.energyBalance != null && day.pairedCompleteness === "partial").length,
   };
 }
 
@@ -568,7 +594,53 @@ function metricLimitations(metric, days) {
   if (metric.key === "balance" && days.some((day) => day.energyBalance == null)) {
     limitations.push("some_days_lack_complete_paired_energy_evidence");
   }
-  return limitations;
+  // Source-neutral evidence-quality semantics carried from the canonical days.
+  if (["intake", "balance"].includes(metric.key)) {
+    days.flatMap((day) => day.nutritionAuthority?.ambiguity ?? [])
+      .forEach((code) => limitations.push(code));
+  }
+  if (metric.key !== "intake" &&
+      days.some((day) => day.activitySource?.measurementType === "wearable_estimate")) {
+    limitations.push("active_expenditure_is_wearable_estimated");
+  }
+  return [...new Set(limitations)];
+}
+
+function summarizeIntakeEvidence(days) {
+  const authorities = days.map((day) => day.nutritionAuthority).filter(Boolean);
+  if (!authorities.length) return null;
+  const byTier = {};
+  const byReliability = {};
+  const ambiguity = new Set();
+  for (const item of authorities) {
+    byTier[item.tier] = (byTier[item.tier] ?? 0) + 1;
+    byReliability[item.reliability] = (byReliability[item.reliability] ?? 0) + 1;
+    item.ambiguity.forEach((code) => ambiguity.add(code));
+  }
+  const rank = { high: 3, moderate: 2, low: 1, none: 0 };
+  return {
+    dayCount: authorities.length,
+    usableDayCount: authorities.filter((item) => item.energyUsable).length,
+    byTier,
+    byReliability,
+    weakestReliability: Object.keys(byReliability)
+      .sort((left, right) => rank[left] - rank[right])[0] ?? "none",
+    mealDetailPartialDayCount: authorities.filter((item) => item.mealDetailCompleteness === "partial").length,
+    ambiguity: [...ambiguity].sort(),
+  };
+}
+
+function summarizeActivityEvidence(days) {
+  const sources = days.map((day) => day.activitySource).filter(Boolean);
+  if (!sources.length) return null;
+  const byCaptureMethod = {};
+  for (const item of sources) byCaptureMethod[item.captureMethod] = (byCaptureMethod[item.captureMethod] ?? 0) + 1;
+  return {
+    dayCount: sources.length,
+    byCaptureMethod,
+    measurementType: "wearable_estimate",
+    weakestReliability: sources.some((item) => item.reliability === "moderate") ? "moderate" : "high",
+  };
 }
 
 function coverageLimitations(audit) {
@@ -655,6 +727,10 @@ function normalizeKinds(kinds) {
     }
   });
   return unique;
+}
+
+function averageOrNull(values) {
+  return values.length ? average(values) : null;
 }
 
 function average(values) {

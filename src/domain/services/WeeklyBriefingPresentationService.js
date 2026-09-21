@@ -1,6 +1,10 @@
 import { createPINarrativeAssessment } from "./PINarrativeAssessmentService";
 import { createWeeklyTrainingPresentationModel } from "./WeeklyTrainingPresentationService";
-import { selectWeeklyNarrativePresentation } from "./WeeklyNarrativePresentationSelector";
+import {
+  selectCanonicalV3WeeklyPresentation,
+  selectWeeklyNarrativePresentation,
+} from "./WeeklyNarrativePresentationSelector";
+import { isV3BoundArtifact, requireCanonicalNarrativeV3 } from "./BriefingV3Projection.js";
 
 export function createWeeklyEnergyProgressModel(assessment) {
   if (!assessment?.dailyRecords?.length) return null;
@@ -37,6 +41,11 @@ export async function adaptWeeklyArtifactForPresentation({
 } = {}) {
   const narrative = artifact?.briefing?.weeklyNarrative;
   if (!narrative) return artifact;
+  // A V3-bound Weekly serves its stored V3 authority. The legacy read-time
+  // narrative rebuild below runs only for frozen V2 artifacts.
+  if (isV3BoundArtifact(artifact)) {
+    return adaptV3WeeklyArtifactForPresentation({ artifact, timeZone });
+  }
   const training = narrative.cards?.progress?.training;
   const window = artifact.evidenceWindow ?? {
     startDate: narrative.weekStart,
@@ -111,6 +120,65 @@ export async function adaptWeeklyArtifactForPresentation({
               ...training,
               presentation: trainingPresentation,
             },
+          },
+        },
+      },
+    },
+  };
+}
+
+function adaptV3WeeklyArtifactForPresentation({ artifact, timeZone = "America/Los_Angeles" } = {}) {
+  const narrative = artifact.briefing.weeklyNarrative;
+  const narrativeV3 = requireCanonicalNarrativeV3(artifact, "Weekly");
+  const training = narrative.cards?.progress?.training;
+  const window = artifact.evidenceWindow ?? {
+    startDate: narrative.weekStart,
+    endDate: narrative.weekEnd,
+    timeZone,
+  };
+  const energy = narrative.cards?.progress?.energy
+    ?? createWeeklyEnergyPresentationFromArtifact(narrative, window);
+  const trainingPresentation = training?.presentation ?? createWeeklyTrainingPresentationModel({
+    window,
+    trainingDays: training?.completedDays ?? 0,
+    piObservations: narrative.context?.pi?.observations ?? [],
+    context: narrative.context,
+    energy,
+  });
+  const selection = selectCanonicalV3WeeklyPresentation({
+    narrativeV3,
+    facts: {
+      domains: createWeeklyDomainFacts(narrative, trainingPresentation, energy),
+      training: { categories: trainingPresentation.categorySummaries },
+    },
+    confidence: narrative.goalConfidence,
+    period: {
+      startDate: window?.startDate ?? narrative.weekStart,
+      endDate: window?.endDate ?? narrative.weekEnd,
+      timeZone,
+    },
+    navigation: { backHref: "/briefings/review", backLabel: "Briefing History" },
+    assessmentId: artifact.confidencePublication?.assessmentId ?? null,
+  });
+  return {
+    ...artifact,
+    briefing: {
+      ...artifact.briefing,
+      weeklyNarrative: {
+        ...narrative,
+        presentationModel: "canonical_narrative_v3",
+        narrativeV3,
+        narrativePresentationSelection: selection,
+        cards: {
+          ...narrative.cards,
+          snapshot: {
+            ...narrative.cards?.snapshot,
+            presentation: createWeeklySnapshotPresentation(narrative, energy),
+          },
+          progress: {
+            ...narrative.cards?.progress,
+            energy,
+            training: { ...training, presentation: trainingPresentation },
           },
         },
       },

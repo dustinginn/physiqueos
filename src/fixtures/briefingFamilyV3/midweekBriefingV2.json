@@ -1,0 +1,2012 @@
+{
+ "artifactType": "scheduled",
+ "briefing": {
+  "activeGoal": {
+   "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+   "name": "Build Lean Mass",
+   "target": {
+    "amount": 10,
+    "baselineValue": null,
+    "description": "Build 10 lb of lean mass",
+    "direction": "increase",
+    "metric": "lean_mass",
+    "targetDate": "2026-10-31",
+    "targetValue": null,
+    "type": "numeric_change",
+    "unit": "lb"
+   }
+  },
+  "activePhase": {
+   "becomingClearer": [
+    "Your intake versus expenditure is beginning to show a useful pattern.",
+    "Training is beginning to show how your body is responding."
+   ],
+   "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+   "name": "Lean Mass Build",
+   "plannedReviewDate": "2026-10-31",
+   "remainsUnclear": [
+    "A few missing nutrition days still make your maintenance intake uncertain.",
+    "Your weight needs more time to show a direction.",
+    "A follow-up DEXA is still needed to measure body-composition change."
+   ],
+   "status": "active",
+   "weekLabel": null
+  },
+  "bodyComposition": {
+   "baseline": {
+    "bodyFatPercentage": 8.1,
+    "date": "2026-09-12",
+    "fatMass": 14.2,
+    "leanMass": 153.3
+   },
+   "interpretation": "The September 12 scan is the starting point for this phase. Over the next several weeks, we want lean mass to increase while body fat stays near this level. The next DEXA will tell us whether that is happening.",
+   "newScan": false,
+   "objective": "Maintain approximately the same body-fat level while gradually increasing lean mass.",
+   "prominent": false
+  },
+  "briefingDate": "2026-09-16",
+  "briefingType": "midweek_briefing",
+  "briefingVersion": "midweek_briefing_v1",
+  "charts": {
+   "energy": {
+    "mobileStacked": true,
+    "points": [
+     {
+      "activeEnergy": 994,
+      "balance": -556,
+      "complete": true,
+      "date": "2026-09-13",
+      "expenditure": 2841,
+      "expenditureMidpoint": 2841,
+      "intake": 2285,
+      "label": "Sun"
+     },
+     {
+      "activeEnergy": 948,
+      "balance": -353,
+      "complete": true,
+      "date": "2026-09-14",
+      "expenditure": 2795,
+      "expenditureMidpoint": 2795,
+      "intake": 2442,
+      "label": "Mon"
+     },
+     {
+      "activeEnergy": 824,
+      "balance": null,
+      "complete": false,
+      "date": "2026-09-15",
+      "expenditure": 2671,
+      "expenditureMidpoint": 2671,
+      "intake": null,
+      "label": "Tue"
+     }
+    ],
+    "title": "Energy Balance, Sunday\u2013Tuesday",
+    "type": "grouped_bar",
+    "unit": "kcal"
+   },
+   "training": null,
+   "weight": null
+  },
+  "coachTake": {
+   "biggestTakeaway": "Upper-body pulling is progressing the way we want while building muscle. Protect that momentum instead of reacting to a few days of calorie math.",
+   "recommendation": "Keep calories and activity steady through Sunday. The full week will give us a better basis for deciding whether intake needs to change."
+  },
+  "coachingDecision": {
+   "protocolChangeRecommended": false,
+   "rationale": "We need a little more food and activity data before changing calories. Training and weight do not suggest an urgent change.",
+   "supportingEvidence": [
+    "Iso-Lateral High Rows made the biggest move. That is the kind of progression we want while building muscle.",
+    "Your average weight is 0.4 lb higher than last week. That fits the current calorie picture, but it is not enough by itself to change the plan."
+   ],
+   "title": "Keep the plan steady",
+   "type": "hold_and_gather"
+  },
+  "energyBalance": {
+   "averageActiveEnergy": 922,
+   "averageIntake": 2363.5,
+   "balanceDirection": "probably_below",
+   "chartPoints": [
+    {
+     "activeEnergy": 994,
+     "balance": -556,
+     "complete": true,
+     "date": "2026-09-13",
+     "expenditure": 2841,
+     "expenditureMidpoint": 2841,
+     "intake": 2285,
+     "label": "Sun"
+    },
+    {
+     "activeEnergy": 948,
+     "balance": -353,
+     "complete": true,
+     "date": "2026-09-14",
+     "expenditure": 2795,
+     "expenditureMidpoint": 2795,
+     "intake": 2442,
+     "label": "Mon"
+    },
+    {
+     "activeEnergy": 824,
+     "balance": null,
+     "complete": false,
+     "date": "2026-09-15",
+     "expenditure": 2671,
+     "expenditureMidpoint": 2671,
+     "intake": null,
+     "label": "Tue"
+    }
+   ],
+   "comparableDays": 2,
+   "comparison": {
+    "averageBalance": 657.7,
+    "averageExpenditure": 2296.7,
+    "averageIntake": 2954.3
+   },
+   "completeActivityDays": 3,
+   "completeNutritionDays": 1,
+   "cumulativeBalance": -909,
+   "estimatedAverageDailyBalance": -454.5,
+   "estimatedAverageExpenditure": 2818,
+   "estimatedDailyBalanceMidpoint": -454.5,
+   "observedNutritionDays": 2,
+   "reliability": "limited",
+   "restingEnergyBasis": 1847,
+   "rmrProvenance": {
+    "estimated": true,
+    "sourceDexaDate": "2026-09-12",
+    "sourceDexaId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "strategy": "latest_eligible_rmr_for_window"
+   },
+   "totalActiveEnergy": 2766,
+   "totalIntake": 4727,
+   "warnings": [
+    "Nutrition coverage is incomplete for the Sunday\u2013Tuesday window."
+   ]
+  },
+  "evidenceCompleteness": {
+   "activity": {
+    "completeDays": 3,
+    "expectedDays": 3
+   },
+   "dexa": {
+    "newScan": false
+   },
+   "nutrition": {
+    "completeDays": 1,
+    "expectedDays": 3,
+    "observedDays": 2
+   },
+   "recovery": {
+    "completeDays": 0,
+    "expectedDays": 3
+   },
+   "training": {
+    "sessions": 4
+   },
+   "weight": {
+    "completeDays": 3,
+    "expectedDays": 3
+   }
+  },
+  "evidenceWindow": {
+   "briefingDate": "2026-09-16",
+   "cadence": "midweek",
+   "closed": true,
+   "cutoff": "2026-09-16T06:59:59.999Z",
+   "date": "2026-09-15",
+   "end": "2026-09-15T23:59:59.999",
+   "endDate": "2026-09-15",
+   "id": "midweek:2026-09-13:2026-09-15:America/Los_Angeles",
+   "relativeLabel": "Sunday through Tuesday",
+   "sameDayEvidenceExcluded": true,
+   "start": "2026-09-13T00:00:00",
+   "startDate": "2026-09-13",
+   "timeZone": "America/Los_Angeles"
+  },
+  "generatedAt": "2026-09-16T07:04:38.549Z",
+  "goalConfidence": {
+   "assessmentContext": {
+    "goalContractId": "goal_contract|goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass|f0f507f5ac9212b14a19a8322ad1d0faca551a8c2f75763c82d2a05d0a7e04fd",
+    "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+   },
+   "assessmentId": "confidence_assessment_v2|8520c258e2caebdabf35d3416f191fc83bb9c4ed98775acc0fa6bfc01754f6c7",
+   "assessmentTimestamp": "2026-09-16T07:04:38.549Z",
+   "band": "moderate",
+   "captureSemantics": "canonical_v2_assessment_at_atomic_publication",
+   "capturedAt": "2026-09-16T07:04:38.549Z",
+   "delta": 0,
+   "evidenceCutoff": "2026-09-16T06:59:59.999Z",
+   "limitingReasons": [
+    "The available signals have mixed agreement.",
+    "An accepted boundary requires continued observation."
+   ],
+   "modelVersion": "canonical_confidence_assessment_v2",
+   "movementDirection": "held",
+   "movementMagnitude": "none",
+   "originatingArtifactId": "midweek_briefing_user_founder_001_20260913_20260915",
+   "originatingPublisher": "midweek_briefing",
+   "piVersion": "confidence_v2",
+   "presentationExplanation": "Confidence remained stable because the supporting evidence signal is still preliminary within the current evidence period, while direct Goal confirmation remains unresolved.",
+   "primaryReason": "Confidence remained stable because the supporting evidence signal is still preliminary within the current evidence period, while direct Goal confirmation remains unresolved.",
+   "priorScore": 62,
+   "score": 62,
+   "source": "canonical_confidence_v2_snapshot",
+   "supportingReasons": [
+    "The Goal remains on its expected path.",
+    "The objective remains feasible."
+   ],
+   "temporalCutoff": "2026-09-16T06:59:59.999Z",
+   "unresolvedUncertainty": [
+    {
+     "affectedConclusionRefs": [],
+     "kind": "energy_calibration_uncertain",
+     "materiality": "moderate",
+     "reducibility": "reducible",
+     "sourceUncertaintyId": "interpretation_uncertainty|1d5a024415232a9f69f4d3f15c1ab5932c6426119006af967a0443cc2f676c08",
+     "text": "Energy evidence is available, but its Goal-relative direction remains unresolved.",
+     "translationStatus": "translated"
+    },
+    {
+     "affectedConclusionRefs": [
+      "guardrail:goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_recovery"
+     ],
+     "kind": "goal_semantics_missing",
+     "materiality": "moderate",
+     "reducibility": "unknown",
+     "sourceUncertaintyId": "interpretation_uncertainty|3da3afaac6b02d3b0eaf0de2922317d0905699e80412cc4b6e75afb95c9b059a",
+     "text": "Required success criteria remain undefined.",
+     "translationStatus": "translated"
+    },
+    {
+     "affectedConclusionRefs": [
+      "guardrail:goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_guardrail_gradual_gain"
+     ],
+     "kind": "goal_semantics_missing",
+     "materiality": "moderate",
+     "reducibility": "unknown",
+     "sourceUncertaintyId": "interpretation_uncertainty|4b1f9d5e73b9ad0a314b4f289d669b8289690db72f01ae992635a6750ea9b7a9",
+     "text": "Required success criteria remain undefined.",
+     "translationStatus": "translated"
+    }
+   ]
+  },
+  "guardrailEvaluation": {
+   "explanation": "A few days of scale weight do not establish body-fat change.",
+   "guardrail": "Maintain approximately 8\u20139% body fat.",
+   "label": "Guardrail cannot yet be reassessed",
+   "status": "cannot_yet_be_reassessed"
+  },
+  "hero": {
+   "label": "Midweek Briefing",
+   "summary": "Lower-body training produced the strongest performance of the week. Intake still appears slightly below maintenance, so keep logging through Saturday and wait for Sunday\u2019s full review before changing calories.",
+   "verdict": "Your intake versus expenditure is the clearest part of the week so far. It shows whether you are eating enough to support training. Keep logging through Saturday so Sunday can judge the full pattern."
+  },
+  "id": "midweek_briefing_user_founder_001_20260913_20260915",
+  "openCoachingThreads": [
+   {
+    "createdFrom": "midweek_briefing",
+    "createdOn": "2026-09-16",
+    "evidenceRequired": [
+     "Complete nutrition",
+     "Complete activity",
+     "Full-week weight context"
+    ],
+    "intendedResolution": "sunday_weekly_briefing",
+    "key": "maintenance_range_holding",
+    "lifecycle": {
+     "allowedSundayStates": [
+      "confirmed",
+      "revised",
+      "unresolved",
+      "retired"
+     ],
+     "persisted": true,
+     "state": "open"
+    },
+    "priority": "high",
+    "question": "Is the estimated maintenance range holding?",
+    "sourceClaim": "The opening balance estimate is provisional.",
+    "status": "open"
+   },
+   {
+    "createdFrom": "midweek_briefing",
+    "createdOn": "2026-09-16",
+    "evidenceRequired": [
+     "Second-half resistance sessions",
+     "Performance observations"
+    ],
+    "intendedResolution": "sunday_weekly_briefing",
+    "key": "training_response_continues",
+    "lifecycle": {
+     "allowedSundayStates": [
+      "confirmed",
+      "revised",
+      "unresolved",
+      "retired"
+     ],
+     "persisted": true,
+     "state": "open"
+    },
+    "priority": "high",
+    "question": "Did training continue improving?",
+    "sourceClaim": "Iso-Lateral High Rows made the biggest move. That is the kind of progression we want while building muscle.",
+    "status": "open"
+   },
+   {
+    "createdFrom": "midweek_briefing",
+    "createdOn": "2026-09-16",
+    "evidenceRequired": [
+     "Approved body-composition evidence when available"
+    ],
+    "intendedResolution": "sunday_weekly_briefing",
+    "key": "guardrail_supported",
+    "lifecycle": {
+     "allowedSundayStates": [
+      "confirmed",
+      "revised",
+      "unresolved",
+      "retired"
+     ],
+     "persisted": true,
+     "state": "open"
+    },
+    "priority": "medium",
+    "question": "Was the body-fat guardrail still supported?",
+    "sourceClaim": "No midweek body-composition change can be inferred from scale weight.",
+    "status": "open"
+   }
+  ],
+  "otherRelevantEvidence": [],
+  "persistence": {
+   "artifactPersisted": true,
+   "lifecycleAdvanced": true,
+   "threadsPersisted": true
+  },
+  "prioritiesThroughSunday": [
+   "Log each meal through Saturday so Sunday\u2019s calorie decision is useful.",
+   "Keep Apple Watch activity near this week\u2019s current level.",
+   "Add load or reps to one priority movement where form stays clean."
+  ],
+  "sundayContinuity": {
+   "approach": "Revisit Wednesday's hypotheses using the complete week; confirm, revise, retire, or leave each thread unresolved without repeating Wednesday's narrative.",
+   "coverage": "Sunday through Saturday"
+  },
+  "timeZone": "America/Los_Angeles",
+  "training": {
+   "chartPoints": [],
+   "highlights": [
+    {
+     "delta": 2880,
+     "exercise": "Iso-Lateral High Rows",
+     "icon": "\ud83d\udcc8",
+     "kind": "Trending up",
+     "label": "Workload increased",
+     "percentChange": 36.4,
+     "previous": 7920,
+     "unit": "lb",
+     "value": 10800
+    },
+    {
+     "delta": 2205,
+     "exercise": "Leg Press (Feet Middle)",
+     "icon": "\ud83c\udfc6",
+     "kind": "Record",
+     "label": "New volume-load record",
+     "percentChange": 19.1,
+     "previous": 11520,
+     "unit": "lb",
+     "value": 13725
+    },
+    {
+     "delta": 75,
+     "exercise": "Pull-Ups",
+     "icon": "\ud83c\udfc6",
+     "kind": "Record",
+     "label": "New volume-load record",
+     "percentChange": 12.5,
+     "previous": 600,
+     "unit": "lb",
+     "value": 675
+    }
+   ],
+   "interpretation": "Upper-body pulling produced the week\u2019s strongest performance. That is the kind of progression we want while building muscle.",
+   "performanceHeadline": "This week produced measurable training progress",
+   "performanceTrend": "improving",
+   "plannedSessions": null,
+   "priorityCategories": [
+    {
+     "comparableExerciseCount": 3,
+     "id": "triceps",
+     "label": "Triceps",
+     "status": "plateauing",
+     "statusLabel": "Plateauing",
+     "statusTone": "warning"
+    },
+    {
+     "comparableExerciseCount": 11,
+     "id": "quads",
+     "label": "Quads",
+     "status": "improving",
+     "statusLabel": "Improving",
+     "statusTone": "success"
+    },
+    {
+     "comparableExerciseCount": 8,
+     "id": "glutes",
+     "label": "Glutes",
+     "status": "improving",
+     "statusLabel": "Improving",
+     "statusTone": "success"
+    },
+    {
+     "comparableExerciseCount": 6,
+     "id": "chest",
+     "label": "Chest",
+     "status": "improving",
+     "statusLabel": "Improving",
+     "statusTone": "success"
+    }
+   ],
+   "sessionsCompleted": 4,
+   "warnings": [],
+   "watch": [
+    {
+     "exercise": "Cable Crunches",
+     "message": "Cable crunches has been stable for several sessions. Consider increasing difficulty before adding more of the same work.",
+     "status": "plateauing"
+    },
+    {
+     "exercise": "Cable Machine Front Raises",
+     "message": "Cable machine front raises have been stable for several sessions. Consider increasing difficulty before adding more of the same work.",
+     "status": "plateauing"
+    }
+   ]
+  },
+  "unavailableSections": [
+   "new_body_composition"
+  ],
+  "version": "midweek_briefing_v1",
+  "warnings": [
+   "Nutrition coverage is incomplete for the Sunday\u2013Tuesday window."
+  ],
+  "weightContext": {
+   "averageWeight": 171.6,
+   "changeFromPriorComparable": 0.4,
+   "chart": null,
+   "interpretation": "Your average weight is 0.4 lb higher than last week. That fits the current calorie picture, but it is not enough by itself to change the plan.",
+   "observations": 3,
+   "phaseBaseline": null,
+   "priorComparableAverage": 171.2
+  }
+ },
+ "cadence": "midweek",
+ "confidencePublication": {
+  "assessmentId": "confidence_assessment_v2|8520c258e2caebdabf35d3416f191fc83bb9c4ed98775acc0fa6bfc01754f6c7",
+  "intelligenceRunId": "pi-execution|intelligence_lifecycle_identity_v1|user_founder_001|midweek_briefing|goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass|goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78|midweek_briefing_user_founder_001_20260913_20260915|midweek_briefing_user_founder_001_20260913_20260915|midweek%3A2026-09-13%3A2026-09-15%3AAmerica%2FLos_Angeles|2026-09-16T06%3A59%3A59.999Z|confidence_v2%7Cmidweek%7Cmidweek_briefing_user_founder_001_20260913_20260915",
+  "originatingBriefingId": "midweek_briefing_user_founder_001_20260913_20260915",
+  "publicationCutoff": "2026-09-16T06:59:59.999Z",
+  "publisherType": "midweek_briefing",
+  "schemaVersion": "briefing_confidence_binding_v2"
+ },
+ "createdAt": "2026-09-16T07:04:38.549Z",
+ "dependencyManifest": {
+  "briefingType": "midweek",
+  "canonicalDependencies": [
+   {
+    "canonicalObjectId": "activity_day|2026-09-13",
+    "evidenceType": "activity_day",
+    "logicalIdentity": "activity_day|2026-09-13",
+    "observedDate": "2026-09-13",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-14T05:51:14.448Z",
+    "semanticDigest": "sha256_bfd57bd846d32045f88fa09ba6cd25a43eae28e0ec0eb0a688f7d1eb6afefc49",
+    "semanticRevision": null,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "evidence_submission_16C8817C1AD64C858853042769286801_images"
+    }
+   },
+   {
+    "canonicalObjectId": "activity_day|2026-09-14",
+    "evidenceType": "activity_day",
+    "logicalIdentity": "activity_day|2026-09-14",
+    "observedDate": "2026-09-14",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-15T05:56:16.735Z",
+    "semanticDigest": "sha256_a0494fc4430eef4293c75d2c73357a9b028785e380b698e5daa9e69f3fe005fd",
+    "semanticRevision": null,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "evidence_submission_F4A491C6B6ED4DEFB178DAB7C91D93F8_images"
+    }
+   },
+   {
+    "canonicalObjectId": "activity_day|2026-09-15",
+    "evidenceType": "activity_day",
+    "logicalIdentity": "activity_day|2026-09-15",
+    "observedDate": "2026-09-15",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-16T05:46:55.769Z",
+    "semanticDigest": "sha256_33df41f8fa25b18a366115d92f7d7e82e175ca638e4ee09cae41b063b9e0f60b",
+    "semanticRevision": null,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "evidence_submission_344C13E85EF44CF68ADBFF063A377F24_images"
+    }
+   },
+   {
+    "canonicalObjectId": "nutrition|2026-09-13|nutrition-day",
+    "evidenceType": "nutrition",
+    "logicalIdentity": "nutrition|2026-09-13",
+    "observedDate": "2026-09-13",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-14T03:16:50.658Z",
+    "semanticDigest": "sha256_fcfddd78f982c22a55da80861065438cb3e13829aae72a87710e4cd417f12a7f",
+    "semanticRevision": 1,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "evidence_submission_046E24B1602140E79131388487D001F6_images",
+     "sourceReviewId": "evidence_review_046E24B1602140E79131388487D001F6"
+    }
+   },
+   {
+    "canonicalObjectId": "nutrition|2026-09-14|nutrition-day",
+    "evidenceType": "nutrition",
+    "logicalIdentity": "nutrition|2026-09-14",
+    "observedDate": "2026-09-14",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-15T05:55:51.622Z",
+    "semanticDigest": "sha256_a6dd1bccd59c06c96cc934acf2a647dba151d2ff18d0482157172b9d12702377",
+    "semanticRevision": 1,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "evidence_submission_0E5F7598A4824F6CAEF0B4915CF6FA7C_images",
+     "sourceReviewId": "evidence_review_0E5F7598A4824F6CAEF0B4915CF6FA7C"
+    }
+   },
+   {
+    "canonicalObjectId": "training|authoritative|apple_workout_1btrcd1|training_logger_draft_ABB72390-C0D9-46B5-9F3F-939BA2820487|Apple Health Screenshot 2.jpg",
+    "evidenceType": "training",
+    "logicalIdentity": "training|2026-09-13|training|authoritative|apple_workout_1btrcd1|training_logger_draft_ABB72390-C0D9-46B5-9F3F-939BA2820487|Apple Health Screenshot 2.jpg",
+    "observedDate": "2026-09-13",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-14T03:10:54.052Z",
+    "semanticDigest": "sha256_f774b0dde3d347328d2ef6bf59e5056c74d8d9d974e25c52bb6d6fbb9107c29e",
+    "semanticRevision": null,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "training_logger_submission_ABB72390-C0D9-46B5-9F3F-939BA2820487_01a09de5-0c05-71b1-92a3-e74926fa01ce"
+    }
+   },
+   {
+    "canonicalObjectId": "training|authoritative|evidence_submission_9B9B0363B6E34A599A1DF27070FA23D4_images_file_1",
+    "evidenceType": "training",
+    "logicalIdentity": "training|2026-09-14|training|authoritative|evidence_submission_9B9B0363B6E34A599A1DF27070FA23D4_images_file_1",
+    "observedDate": "2026-09-14",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-14T16:58:51.158Z",
+    "semanticDigest": "sha256_af76f1f025c78bf0dfd1b9428150e9a09ead47c032ef34e32cc6d930935d24d9",
+    "semanticRevision": null,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "evidence_submission_9B9B0363B6E34A599A1DF27070FA23D4_images"
+    }
+   },
+   {
+    "canonicalObjectId": "training|authoritative|evidence_submission_9B9B0363B6E34A599A1DF27070FA23D4_images_file_3",
+    "evidenceType": "training",
+    "logicalIdentity": "training|2026-09-14|training|authoritative|evidence_submission_9B9B0363B6E34A599A1DF27070FA23D4_images_file_3",
+    "observedDate": "2026-09-14",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-14T16:58:51.160Z",
+    "semanticDigest": "sha256_62a06baf5f3604877335a1e4dbc4465079dae461c64d9ad5421b20901a04efa5",
+    "semanticRevision": null,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "evidence_submission_9B9B0363B6E34A599A1DF27070FA23D4_images"
+    }
+   },
+   {
+    "canonicalObjectId": "training|authoritative|training_logger_draft_A5936FA6-FEE7-4BAA-9D84-9E0034BDC8A6",
+    "evidenceType": "training",
+    "logicalIdentity": "training|2026-09-14|training|authoritative|training_logger_draft_A5936FA6-FEE7-4BAA-9D84-9E0034BDC8A6",
+    "observedDate": "2026-09-14",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-14T16:58:23.690Z",
+    "semanticDigest": "sha256_46bc6923248b628b29c285c4641788013fd4fe036bb0356f35eac749b0c5c41a",
+    "semanticRevision": null,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "evidence_submission_9B9B0363B6E34A599A1DF27070FA23D4_images"
+    }
+   },
+   {
+    "canonicalObjectId": "training|authoritative|training_logger_draft_E017D899-55F6-4983-8F14-022AD7DBE809",
+    "evidenceType": "training",
+    "logicalIdentity": "training|2026-09-15|training|authoritative|training_logger_draft_E017D899-55F6-4983-8F14-022AD7DBE809",
+    "observedDate": "2026-09-15",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-16T00:36:52.587Z",
+    "semanticDigest": "sha256_d813fbb0a35e62ab4c3ce6b45c36547f48f093897cc0ab84d6df452fafc3b482",
+    "semanticRevision": null,
+    "sourceLinkage": {
+     "sourceEvidencePackageId": "training_logger_submission_E017D899-55F6-4983-8F14-022AD7DBE809_01a0a7a4-d897-7389-801e-ecb0c9e6da91"
+    }
+   },
+   {
+    "canonicalObjectId": "morning_weight|user_founder_001|2026-09-13",
+    "evidenceType": "weight",
+    "logicalIdentity": "weight|2026-09-13|morning_weight|user_founder_001|2026-09-13",
+    "observedDate": "2026-09-13",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-13T16:26:20.156Z",
+    "semanticDigest": "sha256_d563f7d4090e8024a82cf12d62ccf7443242c036d35f932b3fbcf2ff0cd4198a",
+    "semanticRevision": null,
+    "sourceLinkage": {}
+   },
+   {
+    "canonicalObjectId": "weight_2026_09_13",
+    "evidenceType": "weight",
+    "logicalIdentity": "weight|2026-09-13|weight_2026_09_13",
+    "observedDate": "2026-09-13",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-13T16:26:20.156Z",
+    "semanticDigest": "sha256_72130d9907581263f3f184e85b89808a5fe3fe4ce0835ed8eeb3ee5e7d33078d",
+    "semanticRevision": null,
+    "sourceLinkage": {}
+   },
+   {
+    "canonicalObjectId": "morning_weight|user_founder_001|2026-09-14",
+    "evidenceType": "weight",
+    "logicalIdentity": "weight|2026-09-14|morning_weight|user_founder_001|2026-09-14",
+    "observedDate": "2026-09-14",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-14T13:21:31.442Z",
+    "semanticDigest": "sha256_817ef2d12e70d37909bfe949cebb24a46dfff2cc9d1e6ce573ad6672c192f2c8",
+    "semanticRevision": null,
+    "sourceLinkage": {}
+   },
+   {
+    "canonicalObjectId": "weight_2026_09_14",
+    "evidenceType": "weight",
+    "logicalIdentity": "weight|2026-09-14|weight_2026_09_14",
+    "observedDate": "2026-09-14",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-14T13:21:31.442Z",
+    "semanticDigest": "sha256_9780b3e5def8ef40906d0ab99c944f9eaf415545e4501734bf487b2f4dd93a45",
+    "semanticRevision": null,
+    "sourceLinkage": {}
+   },
+   {
+    "canonicalObjectId": "morning_weight|user_founder_001|2026-09-15",
+    "evidenceType": "weight",
+    "logicalIdentity": "weight|2026-09-15|morning_weight|user_founder_001|2026-09-15",
+    "observedDate": "2026-09-15",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-15T13:38:14.873Z",
+    "semanticDigest": "sha256_cf1ee71d4302cb9d9c4f987f8c9712fcd01db04d96ba9034ffd547fe5d86944f",
+    "semanticRevision": null,
+    "sourceLinkage": {}
+   },
+   {
+    "canonicalObjectId": "weight_2026_09_15",
+    "evidenceType": "weight",
+    "logicalIdentity": "weight|2026-09-15|weight_2026_09_15",
+    "observedDate": "2026-09-15",
+    "schemaVersion": "canonical_evidence_dependency_v1",
+    "semanticChangedAt": "2026-09-15T13:38:14.873Z",
+    "semanticDigest": "sha256_055943ba9b9e80c80f53166674e8158e77df6030a9b8ca89b3a04bc93851647d",
+    "semanticRevision": null,
+    "sourceLinkage": {}
+   }
+  ],
+  "evidenceCutoff": "2026-09-16T06:59:59.999Z",
+  "evidenceWindowEnd": "2026-09-15",
+  "evidenceWindowId": "midweek:2026-09-13:2026-09-15:America/Los_Angeles",
+  "evidenceWindowStart": "2026-09-13",
+  "fingerprint": "sha256_d48bc90edd464849b357d1e81d3b88dfe1824371d44b304657840ac610abd9d7",
+  "occurrenceIdentity": "user_founder_001|scheduled|midweek|midweek:2026-09-13:2026-09-15:America/Los_Angeles",
+  "publicationRootId": "midweek_briefing_user_founder_001_20260913_20260915",
+  "schemaVersion": "briefing_dependency_manifest_v1",
+  "timeZone": "America/Los_Angeles"
+ },
+ "evidenceWindow": {
+  "briefingDate": "2026-09-16",
+  "cadence": "midweek",
+  "closed": true,
+  "cutoff": "2026-09-16T06:59:59.999Z",
+  "date": "2026-09-15",
+  "end": "2026-09-15T23:59:59.999",
+  "endDate": "2026-09-15",
+  "id": "midweek:2026-09-13:2026-09-15:America/Los_Angeles",
+  "relativeLabel": "Sunday through Tuesday",
+  "sameDayEvidenceExcluded": true,
+  "start": "2026-09-13T00:00:00",
+  "startDate": "2026-09-13",
+  "timeZone": "America/Los_Angeles"
+ },
+ "generatedAt": "2026-09-16T07:04:38.549Z",
+ "id": "midweek_briefing_user_founder_001_20260913_20260915",
+ "lifecycle": {
+  "claimedAt": "2026-09-16T07:04:38.549Z",
+  "completedAt": "2026-09-16T07:04:38.549Z",
+  "consumedAt": null,
+  "failedAt": null,
+  "failureReason": null,
+  "generatedAt": "2026-09-16T07:04:38.549Z",
+  "generationStatus": "completed",
+  "openedAt": null
+ },
+ "piMemory": {
+  "briefingDate": "2026-09-16",
+  "cadence": "midweek",
+  "claimHistory": [
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|training_progress_weight_change|midweek.progress",
+    "communicatedAt": "2026-07-29",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|training_volume_weight_change|midweek.volume",
+    "communicatedAt": "2026-07-29",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|energy_trend|midweek.energy_calibration",
+    "communicatedAt": "2026-07-29",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|training_volume_weight_change|midweek.volume",
+    "communicatedAt": "2026-08-05",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|weight_change_training_stability|midweek.stability",
+    "communicatedAt": "2026-08-05",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|energy_trend|midweek.energy_calibration",
+    "communicatedAt": "2026-08-05",
+    "lifecycleState": "strengthened"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|training_volume_weight_change|midweek.volume",
+    "communicatedAt": "2026-08-12",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|weight_change_training_stability|midweek.stability",
+    "communicatedAt": "2026-08-12",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|energy_trend|midweek.energy_calibration",
+    "communicatedAt": "2026-08-12",
+    "lifecycleState": "weakened"
+   },
+   {
+    "claimId": "pi_narrative|direct_training|performance|category|back",
+    "communicatedAt": "2026-08-19",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|direct_training|performance|overall|resistance",
+    "communicatedAt": "2026-08-19",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|energy_trend|midweek.energy_calibration",
+    "communicatedAt": "2026-08-19",
+    "lifecycleState": "contradicted"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|training_regression_weight_change|midweek.regression",
+    "communicatedAt": "2026-09-02",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|training_volume_weight_change|midweek.volume",
+    "communicatedAt": "2026-09-02",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|energy_trend|midweek.energy_calibration",
+    "communicatedAt": "2026-09-02",
+    "lifecycleState": "contradicted"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|training_regression_weight_change|midweek.regression",
+    "communicatedAt": "2026-09-09",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|training_volume_weight_change|midweek.volume",
+    "communicatedAt": "2026-09-09",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|energy_trend|midweek.energy_calibration",
+    "communicatedAt": "2026-09-09",
+    "lifecycleState": "contradicted"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|training_volume_weight_change|midweek.volume",
+    "communicatedAt": "2026-09-16",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|claim|pi_claim|training+weight|weight_change_training_stability|midweek.stability",
+    "communicatedAt": "2026-09-16",
+    "lifecycleState": "new"
+   },
+   {
+    "claimId": "pi_narrative|energy_trend|midweek.energy_calibration",
+    "communicatedAt": "2026-09-16",
+    "lifecycleState": "contradicted"
+   }
+  ],
+  "communicatedClaimIds": [
+   "pi_narrative|energy_trend|midweek.energy_calibration",
+   "pi_narrative|claim|pi_claim|training+weight|training_progress_weight_change|midweek.progress",
+   "pi_narrative|claim|pi_claim|training+weight|training_volume_weight_change|midweek.volume",
+   "pi_narrative|claim|pi_claim|training+weight|weight_change_training_stability|midweek.stability",
+   "pi_narrative|direct_training|performance|overall|resistance",
+   "pi_narrative|direct_training|performance|category|back",
+   "pi_narrative|claim|pi_claim|training+weight|training_regression_weight_change|midweek.regression"
+  ],
+  "limitations": [
+   "structured_pi_memory_unavailable"
+  ],
+  "priorClaims": [
+   {
+    "candidateType": "cross_domain_claim",
+    "confidence": {
+     "factors": [],
+     "level": "unevaluated",
+     "limitations": [
+      "activity_without_nutrition",
+      "energy_coverage_partial",
+      "expenditure_is_estimated_rmr_plus_active_calories",
+      "some_days_lack_complete_paired_energy_evidence"
+     ],
+     "method": "training_energy_weaker_participant",
+     "reasons": [
+      "weaker_participant_ceiling"
+     ],
+     "score": null
+    },
+    "coverage": {
+     "state": "complete"
+    },
+    "direction": "unknown",
+    "evidenceWindow": {
+     "comparisonEndDate": null,
+     "comparisonStartDate": null,
+     "endDate": "2026-09-15",
+     "startDate": "2026-09-13"
+    },
+    "explanationData": {
+     "comparison": null
+    },
+    "goalContext": {},
+    "id": "pi_narrative|claim|pi_claim|energy+training|training_energy_relationship|resistance.estimated_energy_balance.midweek",
+    "lifecycle": {
+     "changeReasons": [
+      "first_appearance"
+     ],
+     "consecutiveObservationCount": 1,
+     "consecutiveUnchangedCount": 0,
+     "currentConfidence": "unevaluated",
+     "eligibility": "eligible",
+     "firstObservedDate": "2026-09-16",
+     "lastMaterialChangeDate": "2026-09-16",
+     "lastObservedDate": "2026-09-16",
+     "limitations": [],
+     "missedEvaluationCount": 0,
+     "priorClaimId": null,
+     "priorConfidence": null,
+     "provenance": {
+      "evaluationCoverage": "complete",
+      "evaluationDate": "2026-09-16",
+      "producer": "pi_claim_lifecycle_service",
+      "producerVersion": "pi_claim_lifecycle_v1",
+      "sourceClaimIds": [
+       "pi_claim|energy+training|training_energy_relationship|resistance.estimated_energy_balance.midweek"
+      ]
+     },
+     "resolutionReason": null,
+     "retirementReason": null,
+     "state": "new",
+     "totalObservationCount": 1
+    },
+    "limitations": [
+     "activity_without_nutrition",
+     "energy_coverage_partial",
+     "expenditure_is_estimated_rmr_plus_active_calories",
+     "some_days_lack_complete_paired_energy_evidence"
+    ],
+    "materiality": {
+     "basis": [],
+     "level": "unevaluated",
+     "method": "shared_ranking_pending",
+     "score": null
+    },
+    "participatingDomains": [
+     "energy",
+     "training"
+    ],
+    "provenance": {
+     "producer": "pi_briefing_memory_service",
+     "sourceCandidateProducer": "pi_narrative_candidate_service"
+    },
+    "relationshipKind": "training_energy_relationship",
+    "schemaVersion": "pi_narrative_candidate_v1",
+    "semanticFamily": "energy+training|training_energy_relationship",
+    "semanticScope": "resistance.estimated_energy_balance.midweek",
+    "sourceId": "pi_claim|energy+training|training_energy_relationship|resistance.estimated_energy_balance.midweek",
+    "sourceType": "pi_claim",
+    "status": "new",
+    "supportingEvidenceIds": [
+     "performance|overall|resistance",
+     "pi|energy|energy_balance|estimated_energy_balance|midweek.balance",
+     "pi|energy|paired_day_coverage|paired_day_coverage|midweek.paired_day_coverage"
+    ],
+    "thesisDomain": "training"
+   },
+   {
+    "candidateType": "cross_domain_claim",
+    "confidence": {
+     "factors": [
+      {
+       "level": "moderate",
+       "observationId": "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+      },
+      {
+       "level": "moderate",
+       "observationId": "pi|energy|energy_balance|estimated_energy_balance|midweek.balance"
+      },
+      {
+       "level": "low",
+       "observationId": "pi|energy|paired_day_coverage|paired_day_coverage|midweek.paired_day_coverage"
+      }
+     ],
+     "level": "unevaluated",
+     "limitations": [
+      "activity_without_nutrition",
+      "expenditure_is_estimated_rmr_plus_active_calories",
+      "paired_energy_coverage_partial",
+      "some_days_lack_complete_paired_energy_evidence"
+     ],
+     "method": "weakest_participant_with_limitation_reduction",
+     "reasons": [
+      "weakest_participant_low"
+     ],
+     "score": null
+    },
+    "coverage": {
+     "activityOnlyDays": 1,
+     "completePairedDays": 1,
+     "nutritionOnlyDays": 0,
+     "partialDays": 1,
+     "state": "partial"
+    },
+    "direction": "rising",
+    "evidenceWindow": {
+     "comparisonEndDate": "2026-09-08",
+     "comparisonStartDate": "2026-09-06",
+     "endDate": "2026-09-15",
+     "startDate": "2026-09-13"
+    },
+    "explanationData": {
+     "comparison": null
+    },
+    "goalContext": {},
+    "id": "pi_narrative|claim|pi_claim|energy+weight|energy_balance_weight_change|midweek",
+    "lifecycle": {
+     "changeReasons": [
+      "first_appearance"
+     ],
+     "consecutiveObservationCount": 1,
+     "consecutiveUnchangedCount": 0,
+     "currentConfidence": "unevaluated",
+     "eligibility": "eligible",
+     "firstObservedDate": "2026-09-16",
+     "lastMaterialChangeDate": "2026-09-16",
+     "lastObservedDate": "2026-09-16",
+     "limitations": [],
+     "missedEvaluationCount": 0,
+     "priorClaimId": null,
+     "priorConfidence": null,
+     "provenance": {
+      "evaluationCoverage": "complete",
+      "evaluationDate": "2026-09-16",
+      "producer": "pi_claim_lifecycle_service",
+      "producerVersion": "pi_claim_lifecycle_v1",
+      "sourceClaimIds": [
+       "pi_claim|energy+weight|energy_balance_weight_change|midweek"
+      ]
+     },
+     "resolutionReason": null,
+     "retirementReason": null,
+     "state": "new",
+     "totalObservationCount": 1
+    },
+    "limitations": [
+     "activity_without_nutrition",
+     "expenditure_is_estimated_rmr_plus_active_calories",
+     "paired_energy_coverage_partial",
+     "some_days_lack_complete_paired_energy_evidence"
+    ],
+    "materiality": {
+     "basis": [],
+     "level": "unevaluated",
+     "method": "ranking_not_implemented",
+     "score": null
+    },
+    "participatingDomains": [
+     "energy",
+     "weight"
+    ],
+    "provenance": {
+     "producer": "pi_briefing_memory_service",
+     "sourceCandidateProducer": "pi_narrative_candidate_service"
+    },
+    "relationshipKind": "energy_balance_weight_change",
+    "schemaVersion": "pi_narrative_candidate_v1",
+    "semanticFamily": "energy+weight|energy_balance_weight_change",
+    "semanticScope": "midweek",
+    "sourceId": "pi_claim|energy+weight|energy_balance_weight_change|midweek",
+    "sourceType": "pi_claim",
+    "status": "new",
+    "supportingEvidenceIds": [
+     "pi|energy|energy_balance|estimated_energy_balance|midweek.balance",
+     "pi|energy|paired_day_coverage|paired_day_coverage|midweek.paired_day_coverage",
+     "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+    ],
+    "thesisDomain": "weight"
+   },
+   {
+    "candidateType": "cross_domain_claim",
+    "confidence": {
+     "factors": [
+      {
+       "level": "moderate",
+       "observationId": "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+      },
+      {
+       "level": "moderate",
+       "observationId": "pi|energy|energy_expenditure|estimated_expenditure|midweek.expenditure"
+      },
+      {
+       "level": "low",
+       "observationId": "pi|energy|paired_day_coverage|paired_day_coverage|midweek.paired_day_coverage"
+      }
+     ],
+     "level": "unevaluated",
+     "limitations": [
+      "activity_without_nutrition",
+      "expenditure_is_estimated_rmr_plus_active_calories",
+      "paired_energy_coverage_partial"
+     ],
+     "method": "weakest_participant_with_limitation_reduction",
+     "reasons": [
+      "weakest_participant_low"
+     ],
+     "score": null
+    },
+    "coverage": {
+     "activityOnlyDays": 1,
+     "completePairedDays": 1,
+     "nutritionOnlyDays": 0,
+     "partialDays": 1,
+     "state": "partial"
+    },
+    "direction": "rising",
+    "evidenceWindow": {
+     "comparisonEndDate": "2026-09-08",
+     "comparisonStartDate": "2026-09-06",
+     "endDate": "2026-09-15",
+     "startDate": "2026-09-13"
+    },
+    "explanationData": {
+     "comparison": null
+    },
+    "goalContext": {},
+    "id": "pi_narrative|claim|pi_claim|energy+weight|expenditure_weight_change|midweek",
+    "lifecycle": {
+     "changeReasons": [
+      "first_appearance"
+     ],
+     "consecutiveObservationCount": 1,
+     "consecutiveUnchangedCount": 0,
+     "currentConfidence": "unevaluated",
+     "eligibility": "eligible",
+     "firstObservedDate": "2026-09-16",
+     "lastMaterialChangeDate": "2026-09-16",
+     "lastObservedDate": "2026-09-16",
+     "limitations": [],
+     "missedEvaluationCount": 0,
+     "priorClaimId": null,
+     "priorConfidence": null,
+     "provenance": {
+      "evaluationCoverage": "complete",
+      "evaluationDate": "2026-09-16",
+      "producer": "pi_claim_lifecycle_service",
+      "producerVersion": "pi_claim_lifecycle_v1",
+      "sourceClaimIds": [
+       "pi_claim|energy+weight|expenditure_weight_change|midweek"
+      ]
+     },
+     "resolutionReason": null,
+     "retirementReason": null,
+     "state": "new",
+     "totalObservationCount": 1
+    },
+    "limitations": [
+     "activity_without_nutrition",
+     "expenditure_is_estimated_rmr_plus_active_calories",
+     "paired_energy_coverage_partial"
+    ],
+    "materiality": {
+     "basis": [],
+     "level": "unevaluated",
+     "method": "ranking_not_implemented",
+     "score": null
+    },
+    "participatingDomains": [
+     "energy",
+     "weight"
+    ],
+    "provenance": {
+     "producer": "pi_briefing_memory_service",
+     "sourceCandidateProducer": "pi_narrative_candidate_service"
+    },
+    "relationshipKind": "expenditure_weight_change",
+    "schemaVersion": "pi_narrative_candidate_v1",
+    "semanticFamily": "energy+weight|expenditure_weight_change",
+    "semanticScope": "midweek",
+    "sourceId": "pi_claim|energy+weight|expenditure_weight_change|midweek",
+    "sourceType": "pi_claim",
+    "status": "new",
+    "supportingEvidenceIds": [
+     "pi|energy|energy_expenditure|estimated_expenditure|midweek.expenditure",
+     "pi|energy|paired_day_coverage|paired_day_coverage|midweek.paired_day_coverage",
+     "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+    ],
+    "thesisDomain": "weight"
+   },
+   {
+    "candidateType": "cross_domain_claim",
+    "confidence": {
+     "factors": [
+      {
+       "level": "moderate",
+       "observationId": "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+      },
+      {
+       "level": "moderate",
+       "observationId": "pi|energy|energy_intake|caloric_intake|midweek.intake"
+      },
+      {
+       "level": "low",
+       "observationId": "pi|energy|paired_day_coverage|paired_day_coverage|midweek.paired_day_coverage"
+      }
+     ],
+     "level": "unevaluated",
+     "limitations": [
+      "activity_without_nutrition",
+      "expenditure_is_estimated_rmr_plus_active_calories",
+      "paired_energy_coverage_partial"
+     ],
+     "method": "weakest_participant_with_limitation_reduction",
+     "reasons": [
+      "weakest_participant_low"
+     ],
+     "score": null
+    },
+    "coverage": {
+     "activityOnlyDays": 1,
+     "completePairedDays": 1,
+     "nutritionOnlyDays": 0,
+     "partialDays": 1,
+     "state": "partial"
+    },
+    "direction": "rising",
+    "evidenceWindow": {
+     "comparisonEndDate": "2026-09-08",
+     "comparisonStartDate": "2026-09-06",
+     "endDate": "2026-09-15",
+     "startDate": "2026-09-13"
+    },
+    "explanationData": {
+     "comparison": null
+    },
+    "goalContext": {},
+    "id": "pi_narrative|claim|pi_claim|energy+weight|intake_weight_change|midweek",
+    "lifecycle": {
+     "changeReasons": [
+      "first_appearance"
+     ],
+     "consecutiveObservationCount": 1,
+     "consecutiveUnchangedCount": 0,
+     "currentConfidence": "unevaluated",
+     "eligibility": "eligible",
+     "firstObservedDate": "2026-09-16",
+     "lastMaterialChangeDate": "2026-09-16",
+     "lastObservedDate": "2026-09-16",
+     "limitations": [],
+     "missedEvaluationCount": 0,
+     "priorClaimId": null,
+     "priorConfidence": null,
+     "provenance": {
+      "evaluationCoverage": "complete",
+      "evaluationDate": "2026-09-16",
+      "producer": "pi_claim_lifecycle_service",
+      "producerVersion": "pi_claim_lifecycle_v1",
+      "sourceClaimIds": [
+       "pi_claim|energy+weight|intake_weight_change|midweek"
+      ]
+     },
+     "resolutionReason": null,
+     "retirementReason": null,
+     "state": "new",
+     "totalObservationCount": 1
+    },
+    "limitations": [
+     "activity_without_nutrition",
+     "expenditure_is_estimated_rmr_plus_active_calories",
+     "paired_energy_coverage_partial"
+    ],
+    "materiality": {
+     "basis": [],
+     "level": "unevaluated",
+     "method": "ranking_not_implemented",
+     "score": null
+    },
+    "participatingDomains": [
+     "energy",
+     "weight"
+    ],
+    "provenance": {
+     "producer": "pi_briefing_memory_service",
+     "sourceCandidateProducer": "pi_narrative_candidate_service"
+    },
+    "relationshipKind": "intake_weight_change",
+    "schemaVersion": "pi_narrative_candidate_v1",
+    "semanticFamily": "energy+weight|intake_weight_change",
+    "semanticScope": "midweek",
+    "sourceId": "pi_claim|energy+weight|intake_weight_change|midweek",
+    "sourceType": "pi_claim",
+    "status": "new",
+    "supportingEvidenceIds": [
+     "pi|energy|energy_intake|caloric_intake|midweek.intake",
+     "pi|energy|paired_day_coverage|paired_day_coverage|midweek.paired_day_coverage",
+     "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+    ],
+    "thesisDomain": "weight"
+   },
+   {
+    "candidateType": "cross_domain_claim",
+    "confidence": {
+     "factors": [
+      {
+       "level": "high",
+       "observationId": "performance|exercise|bicep_curl_machine"
+      },
+      {
+       "level": "moderate",
+       "observationId": "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+      }
+     ],
+     "level": "low",
+     "limitations": [
+      "conflicting_training_directions",
+      "training_scope_isolated_exercise"
+     ],
+     "method": "weakest_participant_with_limitation_reduction",
+     "reasons": [
+      "weakest_participant_moderate"
+     ],
+     "score": null
+    },
+    "coverage": {
+     "state": "complete"
+    },
+    "direction": "rising",
+    "evidenceWindow": {
+     "comparisonEndDate": "2026-09-08",
+     "comparisonStartDate": "2026-09-06",
+     "endDate": "2026-09-15",
+     "startDate": "2026-09-13"
+    },
+    "explanationData": {
+     "comparison": null
+    },
+    "goalContext": {
+     "training": {
+      "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "goalPhase": "lean_mass_build",
+      "guardrailRelevance": false,
+      "observationRole": "context",
+      "phaseAgeBand": "week_5_to_8",
+      "primaryOutcomeRelevance": true,
+      "semanticGoalType": "lean_mass_gain"
+     },
+     "weight": {
+      "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "goalPhase": "lean_mass_build",
+      "guardrailRelevance": false,
+      "observationRole": "context",
+      "phaseAgeBand": "week_5_to_8",
+      "primaryOutcomeRelevance": false,
+      "semanticGoalType": "lean_mass_gain"
+     }
+    },
+    "id": "pi_narrative|claim|pi_claim|training+weight|training_progress_weight_change|midweek.progress",
+    "lifecycle": {
+     "changeReasons": [
+      "first_appearance"
+     ],
+     "consecutiveObservationCount": 1,
+     "consecutiveUnchangedCount": 0,
+     "currentConfidence": "low",
+     "eligibility": "eligible",
+     "firstObservedDate": "2026-09-16",
+     "lastMaterialChangeDate": "2026-09-16",
+     "lastObservedDate": "2026-09-16",
+     "limitations": [],
+     "missedEvaluationCount": 0,
+     "priorClaimId": null,
+     "priorConfidence": null,
+     "provenance": {
+      "evaluationCoverage": "complete",
+      "evaluationDate": "2026-09-16",
+      "producer": "pi_claim_lifecycle_service",
+      "producerVersion": "pi_claim_lifecycle_v1",
+      "sourceClaimIds": [
+       "pi_claim|training+weight|training_progress_weight_change|midweek.progress"
+      ]
+     },
+     "resolutionReason": null,
+     "retirementReason": null,
+     "state": "new",
+     "totalObservationCount": 1
+    },
+    "limitations": [
+     "conflicting_training_directions",
+     "training_scope_isolated_exercise"
+    ],
+    "materiality": {
+     "basis": [],
+     "level": "unevaluated",
+     "method": "ranking_not_implemented",
+     "score": null
+    },
+    "participatingDomains": [
+     "training",
+     "weight"
+    ],
+    "provenance": {
+     "producer": "pi_briefing_memory_service",
+     "sourceCandidateProducer": "pi_narrative_candidate_service"
+    },
+    "relationshipKind": "training_progress_weight_change",
+    "schemaVersion": "pi_narrative_candidate_v1",
+    "semanticFamily": "training+weight|training_progress_weight_change",
+    "semanticScope": "midweek.progress",
+    "sourceId": "pi_claim|training+weight|training_progress_weight_change|midweek.progress",
+    "sourceType": "pi_claim",
+    "status": "new",
+    "supportingEvidenceIds": [
+     "training_2026-08-01_traditional_strength_training_1108-1236_costa_mesa",
+     "training_2026-08-05_traditional_strength_training_0633_1",
+     "training_2026-08-08_TraditionalStrengthTraining_1438",
+     "training_2026-08-19_15-58_traditional_strength_training",
+     "training_2026-08-22_traditional_strength_training_0734-0848",
+     "training_2026-08-26_traditional_strength_training_0807-0926_IMG_2027.png",
+     "training_applefitness_2026-07-29_0825_traditional_strength_training",
+     "training_logger_session_43879E84-ACB7-4415-BD5D-D8B39DE0C9AA",
+     "training_logger_session_training_logger_5debee6f-9844-4182-b4b3-d975bf4c0f5e",
+     "training_logger_session_training_logger_66cb30d7-aa96-48db-b441-8380ce000699",
+     "training_logger_session_training_logger_737c6733-c7d3-45df-a068-fb27ef11c67f",
+     "training_logger_session_training_logger_7e68f16c-3639-48f2-bb0a-34f9b4c484a2",
+     "training_logger_session_training_logger_dc4e0ad0-2a13-4e28-a2ed-b37497d7b80a",
+     "weight_2026_09_07",
+     "weight_2026_09_08",
+     "weight_2026_09_13",
+     "weight_2026_09_14",
+     "weight_2026_09_15"
+    ],
+    "thesisDomain": "training"
+   },
+   {
+    "candidateType": "cross_domain_claim",
+    "confidence": {
+     "factors": [
+      {
+       "level": "high",
+       "observationId": "performance|exercise|seated_cable_row"
+      },
+      {
+       "level": "moderate",
+       "observationId": "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+      }
+     ],
+     "level": "low",
+     "limitations": [
+      "conflicting_training_directions",
+      "training_scope_isolated_exercise"
+     ],
+     "method": "weakest_participant_with_limitation_reduction",
+     "reasons": [
+      "weakest_participant_moderate"
+     ],
+     "score": null
+    },
+    "coverage": {
+     "state": "complete"
+    },
+    "direction": "rising",
+    "evidenceWindow": {
+     "comparisonEndDate": "2026-09-08",
+     "comparisonStartDate": "2026-09-06",
+     "endDate": "2026-09-15",
+     "startDate": "2026-09-13"
+    },
+    "explanationData": {
+     "comparison": null
+    },
+    "goalContext": {
+     "training": {
+      "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "goalPhase": "lean_mass_build",
+      "guardrailRelevance": false,
+      "observationRole": "context",
+      "phaseAgeBand": "week_5_to_8",
+      "primaryOutcomeRelevance": true,
+      "semanticGoalType": "lean_mass_gain"
+     },
+     "weight": {
+      "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "goalPhase": "lean_mass_build",
+      "guardrailRelevance": false,
+      "observationRole": "context",
+      "phaseAgeBand": "week_5_to_8",
+      "primaryOutcomeRelevance": false,
+      "semanticGoalType": "lean_mass_gain"
+     }
+    },
+    "id": "pi_narrative|claim|pi_claim|training+weight|training_regression_weight_change|midweek.regression",
+    "lifecycle": {
+     "changeReasons": [
+      "first_appearance"
+     ],
+     "consecutiveObservationCount": 1,
+     "consecutiveUnchangedCount": 0,
+     "currentConfidence": "low",
+     "eligibility": "eligible",
+     "firstObservedDate": "2026-09-16",
+     "lastMaterialChangeDate": "2026-09-16",
+     "lastObservedDate": "2026-09-16",
+     "limitations": [],
+     "missedEvaluationCount": 0,
+     "priorClaimId": null,
+     "priorConfidence": null,
+     "provenance": {
+      "evaluationCoverage": "complete",
+      "evaluationDate": "2026-09-16",
+      "producer": "pi_claim_lifecycle_service",
+      "producerVersion": "pi_claim_lifecycle_v1",
+      "sourceClaimIds": [
+       "pi_claim|training+weight|training_regression_weight_change|midweek.regression"
+      ]
+     },
+     "resolutionReason": null,
+     "retirementReason": null,
+     "state": "new",
+     "totalObservationCount": 1
+    },
+    "limitations": [
+     "conflicting_training_directions",
+     "training_scope_isolated_exercise"
+    ],
+    "materiality": {
+     "basis": [],
+     "level": "unevaluated",
+     "method": "ranking_not_implemented",
+     "score": null
+    },
+    "participatingDomains": [
+     "training",
+     "weight"
+    ],
+    "provenance": {
+     "producer": "pi_briefing_memory_service",
+     "sourceCandidateProducer": "pi_narrative_candidate_service"
+    },
+    "relationshipKind": "training_regression_weight_change",
+    "schemaVersion": "pi_narrative_candidate_v1",
+    "semanticFamily": "training+weight|training_regression_weight_change",
+    "semanticScope": "midweek.regression",
+    "sourceId": "pi_claim|training+weight|training_regression_weight_change|midweek.regression",
+    "sourceType": "pi_claim",
+    "status": "new",
+    "supportingEvidenceIds": [
+     "TrainingSession_2026-08-16_TraditionalStrengthTraining_1",
+     "evidence_correction_20260706232453352_training_2026_07_05_traditional_strength_training_3909_454_training_correction",
+     "training_2026-07-12_16-58_costa_mesa",
+     "training_2026-07-19_14-51_strength_training",
+     "training_2026-07-26_traditionalstrengthtraining_1047am",
+     "weight_2026_09_07",
+     "weight_2026_09_08",
+     "weight_2026_09_13",
+     "weight_2026_09_14",
+     "weight_2026_09_15"
+    ],
+    "thesisDomain": "training"
+   },
+   {
+    "candidateType": "cross_domain_claim",
+    "confidence": {
+     "factors": [
+      {
+       "level": "high",
+       "observationId": "performance|exercise|spider_curl"
+      },
+      {
+       "level": "moderate",
+       "observationId": "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+      }
+     ],
+     "level": "low",
+     "limitations": [
+      "training_scope_isolated_exercise"
+     ],
+     "method": "weakest_participant_with_limitation_reduction",
+     "reasons": [
+      "weakest_participant_moderate"
+     ],
+     "score": null
+    },
+    "coverage": {
+     "state": "complete"
+    },
+    "direction": "rising",
+    "evidenceWindow": {
+     "comparisonEndDate": "2026-09-08",
+     "comparisonStartDate": "2026-09-06",
+     "endDate": "2026-09-15",
+     "startDate": "2026-09-13"
+    },
+    "explanationData": {
+     "comparison": null
+    },
+    "goalContext": {
+     "training": {
+      "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "goalPhase": "lean_mass_build",
+      "guardrailRelevance": false,
+      "observationRole": "context",
+      "phaseAgeBand": "week_5_to_8",
+      "primaryOutcomeRelevance": true,
+      "semanticGoalType": "lean_mass_gain"
+     },
+     "weight": {
+      "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "goalPhase": "lean_mass_build",
+      "guardrailRelevance": false,
+      "observationRole": "context",
+      "phaseAgeBand": "week_5_to_8",
+      "primaryOutcomeRelevance": false,
+      "semanticGoalType": "lean_mass_gain"
+     }
+    },
+    "id": "pi_narrative|claim|pi_claim|training+weight|training_volume_weight_change|midweek.volume",
+    "lifecycle": {
+     "changeReasons": [
+      "first_appearance"
+     ],
+     "consecutiveObservationCount": 1,
+     "consecutiveUnchangedCount": 0,
+     "currentConfidence": "low",
+     "eligibility": "eligible",
+     "firstObservedDate": "2026-09-16",
+     "lastMaterialChangeDate": "2026-09-16",
+     "lastObservedDate": "2026-09-16",
+     "limitations": [],
+     "missedEvaluationCount": 0,
+     "priorClaimId": null,
+     "priorConfidence": null,
+     "provenance": {
+      "evaluationCoverage": "complete",
+      "evaluationDate": "2026-09-16",
+      "producer": "pi_claim_lifecycle_service",
+      "producerVersion": "pi_claim_lifecycle_v1",
+      "sourceClaimIds": [
+       "pi_claim|training+weight|training_volume_weight_change|midweek.volume"
+      ]
+     },
+     "resolutionReason": null,
+     "retirementReason": null,
+     "state": "new",
+     "totalObservationCount": 1
+    },
+    "limitations": [
+     "training_scope_isolated_exercise"
+    ],
+    "materiality": {
+     "basis": [],
+     "level": "unevaluated",
+     "method": "ranking_not_implemented",
+     "score": null
+    },
+    "participatingDomains": [
+     "training",
+     "weight"
+    ],
+    "provenance": {
+     "producer": "pi_briefing_memory_service",
+     "sourceCandidateProducer": "pi_narrative_candidate_service"
+    },
+    "relationshipKind": "training_volume_weight_change",
+    "schemaVersion": "pi_narrative_candidate_v1",
+    "semanticFamily": "training+weight|training_volume_weight_change",
+    "semanticScope": "midweek.volume",
+    "sourceId": "pi_claim|training+weight|training_volume_weight_change|midweek.volume",
+    "sourceType": "pi_claim",
+    "status": "new",
+    "supportingEvidenceIds": [
+     "training_2026-07-08_tradstrengthtraining_0802_0919_typed_reprocess",
+     "training_2026-07-11_1455_traditional_strength_training",
+     "training_2026-07-18_traditional_strength_training_0854",
+     "training_2026-07-22_traditional_strength_training_0803",
+     "training_2026-07-25_traditional_strength_training_1",
+     "training_2026-08-01_traditional_strength_training_1108-1236_costa_mesa",
+     "training_2026-08-05_traditional_strength_training_0633_1",
+     "training_2026-08-08_TraditionalStrengthTraining_1438",
+     "training_2026-08-19_15-58_traditional_strength_training",
+     "training_2026-08-22_traditional_strength_training_0734-0848",
+     "training_2026-08-26_traditional_strength_training_0807-0926_IMG_2027.png",
+     "training_20260715_0801_traditional_strength_training_1",
+     "training_applefitness_2026-07-29_0825_traditional_strength_training",
+     "training_logger_session_43879E84-ACB7-4415-BD5D-D8B39DE0C9AA",
+     "training_logger_session_training_logger_5debee6f-9844-4182-b4b3-d975bf4c0f5e",
+     "training_logger_session_training_logger_66cb30d7-aa96-48db-b441-8380ce000699",
+     "training_logger_session_training_logger_737c6733-c7d3-45df-a068-fb27ef11c67f",
+     "training_logger_session_training_logger_7e68f16c-3639-48f2-bb0a-34f9b4c484a2",
+     "training_logger_session_training_logger_dc4e0ad0-2a13-4e28-a2ed-b37497d7b80a",
+     "training_traditional_strength_197cal_today",
+     "weight_2026_09_07",
+     "weight_2026_09_08",
+     "weight_2026_09_13",
+     "weight_2026_09_14",
+     "weight_2026_09_15"
+    ],
+    "thesisDomain": "training"
+   },
+   {
+    "candidateType": "cross_domain_claim",
+    "confidence": {
+     "factors": [
+      {
+       "level": "moderate",
+       "observationId": "performance|category|triceps"
+      },
+      {
+       "level": "moderate",
+       "observationId": "pi|weight|weight_average_change|body_weight|midweek.average_comparison"
+      }
+     ],
+     "level": "moderate",
+     "limitations": [],
+     "method": "weakest_participant_with_limitation_reduction",
+     "reasons": [
+      "weakest_participant_moderate"
+     ],
+     "score": null
+    },
+    "coverage": {
+     "state": "complete"
+    },
+    "direction": "rising",
+    "evidenceWindow": {
+     "comparisonEndDate": "2026-09-08",
+     "comparisonStartDate": "2026-09-06",
+     "endDate": "2026-09-15",
+     "startDate": "2026-09-13"
+    },
+    "explanationData": {
+     "comparison": null
+    },
+    "goalContext": {
+     "training": {
+      "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "goalPhase": "lean_mass_build",
+      "guardrailRelevance": false,
+      "observationRole": "context",
+      "phaseAgeBand": "week_5_to_8",
+      "primaryOutcomeRelevance": true,
+      "semanticGoalType": "lean_mass_gain"
+     },
+     "weight": {
+      "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "goalPhase": "lean_mass_build",
+      "guardrailRelevance": false,
+      "observationRole": "context",
+      "phaseAgeBand": "week_5_to_8",
+      "primaryOutcomeRelevance": false,
+      "semanticGoalType": "lean_mass_gain"
+     }
+    },
+    "id": "pi_narrative|claim|pi_claim|training+weight|weight_change_training_stability|midweek.stability",
+    "lifecycle": {
+     "changeReasons": [
+      "first_appearance"
+     ],
+     "consecutiveObservationCount": 1,
+     "consecutiveUnchangedCount": 0,
+     "currentConfidence": "moderate",
+     "eligibility": "eligible",
+     "firstObservedDate": "2026-09-16",
+     "lastMaterialChangeDate": "2026-09-16",
+     "lastObservedDate": "2026-09-16",
+     "limitations": [],
+     "missedEvaluationCount": 0,
+     "priorClaimId": null,
+     "priorConfidence": null,
+     "provenance": {
+      "evaluationCoverage": "complete",
+      "evaluationDate": "2026-09-16",
+      "producer": "pi_claim_lifecycle_service",
+      "producerVersion": "pi_claim_lifecycle_v1",
+      "sourceClaimIds": [
+       "pi_claim|training+weight|weight_change_training_stability|midweek.stability"
+      ]
+     },
+     "resolutionReason": null,
+     "retirementReason": null,
+     "state": "new",
+     "totalObservationCount": 1
+    },
+    "limitations": [],
+    "materiality": {
+     "basis": [],
+     "level": "unevaluated",
+     "method": "ranking_not_implemented",
+     "score": null
+    },
+    "participatingDomains": [
+     "training",
+     "weight"
+    ],
+    "provenance": {
+     "producer": "pi_briefing_memory_service",
+     "sourceCandidateProducer": "pi_narrative_candidate_service"
+    },
+    "relationshipKind": "weight_change_training_stability",
+    "schemaVersion": "pi_narrative_candidate_v1",
+    "semanticFamily": "training+weight|weight_change_training_stability",
+    "semanticScope": "midweek.stability",
+    "sourceId": "pi_claim|training+weight|weight_change_training_stability|midweek.stability",
+    "sourceType": "pi_claim",
+    "status": "new",
+    "supportingEvidenceIds": [
+     "training_2026-07-08_tradstrengthtraining_0802_0919_typed_reprocess",
+     "training_2026-07-11_1455_traditional_strength_training",
+     "training_2026-07-18_traditional_strength_training_0854",
+     "training_2026-07-22_traditional_strength_training_0803",
+     "training_2026-07-25_traditional_strength_training_1",
+     "training_2026-08-01_traditional_strength_training_1108-1236_costa_mesa",
+     "training_2026-08-05_traditional_strength_training_0633_1",
+     "training_2026-08-08_TraditionalStrengthTraining_1438",
+     "training_2026-08-19_15-58_traditional_strength_training",
+     "training_2026-08-22_traditional_strength_training_0734-0848",
+     "training_2026-08-26_traditional_strength_training_0807-0926_IMG_2027.png",
+     "training_20260715_0801_traditional_strength_training_1",
+     "training_applefitness_2026-07-29_0825_traditional_strength_training",
+     "training_logger_session_43879E84-ACB7-4415-BD5D-D8B39DE0C9AA",
+     "training_logger_session_training_logger_66cb30d7-aa96-48db-b441-8380ce000699",
+     "training_logger_session_training_logger_737c6733-c7d3-45df-a068-fb27ef11c67f",
+     "training_logger_session_training_logger_7e68f16c-3639-48f2-bb0a-34f9b4c484a2",
+     "training_logger_session_training_logger_dc4e0ad0-2a13-4e28-a2ed-b37497d7b80a",
+     "weight_2026_09_07",
+     "weight_2026_09_08",
+     "weight_2026_09_13",
+     "weight_2026_09_14",
+     "weight_2026_09_15"
+    ],
+    "thesisDomain": "training"
+   },
+   {
+    "candidateType": "energy_trend",
+    "confidence": {
+     "factors": [],
+     "level": "moderate",
+     "limitations": [
+      "paired_coverage_incomplete",
+      "paired_coverage_partial"
+     ],
+     "method": "cadence_energy_coverage",
+     "reasons": [
+      "paired_energy_coverage"
+     ],
+     "score": 50
+    },
+    "coverage": {
+     "completePairedDayCount": 1,
+     "coverageRatio": 0.5,
+     "eligibleDayCount": 3,
+     "missingDayCount": 0,
+     "pairedDayCount": 2,
+     "partialPairedDayCount": 1,
+     "state": "partial",
+     "unknownPairedDayCount": 0,
+     "unpairedActivityDayCount": 1,
+     "unpairedNutritionDayCount": 0
+    },
+    "direction": "falling",
+    "evidenceWindow": {
+     "comparisonEndDate": "2026-09-08",
+     "comparisonStartDate": "2026-09-06",
+     "endDate": "2026-09-15",
+     "startDate": "2026-09-13"
+    },
+    "explanationData": {
+     "comparison": {
+      "estimatedExpenditure": {
+       "direction": "rising"
+      },
+      "intake": {
+       "direction": "falling"
+      },
+      "netBalance": {
+       "direction": "falling"
+      }
+     }
+    },
+    "goalContext": {
+     "activeGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+     "conflicts": [],
+     "contextualDomains": [
+      "activity",
+      "nutrition",
+      "photos",
+      "protocols",
+      "weight"
+     ],
+     "contextualMeasures": [
+      "activity",
+      "adherence",
+      "calories",
+      "macros",
+      "progress_photos",
+      "protein",
+      "recovery",
+      "scale_weight",
+      "sleep"
+     ],
+     "evidencePurpose": null,
+     "goalPhase": "lean_mass_build",
+     "goalStartDate": "2026-07-19",
+     "goalStatus": "active",
+     "goalType": "build_lean_mass",
+     "guardrailDomains": [
+      "dexa",
+      "training",
+      "weight"
+     ],
+     "guardrailMeasures": [
+      "body_fat_percentage",
+      "dexa_body_fat",
+      "dexa_fat_mass",
+      "recovery",
+      "scale_weight",
+      "training_performance"
+     ],
+     "guardrailRelevance": false,
+     "limitations": [
+      "body_fat_guardrail_range_unavailable"
+     ],
+     "observationRole": "context",
+     "phaseAgeBand": "week_5_to_8",
+     "phaseAgeDays": 32,
+     "phaseAgeWeeks": 4,
+     "phaseId": "goal_phase_8d7d4fae_084d_44e7_832a_994d5b735f78",
+     "phaseStartDate": "2026-08-15",
+     "primaryOutcomeDomains": [
+      "dexa",
+      "training"
+     ],
+     "primaryOutcomeMeasures": [
+      "dexa_body_fat",
+      "dexa_fat_mass",
+      "dexa_lean_mass",
+      "lean_mass",
+      "progressive_overload",
+      "training_trend"
+     ],
+     "primaryOutcomeRelevance": false,
+     "provenance": {
+      "mappingMethod": "canonical_goal_phase_measurement_mapping",
+      "resolver": "pi_observation_goal_context_service",
+      "resolverVersion": "pi_goal_context_v1",
+      "sourceGoalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "sourcePhaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+     },
+     "semanticGoalType": "lean_mass_gain",
+     "sourceGoalIds": [
+      "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass"
+     ],
+     "sourceProtocolIds": [],
+     "targetRanges": []
+    },
+    "id": "pi_narrative|energy_trend|midweek.energy_calibration",
+    "lifecycle": {
+     "firstObservedDate": "2026-07-29",
+     "lastMaterialChangeDate": "2026-09-16",
+     "lastObservedDate": "2026-09-16",
+     "state": "contradicted",
+     "totalObservationCount": 7
+    },
+    "limitations": [
+     "paired_coverage_incomplete",
+     "paired_coverage_partial"
+    ],
+    "materiality": {
+     "basis": [
+      "directional_change"
+     ],
+     "level": "moderate",
+     "method": "cadence_energy_direction_change",
+     "score": 55
+    },
+    "participatingDomains": [
+     "energy"
+    ],
+    "provenance": {
+     "producer": "pi_briefing_memory_service",
+     "sourceCandidateProducer": "pi_narrative_candidate_service"
+    },
+    "relationshipKind": "cadence_energy_trend",
+    "schemaVersion": "pi_narrative_candidate_v1",
+    "semanticFamily": "energy|midweek|calibration",
+    "semanticScope": "midweek.energy_calibration",
+    "sourceId": "midweek.energy_calibration",
+    "sourceType": "cadence_energy_assessment",
+    "status": "changed",
+    "supportingEvidenceIds": [
+     "activity_day|2026-09-13",
+     "activity_day|2026-09-14",
+     "activity_day|2026-09-15",
+     "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+     "nutrition|2026-09-13|nutrition-day",
+     "nutrition|2026-09-14|nutrition-day"
+    ],
+    "thesisDomain": "energy"
+   }
+  ],
+  "provenance": {
+   "bounded": true,
+   "producer": "pi_briefing_memory_service",
+   "producerVersion": "pi_briefing_memory_v1",
+   "proseStored": false
+  },
+  "schemaVersion": "pi_briefing_memory_v1",
+  "trainingPRClaimIds": []
+ },
+ "publicationReconciliation": {
+  "dependencyFingerprint": "sha256_d48bc90edd464849b357d1e81d3b88dfe1824371d44b304657840ac610abd9d7",
+  "schemaVersion": "briefing_publication_reconciliation_v1",
+  "state": "current"
+ },
+ "source": {
+  "confidence": "high",
+  "name": "PhysiqueOS",
+  "type": "computed"
+ },
+ "sourceRevisions": {
+  "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+  "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78"
+ },
+ "trigger": {},
+ "updatedAt": "2026-09-16T07:04:38.549Z",
+ "userId": "user_founder_001",
+ "version": 3
+}

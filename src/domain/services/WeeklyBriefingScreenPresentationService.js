@@ -16,7 +16,15 @@ export function createWeeklyBriefingScreenPresentation(narrative) {
     array(interpretationSelection.items).map((item) => [item.domain, item])
   );
 
+  const v3 = narrative?.presentationModel === "canonical_narrative_v3";
   return {
+    presentationModel: v3 ? "canonical_narrative_v3" : null,
+    // Structured V3 additions for surfaces that render them (Server-provided text).
+    ...(v3 ? {
+      uncertainty: array(narrative.narrativeV3?.uncertainty),
+      energyStrategy: object(narrative.narrativeV3?.energy),
+      recommendation: object(narrative.narrativeV3?.recommendation),
+    } : {}),
     hero: {
       eyebrow: "Weekly Briefing",
       periodLabel: `Completed week\n${formatRange(narrative?.weekStart, narrative?.weekEnd)}`,

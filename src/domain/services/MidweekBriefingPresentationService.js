@@ -1,28 +1,12 @@
+import { isV3BoundArtifact } from "./BriefingV3Projection.js";
 import { createMidweekConfidencePresentation } from "./BriefingGoalConfidencePresentationService";
 import { createMidweekEditorialNarrative } from "./MidweekBriefingEditorialService";
 
 export function prepareMidweekBriefingReviewPresentation({ artifact } = {}) {
   if (!artifact?.briefing) return null;
   const briefing = artifact.briefing;
-  if (artifact.confidencePublication?.schemaVersion ===
-      "briefing_confidence_binding_v3") {
-    const narrativeV3 = requireCanonicalMidweekNarrativeV3(briefing);
-    return {
-      ...briefing,
-      presentationModel: "canonical_narrative_v3",
-      energyBalance: {
-        ...briefing.energyBalance,
-        ...createMidweekEnergyPresentation(briefing.energyBalance),
-      },
-      coachTake: {
-        biggestTakeaway: narrativeV3.coachTake,
-        recommendation: narrativeV3.sections.action,
-      },
-      goalConfidence: createMidweekConfidencePresentation(
-        briefing.goalConfidence,
-        { briefing }
-      ),
-    };
+  if (isV3BoundArtifact(artifact)) {
+    return projectCanonicalMidweekV3(artifact);
   }
   const editorial = createMidweekEditorialNarrative({
     energyBalance: briefing.energyBalance,
@@ -42,6 +26,51 @@ export function prepareMidweekBriefingReviewPresentation({ artifact } = {}) {
       ...energyPresentation,
     },
     coachTake: editorial.coachTake,
+    goalConfidence: createMidweekConfidencePresentation(
+      briefing.goalConfidence,
+      { briefing }
+    ),
+  };
+}
+
+// V3-bound Midweek. The stored V3 narrative is the semantic authority. Factual
+// Energy, Weight and Training evidence stays available as structured facts; the
+// legacy V2 interpretation of that evidence (energy prose, training and weight
+// interpretation, coaching decision, open threads, unclear-items) is not
+// served, so a hidden V2 body can never become semantic authority.
+function projectCanonicalMidweekV3(artifact) {
+  const briefing = artifact.briefing;
+  const narrativeV3 = requireCanonicalMidweekNarrativeV3(briefing);
+  const {
+    coachingDecision: _coachingDecision,
+    openCoachingThreads: _openCoachingThreads,
+    sundayContinuity: _sundayContinuity,
+    ...factual
+  } = briefing;
+  const energy = createMidweekEnergyPresentation(briefing.energyBalance);
+  const { remainsUnclear: _remainsUnclear, ...activePhase } = briefing.activePhase ?? {};
+  return {
+    ...factual,
+    presentationModel: "canonical_narrative_v3",
+    activePhase: briefing.activePhase ? activePhase : briefing.activePhase,
+    energyBalance: {
+      ...briefing.energyBalance,
+      // Factual values only; interpretation is the V3 Energy statement.
+      balanceHeadline: energy.balanceHeadline,
+      comparisonNarrative: energy.comparisonNarrative,
+      chartTitle: energy.chartTitle,
+      headline: null,
+      interpretation: narrativeV3.energy?.statement ?? null,
+    },
+    training: briefing.training
+      ? { ...briefing.training, interpretation: null, watch: [] } : briefing.training,
+    weightContext: briefing.weightContext
+      ? { ...briefing.weightContext, interpretation: null } : briefing.weightContext,
+    coachTake: {
+      biggestTakeaway: narrativeV3.coachTake,
+      recommendation: narrativeV3.sections.action,
+    },
+    uncertainty: narrativeV3.uncertainty ?? [],
     goalConfidence: createMidweekConfidencePresentation(
       briefing.goalConfidence,
       { briefing }

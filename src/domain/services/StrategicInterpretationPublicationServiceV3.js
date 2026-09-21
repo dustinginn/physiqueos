@@ -3,6 +3,8 @@ import { createCanonicalConfidenceAssessmentV3 } from
   "../confidence/CanonicalConfidenceAssessmentModel";
 import { buildProductionConfidenceNarrativeV3Input } from
   "../intelligence/ProductionConfidenceNarrativeV3Adapter";
+import { supersedeStaleCadenceObservations } from
+  "../intelligence/CurrentWindowSupersessionV3.js";
 import { runConfidenceNarrativeV3 } from
   "../intelligence/v3/ConfidenceNarrativeV3Pipeline";
 import { createPhaseReviewArtifactPackage } from
@@ -30,7 +32,14 @@ export function createStrategicInterpretationPublicationServiceV3({
         goalContract: production.goalContract,
         evidenceCutoff: normalized.evidenceCutoff,
       }) : normalized.additionalObservations;
-    const observations = mergeObservations(production.observations, additional);
+    // Current cadence beats stale carry-forward: an older cadence observation
+    // never fills a capability the current briefing already covers.
+    const supersession = supersedeStaleCadenceObservations({
+      stored: production.observations,
+      current: additional ?? [],
+      currentArtifactId: normalized.artifactId,
+    });
+    const observations = mergeObservations(supersession.observations, additional);
     const prior = priorV3Context(normalized.previousCanonicalAssessment);
     const outputs = runConfidenceNarrativeV3({
       goalContract: production.goalContract,
@@ -77,6 +86,9 @@ export function createStrategicInterpretationPublicationServiceV3({
         ...normalized.sourceLineage,
         strategicPublicationVersion:
           STRATEGIC_INTERPRETATION_PUBLICATION_V3_VERSION,
+        ...(supersession.superseded.length
+          ? { supersededStaleObservations: supersession.superseded.map((item) => ({ ...item })) }
+          : {}),
       },
     });
     const phaseReview = normalized.phaseReviewContext
@@ -115,7 +127,8 @@ export function createStrategicInterpretationPublicationServiceV3({
       evidenceWindowClosed: normalized.evidenceWindowClosed,
     });
     return Object.freeze({ normalized, authorization, assessment, artifact,
-      goalContract: production.goalContract, observations, ...outputs });
+      goalContract: production.goalContract, observations,
+      supersededObservations: supersession.superseded, ...outputs });
   }
 
   return Object.freeze({

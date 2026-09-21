@@ -1,3 +1,8 @@
+import {
+  NutritionAssertionTier,
+  resolveNutritionDayAuthority,
+} from "../models/nutritionDayAuthority.js";
+
 export const ENERGY_SOURCE_COMPLETENESS_STATES = Object.freeze([
   "complete",
   "partial",
@@ -13,7 +18,21 @@ export const PAIRED_ENERGY_COMPLETENESS_STATES = Object.freeze([
   "missing",
 ]);
 
+// Daily-total completeness for Energy pairing. A full-day assertion or a
+// meal-derived daily total is usable evidence and is never downgraded because
+// individual meals are absent or partial; the residual uncertainty about a
+// meal-derived total is carried separately as explicit intake ambiguity (see
+// resolveNutritionDayAuthority). Records without daily totals keep the legacy
+// completeness interpretation.
 export function resolveNutritionEvidenceCompleteness(record) {
+  if (!record) return "missing";
+  const authority = resolveNutritionDayAuthority(record);
+  if ([
+    NutritionAssertionTier.FULL_DAY_ASSERTED,
+    NutritionAssertionTier.MEAL_DERIVED_UNVERIFIED,
+  ].includes(authority.assertion.tier) && authority.energyUsable) {
+    return "complete";
+  }
   return resolveSource(record, "nutrition");
 }
 

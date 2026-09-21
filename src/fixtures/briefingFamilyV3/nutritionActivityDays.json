@@ -1,0 +1,2562 @@
+{
+ "activityDays": [
+  {
+   "canonicalId": "activity_day|2026-09-06",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-06",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 6,
+     "move_calories": 341,
+     "move_goal": 700,
+     "stand_hours": null
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-06_applefitness_1",
+    "observed_at": "2026-09-06",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "IMG_2521.png"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-07",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-07",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 3,
+     "move_calories": 231,
+     "move_goal": null,
+     "stand_hours": 13
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-07_apple_fitness_1",
+    "observed_at": "2026-09-07",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "IMG_2361.png"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-08",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-08",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 106,
+     "move_calories": 909,
+     "move_goal": null,
+     "stand_hours": 11
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-08_applefitness_IMG_2520",
+    "observed_at": "2026-09-08",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "IMG_2520.png"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-09",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-09",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 106,
+     "move_calories": 912,
+     "move_goal": null,
+     "stand_hours": 14
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-09_applefitness_01",
+    "observed_at": "2026-09-09",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "IMG_2543.png"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-10",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-10",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 93,
+     "move_calories": 818,
+     "move_goal": null,
+     "stand_hours": 13
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-10_applefitness_cf05f467d44447a4909c6956f3b88769_0",
+    "observed_at": "2026-09-10",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_cf05f467d44447a4909c6956f3b88769_images_file_1"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-11",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-11",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 100,
+     "move_calories": 799,
+     "move_goal": null,
+     "stand_hours": 15
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-11_applefitness_01",
+    "observed_at": "2026-09-11",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_DEF47271F86C4054B52B99C7B9C9F435_images_file_1"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-12",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-12",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 105,
+     "move_calories": 991,
+     "move_goal": null,
+     "stand_hours": 15
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-12_AppleFitness_1",
+    "observed_at": "2026-09-12",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_8AF50C5E9BD64AAAB0C8864FC31F1922_images_file_1"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-13",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-13",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 131,
+     "move_calories": 994,
+     "move_goal": null,
+     "stand_hours": 12
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-13_applefitness_evidence_submission_16C8817C1AD64C858853042769286801_images_file_1_0",
+    "observed_at": "2026-09-13",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_16C8817C1AD64C858853042769286801_images_file_1"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-14",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-14",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 96,
+     "move_calories": 948,
+     "move_goal": null,
+     "stand_hours": 10
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-14_apple_fitness",
+    "observed_at": "2026-09-14",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_F4A491C6B6ED4DEFB178DAB7C91D93F8_images_file_1"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-15",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-15",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 94,
+     "move_calories": 824,
+     "move_goal": null,
+     "stand_hours": 13
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-15_applefitness_01",
+    "observed_at": "2026-09-15",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_344C13E85EF44CF68ADBFF063A377F24_images_file_1"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-16",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-16",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 111,
+     "move_calories": 841,
+     "move_goal": null,
+     "stand_hours": 15
+    },
+    "evidence_type": "activity_day",
+    "id": "evidence_submission_D810E051D58F43898C3D8839D7CB31B6_images_activity_day",
+    "observed_at": "2026-09-16",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "artifact_D810E051D58F43898C3D8839D7CB31B6_1"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-17",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-17",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 93,
+     "move_calories": 876,
+     "move_goal": 700,
+     "stand_hours": 15
+    },
+    "evidence_type": "activity_day",
+    "id": "activity_day_2026-09-17_applefitness",
+    "observed_at": "2026-09-17",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_53E932053B164AF0A54F71BFA15B714A_images_file_1"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "activity_day|2026-09-18",
+   "evidence_type": "activity_day",
+   "lastObservedAt": "2026-09-18",
+   "payload": {
+    "daily_activity": {
+     "exercise_minutes": 117,
+     "move_calories": 906,
+     "move_goal": null,
+     "stand_hours": 15
+    },
+    "evidence_type": "activity_day",
+    "id": "evidence_submission_F4EBFEFC597E4F81B159E113E6935D4B_images_activity_day",
+    "observed_at": "2026-09-18",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "Apple Fitness",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "artifact_F4EBFEFC597E4F81B159E113E6935D4B_1"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  }
+ ],
+ "nutritionDays": [
+  {
+   "canonicalId": "nutrition|2026-09-06|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-06",
+   "payload": {
+    "daily_totals": {
+     "calories": 3920,
+     "carbs_g": 385,
+     "cholesterol_mg": null,
+     "fat_g": 191,
+     "fiber_g": null,
+     "protein_g": 183,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutritionday_2026-09-06_1",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_breakfast_2026-09-06",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 585,
+       "carbs_g": 64,
+       "cholesterol_mg": null,
+       "fat_g": 23,
+       "fiber_g": null,
+       "protein_g": 33,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_lunch_2026-09-06",
+      "name": "Lunch",
+      "totals": {
+       "calories": 620,
+       "carbs_g": 50,
+       "cholesterol_mg": null,
+       "fat_g": 32,
+       "fiber_g": null,
+       "protein_g": 53,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-dinner-1",
+      "name": "Dinner",
+      "totals": {
+       "calories": 1584,
+       "carbs_g": 139,
+       "cholesterol_mg": null,
+       "fat_g": 77,
+       "fiber_g": null,
+       "protein_g": 78,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-snacks-1",
+      "name": "Snacks",
+      "totals": {
+       "calories": 1131,
+       "carbs_g": 131,
+       "cholesterol_mg": null,
+       "fat_g": 60,
+       "fiber_g": null,
+       "protein_g": 20,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "unknown",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": null,
+      "computed_fields": null,
+      "conflicting_fields": null,
+      "daily_totals_scope": null,
+      "differences": null,
+      "meal_sums": null,
+      "source_daily_totals": null,
+      "status": null
+     },
+     "daily_totals_scope": "full_day_summary",
+     "daily_totals_source_artifact_refs": [
+      "IMG_2488.jpeg"
+     ],
+     "date": "2026-09-06",
+     "food_count": 15,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "screenshot"
+    },
+    "observed_at": "2026-09-06",
+    "quality": {
+     "limitations": [
+      "Partial meal logging indicated by 'Log more' buttons",
+      "No full daily totals calories and macros visible, only partial meal subtotals for Dinner and Snacks. No explicit daily summary. No targets or goals visible. No indication of additional foods beyond listed items.",
+      "No meal or food-level detail visible",
+      "No nutrition target or goal status visible",
+      "No micronutrient detail visible"
+     ],
+     "status": "complete"
+    },
+    "source": {
+     "application": null,
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "IMG_2490.jpeg",
+      "IMG_2489.png",
+      "IMG_2488.jpeg"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-07|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-07",
+   "payload": {
+    "daily_totals": {
+     "calories": 2632,
+     "carbs_g": 243,
+     "cholesterol_mg": null,
+     "fat_g": 117,
+     "fiber_g": null,
+     "protein_g": 182,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutritionday_2026-09-07_evidence_submission_4b423f020b424e19b7dd870c29aed296_0",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "known_foods_available",
+      "id": "meal_breakfast_2026-09-07_evidence_submission_4b423f020b424e19b7dd870c29aed296_0",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 440,
+       "carbs_g": 37,
+       "cholesterol_mg": null,
+       "fat_g": 6,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "known_foods_available",
+      "id": "meal_lunch_2026-09-07_evidence_submission_4b423f020b424e19b7dd870c29aed296_0",
+      "name": "Lunch",
+      "totals": {
+       "calories": 620,
+       "carbs_g": 50,
+       "cholesterol_mg": null,
+       "fat_g": 32,
+       "fiber_g": null,
+       "protein_g": 53,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-2026-09-07-dinner",
+      "name": "Dinner",
+      "totals": {
+       "calories": 702,
+       "carbs_g": 31,
+       "cholesterol_mg": null,
+       "fat_g": 41,
+       "fiber_g": null,
+       "protein_g": 55,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-2026-09-07-snacks",
+      "name": "Snacks",
+      "totals": {
+       "calories": 871,
+       "carbs_g": 125,
+       "cholesterol_mg": null,
+       "fat_g": 38,
+       "fiber_g": null,
+       "protein_g": 13,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "unknown",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": null,
+      "computed_fields": null,
+      "conflicting_fields": null,
+      "daily_totals_scope": null,
+      "differences": null,
+      "meal_sums": null,
+      "source_daily_totals": null,
+      "status": null
+     },
+     "daily_totals_scope": "unknown",
+     "daily_totals_source_artifact_refs": [
+      "IMG_2362.jpeg"
+     ],
+     "date": "2026-09-07",
+     "food_count": 16,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "screenshot"
+    },
+    "observed_at": "2026-09-07",
+    "quality": {
+     "limitations": [
+      "No explicit full day totals, metadata.daily_totals_scope set to partial_meal_subtotal",
+      "No date shown explicitly on screenshot; using upload date as observed_at date",
+      "No detailed nutrient data except calories, carbs, fat, protein",
+      "No meal-level detail or food-level detail visible"
+     ],
+     "status": "complete"
+    },
+    "source": {
+     "application": null,
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "IMG_2364.png",
+      "IMG_2363.jpeg",
+      "IMG_2362.jpeg"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-08|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-08",
+   "payload": {
+    "daily_totals": {
+     "calories": 2311,
+     "carbs_g": 223,
+     "cholesterol_mg": null,
+     "fat_g": 96,
+     "fiber_g": null,
+     "protein_g": 165,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-08_1",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-breakfast-2026-09-08",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 320,
+       "carbs_g": 34,
+       "cholesterol_mg": null,
+       "fat_g": 5,
+       "fiber_g": null,
+       "protein_g": 38,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-lunch-2026-09-08",
+      "name": "Lunch",
+      "totals": {
+       "calories": 620,
+       "carbs_g": 50,
+       "cholesterol_mg": null,
+       "fat_g": 32,
+       "fiber_g": null,
+       "protein_g": 53,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_dinner_2026-09-08",
+      "name": "Dinner",
+      "totals": {
+       "calories": 640,
+       "carbs_g": 36,
+       "cholesterol_mg": null,
+       "fat_g": 28,
+       "fiber_g": null,
+       "protein_g": 64,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_snacks_2026-09-08",
+      "name": "Snacks",
+      "totals": {
+       "calories": 731,
+       "carbs_g": 103,
+       "cholesterol_mg": null,
+       "fat_g": 31,
+       "fiber_g": null,
+       "protein_g": 10,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1371,
+       "carbs_g": -139,
+       "cholesterol_mg": null,
+       "fat_g": -59,
+       "fiber_g": null,
+       "protein_g": -74,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2311,
+       "carbs_g": 223,
+       "cholesterol_mg": null,
+       "fat_g": 96,
+       "fiber_g": null,
+       "protein_g": 165,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 940,
+       "carbs_g": 84,
+       "cholesterol_mg": null,
+       "fat_g": 37,
+       "fiber_g": null,
+       "protein_g": 91,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "IMG_2518.jpeg"
+     ],
+     "date": "2026-09-08",
+     "food_count": 11,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "screenshot"
+    },
+    "observed_at": "2026-09-08",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": null,
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "IMG_2519.jpeg",
+      "IMG_2518.jpeg"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-09|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-09",
+   "payload": {
+    "daily_totals": {
+     "calories": 2256,
+     "carbs_g": 203,
+     "cholesterol_mg": null,
+     "fat_g": 82,
+     "fiber_g": null,
+     "protein_g": 180,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutritionday-2026-09-09-1",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-breakfast-2026-09-09",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 440,
+       "carbs_g": 37,
+       "cholesterol_mg": null,
+       "fat_g": 6,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 1,
+      "completeness": "partial",
+      "id": "meal-lunch-2026-09-09",
+      "name": "Lunch",
+      "totals": {
+       "calories": 620,
+       "carbs_g": 50,
+       "cholesterol_mg": null,
+       "fat_g": 32,
+       "fiber_g": null,
+       "protein_g": 53,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial_meal_subtotal",
+      "id": "meal_2026-09-09_dinner",
+      "name": "Dinner",
+      "totals": {
+       "calories": 528,
+       "carbs_g": 22,
+       "cholesterol_mg": null,
+       "fat_g": 15,
+       "fiber_g": null,
+       "protein_g": 54,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial_meal_subtotal",
+      "id": "meal_2026-09-09_snacks",
+      "name": "Snacks",
+      "totals": {
+       "calories": 668,
+       "carbs_g": 94,
+       "cholesterol_mg": null,
+       "fat_g": 29,
+       "fiber_g": null,
+       "protein_g": 11,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1060,
+       "carbs_g": -87,
+       "cholesterol_mg": null,
+       "fat_g": -38,
+       "fiber_g": null,
+       "protein_g": -115,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2256,
+       "carbs_g": 203,
+       "cholesterol_mg": null,
+       "fat_g": 82,
+       "fiber_g": null,
+       "protein_g": 180,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 1196,
+       "carbs_g": 116,
+       "cholesterol_mg": null,
+       "fat_g": 44,
+       "fiber_g": null,
+       "protein_g": 65,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "IMG_2542.png"
+     ],
+     "date": "2026-09-09",
+     "food_count": 14,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "screenshot"
+    },
+    "observed_at": "2026-09-09",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": null,
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "IMG_2542.png",
+      "IMG_2541.jpeg"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-10|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-10",
+   "payload": {
+    "daily_totals": {
+     "calories": 2398,
+     "carbs_g": 210,
+     "cholesterol_mg": null,
+     "fat_g": 102,
+     "fiber_g": null,
+     "protein_g": 179,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-10_1",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "breakfast_2026-09-10",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 440,
+       "carbs_g": 37,
+       "cholesterol_mg": null,
+       "fat_g": 6,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "lunch_2026-09-10",
+      "name": "Lunch",
+      "totals": {
+       "calories": 620,
+       "carbs_g": 50,
+       "cholesterol_mg": null,
+       "fat_g": 32,
+       "fiber_g": null,
+       "protein_g": 53,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_dinner_20260910_1",
+      "name": "Dinner",
+      "totals": {
+       "calories": 670,
+       "carbs_g": 29,
+       "cholesterol_mg": null,
+       "fat_g": 35,
+       "fiber_g": null,
+       "protein_g": 53,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_snacks_20260910_1",
+      "name": "Snacks",
+      "totals": {
+       "calories": 668,
+       "carbs_g": 94,
+       "cholesterol_mg": null,
+       "fat_g": 29,
+       "fiber_g": null,
+       "protein_g": 11,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1060,
+       "carbs_g": -87,
+       "cholesterol_mg": null,
+       "fat_g": -38,
+       "fiber_g": null,
+       "protein_g": -115,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2398,
+       "carbs_g": 210,
+       "cholesterol_mg": null,
+       "fat_g": 102,
+       "fiber_g": null,
+       "protein_g": 179,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 1338,
+       "carbs_g": 123,
+       "cholesterol_mg": null,
+       "fat_g": 64,
+       "fiber_g": null,
+       "protein_g": 64,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "IMG_2549.jpeg"
+     ],
+     "date": "2026-09-10",
+     "food_count": 13,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "screenshot"
+    },
+    "observed_at": "2026-09-10",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": null,
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "IMG_2548.jpeg",
+      "IMG_2549.jpeg"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-11|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-11",
+   "payload": {
+    "daily_totals": {
+     "calories": 2598,
+     "carbs_g": 195,
+     "cholesterol_mg": null,
+     "fat_g": 118,
+     "fiber_g": null,
+     "protein_g": 187,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-11_1",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_1",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 440,
+       "carbs_g": 37,
+       "cholesterol_mg": null,
+       "fat_g": 6,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_2",
+      "name": "Lunch",
+      "totals": {
+       "calories": 1360,
+       "carbs_g": 98,
+       "cholesterol_mg": null,
+       "fat_g": 78,
+       "fiber_g": null,
+       "protein_g": 59,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-dinner-2026-09-11-1",
+      "name": "Dinner",
+      "totals": {
+       "calories": 640,
+       "carbs_g": 36,
+       "cholesterol_mg": null,
+       "fat_g": 28,
+       "fiber_g": null,
+       "protein_g": 64,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-snacks-2026-09-11-1",
+      "name": "Snacks",
+      "totals": {
+       "calories": 158,
+       "carbs_g": 24,
+       "cholesterol_mg": null,
+       "fat_g": 6,
+       "fiber_g": null,
+       "protein_g": 2,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1800,
+       "carbs_g": -135,
+       "cholesterol_mg": null,
+       "fat_g": -84,
+       "fiber_g": null,
+       "protein_g": -121,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2598,
+       "carbs_g": 195,
+       "cholesterol_mg": null,
+       "fat_g": 118,
+       "fiber_g": null,
+       "protein_g": 187,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 798,
+       "carbs_g": 60,
+       "cholesterol_mg": null,
+       "fat_g": 34,
+       "fiber_g": null,
+       "protein_g": 66,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "evidence_submission_3DE32D79FEFC4CCEAB1599D25A10B469_images_file_1"
+     ],
+     "date": "2026-09-11",
+     "food_count": 7,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "MyFitnessPal"
+    },
+    "observed_at": "2026-09-11",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "MyFitnessPal",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_3DE32D79FEFC4CCEAB1599D25A10B469_images_file_1",
+      "evidence_submission_3DE32D79FEFC4CCEAB1599D25A10B469_images_file_2-0"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-12|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-12",
+   "payload": {
+    "daily_totals": {
+     "calories": 4190,
+     "carbs_g": 313,
+     "cholesterol_mg": null,
+     "fat_g": 239,
+     "fiber_g": null,
+     "protein_g": 192,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-12",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_breakfast_2026-09-12",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 240,
+       "carbs_g": 6,
+       "cholesterol_mg": null,
+       "fat_g": 3,
+       "fiber_g": null,
+       "protein_g": 48,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_lunch_2026-09-12",
+      "name": "Lunch",
+      "totals": {
+       "calories": 1500,
+       "carbs_g": 105,
+       "cholesterol_mg": null,
+       "fat_g": 88,
+       "fiber_g": null,
+       "protein_g": 70,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "dinner_2026-09-12",
+      "name": "Dinner",
+      "totals": {
+       "calories": 1200,
+       "carbs_g": 84,
+       "cholesterol_mg": null,
+       "fat_g": 70,
+       "fiber_g": null,
+       "protein_g": 56,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "snacks_2026-09-12",
+      "name": "Snacks",
+      "totals": {
+       "calories": 1250,
+       "carbs_g": 118,
+       "cholesterol_mg": null,
+       "fat_g": 78,
+       "fiber_g": null,
+       "protein_g": 18,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "unknown",
+      "differences": {
+       "calories": 0,
+       "carbs_g": 0,
+       "cholesterol_mg": null,
+       "fat_g": 0,
+       "fiber_g": null,
+       "protein_g": 0,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 4190,
+       "carbs_g": 313,
+       "cholesterol_mg": null,
+       "fat_g": 239,
+       "fiber_g": null,
+       "protein_g": 192,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 4190,
+       "carbs_g": 313,
+       "cholesterol_mg": null,
+       "fat_g": 239,
+       "fiber_g": null,
+       "protein_g": 192,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "unknown",
+     "daily_totals_source_artifact_refs": [
+      "Photo 1"
+     ],
+     "date": "2026-09-12",
+     "food_count": 4,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "MyFitnessPal"
+    },
+    "observed_at": "2026-09-12",
+    "quality": {
+     "limitations": [
+      "Meal completeness for Lunch and Breakfast is partial due to possible undisclosed foods (e.g. 'Log more' indicates potential additional foods not listed).",
+      "No explicit daily nutrition totals or goals are visible; only partial meal totals extracted.",
+      "Nutrition day is partial meal subtotals only; no full daily totals or targets visible.",
+      "No full macronutrient breakdown beyond protein, carbs, fat per meal.",
+      "Only two meals visible; no other meals or foods noted."
+     ],
+     "status": "complete"
+    },
+    "source": {
+     "application": "MyFitnessPal",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "Photo 1",
+      "Photo 2"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-13|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-13",
+   "payload": {
+    "daily_totals": {
+     "calories": 2285,
+     "carbs_g": 190,
+     "cholesterol_mg": null,
+     "fat_g": 103,
+     "fiber_g": null,
+     "protein_g": 178,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-13_1",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_2026-09-13_breakfast",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 456,
+       "carbs_g": 40,
+       "cholesterol_mg": null,
+       "fat_g": 7,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_2026-09-13_lunch",
+      "name": "Lunch",
+      "totals": {
+       "calories": 659,
+       "carbs_g": 60,
+       "cholesterol_mg": null,
+       "fat_g": 32,
+       "fiber_g": null,
+       "protein_g": 54,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "dinner_2026-09-13",
+      "name": "Dinner",
+      "totals": {
+       "calories": 702,
+       "carbs_g": 31,
+       "cholesterol_mg": null,
+       "fat_g": 41,
+       "fiber_g": null,
+       "protein_g": 55,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "snacks_2026-09-13",
+      "name": "Snacks",
+      "totals": {
+       "calories": 468,
+       "carbs_g": 59,
+       "cholesterol_mg": null,
+       "fat_g": 23,
+       "fiber_g": null,
+       "protein_g": 7,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1115,
+       "carbs_g": -100,
+       "cholesterol_mg": null,
+       "fat_g": -39,
+       "fiber_g": null,
+       "protein_g": -116,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2285,
+       "carbs_g": 190,
+       "cholesterol_mg": null,
+       "fat_g": 103,
+       "fiber_g": null,
+       "protein_g": 178,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 1170,
+       "carbs_g": 90,
+       "cholesterol_mg": null,
+       "fat_g": 64,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "Photo 1"
+     ],
+     "date": "2026-09-13",
+     "food_count": 16,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "MyFitnessPal"
+    },
+    "observed_at": "2026-09-13",
+    "quality": {
+     "limitations": [
+      "Partial meal data only, no full daily nutrition summary or targets"
+     ],
+     "status": "complete"
+    },
+    "source": {
+     "application": "MyFitnessPal",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "Photo 1",
+      "Photo 2"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-14|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-14",
+   "payload": {
+    "daily_totals": {
+     "calories": 2442,
+     "carbs_g": 173,
+     "cholesterol_mg": null,
+     "fat_g": 118,
+     "fiber_g": null,
+     "protein_g": 182,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-14_0E5F75",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_breakfast_2026-09-14",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 456,
+       "carbs_g": 40,
+       "cholesterol_mg": null,
+       "fat_g": 7,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_lunch_2026-09-14",
+      "name": "Lunch",
+      "totals": {
+       "calories": 640,
+       "carbs_g": 36,
+       "cholesterol_mg": null,
+       "fat_g": 28,
+       "fiber_g": null,
+       "protein_g": 64,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_dinner_2026-09-14",
+      "name": "Dinner",
+      "totals": {
+       "calories": 809,
+       "carbs_g": 27,
+       "cholesterol_mg": null,
+       "fat_g": 57,
+       "fiber_g": null,
+       "protein_g": 47,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_snacks_2026-09-14",
+      "name": "Snacks",
+      "totals": {
+       "calories": 537,
+       "carbs_g": 70,
+       "cholesterol_mg": null,
+       "fat_g": 26,
+       "fiber_g": null,
+       "protein_g": 9,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1096,
+       "carbs_g": -76,
+       "cholesterol_mg": null,
+       "fat_g": -35,
+       "fiber_g": null,
+       "protein_g": -126,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2442,
+       "carbs_g": 173,
+       "cholesterol_mg": null,
+       "fat_g": 118,
+       "fiber_g": null,
+       "protein_g": 182,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 1346,
+       "carbs_g": 97,
+       "cholesterol_mg": null,
+       "fat_g": 83,
+       "fiber_g": null,
+       "protein_g": 56,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "evidence_submission_0E5F7598A4824F6CAEF0B4915CF6FA7C_images_file_1"
+     ],
+     "date": "2026-09-14",
+     "food_count": 12,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "MyFitnessPal"
+    },
+    "observed_at": "2026-09-14",
+    "quality": {
+     "limitations": [
+      "No explicit daily total nutrients beyond calories visible",
+      "No nutrition targets or goal status visible",
+      " Meal completeness partial for Snacks due to repeated items suggesting possible duplicates or partial log",
+      "Exact meal times not visible"
+     ],
+     "status": "complete"
+    },
+    "source": {
+     "application": "MyFitnessPal",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_0E5F7598A4824F6CAEF0B4915CF6FA7C_images_file_1",
+      "Photo 3"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-15|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-15",
+   "payload": {
+    "daily_totals": {
+     "calories": 2484,
+     "carbs_g": 165,
+     "cholesterol_mg": null,
+     "fat_g": 120,
+     "fiber_g": null,
+     "protein_g": 181,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutritionday_2026-09-15_0",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_breakfast_2026-09-15",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 400,
+       "carbs_g": 27,
+       "cholesterol_mg": null,
+       "fat_g": 6,
+       "fiber_g": null,
+       "protein_g": 61,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_lunch_2026-09-15",
+      "name": "Lunch",
+      "totals": {
+       "calories": 588,
+       "carbs_g": 24,
+       "cholesterol_mg": null,
+       "fat_g": 23,
+       "fiber_g": null,
+       "protein_g": 61,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_dinner_2026-09-15_1",
+      "name": "Dinner",
+      "totals": {
+       "calories": 809,
+       "carbs_g": 27,
+       "cholesterol_mg": null,
+       "fat_g": 57,
+       "fiber_g": null,
+       "protein_g": 47,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_snacks_2026-09-15_1",
+      "name": "Snacks",
+      "totals": {
+       "calories": 687,
+       "carbs_g": 87,
+       "cholesterol_mg": null,
+       "fat_g": 34,
+       "fiber_g": null,
+       "protein_g": 12,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -988,
+       "carbs_g": -51,
+       "cholesterol_mg": null,
+       "fat_g": -29,
+       "fiber_g": null,
+       "protein_g": -122,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2484,
+       "carbs_g": 165,
+       "cholesterol_mg": null,
+       "fat_g": 120,
+       "fiber_g": null,
+       "protein_g": 181,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 1496,
+       "carbs_g": 114,
+       "cholesterol_mg": null,
+       "fat_g": 91,
+       "fiber_g": null,
+       "protein_g": 59,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "evidence_submission_D6CF6380A6FE443FB1D99B2218386677_images_file_1"
+     ],
+     "date": "2026-09-15",
+     "food_count": 13,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "MyFitnessPal"
+    },
+    "observed_at": "2026-09-15",
+    "quality": {
+     "limitations": [
+      "No explicit date on screenshot; date inferred from submission metadata",
+      "No nutrition targets or daily summary present"
+     ],
+     "status": "complete"
+    },
+    "source": {
+     "application": "MyFitnessPal",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_D6CF6380A6FE443FB1D99B2218386677_images_file_1",
+      "Photo 2"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-16|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-16",
+   "payload": {
+    "daily_totals": {
+     "calories": 2664,
+     "carbs_g": 166,
+     "cholesterol_mg": null,
+     "fat_g": 133,
+     "fiber_g": null,
+     "protein_g": 211,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-16_1",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_breakfast_2026-09-16",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 456,
+       "carbs_g": 40,
+       "cholesterol_mg": null,
+       "fat_g": 7,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_lunch_2026-09-16",
+      "name": "Lunch",
+      "totals": {
+       "calories": 735,
+       "carbs_g": 61,
+       "cholesterol_mg": null,
+       "fat_g": 28,
+       "fiber_g": null,
+       "protein_g": 65,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 1,
+      "completeness": "partial",
+      "id": "meal_dinner_2026-09-16",
+      "name": "Dinner",
+      "totals": {
+       "calories": 1473,
+       "carbs_g": 65,
+       "cholesterol_mg": null,
+       "fat_g": 98,
+       "fiber_g": null,
+       "protein_g": 84,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1191,
+       "carbs_g": -101,
+       "cholesterol_mg": null,
+       "fat_g": -35,
+       "fiber_g": null,
+       "protein_g": -127,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2664,
+       "carbs_g": 166,
+       "cholesterol_mg": null,
+       "fat_g": 133,
+       "fiber_g": null,
+       "protein_g": 211,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 1473,
+       "carbs_g": 65,
+       "cholesterol_mg": null,
+       "fat_g": 98,
+       "fiber_g": null,
+       "protein_g": 84,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "evidence_submission_8B65E85DB8FC412F8ABB33C6C4537BF4_images_file_1"
+     ],
+     "date": "2026-09-16",
+     "food_count": 10,
+     "goal_set": true,
+     "meal_count": 3,
+     "source": "MyFitnessPal"
+    },
+    "observed_at": "2026-09-16",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "MyFitnessPal",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_8B65E85DB8FC412F8ABB33C6C4537BF4_images_file_1",
+      "Photo 2"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-17|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-17",
+   "payload": {
+    "daily_totals": {
+     "calories": 2397,
+     "carbs_g": 201,
+     "cholesterol_mg": null,
+     "fat_g": 89,
+     "fiber_g": null,
+     "protein_g": 197,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-17_01",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_breakfast_2026-09-17",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 456,
+       "carbs_g": 40,
+       "cholesterol_mg": null,
+       "fat_g": 7,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_lunch_2026-09-17",
+      "name": "Lunch",
+      "totals": {
+       "calories": 683,
+       "carbs_g": 49,
+       "cholesterol_mg": null,
+       "fat_g": 23,
+       "fiber_g": null,
+       "protein_g": 61,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "dinner_2026-09-17_1",
+      "name": "Dinner",
+      "totals": {
+       "calories": 640,
+       "carbs_g": 36,
+       "cholesterol_mg": null,
+       "fat_g": 28,
+       "fiber_g": null,
+       "protein_g": 64,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "snacks_2026-09-17_1",
+      "name": "Snacks",
+      "totals": {
+       "calories": 618,
+       "carbs_g": 76,
+       "cholesterol_mg": null,
+       "fat_g": 31,
+       "fiber_g": null,
+       "protein_g": 10,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1139,
+       "carbs_g": -89,
+       "cholesterol_mg": null,
+       "fat_g": -30,
+       "fiber_g": null,
+       "protein_g": -123,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2397,
+       "carbs_g": 201,
+       "cholesterol_mg": null,
+       "fat_g": 89,
+       "fiber_g": null,
+       "protein_g": 197,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 1258,
+       "carbs_g": 112,
+       "cholesterol_mg": null,
+       "fat_g": 59,
+       "fiber_g": null,
+       "protein_g": 74,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "evidence_submission_2228B6C092D04672910256EBBCBD9EE4_images_file_1"
+     ],
+     "date": "2026-09-17",
+     "food_count": 12,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "MyFitnessPal"
+    },
+    "observed_at": "2026-09-17",
+    "quality": {
+     "limitations": [
+      "Some nutrient details and daily totals are incomplete due to partial meal data only."
+     ],
+     "status": "complete"
+    },
+    "source": {
+     "application": "MyFitnessPal",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_2228B6C092D04672910256EBBCBD9EE4_images_file_1",
+      "evidence_submission_2228B6C092D04672910256EBBCBD9EE4_images_file_2"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-18|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-18",
+   "payload": {
+    "daily_totals": {
+     "calories": 2463,
+     "carbs_g": 207,
+     "cholesterol_mg": null,
+     "fat_g": 110,
+     "fiber_g": null,
+     "protein_g": 191,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-18",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_breakfast_2026-09-18",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 456,
+       "carbs_g": 40,
+       "cholesterol_mg": null,
+       "fat_g": 7,
+       "fiber_g": null,
+       "protein_g": 62,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_lunch_2026-09-18",
+      "name": "Lunch",
+      "totals": {
+       "calories": 715,
+       "carbs_g": 75,
+       "cholesterol_mg": null,
+       "fat_g": 32,
+       "fiber_g": null,
+       "protein_g": 54,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_dinner_2026-09-18",
+      "name": "Dinner",
+      "totals": {
+       "calories": 755,
+       "carbs_g": 22,
+       "cholesterol_mg": null,
+       "fat_g": 45,
+       "fiber_g": null,
+       "protein_g": 66,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_snacks_2026-09-18",
+      "name": "Snacks",
+      "totals": {
+       "calories": 537,
+       "carbs_g": 70,
+       "cholesterol_mg": null,
+       "fat_g": 26,
+       "fiber_g": null,
+       "protein_g": 9,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1292,
+       "carbs_g": -92,
+       "cholesterol_mg": null,
+       "fat_g": -71,
+       "fiber_g": null,
+       "protein_g": -75,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2463,
+       "carbs_g": 207,
+       "cholesterol_mg": null,
+       "fat_g": 110,
+       "fiber_g": null,
+       "protein_g": 191,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 1171,
+       "carbs_g": 115,
+       "cholesterol_mg": null,
+       "fat_g": 39,
+       "fiber_g": null,
+       "protein_g": 116,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "Photo 2"
+     ],
+     "date": "2026-09-18",
+     "food_count": 13,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "MyFitnessPal"
+    },
+    "observed_at": "2026-09-18",
+    "quality": {
+     "limitations": [
+      "No explicit source application identified",
+      "No explicit meal times or food brands beyond visible",
+      "Additional foods may be present outside visible items"
+     ],
+     "status": "complete"
+    },
+    "source": {
+     "application": "MyFitnessPal",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "evidence_submission_F08E88A4E31D49CDA8A29CE93065CE04_images_file_1",
+      "Photo 2"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  },
+  {
+   "canonicalId": "nutrition|2026-09-19|nutrition-day",
+   "evidence_type": "nutrition",
+   "lastObservedAt": "2026-09-19",
+   "payload": {
+    "daily_totals": {
+     "calories": 2467,
+     "carbs_g": 261,
+     "cholesterol_mg": null,
+     "fat_g": 99,
+     "fiber_g": null,
+     "protein_g": 157,
+     "sodium_mg": null,
+     "sugar_g": null
+    },
+    "evidence_type": "nutrition",
+    "id": "nutrition_2026-09-19_1",
+    "meals": [
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_1_2026-09-19",
+      "name": "Breakfast",
+      "totals": {
+       "calories": 1225,
+       "carbs_g": 114,
+       "cholesterol_mg": null,
+       "fat_g": 45,
+       "fiber_g": null,
+       "protein_g": 91,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal_2_2026-09-19",
+      "name": "Lunch",
+      "totals": {
+       "calories": 620,
+       "carbs_g": 50,
+       "cholesterol_mg": null,
+       "fat_g": 32,
+       "fiber_g": null,
+       "protein_g": 53,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-dinner-2026-09-19-photo1",
+      "name": "Dinner",
+      "totals": {
+       "calories": 290,
+       "carbs_g": 36,
+       "cholesterol_mg": null,
+       "fat_g": 12,
+       "fiber_g": null,
+       "protein_g": 10,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     },
+     {
+      "additional_foods_detected": 0,
+      "completeness": "partial",
+      "id": "meal-snacks-2026-09-19-photo1",
+      "name": "Snacks",
+      "totals": {
+       "calories": 332,
+       "carbs_g": 61,
+       "cholesterol_mg": null,
+       "fat_g": 10,
+       "fiber_g": null,
+       "protein_g": 3,
+       "sodium_mg": null,
+       "sugar_g": null
+      }
+     }
+    ],
+    "metadata": {
+     "completeness": "partial_meal_subtotal",
+     "confidence": "high",
+     "daily_totals_reconciliation": {
+      "authoritative_source": "canonical_meal_sums",
+      "computed_fields": [
+       "calories",
+       "protein_g",
+       "carbs_g",
+       "fat_g"
+      ],
+      "conflicting_fields": [],
+      "daily_totals_scope": "partial_meal_subtotal",
+      "differences": {
+       "calories": -1845,
+       "carbs_g": -164,
+       "cholesterol_mg": null,
+       "fat_g": -77,
+       "fiber_g": null,
+       "protein_g": -144,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "meal_sums": {
+       "calories": 2467,
+       "carbs_g": 261,
+       "cholesterol_mg": null,
+       "fat_g": 99,
+       "fiber_g": null,
+       "protein_g": 157,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "source_daily_totals": {
+       "calories": 622,
+       "carbs_g": 97,
+       "cholesterol_mg": null,
+       "fat_g": 22,
+       "fiber_g": null,
+       "protein_g": 13,
+       "sodium_mg": null,
+       "sugar_g": null
+      },
+      "status": "reconciled"
+     },
+     "daily_totals_scope": "partial_meal_subtotal",
+     "daily_totals_source_artifact_refs": [
+      "Photo 1"
+     ],
+     "date": "2026-09-19",
+     "food_count": 9,
+     "goal_set": true,
+     "meal_count": 4,
+     "source": "MyFitnessPal"
+    },
+    "observed_at": "2026-09-19",
+    "quality": {
+     "limitations": [],
+     "status": "complete"
+    },
+    "source": {
+     "application": "MyFitnessPal",
+     "integration": null,
+     "modality": "screenshot",
+     "source_artifact_refs": [
+      "Photo 1",
+      "Photo 2"
+     ]
+    }
+   },
+   "quality": {
+    "status": "complete"
+   }
+  }
+ ]
+}
