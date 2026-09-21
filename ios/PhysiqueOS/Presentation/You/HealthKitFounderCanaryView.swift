@@ -14,6 +14,11 @@ struct HealthKitFounderCanaryView: View {
     @State private var authorizationMessage: String?
     @State private var result: HealthKitFounderCanaryRunResult?
     @State private var errorMessage: String?
+    @State private var testDayDate = Date()
+    @State private var isEditingTestDay = false
+    @State private var isTestDayWorking = false
+    @State private var testDayResult: HealthKitCanonicalTestDayRunResult?
+    @State private var testDayError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -82,6 +87,34 @@ struct HealthKitFounderCanaryView: View {
                     .foregroundStyle(PhysiqueOSTheme.chartEffort)
             }
             if let result { resultView(result) }
+
+            canonicalTestDayCard
+        }
+        .sheet(isPresented: $isEditingTestDay) {
+            NavigationStack {
+                VStack {
+                    DatePicker(
+                        "Canonical test day",
+                        selection: $testDayDate,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.graphical)
+                    .padding()
+                    Spacer()
+                }
+                .background(PhysiqueOSTheme.background)
+                .navigationTitle("Test day")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Use date") {
+                            testDayResult = nil
+                            isEditingTestDay = false
+                        }
+                    }
+                }
+            }
+            .preferredColorScheme(.dark)
         }
         .sheet(item: $editingDate) { field in
             NavigationStack {
@@ -112,6 +145,90 @@ struct HealthKitFounderCanaryView: View {
                 }
             }
             .preferredColorScheme(.dark)
+        }
+    }
+
+    /// Controlled canonical proving day. The exact date is the Founder-approved
+    /// activation date. Apple Health is uploaded for that one day only; the
+    /// Server decides whether it canonicalizes and always keeps it out of V3,
+    /// Confidence, and briefings.
+    private var canonicalTestDayCard: some View {
+        CardContainer(padding: .md) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Controlled canonical test day")
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text("Uploads Apple Health Activity and Nutrition daily totals for one exact day. Server canonicalization is limited to the approved test date, is never used for V3, Confidence, or briefings, and no meals are created. Workouts are not uploaded.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Button {
+                    isEditingTestDay = true
+                } label: {
+                    HStack {
+                        Text("Test day")
+                        Spacer()
+                        Text(Self.localDate(testDayDate))
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    }
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .padding(12)
+                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                PrimaryActionButton(
+                    title: isTestDayWorking ? "Syncing test day…" : "Sync test day now",
+                    isEnabled: canSyncTestDay
+                ) {
+                    runCanonicalTestDay()
+                }
+                if let testDayError {
+                    Text(testDayError)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                }
+                if let testDayResult {
+                    statusRow("Test day", testDayResult.testDay.localDate)
+                    statusRow("Day status", testDayResult.endDateIsProvisional ? "Current day (partial until it ends)" : "Completed day")
+                    statusRow("Activity observations uploaded", String(testDayResult.activity.additionsDiscovered))
+                    statusRow("Nutrition observations uploaded", String(testDayResult.nutrition.additionsDiscovered))
+                    statusRow("Pending batches", String(testDayResult.activityDiagnostics.pendingBatchCount + testDayResult.nutritionDiagnostics.pendingBatchCount))
+                    statusRow("Last acknowledgement", (testDayResult.nutritionDiagnostics.lastDurableAcknowledgement ?? testDayResult.activityDiagnostics.lastDurableAcknowledgement)?.formatted() ?? "None")
+                    if testDayResult.activity.additionsDiscovered == 0 && testDayResult.nutrition.additionsDiscovered == 0 {
+                        Text("Nothing changed since the last sync for this day.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var canSyncTestDay: Bool {
+        canaryEnabled &&
+        environment.healthKitFounderCanaryCoordinator.authorizationWasExplicitlyRequested &&
+        !isTestDayWorking
+    }
+
+    private func runCanonicalTestDay() {
+        isTestDayWorking = true
+        testDayResult = nil
+        testDayError = nil
+        Task {
+            do {
+                let testDay = try HealthKitCanonicalTestDay(localDate: Self.localDate(testDayDate))
+                let completed = try await environment.healthKitFounderCanaryCoordinator.synchronizeCanonicalTestDay(testDay)
+                await MainActor.run {
+                    testDayResult = completed
+                    isTestDayWorking = false
+                }
+            } catch {
+                await MainActor.run {
+                    testDayError = (error as? LocalizedError)?.errorDescription
+                        ?? "The canonical test-day sync did not complete."
+                    isTestDayWorking = false
+                }
+            }
         }
     }
 

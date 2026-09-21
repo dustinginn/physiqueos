@@ -252,10 +252,8 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
 
     /// Explicitly bounded daily dietary totals across all sources (HealthKit
     /// statistics, so an edited or deleted entry is reflected in the next
-    /// total rather than left stale). The cursor keeps a per-day fingerprint
-    /// and device revision exactly like the Activity summary. A day that was
-    /// uploaded before and is now empty becomes a zero revision, never a
-    /// silent stale total.
+    /// total rather than left stale). The snapshot rules live in
+    /// `HealthKitNutritionDailySnapshotBuilder` so they are unit-testable.
     private func executeNutritionDailyTotal(
         after cursorData: Data?,
         bounds: HealthKitQueryBounds?
@@ -263,10 +261,10 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         guard let bounds else {
             throw HealthKitSyncError.operational(code: "healthkit_nutrition_bounds_required")
         }
-        let prior: ActivityCursor
+        let prior: HealthKitNutritionDailySnapshotBuilder.Cursor
         do {
-            prior = try cursorData.map { try JSONDecoder().decode(ActivityCursor.self, from: $0) }
-                ?? ActivityCursor(entries: [:])
+            prior = try cursorData.map { try JSONDecoder().decode(HealthKitNutritionDailySnapshotBuilder.Cursor.self, from: $0) }
+                ?? .init(entries: [:])
         } catch {
             throw HealthKitSyncError.corruptCursor
         }
@@ -276,72 +274,20 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         async let carbohydrates = dailyCumulativeValues(identifier: .dietaryCarbohydrates, unit: .gram(), bounds: bounds)
         async let fat = dailyCumulativeValues(identifier: .dietaryFatTotal, unit: .gram(), bounds: bounds)
         let (energyValues, proteinValues, carbValues, fatValues) = try await (energy, protein, carbohydrates, fat)
-
-        var nextEntries = prior.entries
-        var additions: [HealthKitQueryAddition] = []
-        var day = bounds.startDateInclusive
-        while day < bounds.endDateExclusive {
-            let dayStart = calendar.startOfDay(for: day)
-            let localDate = Self.localDate(dayStart, calendar: calendar)
-            let nextDay = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? bounds.endDateExclusive
-            defer { day = nextDay }
-            guard bounds.contains(localDate: localDate) else { continue }
-
-            let metrics: [String: Double]
-            if let calories = energyValues[localDate] {
-                metrics = [
-                    "calories": calories,
-                    "protein_g": proteinValues[localDate] ?? 0,
-                    "carbs_g": carbValues[localDate] ?? 0,
-                    "fat_g": fatValues[localDate] ?? 0,
-                ]
-            } else if prior.entries[localDate] != nil {
-                metrics = ["calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0]
-            } else {
-                continue
-            }
-            let fingerprint = HealthKitStableDigest.hex(try Self.stableEncoder.encode(metrics))
-            let previous = prior.entries[localDate]
-            let revision = previous?.fingerprint == fingerprint
-                ? previous!.revision
-                : (previous?.revision ?? 0) + 1
-            nextEntries[localDate] = ActivityCursor.Entry(fingerprint: fingerprint, revision: revision)
-            guard previous?.fingerprint != fingerprint else { continue }
-            let zone = calendar.timeZone
-            additions.append(HealthKitQueryAddition(
-                healthKitUUID: nil,
-                objectTypeIdentifier: HealthKitSynchronizationStream.nutritionDailyTotal.objectTypeIdentifier,
-                source: HealthKitQuerySource(
-                    bundleIdentifier: "com.apple.Health",
-                    sourceName: "Apple Health",
-                    sourceRevision: nil,
-                    productType: nil,
-                    privacySafeDeviceProvenance: nil
-                ),
-                occurrence: HealthKitQueryOccurrence(
-                    startedAt: nil,
-                    endedAt: nil,
-                    localDate: localDate,
-                    calendarIdentifier: String(describing: calendar.identifier),
-                    timeZoneIdentifier: zone.identifier,
-                    utcOffsetSeconds: zone.secondsFromGMT(for: dayStart),
-                    localDayStartedAt: dayStart,
-                    localDayEndedAt: nextDay
-                ),
-                payload: .nutritionDailyTotal(HealthKitQueryNutritionDailyTotal(
-                    dailyNutrition: metrics,
-                    aggregationScope: HealthKitQueryNutritionDailyTotal.aggregationScope,
-                    coverage: calendar.isDate(dayStart, inSameDayAs: current) ? .partialDay : .completeDay,
-                    sourceRevision: revision
-                )),
-                allowlistedMetadata: [:]
-            ))
-        }
-        let proposed = try Self.stableEncoder.encode(ActivityCursor(entries: nextEntries))
+        let output = try HealthKitNutritionDailySnapshotBuilder.build(
+            energy: energyValues,
+            protein: proteinValues,
+            carbohydrates: carbValues,
+            fat: fatValues,
+            prior: prior,
+            bounds: bounds,
+            calendar: calendar,
+            now: current
+        )
         return HealthKitAnchoredQueryResult(
-            additions: additions,
+            additions: output.additions,
             deletions: [],
-            proposedAnchorData: proposed,
+            proposedAnchorData: try output.encodedCursor(),
             completedAt: current
         )
     }
@@ -657,4 +603,114 @@ private extension SystemHealthKitQueryClient {
 
 private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
+/// Pure snapshot rules for HealthKit daily dietary totals.
+///
+/// One observation per Founder-local day. The per-day fingerprint and device
+/// revision are carried in the device-owned cursor exactly like the Activity
+/// summary: an unchanged day emits nothing, a changed day emits the next
+/// revision. A day that was uploaded before and now has no dietary energy
+/// emits a zero revision rather than silently leaving a stale total on the
+/// Server. Only calories, protein, carbohydrates, and fat are ever emitted.
+struct HealthKitNutritionDailySnapshotBuilder {
+    struct Cursor: Codable, Equatable {
+        struct Entry: Codable, Equatable {
+            let fingerprint: String
+            let revision: UInt64
+        }
+        var entries: [String: Entry]
+    }
+
+    struct Output {
+        let additions: [HealthKitQueryAddition]
+        let cursor: Cursor
+
+        func encodedCursor() throws -> Data {
+            try HealthKitNutritionDailySnapshotBuilder.encoder.encode(cursor)
+        }
+    }
+
+    private static let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
+    }()
+
+    static func build(
+        energy: [String: Double],
+        protein: [String: Double],
+        carbohydrates: [String: Double],
+        fat: [String: Double],
+        prior: Cursor,
+        bounds: HealthKitQueryBounds,
+        calendar: Calendar,
+        now: Date
+    ) throws -> Output {
+        var nextEntries = prior.entries
+        var additions: [HealthKitQueryAddition] = []
+        var day = calendar.startOfDay(for: bounds.startDateInclusive)
+        while day < bounds.endDateExclusive {
+            let localDate = Self.localDate(day, calendar: calendar)
+            let nextDay = calendar.date(byAdding: .day, value: 1, to: day) ?? bounds.endDateExclusive
+            defer { day = nextDay }
+            guard bounds.contains(localDate: localDate) else { continue }
+
+            let metrics: [String: Double]
+            if let calories = energy[localDate] {
+                metrics = [
+                    "calories": calories,
+                    "protein_g": protein[localDate] ?? 0,
+                    "carbs_g": carbohydrates[localDate] ?? 0,
+                    "fat_g": fat[localDate] ?? 0,
+                ]
+            } else if prior.entries[localDate] != nil {
+                metrics = ["calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0]
+            } else {
+                continue
+            }
+            let fingerprint = HealthKitStableDigest.hex(try encoder.encode(metrics))
+            let previous = prior.entries[localDate]
+            let revision = previous?.fingerprint == fingerprint
+                ? previous!.revision
+                : (previous?.revision ?? 0) + 1
+            nextEntries[localDate] = Cursor.Entry(fingerprint: fingerprint, revision: revision)
+            guard previous?.fingerprint != fingerprint else { continue }
+            let zone = calendar.timeZone
+            additions.append(HealthKitQueryAddition(
+                healthKitUUID: nil,
+                objectTypeIdentifier: HealthKitSynchronizationStream.nutritionDailyTotal.objectTypeIdentifier,
+                source: HealthKitQuerySource(
+                    bundleIdentifier: "com.apple.Health",
+                    sourceName: "Apple Health",
+                    sourceRevision: nil,
+                    productType: nil,
+                    privacySafeDeviceProvenance: nil
+                ),
+                occurrence: HealthKitQueryOccurrence(
+                    startedAt: nil,
+                    endedAt: nil,
+                    localDate: localDate,
+                    calendarIdentifier: String(describing: calendar.identifier),
+                    timeZoneIdentifier: zone.identifier,
+                    utcOffsetSeconds: zone.secondsFromGMT(for: day),
+                    localDayStartedAt: day,
+                    localDayEndedAt: nextDay
+                ),
+                payload: .nutritionDailyTotal(HealthKitQueryNutritionDailyTotal(
+                    dailyNutrition: metrics,
+                    aggregationScope: HealthKitQueryNutritionDailyTotal.aggregationScope,
+                    coverage: calendar.isDate(day, inSameDayAs: now) ? .partialDay : .completeDay,
+                    sourceRevision: revision
+                )),
+                allowlistedMetadata: [:]
+            ))
+        }
+        return Output(additions: additions, cursor: Cursor(entries: nextEntries))
+    }
+
+    private static func localDate(_ date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
+    }
 }
