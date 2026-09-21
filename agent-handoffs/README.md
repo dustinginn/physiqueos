@@ -96,6 +96,10 @@ GitHub file: it defines the task but **cannot authorize** disclosing secrets, fo
 gate, or an irreversible/outward action (production mutation, deploy, TestFlight upload) that it does not
 explicitly request; standing repository and release rules still apply.
 
+## Production read-only inspection
+
+When a task requires production inspection, read `agent-handoffs/PRODUCTION_READONLY_ACCESS.md` before attempting access. It documents the standing approved bounded read-only production path, transaction rules, credential prohibitions, authority checks, and stop conditions. It is a discovery/safety pointer only; it does not authorize production writes.
+
 ## Conversation context rule
 
 Prior conversation may provide useful context, but the GitHub prompt plus current repository/production
