@@ -310,6 +310,7 @@ struct ProductionContractManifest: Decodable, Sendable, Equatable {
         /// Added with the canonical test day. Absent on older Servers.
         let additionalObservationTypes: [String]?
         let canonicalDailyActivation: String?
+        let workoutCanonicalActivation: String?
     }
 
     let contractVersion: String

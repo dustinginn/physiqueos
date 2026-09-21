@@ -33,6 +33,17 @@ protocol HealthKitCanonicalTestDaySynchronizing: HealthKitActivityCanarySynchron
 
 extension HealthKitSynchronizationEngine: HealthKitCanonicalTestDaySynchronizing {}
 
+/// The dormant exact-day Workout path, again without widening the base protocol.
+protocol HealthKitWorkoutCanarySynchronizing: HealthKitActivityCanarySynchronizing {
+    func synchronizeWorkoutCanary(
+        scope: HealthKitCursorScope,
+        day: HealthKitWorkoutCanaryDay,
+        calendar: Calendar
+    ) async throws -> HealthKitCanarySyncSummary
+}
+
+extension HealthKitSynchronizationEngine: HealthKitWorkoutCanarySynchronizing {}
+
 protocol HealthKitFounderCanaryServer: Sendable {
     func healthKitCanaryContract() async throws -> HealthKitCanaryServerContract
     func founderOwnerIdentity() async throws -> String
@@ -74,7 +85,8 @@ extension ProductionNativeAPI: HealthKitFounderCanaryServer {
             ingestionPurposes: Set(healthKit.ingestionPurposes),
             diagnosticEndpoint: HealthKitServerIngestionContract.activityCanaryDiagnosticEndpoint,
             additionalObservationTypes: Set(healthKit.additionalObservationTypes ?? []),
-            hasCanonicalDailyActivation: !(healthKit.canonicalDailyActivation ?? "").isEmpty
+            hasCanonicalDailyActivation: !(healthKit.canonicalDailyActivation ?? "").isEmpty,
+            hasWorkoutCanonicalActivation: !(healthKit.workoutCanonicalActivation ?? "").isEmpty
         )
     }
 
@@ -235,6 +247,36 @@ final class HealthKitFounderCanaryCoordinator {
             nutrition: nutrition,
             activityDiagnostics: try await synchronizer.diagnostics(scope: activityScope),
             nutritionDiagnostics: try await synchronizer.diagnostics(scope: nutritionScope),
+            canonicalization: canonicalizationLedger?.reports() ?? []
+        )
+    }
+
+    /// Foreground, exact-day workout upload for the dormant Workout canary.
+    /// Nothing runs at launch. The Server decides whether a workout
+    /// canonicalizes (its own separate policy, OFF by default) and always keeps
+    /// it quarantined; the Workout Logger stays the authority for training content.
+    @MainActor
+    func synchronizeWorkoutCanary(_ day: HealthKitWorkoutCanaryDay) async throws -> HealthKitWorkoutCanaryRunResult {
+        guard isEnabled else { throw HealthKitCanaryError.disabled }
+        guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
+        guard let synchronizer = synchronizer as? any HealthKitWorkoutCanarySynchronizing else {
+            throw HealthKitCanaryError.canonicalTestDayUnsupported
+        }
+        let contract = try await server.healthKitCanaryContract()
+        guard contract.isCompatible else { throw HealthKitCanaryError.serverContractMismatch }
+        guard contract.supportsWorkoutCanary else { throw HealthKitCanaryError.canonicalTestDayUnsupported }
+        let scope = HealthKitCursorScope(
+            ownerIdentity: try await server.founderOwnerIdentity(),
+            enrolledDeviceIdentity: try deviceIdentityStore.stableIdentity(),
+            stream: .workouts,
+            predicateVersion: day.predicateVersion
+        )
+        canonicalizationLedger?.reset()
+        let summary = try await synchronizer.synchronizeWorkoutCanary(scope: scope, day: day, calendar: calendar)
+        return HealthKitWorkoutCanaryRunResult(
+            day: day,
+            synchronization: summary,
+            diagnostics: try await synchronizer.diagnostics(scope: scope),
             canonicalization: canonicalizationLedger?.reports() ?? []
         )
     }

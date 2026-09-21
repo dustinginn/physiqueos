@@ -15,7 +15,9 @@ struct HealthKitCanonicalizationReport: Equatable, Sendable {
     let reason: String?
     let occurredAt: String?
 
-    var wasCanonicalized: Bool { reconciliationState?.hasSuffix("_day_canonicalized") == true }
+    var wasCanonicalized: Bool {
+        reconciliationState?.hasSuffix("_day_canonicalized") == true || reconciliationState == "workout_canonicalized"
+    }
 }
 
 /// Collects the Server's per-observation reconciliation from durable

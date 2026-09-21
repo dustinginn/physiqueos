@@ -270,6 +270,75 @@ actor HealthKitSynchronizationEngine {
         )
     }
 
+    /// Explicit foreground-only, exact-day operational path for the dormant
+    /// Workout canary. Same guarantees as the Activity + Nutrition test day: the
+    /// cursor scope binds the exact local date, additions are re-filtered to it,
+    /// deletions are dropped, and a pending validation-only batch is never
+    /// resumed as operational. It uploads workout observations only; the Server
+    /// canonicalizes them only inside its own separate Workout policy window.
+    func synchronizeWorkoutCanary(
+        scope: HealthKitCursorScope,
+        day: HealthKitWorkoutCanaryDay,
+        calendar: Calendar = .autoupdatingCurrent
+    ) async throws -> HealthKitCanarySyncSummary {
+        guard featureGate.allows(.observationQuery), featureGate.allows(.serverUpload) else {
+            throw HealthKitSyncError.featureDisabled
+        }
+        guard scope.stream == .workouts, scope.predicateVersion == day.predicateVersion else {
+            throw HealthKitSyncError.ownerOrDeviceMismatch
+        }
+        let pending = try await store.pendingBatches(for: scope)
+        if !pending.isEmpty {
+            guard pending.allSatisfy({ $0.ingestionPurpose == .operational }) else {
+                throw HealthKitSyncError.ownerOrDeviceMismatch
+            }
+            try await deliverPending(scope: scope)
+            return HealthKitCanarySyncSummary(
+                batchIdentity: pending.first?.identity,
+                additionsDiscovered: 0,
+                deletionsDiscovered: 0,
+                additionsFilteredByWindow: 0,
+                deletionsFilteredByWindow: 0,
+                resumedPendingBatch: true
+            )
+        }
+        let bounds = try day.window.queryBounds(calendar: calendar)
+        var cursor = try await store.authoritativeCursor(for: scope)
+        let raw: HealthKitAnchoredQueryResult
+        do {
+            raw = try await queryClient.execute(stream: .workouts, after: cursor?.opaqueAnchorData, bounds: bounds)
+        } catch HealthKitSyncError.corruptCursor {
+            try await store.resetCursorForBoundedRecovery(for: scope)
+            cursor = nil
+            raw = try await queryClient.execute(stream: .workouts, after: nil, bounds: bounds)
+        }
+        let additions = raw.additions.filter { day.window.contains(localDate: $0.occurrence.localDate) }
+        let bounded = HealthKitAnchoredQueryResult(
+            additions: additions,
+            deletions: [],
+            proposedAnchorData: raw.proposedAnchorData,
+            completedAt: raw.completedAt
+        )
+        try await store.recordSuccessfulQuery(for: scope, at: bounded.completedAt)
+        let batch = try batchBuilder.build(
+            scope: scope,
+            previousCursor: cursor,
+            queryResult: bounded,
+            createdAt: now(),
+            ingestionPurpose: .operational
+        )
+        try await store.stage(batch)
+        try await deliverPending(scope: scope)
+        return HealthKitCanarySyncSummary(
+            batchIdentity: batch.identity,
+            additionsDiscovered: raw.additions.count,
+            deletionsDiscovered: raw.deletions.count,
+            additionsFilteredByWindow: raw.additions.count - additions.count,
+            deletionsFilteredByWindow: raw.deletions.count,
+            resumedPendingBatch: false
+        )
+    }
+
     /// Relaunch recovery uses only already-staged bytes and identities. It
     /// never reruns an anchored query while a batch is unresolved.
     func resumePending(scope: HealthKitCursorScope) async throws {

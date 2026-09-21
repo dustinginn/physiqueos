@@ -19,6 +19,11 @@ struct HealthKitFounderCanaryView: View {
     @State private var isTestDayWorking = false
     @State private var testDayResult: HealthKitCanonicalTestDayRunResult?
     @State private var testDayError: String?
+    @State private var workoutDayDate = Date()
+    @State private var isEditingWorkoutDay = false
+    @State private var isWorkoutWorking = false
+    @State private var workoutResult: HealthKitWorkoutCanaryRunResult?
+    @State private var workoutError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -89,6 +94,28 @@ struct HealthKitFounderCanaryView: View {
             if let result { resultView(result) }
 
             canonicalTestDayCard
+            workoutCanaryCard
+        }
+        .sheet(isPresented: $isEditingWorkoutDay) {
+            NavigationStack {
+                VStack {
+                    DatePicker("Workout canary day", selection: $workoutDayDate, in: ...Date(), displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .padding()
+                    Spacer()
+                }
+                .background(PhysiqueOSTheme.background)
+                .navigationTitle("Workout day")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Use date") {
+                            workoutResult = nil
+                            isEditingWorkoutDay = false
+                        }
+                    }
+                }
+            }
+            .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $isEditingTestDay) {
             NavigationStack {
@@ -228,7 +255,7 @@ struct HealthKitFounderCanaryView: View {
     private var canSyncTestDay: Bool {
         canaryEnabled &&
         environment.healthKitFounderCanaryCoordinator.authorizationWasExplicitlyRequested &&
-        !isTestDayWorking && !isWorking
+        !isTestDayWorking && !isWorking && !isWorkoutWorking
     }
 
     private func runCanonicalTestDay() {
@@ -253,10 +280,102 @@ struct HealthKitFounderCanaryView: View {
         }
     }
 
+    /// Dormant Workout canary. It only uploads workouts for one exact day. The
+    /// Server canonicalizes them only inside its own separate Workout window
+    /// (off unless the Founder activates it), never treats them as V3,
+    /// Confidence, or briefing evidence, and never changes the Workout Logger.
+    private var workoutCanaryCard: some View {
+        CardContainer(padding: .md) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Workout canary")
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text("Uploads Apple Health workouts for one exact day so a strength session can be matched to your Workout Logger session as a candidate. Nothing is linked automatically, the Logger keeps exercises, sets, and load, and workouts are never used for V3, Confidence, or briefings. Do nothing here unless the coordinating agent asks.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Button {
+                    isEditingWorkoutDay = true
+                } label: {
+                    HStack {
+                        Text("Workout day")
+                        Spacer()
+                        Text(Self.localDate(workoutDayDate)).foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    }
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .padding(12)
+                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                PrimaryActionButton(
+                    title: isWorkoutWorking ? "Syncing workouts…" : "Sync workouts for this day",
+                    isEnabled: canSyncWorkouts
+                ) {
+                    runWorkoutCanary()
+                }
+                if let workoutError {
+                    Text(workoutError)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                }
+                if let workoutResult {
+                    statusRow("Workout day", workoutResult.day.localDate)
+                    statusRow("Workouts uploaded", String(workoutResult.synchronization.additionsDiscovered))
+                    statusRow("Pending batches", String(workoutResult.diagnostics.pendingBatchCount))
+                    let canonicalized = workoutResult.canonicalization.filter(\.wasCanonicalized).count
+                    statusRow("Server canonicalized", canonicalized == 0 ? "Nothing new" : "\(canonicalized) workout(s)")
+                    if let reason = workoutResult.canonicalization
+                        .first(where: { !$0.wasCanonicalized && $0.reconciliationState?.contains("canonicalization_deferred") == true })?.reason {
+                        Text("The Server stored these workouts raw and did not canonicalize them (\(reason.replacingOccurrences(of: "_", with: " "))). This is expected until the Workout canary is activated.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                    if workoutResult.synchronization.resumedPendingBatch {
+                        Text("Resumed an interrupted upload for this day.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    } else if workoutResult.synchronization.additionsDiscovered == 0 {
+                        Text("No new workouts found for this day.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var canSyncWorkouts: Bool {
+        canaryEnabled &&
+        environment.healthKitFounderCanaryCoordinator.authorizationWasExplicitlyRequested &&
+        !isWorkoutWorking && !isTestDayWorking && !isWorking
+    }
+
+    private func runWorkoutCanary() {
+        isWorkoutWorking = true
+        workoutResult = nil
+        workoutError = nil
+        Task {
+            do {
+                let day = try HealthKitWorkoutCanaryDay(localDate: Self.localDate(workoutDayDate))
+                let completed = try await environment.healthKitFounderCanaryCoordinator.synchronizeWorkoutCanary(day)
+                await MainActor.run {
+                    workoutResult = completed
+                    isWorkoutWorking = false
+                }
+            } catch {
+                await MainActor.run {
+                    workoutError = (error as? LocalizedError)?.errorDescription
+                        ?? "The workout canary sync did not complete."
+                    isWorkoutWorking = false
+                }
+            }
+        }
+    }
+
     private var canRun: Bool {
         canaryEnabled &&
         environment.healthKitFounderCanaryCoordinator.authorizationWasExplicitlyRequested &&
-        startDate != nil && endDate != nil && !isWorking && !isTestDayWorking
+        startDate != nil && endDate != nil && !isWorking && !isTestDayWorking && !isWorkoutWorking
     }
 
     private var availabilityText: String {

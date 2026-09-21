@@ -116,6 +116,39 @@ struct HealthKitCanonicalTestDay: Equatable, Sendable {
     }
 }
 
+/// One exact Founder-local day for the dormant Workout canary. Same shape and
+/// limits as the Activity + Nutrition test day: a single date, never a range,
+/// not in the future, at most a few days old. The Server alone decides whether
+/// a workout canonicalizes (its own separate Workout policy, OFF by default).
+struct HealthKitWorkoutCanaryDay: Equatable, Sendable {
+    static let maximumAgeDays = 3
+    static let predicatePrefix = "healthkit-workout-canary-v1:"
+
+    let localDate: String
+    let window: HealthKitActivityValidationWindow
+
+    init(localDate: String, now: Date = Date(), calendar: Calendar = .autoupdatingCurrent) throws {
+        let window = try HealthKitActivityValidationWindow(startDate: localDate, endDate: localDate)
+        let today = HealthKitActivityValidationWindow.localDate(now, calendar: calendar)
+        guard let oldest = calendar.date(byAdding: .day, value: -Self.maximumAgeDays, to: calendar.startOfDay(for: now)) else {
+            throw HealthKitCanaryError.invalidCanonicalTestDay
+        }
+        let oldestDate = HealthKitActivityValidationWindow.localDate(oldest, calendar: calendar)
+        guard localDate <= today, localDate >= oldestDate else { throw HealthKitCanaryError.invalidCanonicalTestDay }
+        self.localDate = localDate
+        self.window = window
+    }
+
+    var predicateVersion: String { "\(Self.predicatePrefix)\(localDate)" }
+}
+
+struct HealthKitWorkoutCanaryRunResult: Equatable, Sendable {
+    let day: HealthKitWorkoutCanaryDay
+    let synchronization: HealthKitCanarySyncSummary
+    let diagnostics: HealthKitStreamDiagnostics
+    var canonicalization: [HealthKitCanonicalizationReport] = []
+}
+
 struct HealthKitCanonicalTestDayRunResult: Equatable, Sendable {
     let testDay: HealthKitCanonicalTestDay
     let endDateIsProvisional: Bool
@@ -150,6 +183,11 @@ struct HealthKitCanaryServerContract: Equatable, Sendable {
     /// Present only on a Server that supports the controlled canonical test day.
     var additionalObservationTypes: Set<String> = []
     var hasCanonicalDailyActivation = false
+
+    /// Present only on a Server that advertises the dormant Workout policy.
+    var hasWorkoutCanonicalActivation = false
+
+    var supportsWorkoutCanary: Bool { hasWorkoutCanonicalActivation }
 
     var supportsCanonicalTestDay: Bool {
         additionalObservationTypes.contains(HealthKitServerIngestionContract.nutritionDailyTotalObservationType) &&
