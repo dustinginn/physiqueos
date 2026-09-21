@@ -14,6 +14,7 @@ struct LogView: View {
     /// guards against rebuilding (and blanking) an already-loaded view
     /// model just because the tab was revisited.
     @State private var viewModelAuthority: NativeAPIEnvironment?
+    @Environment(\.scenePhase) private var scenePhase
     var onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -31,6 +32,13 @@ struct LogView: View {
                 viewModelAuthority = environment.nativeAuthority
             }
             await viewModel?.load()
+        }
+        // While a confirmed review is Processing, refresh on a bounded cadence so the
+        // card clears when the Server finishes. `.task` is cancelled when the screen
+        // leaves, the app backgrounds (scenePhase in the id), or nothing is processing.
+        .task(id: "\(viewModel?.processingKey ?? "-"):\(scenePhase == .active)") {
+            guard scenePhase == .active, let viewModel, viewModel.processingKey != nil else { return }
+            await ProcessingRefresh.run { await viewModel.refreshWhileProcessing() }
         }
     }
 

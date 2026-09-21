@@ -59,6 +59,7 @@ app_files = [
     ("Contracts", "TrainingSessionRenderItems.swift"),
     ("Contracts", "TrainingSessionCorrectionValidation.swift"),
     ("Contracts", "TrainingExerciseHistoryCalculator.swift"),
+    ("Contracts", "ProcessingRefresh.swift"),
     ("Contracts", "TrainingPerformanceRecordsCalculator.swift"),
     ("Contracts", "TrainingReportingReadModel.swift"),
     ("Contracts", "TrainingLoggerReadModel.swift"),
@@ -381,6 +382,7 @@ test_files = [
     ("PhysiqueOSTests", "TrainingStrategyAPITests.swift"),
     ("PhysiqueOSTests", "BriefingV3PresentationTests.swift"),
     ("PhysiqueOSTests", "TrainingLoadSemanticsTests.swift"),
+    ("PhysiqueOSTests", "PhotoProcessingUXTests.swift"),
 ]
 
 ui_test_files = [

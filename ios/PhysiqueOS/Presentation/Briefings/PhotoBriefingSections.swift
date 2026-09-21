@@ -83,17 +83,17 @@ struct PhotoBriefingSections: View {
     private var photoGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
             ForEach(content.activeViews) { view in
-                Button {
-                    onNavigate(.photoSetDetail(setId: view.setId, poseId: view.poseId))
-                } label: {
-                    ProgressPhotoTile(
-                        roleLabel: view.poseId.label,
-                        source: mediaSource(for: view),
-                        caption: BriefingDateFormatting.shortDate(view.captureDate)
-                    )
-                }
-                .buttonStyle(.plain)
+                // Not a Button: the tile's own Retry is a Button, and a Button nested in
+                // another Button's label never receives its tap.
+                ProgressPhotoTile(
+                    roleLabel: view.poseId.label,
+                    source: mediaSource(for: view),
+                    caption: BriefingDateFormatting.shortDate(view.captureDate)
+                )
+                .contentShape(Rectangle())
+                .onTapGesture { onNavigate(.photoSetDetail(setId: view.setId, poseId: view.poseId)) }
                 .accessibilityLabel("\(view.poseId.label) photo, open in Progress Photos")
+                .accessibilityAddTraits(.isButton)
             }
         }
     }

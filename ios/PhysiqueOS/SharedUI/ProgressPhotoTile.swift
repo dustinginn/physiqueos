@@ -141,6 +141,13 @@ struct ProgressPhotoTile: View {
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
             .buttonStyle(.plain)
+        case .unavailable:
+            VStack(spacing: 6) {
+                Image(systemName: "photo.badge.exclamationmark")
+                Text("Photo unavailable")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+            }
+            .foregroundStyle(PhysiqueOSTheme.textMuted)
         }
     }
 }

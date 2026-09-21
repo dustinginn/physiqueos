@@ -12,7 +12,12 @@ import UIKit
 @Observable
 @MainActor
 final class FounderProductionPhotoMediaStore {
-    enum ImageState: Equatable { case idle, loading, loaded(UIImage), failed }
+    /// `failed` is a transient failure a Retry can act on (another authenticated
+    /// media read); `unavailable` is a permanent one (an unsupported or undecodable
+    /// image) where no retry operation exists, so no Retry is offered.
+    enum ImageState: Equatable { case idle, loading, loaded(UIImage), failed, unavailable }
+
+    private struct UndecodableImage: Error {}
 
     private(set) var imageStates: [String: ImageState] = [:]
     private let api: ProductionNativeAPI
@@ -34,13 +39,21 @@ final class FounderProductionPhotoMediaStore {
                         kCGImageSourceCreateThumbnailWithTransform: true,
                         kCGImageSourceThumbnailMaxPixelSize: 1_600,
                       ] as CFDictionary)
-                else { throw ProductionNativeError.invalidResponse }
+                else { throw UndecodableImage() }
                 return UIImage(cgImage: image)
             }.value
             imageStates[mediaId] = .loaded(image)
         } catch {
-            imageStates[mediaId] = .failed
+            // A view leaving the screen cancels the read; that is not a failure and
+            // must not strand the tile behind a Retry.
+            imageStates[mediaId] = Task.isCancelled ? .idle : Self.failureState(for: error)
         }
+    }
+
+    static func failureState(for error: Error) -> ImageState {
+        if error is UndecodableImage { return .unavailable }
+        if case ProductionNativeError.unsupportedMediaType = error { return .unavailable }
+        return .failed
     }
 
     func retryImage(mediaId: String) async {

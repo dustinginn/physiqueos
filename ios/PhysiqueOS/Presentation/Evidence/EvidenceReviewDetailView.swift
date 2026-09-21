@@ -679,6 +679,7 @@ struct EvidenceReviewDetailView: View {
         case .progressPhotos:
             await environment.productionNativeAPI.invalidateReadResources([
                 "photos", "home", "briefing-history", "evidence-review-queue",
+                "photo-event", "briefing",
             ])
             guard let landing = try? await environment.photosAPI.fetchPhotosLanding(scope: .all) else {
                 return false

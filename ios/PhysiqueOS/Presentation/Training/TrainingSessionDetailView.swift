@@ -338,6 +338,10 @@ private struct TrainingSupportingMediaImage: View {
                 Button("Retry screenshot") {
                     Task { await environment.founderProductionPhotoMediaStore.retryImage(mediaId: mediaId) }
                 }
+            case .unavailable:
+                Text("Screenshot unavailable")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
         }
         .task(id: mediaId) { await environment.founderProductionPhotoMediaStore.loadImage(mediaId: mediaId) }

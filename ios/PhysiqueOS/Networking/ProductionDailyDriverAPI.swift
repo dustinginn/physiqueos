@@ -745,6 +745,11 @@ struct ProductionOperatingPlanAPI: OperatingPlanAPI {
 struct ProductionLogAPI: LogAPI {
     let api: ProductionNativeAPI
 
+    func refreshLog() async throws -> LogReadModel {
+        await api.invalidateReadResources(["evidence-review-queue"])
+        return try await fetchLog()
+    }
+
     func fetchLog() async throws -> LogReadModel {
         async let logRead = api.readResource("evidence-review-queue", as: Payload.self)
         async let weightRead = api.readResource("weight", query: ["context": "all"], as: WeightPayload.self)

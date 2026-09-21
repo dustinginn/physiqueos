@@ -4,6 +4,13 @@ import Foundation
 /// concrete transport.
 protocol LogAPI: Sendable {
     func fetchLog() async throws -> LogReadModel
+    /// A fresh read (never the short read cache) for surfaces waiting on
+    /// Server-side processing.
+    func refreshLog() async throws -> LogReadModel
+}
+
+extension LogAPI {
+    func refreshLog() async throws -> LogReadModel { try await fetchLog() }
 }
 
 /// Fixture-backed conformance: decodes the same bundled JSON a live

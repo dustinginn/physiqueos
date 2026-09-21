@@ -5,6 +5,16 @@ protocol BriefingAPI: Sendable {
     func fetchBriefing(artifactId: String) async throws -> BriefingReadModel?
     func fetchDEXAEvent(scanId: String) async throws -> BriefingReadModel?
     func fetchPhotoEvent(sessionId: String) async throws -> BriefingReadModel?
+    /// A fresh (never cached) check of whether the Photo Briefing for this session
+    /// is published and readable.
+    func photoBriefingAvailability(sessionId: String) async -> PhotoBriefingAvailability
+}
+
+extension BriefingAPI {
+    func photoBriefingAvailability(sessionId: String) async -> PhotoBriefingAvailability {
+        guard let briefing = try? await fetchPhotoEvent(sessionId: sessionId) else { return .pending }
+        return .published(artifactId: briefing.id)
+    }
 }
 
 /// Wraps the existing `BriefingSandboxStore` (unchanged fixture behavior)
@@ -99,6 +109,26 @@ struct ProductionBriefingAPI: BriefingAPI {
             as: ProductionBriefingPayload.self
         )
         return try ProductionBriefingMapper.photoEvent(envelope.data.value)
+    }
+
+    /// `photo-event` answers 404 until the Server has published the briefing for the
+    /// session, so a not-found is "pending", not an error. The read bypasses the
+    /// cache so each poll reflects the Server. Any other failure is `unknown`.
+    func photoBriefingAvailability(sessionId: String) async -> PhotoBriefingAvailability {
+        do {
+            let envelope = try await api.readResource(
+                "photo-event",
+                query: ["sessionId": sessionId],
+                policy: .reload,
+                as: ProductionBriefingPayload.self
+            )
+            guard let briefing = try ProductionBriefingMapper.photoEvent(envelope.data.value) else { return .pending }
+            return .published(artifactId: briefing.id)
+        } catch ProductionNativeError.notFound {
+            return .pending
+        } catch {
+            return .unknown
+        }
     }
 
     private struct HistoryPayload: Decodable, @unchecked Sendable {

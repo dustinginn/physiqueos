@@ -35,6 +35,8 @@ struct BriefingDetailView: View {
     private enum LoadState {
         case loading
         case loaded(BriefingReadModel?)
+        /// The Server has not published this Briefing yet (a 404 read).
+        case notReady
         case failed
     }
 
@@ -114,6 +116,16 @@ struct BriefingDetailView: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     .frame(maxWidth: .infinity, minHeight: 200, alignment: .center)
             }
+        case .notReady:
+            VStack(spacing: 16) {
+                BriefingDetailPreHeroNavigation(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
+                Text("This Briefing isn't ready yet. It will be available here as soon as it is published. No action needed.")
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+                Button("Check Again") { Task { await load(showLoading: true) } }
+                    .buttonStyle(.bordered)
+            }
         case .failed:
             VStack(spacing: 16) {
                 BriefingDetailPreHeroNavigation(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
@@ -129,6 +141,8 @@ struct BriefingDetailView: View {
         if showLoading { state = .loading }
         do {
             state = .loaded(try await environment.briefingAPI.fetchBriefing(artifactId: briefingId))
+        } catch ProductionNativeError.notFound {
+            state = .notReady
         } catch {
             state = .failed
         }

@@ -613,11 +613,21 @@ actor ProductionNativeAPI {
               mediaId.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil
         else { throw ProductionNativeError.invalidResponse }
 
-        let (data, response) = try await authenticatedResponse(
-            path: "\(configuration.routeFamily)/media/\(mediaId)",
-            method: "GET",
-            accept: "image/jpeg,image/png,image/heic,image/webp,application/pdf"
-        )
+        let mediaPath = "\(configuration.routeFamily)/media/\(mediaId)"
+        let mediaAccept = "image/jpeg,image/png,image/heic,image/webp,application/pdf"
+        let data: Data
+        let response: HTTPURLResponse
+        do {
+            (data, response) = try await authenticatedResponse(path: mediaPath, method: "GET", accept: mediaAccept)
+        } catch ProductionNativeError.notFound {
+            // The media route reports an expired 10-minute access token as a plain
+            // 404 rather than the 401 `ACCESS_TOKEN_EXPIRED` problem the JSON routes
+            // return, so the generic refresh never runs and a Retry would resend the
+            // same stale bearer forever. Refresh once (single-flight) and read once
+            // more; a genuinely absent object still fails with `notFound`.
+            _ = try await refreshAccessToken()
+            (data, response) = try await authenticatedResponse(path: mediaPath, method: "GET", accept: mediaAccept)
+        }
         let contentType = response.mimeType?.lowercased()
         let supported = ["image/jpeg", "image/png", "image/heic", "image/webp", "application/pdf"]
         guard let contentType, supported.contains(contentType) else {

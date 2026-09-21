@@ -26,4 +26,18 @@ final class LogViewModel {
             state = .failed("Log could not be loaded.")
         }
     }
+
+    /// Identity of the reviews currently shown as Processing, nil when none. A
+    /// change restarts the bounded refresh; nil means there is nothing to wait for.
+    var processingKey: String? {
+        guard case .loaded(let log) = state, let processing = log.processingEvidenceReviews, !processing.isEmpty else { return nil }
+        return processing.map(\.id).sorted().joined(separator: ",")
+    }
+
+    /// One quiet refresh while Processing is showing: never flips the screen back to
+    /// a spinner, and a transient failure keeps the last good state.
+    func refreshWhileProcessing() async -> ProcessingRefreshOutcome {
+        if let refreshed = try? await api.refreshLog() { state = .loaded(refreshed) }
+        return processingKey == nil ? .finished : .waiting
+    }
 }

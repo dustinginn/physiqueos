@@ -2632,6 +2632,123 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "b", count: 43))")
     }
 
+    /// The media route answers an expired 10-minute bearer with a plain 404 (never the
+    /// 401 `ACCESS_TOKEN_EXPIRED` problem the JSON routes send), so the generic refresh
+    /// never ran and a Retry resent the same stale bearer. Root cause of the first
+    /// Sep 19 photo showing an unrecoverable "Retry photo".
+    func testProductionMediaRefreshesOnceWhenTheRouteMasksAnExpiredBearerAsNotFound() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .data(404, mimeType: "text/plain", Data("Not found".utf8)),
+            .json(200, sessionJSON(access: "b", refresh: "s")),
+            .data(200, mimeType: "image/jpeg", Data([0xFF, 0xD8, 0xFF])),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let media = try await api.readMedia(mediaId: "media_opaque_1")
+
+        XCTAssertEqual(media.contentType, "image/jpeg")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map { $0.url?.path }, [
+            "/api/v1/native/auth/pair", "/api/v1/native/media/media_opaque_1",
+            "/api/v1/native/auth/refresh", "/api/v1/native/media/media_opaque_1",
+        ])
+        XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "b", count: 43))")
+    }
+
+    func testProductionMediaGenuinelyMissingObjectRefreshesOnceThenStillFailsNotFound() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .data(404, mimeType: "text/plain", Data("Not found".utf8)),
+            .json(200, sessionJSON(access: "b", refresh: "s")),
+            .data(404, mimeType: "text/plain", Data("Not found".utf8)),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        await XCTAssertThrowsErrorAsync(try await api.readMedia(mediaId: "media_opaque_1")) { error in
+            guard case .notFound = error as? ProductionNativeError else { return XCTFail("expected notFound, got \(error)") }
+        }
+        let count = await transport.requests.count
+        XCTAssertEqual(count, 4, "bounded: one refresh and one re-read, never a loop")
+    }
+
+    @MainActor
+    func testRetryAfterAFailedPhotoPerformsAnotherServerReadAndRecovers() async throws {
+        let notFound = SequencedFounderTransport.Outcome.data(404, mimeType: "text/plain", Data("Not found".utf8))
+        let jpeg = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 16)).jpegData(withCompressionQuality: 0.9) { context in
+            UIColor.darkGray.setFill(); context.fill(CGRect(x: 0, y: 0, width: 12, height: 16))
+        }
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            notFound, .json(200, sessionJSON(access: "b", refresh: "s")), notFound,   // first load fails
+            .data(200, mimeType: "image/jpeg", jpeg),                                   // Retry
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let store = FounderProductionPhotoMediaStore(api: api)
+
+        await store.loadImage(mediaId: "media_opaque_1")
+        XCTAssertEqual(store.imageStates["media_opaque_1"], .failed)
+        let beforeRetry = await transport.requests.count
+
+        await store.retryImage(mediaId: "media_opaque_1")
+
+        let afterRetry = await transport.requests.count
+        XCTAssertEqual(afterRetry - beforeRetry, 1, "Retry performs another Server media read")
+        guard case .loaded = store.imageStates["media_opaque_1"] else { return XCTFail("Retry should recover the photo") }
+        XCTAssertEqual(store.imageStates.count, 1, "no duplicated media entry for the same photo")
+    }
+
+    @MainActor
+    func testPermanentMediaFailuresOfferNoRetryAndTransientOnesDo() {
+        XCTAssertEqual(FounderProductionPhotoMediaStore.failureState(for: ProductionNativeError.unsupportedMediaType("text/html")), .unavailable)
+        XCTAssertEqual(FounderProductionPhotoMediaStore.failureState(for: ProductionNativeError.notFound(nil)), .failed)
+        XCTAssertEqual(FounderProductionPhotoMediaStore.failureState(for: ProductionNativeError.networkFailure), .failed)
+        XCTAssertEqual(FounderProductionPhotoMediaStore.failureState(for: ProductionNativeError.invalidResponse), .failed)
+    }
+
+    @MainActor
+    func testUndecodableImageBytesAreUnavailableNotRetryable() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .data(200, mimeType: "image/jpeg", Data([0x00, 0x01, 0x02])),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let store = FounderProductionPhotoMediaStore(api: api)
+        await store.loadImage(mediaId: "media_opaque_1")
+        XCTAssertEqual(store.imageStates["media_opaque_1"], .unavailable)
+    }
+
+    func testPhotoBriefingAvailabilityMapsServerPublicationAndNeverCachesAPendingAnswer() async throws {
+        let published = productionPhotoEventJSON
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(404, #"{"type":"about:blank","title":"Not Found","status":404,"code":"RESOURCE_NOT_FOUND"}"#),
+            .json(404, #"{"type":"about:blank","title":"Not Found","status":404,"code":"RESOURCE_NOT_FOUND"}"#),
+            .json(200, published),
+            .json(500, #"{"status":500,"code":"INTERNAL","title":"Failure","detail":null}"#),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let briefings = ProductionBriefingAPI(api: api)
+
+        let first = await briefings.photoBriefingAvailability(sessionId: "session-1")
+        let second = await briefings.photoBriefingAvailability(sessionId: "session-1")
+        let third = await briefings.photoBriefingAvailability(sessionId: "session-1")
+        let fourth = await briefings.photoBriefingAvailability(sessionId: "session-1")
+
+        XCTAssertEqual(first, .pending)
+        XCTAssertEqual(second, .pending, "each poll reaches the Server")
+        guard case .published(let artifactId) = third else { return XCTFail("a 200 photo-event is published") }
+        XCTAssertFalse(artifactId.isEmpty)
+        XCTAssertEqual(fourth, .unknown, "a Server failure is not treated as pending or published")
+        let paths = await transport.requests.compactMap { $0.url?.path }.filter { $0.hasSuffix("photo-event") }
+        XCTAssertEqual(paths.count, 4)
+    }
+
     func testProductionMediaRejectsUnsupportedContentType() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
