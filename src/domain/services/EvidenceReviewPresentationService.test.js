@@ -61,6 +61,19 @@ describe("Evidence Review presentation", () => {
     expect(object).toEqual(before);
   });
 
+  it("states honestly that a full-day total outranks partial meal detail instead of claiming the meals match", () => {
+    const object = applyNutritionDayMealAggregation({
+      id: "nutrition-full-day", evidence_type: "nutrition",
+      daily_totals: { calories: 1930, protein_g: 150 },
+      metadata: { daily_totals_scope: "full_day_summary" },
+      meals: [{ id: "meal", name: "Dinner", totals: { calories: 813, protein_g: 60 }, foods: [] }],
+    });
+    expect(object.daily_totals.calories).toBe(1930);
+    const card = presentEvidenceObject(object, evidencePackage([object]));
+    expect(card.reconciliation).toBe("The full-day total is used. The listed meals cover only part of it.");
+    expect(card.reconciliation).not.toContain("match the daily total");
+  });
+
   it("preserves partial-subtotal scope and does not manufacture a daily conflict", () => {
     const object = applyNutritionDayMealAggregation({
       id: "nutrition-partial", evidence_type: "nutrition",

@@ -105,7 +105,12 @@ export function resolveNutritionDayAuthority(record, {
   if (hasSource) competing.push({ basis: `source_total:${scope}`, totals: sourceTotals });
   if (hasMealSums) competing.push({ basis: "meal_sum", totals: mealSums });
 
+  // A device or integration daily aggregate is a full-day assertion by
+  // construction even when it carries no scope marker and no meal objects.
+  // Only an explicit partial-subtotal scope keeps it from being one.
   const fullDayClaim = scope === NutritionDailyTotalsScope.FULL_DAY_SUMMARY ||
+    (scope === NutritionDailyTotalsScope.UNKNOWN && hasSource &&
+      capture.captureMethod === "device_aggregate") ||
     (scope === NutritionDailyTotalsScope.UNKNOWN && !meals.length && hasSource &&
       isLegacyCompleteMarker(metadata.completeness, payload.quality?.status));
 
@@ -114,10 +119,10 @@ export function resolveNutritionDayAuthority(record, {
       ? comparableFields(sourceTotals, mealSums).filter((field) =>
         mealSums[field] - sourceTotals[field] > (tolerance[field] ?? 0))
       : [];
-    if (exceeding.length) {
-      // A full-day claim that is smaller than its own meals is self-contradicted:
-      // keep the larger, better-evidenced meal-derived total and preserve the
-      // conflict rather than override it silently.
+    if (exceeding.includes("calories")) {
+      // A full-day claim whose calories are smaller than its own meals is
+      // self-contradicted: keep the larger, better-evidenced meal-derived total
+      // and preserve the conflict rather than override it silently.
       tier = NutritionAssertionTier.MEAL_DERIVED_UNVERIFIED;
       origin = NutritionAssertionOrigin.MEAL_SUM;
       dailyTotals = mergeTotals(mealSums, sourceTotals);
@@ -125,10 +130,20 @@ export function resolveNutritionDayAuthority(record, {
       conflictingFields = exceeding;
       ambiguity.push("intake_source_conflict");
     } else {
+      // The full-day total stays authoritative field by field. A macronutrient
+      // the meals exceed is a preserved conflict for that field only; it never
+      // replaces the full-day calories that Energy reasons about.
       tier = NutritionAssertionTier.FULL_DAY_ASSERTED;
       origin = capture.origin;
-      dailyTotals = mergeTotals(sourceTotals, {});
-      if (hasMealSums) {
+      dailyTotals = mergeTotals(Object.fromEntries(
+        NUTRITION_AUTHORITY_ENERGY_TOTAL_FIELDS.map((field) => [
+          field, exceeding.includes(field) ? mealSums[field] : sourceTotals[field],
+        ])), sourceTotals);
+      if (exceeding.length) {
+        state = NutritionReconciliationState.CONFLICT;
+        conflictingFields = exceeding;
+        ambiguity.push("intake_source_conflict");
+      } else if (hasMealSums) {
         const shortfall = comparableFields(sourceTotals, mealSums).some((field) =>
           sourceTotals[field] - mealSums[field] > (tolerance[field] ?? 0));
         state = shortfall
@@ -156,7 +171,7 @@ export function resolveNutritionDayAuthority(record, {
   if (tier === NutritionAssertionTier.PARTIAL_SUBTOTAL) ambiguity.push("intake_partial_subtotal");
   if (tier === NutritionAssertionTier.MISSING) ambiguity.push("intake_totals_missing");
 
-  const reliability = reliabilityFor(tier, origin, capture);
+  const reliability = reliabilityFor(tier, origin, capture, state);
   const energyUsable = tier !== NutritionAssertionTier.MISSING && finite(dailyTotals.calories);
   return Object.freeze({
     schemaVersion: NUTRITION_DAY_AUTHORITY_VERSION,
@@ -221,10 +236,12 @@ function reliabilityRank(value) {
   return ({ high: 3, moderate: 2, low: 1, none: 0 })[value] ?? 0;
 }
 
-function reliabilityFor(tier, origin, capture) {
+function reliabilityFor(tier, origin, capture, state) {
   if (tier === NutritionAssertionTier.MISSING) return NutritionSourceReliability.NONE;
   if (tier === NutritionAssertionTier.PARTIAL_SUBTOTAL) return NutritionSourceReliability.LOW;
   if (tier === NutritionAssertionTier.MEAL_DERIVED_UNVERIFIED) return NutritionSourceReliability.MODERATE;
+  // A full-day total that its own meals contradict on any field is not trusted as fully as one that stands alone.
+  if (state === NutritionReconciliationState.CONFLICT) return NutritionSourceReliability.MODERATE;
   if (origin === NutritionAssertionOrigin.DEVICE_AGGREGATE) return NutritionSourceReliability.HIGH;
   if (origin === NutritionAssertionOrigin.SOURCE_SUMMARY) {
     return capture.extractionConfidence === "high"

@@ -14,7 +14,7 @@ const midweek = { startDate: "2026-09-13", endDate: "2026-09-15" };
 describe("current-window supersession", () => {
   it("drops an older observation for a capability the current window covers with usable evidence", () => {
     const result = supersedeStaleCadenceObservations({
-      stored: [observation("midweek_a|nutrition|coverage", "execution.nutrition", midweek)],
+      stored: [observation("weekly_a|nutrition|coverage", "execution.nutrition", priorWeek)],
       current: [observation("weekly_b|nutrition|coverage", "execution.nutrition", week)],
       currentArtifactId: "weekly_b",
     });
@@ -61,10 +61,51 @@ describe("current-window supersession", () => {
     expect(result.observations).toEqual([]);
   });
 
-  it("never supersedes the current artifact's own observations or non-cadence observations", () => {
-    const own = observation("weekly_b|nutrition|coverage", "execution.nutrition", week);
+  it("replaces a regenerated artifact's own prior version entirely, never merging its leftovers", () => {
+    const priorOwnTension = observation("weekly_b|energy|outcome_tension", "strategy.energy_outcome_tension", week);
+    const result = supersedeStaleCadenceObservations({
+      stored: [priorOwnTension],
+      current: [observation("weekly_b|energy|weekly.balance", "strategy.energy_balance_estimate", week)],
+      currentArtifactId: "weekly_b",
+    });
+    expect(result.observations).toEqual([]);
+    expect(result.superseded[0].reason).toBe("regenerated_artifact_replaces_prior_version");
+  });
+
+  it("supersedes contained Nutrition coverage even when the current window has no usable Nutrition capability", () => {
+    // The current briefing measured Energy for the whole week (food logged, no activity recorded),
+    // so an earlier Midweek's Nutrition/Activity coverage for days inside the week is stale.
+    const result = supersedeStaleCadenceObservations({
+      stored: [
+        observation("midweek_a|nutrition|coverage", "execution.nutrition", midweek),
+        observation("midweek_a|activity|coverage", "execution.activity", midweek),
+      ],
+      current: [observation("weekly_b|energy|weekly.balance", "strategy.energy_balance_estimate", week, "insufficient")],
+      currentArtifactId: "weekly_b",
+    });
+    expect(result.observations).toEqual([]);
+    expect(result.superseded.map((item) => item.reason)).toEqual([
+      "current_window_contains_observation_window", "current_window_contains_observation_window",
+    ]);
+  });
+
+  it("does not supersede non-window-scoped evidence just because its window is contained", () => {
+    const training = observation("midweek_a|performance|overall", "execution.training", midweek);
+    const result = supersedeStaleCadenceObservations({
+      stored: [training],
+      current: [observation("weekly_b|energy|weekly.balance", "strategy.energy_balance_estimate", week)],
+      currentArtifactId: "weekly_b",
+    });
+    expect(result.observations).toEqual([training]);
+  });
+
+  it("never supersedes non-cadence observations", () => {
     const canonical = { observationId: "canonical|dexa|1", capabilities: [{ capabilityId: "execution.nutrition" }] };
-    const result = supersedeStaleCadenceObservations({ stored: [own, canonical], current: [own], currentArtifactId: "weekly_b" });
-    expect(result.observations).toEqual([own, canonical]);
+    const result = supersedeStaleCadenceObservations({
+      stored: [canonical],
+      current: [observation("weekly_b|nutrition|coverage", "execution.nutrition", week)],
+      currentArtifactId: "weekly_b",
+    });
+    expect(result.observations).toEqual([canonical]);
   });
 });

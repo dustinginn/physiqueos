@@ -31,9 +31,10 @@ export function describeUncertaintyV3(item, { vocabulary = null } = {}) {
       return "It is not fully clear how much of the progress comes from the current plan.";
     case "guardrail": {
       const names = item.reasons.map((code) => /^unassessed:(.+)$/u.exec(code)?.[1]).filter(Boolean)
-        .map((id) => vocabulary?.guardrails?.[id]?.displayName).filter(Boolean);
+        .map((id) => vocabulary?.guardrails?.[id]?.displayName)
+        .filter(Boolean).map((name) => String(name).trim().replace(/[.!?]+$/u, ""));
       return names.length
-        ? `${sentenceCase(names.join(" and "))} could not be assessed this period.`
+        ? `${capitalize(names.join(" and "))} could not be assessed this period.`
         : "A safeguard could not be assessed this period.";
     }
     case "measurement_coverage":
@@ -47,6 +48,11 @@ export function describeUncertaintyV3(item, { vocabulary = null } = {}) {
     default:
       return "Some evidence carries an open limitation.";
   }
+}
+
+function capitalize(value) {
+  const text = String(value ?? "").trim();
+  return text ? `${text[0].toLocaleUpperCase("en-US")}${text.slice(1)}` : text;
 }
 
 function sentenceCase(value) {

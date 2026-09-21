@@ -144,6 +144,45 @@ describe("Nutrition daily-total authority", () => {
     expect(authority.dailyTotals.calories).toBe(2484);
   });
 
+  it("resolves a conflict per field: a macro the meals exceed never replaces the full-day calories", () => {
+    const authority = resolveNutritionDayAuthority(day({
+      metadata: { daily_totals_scope: "full_day_summary" },
+      daily_totals: { calories: 2000, protein_g: 100, carbs_g: 200, fat_g: 70 },
+      meals: [meal("Lunch", 1500, 130, 150, 50)],
+    }));
+    expect(authority.assertion.tier).toBe(NutritionAssertionTier.FULL_DAY_ASSERTED);
+    expect(authority.dailyTotals.calories).toBe(2000);
+    expect(authority.dailyTotals.protein_g).toBe(130);
+    expect(authority.reconciliation.state).toBe(NutritionReconciliationState.CONFLICT);
+    expect(authority.reconciliation.conflictingFields).toEqual(["protein_g"]);
+    expect(authority.ambiguity).toContain("intake_source_conflict");
+    expect(authority.reliability).toBe(NutritionSourceReliability.MODERATE);
+    expect(authority.energyUsable).toBe(true);
+  });
+
+  it("treats a device daily aggregate with no scope marker and no meals as a full-day assertion", () => {
+    const authority = resolveNutritionDayAuthority(day({
+      source: { modality: "integration", integration: "apple_health" },
+      metadata: {},
+      daily_totals: { calories: 2400, protein_g: 180, carbs_g: 250, fat_g: 75 },
+    }));
+    expect(authority.assertion).toMatchObject({
+      tier: NutritionAssertionTier.FULL_DAY_ASSERTED, origin: NutritionAssertionOrigin.DEVICE_AGGREGATE,
+    });
+    expect(authority.reliability).toBe(NutritionSourceReliability.HIGH);
+    expect(authority.ambiguity).toEqual([]);
+    expect(authority.energyCompleteness).toBe("complete");
+  });
+
+  it("does not promote a device total that explicitly declares itself a partial subtotal", () => {
+    const authority = resolveNutritionDayAuthority(day({
+      source: { modality: "integration", integration: "apple_health" },
+      metadata: { daily_totals_scope: "partial_meal_subtotal" },
+      daily_totals: { calories: 900 },
+    }));
+    expect(authority.assertion.tier).toBe(NutritionAssertionTier.PARTIAL_SUBTOTAL);
+  });
+
   it("orders source reliability by capture semantics rather than by integration name", () => {
     const base = { metadata: { daily_totals_scope: "full_day_summary", confidence: "high" }, daily_totals: { calories: 2400 } };
     const device = resolveNutritionDayAuthority(day({ ...base, source: { modality: "device" } }));

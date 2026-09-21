@@ -95,4 +95,46 @@ describe("Energy execution and ambiguity (V3)", () => {
     expect(statement).toMatch(/Active calories averaged 900 kcal\/day, 100 kcal\/day above the 800 kcal\/day target/);
     expect(statement).toMatch(/-289 kcal\/day across 6 of 7 paired days/);
   });
+
+  it("words a guardrail that could not be assessed without doubled punctuation", () => {
+    const text = describeUncertaintyV3(
+      { type: "guardrail", reasons: ["unassessed:g1"] },
+      { vocabulary: { guardrails: { g1: { displayName: "Recovery." } } } },
+    );
+    expect(text).toBe("Recovery could not be assessed this period.");
+  });
+
+  it("treats a wearable estimate alone as low-materiality context, not a reason to temper", () => {
+    const execution = deriveEnergyExecutionV3({ goalContract, observations: [
+      observation("o|activity", "execution.energy_activity", { plan: plan(800, 900), measurementType: "WEARABLE_ESTIMATE" },
+        ["active_expenditure_is_wearable_estimated"], 900),
+      observation("o|pairing", "execution.energy_pairing", {
+        pairing: { eligibleDayCount: 7, pairedDayCount: 7, pairedCoverageRatio: 1 },
+      }, [], 1),
+    ] });
+    const wearable = execution.ambiguity.find((item) => item.type === EnergyAmbiguityTypeV3.WEARABLE_ESTIMATE);
+    expect(wearable.materiality).toBe("low");
+    expect(applyEnergyAmbiguityToRecommendation({ action: "x" }, execution).strength).toBe("firm");
+  });
+
+  it("raises the wearable estimate to moderate when intake or pairing is weak, and high with outcome tension", () => {
+    const weakIntake = deriveEnergyExecutionV3({ goalContract, observations: [
+      observation("o|activity", "execution.energy_activity", { measurementType: "WEARABLE_ESTIMATE" },
+        ["active_expenditure_is_wearable_estimated"], 900),
+      observation("o|intake", "execution.energy_intake", {}, ["intake_meal_derived_unverified"], 2400),
+    ] });
+    expect(weakIntake.ambiguity.find((item) => item.type === EnergyAmbiguityTypeV3.WEARABLE_ESTIMATE).materiality).toBe("moderate");
+    const tension = deriveEnergyExecutionV3({ goalContract, observations: fullObservations() });
+    expect(tension.ambiguity.find((item) => item.type === EnergyAmbiguityTypeV3.WEARABLE_ESTIMATE).materiality).toBe("high");
+  });
+
+  it("names which side of a day pair is missing without swapping nutrition and activity", () => {
+    const execution = deriveEnergyExecutionV3({ goalContract, observations: [
+      observation("o|pairing", "execution.energy_pairing", {
+        pairing: { eligibleDayCount: 7, pairedDayCount: 6, pairedCoverageRatio: 6 / 7, unpairedNutritionDayCount: 1 },
+      }, [], 6 / 7),
+    ] });
+    expect(execution.ambiguity[0].reasons).toContain("activity_missing_for_some_days");
+    expect(execution.ambiguity[0].reasons).not.toContain("nutrition_missing_for_some_days");
+  });
 });

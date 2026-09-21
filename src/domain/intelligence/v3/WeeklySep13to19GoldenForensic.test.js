@@ -12,6 +12,7 @@ import { adaptWeeklyArtifactForPresentation } from "../../services/WeeklyBriefin
 import { createWeeklyBriefingScreenPresentation } from "../../services/WeeklyBriefingScreenPresentationService";
 import { projectV3Hero } from "../../services/BriefingV3Projection.js";
 import {
+  buildWeeklyStore,
   computeCorrectedEnergyObservations,
   fixtures,
   prepareWeeklyV3,
@@ -218,6 +219,8 @@ describe("Sep 13–19 Weekly: corrected V3 forensic replay", () => {
     expect(energy.length).toBeGreaterThanOrEqual(4);
     const served = createWeeklyBriefingScreenPresentation(
       (await adaptWeeklyArtifactForPresentation({ artifact: prepared.artifact })).briefing.weeklyNarrative);
+    expect(served.energy.title).toMatch(/^Calorie intake averaged 2,4\d\d kcal\/day, in line with the 2,500 kcal\/day target\.$/);
+    expect(served.energy.narrative).toBe(prepared.artifact.briefing.narrativeV3.energy.statement);
     const actions = served.coachInsight.actionItems;
     expect(new Set(actions).size).toBe(actions.length);
     expect(actions.filter((item) => /food and activity/i.test(item))).toHaveLength(0);
@@ -240,5 +243,33 @@ describe("Sep 13–19 Weekly: corrected V3 forensic replay", () => {
     const energyIds = (envelope) => envelope.observations.filter((item) => item.domain === "energy")
       .map((item) => JSON.stringify(item)).sort();
     expect(energyIds(withSep13)).toEqual(energyIds(weeklyPiEnvelope({ energyObservations: observations })));
+  });
+
+  it("keeps the rich Energy picture and supersedes stale coverage when no activity was recorded at all", async () => {
+    // Food logged for the whole week but no activity days: the estimate cannot be formed.
+    const { observations } = computeCorrectedEnergyObservations({ activityDays: [] });
+    const prepared = await prepareWeeklyV3({ piEnvelope: weeklyPiEnvelope({ energyObservations: observations }) });
+    const eligible = prepared.assessment.evidenceEligibility.eligibleObservations.map((item) => item.observationId);
+    expect(eligible.filter((id) => id.includes("midweek_briefing_user_founder_001_20260913_20260915"))
+      .filter((id) => /\|(nutrition|activity)\|coverage$/.test(id))).toEqual([]);
+    const execution = prepared.strategicInterpretation.energyExecution;
+    expect(execution.estimate.averageKcalPerDay).toBeNull();
+    expect(execution.findings.find((item) => item.dimension === "intake").observedValue).toBeGreaterThan(2000);
+    const types = prepared.strategicInterpretation.uncertaintyProfile.map((item) => item.type);
+    expect(types).toEqual(expect.arrayContaining(["energy_intake_uncertainty", "energy_pairing_incomplete"]));
+    expect(prepared.strategicInterpretation.recommendation.strength).toBe("tempered");
+    expect(prepared.assessment.currentPercentage).toBe(79);
+  });
+
+  it("does not let a regenerated Weekly inherit leftovers from its own earlier version", async () => {
+    const { observations } = computeCorrectedEnergyObservations();
+    const first = await prepareWeeklyV3({ piEnvelope: weeklyPiEnvelope({ energyObservations: observations }) });
+    const store = buildWeeklyStore();
+    store.dailyBriefings = [first.artifact];
+    // The regeneration has no Energy evidence at all.
+    const regenerated = await prepareWeeklyV3({ piEnvelope: weeklyPiEnvelope({ energyObservations: [], dropEnergy: true }), store });
+    const ids = regenerated.assessment.evidenceEligibility.eligibleObservations.map((item) => item.observationId);
+    expect(ids.filter((id) => /\|(energy|nutrition|activity)\|/.test(id))).toEqual([]);
+    expect(regenerated.strategicInterpretation.energyExecution?.estimate ?? null).toBeNull();
   });
 });

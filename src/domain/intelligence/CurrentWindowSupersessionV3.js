@@ -33,11 +33,38 @@ export function supersedeStaleCadenceObservations({
     }
   }
   const superseded = [];
+  const windowScoped = current.filter((observation) => isCadenceObservation(observation) &&
+    (observation.capabilities ?? []).some((measurement) =>
+      WINDOW_SCOPED_FAMILIES.has(capabilityFamily(measurement.capabilityId))));
+  const currentHull = hullOf(windowScoped.map((observation) => observation.evidenceWindow));
+  const currentHullSource = windowScoped[0]?.observationId ?? null;
   const kept = stored.filter((observation) => {
     if (!isCadenceObservation(observation)) return true;
-    if (currentArtifactId && observationArtifactId(observation) === currentArtifactId) return true;
+    // A regenerated artifact replaces its own prior version entirely; leftovers
+    // from the earlier version are never carried into the new one.
+    if (currentArtifactId && observationArtifactId(observation) === currentArtifactId) {
+      superseded.push(Object.freeze({
+        observationId: observation.observationId,
+        capabilityId: observation.capabilities?.[0]?.capabilityId ?? null,
+        supersededBy: null,
+        reason: "regenerated_artifact_replaces_prior_version",
+      }));
+      return false;
+    }
     for (const measurement of observation.capabilities ?? []) {
       const family = capabilityFamily(measurement.capabilityId);
+      // Window-scoped measurements (Energy, Nutrition and Activity coverage) that
+      // describe a period the current briefing fully contains are stale by
+      // construction, whether or not the current briefing restates them.
+      if (WINDOW_SCOPED_FAMILIES.has(family) && currentHull && windowContains(currentHull, observation.evidenceWindow)) {
+        superseded.push(Object.freeze({
+          observationId: observation.observationId,
+          capabilityId: measurement.capabilityId,
+          supersededBy: currentHullSource,
+          reason: "current_window_contains_observation_window",
+        }));
+        return false;
+      }
       const byCapability = covered.get(family);
       const byWindow = (currentWindows.get(family) ?? [])
         .find((item) => windowContains(item.window, observation.evidenceWindow));
@@ -58,6 +85,17 @@ export function supersedeStaleCadenceObservations({
 // Energy execution, estimate, pairing and tension describe one measurement of
 // one window. A current Energy estimate supersedes every prior-window member of
 // that family, including a prior tension the current window does not restate.
+const WINDOW_SCOPED_FAMILIES = new Set(["energy_family", "execution.nutrition", "execution.activity"]);
+
+function hullOf(windows) {
+  const usable = windows.filter((window) => window?.startDate && window?.endDate);
+  if (!usable.length) return null;
+  return {
+    startDate: usable.map((window) => String(window.startDate).slice(0, 10)).sort()[0],
+    endDate: usable.map((window) => String(window.endDate).slice(0, 10)).sort().at(-1),
+  };
+}
+
 export function capabilityFamily(capabilityId) {
   return /^(execution\.energy_|strategy\.energy_)/.test(String(capabilityId)) ? "energy_family" : capabilityId;
 }

@@ -80,11 +80,18 @@ export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}
   const tensions = energyObservations.flatMap((item) => item.capabilities
     .map((measurement) => measurement.metadata?.tension ?? measurement.metadata?.estimateVsOutcomeTension)
     .filter(Boolean));
+  const pairing = byCapability("execution.energy_pairing")[0] ?? null;
+  const pairingRatio = pairing
+    ? Number(metadataOf(pairing, "execution.energy_pairing").pairing?.pairedCoverageRatio) : NaN;
+  const otherwiseWeak = intakeCodes.length > 0 || (Number.isFinite(pairingRatio) && pairingRatio < 0.85);
   if (wearable.length) {
-    ambiguity.push(entry(EnergyAmbiguityTypeV3.WEARABLE_ESTIMATE, tensions.length ? "high" : "moderate",
+    // Active calories are always a wearable estimate. That alone is context:
+    // it becomes decision-relevant when the estimate is also contradicted by the
+    // outcome (high) or the rest of the Energy picture is weak (moderate).
+    ambiguity.push(entry(EnergyAmbiguityTypeV3.WEARABLE_ESTIMATE,
+      tensions.length ? "high" : otherwiseWeak ? "moderate" : "low",
       ["active_expenditure_is_wearable_estimated"], wearable.map((item) => item.observationId)));
   }
-  const pairing = byCapability("execution.energy_pairing")[0] ?? null;
   if (pairing) {
     const details = metadataOf(pairing, "execution.energy_pairing").pairing ?? {};
     const ratio = Number(details.pairedCoverageRatio);
@@ -92,8 +99,9 @@ export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}
       ambiguity.push(entry(EnergyAmbiguityTypeV3.PAIRING,
         ratio < 0.5 ? "high" : ratio < 0.85 ? "moderate" : "low",
         [`paired_days_${details.pairedDayCount}_of_${details.eligibleDayCount}`,
-          ...(details.unpairedActivityDayCount ? ["activity_missing_for_some_days"] : []),
-          ...(details.unpairedNutritionDayCount ? ["nutrition_missing_for_some_days"] : [])],
+          // Nutrition-only days lack activity; activity-only days lack nutrition.
+          ...(details.unpairedNutritionDayCount ? ["activity_missing_for_some_days"] : []),
+          ...(details.unpairedActivityDayCount ? ["nutrition_missing_for_some_days"] : [])],
         [pairing.observationId]));
     }
   }

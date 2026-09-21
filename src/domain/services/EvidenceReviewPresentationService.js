@@ -306,7 +306,9 @@ function presentNutrition(object, common) {
     ]),
     meals,
     reconciliation: reconciliation.status === "reconciled"
-      ? "Meal totals match the daily total."
+      ? reconciliation.meal_detail_state === "partial"
+        ? "The full-day total is used. The listed meals cover only part of it."
+        : "Meal totals match the daily total."
       : reconciliation.status === "needs_review"
         ? "The uploaded daily total and complete meal totals differ. Review the conflicting totals before confirming."
         : null,

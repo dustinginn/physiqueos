@@ -4,7 +4,7 @@ import { createV3EvidenceUniverse, V3_CARRY_FORWARD_BRIEFING_LIMIT } from "./V3E
 const goal = { id: "goal-a" };
 const phase = { id: "phase-a", startedAt: "2026-08-01" };
 const briefing = (id, endDate, overrides = {}) => ({
-  id, goalId: "goal-a", phaseId: "phase-a", evidenceWindow: { endDate }, ...overrides,
+  id, cadence: "weekly", goalId: "goal-a", phaseId: "phase-a", evidenceWindow: { endDate }, ...overrides,
 });
 
 describe("shared V3 evidence universe", () => {
@@ -22,6 +22,15 @@ describe("shared V3 evidence universe", () => {
     const universe = createV3EvidenceUniverse({ store, goal, phase, evidenceCutoff: "2026-09-05T00:00:00.000Z" });
     expect(universe.dailyBriefings.map((item) => item.id)).toEqual(["b4", "b3", "b2"]);
     expect(universe.dailyBriefings).toHaveLength(V3_CARRY_FORWARD_BRIEFING_LIMIT);
+  });
+
+  it("keeps the newest briefings per cadence so newer Events cannot crowd out the latest Weekly", () => {
+    const store = { dailyBriefings: [
+      briefing("weekly-old", "2026-08-10"),
+      ...["e1", "e2", "e3", "e4"].map((id, index) => briefing(id, `2026-08-2${index}`, { cadence: "event" })),
+    ] };
+    const universe = createV3EvidenceUniverse({ store, goal, phase, evidenceCutoff: "2026-09-05T00:00:00.000Z" });
+    expect(universe.dailyBriefings.map((item) => item.id)).toContain("weekly-old");
   });
 
   it("reads the read-only namespace a bounded publisher supplies and de-duplicates by id", () => {

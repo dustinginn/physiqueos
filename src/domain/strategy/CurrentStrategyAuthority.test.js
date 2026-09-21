@@ -64,6 +64,35 @@ describe("current strategy authority (Sep 13–19 Founder records)", () => {
     expect(authority.diagnostics).toContain("energy_protocol_revision_unavailable");
   });
 
+  it("reads a window with the revision in force at its evidence cutoff, not a later protocol change", () => {
+    const energyProtocol = protocols.find((item) => item.category === "energy");
+    const v2 = protocolVersions.find((item) => item.protocolId === energyProtocol.id && item.versionNumber === 2);
+    const v3 = {
+      ...v2, id: `${energyProtocol.id}_v3`, versionNumber: 3, effectiveAt: "2026-09-25T00:00:00.000Z",
+      change: { ...v2.change, reviewedChanges: { ...v2.change.reviewedChanges, caloricIntakeTarget: { value: 2700, unit: "kcal/day" } } },
+    };
+    const versions = [...protocolVersions, v3];
+    const protocol = { ...energyProtocol, currentVersionId: v3.id };
+    const otherProtocols = protocols.map((item) => item.id === energyProtocol.id ? protocol : item);
+    const atSep20 = resolve({ protocols: otherProtocols, protocolVersions: versions, evidenceCutoff: "2026-09-20T06:59:59.999Z" });
+    expect(atSep20.energyStrategy.intakeTarget.value).toBe(2500);
+    const atOct1 = resolve({ protocols: otherProtocols, protocolVersions: versions, evidenceCutoff: "2026-10-01T06:59:59.999Z" });
+    expect(atOct1.energyStrategy.intakeTarget.value).toBe(2700);
+  });
+
+  it("prefers the Energy protocol bound to the accepted strategy over another active Energy protocol", () => {
+    const energyProtocol = protocols.find((item) => item.category === "energy");
+    const stray = { ...energyProtocol, id: "protocol_stray_energy", phaseStrategyId: "other_strategy", currentVersionId: "protocol_stray_energy_v9" };
+    const strayVersion = {
+      ...protocolVersions.find((item) => item.protocolId === energyProtocol.id && item.versionNumber === 2),
+      id: "protocol_stray_energy_v9", protocolId: stray.id, versionNumber: 9, strategyId: undefined, phaseId: undefined,
+      change: { reviewedChanges: { caloricIntakeTarget: { value: 3100, unit: "kcal/day" }, activityExpenditureTarget: { value: 300, unit: "kcal/day" } } },
+    };
+    const authority = resolve({ protocols: [...protocols, stray], protocolVersions: [...protocolVersions, strayVersion] });
+    expect(authority.energyStrategy.intakeTarget.value).toBe(2500);
+    expect(authority.energyStrategy.protocolId).toBe(energyProtocol.id);
+  });
+
   it("does not resolve a strategy from a different phase", () => {
     const authority = resolve({ phaseStrategies: [{ ...phaseStrategy, phaseId: "some_other_phase" }] });
     expect(authority.phaseStrategy).toBeNull();

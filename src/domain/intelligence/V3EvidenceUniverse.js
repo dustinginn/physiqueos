@@ -31,7 +31,13 @@ export function createV3EvidenceUniverse({
     .map((artifact) => ({ artifact, cutoff: artifactCutoff(artifact) }))
     .filter((item) => item.cutoff != null && Date.parse(item.cutoff) <= cutoffMs)
     .sort((left, right) => right.cutoff.localeCompare(left.cutoff))
-    .slice(0, V3_CARRY_FORWARD_BRIEFING_LIMIT)
+    // Newest few per cadence, so a run of newer Event briefings can never crowd
+    // out the latest Weekly or Midweek that carry-forward reads.
+    .filter((item, _index, all) => {
+      const family = briefingFamily(item.artifact);
+      return all.filter((other) => briefingFamily(other.artifact) === family)
+        .indexOf(item) < V3_CARRY_FORWARD_BRIEFING_LIMIT;
+    })
     .map((item) => item.artifact);
   const referencedAssessments = new Set(briefings.map((artifact) =>
     artifact?.confidencePublication?.assessmentId ??
@@ -60,6 +66,10 @@ export function createV3EvidenceUniverse({
     photoAnalyses: pool("photoAnalyses"),
     v3EvidenceObservations: store?.v3EvidenceObservations ?? [],
   });
+}
+
+function briefingFamily(artifact) {
+  return String(artifact?.cadence ?? artifact?.artifactType ?? "unknown");
 }
 
 function ownedByGoalPhase(artifact, goal, phase) {

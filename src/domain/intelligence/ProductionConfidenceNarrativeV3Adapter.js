@@ -182,7 +182,7 @@ export function buildGoalContractV3FromCanonical({
     strategy: {
       strategyRevisionId,
       label: phase.strategyLabel ?? goal.strategyLabel ?? "the current plan",
-      ...currentStrategyContractFields({ goal, phase, store }),
+      ...currentStrategyContractFields({ goal, phase, store, evidenceCutoff }),
       adequateExposure: {
         minimumDays: number(phase.minimumStrategyExposureDays ??
           goal.minimumStrategyExposureDays) ?? 0,
@@ -601,11 +601,15 @@ export function adaptCadenceEvidenceObservationsV3({
   })];
 }
 
+// The rich Energy adaptation applies whenever the Energy producer supplied
+// measured or evidence-quality detail, including a window whose estimate could
+// not be formed (for example food logged but no activity recorded). Only old
+// records that carry neither fall back to the flat adaptation.
 function hasRichEnergyObservationsV3(values) {
   return Array.isArray(values) && values.some((item) =>
-    item?.domain === "energy" && item.kind === "energy_balance" &&
-    Number.isFinite(Number(item.explanationData?.currentAverage)) &&
-    item.explanationData?.currentAverage !== null);
+    item?.domain === "energy" && ["energy_balance", "energy_intake", "energy_expenditure", "paired_day_coverage"].includes(item.kind) &&
+    (Number.isFinite(Number(item.explanationData?.currentAverage)) && item.explanationData?.currentAverage !== null ||
+      Boolean(item.explanationData?.intakeEvidence || item.explanationData?.activityEvidence)));
 }
 
 function selectRepresentativeCadenceObservationsV3(values, { excludeEnergy = false } = {}) {
@@ -1019,12 +1023,13 @@ function adaptCanonicalWeightEntries({ goalContract, entries = [], cutoff }) {
   }).filter(Boolean);
 }
 
-function currentStrategyContractFields({ goal, phase, store }) {
+function currentStrategyContractFields({ goal, phase, store, evidenceCutoff }) {
   const authority = resolveCurrentStrategyAuthority({
     goal, phase,
     phaseStrategies: store?.phaseStrategies ?? [],
     protocols: store?.protocols ?? [],
     protocolVersions: store?.protocolVersions ?? [],
+    evidenceCutoff,
   });
   return {
     ...(authority.energyStrategy ? { energyStrategy: authority.energyStrategy } : {}),

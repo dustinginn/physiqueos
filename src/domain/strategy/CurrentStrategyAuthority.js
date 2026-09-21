@@ -23,13 +23,17 @@ export function resolveCurrentStrategyAuthority({
   phaseStrategies = [],
   protocols = [],
   protocolVersions = [],
+  // When supplied, only records already effective at the evidence cutoff apply,
+  // so a later protocol change never rewrites how an earlier window is read.
+  evidenceCutoff = null,
 } = {}) {
   const diagnostics = [];
+  const cutoffMs = Number.isFinite(Date.parse(evidenceCutoff)) ? Date.parse(evidenceCutoff) : null;
   const phaseId = phase?.id ?? goal?.currentPhaseId ?? goal?.timeline?.currentPhaseId ?? null;
-  const strategy = selectPhaseStrategy({ goal, phaseId, phaseStrategies });
+  const strategy = selectPhaseStrategy({ goal, phaseId, phaseStrategies, cutoffMs });
   if (!strategy) diagnostics.push("phase_strategy_unavailable");
 
-  const energy = resolveEnergyStrategy({ strategy, phaseId, protocols, protocolVersions, diagnostics });
+  const energy = resolveEnergyStrategy({ strategy, phaseId, protocols, protocolVersions, diagnostics, cutoffMs });
   const operating = resolveOperatingState({ goal, phase, strategy, energy });
   const bodyFat = resolveBodyFatGuardrailAuthority({ goal, strategy });
 
@@ -100,29 +104,40 @@ export function resolveWeeklyActivityTargetKcal(authority, days = 7) {
     ? Math.round(daily.value * days) : null;
 }
 
-function selectPhaseStrategy({ goal, phaseId, phaseStrategies }) {
+function effectiveBy(value, cutoffMs) {
+  if (cutoffMs == null || !value) return true;
+  const at = Date.parse(value);
+  return !Number.isFinite(at) || at <= cutoffMs;
+}
+
+function selectPhaseStrategy({ goal, phaseId, phaseStrategies, cutoffMs }) {
   const candidates = (phaseStrategies ?? []).filter((item) =>
     item && (!phaseId || item.phaseId === phaseId) && item.status === "accepted" &&
-    !item.supersededAt && !item.supersededBy);
+    !item.supersededAt && !item.supersededBy && effectiveBy(item.acceptedAt, cutoffMs));
   const referenced = goal?.activePhaseStrategyId ?? goal?.timeline?.activePhaseStrategyId ?? null;
   return candidates.find((item) => (item.id ?? item.strategyId) === referenced) ??
     candidates.sort((left, right) =>
       (Number(right.revision) || 0) - (Number(left.revision) || 0))[0] ?? null;
 }
 
-function resolveEnergyStrategy({ strategy, phaseId, protocols, protocolVersions, diagnostics }) {
+function resolveEnergyStrategy({ strategy, phaseId, protocols, protocolVersions, diagnostics, cutoffMs }) {
   const domain = strategy?.domains?.energy ?? null;
   const strategyId = strategy?.id ?? strategy?.strategyId ?? null;
   const energyProtocols = (protocols ?? []).filter((item) =>
     item?.status === "active" &&
     [item.category, item.protocolType].some((value) => value === "energy") &&
     (!phaseId || item.phaseId === phaseId || (strategyId && item.phaseStrategyId === strategyId)));
-  let selected = null;
-  for (const protocol of energyProtocols) {
-    const version = selectVersion({ protocol, phaseId, strategyId, protocolVersions });
-    if (version && (!selected || (Number(version.versionNumber) || 0) >
-      (Number(selected.version.versionNumber) || 0))) selected = { protocol, version };
-  }
+  // The Energy protocol bound to the accepted phase strategy outranks any other
+  // active Energy protocol; version numbers are only comparable within a protocol.
+  const candidates = energyProtocols
+    .map((protocol) => ({ protocol, version: selectVersion({ protocol, phaseId, strategyId, protocolVersions, cutoffMs }) }))
+    .filter((item) => item.version)
+    .sort((left, right) =>
+      Number(Boolean(strategyId) && right.protocol.phaseStrategyId === strategyId) -
+        Number(Boolean(strategyId) && left.protocol.phaseStrategyId === strategyId) ||
+      (Date.parse(right.version.effectiveAt) || 0) - (Date.parse(left.version.effectiveAt) || 0) ||
+      (Number(right.version.versionNumber) || 0) - (Number(left.version.versionNumber) || 0));
+  const selected = candidates[0] ?? null;
   if (!selected) {
     if (energyProtocols.length) diagnostics.push("energy_protocol_revision_unavailable");
     else diagnostics.push("energy_protocol_unavailable");
@@ -156,12 +171,21 @@ function resolveEnergyStrategy({ strategy, phaseId, protocols, protocolVersions,
   });
 }
 
-function selectVersion({ protocol, phaseId, strategyId, protocolVersions }) {
+function selectVersion({ protocol, phaseId, strategyId, protocolVersions, cutoffMs }) {
   const versions = (protocolVersions ?? []).filter((item) => item?.protocolId === protocol.id);
-  const current = versions.find((item) => item.id === protocol.currentVersionId);
-  const active = current?.status === "active" ? current
-    : versions.filter((item) => item.status === "active")
-      .sort((left, right) => (Number(right.versionNumber) || 0) - (Number(left.versionNumber) || 0))[0];
+  const byNumber = (left, right) => (Number(right.versionNumber) || 0) - (Number(left.versionNumber) || 0);
+  let active;
+  if (cutoffMs == null) {
+    const current = versions.find((item) => item.id === protocol.currentVersionId);
+    active = current?.status === "active" ? current
+      : versions.filter((item) => item.status === "active").sort(byNumber)[0];
+  } else {
+    // The revision that was in force at the cutoff: the newest active or since
+    // superseded version that was already effective then.
+    active = versions
+      .filter((item) => ["active", "superseded"].includes(item.status) && effectiveBy(item.effectiveAt, cutoffMs))
+      .sort(byNumber)[0];
+  }
   if (!active) return null;
   // A revision from a different phase or strategy is historical context.
   if (phaseId && active.phaseId && active.phaseId !== phaseId) return null;

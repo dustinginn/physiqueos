@@ -44,7 +44,12 @@ export function createWeeklyBriefingScreenPresentation(narrative) {
     },
     energy: isObject(progress.energy) ? {
       ...progress.energy,
-      title: string(array(heroSelection.cards).find((item) => item.domain === "energy")?.headline),
+      // A V3 Weekly has no legacy domain headline. Its Energy title is the first
+      // factual sentence of the stored V3 Energy statement, so a screen never
+      // falls back to a data-independent claim.
+      title: v3
+        ? firstSentence(narrative.narrativeV3?.energy?.statement) || "Energy this week"
+        : string(array(heroSelection.cards).find((item) => item.domain === "energy")?.headline),
       narrative: string(domainNarratives.get("energy")?.text),
     } : null,
     weight: isObject(progress.weight) ? {
@@ -102,6 +107,12 @@ export function createWeeklyBriefingScreenPresentation(narrative) {
       backLabel: string(navigation.backLabel) || "Briefing History",
     },
   };
+}
+
+function firstSentence(value) {
+  const text = string(value).trim();
+  const match = /^.+?[.!?](?=\s|$)/u.exec(text);
+  return match ? match[0] : text;
 }
 
 function createBodyCompositionPresentation(context, progressDexa, narrative) {
