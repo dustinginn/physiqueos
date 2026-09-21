@@ -346,7 +346,10 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
     /// This set's semantic classification, with the exercise default as the
     /// bodyweight base.
     func loadSemantics(defaultLoadType: String?) -> TrainingSetLoadSemantics {
-        TrainingSetLoadSemantics.classify(weight: load, loadType: loadType, defaultLoadType: defaultLoadType)
+        // A bodyweight marker prepopulated from history is stale once the user enters
+        // added load, so a positive entered load classifies the set as weighted.
+        let marker = loadType == "bodyweight" && (load ?? 0) > 0 ? nil : loadType
+        return TrainingSetLoadSemantics.classify(weight: load, loadType: marker, defaultLoadType: defaultLoadType)
     }
 
     /// The canonical write shape. A bodyweight set (any encoding: no load or a

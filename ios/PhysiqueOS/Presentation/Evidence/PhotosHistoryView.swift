@@ -202,10 +202,11 @@ struct PhotosHistoryView: View {
                 } else {
                     VStack(spacing: 8) {
                         ForEach(isHistoryExpanded ? history : preview) { set in
-                            Button { selectedPhotoSet = set } label: {
-                                PhotoSetHistoryRow(set: set)
-                            }
-                            .buttonStyle(.plain)
+                            // Not a Button: the row's thumbnail carries its own Retry.
+                            PhotoSetHistoryRow(set: set)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selectedPhotoSet = set }
+                                .accessibilityAddTraits(.isButton)
                         }
                     }
                 }

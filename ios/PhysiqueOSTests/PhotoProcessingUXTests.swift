@@ -98,12 +98,24 @@ final class PhotoProcessingUXTests: XCTestCase {
         XCTAssertEqual(briefings.calls, 3, "the first probe plus the two scheduled refreshes")
     }
 
-    func testTransientProbeFailureIsUnknownAndDoesNotPoll() async {
+    func testTransientProbeFailureShowsNothingButKeepsWaitingWithinTheBound() async {
         let briefings = ScriptedBriefingAPI([.unknown])
-        let model = PhotosHistoryViewModel(api: FixturePhotosAPI(), briefingAPI: briefings, refreshSchedule: .standard, sleep: { _ in XCTFail("no wait expected") })
+        let schedule = ProcessingRefreshSchedule(delays: [.seconds(1), .seconds(2)])
+        let model = PhotosHistoryViewModel(api: FixturePhotosAPI(), briefingAPI: briefings, refreshSchedule: schedule, sleep: { _ in })
         await model.watchPhotoBriefing(sessionId: "s1")
-        XCTAssertEqual(model.briefingAvailability, .unknown)
-        XCTAssertEqual(briefings.calls, 1)
+        XCTAssertEqual(model.briefingAvailability, .unknown, "a failed probe never claims pending or published")
+        XCTAssertEqual(briefings.calls, 3, "still bounded")
+    }
+
+    func testTransientFailureMidPollKeepsPendingAndStillReachesPublished() async {
+        let briefings = ScriptedBriefingAPI([.pending, .unknown, .pending, .published(artifactId: "a")])
+        let model = PhotosHistoryViewModel(
+            api: FixturePhotosAPI(), briefingAPI: briefings,
+            refreshSchedule: .init(delays: Array(repeating: .seconds(1), count: 6)), sleep: { _ in }
+        )
+        await model.watchPhotoBriefing(sessionId: "s1")
+        XCTAssertEqual(model.briefingAvailability, .published(artifactId: "a"))
+        XCTAssertEqual(briefings.calls, 4)
     }
 
     func testSandboxWithoutABriefingAPINeverProbes() async {

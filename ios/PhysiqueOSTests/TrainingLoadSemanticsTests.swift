@@ -66,6 +66,23 @@ final class TrainingLoadSemanticsTests: XCTestCase {
         XCTAssertEqual(workout.performanceAchievementLines, ["Pull-Ups · bodyweight rep best"])
     }
 
+    func testAddedLoadTypedOverAPrepopulatedBodyweightSetIsWeightedNotUnknown() {
+        var workout = draft(date: "2026-09-20")
+        workout.addExercise(pullUps(history: [record("2026-09-13", [
+            set(1, reps: 6, weight: 25, unit: "lb", loadType: "external_load"),
+            set(2, reps: 8, weight: nil, unit: "bodyweight", loadType: "bodyweight", setType: "bodyweight_reps"),
+        ])]))
+        // Second prepopulated set is bodyweight; the user then types 25 lb over it
+        // without the marker being reset (the real UI flow).
+        XCTAssertEqual(workout.exercises[0].sets[1].loadType, "bodyweight")
+        workout.exercises[0].sets[1].load = 25
+        workout.exercises[0].sets[1].reps = 7
+        workout.exercises[0].sets[1].isCompleted = true
+        XCTAssertEqual(workout.exercises[0].sets[1].loadSemantics(defaultLoadType: bodyweightDefault), .weightedBodyweight)
+        XCTAssertEqual(workout.exercises[0].sets[1].writeRepresentation(defaultLoadType: bodyweightDefault).loadType, "external_load")
+        XCTAssertEqual(workout.performanceAchievementLines, ["Pull-Ups · better reps at matched load"])
+    }
+
     func testMachineRepsAtMatchedLoadStillWorks() {
         let row = TrainingLoggerCatalogExercise(
             canonicalExerciseId: "seated_cable_row", name: "Seated Cable Rows", areaId: "back", equipment: "cable",

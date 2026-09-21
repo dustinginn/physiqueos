@@ -2174,7 +2174,7 @@ final class FounderServerAPITests: XCTestCase {
         for path in ["PhysiqueOS/Networking/EvidenceReviewAPI.swift", "PhysiqueOS/Presentation/Evidence/EvidenceReviewDetailView.swift"] {
             let source = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
             XCTAssertFalse(source.contains("Progress photos\""), "\(path) must not author 'Progress photos' provenance")
-            XCTAssertFalse(source.lowercased().contains("byteCount"), "\(path) must not classify by image size")
+            XCTAssertFalse(source.lowercased().contains("bytecount"), "\(path) must not classify by image size")
         }
     }
 

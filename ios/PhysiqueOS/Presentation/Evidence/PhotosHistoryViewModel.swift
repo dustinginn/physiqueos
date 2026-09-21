@@ -40,11 +40,19 @@ final class PhotosHistoryViewModel {
     /// bounded cadence. Ends when published, exhausted, or cancelled with the view.
     func watchPhotoBriefing(sessionId: String) async {
         guard let briefingAPI else { return }
-        briefingAvailability = await briefingAPI.photoBriefingAvailability(sessionId: sessionId)
-        guard briefingAvailability == .pending else { return }
-        await ProcessingRefresh.run(schedule: refreshSchedule, sleep: sleep) {
-            briefingAvailability = await briefingAPI.photoBriefingAvailability(sessionId: sessionId)
-            return briefingAvailability == .pending ? .waiting : .finished
+        briefingAvailability = .unknown
+        // A transient probe failure (`unknown`) never overwrites a known `pending`
+        // and never ends the wait: only publication does, or the bounded cadence.
+        let first = await briefingAPI.photoBriefingAvailability(sessionId: sessionId)
+        briefingAvailability = first
+        guard case .published = first else {
+            await ProcessingRefresh.run(schedule: refreshSchedule, sleep: sleep) {
+                let latest = await briefingAPI.photoBriefingAvailability(sessionId: sessionId)
+                if latest != .unknown { briefingAvailability = latest }
+                if case .published = latest { return .finished }
+                return .waiting
+            }
+            return
         }
     }
 
