@@ -1,60 +1,44 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T06:14:01Z",
+  "generated_at_utc": "2026-09-21T06:27:00Z",
   "task": {
-    "id": "bidirectional-control-plane-setup-20260921",
-    "title": "Set up bidirectional GitHub agent-control protocol",
+    "id": "chatgpt-roundtrip-test-20260921",
+    "title": "ChatGPT Claude roundtrip transport test",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "25003f9e3148d2e46e1b22d75d8d0619843f8566",
-    "final_sha": "884e5d71656561d0263e1c54202fdc8a22fb251d",
+    "base_sha": "22f090f64156c18f249b3320825cc085de906df6",
+    "final_sha": null,
     "production_server_sha": "714dcaef03a28f53f7f34f1d825419b253744b53",
     "production_deployment": "7292d936-bd71-4f1b-b242-acf740f1557f",
     "native_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
     "native_build": 47
   },
   "result": {
-    "summary": "Added the ChatGPT -> GitHub -> agent inbox on main: README (both directions, branch model, agent behavior, context rule, replay safety, security), a short docs/CODEX.md pointer, a sanitized-publish/consume inbox tool with claim/cancel, and --inbox-task-id identity + replay enforcement in the completion publisher. Published one harmless test task (github-bidirectional-transport-test-20260921, status ready, unexecuted). No application, Server, Native or infrastructure change.",
+    "summary": "Fetched task chatgpt-roundtrip-test-20260921 from the inbox (all gate checks passed), read the full prompt, and confirmed agent-handoffs/README.md exists on origin/main and documents the bidirectional GitHub control-plane protocol. The literal marker CHATGPT_CLAUDE_ROUNDTRIP_20260921 was not found inside README.md itself; it appears verbatim only in the task prompt file, which was retrieved unmodified from origin/main. Reverified production authority read-only (physiqueos-audit context): active deployment 7292d936-bd71-4f1b-b242-acf740f1557f, phase ACTIVE, source_commit_hash 714dcaef03a28f53f7f34f1d825419b253744b53, matching the task's expected values. Native SHA/build reused from the prior known record (not independently re-verified this session; no Native artifact exists to check for a control-plane-only task). No application, Server, Native, infrastructure, or production state was mutated.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
-    "tests": {
-      "status": "passed",
-      "summary": "Inbox publisher: 40 dry-run cases each asserting the specific guard (schema, unsafe safety flags, bad/traversal/absolute/missing prompt, stale timestamp, wrong repository, secrets/JWT/tokens/URLs/email, raw-export-like size/line/blob/data-URI). 3 unexpected-staged-file and 2 wrong-repo refusals. Completion publisher regression 16 + 7 cases. Sandbox lifecycle rehearsal 37/37 (fetch refusals, replay evidence, claim, identity, completion flip). Real-remote read-only gate check: executable for claude, refused for codex."
-    },
-    "review": {
-      "status": "not_run",
-      "summary": "No independent review; control-plane tooling and documentation only, no application code."
-    },
+    "tests": null,
+    "review": null,
     "zero_write_audit": {
-      "status": "not_applicable",
-      "summary": "No production writes and no production data access; only a read-only lookup of the active deployment record to confirm authority values."
+      "status": "passed",
+      "summary": "Only read-only actions taken: inbox fetch/claim, git show/log/grep against origin/main, and a read-only doctl apps get / get-deployment call against physiqueos-audit. No files outside agent-handoffs/ were touched; no application, config, or infrastructure changes made."
     }
   },
-  "decisions_required": [
-    "No AGENTS.md or CLAUDE.md exists in the repo; the pointer was added only to the existing docs/CODEX.md, and only on main. Decide whether to add root AGENTS.md/CLAUDE.md pointers and whether to propagate the pointer to branches agents actually work on (production and feature branches do not have it).",
-    "Confirm ChatGPT can write files to the repo through its GitHub connection; retrieval is proven, publishing a task from ChatGPT is untested. If it cannot write, an agent can publish ChatGPT's task with physiqueos-inbox publish."
-  ],
+  "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "Validation caught a scanner false positive: the long prompt_path tripped the base64-blob pattern and masked the intended failure of the secret-pattern tests. Fixed by masking only strictly-structured handoff paths; the harness now asserts the specific guard per case.",
-    "docs/CODEX.md is asserted by an existing unit test (mobile-first phrases); the pointer is additive (+4/-0 lines) and those assertions were rechecked.",
-    "Native Build 47 SHA f372699f is still local-only (branch not pushed).",
-    "Agents working in worktrees on other branches will not see the docs/CODEX.md pointer; the Founder's explicit instruction and the assistant's memory carry discovery for now."
+    "The task prompt asked to confirm the marker CHATGPT_CLAUDE_ROUNDTRIP_20260921 was present in agent-handoffs/README.md, but the marker does not appear anywhere in README.md (grep on origin/main:agent-handoffs/README.md returned no match). The marker only appears in the prompt file itself (agent-handoffs/inbox/prompts/20260921T062000Z-chatgpt-roundtrip-test-20260921.md). Reporting this literally rather than claiming a false match: the README-existence and protocol-content checks passed, but the marker-in-README check did not."
   ],
-  "backlog": [
-    "Founder runs the reverse test: tell Claude to read the latest task from GitHub and execute it, then tell ChatGPT that Claude finished.",
-    "Build 48 (not started).",
-    "Optionally push codex/build47-native-closure so the Native SHA is retrievable."
-  ],
-  "recommended_next_step": "Run the end-to-end reverse test by telling Claude: Read the latest PhysiqueOS task from GitHub and execute it.",
-  "full_report_path": "agent-handoffs/reports/20260921T061401Z-bidirectional-control-plane-setup.md",
+  "backlog": [],
+  "recommended_next_step": "If the intent was for the marker to live inside README.md, ChatGPT should publish a follow-up task; otherwise this roundtrip is fully verified (task retrieved intact from GitHub, executed, and reported back with the exact marker text preserved).",
+  "full_report_path": "agent-handoffs/reports/20260921T062700Z-chatgpt-roundtrip-test.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
