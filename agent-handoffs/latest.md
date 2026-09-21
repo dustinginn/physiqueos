@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Pre-HealthKit storage, authority and Remote Control anchor readiness (`pre-healthkit-storage-anchor-readiness-20260921`)
+- Task: Preserve Build 48 and move scheduled briefings to 3 AM (`native-preserve-and-3am-briefings-v2-20260921`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-21T17:05:45Z
+- Generated (UTC): 2026-09-21T18:14:43Z
 - Success: true
 
-Summary: Storage audited and cleaned (free 12.3 GB -> 17.1 GB; five stale worktrees and regenerable build products removed after no-unique-work proof; Build 47 and 48 archives kept). Remote Control anchor fast-forwarded in place from Build 47 to Build 48 bbb46e19, clean and exact; host binary resolves baseRef=head per spawn at the host cwd, so no restart needed and host and 7 sessions left running. Spawn proof pending one phone-started session. Production Server a428fbda verified live, nothing mutated. HealthKit foundation reviewed: Server ingestion and validation-only canary already in production, Native Build 48 contains N0/N1/canary code and entitlements; old foundation branches superseded. Flags: STORAGE_AUDIT_COMPLETE=YES SAFE_CLEANUP_COMPLETE=YES DISK_SPACE_HEALTHY=NO BUILD48_ARCHIVE_PRESERVED=YES ADMIN_KEY_SECURE_COPY_PRESERVED=YES REDUNDANT_ADMIN_KEY_DOWNLOAD_REMOVED=NOT_APPLICABLE(no copy found) REMOTE_CONTROL_ANCHOR_BUILD48=YES REMOTE_CONTROL_HOST_BUILD48_READY=YES REMOTE_CONTROL_SPAWN_BUILD48_PROVEN=NO PRODUCTION_SERVER_AUTHORITY_VERIFIED=YES HEALTHKIT_FOUNDATION_REVIEWED=YES THREE_AM_BRIEFING_CHANGE_QUEUED=YES PHONE_ONLY_HEALTHKIT_WORK_READY=YES(provisional) FOUNDER_MAC_ACTION_REQUIRED=NO PRODUCTION_DATA_MUTATED_DURING_READINESS=NO.
+Summary: Native Build 48 preserved on origin as native/build48-accepted (exactly bbb46e19; main and the prod branch untouched). Midweek, Weekly and Monthly now generate at 03:00 local from one BriefingScheduleAuthority on their existing cadence dates; the Founder's stored 05:30 is overridden with no data mutation and Monthly's own 00:00 gate is unified. Cutoff and observed-date eligibility are unchanged, so prior-day evidence landing 00:00-02:59 joins and new-day evidence never does; later evidence follows the existing reconciliation contract. DST and boundary proofs pass; unit suite equals pristine base (no new failures); ESLint, build and phase gates clean; independent review approved the exact SHA. Deployed with the Founder's chat authorization (deployment c353b945, web and worker on ba250af1 after a forced rebuild); zero-write audit had no differences. Next due at 03:00 PDT: Wed 2026-09-23, Sun 2026-09-27, Thu 2026-10-01. Schema, cost, V3, HealthKit and DEXA/Photo event behavior unchanged. Flags in report: all YES/NONE as required; HISTORICAL_BRIEFINGS_MUTATED=NO; READY_FOR_HEALTHKIT_NEXT_PHASE=YES after the Founder's Build 48 canary.
 
-Detailed report: `agent-handoffs/reports/20260921T170545Z-pre-healthkit-storage-anchor-readiness.md`
+Detailed report: `agent-handoffs/reports/20260921T183500Z-native-preserve-and-3am-briefings.md`
 
 Protocol: `agent-handoffs/README.md`
