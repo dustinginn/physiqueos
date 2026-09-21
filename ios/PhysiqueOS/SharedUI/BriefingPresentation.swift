@@ -194,6 +194,42 @@ struct BriefingEditorialHeading: View {
     }
 }
 
+/// Server-authored uncertainty, shown verbatim. The Server decides what is
+/// surfaced (`surfaced` / high materiality); Native writes no uncertainty
+/// copy and never lets it alter Confidence. Renders nothing when the Server
+/// supplied no presentable text.
+struct BriefingUncertaintyCard: View {
+    static let title = "Still Unresolved"
+    let texts: [String]
+
+    init(items: [BriefingUncertaintyItem]?) {
+        var seen = Set<String>()
+        texts = (items ?? []).presentableTexts.filter { seen.insert($0).inserted }
+    }
+
+    var body: some View {
+        if !texts.isEmpty {
+            BriefingEditorialCard(tint: PhysiqueOSTheme.textMuted) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(Self.title.uppercased())
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(texts, id: \.self) { text in
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle().fill(PhysiqueOSTheme.textMuted).frame(width: 5, height: 5).padding(.top, 8)
+                            Text(text)
+                                .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
+                }
+            }
+            .accessibilityIdentifier("briefing.uncertainty")
+        }
+    }
+}
+
 /// One integrated opening composition for recurring Briefings. The live
 /// web lead places Confidence, editorial headline, narrative, and strategy
 /// context inside a single zine-style card; keeping those elements here

@@ -22,6 +22,7 @@ struct MonthlyBriefingSections: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 34) {
             hero
+            if let strategic = content.strategicSummaryV3 { MonthlyStrategicSummaryCard(summary: strategic, heroBody: content.heroBody) }
             if let goalMilestone = content.goalMilestone { goalMilestoneCard(goalMilestone) }
             if let trainingProgress = content.trainingProgress { trainingProgressCard(trainingProgress) }
             if let energyEvolution = content.energyEvolution { energyEvolutionCard(energyEvolution) }
@@ -29,6 +30,7 @@ struct MonthlyBriefingSections: View {
             if !(content.whatChangedSections ?? []).isEmpty || !content.whatChanged.isEmpty { whatChangedCard }
             if !(content.definingMomentDetails ?? []).isEmpty || !content.definingMoments.isEmpty { definingMomentsCard }
             if !(content.monthAheadActions ?? []).isEmpty || !content.monthAhead.isEmpty { monthAheadCard }
+            if let strategic = content.strategicSummaryV3 { BriefingUncertaintyCard(items: strategic.uncertainty) }
         }
     }
 
@@ -180,7 +182,7 @@ struct MonthlyBriefingSections: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     monthlyMetric("Avg Intake", "\(energyEvolution.averageIntakeKcal) kcal", color: PhysiqueOSTheme.energyIntake)
                     monthlyMetric("Avg Expenditure", "\(energyEvolution.averageExpenditureKcal) kcal", color: PhysiqueOSTheme.energyExpenditure)
-                    monthlyMetric("Avg Balance", signedCalories(energyEvolution.averageBalanceKcal), color: PhysiqueOSTheme.chartSuccess)
+                    monthlyMetric("Avg Balance", signedCalories(energyEvolution.averageBalanceKcal), color: PhysiqueOSTheme.textMuted)
                     monthlyMetric("Balance Magnitude", "\(abs(energyEvolution.averageBalanceKcal)) kcal/day", color: PhysiqueOSTheme.accent)
                 }
                 if let insight = energyEvolution.insight {
@@ -561,5 +563,47 @@ struct MonthlyBriefingSections: View {
         .background(color.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(color.opacity(0.22)))
+    }
+}
+
+/// Canonical V3 Monthly strategic read: the Server's own sections and coach
+/// take, shown verbatim. A section identical to the hero body (the Server
+/// reuses "meaning" as the hero thesis) is not repeated. Nothing here is
+/// derived, reworded, or colored by Native.
+struct MonthlyStrategicSummaryCard: View {
+    let summary: MonthlyStrategicSummaryV3
+    let heroBody: String
+
+    var renderedSectionTitles: [String] { sections.map(\.title) }
+
+    private var sections: [(title: String, text: String)] {
+        [("Result", summary.result), ("What It Means", summary.meaning),
+         ("What To Do", summary.action), ("What To Watch", summary.watch),
+         ("Confidence", summary.confidence), ("Energy", summary.energyStatement),
+         ("Coach's Take", summary.coachTake)]
+            .compactMap { title, text in
+                guard let text, !text.isEmpty, text != heroBody else { return nil }
+                return (title, text)
+            }
+    }
+
+    var body: some View {
+        if !sections.isEmpty {
+            BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(sections, id: \.title) { section in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(section.title.uppercased())
+                                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                .foregroundStyle(PhysiqueOSTheme.accent)
+                            Text(section.text)
+                                .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
+                }
+            }
+            .accessibilityIdentifier("briefing.monthly.strategic")
+        }
     }
 }

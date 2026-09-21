@@ -251,6 +251,61 @@ struct WeeklyEnergySection: Codable, Equatable {
     var comparisonNarrative: String? = nil
     var methodology: String? = nil
     var chartTitle: String? = nil
+    /// Non-nil only for a canonical Narrative V3 briefing. The Server's
+    /// goal-relative Energy result is then the sole Energy interpretation;
+    /// Native adds no verdict, wording, or color of its own.
+    var canonicalV3: BriefingEnergyStrategyReadModel? = nil
+}
+
+/// One Server-authored uncertainty from the canonical V3 `uncertainty[]`.
+/// `text` is the Server's plain-language statement. Native never writes
+/// uncertainty copy and never lets uncertainty move the Confidence number.
+struct BriefingUncertaintyItem: Codable, Equatable, Identifiable {
+    var id: String
+    var type: String? = nil
+    var domain: String? = nil
+    var materiality: String? = nil
+    var text: String? = nil
+    var surfaced: Bool = false
+    var surfacedIn: String? = nil
+    var suppressionReason: String? = nil
+
+    /// The Server's text when the Server surfaced this item or marked it
+    /// high-materiality; nil for suppressed or text-less items.
+    var presentableText: String? {
+        guard surfaced || materiality == "high",
+              let text = text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty else { return nil }
+        return text
+    }
+}
+
+extension Array where Element == BriefingUncertaintyItem {
+    var presentableTexts: [String] { compactMap(\.presentableText) }
+}
+
+/// The Server's goal-relative Energy execution (`energyStrategy` on Weekly,
+/// `narrativeV3.energy` elsewhere). `state` is the Server's own comparison
+/// against the current plan targets — never derived from balance sign.
+struct BriefingEnergyStrategyReadModel: Codable, Equatable {
+    struct Finding: Codable, Equatable, Identifiable {
+        var id: String
+        /// `intake` or `activity`.
+        var dimension: String
+        /// `on_plan`, `below_plan`, or `above_plan`.
+        var state: String
+        var observedValue: Double
+        var targetValue: Double
+        var unit: String?
+    }
+
+    /// Factual, strategy-relative Energy statement, rendered verbatim.
+    var statement: String? = nil
+    var findings: [Finding] = []
+    var estimateAverageKcalPerDay: Double? = nil
+    var estimatePairedDayCount: Int? = nil
+    var estimateEligibleDayCount: Int? = nil
+    var ambiguity: [BriefingUncertaintyItem] = []
 }
 
 struct BriefingDailyEnergyPoint: Codable, Equatable, Identifiable {
@@ -361,6 +416,8 @@ struct WeeklyBriefingContent: Codable, Equatable {
     var training: WeeklyTrainingSection?
     var bodyComposition: WeeklyBodyCompositionSection?
     var coachTake: WeeklyCoachTakeSection
+    /// Server `uncertainty[]` for a canonical V3 Weekly; nil for frozen V2.
+    var uncertainty: [BriefingUncertaintyItem]? = nil
 }
 
 // MARK: - Midweek content (verified DISTINCT, smaller surface: Energy
@@ -390,11 +447,15 @@ struct MidweekBriefingContent: Codable, Equatable {
     /// Historical V2 artifacts leave this nil and retain their immutable
     /// legacy section layout.
     var narrativeV3: CanonicalNarrativeV3ReadModel? = nil
+    /// Server `uncertainty[]` for a canonical V3 Midweek; nil for frozen V2.
+    var uncertainty: [BriefingUncertaintyItem]? = nil
 }
 
 struct CanonicalNarrativeV3ReadModel: Codable, Equatable {
     var summary: String
-    var detail: String
+    /// The Server does not require `detail` for Midweek; the hero falls
+    /// back to the Server's own `hero.summary` when it is absent.
+    var detail: String?
     var result: String
     var meaning: String
     var action: String
@@ -524,6 +585,23 @@ struct MonthlyBriefingContent: Codable, Equatable {
     var monthAheadIntroduction: String? = nil
     var monthAheadActions: [MonthlyActionCard]? = nil
     var heroHighlights: [MonthlyHeroHighlight]? = nil
+    /// Server `strategicSummaryV3` for a Monthly published with canonical
+    /// V3 intelligence (first run Oct 1); nil for frozen V2 Monthly.
+    var strategicSummaryV3: MonthlyStrategicSummaryV3? = nil
+}
+
+/// The Server's canonical V3 monthly strategic read, rendered verbatim.
+/// Every text field is optional: a partial payload shows what the Server
+/// wrote and never blocks the artifact.
+struct MonthlyStrategicSummaryV3: Codable, Equatable {
+    var result: String? = nil
+    var meaning: String? = nil
+    var action: String? = nil
+    var watch: String? = nil
+    var confidence: String? = nil
+    var coachTake: String? = nil
+    var energyStatement: String? = nil
+    var uncertainty: [BriefingUncertaintyItem] = []
 }
 
 // MARK: - DEXA Event content (verified section list: Hero [title/body/

@@ -18,6 +18,7 @@ struct MidweekBriefingSections: View {
             hero
             if let narrative = content.narrativeV3 {
                 canonicalNarrativeCard(narrative)
+                BriefingUncertaintyCard(items: content.uncertainty)
                 canonicalCoachTakeCard(narrative.coachTake)
             } else {
                 if let energy = content.energy { WeeklyEnergyCard(section: energy, showsDailySemanticRows: true) }
@@ -42,7 +43,7 @@ struct MidweekBriefingSections: View {
             eyebrow: Self.heroTypeLabel,
             rangeLabel: BriefingDateFormatting.humanizedPeriodLabel(content.reportingRangeLabel),
             headline: content.narrativeV3?.summary ?? content.heroVerdict,
-            narrative: content.narrativeV3?.detail ?? content.heroSummary,
+            narrative: content.narrativeV3?.detail.flatMap { $0.isEmpty ? nil : $0 } ?? content.heroSummary,
             confidence: confidence
         )
     }
@@ -110,9 +111,11 @@ struct MidweekBriefingSections: View {
                         .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                         .foregroundStyle(PhysiqueOSTheme.chartEvidence)
                 }
-                Text(weight.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if !weight.narrative.isEmpty {
+                    Text(weight.narrative)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
             }
         }
     }

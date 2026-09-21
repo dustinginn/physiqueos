@@ -127,7 +127,7 @@ enum ProductionBriefingMapper {
                 id: id, cadence: .monthly, generatedAt: generatedAt, window: window,
                 attribution: attribution(from: rawAttribution, fallbackTitle: presentation["hero"]?["goal"]?.string ?? goalTitle),
                 confidence: try confidence(from: presentation["hero"]?["confidence"]),
-                monthly: monthly(from: presentation)
+                monthly: monthly(from: presentation, strategicSummaryV3: briefing?["monthlyNarrative"]?["strategicSummaryV3"])
             )
         case .event:
             if let narrative = briefing?["dexaEventNarrative"] {
@@ -262,6 +262,7 @@ enum ProductionBriefingMapper {
     }
 
     private static func weekly(from value: BriefingJSONValue) -> WeeklyBriefingContent {
+        let isCanonicalV3 = value["presentationModel"]?.literalString == canonicalNarrativeV3
         let hero = value["hero"]
         let energy = value["energy"]
         let weight = value["weight"]
@@ -297,7 +298,8 @@ enum ProductionBriefingMapper {
                 headline: headline,
                 balanceHeadline: balanceHeadline,
                 comparisonNarrative: comparisonNarrative,
-                methodology: methodology
+                methodology: methodology,
+                canonicalV3: isCanonicalV3 ? energyStrategy(value["energyStrategy"]) : nil
             )
         } else {
             energySection = nil
@@ -342,17 +344,17 @@ enum ProductionBriefingMapper {
                 biggestTakeaway: coach?["biggestWin"]?.string ?? "",
                 recommendation: coach?["keepBuilding"]?.string ?? coach?["watchNextWeek"]?.string ?? "",
                 intoNextWeek: strings(coach?["actionItems"])
-            )
+            ),
+            uncertainty: isCanonicalV3 ? uncertaintyItems(value["uncertainty"]) : nil
         )
     }
 
     private static func midweek(from value: BriefingJSONValue, window: BriefingEvidenceWindowReadModel) throws -> MidweekBriefingContent {
         let narrativeV3: CanonicalNarrativeV3ReadModel?
-        if value["presentationModel"]?.string == "canonical_narrative_v3" {
+        if value["presentationModel"]?.string == canonicalNarrativeV3 {
             let narrative = value["narrativeV3"]
             guard
                 let summary = nonEmptyString(narrative?["summary"]),
-                let detail = nonEmptyString(narrative?["detail"]),
                 let result = nonEmptyString(narrative?["sections"]?["result"]),
                 let meaning = nonEmptyString(narrative?["sections"]?["meaning"]),
                 let action = nonEmptyString(narrative?["sections"]?["action"]),
@@ -361,7 +363,7 @@ enum ProductionBriefingMapper {
                 let coachTake = nonEmptyString(narrative?["coachTake"])
             else { throw ProductionNativeError.invalidResponse }
             narrativeV3 = .init(
-                summary: summary, detail: detail, result: result, meaning: meaning,
+                summary: summary, detail: nonEmptyString(narrative?["detail"]), result: result, meaning: meaning,
                 action: action, watch: watch, confidence: confidence, coachTake: coachTake
             )
         } else {
@@ -422,7 +424,8 @@ enum ProductionBriefingMapper {
             coachTakeNarrative: coach?["biggestTakeaway"]?.string ?? "",
             coachRecommendation: coach?["recommendation"]?.string,
             prioritiesThroughSunday: strings(value["prioritiesThroughSunday"]),
-            narrativeV3: narrativeV3
+            narrativeV3: narrativeV3,
+            uncertainty: narrativeV3 == nil ? nil : uncertaintyItems(value["uncertainty"] ?? value["narrativeV3"]?["uncertainty"])
         )
     }
 
@@ -495,7 +498,7 @@ enum ProductionBriefingMapper {
         )
     }
 
-    private static func monthly(from value: BriefingJSONValue) -> MonthlyBriefingContent {
+    private static func monthly(from value: BriefingJSONValue, strategicSummaryV3: BriefingJSONValue? = nil) -> MonthlyBriefingContent {
         let hero = value["hero"]
         let milestone = value["milestone"]
         let training = value["training"]
@@ -596,7 +599,23 @@ enum ProductionBriefingMapper {
                     icon: monthlyIcon(item["icon"]?.string),
                     tone: item["tone"]?.string ?? "primary"
                 )
-            }
+            },
+            strategicSummaryV3: monthlyStrategicSummary(strategicSummaryV3)
+        )
+    }
+
+    private static func monthlyStrategicSummary(_ value: BriefingJSONValue?) -> MonthlyStrategicSummaryV3? {
+        guard let value, value.object != nil else { return nil }
+        let sections = value["sections"]
+        return .init(
+            result: nonEmptyString(sections?["result"]),
+            meaning: nonEmptyString(sections?["meaning"]),
+            action: nonEmptyString(sections?["action"]),
+            watch: nonEmptyString(sections?["watch"]),
+            confidence: nonEmptyString(sections?["confidence"]),
+            coachTake: nonEmptyString(value["coachTake"]),
+            energyStatement: nonEmptyString(value["energy"]?["statement"]),
+            uncertainty: uncertaintyItems(value["uncertainty"])
         )
     }
 
@@ -884,6 +903,53 @@ enum ProductionBriefingMapper {
         guard let text = value?.literalString?.trimmingCharacters(in: .whitespacesAndNewlines),
               !text.isEmpty else { return nil }
         return text
+    }
+
+    private static let canonicalNarrativeV3 = "canonical_narrative_v3"
+
+    /// Server `uncertainty[]` items, decoded losslessly. Text is the Server's;
+    /// items without text stay in the model (and are simply not presentable).
+    private static func uncertaintyItems(_ value: BriefingJSONValue?) -> [BriefingUncertaintyItem] {
+        (value?.array ?? []).enumerated().compactMap { index, item in
+            guard item.object != nil else { return nil }
+            return .init(
+                id: item["uncertaintyId"]?.literalString ?? "uncertainty-\(index)",
+                type: item["type"]?.literalString,
+                domain: item["domain"]?.literalString,
+                materiality: item["materiality"]?.literalString,
+                text: nonEmptyString(item["text"]),
+                surfaced: item["surfaced"]?.bool ?? false,
+                surfacedIn: item["surfacedIn"]?.literalString,
+                suppressionReason: item["suppressionReason"]?.literalString
+            )
+        }
+    }
+
+    /// The Server's goal-relative Energy result. Always returned for a V3
+    /// briefing (empty when the Server sent none) so the presentation knows
+    /// to render Server Energy authority only.
+    private static func energyStrategy(_ value: BriefingJSONValue?) -> BriefingEnergyStrategyReadModel {
+        let findings = (value?["findings"]?.array ?? []).enumerated().compactMap { index, item -> BriefingEnergyStrategyReadModel.Finding? in
+            guard let dimension = item["dimension"]?.literalString,
+                  let state = item["state"]?.literalString,
+                  let observed = item["observedValue"]?.double,
+                  let target = item["targetValue"]?.double else { return nil }
+            return .init(
+                id: item["findingId"]?.literalString ?? "finding-\(index)",
+                dimension: dimension, state: state,
+                observedValue: observed, targetValue: target,
+                unit: item["unit"]?.literalString
+            )
+        }
+        let estimate = value?["estimate"]
+        return .init(
+            statement: nonEmptyString(value?["statement"]),
+            findings: findings,
+            estimateAverageKcalPerDay: estimate?["averageKcalPerDay"]?.double,
+            estimatePairedDayCount: estimate?["pairing"]?["pairedDayCount"]?.int,
+            estimateEligibleDayCount: estimate?["pairing"]?["eligibleDayCount"]?.int,
+            ambiguity: uncertaintyItems(value?["ambiguity"])
+        )
     }
 
     private static func factorTexts(_ value: BriefingJSONValue?) -> [String] {

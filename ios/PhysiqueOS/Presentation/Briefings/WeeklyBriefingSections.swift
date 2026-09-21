@@ -18,9 +18,10 @@ struct WeeklyBriefingSections: View {
             hero
             if let energy = content.energy { WeeklyEnergyCard(section: energy) }
             if let weight = content.weight { weightCard(weight) }
-            if let photos = content.photos { photosCard(photos) }
+            if let photos = content.photos, !photos.narrative.isEmpty || photos.photoEventDestination != nil { photosCard(photos) }
             if let training = content.training { trainingCard(training) }
             if let bodyComposition = content.bodyComposition { bodyCompositionCard(bodyComposition) }
+            BriefingUncertaintyCard(items: content.uncertainty)
             coachTakeCard
         }
     }
@@ -57,9 +58,11 @@ struct WeeklyBriefingSections: View {
                         .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                         .foregroundStyle(PhysiqueOSTheme.chartEvidence)
                 }
-                Text(weight.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if !weight.narrative.isEmpty {
+                    Text(weight.narrative)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
             }
         }
     }
@@ -68,9 +71,11 @@ struct WeeklyBriefingSections: View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
             VStack(alignment: .leading, spacing: 16) {
                 BriefingEditorialHeading(title: "Photos")
-                Text(photos.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if !photos.narrative.isEmpty {
+                    Text(photos.narrative)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
                 if let destination = photos.photoEventDestination {
                     Button {
                         onNavigate(destination)
@@ -106,9 +111,11 @@ struct WeeklyBriefingSections: View {
                     weeklyMetric("Lean Mass", body.leanMassLb, color: PhysiqueOSTheme.accent)
                     weeklyMetric("Fat Mass", body.fatMassLb, color: PhysiqueOSTheme.accent)
                 }
-                Text(body.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if !body.narrative.isEmpty {
+                    Text(body.narrative)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
             }
         }
     }
@@ -155,12 +162,16 @@ struct BriefingTrainingResponseCard: View {
                         .foregroundStyle(PhysiqueOSTheme.chartSuccess)
                         .accessibilityIdentifier("briefing.trainingResponse")
                 }
-                Text(training.headline ?? "Training kept moving forward.")
-                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(training.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if let headline = training.headline, !headline.isEmpty {
+                    Text(headline)
+                        .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                }
+                if !training.narrative.isEmpty {
+                    Text(training.narrative)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
                 Text(coverage)
                     .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -224,7 +235,6 @@ struct BriefingTrainingResponseCard: View {
         if training.steadyCount > 0 { parts.append("\(training.steadyCount) steady") }
         if let plateauing = training.plateauingCount { parts.append("\(plateauing) plateauing") }
         if let regressing = training.regressingCount, regressing > 0 { parts.append("\(regressing) regressing") }
-        if let insufficient = training.insufficientCount { parts.append("\(insufficient) building evidence") }
         return parts.joined(separator: " · ")
     }
 
@@ -321,15 +331,21 @@ struct WeeklyEnergyCard: View {
                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                Text(section.headline ?? "Energy Balance")
-                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(balanceStatement)
-                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
-                    .foregroundStyle(balanceColor)
-                Text(section.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if let strategy = section.canonicalV3 {
+                    canonicalEnergyContent(strategy)
+                } else {
+                    Text(section.headline ?? "Energy Balance")
+                        .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(balanceStatement)
+                        .physiqueOSFont(PhysiqueOSTypography.editorialHero)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    if !section.narrative.isEmpty {
+                        Text(section.narrative)
+                            .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                }
                 if let comparison = section.comparisonNarrative, !comparison.isEmpty {
                     Text(comparison)
                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
@@ -348,7 +364,7 @@ struct WeeklyEnergyCard: View {
                 HStack(alignment: .top, spacing: 8) {
                     energyMetric("Avg Intake", "\(section.averageIntakeKcal) kcal", color: PhysiqueOSTheme.energyIntake)
                     energyMetric("Avg Expenditure", "\(section.averageExpenditureKcal) kcal", color: PhysiqueOSTheme.energyExpenditure)
-                    energyMetric("Avg Balance", "\(section.averageBalanceKcal >= 0 ? "+" : "")\(section.averageBalanceKcal) kcal", color: PhysiqueOSTheme.chartSuccess)
+                    energyMetric("Avg Balance", "\(section.averageBalanceKcal >= 0 ? "+" : "")\(section.averageBalanceKcal) kcal", color: PhysiqueOSTheme.textMuted)
                 }
                 Divider().overlay(PhysiqueOSTheme.divider)
                 if let dailyBalances = section.dailyBalances, !dailyBalances.isEmpty {
@@ -369,8 +385,74 @@ struct WeeklyEnergyCard: View {
         return "\(abs(balance).formatted()) kcal/day \(balance < 0 ? "below" : "above")"
     }
 
-    private var balanceColor: Color {
-        PhysiqueOSTheme.chartSuccess
+    /// Canonical V3: the Server's factual, plan-relative Energy statement is
+    /// the whole interpretation. The Server title is that statement's first
+    /// sentence, so it is shown only when there is no statement. Findings are
+    /// the Server's own comparison against the current targets; nothing here
+    /// is colored or worded by balance sign.
+    @ViewBuilder
+    private func canonicalEnergyContent(_ strategy: BriefingEnergyStrategyReadModel) -> some View {
+        if let statement = strategy.statement ?? nonEmpty(section.narrative) {
+            Text(statement)
+                .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .accessibilityIdentifier("briefing.energy.statement")
+        } else if let headline = nonEmpty(section.headline) {
+            Text(headline)
+                .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        }
+        if !strategy.findings.isEmpty {
+            VStack(spacing: 8) {
+                ForEach(strategy.findings) { finding in planFindingRow(finding) }
+            }
+        }
+    }
+
+    private func planFindingRow(_ finding: BriefingEnergyStrategyReadModel.Finding) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(Self.findingDimensionLabel(finding.dimension))
+                .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(Self.kcal(finding.observedValue)) vs \(Self.kcal(finding.targetValue)) target")
+                    .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(Self.findingStateLabel(finding.state))
+                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    static func findingDimensionLabel(_ dimension: String) -> String {
+        switch dimension {
+        case "intake": "Calorie intake"
+        case "activity": "Active calories"
+        default: dimension.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    /// The Server's `state` enum, unchanged in meaning: `on_plan`,
+    /// `below_plan`, `above_plan`.
+    static func findingStateLabel(_ state: String) -> String {
+        state.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    private static func kcal(_ value: Double) -> String {
+        "\(Int(value.rounded()).formatted(.number.grouping(.automatic))) kcal"
+    }
+
+    private func nonEmpty(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
     }
 
     private func dailySemanticRow(_ point: BriefingDailyEnergyPoint) -> some View {
@@ -382,7 +464,7 @@ struct WeeklyEnergyCard: View {
             if point.hasPairedData, let balance = point.balanceKcal {
                 Text("\(balance >= 0 ? "+" : "−")\(abs(balance)) kcal")
                     .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                    .foregroundStyle(balance == 0 ? PhysiqueOSTheme.textSecondary : PhysiqueOSTheme.chartSuccess)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
             } else {
                 Text("No data")
                     .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
