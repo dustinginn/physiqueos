@@ -170,8 +170,109 @@ function store() {
     user: [{ id: OWNER, timeZone: "America/Los_Angeles", version: 1 }],
     healthKitObservations: [],
     healthKitCanonicalDays: [],
+    healthKitCanonicalWorkouts: [],
+    healthKitWorkoutLinks: [],
     healthKitConfiguration: [],
     canonicalEvidenceObjects: [{ canonicalId: "activity_day|2026-09-20", version: 1, payload: { evidence_type: "activity_day", observed_at: "2026-09-20" } }],
     dailyBriefings: [{ id: "briefing-1", version: 1 }],
   });
 }
+
+describe("independent Workout activation policy", () => {
+  const workoutAuth = { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-25", endLocalDate: "2026-09-25", authorizationReference: "founder-chat-workout-canary" };
+  const WORKOUT_ID = "healthkit_workout_canonical_activation_policy";
+  const withDailyPolicy = () => {
+    const records = store();
+    return records.put({
+      ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: POLICY_ID,
+      payload: { id: POLICY_ID, schemaVersion: "healthkit-canonical-activation-policy-v1", status: "enabled", domains: ["activity", "nutrition"],
+        effectiveLocalDate: "2026-09-21", endLocalDate: "2026-09-21", strategicEvidenceEligibility: "quarantined", historicalBackfill: false, version: 1 },
+    }).then(() => records);
+  };
+
+  it("dry-run predicts two new rows and previews the raw workouts in the window without writing", async () => {
+    const records = await withDailyPolicy();
+    await records.put({ ownerUserId: OWNER, collection: "healthKitObservations", recordId: "healthkit_observation_w", payload: {
+      id: "healthkit_observation_w", observationType: "workout", ingestionPurpose: "operational", occurrenceDate: "2026-09-25", measurement: { activityType: "50" } } });
+    const before = records.snapshot();
+    const result = await runHealthKitActivationPolicy({ records, authorization: workoutAuth, action: "activate", policyKind: "workout" });
+    expect(result).toMatchObject({
+      outcome: "dry_run", policyKind: "workout", strategicEvidenceEligibility: "quarantined", historicalBackfill: false,
+      policy: { status: "enabled", domains: ["workout"], effectiveLocalDate: "2026-09-25", endLocalDate: "2026-09-25" },
+      predictedMutations: [{ collection: "healthKitConfiguration", recordId: WORKOUT_ID, operation: "create" }, { operation: "create" }],
+      workoutPreview: { rawWorkoutObservationsInWindow: 1, byFamily: { strength: 1, cardio: 0, unsupported: 0 } },
+    });
+    expect(result.unchangedByDesign.otherPolicyRecord).not.toBe("absent");
+    expect(records.snapshot()).toEqual(before);
+  });
+
+  it("applies only the Workout policy and audit rows, and provably leaves the Activity + Nutrition policy untouched", async () => {
+    const records = await withDailyPolicy();
+    const dailyBefore = structuredClone(records.snapshot().healthKitConfiguration.find((row) => row.id === POLICY_ID));
+    const dry = await runHealthKitActivationPolicy({ records, authorization: workoutAuth, action: "activate", policyKind: "workout" });
+    const applied = await runHealthKitActivationPolicy({ records, authorization: workoutAuth, action: "activate", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(applied.outcome).toBe("applied");
+    expect(applied.invariants).toMatchObject({ otherPolicyUntouched: true, linkAutoConfirmOff: true, canonicalWorkoutsUnchanged: true, linksUnchanged: true });
+    expect(Object.values(applied.invariants).every(Boolean)).toBe(true);
+    const rows = records.snapshot().healthKitConfiguration;
+    expect(rows.find((row) => row.id === POLICY_ID)).toEqual(dailyBefore);
+    expect(rows.find((row) => row.id === WORKOUT_ID)).toMatchObject({
+      status: "enabled", domains: ["workout"], effectiveLocalDate: "2026-09-25", endLocalDate: "2026-09-25",
+      strategicEvidenceEligibility: "quarantined", historicalBackfill: false, linkAutoConfirm: false,
+    });
+    expect(rows.find((row) => row.kind === "healthkit_workout_activation_audit")).toMatchObject({ action: "activate", policyRecordId: WORKOUT_ID });
+    expect(rows.filter((row) => String(row.id).startsWith("healthkit_workout_activation_audit_"))).toHaveLength(1);
+  });
+
+  it("refuses a daily domain, an over-long window, or an already-enabled Workout policy, and never accepts eligibility or auto-confirm", async () => {
+    const records = store();
+    for (const bad of [
+      { ...workoutAuth, domains: ["activity"] },
+      { ...workoutAuth, domains: ["workout", "nutrition"] },
+      { ...workoutAuth, endLocalDate: "2026-09-29" },
+    ]) {
+      expect(await runHealthKitActivationPolicy({ records, authorization: bad, action: "activate", policyKind: "workout" })).toMatchObject({ outcome: "refused" });
+    }
+    const auth = { ...workoutAuth, strategicEvidenceEligibility: "eligible", linkAutoConfirm: true, historicalBackfill: true };
+    const dry = await runHealthKitActivationPolicy({ records, authorization: auth, action: "activate", policyKind: "workout" });
+    await runHealthKitActivationPolicy({ records, authorization: auth, action: "activate", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(records.snapshot().healthKitConfiguration.find((row) => row.id === WORKOUT_ID))
+      .toMatchObject({ strategicEvidenceEligibility: "quarantined", linkAutoConfirm: false, historicalBackfill: false });
+    expect(await runHealthKitActivationPolicy({ records, authorization: { ...workoutAuth, authorizationReference: "other" }, action: "activate", policyKind: "workout" }))
+      .toMatchObject({ outcome: "refused" });
+  });
+
+  it("deactivates the Workout policy without touching canonical workouts, links, or the daily policy", async () => {
+    const records = await withDailyPolicy();
+    const dry = await runHealthKitActivationPolicy({ records, authorization: workoutAuth, action: "activate", policyKind: "workout" });
+    await runHealthKitActivationPolicy({ records, authorization: workoutAuth, action: "activate", policyKind: "workout", apply: true, expected: dry.facts });
+    await records.put({ ownerUserId: OWNER, collection: "healthKitCanonicalWorkouts", recordId: "healthkit_canonical_workout_x", payload: { id: "healthkit_canonical_workout_x", localDate: "2026-09-25", revision: 1 } });
+    const off = { ...workoutAuth, authorizationReference: "rollback-workout" };
+    const dryOff = await runHealthKitActivationPolicy({ records, authorization: off, action: "deactivate", policyKind: "workout" });
+    const applied = await runHealthKitActivationPolicy({ records, authorization: off, action: "deactivate", policyKind: "workout", apply: true, expected: dryOff.facts });
+    expect(applied.outcome).toBe("applied");
+    const rows = records.snapshot();
+    expect(rows.healthKitConfiguration.find((row) => row.id === WORKOUT_ID).status).toBe("disabled");
+    expect(rows.healthKitCanonicalWorkouts).toHaveLength(1);
+    expect(rows.healthKitConfiguration.find((row) => row.id === POLICY_ID).status).toBe("enabled");
+  });
+
+  it("an unknown policy kind is rejected", async () => {
+    await expect(runHealthKitActivationPolicy({ records: store(), authorization: workoutAuth, action: "activate", policyKind: "sleep" }))
+      .rejects.toMatchObject({ code: "POLICY_KIND_INVALID" });
+  });
+});
+
+describe("Workout preview uses the derived day (review MINOR-4)", () => {
+  it("counts a workout by its own start in its own time zone, not the client label", async () => {
+    const records = store();
+    await records.put({ ownerUserId: OWNER, collection: "healthKitObservations", recordId: "healthkit_observation_late", payload: {
+      id: "healthkit_observation_late", observationType: "workout", ingestionPurpose: "operational", occurrenceDate: "2026-09-26",
+      occurrence: { startedAt: "2026-09-25T23:50:00-07:00", timeZone: "America/Los_Angeles" }, measurement: { activityType: "52" } } });
+    const dry = await runHealthKitActivationPolicy({
+      records, action: "activate", policyKind: "workout",
+      authorization: { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-25", endLocalDate: "2026-09-25", authorizationReference: "ref" },
+    });
+    expect(dry.workoutPreview).toMatchObject({ rawWorkoutObservationsInWindow: 1, byFamily: { cardio: 1 } });
+  });
+});

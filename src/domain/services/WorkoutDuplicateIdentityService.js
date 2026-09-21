@@ -1,8 +1,8 @@
 import { normalizeIdentityPart } from "./normalizeIdentityPart";
 
-const DUPLICATE_CONFIDENCE_THRESHOLD = 80;
-const POSSIBLE_DUPLICATE_CONFIDENCE_THRESHOLD = 50;
-const TEMPORAL_TOLERANCE_MINUTES = 5;
+export const DUPLICATE_CONFIDENCE_THRESHOLD = 80;
+export const POSSIBLE_DUPLICATE_CONFIDENCE_THRESHOLD = 50;
+export const TEMPORAL_TOLERANCE_MINUTES = 5;
 // A bare display filename ("Apple Health Screenshot 2.jpg", "IMG_1688.png") is
 // only a label the uploading device chose. Native names every Health screenshot
 // with the same ordinal names on every day, so a filename alone can never

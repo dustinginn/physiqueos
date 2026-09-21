@@ -195,6 +195,7 @@ export const nativeProductionContractManifest = Object.freeze({
     validationOnly: "permanently raw, non-canonical, and non-strategic; purpose is immutable per V1 source identity",
     activityActivation: "server-owned, disabled until an explicit Founder-approved canonical effective date is configured; no historical backfill",
     canonicalDailyActivation: "server-owned policy scoped to explicit domains (activity, nutrition) and an exact local-date window of at most 7 days; disabled by default; no historical backfill; canonical days are stored in healthKitCanonicalDays, never in strategic Evidence",
+    workoutCanonicalActivation: "dormant: a separate server-owned Workout policy (exact window of at most 3 local dates, quarantined, no backfill, no auto-confirmed links) governs canonical Apple workouts and strength link candidates; disabled by default",
     nutritionDailyTotal: "nutrition_daily_total carries HealthKit daily statistics across all sources for calories, protein_g, carbs_g, fat_g only; no meal objects; device-scoped source revision; partial_day or complete_day coverage",
     strategicEvidenceEligibility: "quarantined: HealthKit-derived canonical days are never V3, Confidence, or briefing Evidence during the proving period",
     validationDiagnostic: "/api/v1/native/read/healthkit-activity-canary requires bounded startDate and endDate",

@@ -46,7 +46,29 @@ import {
   normalizeHealthKitObservationBatch,
   reconcileHealthKitWorkoutObservation,
   resolveHealthKitCanonicalActivationPolicy,
+  HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
+  assessHealthKitWorkoutCanonicalization,
+  resolveHealthKitWorkoutActivationPolicy,
 } from "../../domain/services/HealthKitObservationService.js";
+import {
+  HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
+  HealthKitWorkoutFamily,
+  classifyHealthKitWorkoutType,
+  deriveHealthKitWorkoutLocalDate,
+  getHealthKitCanonicalWorkoutRecordId,
+  reconcileHealthKitCanonicalWorkout,
+} from "../../domain/services/HealthKitWorkoutService.js";
+import {
+  HEALTHKIT_WORKOUT_LINK_COLLECTION,
+  HealthKitStrengthMatchOutcome,
+  HealthKitWorkoutLinkStatus,
+  assessHealthKitCardioCoexistence,
+  assessHealthKitStrengthLinkCandidates,
+  createHealthKitWorkoutLinkCandidate,
+  findPossibleDuplicateCanonicalWorkouts,
+  refreshHealthKitWorkoutLinkCandidate,
+  unlinkHealthKitWorkoutLink,
+} from "../../domain/services/HealthKitWorkoutLinkService.js";
 import {
   HEALTHKIT_CANONICAL_DAY_COLLECTION,
   HealthKitCanonicalDomain,
@@ -323,6 +345,27 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       }),
       records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }),
     ]);
+    const [workoutPolicyRecord, existingCanonicalWorkouts, existingWorkoutLinks] = await Promise.all([
+      records.get({
+        ownerUserId: context.ownerUserId,
+        collection: "healthKitConfiguration",
+        recordId: HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
+      }),
+      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION }),
+      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION }),
+    ]);
+    const workoutPolicy = resolveHealthKitWorkoutActivationPolicy(workoutPolicyRecord);
+    const workoutActivationSnapshot = workoutPolicy.enabled
+      ? {
+        policyRecordId: HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
+        policyVersion: workoutPolicyRecord.version ?? null,
+        effectiveLocalDate: workoutPolicy.effectiveLocalDate,
+        endLocalDate: workoutPolicy.endLocalDate,
+      }
+      : null;
+    const canonicalWorkoutById = new Map(existingCanonicalWorkouts.map((record) => [record.id, record]));
+    const workoutLinks = [...existingWorkoutLinks];
+    let batchHadWorkout = false;
     const activationPolicy = resolveHealthKitCanonicalActivationPolicy(activationPolicyRecord);
     const activationSnapshot = activationPolicy.enabled
       ? {
@@ -401,7 +444,43 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
             };
         }
       } else if (observation.observationType === HealthKitObservationType.WORKOUT) {
-        reconciliation = reconcileHealthKitWorkoutObservation({ observation, canonicalObjects });
+        batchHadWorkout = true;
+        const classification = classifyHealthKitWorkoutType(observation.measurement.activityType);
+        // The effective day is the workout's own start in its own time zone.
+        const effectiveLocalDate = deriveHealthKitWorkoutLocalDate({
+          startedAt: observation.occurrence.startedAt,
+          timeZone: observation.occurrence.timeZone,
+        }) ?? observation.occurrence.localDate;
+        const workoutAssessment = assessHealthKitWorkoutCanonicalization({
+          observation, effectiveLocalDate, activationPolicy: workoutPolicyRecord,
+        });
+        if (existing && WORKOUT_TERMINAL_STATES.has(existing.reconciliation?.state)) {
+          // A canonicalized (or superseded) workout is never reconsidered on replay.
+          reconciliation = structuredClone(existing.reconciliation);
+        } else if (!existing && workoutAssessment.eligible && classification.family === HealthKitWorkoutFamily.UNSUPPORTED) {
+          reconciliation = { state: HealthKitReconciliationState.SOURCE_ONLY, reason: "unsupported_workout_type" };
+        } else if (!existing && workoutAssessment.eligible) {
+          const preview = reconcileHealthKitCanonicalWorkout({
+            observation,
+            existing: canonicalWorkoutById.get(getHealthKitCanonicalWorkoutRecordId(observation)) ?? null,
+            ownerUserId: context.ownerUserId,
+            now: now(),
+            activation: workoutActivationSnapshot,
+          });
+          reconciliation = preview.action === "superseded"
+            ? {
+              state: HealthKitReconciliationState.WORKOUT_SUMMARY_SUPERSEDED,
+              reason: preview.reason,
+              supersededBySourceObservationId: preview.record.current.sourceObservationId,
+            }
+            : {
+              state: HealthKitReconciliationState.WORKOUT_CANONICALIZATION_PENDING,
+              reason: workoutAssessment.reason,
+              canonicalizationPermitted: true,
+            };
+        } else {
+          reconciliation = reconcileHealthKitWorkoutObservation({ observation, canonicalObjects });
+        }
       } else {
         reconciliation = { state: HealthKitReconciliationState.SOURCE_ONLY };
       }
@@ -510,6 +589,77 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           coexistenceState: persistedDay.coexistence?.state ?? null,
         };
       }
+      let canonicalWorkoutOutcome = null;
+      if (ownsCreation && observation.observationType === HealthKitObservationType.WORKOUT &&
+        reconciliation.state === HealthKitReconciliationState.WORKOUT_CANONICALIZATION_PENDING) {
+        const workoutRecordId = getHealthKitCanonicalWorkoutRecordId(observation);
+        const currentWorkout = await records.get({
+          ownerUserId: context.ownerUserId,
+          collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
+          recordId: workoutRecordId,
+        });
+        const decision = reconcileHealthKitCanonicalWorkout({
+          observation,
+          existing: currentWorkout,
+          ownerUserId: context.ownerUserId,
+          now: now(),
+          activation: workoutActivationSnapshot,
+        });
+        let persistedWorkout = decision.record;
+        if (decision.action === "create") {
+          const created = await records.putIfAbsent({
+            ownerUserId: context.ownerUserId,
+            collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
+            recordId: workoutRecordId,
+            sourceIdentity: workoutRecordId,
+            payload: decision.record,
+          });
+          if (!created.created) {
+            throw problem(409, "HEALTHKIT_CANONICAL_WORKOUT_CONFLICT", "The HealthKit canonical workout changed concurrently; retry the batch.");
+          }
+          persistedWorkout = created.record;
+        } else if (decision.action === "update") {
+          persistedWorkout = await records.put({
+            ownerUserId: context.ownerUserId,
+            collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
+            recordId: workoutRecordId,
+            expectedVersion: currentWorkout.version,
+            sourceIdentity: workoutRecordId,
+            payload: decision.record,
+          });
+        }
+        canonicalWorkoutById.set(workoutRecordId, persistedWorkout);
+        reconciliation = decision.action === "create" || decision.action === "update"
+          ? {
+            state: HealthKitReconciliationState.WORKOUT_CANONICALIZED,
+            canonicalStore: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
+            canonicalId: workoutRecordId,
+            canonicalRevision: persistedWorkout.revision,
+            canonicalAction: decision.action,
+            workoutFamily: persistedWorkout.current.family,
+            evidenceEligibility: persistedWorkout.evidenceEligibility.state,
+            activityInteraction: "descriptive_never_additive",
+          }
+          : {
+            state: HealthKitReconciliationState.WORKOUT_SUMMARY_SUPERSEDED,
+            reason: decision.reason,
+            supersededBySourceObservationId: persistedWorkout.current.sourceObservationId,
+          };
+        stored = await records.put({
+          ownerUserId: context.ownerUserId,
+          collection: "healthKitObservations",
+          recordId: stored.id,
+          expectedVersion: stored.version,
+          sourceIdentity: stored.id,
+          payload: { ...stored, reconciliation },
+        });
+        canonicalWorkoutOutcome = {
+          action: decision.action,
+          revision: persistedWorkout.revision,
+          family: persistedWorkout.current.family,
+          localDate: persistedWorkout.localDate,
+        };
+      }
       const reconciliationChanged = existing &&
         observation.observationType === HealthKitObservationType.WORKOUT &&
         comparableRecord(existing.reconciliation) !== comparableRecord(reconciliation);
@@ -534,6 +684,20 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         occurredAt: stored.occurredAt,
         reconciliation: stored.reconciliation,
         ...(canonicalDayOutcome ? { canonicalDay: canonicalDayOutcome } : {}),
+        ...(canonicalWorkoutOutcome ? { canonicalWorkout: canonicalWorkoutOutcome } : {}),
+      });
+    }
+    // Relationship reassessment. Read-mostly and idempotent: it only runs while
+    // the separate Workout policy is enabled, only for canonical workouts inside
+    // its exact window, and it never touches the Logger session or Evidence.
+    let workoutRelationships = { assessed: 0, updated: 0, candidateLinksCreated: 0, candidateLinksReleased: 0 };
+    if (batchHadWorkout && workoutPolicy.enabled) {
+      workoutRelationships = await reassessWorkoutRelationships({
+        context,
+        workoutPolicy,
+        canonicalWorkoutById,
+        workoutLinks,
+        canonicalObjects,
       });
     }
     const canonicalizedBy = (domain) => results.filter((item) =>
@@ -550,6 +714,10 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         matchedCount: results.filter((item) => item.outcome === "matched").length,
         activityDayCanonicalizedCount: canonicalizedBy(HealthKitCanonicalDomain.ACTIVITY),
         nutritionDayCanonicalizedCount: canonicalizedBy(HealthKitCanonicalDomain.NUTRITION),
+        workoutCanonicalizedCount: results.filter((item) =>
+          item.reconciliation?.state === HealthKitReconciliationState.WORKOUT_CANONICALIZED
+        ).length,
+        workoutRelationships,
         validationOnlyAcceptedCount: results.filter((item) =>
           item.ingestionPurpose === "validation_only"
         ).length,
@@ -559,6 +727,114 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       },
       outbox: [],
     };
+  }
+
+  async function reassessWorkoutRelationships({ context, workoutPolicy, canonicalWorkoutById, workoutLinks, canonicalObjects }) {
+    const summary = { assessed: 0, updated: 0, candidateLinksCreated: 0, candidateLinksReleased: 0, candidateLinksRefreshed: 0 };
+    const at = now().toISOString();
+    const inWindow = [...canonicalWorkoutById.values()].filter((workout) =>
+      workout.localDate >= workoutPolicy.effectiveLocalDate && workout.localDate <= workoutPolicy.endLocalDate);
+    const saveLink = async (link, next) => {
+      const saved = await records.put({
+        ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION, recordId: link.id,
+        expectedVersion: link.version, sourceIdentity: link.id, payload: next,
+      });
+      workoutLinks.splice(workoutLinks.findIndex((item) => item.id === link.id), 1, saved);
+      return saved;
+    };
+    for (const workout of inWindow) {
+      summary.assessed += 1;
+      // One physical workout can appear as two canonical records (a re-created
+      // HealthKit workout, or two sources). Only the earliest may hold a link.
+      const duplicates = findPossibleDuplicateCanonicalWorkouts(workout, inWindow);
+      const group = [workout, ...duplicates.map((id) => canonicalWorkoutById.get(id))].filter(Boolean);
+      const primary = group.sort((left, right) =>
+        String(left.createdAt).localeCompare(String(right.createdAt)) || String(left.id).localeCompare(String(right.id)))[0];
+      const isPrimary = primary.id === workout.id;
+      let patch;
+      if (workout.current.family === HealthKitWorkoutFamily.STRENGTH) {
+        const assessment = assessHealthKitStrengthLinkCandidates({ canonicalWorkout: workout, canonicalObjects, existingLinks: workoutLinks });
+        const single = [HealthKitStrengthMatchOutcome.CONFIDENT, HealthKitStrengthMatchOutcome.POSSIBLE].includes(assessment.outcome);
+        const session = single ? assessment.candidates[0].loggerSessionCanonicalId : null;
+        const heldByAnother = single && workoutLinks.some((link) =>
+          link.loggerSessionCanonicalId === session && link.canonicalWorkoutId !== workout.id &&
+          [HealthKitWorkoutLinkStatus.CANDIDATE, HealthKitWorkoutLinkStatus.CONFIRMED].includes(link.status));
+        const suppressed = !isPrimary ? "possible_duplicate_of_another_canonical_workout"
+          : heldByAnother ? "session_already_linked_to_another_workout" : null;
+        patch = {
+          linkAssessment: {
+            outcome: assessment.outcome,
+            reason: assessment.reason,
+            matcherVersion: assessment.matcherVersion,
+            unverifiableSessionCount: assessment.unverifiableSessionCount,
+            candidates: assessment.candidates.map((candidate) => ({
+              loggerSessionCanonicalId: candidate.loggerSessionCanonicalId,
+              confidence: candidate.confidence,
+              basis: candidate.basis,
+            })),
+            ...(duplicates.length > 0 ? { possibleDuplicateOf: [...duplicates] } : {}),
+            ...(suppressed ? { linkSuppressed: suppressed } : {}),
+          },
+        };
+        const wanted = single && !suppressed ? session : null;
+        // Release system candidates the matcher (or the duplicate rule) no longer supports.
+        for (const link of workoutLinks.filter((item) =>
+          item.canonicalWorkoutId === workout.id && item.status === HealthKitWorkoutLinkStatus.CANDIDATE)) {
+          if (wanted === link.loggerSessionCanonicalId) continue;
+          await saveLink(link, unlinkHealthKitWorkoutLink(link, {
+            by: { kind: "system_matcher", ref: assessment.matcherVersion }, now: at, reason: "assessment_changed",
+          }));
+          summary.candidateLinksReleased += 1;
+        }
+        if (wanted) {
+          const candidate = createHealthKitWorkoutLinkCandidate({
+            canonicalWorkout: workout, assessment, ownerUserId: context.ownerUserId, now: at, existingLinks: workoutLinks,
+          });
+          const existing = workoutLinks.find((item) => item.id === candidate.id);
+          if (!existing) {
+            const created = await records.putIfAbsent({
+              ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION,
+              recordId: candidate.id, sourceIdentity: candidate.id, payload: candidate,
+            });
+            workoutLinks.push(created.record);
+            if (created.created) summary.candidateLinksCreated += 1;
+          } else {
+            const refreshed = refreshHealthKitWorkoutLinkCandidate(existing, { assessment, now: at, existingLinks: workoutLinks });
+            if (refreshed !== existing) {
+              await saveLink(existing, refreshed);
+              summary.candidateLinksRefreshed += 1;
+            }
+          }
+        }
+      } else if (workout.current.family === HealthKitWorkoutFamily.CARDIO) {
+        const coexistence = assessHealthKitCardioCoexistence({ canonicalWorkout: workout, canonicalObjects });
+        patch = {
+          coexistence: {
+            state: coexistence.state,
+            unverifiableCount: coexistence.unverifiableCount,
+            candidates: coexistence.candidates.map((item) => ({ canonicalId: item.canonicalId, outcome: item.outcome, confidence: item.confidence })),
+            ...(duplicates.length > 0 ? { possibleDuplicateOf: [...duplicates] } : {}),
+          },
+        };
+      }
+      if (!patch) continue;
+      const previous = workout.linkAssessment ?? workout.coexistence ?? null;
+      const next = patch.linkAssessment ?? patch.coexistence;
+      // Key-sorted comparison: a jsonb column returns object keys in its own
+      // order, so an insertion-order comparison would rewrite every time.
+      if (stableJson(previous) === stableJson(next)) continue;
+      const saved = await records.put({
+        ownerUserId: context.ownerUserId,
+        collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
+        recordId: workout.id,
+        expectedVersion: workout.version,
+        sourceIdentity: workout.id,
+        payload: { ...workout, ...patch, updatedAt: at },
+      });
+      canonicalWorkoutById.set(workout.id, saved);
+      summary.updated += 1;
+    }
+    return summary;
   }
 
   async function saveCoachingUpdates(context) {
@@ -2202,6 +2478,17 @@ function assertManualActivitySource(source) {
 function recordIdentity(record, index = 0) {
   return String(record?.id ?? record?.canonicalId ?? record?.package_id ?? record?.review_id ?? `@index:${index}`);
 }
+
+function stableJson(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+}
+
+const WORKOUT_TERMINAL_STATES = new Set([
+  HealthKitReconciliationState.WORKOUT_CANONICALIZED,
+  HealthKitReconciliationState.WORKOUT_SUMMARY_SUPERSEDED,
+]);
 
 const DAILY_SNAPSHOT_STATES = Object.freeze({
   [HealthKitCanonicalDomain.ACTIVITY]: Object.freeze({

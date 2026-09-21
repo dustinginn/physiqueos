@@ -18,6 +18,11 @@ export const HEALTHKIT_CANONICAL_ACTIVATION_POLICY_SCHEMA_VERSION = "healthkit-c
 // One explicitly bounded proving window. It is a date range only so a test day
 // can finish after midnight; it is never an open-ended activation.
 export const HEALTHKIT_CANONICAL_ACTIVATION_MAX_DAYS = 7;
+// Workout canonicalization is activated independently of the daily domains: its
+// own record, its own exact window, and its own audit trail. OFF by default.
+export const HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID = "healthkit_workout_canonical_activation_policy";
+export const HEALTHKIT_WORKOUT_ACTIVATION_POLICY_SCHEMA_VERSION = "healthkit-workout-activation-policy-v1";
+export const HEALTHKIT_WORKOUT_ACTIVATION_MAX_DAYS = 3;
 export const HEALTHKIT_NUTRITION_MAX_FIELDS = 4;
 export const HEALTHKIT_NUTRITION_DAILY_TOTAL_SCOPE = "daily_total_all_sources";
 export const HealthKitCanonicalizationDomain = Object.freeze({
@@ -51,6 +56,9 @@ export const HealthKitReconciliationState = Object.freeze({
   NUTRITION_VALIDATION_ONLY: "nutrition_validation_only",
   NUTRITION_SUMMARY_SUPERSEDED: "nutrition_summary_superseded",
   WORKOUT_CANONICALIZATION_DEFERRED: "workout_canonicalization_deferred",
+  WORKOUT_CANONICALIZATION_PENDING: "workout_canonicalization_pending",
+  WORKOUT_CANONICALIZED: "workout_canonicalized",
+  WORKOUT_SUMMARY_SUPERSEDED: "workout_summary_superseded",
   TRAINING_MATCH_CANDIDATE: "training_match_candidate",
   TRAINING_MATCH_AMBIGUOUS: "training_match_ambiguous",
   TRAINING_SESSION_LINKED: "training_session_linked",
@@ -231,6 +239,78 @@ export function assessHealthKitCanonicalization({ observation, activationPolicy 
   });
 }
 
+export function resolveHealthKitWorkoutActivationPolicy(record) {
+  const disabled = (source, invalidReason = null) => Object.freeze({
+    enabled: false,
+    effectiveLocalDate: null,
+    endLocalDate: null,
+    source,
+    invalidReason,
+  });
+  if (!record) return disabled("not_configured");
+  // Same fail-closed, never-throws contract as the daily policy.
+  try {
+    if (record.status !== "enabled") return disabled("server_owned_configuration", "status_not_enabled");
+    if (record.schemaVersion !== HEALTHKIT_WORKOUT_ACTIVATION_POLICY_SCHEMA_VERSION) {
+      return disabled("invalid_configuration_fail_closed", "schema_version_unrecognized");
+    }
+    if (record.strategicEvidenceEligibility !== undefined && record.strategicEvidenceEligibility !== "quarantined") {
+      return disabled("invalid_configuration_fail_closed", "strategic_eligibility_not_quarantined");
+    }
+    if (record.historicalBackfill !== undefined && record.historicalBackfill !== false) {
+      return disabled("invalid_configuration_fail_closed", "historical_backfill_not_permitted");
+    }
+    // A confirmed link is always a separate, explicit act; it is never a policy option.
+    if (record.linkAutoConfirm !== undefined && record.linkAutoConfirm !== false) {
+      return disabled("invalid_configuration_fail_closed", "link_auto_confirm_not_permitted");
+    }
+    if (!Array.isArray(record.domains) || record.domains.length !== 1 || record.domains[0] !== "workout") {
+      return disabled("invalid_configuration_fail_closed", "domains_invalid");
+    }
+    const effectiveLocalDate = calendarDate(record.effectiveLocalDate, "effectiveLocalDate");
+    const endLocalDate = calendarDate(record.endLocalDate, "endLocalDate");
+    const days = Math.round((Date.parse(`${endLocalDate}T00:00:00.000Z`) - Date.parse(`${effectiveLocalDate}T00:00:00.000Z`)) / 86400000) + 1;
+    if (days < 1 || days > HEALTHKIT_WORKOUT_ACTIVATION_MAX_DAYS) {
+      return disabled("invalid_configuration_fail_closed", "window_invalid");
+    }
+    return Object.freeze({
+      enabled: true,
+      effectiveLocalDate,
+      endLocalDate,
+      source: "server_owned_configuration",
+      invalidReason: null,
+    });
+  } catch {
+    return disabled("invalid_configuration_fail_closed", "policy_unreadable");
+  }
+}
+
+/**
+ * Whether one workout may be canonicalized. The effective local date is
+ * supplied by the caller, derived from the workout's own start and time zone,
+ * never from the client label or the ingestion time.
+ */
+export function assessHealthKitWorkoutCanonicalization({ observation, effectiveLocalDate, activationPolicy } = {}) {
+  if (observation?.observationType !== HealthKitObservationType.WORKOUT) {
+    return Object.freeze({ eligible: false, reason: "not_a_workout" });
+  }
+  if (observation.ingestionPurpose === HealthKitIngestionPurpose.VALIDATION_ONLY) {
+    return Object.freeze({ eligible: false, permanent: true, reason: "validation_only_permanently_raw" });
+  }
+  const policy = resolveHealthKitWorkoutActivationPolicy(activationPolicy);
+  if (!policy.enabled) {
+    return Object.freeze({ eligible: false, permanent: false, reason: "workout_canonicalization_not_activated" });
+  }
+  const scope = { effectiveLocalDate: policy.effectiveLocalDate, endLocalDate: policy.endLocalDate };
+  if (effectiveLocalDate < policy.effectiveLocalDate) {
+    return Object.freeze({ eligible: false, permanent: true, reason: "before_activation_date", ...scope });
+  }
+  if (effectiveLocalDate > policy.endLocalDate) {
+    return Object.freeze({ eligible: false, permanent: true, reason: "after_activation_window", ...scope });
+  }
+  return Object.freeze({ eligible: true, permanent: false, reason: "within_activation_window", ...scope });
+}
+
 export function isCompatibleHealthKitReplay(existing, incoming) {
   const existingPurpose = existing?.ingestionPurpose ?? HealthKitIngestionPurpose.OPERATIONAL;
   if (existingPurpose !== incoming?.ingestionPurpose) return false;
@@ -324,6 +404,10 @@ function normalizeObservation(value, { batchId, principalDeviceId, index }) {
   if (canonicalizationDomain(observationType)) {
     // Daily snapshots legitimately change; device and revision are identity.
     identityParts.push(principalDeviceId, String(measurement.sourceRevision));
+  } else if (observationType === HealthKitObservationType.WORKOUT && measurement.sourceRevision > 1) {
+    // A workout revision is a new observation of the same source workout. A
+    // first (or unstated) revision keeps the exact V1 identity.
+    identityParts.push(String(measurement.sourceRevision));
   }
   // V1 compatibility boundary: this NUL separator is deliberately preserved.
   const id = `healthkit_observation_${digest(identityParts.join("\u0000"))}`;
@@ -451,6 +535,12 @@ function normalizeMeasurement(value, observationType, index) {
       distance: optionalFinite(workout.distance, `observations[${index}].workout.distance`),
       distanceUnit: optionalText(workout.distanceUnit, `observations[${index}].workout.distanceUnit`),
       averageHeartRate: optionalFinite(workout.averageHeartRate, `observations[${index}].workout.averageHeartRate`),
+      // A first revision is the same observation whether stated or not.
+      sourceRevision: workout.sourceRevision == null
+        ? null
+        : (positiveInteger(workout.sourceRevision, `observations[${index}].workout.sourceRevision`) > 1
+          ? positiveInteger(workout.sourceRevision, `observations[${index}].workout.sourceRevision`)
+          : null),
     });
   }
   const sample = value.quantitySample;
@@ -465,7 +555,7 @@ function normalizeMeasurement(value, observationType, index) {
   };
 }
 
-function createCanonicalWorkoutCandidate(observation) {
+export function createCanonicalWorkoutCandidate(observation) {
   const measurement = observation.measurement;
   return Object.freeze({
     id: observation.id,
@@ -497,7 +587,7 @@ function createCanonicalWorkoutCandidate(observation) {
   });
 }
 
-function isActiveDetailedStrengthSession(record) {
+export function isActiveDetailedStrengthSession(record) {
   const payload = record?.payload ?? record;
   return payload?.evidence_type === "training" &&
     record?.quality?.status !== "superseded" &&
@@ -506,8 +596,12 @@ function isActiveDetailedStrengthSession(record) {
     Array.isArray(payload?.exercises) && payload.exercises.length > 0;
 }
 
-function isStrengthWorkout(value) {
-  return /strength|resistance|weight training|functional strength|traditional strength/i.test(String(value ?? ""));
+// Native sends HKWorkoutActivityType as its numeric raw value (for example "50"),
+// so the numeric form must classify exactly like the display name.
+export function isStrengthWorkout(value) {
+  const text = String(value ?? "").trim();
+  if (text === "50" || text === "20") return true;
+  return /strength|resistance|weight training|functional strength|traditional strength/i.test(text);
 }
 
 function canonicalizationDomain(observationType) {

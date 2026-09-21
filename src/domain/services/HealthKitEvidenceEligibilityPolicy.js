@@ -25,6 +25,9 @@ export const HEALTHKIT_CANONICAL_DAY_COLLECTION = "healthKitCanonicalDays";
 export const HEALTHKIT_OBSERVATION_COLLECTION = "healthKitObservations";
 export const HEALTHKIT_OBSERVATION_ID_PREFIX = "healthkit_observation_";
 export const HEALTHKIT_CANONICAL_DAY_ID_PREFIX = "healthkit_canonical_day_";
+export const HEALTHKIT_CANONICAL_WORKOUT_COLLECTION_NAME = "healthKitCanonicalWorkouts";
+export const HEALTHKIT_WORKOUT_LINK_COLLECTION_NAME = "healthKitWorkoutLinks";
+export const HEALTHKIT_WORKOUT_RECORD_ID_PREFIXES = Object.freeze(["healthkit_canonical_workout_", "healthkit_workout_link_"]);
 
 /**
  * Whether any HealthKit-derived record may currently be strategic Evidence.
@@ -67,6 +70,7 @@ export function isHealthKitDerivedRecord(record) {
     /^(direct|api|device|integration|wearable)$/i.test(String(source.modality ?? ""))) return true;
   const ownId = String(payload.id ?? record?.id ?? "");
   if (ownId.startsWith(HEALTHKIT_OBSERVATION_ID_PREFIX) || ownId.startsWith(HEALTHKIT_CANONICAL_DAY_ID_PREFIX)) return true;
+  if (HEALTHKIT_WORKOUT_RECORD_ID_PREFIXES.some((prefix) => ownId.startsWith(prefix))) return true;
   if (payload.observationType && payload.ingestion?.deliveryDeviceId !== undefined &&
     String(payload.schemaVersion ?? "").startsWith("healthkit-")) return true;
   if (typeof source.source_observation_id === "string" &&

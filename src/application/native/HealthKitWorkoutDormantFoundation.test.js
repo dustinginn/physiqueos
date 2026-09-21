@@ -1,0 +1,442 @@
+import { describe, expect, it } from "vitest";
+import { createCanonicalPersistenceCommandPorts } from "../commands/CanonicalPersistenceCommandPorts.js";
+import { createInMemoryCanonicalRecordStore } from "../../platform/database/Phase4CanonicalRecordStore.js";
+import { createV3EvidenceUniverse } from "../../domain/intelligence/V3EvidenceUniverse.js";
+import {
+  assertNotQuarantinedHealthKitEvidence,
+  assessHealthKitStrategicEvidenceEligibility,
+  selectStrategicallyEligibleRecords,
+} from "../../domain/services/HealthKitEvidenceEligibilityPolicy.js";
+import { resolveHealthKitWorkoutActivationPolicy } from "../../domain/services/HealthKitObservationService.js";
+
+const OWNER = "user_founder_001";
+const WORKOUT_POLICY_ID = "healthkit_workout_canonical_activation_policy";
+const DAILY_POLICY_ID = "healthkit_canonical_daily_activation_policy";
+const DAY = "2026-09-23";
+const HK_UUID = "9f3c2a10-1111-4222-8333-444455556666";
+const SENTINELS = [
+  "goals", "phaseStrategies", "goalConfidenceSnapshots", "goalConfidenceHistory", "analyses", "dailyBriefings",
+  "briefingReconciliationWorkItems", "phaseReviewDecisions", "phaseLifecycleReadModels", "operatingPlan", "protocols",
+  "trainingPerformanceEvents", "trainingPerformanceEventBatches", "canonicalExerciseLibrary", "dexaScans", "progressPhotos",
+];
+
+describe("Workout canonicalization is OFF by default", () => {
+  it("keeps every workout raw when no Workout policy exists, exactly as before, with numeric types now recognized", async () => {
+    const records = store({ workoutPolicy: false, evidence: [logger("session-a", "10:01", "10:59")] });
+    const before = records.snapshot();
+    const result = await ingest(records, [workout({ activityType: "50" })]);
+    expect(result.result).toMatchObject({ workoutCanonicalizedCount: 0, workoutRelationships: { assessed: 0 } });
+    // The pre-existing raw candidate state; the numeric "50" is now recognized as strength.
+    expect(result.result.observations[0].reconciliation).toMatchObject({ state: "training_match_candidate", confirmationRequired: true });
+    const after = records.snapshot();
+    expect(after.healthKitCanonicalWorkouts).toEqual([]);
+    expect(after.healthKitWorkoutLinks).toEqual([]);
+    for (const name of [...SENTINELS, "canonicalEvidenceObjects"]) expect(after[name]).toEqual(before[name]);
+  });
+
+  it.each([
+    ["not enabled", { status: "disabled" }],
+    ["no schema version", { schemaVersion: undefined }],
+    ["an eligibility other than quarantined", { strategicEvidenceEligibility: "eligible" }],
+    ["a backfill request", { historicalBackfill: true }],
+    ["link auto-confirm", { linkAutoConfirm: true }],
+    ["extra domains", { domains: ["workout", "activity"] }],
+    ["a window over three days", { endLocalDate: "2026-09-27" }],
+    ["an open window", { endLocalDate: undefined }],
+  ])("fails closed on a policy with %s, without throwing", async (_label, overrides) => {
+    expect(resolveHealthKitWorkoutActivationPolicy(policy(overrides)).enabled).toBe(false);
+    const records = store({ workoutPolicyOverrides: overrides });
+    const result = await ingest(records, [workout()]);
+    expect(result.status).toBe("committed");
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
+  });
+
+  it("is independent of the Activity + Nutrition policy: each enables only its own domains", async () => {
+    const dailyOnly = store({ workoutPolicy: false, dailyPolicy: true });
+    const first = await ingest(dailyOnly, [workout(), activity()]);
+    expect(first.result).toMatchObject({ workoutCanonicalizedCount: 0, activityDayCanonicalizedCount: 1 });
+    const workoutOnly = store({ workoutPolicy: true, dailyPolicy: false });
+    const second = await ingest(workoutOnly, [workout(), activity()]);
+    expect(second.result).toMatchObject({ workoutCanonicalizedCount: 1, activityDayCanonicalizedCount: 0 });
+    expect(workoutOnly.snapshot().healthKitObservations.find((o) => o.observationType === "activity_summary").reconciliation.reason)
+      .toBe("canonicalization_not_activated");
+  });
+});
+
+describe("controlled Workout window (policy enabled)", () => {
+  it("canonicalizes a strength workout as Apple telemetry, creates a link CANDIDATE, and touches nothing else", async () => {
+    const session = logger("session-a", "10:01", "10:59");
+    const records = store({ evidence: [session] });
+    const before = records.snapshot();
+    const result = await ingest(records, [workout({ activityType: "50" })]);
+    const after = records.snapshot();
+    expect(result.result).toMatchObject({
+      workoutCanonicalizedCount: 1,
+      workoutRelationships: { assessed: 1, updated: 1, candidateLinksCreated: 1 },
+    });
+    expect(result.result.observations[0].reconciliation).toMatchObject({
+      state: "workout_canonicalized", canonicalStore: "healthKitCanonicalWorkouts", workoutFamily: "strength",
+      evidenceEligibility: "quarantined", activityInteraction: "descriptive_never_additive",
+    });
+    const [canonical] = after.healthKitCanonicalWorkouts;
+    expect(canonical).toMatchObject({
+      localDate: DAY, revision: 1,
+      current: { family: "strength", canonicalType: "traditional_strength_training" },
+      linkAssessment: { outcome: "confident_match", candidates: [{ loggerSessionCanonicalId: "session-a" }] },
+      evidenceEligibility: { state: "quarantined", strategic: false },
+    });
+    expect(JSON.stringify(canonical)).not.toContain(HK_UUID);
+    expect(after.healthKitWorkoutLinks).toHaveLength(1);
+    expect(after.healthKitWorkoutLinks[0]).toMatchObject({
+      status: "candidate", contentAuthority: { trainingContent: "workout_logger", telemetry: "healthkit" },
+      loggerSessionCanonicalId: "session-a", canonicalWorkoutId: canonical.id,
+    });
+    // Logger authority, Training events, Library, strategy: byte-identical.
+    for (const name of [...SENTINELS, "canonicalEvidenceObjects", "evidencePackages"]) expect(after[name]).toEqual(before[name]);
+    expect(after.canonicalEvidenceObjects[0]).toEqual(session);
+  });
+
+  it("is idempotent: an identical replay under a new batch changes nothing", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "b1");
+    const snapshot = records.snapshot();
+    const replay = await ingest(records, [workout()], "b2");
+    expect(replay.result).toMatchObject({ status: "matched", createdCount: 0, matchedCount: 1, workoutCanonicalizedCount: 1 });
+    expect(replay.result.workoutRelationships).toMatchObject({ candidateLinksCreated: 0, updated: 0 });
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual(snapshot.healthKitCanonicalWorkouts);
+    expect(records.snapshot().healthKitWorkoutLinks).toEqual(snapshot.healthKitWorkoutLinks);
+  });
+
+  it("advances the same canonical workout on a later revision and keeps one link", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout({ durationSeconds: 3300, activeCalories: 350 })], "b1");
+    const revised = await ingest(records, [workout({ sourceRevision: 2, durationSeconds: 3600, activeCalories: 410 })], "b2");
+    expect(revised.result.observations[0].reconciliation).toMatchObject({ state: "workout_canonicalized", canonicalRevision: 2, canonicalAction: "update" });
+    const snapshot = records.snapshot();
+    expect(snapshot.healthKitCanonicalWorkouts).toHaveLength(1);
+    expect(snapshot.healthKitCanonicalWorkouts[0]).toMatchObject({ revision: 2, current: { telemetry: { activeCalories: 410, durationSeconds: 3600 } } });
+    expect(snapshot.healthKitCanonicalWorkouts[0].revisionHistory).toHaveLength(1);
+    expect(snapshot.healthKitWorkoutLinks).toHaveLength(1);
+    expect(snapshot.healthKitObservations).toHaveLength(2);
+  });
+
+  it("attributes the day by the workout's own start, not the client label or the ingestion time", async () => {
+    const records = store();
+    // Started 23:50 PDT Sep 23 (06:50Z Sep 24), client mislabelled Sep 24, delivered on Sep 25 UTC.
+    const late = await ingest(records, [workout({ startedAt: "2026-09-23T23:50:00-07:00", endedAt: "2026-09-24T00:40:00-07:00", clientLocalDate: "2026-09-24" })], "b1", { receivedAt: "2026-09-25T09:00:00.000Z" });
+    expect(late.result.workoutCanonicalizedCount).toBe(1);
+    expect(records.snapshot().healthKitCanonicalWorkouts[0]).toMatchObject({ localDate: DAY, current: { localDateCorrected: true, clientLocalDate: "2026-09-24" } });
+    // Started 00:10 PDT Sep 24: outside the exact window even though the client said Sep 23.
+    const next = await ingest(records, [workout({ externalId: "next-uuid", startedAt: "2026-09-24T00:10:00-07:00", endedAt: "2026-09-24T01:00:00-07:00", clientLocalDate: DAY })], "b2");
+    expect(next.result.observations[0].reconciliation.state).not.toBe("workout_canonicalized");
+    expect(next.result.workoutCanonicalizedCount).toBe(0);
+    expect(records.snapshot().healthKitCanonicalWorkouts).toHaveLength(1);
+  });
+
+  it("re-evaluates the link when the Logger session is committed AFTER the Apple workout arrived", async () => {
+    const records = store();
+    await ingest(records, [workout()], "b1");
+    expect(records.snapshot().healthKitCanonicalWorkouts[0].linkAssessment).toMatchObject({ outcome: "no_match" });
+    expect(records.snapshot().healthKitWorkoutLinks).toEqual([]);
+    await records.put({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-a", payload: logger("session-a", "10:01", "10:59") });
+    const replay = await ingest(records, [workout()], "b2");
+    expect(replay.result.workoutRelationships).toMatchObject({ candidateLinksCreated: 1, updated: 1 });
+    expect(records.snapshot().healthKitWorkoutLinks[0]).toMatchObject({ status: "candidate", loggerSessionCanonicalId: "session-a" });
+  });
+
+  it("never links an ambiguous match and releases a stale candidate when a second session appears", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "b1");
+    expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(1);
+    await records.put({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-b", payload: logger("session-b", "10:02", "11:01") });
+    const replay = await ingest(records, [workout()], "b2");
+    expect(replay.result.workoutRelationships).toMatchObject({ candidateLinksReleased: 1 });
+    const snapshot = records.snapshot();
+    expect(snapshot.healthKitCanonicalWorkouts[0].linkAssessment).toMatchObject({ outcome: "ambiguous_multiple" });
+    expect(snapshot.healthKitWorkoutLinks).toHaveLength(1);
+    expect(snapshot.healthKitWorkoutLinks[0].status).toBe("unlinked");
+    expect(snapshot.healthKitWorkoutLinks[0].statusHistory.at(-1)).toMatchObject({ reason: "assessment_changed" });
+  });
+
+  it("canonicalizes cardio idempotently and records coexistence with an existing Apple Fitness walk (no double count)", async () => {
+    const appleFitnessWalk = {
+      canonicalId: "training|screenshot|walk-1", version: 1, quality: { status: "active" },
+      payload: { id: "walk-1", evidence_type: "training", observed_at: DAY, source: { application: "Apple Fitness", modality: "screenshot" },
+        metadata: { activity_type: "Outdoor Walk", start_time: `${DAY}T07:01:00-07:00`, end_time: `${DAY}T07:41:00-07:00`, duration_seconds: 2400, active_calories: 150 }, exercises: [] },
+    };
+    const records = store({ evidence: [appleFitnessWalk] });
+    const before = records.snapshot();
+    const walk = workout({ externalId: "walk-uuid", activityType: "52", startedAt: `${DAY}T07:00:00-07:00`, endedAt: `${DAY}T07:40:00-07:00`, durationSeconds: 2400, activeCalories: 150 });
+    await ingest(records, [walk], "b1");
+    await ingest(records, [walk], "b2");
+    const after = records.snapshot();
+    expect(after.healthKitCanonicalWorkouts).toHaveLength(1);
+    expect(after.healthKitCanonicalWorkouts[0]).toMatchObject({ current: { family: "cardio", canonicalType: "walking" }, coexistence: { state: "matches_existing_evidence_workout" } });
+    expect(after.healthKitWorkoutLinks).toEqual([]);
+    expect(after.canonicalEvidenceObjects).toEqual(before.canonicalEvidenceObjects);
+  });
+
+  it("keeps unsupported types and validation-only workouts raw", async () => {
+    const records = store();
+    const unsupported = await ingest(records, [workout({ externalId: "elliptical", activityType: "16" })], "b1");
+    expect(unsupported.result.observations[0].reconciliation).toMatchObject({ state: "source_only", reason: "unsupported_workout_type" });
+    const validation = await ingest(records, [{ ...workout({ externalId: "validation-uuid" }), ingestionPurpose: "validation_only" }], "b2");
+    expect(validation.result.workoutCanonicalizedCount).toBe(0);
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
+  });
+
+  it("never reconsiders a raw workout stored before activation (activate first, then sync)", async () => {
+    const records = store({ workoutPolicy: false });
+    await ingest(records, [workout()], "b1");
+    await records.put({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID, payload: policy() });
+    const replay = await ingest(records, [workout()], "b2");
+    expect(replay.result.workoutCanonicalizedCount).toBe(0);
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
+  });
+
+  it("deactivation stops new canonicalization and keeps every canonical record and link", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "b1");
+    const kept = structuredClone({ w: records.snapshot().healthKitCanonicalWorkouts, l: records.snapshot().healthKitWorkoutLinks });
+    const current = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID });
+    await records.put({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID, expectedVersion: current.version, payload: { ...current, status: "disabled" } });
+    const later = await ingest(records, [workout({ externalId: "second-uuid", startedAt: `${DAY}T16:00:00-07:00`, endedAt: `${DAY}T17:00:00-07:00` })], "b2");
+    expect(later.result.workoutCanonicalizedCount).toBe(0);
+    expect({ w: records.snapshot().healthKitCanonicalWorkouts, l: records.snapshot().healthKitWorkoutLinks }).toEqual(kept);
+  });
+});
+
+describe("daily Activity is never double counted", () => {
+  it("leaves the canonical Activity day byte-identical when workouts with energy are canonicalized around it", async () => {
+    const records = store({ dailyPolicy: true });
+    await ingest(records, [activity({ moveCalories: 900 })], "b1");
+    const day = structuredClone(records.snapshot().healthKitCanonicalDays[0]);
+    await ingest(records, [
+      workout({ activeCalories: 400 }),
+      workout({ externalId: "walk-uuid", activityType: "52", startedAt: `${DAY}T07:00:00-07:00`, endedAt: `${DAY}T07:40:00-07:00`, activeCalories: 150 }),
+    ], "b2");
+    const snapshot = records.snapshot();
+    expect(snapshot.healthKitCanonicalDays).toEqual([day]);
+    expect(snapshot.healthKitCanonicalDays[0].current.values.dailyActivity.move_calories).toBe(900);
+    expect(snapshot.healthKitCanonicalDays[0].current.workoutActiveCaloriesAdditive).toBe(false);
+    expect(snapshot.healthKitCanonicalWorkouts.every((w) => w.activityInteraction.additiveToDailyActivity === false)).toBe(true);
+  });
+
+  it("leaves the current Activity + Nutrition test-day canonicalization exactly as it is when the Workout policy is on", async () => {
+    const both = store({ dailyPolicy: true, workoutPolicy: true });
+    const alone = store({ dailyPolicy: true, workoutPolicy: false });
+    for (const records of [both, alone]) await ingest(records, [activity({ moveCalories: 800 }), nutrition()], "b1");
+    const strip = (days) => days.map(({ createdAt, updatedAt, coexistence, ...rest }) => rest);
+    expect(strip(both.snapshot().healthKitCanonicalDays)).toEqual(strip(alone.snapshot().healthKitCanonicalDays));
+  });
+});
+
+describe("strategic quarantine", () => {
+  it("keeps Apple workouts and links out of V3, Evidence, and every strategic reader", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "b1");
+    const snapshot = records.snapshot();
+    const universe = createV3EvidenceUniverse({
+      store: snapshot, goal: { id: "g" }, phase: { id: "p", startedAt: "2026-09-01" }, evidenceCutoff: "2026-09-27T06:59:59.999Z",
+    });
+    expect(JSON.stringify(universe)).not.toMatch(/healthkit/i);
+    const derived = [...snapshot.healthKitCanonicalWorkouts, ...snapshot.healthKitWorkoutLinks];
+    expect(derived).toHaveLength(2);
+    expect(derived.every((record) => assessHealthKitStrategicEvidenceEligibility(record).eligible === false)).toBe(true);
+    expect(selectStrategicallyEligibleRecords(derived)).toEqual([]);
+    for (const record of derived) expect(() => assertNotQuarantinedHealthKitEvidence(record)).toThrow();
+    // No Training performance events, PRs, or Library records are produced.
+    expect(snapshot.trainingPerformanceEvents).toEqual([{ id: "trainingPerformanceEvents-sentinel", version: 1 }]);
+    expect(snapshot.canonicalExerciseLibrary).toEqual([{ id: "canonicalExerciseLibrary-sentinel", version: 1 }]);
+  });
+});
+
+async function ingest(records, observations, batchId = "batch-one", { receivedAt = "2026-09-23T23:30:00.000Z" } = {}) {
+  return createCanonicalPersistenceCommandPorts({ records, now: () => new Date(receivedAt) })
+    .ingestHealthKitObservations({
+      ownerUserId: OWNER,
+      principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+      metadata: { clientOccurredAt: receivedAt, clientTimeZone: "America/Los_Angeles", idempotencyKey: `key-${batchId}` },
+      payload: { batchId, observations },
+    });
+}
+
+function policy(overrides = {}) {
+  return {
+    id: WORKOUT_POLICY_ID,
+    schemaVersion: "healthkit-workout-activation-policy-v1",
+    status: "enabled",
+    domains: ["workout"],
+    effectiveLocalDate: DAY,
+    endLocalDate: DAY,
+    strategicEvidenceEligibility: "quarantined",
+    historicalBackfill: false,
+    linkAutoConfirm: false,
+    version: 1,
+    ...overrides,
+  };
+}
+
+function store({ workoutPolicy = true, workoutPolicyOverrides = {}, dailyPolicy = false, evidence = [] } = {}) {
+  const configuration = [];
+  if (workoutPolicy) configuration.push(policy(workoutPolicyOverrides));
+  if (dailyPolicy) {
+    configuration.push({
+      id: DAILY_POLICY_ID, schemaVersion: "healthkit-canonical-activation-policy-v1", status: "enabled",
+      domains: ["activity", "nutrition"], effectiveLocalDate: DAY, endLocalDate: DAY,
+      strategicEvidenceEligibility: "quarantined", historicalBackfill: false, version: 1,
+    });
+  }
+  return createInMemoryCanonicalRecordStore({
+    user: [{ id: OWNER, timeZone: "America/Los_Angeles", version: 1 }],
+    healthKitObservations: [],
+    healthKitCanonicalDays: [],
+    healthKitCanonicalWorkouts: [],
+    healthKitWorkoutLinks: [],
+    healthKitConfiguration: configuration,
+    canonicalEvidenceObjects: evidence,
+    evidencePackages: [],
+    ...Object.fromEntries(SENTINELS.map((name) => [name, [{ id: `${name}-sentinel`, version: 1 }]])),
+  });
+}
+
+function workout({
+  activityType = "50", externalId = HK_UUID, startedAt = `${DAY}T10:00:00-07:00`, endedAt = `${DAY}T11:00:00-07:00`,
+  clientLocalDate = DAY, durationSeconds = 3600, activeCalories = 400, averageHeartRate = 122, sourceRevision,
+} = {}) {
+  return {
+    observationType: "workout",
+    externalId,
+    source: { bundleIdentifier: "com.apple.health.watch", sourceName: "Apple Watch", productType: "Watch7,5" },
+    occurrence: { localDate: clientLocalDate, timeZone: "America/Los_Angeles", startedAt, endedAt },
+    workout: { activityType, durationSeconds, activeCalories, averageHeartRate, ...(sourceRevision ? { sourceRevision } : {}) },
+  };
+}
+
+function activity({ moveCalories = 800 } = {}) {
+  return {
+    observationType: "activity_summary",
+    externalId: `activity-summary:${DAY}`,
+    source: { bundleIdentifier: "com.apple.Health" },
+    occurrence: { localDate: DAY, timeZone: "America/Los_Angeles" },
+    activitySummary: { aggregationScope: "daily_total_including_workouts", coverage: "complete_day", sourceRevision: 1, dailyActivity: { move_calories: moveCalories, exercise_minutes: 50, stand_hours: 11 } },
+  };
+}
+
+function nutrition() {
+  return {
+    observationType: "nutrition_daily_total",
+    externalId: `nutrition-daily-total:${DAY}`,
+    source: { bundleIdentifier: "com.apple.Health" },
+    occurrence: { localDate: DAY, timeZone: "America/Los_Angeles" },
+    nutritionDailyTotal: { aggregationScope: "daily_total_all_sources", coverage: "complete_day", sourceRevision: 1, dailyNutrition: { calories: 2400, protein_g: 200, carbs_g: 250, fat_g: 70 } },
+  };
+}
+
+function logger(id, start, end, duration = 3540) {
+  return {
+    canonicalId: id,
+    version: 1,
+    quality: { status: "active" },
+    payload: {
+      id, evidence_type: "training", observed_at: DAY,
+      source: { application: "Training Logger + Apple Fitness", modality: "mixed" },
+      metadata: { activity_type: "Traditional Strength Training", start_time: `${DAY}T${start}:00-07:00`, end_time: `${DAY}T${end}:00-07:00`, duration_seconds: duration },
+      exercises: [{ name: "Bench Press", sets: [{ reps: 8, weight: 185 }] }],
+    },
+  };
+}
+
+describe("review hardening: real storage, duplicates, and shapes", () => {
+  // A jsonb column returns object keys shorter-first then bytewise, not in insertion order.
+  const jsonbOrder = (value) => {
+    if (Array.isArray(value)) return value.map(jsonbOrder);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(Object.keys(value).sort((a, b) => a.length - b.length || (a < b ? -1 : 1)).map((key) => [key, jsonbOrder(value[key])]));
+    }
+    return value;
+  };
+  const jsonbStore = (inner) => Object.freeze({
+    ...inner,
+    get: async (input) => { const r = await inner.get(input); return r ? jsonbOrder(r) : r; },
+    list: async (input) => (await inner.list(input)).map(jsonbOrder),
+    putIfAbsent: async (input) => { const r = await inner.putIfAbsent(input); return { ...r, record: jsonbOrder(r.record) }; },
+    put: async (input) => jsonbOrder(await inner.put(input)),
+  });
+
+  it("is idempotent on a store that reorders keys: repeated replays write nothing and never bump versions", async () => {
+    const inner = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    const records = jsonbStore(inner);
+    await ingest(records, [workout()], "b1");
+    const version = (await records.list({ ownerUserId: OWNER, collection: "healthKitCanonicalWorkouts" }))[0].version;
+    for (const batch of ["b2", "b3", "b4"]) {
+      const replay = await ingest(records, [workout()], batch);
+      expect(replay.result.workoutRelationships).toMatchObject({ updated: 0, candidateLinksCreated: 0, candidateLinksReleased: 0, candidateLinksRefreshed: 0 });
+    }
+    expect((await records.list({ ownerUserId: OWNER, collection: "healthKitCanonicalWorkouts" }))[0].version).toBe(version);
+    const walk = workout({ externalId: "walk-uuid", activityType: "52", startedAt: `${DAY}T07:00:00-07:00`, endedAt: `${DAY}T07:40:00-07:00` });
+    await ingest(records, [walk], "c1");
+    const walkVersion = (await records.list({ ownerUserId: OWNER, collection: "healthKitCanonicalWorkouts" })).find((w) => w.current.family === "cardio").version;
+    for (const batch of ["c2", "c3"]) {
+      expect((await ingest(records, [walk], batch)).result.workoutRelationships.updated).toBe(0);
+    }
+    expect((await records.list({ ownerUserId: OWNER, collection: "healthKitCanonicalWorkouts" })).find((w) => w.current.family === "cardio").version).toBe(walkVersion);
+  });
+
+  it("keeps one physical workout from becoming two candidate links when HealthKit re-creates it under a new UUID", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout({ externalId: "original-uuid" })], "b1");
+    const recreated = await ingest(records, [workout({ externalId: "recreated-uuid" })], "b2");
+    const snapshot = records.snapshot();
+    expect(snapshot.healthKitCanonicalWorkouts).toHaveLength(2);
+    expect(snapshot.healthKitWorkoutLinks).toHaveLength(1);
+    const [first, second] = [...snapshot.healthKitCanonicalWorkouts].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+    expect(first.linkAssessment).toMatchObject({ outcome: "confident_match", possibleDuplicateOf: [second.id] });
+    expect(second.linkAssessment).toMatchObject({ linkSuppressed: "possible_duplicate_of_another_canonical_workout", possibleDuplicateOf: [first.id] });
+    expect(snapshot.healthKitWorkoutLinks[0].canonicalWorkoutId).toBe(first.id);
+    expect(recreated.result.workoutRelationships.candidateLinksCreated).toBe(0);
+  });
+
+  it("restores the system's own released candidate when the ambiguity later clears", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "b1");
+    await records.put({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-b", payload: logger("session-b", "10:02", "11:01") });
+    await ingest(records, [workout()], "b2");
+    expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("unlinked");
+    const b = await records.get({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-b" });
+    await records.put({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-b", expectedVersion: b.version, payload: { ...b, quality: { status: "superseded" } } });
+    const cleared = await ingest(records, [workout()], "b3");
+    expect(cleared.result.workoutRelationships.candidateLinksRefreshed).toBe(1);
+    expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("candidate");
+    expect(records.snapshot().healthKitWorkoutLinks[0].statusHistory.at(-1)).toMatchObject({ reason: "assessment_restored" });
+  });
+
+  it("links a Logger session recorded with a bare wall time or meridiem time", async () => {
+    const shaped = logger("session-a", "10:01", "10:59");
+    shaped.payload.metadata.start_time = "10:01 AM";
+    shaped.payload.metadata.end_time = "10:59 AM";
+    const records = store({ evidence: [shaped] });
+    const result = await ingest(records, [workout()], "b1");
+    expect(result.result.workoutRelationships.candidateLinksCreated).toBe(1);
+    expect(records.snapshot().healthKitCanonicalWorkouts[0].linkAssessment).toMatchObject({ outcome: "confident_match", unverifiableSessionCount: 0 });
+  });
+
+  it("treats an explicit first sourceRevision as the same observation as an unstated one", async () => {
+    const records = store();
+    await ingest(records, [workout()], "b1");
+    const again = await ingest(records, [workout({ sourceRevision: 1 })], "b2");
+    expect(again.result).toMatchObject({ status: "matched", matchedCount: 1, createdCount: 0 });
+    expect(records.snapshot().healthKitObservations).toHaveLength(1);
+  });
+
+  it("keeps coexistence on the canonical cardio workout across a later revision", async () => {
+    const shot = { canonicalId: "training|screenshot|walk-1", version: 1, quality: { status: "active" }, payload: {
+      id: "walk-1", evidence_type: "training", observed_at: DAY, source: { application: "Apple Fitness", modality: "screenshot" },
+      metadata: { activity_type: "Outdoor Walk", start_time: "07:01:00", end_time: "07:41:00", duration_seconds: 2400, active_calories: 150 }, exercises: [] } };
+    const records = store({ evidence: [shot] });
+    const walk = (extra = {}) => workout({ externalId: "walk-uuid", activityType: "52", startedAt: `${DAY}T07:00:00-07:00`, endedAt: `${DAY}T07:40:00-07:00`, durationSeconds: 2400, activeCalories: 150, ...extra });
+    await ingest(records, [walk()], "b1");
+    await ingest(records, [walk({ sourceRevision: 2, activeCalories: 160 })], "b2");
+    expect(records.snapshot().healthKitCanonicalWorkouts[0]).toMatchObject({ revision: 2, coexistence: { state: "matches_existing_evidence_workout" } });
+  });
+});

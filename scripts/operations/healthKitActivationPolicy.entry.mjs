@@ -21,6 +21,7 @@ import { createPhase4CanonicalRecordStore } from "../../src/platform/database/Ph
 const EXPECTED_GIT_SHA = typeof __EXPECTED_GIT_SHA__ === "undefined" ? "" : __EXPECTED_GIT_SHA__;
 const MODE = typeof __MODE__ === "undefined" ? "dry-run" : __MODE__;
 const ACTION = typeof __ACTION__ === "undefined" ? "" : __ACTION__;
+const POLICY_KIND = typeof __POLICY_KIND__ === "undefined" ? "daily" : __POLICY_KIND__;
 const DOMAINS = typeof __DOMAINS__ === "undefined" ? "" : __DOMAINS__;
 const EFFECTIVE = typeof __EFFECTIVE__ === "undefined" ? "" : __EFFECTIVE__;
 const END = typeof __END__ === "undefined" ? "" : __END__;
@@ -40,6 +41,7 @@ const sanitizedCode = (error) => (/^[A-Za-z0-9_]{3,60}$/.test(String(error?.code
 
 if (!["dry-run", "apply"].includes(MODE)) stop("MODE_INVALID");
 if (!["activate", "deactivate"].includes(ACTION)) stop("ACTION_INVALID");
+if (!["daily", "workout"].includes(POLICY_KIND)) stop("POLICY_KIND_INVALID");
 if (MODE === "apply" && !AUTHORIZATION_REFERENCE.trim()) stop("AUTHORIZATION_REFERENCE_REQUIRED");
 if (MODE === "apply" && !EXPECTED_JSON) stop("EXPECTED_FACTS_REQUIRED");
 if (!/^[0-9a-f]{40}$/.test(EXPECTED_GIT_SHA)) stop("EXPECTED_GIT_SHA_REQUIRED");
@@ -98,6 +100,7 @@ try {
       authorizationReference: AUTHORIZATION_REFERENCE,
     },
     action: ACTION,
+    policyKind: POLICY_KIND,
     apply,
     expected,
   });
@@ -112,7 +115,7 @@ try {
   clearTimeout(watchdog);
 }
 if (failure || !result) stop(failure ?? "ACTIVATION_INCOMPLETE");
-process.stdout.write(`PHYSIQUEOS_HEALTHKIT_ACTIVATION_JSON:${JSON.stringify({ mode: MODE, action: ACTION, authorizationReference: AUTHORIZATION_REFERENCE || null, ...result })}\n`);
+process.stdout.write(`PHYSIQUEOS_HEALTHKIT_ACTIVATION_JSON:${JSON.stringify({ mode: MODE, action: ACTION, policyKind: POLICY_KIND, authorizationReference: AUTHORIZATION_REFERENCE || null, ...result })}\n`);
 // The success marker means the operation did what was asked: a dry run that
 // planned, or an apply that committed. Refused, drifted, or otherwise
 // rolled-back outcomes end non-zero with no marker.

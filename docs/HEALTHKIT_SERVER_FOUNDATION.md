@@ -109,21 +109,35 @@ During the proving period the Evidence store's screenshot/manual day remains the
 
 `HealthKitEvidenceEligibilityPolicy` is the one explicit gate. `HEALTHKIT_STRATEGIC_EVIDENCE_ELIGIBLE` is a reviewed constant (false), not a setting. Canonical days carry `evidenceEligibility: { state: "quarantined", strategic: false }`. HealthKit-derived records are refused at both strategic Evidence write entry points (`upsertCanonicalDay` and the canonical Evidence package commit) with `HEALTHKIT_STRATEGIC_EVIDENCE_QUARANTINED`, including the legacy non-Native `activity-day.sync.v1` port whose default source was HealthKit. No V3, Confidence, Energy, briefing, Training, or Goal reader loads `healthKitCanonicalDays`. Promotion is a later change to that policy module, never an operator toggle.
 
-## Workout boundary
+## Workout boundary (dormant foundation)
 
-HealthKit workouts remain in the separate `healthKitObservations` source collection.
+HealthKit workouts remain source observations. Production Workout canonicalization is OFF: it needs its own server-owned policy record, `healthkit_workout_canonical_activation_policy` (schema `healthkit-workout-activation-policy-v1`, domain `workout` only, exact inclusive window of at most 3 local dates, quarantined, no backfill, `linkAutoConfirm` false). The record is independent of the Activity + Nutrition policy: separate id, separate window, separate audit rows, and the activation operation proves by digest that it never reads or writes the other. Like the daily policy it fails closed and never throws, and a raw workout stored before activation is never reconsidered (activate first, then sync).
 
-Cardio observations expose a canonical candidate but are not committed into `canonicalEvidenceObjects`. Current downstream Training readers treat records there as strategically consumable Evidence, so auto-commit would violate the eligibility boundary.
+```
+HKWorkout -> Native observation (workout, activityType = numeric HKWorkoutActivityType raw value)
+  -> healthkit.observations.ingest.v1 -> raw healthKitObservations row (immutable V1 identity)
+  -> [policy on, inside window] canonical Apple workout (healthKitCanonicalWorkouts)
+  -> strength: link candidate (healthKitWorkoutLinks)   cardio: coexistence note
+  -> Evidence eligibility: quarantined (HealthKitEvidenceEligibilityPolicy)  -> V3 only after later authorization
+```
 
-For strength workouts, server-owned candidate matching reuses canonical workout duplicate-identity logic. One possible match remains a confirmation-required candidate; multiple matches are ambiguous; pre-existing exact source identity can be recognized; no trustworthy match remains source-only.
+Supported types: strength = traditionalStrengthTraining (50) and functionalStrengthTraining (20); cardio = walking (52), running (37), cycling (13), the types PhysiqueOS already models as cardio. Display names classify identically. Everything else stays a raw source observation, never guessed. (Native sends the numeric raw value, so the numeric form must classify like the name; before this foundation only names did.)
 
-Ingestion never adds, changes, or removes exercises, sets, reps, load, variants, Superset relationships, bodyweight sets, or timed sets. TrainingSession remains authoritative. Confirmation and link mutation remain deferred.
+Identity and revisions. A first or unstated revision keeps the exact V1 observation identity; an optional `workout.sourceRevision` above 1 joins the identity so a revision is a new observation of the same source workout. The canonical record is keyed by a hash of source bundle and immutable HealthKit workout id (the private id is never stored or reported), so every revision resolves to one record. Identical replay is a no-op; a newer source revision advances the same record and keeps the prior telemetry in history; an older or equal revision never displaces a newer one. The effective local date comes from the workout's own start in its own time zone, never the client label or ingestion time. Deletion convergence is not part of the observation contract yet (Native keeps deletions deferred), so a removed or re-created HealthKit workout is a known follow-up, not silently handled.
+
+Telemetry only. A canonical Apple workout carries start, end, duration, active and total calories, distance, average heart rate, source device and workout type; no raw heart-rate series and never exercises, sets, reps, or load. The Workout Logger remains the sole authority for training content. Workout energy is already inside Apple's daily active-energy total, so it is descriptive and never additive: the canonical day is never changed by workouts, and `composeDailyActiveEnergyWithWorkouts` adds nothing.
+
+Strength link candidates. One deterministic Server-owned matcher reuses the existing same-workout semantics of `WorkoutDuplicateIdentityService` unchanged (confident at 80, possible at 50, five-minute temporal tolerance, no bare-filename identity): `confident_match` (one same-day session with real temporal overlap or an explicit source identity), `possible_match` (one session below the confident threshold), `ambiguous_multiple` (two or more plausible sessions, never linked) and `no_match`. Only a confident or possible single match produces a link record, and it is only a `candidate`; nothing is confirmed automatically (an explicit source identity already named by the Logger session is the one exception). A link records the Logger session id as training-content authority, the Apple workout as telemetry authority, who or what created it, and its status history; confirm, unlink and relink are state transitions that keep both records, with at most one confirmed link per side. Reassessment runs whenever a workout batch arrives while the policy is on, so a Logger session committed after the Apple workout still becomes a candidate, and a candidate the matcher no longer supports is released.
+
+Cardio. One HealthKit workout maps idempotently to one canonical record. Coexistence with an existing Evidence workout (for example an Apple Fitness walk) is recorded, never merged, so the same physical workout is not counted twice.
+
+Strategic quarantine holds for workouts exactly as for daily days: canonical workouts and links are quarantined, refused at the Evidence write boundary, absent from every strategic reader (pinned by the structural read-boundary test), and produce no Training performance events, PRs, Library records, or Goal changes.
 
 ## Storage and schema
 
 Raw observations use the application-only `healthKitObservations` collection in the existing `canonical_training_records` JSON table. They are excluded from the canonical Founder runtime import/export inventory and from canonical Evidence reads.
 
-The activation policy and its audit rows use the application-only `healthKitConfiguration` collection, and canonical days use `healthKitCanonicalDays`, both in that same generic table. There is no public activation command; see the gated operation above.
+The activation policies and their audit rows use the application-only `healthKitConfiguration` collection; canonical days, canonical workouts and workout links use `healthKitCanonicalDays`, `healthKitCanonicalWorkouts` and `healthKitWorkoutLinks`, all in that same generic table. There is no public activation command; see the gated operation above.
 
 Founder-authenticated Native clients can read validation-only Activity observations through `/api/v1/native/read/healthkit-activity-canary?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`. Both dates are required, inclusive, and limited to 31 local dates. The projection exposes normalized Activity values and bounded provenance only; it omits anchors and strategic fields and has no canonical authority.
 

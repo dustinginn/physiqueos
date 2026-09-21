@@ -16,11 +16,18 @@ const ALLOWED = new Set([
   "domain/services/HealthKitCanonicalDayService.js",
   "domain/services/HealthKitEvidenceEligibilityPolicy.js",
   "domain/services/HealthKitObservationService.js",
+  "domain/services/HealthKitWorkoutLinkService.js",
+  "domain/services/HealthKitWorkoutService.js",
   "platform/migration/phase4DomainCollections.js",
   "platform/operations/HealthKitActivationPolicyRunner.js",
   "platform/operations/HealthKitCanonicalAcceptanceAudit.js",
+  "platform/operations/HealthKitWorkoutCanaryAudit.js",
 ]);
-const NEEDLES = ["healthKitCanonicalDays", "healthKitObservations", "HEALTHKIT_CANONICAL_DAY_COLLECTION"];
+const NEEDLES = [
+  "healthKitCanonicalDays", "healthKitObservations", "HEALTHKIT_CANONICAL_DAY_COLLECTION",
+  "healthKitCanonicalWorkouts", "healthKitWorkoutLinks",
+  "HEALTHKIT_CANONICAL_WORKOUT_COLLECTION", "HEALTHKIT_WORKOUT_LINK_COLLECTION",
+];
 
 function walk(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
