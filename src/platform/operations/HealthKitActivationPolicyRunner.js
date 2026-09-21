@@ -173,6 +173,14 @@ function planActivation({ authorization, policyRecord, current, observations }) 
   if (!resolved.enabled) {
     return { refusal: `The requested policy is not valid (${resolved.invalidReason ?? "unknown"}): domains must be activity and/or nutrition and the window at most ${HEALTHKIT_CANONICAL_ACTIVATION_MAX_DAYS} local days.` };
   }
+  const validationOnlyInWindow = observations.filter((record) =>
+    record.occurrenceDate >= resolved.effectiveLocalDate && record.occurrenceDate <= resolved.endLocalDate &&
+    ["activity_summary", "nutrition_daily_total"].includes(record.observationType) &&
+    record.ingestionPurpose === "validation_only"
+  ).length;
+  if (validationOnlyInWindow > 0) {
+    return { refusal: `${validationOnlyInWindow} validation-only observation(s) already exist inside the window; an operational upload for those dates could collide with their immutable purpose. Choose a window with no validation-only data.` };
+  }
   if (current.enabled) {
     return { refusal: "A canonical activation policy is already enabled. Deactivate it first; windows are never widened in place." };
   }

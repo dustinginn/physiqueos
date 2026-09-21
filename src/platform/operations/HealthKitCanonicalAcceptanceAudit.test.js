@@ -91,6 +91,15 @@ describe("HealthKit production payload builder", () => {
     expect(code).not.toMatch(/PHYSIQUEOS_DATABASE_URL\s*=/);
   });
 
+  it("the activation entry prints its success marker only for the requested clean outcome", () => {
+    const entry = fs.readFileSync(new URL("../../../scripts/operations/healthKitActivationPolicy.entry.mjs", import.meta.url), "utf8");
+    const guard = entry.indexOf('const expectedOutcome = MODE === "apply" ? "applied" : "dry_run"');
+    const marker = entry.lastIndexOf("process.stdout.write(`${MARKER}");
+    expect(guard).toBeGreaterThan(0);
+    expect(marker).toBeGreaterThan(guard);
+    expect(entry).toContain("if (result.outcome !== expectedOutcome) stop(");
+  });
+
   it("refuses apply without an authorization reference and expected facts", async () => {
     await expect(buildHealthKitPayload({ kind: "policy", sha: SHA, action: "activate", domains: "activity", effective: "2026-09-23", end: "2026-09-23", mode: "apply" }))
       .rejects.toThrow(/authorization-ref/);

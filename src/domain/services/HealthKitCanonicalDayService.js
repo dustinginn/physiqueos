@@ -154,7 +154,7 @@ export function reconcileHealthKitCanonicalDay({
   const nextFingerprint = fingerprintOf(domain, localDate, incoming);
   const semanticChanged = nextFingerprint !== priorFingerprint;
   const history = semanticChanged
-    ? [...(existing.revisionHistory ?? []), historyEntry(existing)]
+    ? [...(existing.revisionHistory ?? []), historyEntry(existing, at)]
     : [...(existing.revisionHistory ?? [])];
   return Object.freeze({
     action: "update",
@@ -201,7 +201,7 @@ export function assessHealthKitCoexistence({
   }
   const otherDescriptor = describeOtherSource(other);
   const fields = domain === HealthKitCanonicalDomain.ACTIVITY
-    ? compareActivity(healthKitDay.current.values.dailyActivity, other)
+    ? compareActivity(healthKitDay.current.values.dailyActivity, other, healthKitDay.current.coverage !== "complete_day")
     : compareNutrition(healthKitDay.current, other);
   if (!fields || fields.length === 0) {
     return Object.freeze({
@@ -352,7 +352,7 @@ function fingerprintOf(domain, localDate, snapshot) {
   return `sha256_${createHash("sha256").update(stable(semantic)).digest("hex")}`;
 }
 
-function historyEntry(record) {
+function historyEntry(record, replacedAt) {
   return {
     revision: record.revision,
     semanticFingerprint: record.semanticFingerprint,
@@ -360,16 +360,20 @@ function historyEntry(record) {
     sourceRevision: record.current.sourceRevision,
     sourceObservationId: record.current.sourceObservationId,
     values: structuredClone(record.current.values),
-    supersededAt: record.updatedAt ?? null,
+    replacedAt,
   };
 }
 
-function compareActivity(healthKitActivity = {}, other) {
+function compareActivity(healthKitActivity = {}, other, partial = false) {
   const payload = other.payload ?? other;
   const daily = payload.daily_activity ?? {};
   return Object.entries(HEALTHKIT_ACTIVITY_COEXISTENCE_TOLERANCE)
     .filter(([field]) => finite(healthKitActivity[field]) && finite(daily[field]))
-    .map(([field, tolerance]) => compareField(field, healthKitActivity[field], daily[field], tolerance));
+    .map(([field, tolerance]) => {
+      const entry = compareField(field, healthKitActivity[field], daily[field], tolerance);
+      // A partial HealthKit snapshot legitimately trails a fuller source.
+      return partial && entry.delta < 0 ? { ...entry, withinTolerance: true, partialSnapshotShortfall: true } : entry;
+    });
 }
 
 function compareNutrition(current, other) {

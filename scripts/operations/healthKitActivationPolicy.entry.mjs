@@ -113,4 +113,9 @@ try {
 }
 if (failure || !result) stop(failure ?? "ACTIVATION_INCOMPLETE");
 process.stdout.write(`PHYSIQUEOS_HEALTHKIT_ACTIVATION_JSON:${JSON.stringify({ mode: MODE, action: ACTION, authorizationReference: AUTHORIZATION_REFERENCE || null, ...result })}\n`);
+// The success marker means the operation did what was asked: a dry run that
+// planned, or an apply that committed. Refused, drifted, or otherwise
+// rolled-back outcomes end non-zero with no marker.
+const expectedOutcome = MODE === "apply" ? "applied" : "dry_run";
+if (result.outcome !== expectedOutcome) stop(`OUTCOME_${String(result.outcome).toUpperCase().replace(/[^A-Z0-9_]/g, "_")}`, 2);
 process.stdout.write(`${MARKER}\n`);

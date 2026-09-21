@@ -24,6 +24,7 @@ export const HEALTHKIT_QUARANTINE_STATE = "quarantined";
 export const HEALTHKIT_CANONICAL_DAY_COLLECTION = "healthKitCanonicalDays";
 export const HEALTHKIT_OBSERVATION_COLLECTION = "healthKitObservations";
 export const HEALTHKIT_OBSERVATION_ID_PREFIX = "healthkit_observation_";
+export const HEALTHKIT_CANONICAL_DAY_ID_PREFIX = "healthkit_canonical_day_";
 
 /**
  * Whether any HealthKit-derived record may currently be strategic Evidence.
@@ -60,6 +61,14 @@ export function isHealthKitDerivedRecord(record) {
   if (!payload || typeof payload !== "object") return false;
   const source = payload.source ?? record?.source ?? {};
   if (/healthkit/i.test(String(source.integration ?? ""))) return true;
+  // An Apple Health source delivered directly (not a screenshot or manual
+  // entry) is HealthKit, whether or not the caller named the integration.
+  if (/apple health/i.test(String(source.application ?? "")) &&
+    /^(direct|api|device|integration|wearable)$/i.test(String(source.modality ?? ""))) return true;
+  const ownId = String(payload.id ?? record?.id ?? "");
+  if (ownId.startsWith(HEALTHKIT_OBSERVATION_ID_PREFIX) || ownId.startsWith(HEALTHKIT_CANONICAL_DAY_ID_PREFIX)) return true;
+  if (payload.observationType && payload.ingestion?.deliveryDeviceId !== undefined &&
+    String(payload.schemaVersion ?? "").startsWith("healthkit-")) return true;
   if (typeof source.source_observation_id === "string" &&
     source.source_observation_id.startsWith(HEALTHKIT_OBSERVATION_ID_PREFIX)) return true;
   const provenance = payload.provenance ?? record?.provenance ?? {};

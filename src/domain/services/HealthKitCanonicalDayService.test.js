@@ -91,6 +91,13 @@ describe("HealthKit canonical Activity days", () => {
     expect(promoted.record.current.values.dailyActivity.move_calories).toBe(900);
   });
 
+  it("labels history with when a snapshot was replaced, not when it was last updated", () => {
+    const first = reconcile({ observation: activity({ moveCalories: 400, sourceRevision: 1, coverage: "partial_day" }) });
+    const second = reconcile({ observation: activity({ moveCalories: 620, sourceRevision: 2, coverage: "partial_day" }), existing: first.record });
+    expect(second.record.revisionHistory[0].replacedAt).toBe(NOW);
+    expect(second.record.revisionHistory[0]).not.toHaveProperty("supersededAt");
+  });
+
   it("treats an older same-coverage revision as superseded", () => {
     const newer = reconcile({ observation: activity({ sourceRevision: 3, moveCalories: 900 }) });
     const older = reconcile({ observation: activity({ sourceRevision: 2, moveCalories: 800 }), existing: newer.record });
@@ -235,6 +242,14 @@ describe("coexistence with screenshot and manual sources", () => {
     expect(evidence[0].payload.daily_activity.move_calories).toBe(700);
   });
 
+  it("does not call a partial HealthKit Activity snapshot that trails a fuller source a conflict", () => {
+    const { record } = reconcile({ observation: activity({ coverage: "partial_day", moveCalories: 300 }), canonicalEvidenceObjects: [screenshotActivity(700)] });
+    expect(record.coexistence.state).toBe(HealthKitCoexistenceState.CONSISTENT);
+    expect(record.coexistence.fields.find((field) => field.field === "move_calories")).toMatchObject({ partialSnapshotShortfall: true });
+    const surpassing = reconcile({ observation: activity({ coverage: "partial_day", moveCalories: 900 }), canonicalEvidenceObjects: [screenshotActivity(700)] });
+    expect(surpassing.record.coexistence.state).toBe(HealthKitCoexistenceState.CONFLICT_SURFACED);
+  });
+
   it("uses the established Nutrition reconciliation tolerance against a MyFitnessPal total", () => {
     const within = reconcile({ observation: nutrition({ calories: 2420 }), canonicalEvidenceObjects: [mfpNutrition(2410)] });
     expect(within.record.coexistence.state).toBe(HealthKitCoexistenceState.CONSISTENT);
@@ -293,6 +308,14 @@ describe("strategic Evidence eligibility policy", () => {
     expect(isHealthKitDerivedRecord({ payload: { provenance: { source_observation_ids: ["healthkit_observation_abc"] } } })).toBe(true);
     expect(isHealthKitDerivedRecord({ payload: { source: { application: "Apple Health", modality: "screenshot" } } })).toBe(false);
     expect(isHealthKitDerivedRecord({ payload: { source: { application: "MyFitnessPal", modality: "screenshot" } } })).toBe(false);
+  });
+
+  it("also detects raw HealthKit observations, canonical days by id, and direct Apple Health sources without an integration key", () => {
+    expect(isHealthKitDerivedRecord({ id: "healthkit_observation_abc", observationType: "activity_summary", schemaVersion: "healthkit-source-observation-v1", evidenceEligibility: { state: "not_assessed" }, ingestion: { deliveryDeviceId: "d" } })).toBe(true);
+    expect(isHealthKitDerivedRecord({ id: "healthkit_canonical_day_activity_2026-09-23" })).toBe(true);
+    expect(isHealthKitDerivedRecord({ payload: { source: { application: "Apple Health", modality: "direct" } } })).toBe(true);
+    expect(isHealthKitDerivedRecord({ payload: { source: { application: "Apple Health", modality: "screenshot" } } })).toBe(false);
+    expect(isHealthKitDerivedRecord({ payload: { source: { application: "Apple Health", modality: "manual" } } })).toBe(false);
   });
 
   it("leaves non-HealthKit Evidence exactly as it was", () => {

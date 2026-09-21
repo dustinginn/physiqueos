@@ -97,6 +97,19 @@ describe("HealthKit canonical activation policy operation", () => {
     expect(policy).toMatchObject({ strategicEvidenceEligibility: "quarantined", historicalBackfill: false });
   });
 
+  it("refuses a window that already contains validation-only daily snapshots (immutable-purpose collision)", async () => {
+    const records = store();
+    await records.put({ ownerUserId: OWNER, collection: "healthKitObservations", recordId: "healthkit_observation_v", payload: {
+      id: "healthkit_observation_v", observationType: "activity_summary", ingestionPurpose: "validation_only", occurrenceDate: "2026-09-23",
+    } });
+    const result = await runHealthKitActivationPolicy({ records, authorization, action: "activate" });
+    expect(result.outcome).toBe("refused");
+    expect(result.reasons[0]).toMatch(/validation-only/);
+    // a window with no validation-only data is unaffected
+    const other = await runHealthKitActivationPolicy({ records, authorization: { ...authorization, effectiveLocalDate: "2026-09-25", endLocalDate: "2026-09-25" }, action: "activate" });
+    expect(other.outcome).toBe("dry_run");
+  });
+
   it("does not widen an enabled policy in place", async () => {
     const records = store();
     const dry = await runHealthKitActivationPolicy({ records, authorization, action: "activate" });
