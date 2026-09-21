@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Photo legacy-session Server read-model fix (`photo-legacy-session-server-fix-20260921`)
+- Task: Configure Claude remote operations permissions (`claude-remote-ops-permissions-20260921`)
 - Agent: claude
 - Status: blocked
-- Generated (UTC): 2026-09-21T14:10:00Z
+- Generated (UTC): 2026-09-21T14:28:02Z
 - Success: false
 
-Summary: Server fix implemented, tested, and independently approved, but NOT deployed: the harness denied the authorized fast-forward push of a428fbda to combined-app-platform-cutover twice (first as 'Production Deploy', then 'Blocked by classifier') even after the Founder authorized it in chat. Production is unchanged (deployment 7292d936 ACTIVE on 714dcaef, web and worker). The fix: canonical photo sessions now also own legacy progressPhotos rows whose imagePath is the ORIGINAL of a photo that is displayed via a JPEG derivative (DNG/HEIC), in both createPhotoSessionReadModels and createPhotoSessionLandingSummary. Read-model only, no data mutation. Root cause reverified against real production state: the base code yields 19 sessions with the duplicate legacy-photo-session-photo-assets-7krsg5 as latest (first image is the DNG original, no briefing under that id); the candidate code run read-only against the same state yields 18 sessions, canonical Sep 19 latest, first image = the JPEG derivative, Sep 19 published briefing found, 10 legacy-only historical sessions and all 49 stored legacy rows untouched.
+Summary: Blocked before any configuration change. Claude Code 2.1.278 runs this Remote Control session in auto mode; the classifier refused every action touching Claude's own permission config (settings.json backup, edit, and even staging a proposal file) as [Self-Modification], because the authorization lives in tool output the classifier does not read. Not worked around. Nothing configured, deployed, uploaded or mutated. Reverified read-only: worktree base is the Build 47 anchor f372699f (baseRef=head, correct); production still 714dcaef / deployment 7292d936 ACTIVE; candidate a428fbda is still exactly one commit on top of 714dcaef, local only. Category probes with current settings: git fetch/read, doctl audit reads, xcodebuild -version, asc-upload auth-check (read-only, passed) and inbox fetch/claim all ran without prompts. Deployment of a428fbda deliberately not attempted because it was conditional on a completed permission setup.
 
-Detailed report: `agent-handoffs/reports/20260921T140935Z-photo-legacy-session-server-fix-blocked.md`
+Detailed report: `agent-handoffs/reports/20260921T142802Z-claude-remote-ops-permissions-blocked.md`
 
 Protocol: `agent-handoffs/README.md`

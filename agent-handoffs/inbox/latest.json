@@ -4,7 +4,7 @@
   "task": {
     "id": "claude-remote-ops-permissions-20260921",
     "title": "Configure Claude remote operations permissions",
-    "status": "claimed"
+    "status": "completed"
   },
   "target": {
     "agent": "claude",
@@ -32,6 +32,9 @@
   },
   "lifecycle": {
     "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-21T14:18:51Z"
+    "claimed_at_utc": "2026-09-21T14:18:51Z",
+    "completed_at_utc": "2026-09-21T14:29:45Z",
+    "completion_status": "blocked",
+    "completion_handoff_path": "agent-handoffs/reports/20260921T142802Z-claude-remote-ops-permissions-blocked.md"
   }
 }

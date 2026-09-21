@@ -1,58 +1,52 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T14:10:00Z",
+  "generated_at_utc": "2026-09-21T14:28:02Z",
   "task": {
-    "id": "photo-legacy-session-server-fix-20260921",
-    "title": "Photo legacy-session Server read-model fix",
+    "id": "claude-remote-ops-permissions-20260921",
+    "title": "Configure Claude remote operations permissions",
     "agent": "claude",
     "status": "blocked"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "714dcaef03a28f53f7f34f1d825419b253744b53",
-    "final_sha": "a428fbda42757620750264e63eaee18950ab7132",
+    "final_sha": null,
     "production_server_sha": "714dcaef03a28f53f7f34f1d825419b253744b53",
     "production_deployment": "7292d936-bd71-4f1b-b242-acf740f1557f",
     "native_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
     "native_build": 47
   },
   "result": {
-    "summary": "Server fix implemented, tested, and independently approved, but NOT deployed: the harness denied the authorized fast-forward push of a428fbda to combined-app-platform-cutover twice (first as 'Production Deploy', then 'Blocked by classifier') even after the Founder authorized it in chat. Production is unchanged (deployment 7292d936 ACTIVE on 714dcaef, web and worker). The fix: canonical photo sessions now also own legacy progressPhotos rows whose imagePath is the ORIGINAL of a photo that is displayed via a JPEG derivative (DNG/HEIC), in both createPhotoSessionReadModels and createPhotoSessionLandingSummary. Read-model only, no data mutation. Root cause reverified against real production state: the base code yields 19 sessions with the duplicate legacy-photo-session-photo-assets-7krsg5 as latest (first image is the DNG original, no briefing under that id); the candidate code run read-only against the same state yields 18 sessions, canonical Sep 19 latest, first image = the JPEG derivative, Sep 19 published briefing found, 10 legacy-only historical sessions and all 49 stored legacy rows untouched.",
+    "summary": "Blocked before any configuration change. Claude Code 2.1.278 runs this Remote Control session in auto mode; the classifier refused every action touching Claude's own permission config (settings.json backup, edit, and even staging a proposal file) as [Self-Modification], because the authorization lives in tool output the classifier does not read. Not worked around. Nothing configured, deployed, uploaded or mutated. Reverified read-only: worktree base is the Build 47 anchor f372699f (baseRef=head, correct); production still 714dcaef / deployment 7292d936 ACTIVE; candidate a428fbda is still exactly one commit on top of 714dcaef, local only. Category probes with current settings: git fetch/read, doctl audit reads, xcodebuild -version, asc-upload auth-check (read-only, passed) and inbox fetch/claim all ran without prompts. Deployment of a428fbda deliberately not attempted because it was conditional on a completed permission setup.",
     "success": false,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
-    "tests": {
-      "status": "passed",
-      "summary": "9 new regression tests pass (8 in CanonicalPhotoSessionReadService.test.js, 1 end-to-end Native projection test in ProgressPhotosReadService.test.js); 6 of them plus the end-to-end test fail on the unfixed source. Full unit suite: candidate 8194 tests / 298 failures vs pristine base 8185 / 298; zero candidate-only failures, all 298 are pre-existing environmental (for example missing private/founder/runtime-store.json), identical by test name. Phase suites vs base: phase3 274 tests/1 fail both, phase4 137/0 both, phase6 521 vs 513 tests/3 fail both, phase6.photo 94 vs 86 tests/2 fail both; zero candidate-only failures. Production build (webpack, provider isolated) compiled successfully and the compiled correction marker is present in two server chunks and absent from a base build. ESLint clean on changed files; git diff --check clean."
-    },
-    "review": {
-      "status": "approved",
-      "summary": "Independent reviewer (fresh-context agent) verdict APPROVE for exact candidate a428fbda: no blockers, no majors. Original-path ownership sufficient and correctly scoped; no legitimate legacy-only session disappears; DNG derivative display and all session output fields unchanged; landing and detailed agree for realistic inputs; no production mutation required. Minor notes accepted without changing the reviewed SHA: ownership map is keyed by canonicalId (only wrong under a duplicate canonicalId with different fingerprints, a store invariant violation, and production canonical ids are distinct); two test assertions are weaker than ideal (an inactive-photo case and a tautological briefing-id check); read-time comparison output for later sessions after any earlier HEIC/DNG session with legacy rows will now compare against the canonical derivative, which is an improvement."
-    },
-    "zero_write_audit": {
-      "status": "passed",
-      "summary": "Predeploy baseline captured read-only through the approved console runner (REPEATABLE READ READ ONLY, transaction_read_only=on verified, owner-scoped, ROLLBACK): Sep 19 canonical session is a singleton with 5 photos; the 10 referenced media rows exist and are verified; 5 legacy Sep 19 rows; exactly 1 Sep 19 Photo Event briefing; no pending outbox (12 dead, 765 succeeded, pre-existing) and no pending evidence reviews; 14 migrations, last 000014; 29 per-collection digests and 52 briefing digests recorded. Candidate and base read-model proofs also ran inside the production component in read-only transactions. No writes anywhere; no postdeploy audit was possible because nothing was deployed."
-    }
+    "tests": null,
+    "review": null,
+    "zero_write_audit": null
   },
-  "decisions_required": [],
+  "decisions_required": [
+    "Founder must clear the [Self-Modification] block once: say in the Claude session chat that the agent is authorized to edit ~/.claude/settings.json to add the proposed PhysiqueOS permissions/autoMode entries (option A in the report), or apply the entries locally via /permissions or /auto-mode-setup (option B)."
+  ],
   "blockers": [
-    "The harness denied git push of a428fbda42757620750264e63eaee18950ab7132 to origin combined-app-platform-cutover (fast-forward of 714dcaef, no force) even though the Founder authorized deployment in chat and in the GitHub task. Per instructions the block was not worked around, so the push, spec stamp update and forced rebuild were not attempted. No deploy step of any kind ran."
+    "Claude auto mode classifier denies Claude editing its own permission configuration ([Self-Modification]); this task's authorization is in GitHub prompt tool output, which the classifier does not read.",
+    "Same root cause as the prior Server task blocker: production deploy and deploy-branch push cannot be cleared by task text alone."
   ],
   "unexpected_findings": [
-    "Only the fast-forward push, the stamp spec update and the forced rebuild remain; everything else (fix, tests, review, baseline, postdeploy payloads) is ready.",
-    "The task's Remote Control worktree was Native-lineage (f372699f then 8256db4b); it was aligned to the Server base by starting a new branch server/photo-legacy-session-fix-20260921 from origin/combined-app-platform-cutover inside the same worktree (no worktree created, switched or deleted). The Native issue-3 commit 8256db4b remains on branch worktree-bridge-cse_01LTdZZXTqJ1pp9UKe6TVNY6, untouched.",
-    "The candidate commit exists only in the local repository (not pushed anywhere) until the Founder or a permitted session pushes it."
+    "This session is in auto mode: blanket Bash(*) and wildcarded-interpreter allow rules are dropped, narrow allow rules and autoMode.environment/allow entries are honored, and Remote Control cannot switch to Auto or Bypass from the phone. So the fix is narrow permissions.allow plus autoMode entries (with $defaults) plus permissions.ask on force pushes, not a bare Bash allow or bypassPermissions.",
+    "Deploy verbs and deploy-branch push are intentionally not proposed for permissions.allow, because an allow rule resolves before the classifier and would remove its production-deploy gate; they are covered by a conditional autoMode.allow exception instead.",
+    "Publishing this blocked completion marks the inbox task completed, so a retry needs either the Founder saying so in this session chat or a new task id."
   ],
   "backlog": [
-    "Deploy a428fbda: fast-forward push to combined-app-platform-cutover, set PHYSIQUEOS_GIT_SHA and PHYSIQUEOS_BUILD_ID stamps for web and worker, create-deployment --force-rebuild, verify web and worker source_commit_hash equal a428fbda (do not trust stamps), then run health, schema, compiled-marker, zero-write postdeploy audit and functional proof.",
-    "Founder re-check of Build 47 after deploy (see report).",
-    "Later Native task: recover 8256db4b (issue 3), full Build 48 gates, review, bump, archive, API-key upload."
+    "After the Founder clears the block: apply the proposed settings, verify with claude auto-mode config and safe probes, then resume the a428fbda deployment (fast-forward push, stamp update, force rebuild, source_commit_hash verification, health, schema/cost, zero-write postdeploy audit, functional proof).",
+    "Exercise xcodebuild archive/exportArchive and the read-only console runner under the new permissions.",
+    "Prove a real API-key TestFlight upload end to end (auth-check already passes)."
   ],
-  "recommended_next_step": "Founder action: either allow the harness to run the deployment steps (add a Bash permission rule for the fast-forward push to combined-app-platform-cutover and the physiqueos-production-deploy doctl update and create-deployment --force-rebuild) and tell this session to continue the claimed task, or perform the fast-forward push of a428fbda yourself. Then the deployment, postdeploy zero-write audit and functional proof can be completed against the prepared payloads.",
-  "full_report_path": "agent-handoffs/reports/20260921T140935Z-photo-legacy-session-server-fix-blocked.md",
+  "recommended_next_step": "Founder: tell the Claude session in chat that it is authorized to edit ~/.claude/settings.json with the PhysiqueOS permissions/autoMode entries described in the report and to continue the blocked Server deployment; or apply them yourself with /permissions or /auto-mode-setup and publish a new task id to resume the a428fbda deployment.",
+  "full_report_path": "agent-handoffs/reports/20260921T142802Z-claude-remote-ops-permissions-blocked.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
