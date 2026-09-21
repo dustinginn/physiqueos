@@ -1,58 +1,64 @@
 {
  "schema_version": 1,
- "generated_at_utc": "2026-09-21T19:58:52Z",
+ "generated_at_utc": "2026-09-21T21:07:25Z",
  "task": {
-  "id": "healthkit-testday-first-sync-audit-20260921",
-  "title": "Audit first HealthKit canonical test-day sync",
+  "id": "healthkit-workout-dormant-foundation-20260921",
+  "title": "Build dormant HealthKit Workout foundation",
   "agent": "claude",
   "status": "completed"
  },
  "repository": "dustinginn/physiqueos",
  "authority": {
   "base_sha": "a40c0b53c49240d5666d2a3475d48541cfd5f57e",
-  "final_sha": null,
-  "production_server_sha": "a40c0b53c49240d5666d2a3475d48541cfd5f57e",
-  "production_deployment": "dda84642-c713-4091-a3a2-126e02345d3b",
+  "final_sha": "6779d1b8fb4d10fde26cb303017807bd6b02dfaa",
+  "production_server_sha": "6779d1b8fb4d10fde26cb303017807bd6b02dfaa",
+  "production_deployment": "ac0e440f-a982-48dc-a750-dd894274eea9",
   "native_sha": "2bfbf54ad105a3a18189e811f06afc421741a7da",
   "native_build": 49
  },
  "result": {
-  "summary": "GREEN. Read-only audit of the first real Build 49 sync (12:49 PM, test day 2026-09-21): policy is exactly Activity + Nutrition for that one date, quarantined, no backfill, one audit row. Each observation was accepted once (operational, revision 1, partial_day, observed date 2026-09-21) and canonicalized to exactly one canonical day per domain (Activity: move energy about 710 kcal, exercise 98 min, stand 6 h, 5321 steps; Nutrition: about 1948 kcal, 170 g protein, 116 g carbs, 87 g fat, zero meal objects). Canonical values match the submitted observations exactly; no screenshot or MFP data exists yet for the day so coexistence is no_other_source. In-memory replay of the production domain code shows an identical replay is a no-op and every later revision (including the complete-day one) updates the same canonical day. Strategic quarantine holds: only 5 HealthKit-collection digests changed versus baseline; goals, Confidence, all 52 briefings, plans, protocols, all Evidence (Training, DEXA, Photo), outbox and cadence operations are identical; zero HealthKit-derived strategic Evidence; V3 eligible HealthKit Activity and Nutrition are both 0. Not appearing in Log or Evidence Hub is expected (separate quarantined store); the future step is a display-only projection adapter, with V3 eligibility gated separately. Ready for one completed-day sync of 2026-09-21 after midnight or tomorrow morning, with the date set back to 2026-09-21.",
+  "summary": "Dormant HealthKit Workout foundation deployed with Workout canonicalization OFF. Server 6779d1b8 (deployment ac0e440f) adds numeric HKWorkoutActivityType support (a real defect: Native sends numeric types the Server did not recognise), stable workout identity with optional source revisions, canonical Apple workout records and strength link CANDIDATES in application-only collections, one deterministic Server-owned matcher reusing the existing same-workout thresholds (ambiguous never linked) with Evidence time-shape normalization, cardio coexistence with existing Apple Fitness walks, no double counting against daily Activity, and an independent Workout policy and activation operation. The Workout Logger stays the sole authority for exercises, sets and load; nothing links automatically; no Training events, Confidence, briefing or V3 effect. Zero-write proof: baselines identical, the Activity + Nutrition test-day state is byte-identical, zero canonical workouts or links. Server unit 8406 tests with the same 298 pre-existing failures as base; Native candidate 1252 tests green; review approved after fixes. Build 50 is required for the canary (Build 49 has no workout sync); the reviewed candidate d96db0d0 was not built or uploaded, per the Founder.",
   "success": true,
-  "production_mutated": false,
-  "deployed": false,
+  "production_mutated": true,
+  "deployed": true,
   "testflight_uploaded": false
  },
  "validation": {
   "tests": {
-   "status": "not_run",
-   "summary": "Audit only; no code changes. Replay and revision behavior was verified by running the production domain code in memory against the stored state."
+   "status": "passed",
+   "summary": "Server unit 8406 (+80 new) with 298 failures identical to pristine base and zero new; phase2/3/4/5/6/6.photo/6.training/access-gate/foundation/migration-safety equal to base; ESLint, diff check and exact-SHA production build clean; Native candidate 1252 tests, 0 failures."
   },
   "review": {
-   "status": "not_applicable",
-   "summary": "Read-only audit; no code to review."
+   "status": "approved",
+   "summary": "Fresh-context review found three real defects (Evidence time shapes, jsonb write churn, re-created-UUID duplicate links) and smaller items; all fixed with reproducing tests and re-reviewed: Server APPROVE WITH FOLLOW-UPS on 6779d1b8, Native APPROVE on d96db0d0."
   },
   "zero_write_audit": {
    "status": "passed",
-   "summary": "All queries ran in READ ONLY REPEATABLE READ transactions with transaction_read_only verified on and explicit rollback. Post-sync digests versus the pre-sync baseline differ only in the three HealthKit collections; no strategic table was written since activation."
+   "summary": "Bounded read-only baselines before and after the deploy show zero differing sections; the Activity + Nutrition test-day state is byte-identical; zero canonical workouts, links and strategic HealthKit records; a live read-only Workout audit confirmed the policy is disabled."
   }
  },
  "decisions_required": [
-  "After the completed-day sync, authorize the completed-day audit task, then decide whether to deactivate the policy or authorize the next slice (display-only Log/Evidence Hub projection, background delivery, or a second proving day crossing a 03:00 briefing)."
+  "Authorize the Build 50 archive and upload when Activity + Nutrition is accepted (required for the Workout canary).",
+  "Decide whether the next slice is the Founder link-confirm command and pre-canary follow-ups (restore one-to-one guard, back-to-back boundary rule) before the first Workout canary.",
+  "Choose the Workout canary day after Build 50 is installed."
  ],
  "blockers": [],
  "unexpected_findings": [
-  "After midnight the Build 49 test-day date defaults to the new day; the Founder must set it back to 2026-09-21 for the completed-day sync (another date would be stored raw and permanently barred).",
-  "Inbox routing initially failed validation because chat_preference used a non-schema value; it was corrected and the task then passed the gate."
+  "Native sends the workout activity type as a numeric raw value that the Server did not recognise, so real strength workouts were never detected before this change.",
+  "Real Evidence workout times arrive in several shapes (offset ISO, naive ISO, bare wall time, meridiem); comparing them naively silently misses matches, so they are now normalized and unverifiable sessions are counted.",
+  "With the Workout policy off, a raw numeric strength workout now receives a strength candidate reconciliation state instead of staying deferred (application-only raw collection; documented).",
+  "The stale-commit spec deployment recurred; a force-rebuild deployment produced the correct one."
  ],
  "backlog": [
-  "HealthKit completed-day audit and policy decision",
-  "Display-only Log/Evidence Hub projection of canonical HealthKit days (V3 eligibility stays separately gated)",
-  "HealthKit background delivery and durable Native revision floor",
-  "HealthKit follow-ups FU-1 pre-auth parse cost and FU-2 Native HTTP 400 permanence"
+  "HealthKit completed-day Activity + Nutrition Sep 21 revision and audit",
+  "Display-only Log and Evidence Hub projection of canonical HealthKit days",
+  "HealthKit Activity and Nutrition background delivery and durable Native revision floor",
+  "Workout Logger draft survival across termination and update",
+  "Photo Briefing production tap-to-expand mismatch",
+  "Coaching Updates delivery-time UI cleanup"
  ],
- "recommended_next_step": "Founder syncs test day 2026-09-21 once more (date set back to 2026-09-21) after logging is final; then publish the completed-day acceptance audit task with a new task id.",
- "full_report_path": "agent-handoffs/reports/20260921T195852Z-healthkit-testday-first-sync-audit.md",
+ "recommended_next_step": "Complete the Activity + Nutrition Sep 21 completed-day sync and audit; then authorize Build 50 (reviewed Native candidate d96db0d0) and the Workout canary procedure in the report.",
+ "full_report_path": "agent-handoffs/reports/20260921T210725Z-healthkit-workout-dormant-foundation.md",
  "safety": {
   "contains_secrets": false,
   "contains_credentials": false,

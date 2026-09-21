@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Audit first HealthKit canonical test-day sync (`healthkit-testday-first-sync-audit-20260921`)
+- Task: Build dormant HealthKit Workout foundation (`healthkit-workout-dormant-foundation-20260921`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-21T19:58:52Z
+- Generated (UTC): 2026-09-21T21:07:25Z
 - Success: true
 
-Summary: GREEN. Read-only audit of the first real Build 49 sync (12:49 PM, test day 2026-09-21): policy is exactly Activity + Nutrition for that one date, quarantined, no backfill, one audit row. Each observation was accepted once (operational, revision 1, partial_day, observed date 2026-09-21) and canonicalized to exactly one canonical day per domain (Activity: move energy about 710 kcal, exercise 98 min, stand 6 h, 5321 steps; Nutrition: about 1948 kcal, 170 g protein, 116 g carbs, 87 g fat, zero meal objects). Canonical values match the submitted observations exactly; no screenshot or MFP data exists yet for the day so coexistence is no_other_source. In-memory replay of the production domain code shows an identical replay is a no-op and every later revision (including the complete-day one) updates the same canonical day. Strategic quarantine holds: only 5 HealthKit-collection digests changed versus baseline; goals, Confidence, all 52 briefings, plans, protocols, all Evidence (Training, DEXA, Photo), outbox and cadence operations are identical; zero HealthKit-derived strategic Evidence; V3 eligible HealthKit Activity and Nutrition are both 0. Not appearing in Log or Evidence Hub is expected (separate quarantined store); the future step is a display-only projection adapter, with V3 eligibility gated separately. Ready for one completed-day sync of 2026-09-21 after midnight or tomorrow morning, with the date set back to 2026-09-21.
+Summary: Dormant HealthKit Workout foundation deployed with Workout canonicalization OFF. Server 6779d1b8 (deployment ac0e440f) adds numeric HKWorkoutActivityType support (a real defect: Native sends numeric types the Server did not recognise), stable workout identity with optional source revisions, canonical Apple workout records and strength link CANDIDATES in application-only collections, one deterministic Server-owned matcher reusing the existing same-workout thresholds (ambiguous never linked) with Evidence time-shape normalization, cardio coexistence with existing Apple Fitness walks, no double counting against daily Activity, and an independent Workout policy and activation operation. The Workout Logger stays the sole authority for exercises, sets and load; nothing links automatically; no Training events, Confidence, briefing or V3 effect. Zero-write proof: baselines identical, the Activity + Nutrition test-day state is byte-identical, zero canonical workouts or links. Server unit 8406 tests with the same 298 pre-existing failures as base; Native candidate 1252 tests green; review approved after fixes. Build 50 is required for the canary (Build 49 has no workout sync); the reviewed candidate d96db0d0 was not built or uploaded, per the Founder.
 
-Detailed report: `agent-handoffs/reports/20260921T195852Z-healthkit-testday-first-sync-audit.md`
+Detailed report: `agent-handoffs/reports/20260921T210725Z-healthkit-workout-dormant-foundation.md`
 
 Protocol: `agent-handoffs/README.md`
