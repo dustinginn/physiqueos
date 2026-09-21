@@ -19,6 +19,9 @@ final class BriefingV3PresentationTests: XCTestCase {
         let energy = try XCTUnwrap(weekly.energy?.canonicalV3)
         XCTAssertEqual(energy.statement, "Calorie intake averaged 2,650 kcal/day, 50 kcal/day below the 2,700 kcal/day target.")
         XCTAssertEqual(weekly.energy?.narrative, energy.statement)
+        // The Energy chart data is untouched by the V3 presentation.
+        XCTAssertEqual(weekly.energy?.dailyBalances?.map(\.date).count, 5)
+        XCTAssertEqual(weekly.energy?.dailyBalances?.filter { !$0.hasPairedData }.count, 1)
     }
 
     func testWeeklyStructuredUncertaintyIsRetainedNotDropped() throws {
@@ -267,7 +270,7 @@ final class BriefingV3PresentationTests: XCTestCase {
             + "\"\(energyTitle)\""
             + #","narrative":"#
             + "\"\(energyNarrative)\""
-            + #","averageIntake":2650,"averageExpenditure":2479,"averageBalance":171,"pairedDayCount":6,"eligibleDayCount":7,"chart":{"points":[]}},"weight":{"weeklyAverage":170.2,"change":0.4,"narrative":""},"photos":{"title":"","narrative":""},"training":{"title":"Completed-week direction","conclusion":"","status":{"improving":2,"plateauing":1,"insufficient":3},"comparableCategoryCount":6,"insufficientCount":3,"trainingDayCount":5,"highlights":[],"priorityCategories":[]},"bodyComposition":null,"coachInsight":{"title":"Carry the week forward","biggestWin":"V3 result.","keepBuilding":"V3 coach take.","watchNextWeek":"V3 watch.","actionItems":["V3 action.","V3 watch."]}}}"#
+            + #","averageIntake":2650,"averageExpenditure":2479,"averageBalance":171,"pairedDayCount":6,"eligibleDayCount":7,"chart":{"points":[{"date":"2026-09-13","label":"Su","intake":2700,"expenditure":2480,"balance":220,"complete":true},{"date":"2026-09-14","label":"Mo","intake":2600,"expenditure":2500,"balance":100,"complete":true},{"date":"2026-09-15","label":"Tu","intake":2650,"expenditure":2450,"balance":200,"complete":true},{"date":"2026-09-16","label":"We","intake":null,"expenditure":2470,"balance":null,"complete":false},{"date":"2026-09-17","label":"Th","intake":2640,"expenditure":2490,"balance":150,"complete":true}]}},"weight":{"weeklyAverage":170.2,"change":0.4,"narrative":""},"photos":{"title":"","narrative":""},"training":{"title":"Completed-week direction","conclusion":"","status":{"improving":2,"plateauing":1,"insufficient":3},"comparableCategoryCount":6,"insufficientCount":3,"trainingDayCount":5,"highlights":[],"priorityCategories":[]},"bodyComposition":null,"coachInsight":{"title":"Carry the week forward","biggestWin":"V3 result.","keepBuilding":"V3 coach take.","watchNextWeek":"V3 watch.","actionItems":["V3 action.","V3 watch."]}}}"#
     }
 
     private func weeklyV2Envelope() -> String {
