@@ -1,29 +1,33 @@
 {
  "schema_version": 1,
- "generated_at_utc": "2026-09-21T16:19:46Z",
- "task": {"id": "build48-admin-api-upload-retry-20260921", "title": "Build 48 Admin API upload retry", "agent": "claude", "status": "blocked"},
+ "generated_at_utc": "2026-09-21T16:26:51Z",
+ "task": {"id": "build48-admin-api-upload-final-retry-20260921", "title": "Build 48 Admin API upload final retry", "agent": "claude", "status": "completed"},
  "repository": "dustinginn/physiqueos",
  "authority": {
   "base_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
-  "final_sha": null,
+  "final_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
   "production_server_sha": "a428fbda42757620750264e63eaee18950ab7132",
   "production_deployment": "d3783f4c-bc14-469b-b10c-93635a047325",
   "native_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
   "native_build": 48
  },
  "result": {
-  "summary": "Blocked before any change: Claude's local permission classifier denied installing the replacement Admin App Store Connect key (secret-store write), so per the task no workaround was attempted. Existing Build 48 archive identity reverified (com.physiqueos.native.dev 1.0 (48), team match); production authority reverified. Key not installed, config not updated, no auth-check/dry-run/upload run. No rebuild, no production mutation, Downloads key copy untouched.",
-  "success": false,
+  "summary": "Build 48 (1.0 (48), existing archive, no rebuild) uploaded to App Store Connect via the guarded API-key path with the replacement Admin key. Cloud signing succeeded. Apple delivery id 92e3c133-d294-4d0d-bd24-11f5a55275c5; build-status VALID, import-status VALID. Auth-check and dry run passed every guard. Interactive Xcode auth not used. Production and HealthKit untouched. Narrow scoped permission rules added for future key replacement (unexercised).",
+  "success": true,
   "production_mutated": false,
   "deployed": false,
-  "testflight_uploaded": false
+  "testflight_uploaded": true
  },
- "validation": {"tests": null, "review": null, "zero_write_audit": null},
- "decisions_required": ["Founder must authorize the Admin key install and upload in Claude's chat (or add a scoped Bash permission rule), then publish a NEW inbox task id to retry."],
- "blockers": ["Claude auto-mode classifier denied writing the new key into the local App Store Connect key directory (secret-store write); GitHub task authorization alone is not accepted by the classifier."],
- "unexpected_findings": [],
- "backlog": ["Retry Build 48 upload of the existing archive with the Admin key", "3 AM local scheduled-briefing generation Server task", "Optional: revoke old Developer key after the Admin path is proven"],
- "recommended_next_step": "Founder gives Claude a plain chat authorization for the key install + guarded upload, and ChatGPT publishes a new inbox task id for the retry.",
- "full_report_path": "agent-handoffs/reports/20260921T161946Z-build48-admin-api-upload-retry.md",
+ "validation": {
+  "tests": null,
+  "review": null,
+  "zero_write_audit": null
+ },
+ "decisions_required": ["Founder accepts Build 48 in TestFlight after it appears as ready for testing, then authorizes the next HealthKit phase."],
+ "blockers": [],
+ "unexpected_findings": ["The first attempt under the earlier task id was blocked by the local classifier until the Founder authorized in chat; the newly added scoped permission rules have not yet been proven against it."],
+ "backlog": ["3 AM briefing generation Server task", "Workout-draft cross-update persistence reliability", "Optional photo accessibility polish", "Optional: revoke old Developer-role API key"],
+ "recommended_next_step": "Founder accepts Build 48 in TestFlight and confirms photo tap-to-expand; then start the HealthKit phase.",
+ "full_report_path": "agent-handoffs/reports/20260921T162651Z-build48-admin-api-upload-final-retry.md",
  "safety": {"contains_secrets": false, "contains_credentials": false, "contains_production_exports": false, "contains_founder_evidence": false, "safe_for_chatgpt_retrieval": true}
 }
