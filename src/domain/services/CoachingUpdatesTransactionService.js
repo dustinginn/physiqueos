@@ -14,6 +14,7 @@ import {
 } from "./CoachingUpdatesReadService.js";
 import { resolveCoachingUpdatesGoalCadencePolicy } from "./CoachingUpdatesGoalCadencePolicyService.js";
 import { selectScheduledBriefingCadence } from "./BriefingEvidenceWindowService.js";
+import { BRIEFING_GENERATION_LOCAL_TIME } from "./BriefingScheduleAuthority.js";
 import { getLocalDateKey, resolveLocalTimeZone } from "../utils/localDate.js";
 
 export const CoachingUpdatesTransactionOutcome = Object.freeze({
@@ -108,9 +109,16 @@ export function prepareCoachingUpdatesTransaction(store, command, timestamp) {
   const current = store.protocolVersions.find((item) => item.id === protocol.currentVersionId);
   const goal = store.goals?.find((item) => item.id === command.goalAssociation?.goalId && item.status === "active");
   if (!goal) return rejected(CoachingUpdatesTransactionOutcome.INVALID_GOAL_POLICY, "Active Goal policy is unavailable.");
-  const configuration = canonicalConfiguration(command);
-  const invalid = validateCoachingUpdatesConfiguration(configuration);
+  const requested = canonicalConfiguration(command);
+  const invalid = validateCoachingUpdatesConfiguration(requested);
   if (invalid) return rejected(invalid, "Requested Coaching Updates configuration is invalid.");
+  // Validated as sent, then recorded with the system generation time.
+  const configuration = {
+    ...requested,
+    midweek: scheduledSurface(requested.midweek),
+    weekly: scheduledSurface(requested.weekly),
+    monthly: scheduledSurface(requested.monthly),
+  };
   const policy = resolveCoachingUpdatesGoalCadencePolicy(goal);
   if (configuration.daily.enabled && !policy.dailyUserActivationPermitted) {
     return rejected(CoachingUpdatesTransactionOutcome.DAILY_NOT_PERMITTED, "Routine Daily Briefings are not permitted.");
@@ -264,7 +272,7 @@ function canonicalConfiguration(command) {
     timeZone: command.timeZone,
     midweek: structuredClone(command.midweek),
     weekly: structuredClone(command.weekly),
-    monthly: structuredClone(command.monthly ?? { enabled: true, dayOfMonth: 1, localTime: "00:00" }),
+    monthly: structuredClone(command.monthly ?? { enabled: true, dayOfMonth: 1, localTime: BRIEFING_GENERATION_LOCAL_TIME }),
     daily: structuredClone(command.daily ?? { enabled: false }),
     eventBriefings: structuredClone(command.eventBriefings ?? { photo: true, dexa: true }),
     // Preserve validation of unknown wire values while retiring the old
@@ -329,13 +337,21 @@ function dateForDay(day) {
   const index = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].indexOf(day);
   return new Date(Date.UTC(2026, 6, 19 + index, 20));
 }
+// Recurring briefings generate at one system time, so a surface's delivery
+// time is never a differentiator: saved configurations record it, and are
+// compared, as the shared schedule authority.
+function scheduledSurface(surface) {
+  return surface
+    ? { ...structuredClone(surface), localTime: BRIEFING_GENERATION_LOCAL_TIME }
+    : surface;
+}
 function sameConfiguration(left, right) {
   const pick = (value) => ({
     schemaVersion: value?.schemaVersion,
     timeZone: value?.timeZone,
-    midweek: value?.midweek,
-    weekly: value?.weekly,
-    monthly: value?.monthly ?? { enabled: true, dayOfMonth: 1, localTime: "00:00" },
+    midweek: scheduledSurface(value?.midweek),
+    weekly: scheduledSurface(value?.weekly),
+    monthly: scheduledSurface(value?.monthly ?? { enabled: true, dayOfMonth: 1 }),
     daily: value?.daily ?? { enabled: false },
     eventBriefings: value?.eventBriefings ?? { photo: true, dexa: true },
     notificationPreference: value?.notificationPreference,

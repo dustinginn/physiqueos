@@ -1,6 +1,7 @@
 import { getLocalDateKey } from "../utils/localDate";
 import { localDateTimeToUtc } from
   "./IntelligenceLifecycleIdentityService";
+import { hasReachedBriefingGenerationTime } from "./BriefingScheduleAuthority";
 
 export const ROUTINE_BRIEFING_CADENCE_VERSION = "routine_briefing_cadence_v3";
 
@@ -19,10 +20,12 @@ export function selectScheduledBriefingCadence({ now = new Date(), timeZone = "A
   const configured = coachingUpdates ?? legacyCoachingUpdates();
   const day = parts.weekday.toLowerCase();
   const time = getTimeInTimeZone(now, timeZone);
+  // Recurring generation time is the shared schedule authority, not the
+  // surface's stored localTime.
   if (configured.weekly?.enabled && day.startsWith(configured.weekly.day.slice(0, 3)) &&
-      time >= configured.weekly.localTime) return "weekly";
+      hasReachedBriefingGenerationTime(time)) return "weekly";
   if (configured.midweek?.enabled && day.startsWith(configured.midweek.day.slice(0, 3)) &&
-      time >= configured.midweek.localTime) return "midweek";
+      hasReachedBriefingGenerationTime(time)) return "midweek";
   if (configured.daily?.enabled) return "daily";
   return "none";
 }
@@ -134,8 +137,8 @@ export function resolveScheduledBriefingExpectation({
 
 function legacyCoachingUpdates() {
   return {
-    midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
-    weekly: { enabled: true, day: "sunday", localTime: "00:00" },
+    midweek: { enabled: true, day: "wednesday" },
+    weekly: { enabled: true, day: "sunday" },
     daily: { enabled: false },
   };
 }

@@ -46,9 +46,21 @@ The existing `PhysiqueOS Runtime Monitor` invokes the short-lived production cad
 
 Eligibility and windows remain:
 
-* Midweek: Wednesday at the configured local time (legacy default `00:00`), using the closed Sunday-through-Tuesday window and excluding all Wednesday evidence.
-* Weekly: Sunday at the configured local time (legacy default `00:00`), using the completed Sunday-through-Saturday week and excluding Sunday evidence.
-* Monthly: the first calendar day of each month at `00:00` local time, using the complete previous local calendar month. The Founder timezone is authoritative and `America/Los_Angeles` is the fallback. Monthly may catch up only through the end of that same local delivery day.
+* Midweek: Wednesday at 03:00 local time, using the closed Sunday-through-Tuesday window and excluding all Wednesday evidence.
+* Weekly: Sunday at 03:00 local time, using the completed Sunday-through-Saturday week and excluding Sunday evidence.
+* Monthly: the first calendar day of each month at 03:00 local time, using the complete previous local calendar month. The Founder timezone is authoritative and `America/Los_Angeles` is the fallback. Monthly may catch up only through the end of that same local delivery day, and still supersedes any Weekly or Midweek occurrence on the same day.
+
+### Generation time and evidence cutoff (`briefing_schedule_authority_v1`)
+
+Recurring briefings generate at one system time, `03:00` in the briefing timezone (the Coaching Updates timezone, then the profile timezone, then `America/Los_Angeles`; never the server timezone). `BriefingScheduleAuthority` owns that time. The cadence registry, each generator's own gate, Home routing, and the Coaching Updates read model all consume it; a stored per-surface `localTime` (the former "preferred delivery time") is history and is not a scheduling input. Saved schedules record the shared time, so a time-only edit is an unchanged configuration.
+
+Generation time and evidence cutoff are separate:
+
+* The cutoff stays the end of the last completed local evidence day (`23:59:59.999` local). It does not move with the generation time, so the evidence window, artifact identity, and cadence dates are unchanged.
+* Evidence eligibility is by the evidence's own observed/effective local date, never by ingestion time. Prior-day evidence that reaches the canonical layer between midnight and 03:00 (a late manual upload, a delayed HealthKit delivery) is present when the briefing reads the canonical store and participates. Evidence observed on the new local day is excluded from the prior window however early it arrived.
+* Evidence that arrives after generation follows the existing late-evidence contract: it reconciles the published occurrence only when its observed date is inside that occurrence's window, it changed after the artifact's `generatedAt`, and it arrived within the following-local-day lateness policy. Completed artifacts are never regenerated because scheduling changed.
+* 03:00 exists exactly once on every local day, including the spring-forward day (02:00-02:59 is skipped) and the fall-back day (01:00-01:59 repeats), so each occurrence generates once. The 1st of a month that is also a Sunday or Wednesday, including a DST Sunday, generates Monthly only.
+* DEXA and Photo Event briefings are triggered by their evidence, are not scheduled, and are not delayed to 03:00.
 
 An eligible missing artifact may be caught up until the end of that same local cadence day. The executor does not generate the occurrence on the following day. It checks for a completed artifact before generation, then delegates ownership and persistence to the existing canonical generator and atomic Founder publication path. Completed artifacts are immutable: later same-day evidence is available to a future applicable cadence and never regenerates the completed occurrence.
 

@@ -14,8 +14,16 @@ describe("twice-weekly routine cadence",()=>{
 
   it.each([
     ["2026-01-01T07:30:00Z","2025-12-31","midweek"],
-    ["2026-03-08T09:30:00Z","2026-03-08","weekly"],
-    ["2026-11-01T08:30:00Z","2026-11-01","weekly"],
+    ["2026-03-08T10:30:00Z","2026-03-08","weekly"],
+    ["2026-11-01T11:30:00Z","2026-11-01","weekly"],
+    // Recurring briefings are generated at 03:00 local: the skipped and the
+    // repeated hours of the DST Sundays are never a generation time.
+    ["2026-03-08T09:30:00Z","2026-03-08","none"],
+    ["2026-03-08T09:59:59Z","2026-03-08","none"],
+    ["2026-03-08T10:00:00Z","2026-03-08","weekly"],
+    ["2026-11-01T08:30:00Z","2026-11-01","none"],
+    ["2026-11-01T10:59:59Z","2026-11-01","none"],
+    ["2026-11-01T11:00:00Z","2026-11-01","weekly"],
   ])("uses local boundaries for %s",(instant,localDate,cadence)=>expect(resolveScheduledBriefingExpectation({now:new Date(instant),timeZone:zone})).toMatchObject({localDate,cadence}));
 
   it("keeps Wednesday Sunday-through-Tuesday and excludes Wednesday",()=>expect(resolveScheduledBriefingExpectation({now:at("2026-07-22"),timeZone:zone})).toMatchObject({cadence:"midweek",evidenceWindow:{cadence:"midweek",startDate:"2026-07-19",endDate:"2026-07-21",sameDayEvidenceExcluded:true},productionRoutingStatus:"active"}));

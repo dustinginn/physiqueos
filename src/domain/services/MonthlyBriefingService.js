@@ -14,6 +14,7 @@ import { applyNarrativeV3ToBriefingArtifact,
   createBriefingGoalConfidenceBlockFromV3 } from
   "./BriefingGoalConfidencePresentationService";
 import { createMonthlyEvidenceWindow } from "./BriefingEvidenceWindowService";
+import { hasReachedBriefingGenerationTime } from "./BriefingScheduleAuthority";
 import {
   createMonthlyBriefingPreviewService,
 } from "./MonthlyBriefingPreviewService";
@@ -567,7 +568,7 @@ function isMonthlyEligible(value, timeZone) {
       .map((part) => [part.type, part.value])
   );
   const time = `${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}`;
-  return Number(parts.day) === 1 && time >= "00:00";
+  return Number(parts.day) === 1 && hasReachedBriefingGenerationTime(time);
 }
 
 function formatMonthRange(window) {

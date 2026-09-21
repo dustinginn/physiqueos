@@ -231,7 +231,8 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     expect(saved.result).toMatchObject({ status: "updated", revision: 86, coachingChanged: true, photosChanged: true, photoReminderChanged: true, dexaChanged: true });
     expect(protectedSnapshot(fixture.snapshot())).toBe(before);
     const readback = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
-    expect(readback.editor).toEqual(draft);
+    // The saved delivery time is the shared 03:00 generation time, whatever the editor sent.
+    expect(readback.editor).toEqual({ ...draft, monthly: { ...draft.monthly, localTime: "03:00" } });
     expect(readback.context).toMatchObject({ expectedRevision: 86, dexaExpectedRevision: 2 });
     expect(readback.context.expectedCurrentVersionId).not.toBe("coaching-v1");
     expect(fixture.snapshot().reminders.find((item) => item.id === "reminder_weekly_progress_photo_set"))
@@ -278,6 +279,7 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     });
     const draft = structuredClone(detail.editor);
     draft.weekly.localTime = "08:15";
+    draft.photoEventBriefingEnabled = false;
     const payload = { protocolId: detail.protocolId, ...detail.context, draft };
     delete payload.expectedRevision;
 
@@ -287,14 +289,15 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
 
     expect(saved.result).toMatchObject({ status: "updated", coachingChanged: true });
     const readback = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
-    expect(readback.editor.weekly.localTime).toBe("08:15");
+    expect(readback.editor.photoEventBriefingEnabled).toBe(false);
+    expect(readback.editor.weekly.localTime).toBe("03:00");
   });
 
   it("persists Midweek, Weekly, and Monthly edits independently on one local day without equal-date successors", async () => {
     const fixture = setup();
     const initial = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
     const midweek = structuredClone(initial.editor);
-    midweek.midweek.localTime = "05:30";
+    midweek.midweek.day = "tuesday";
     const midweekPayload = { protocolId: initial.protocolId, ...initial.context, draft: midweek };
     delete midweekPayload.expectedRevision;
     await fixture.ports.saveCoachingUpdates(context(midweekPayload, initial.context.expectedRevision));
@@ -302,7 +305,7 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     const afterMidweek = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
     const effectiveVersionId = afterMidweek.context.expectedCurrentVersionId;
     const weekly = structuredClone(afterMidweek.editor);
-    weekly.weekly.localTime = "06:45";
+    weekly.weekly.day = "saturday";
     const weeklyPayload = { protocolId: afterMidweek.protocolId, ...afterMidweek.context, draft: weekly };
     delete weeklyPayload.expectedRevision;
     await fixture.ports.saveCoachingUpdates(context(weeklyPayload, afterMidweek.context.expectedRevision));
@@ -310,13 +313,13 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     const afterWeekly = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
     expect(afterWeekly.context.expectedCurrentVersionId).toBe(effectiveVersionId);
     expect(afterWeekly.editor).toMatchObject({
-      midweek: { day: "wednesday", localTime: "05:30" },
-      weekly: { day: "sunday", localTime: "06:45" },
+      midweek: { day: "tuesday", localTime: "03:00" },
+      weekly: { day: "saturday", localTime: "03:00" },
       monthly: { dayOfMonth: 1 },
     });
 
     const monthly = structuredClone(afterWeekly.editor);
-    monthly.monthly.localTime = "07:15";
+    monthly.monthly.enabled = false;
     const monthlyPayload = { protocolId: afterWeekly.protocolId, ...afterWeekly.context, draft: monthly };
     delete monthlyPayload.expectedRevision;
     await fixture.ports.saveCoachingUpdates(context(monthlyPayload, afterWeekly.context.expectedRevision));
@@ -324,9 +327,9 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     const final = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
     expect(final.context.expectedCurrentVersionId).toBe(effectiveVersionId);
     expect(final.editor).toMatchObject({
-      midweek: { enabled: true, day: "wednesday", localTime: "05:30" },
-      weekly: { enabled: true, day: "sunday", localTime: "06:45" },
-      monthly: { enabled: true, dayOfMonth: 1, localTime: "07:15" },
+      midweek: { enabled: true, day: "tuesday", localTime: "03:00" },
+      weekly: { enabled: true, day: "saturday", localTime: "03:00" },
+      monthly: { enabled: false, dayOfMonth: 1, localTime: "03:00" },
     });
     const runtime = fixture.snapshot();
     const coachingVersions = runtime.protocolVersions.filter((item) => item.protocolId === "coaching");
@@ -337,7 +340,7 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     // A second editor loaded before the Weekly save is still rejected after
     // the same-record amendment because its semantic digest is stale.
     const staleMonthly = structuredClone(afterMidweek.editor);
-    staleMonthly.monthly.localTime = "09:00";
+    staleMonthly.monthly.enabled = false;
     const stalePayload = { protocolId: afterMidweek.protocolId, ...afterMidweek.context, draft: staleMonthly };
     delete stalePayload.expectedRevision;
     await expect(fixture.ports.saveCoachingUpdates(

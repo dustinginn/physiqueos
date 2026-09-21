@@ -22,8 +22,8 @@ describe("Coaching Updates canonical transaction", () => {
     const store = baseStore();
     const model = currentModel(store);
     expect(model).toMatchObject({
-      midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
-      weekly: { enabled: true, day: "sunday", localTime: "00:00" },
+      midweek: { enabled: true, day: "wednesday", localTime: "03:00" },
+      weekly: { enabled: true, day: "sunday", localTime: "03:00" },
       daily: { enabled: false },
       notificationPreference: "notify_when_ready",
       eventBriefings: { photo: true, dexa: true },
@@ -41,11 +41,17 @@ describe("Coaching Updates canonical transaction", () => {
     expect(fixture.liveStore.protocolVersions.filter((item) => item.status === "active")).toHaveLength(1);
     const model = currentModel(fixture.liveStore);
     expect(model).toMatchObject({
-      midweek: { enabled: true, day: "tuesday", localTime: "08:30" },
-      weekly: { enabled: true, day: "saturday", localTime: "09:15" },
+      midweek: { enabled: true, day: "tuesday", localTime: "03:00" },
+      weekly: { enabled: true, day: "saturday", localTime: "03:00" },
       daily: { enabled: false },
       notificationPreference: "notify_when_ready",
       scheduleApplication: { status: "active", appliesTo: "future_eligible_runs" },
+    });
+    // A saved successor records the shared generation time, whatever the form
+    // sent; recurring briefings are not scheduled by a per-surface preference.
+    expect(fixture.liveStore.protocolVersions.at(-1).coachingUpdates).toMatchObject({
+      midweek: { day: "tuesday", localTime: "03:00" },
+      weekly: { day: "saturday", localTime: "03:00" },
     });
     expect(selectScheduledBriefingCadence({ now: at("2026-07-21T09:00"), timeZone: model.timeZone, coachingUpdates: model })).toBe("midweek");
     expect(selectScheduledBriefingCadence({ now: at("2026-07-25T09:30"), timeZone: model.timeZone, coachingUpdates: model })).toBe("weekly");
@@ -54,19 +60,20 @@ describe("Coaching Updates canonical transaction", () => {
       now: at("2026-07-20T12:00"),
       timeZone: model.timeZone,
     })).toMatchObject({
-      midweek: { localDate: "2026-07-21", localTime: "08:30", day: "tuesday" },
-      weekly: { localDate: "2026-07-25", localTime: "09:15", day: "saturday" },
+      midweek: { localDate: "2026-07-21", localTime: "03:00", day: "tuesday" },
+      weekly: { localDate: "2026-07-25", localTime: "03:00", day: "saturday" },
       dailyAvailable: false,
     });
     expect(fixture.liveStore.dailyBriefings).toEqual(history);
     expect(fixture.liveStore.executionItems).toEqual(execution);
   });
 
-  it("keeps a selected local time on its selected local calendar day", () => {
+  it("generates at the shared 03:00 local time on its selected local calendar day", () => {
+    // A stored surface localTime is history; only the shared authority gates.
     const model = { ...currentModel(baseStore()), midweek: { enabled: true, day: "tuesday", localTime: "08:30" } };
-    expect(selectScheduledBriefingCadence({ now: at("2026-07-21T08:29"), timeZone: model.timeZone, coachingUpdates: model })).toBe("none");
-    expect(selectScheduledBriefingCadence({ now: at("2026-07-21T08:30"), timeZone: model.timeZone, coachingUpdates: model })).toBe("midweek");
-    expect(selectScheduledBriefingCadence({ now: at("2026-07-22T08:30"), timeZone: model.timeZone, coachingUpdates: model })).toBe("none");
+    expect(selectScheduledBriefingCadence({ now: at("2026-07-21T02:59"), timeZone: model.timeZone, coachingUpdates: model })).toBe("none");
+    expect(selectScheduledBriefingCadence({ now: at("2026-07-21T03:00"), timeZone: model.timeZone, coachingUpdates: model })).toBe("midweek");
+    expect(selectScheduledBriefingCadence({ now: at("2026-07-22T03:00"), timeZone: model.timeZone, coachingUpdates: model })).toBe("none");
   });
 
   it.each([

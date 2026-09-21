@@ -165,9 +165,9 @@ describe("Coaching Updates cross-owner strategy save", () => {
       version: coachingVersion,
       goal: fixture.live.goals[0],
     })).toMatchObject({
-      midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
-      weekly: { enabled: true, day: "sunday", localTime: "00:00" },
-      monthly: { enabled: true, dayOfMonth: 1, localTime: "08:15" },
+      midweek: { enabled: true, day: "wednesday", localTime: "03:00" },
+      weekly: { enabled: true, day: "sunday", localTime: "03:00" },
+      monthly: { enabled: true, dayOfMonth: 1, localTime: "03:00" },
       notificationPreference: "notify_when_ready",
       eventBriefings: { photo: false, dexa: true },
     });
@@ -233,7 +233,7 @@ describe("Coaching Updates cross-owner strategy save", () => {
     const sameDayVersionId = root.currentVersionId;
 
     const weekly = currentCommand(fixture.live, false);
-    weekly.coaching.weekly = { enabled: true, day: "sunday", localTime: "06:45" };
+    weekly.coaching.weekly = { enabled: true, day: "saturday", localTime: "06:45" };
     expect(await fixture.service.save(weekly)).toMatchObject({
       outcome: "success", committed: true, coachingChanged: true,
       photosChanged: false, photoReminderChanged: false, dexaChanged: false,
@@ -243,10 +243,10 @@ describe("Coaching Updates cross-owner strategy save", () => {
       protocol: root,
       version: fixture.live.protocolVersions.find((item) => item.id === root.currentVersionId),
       goal: fixture.live.goals[0],
-    }).weekly).toEqual({ enabled: true, day: "sunday", localTime: "06:45" });
+    }).weekly).toEqual({ enabled: true, day: "saturday", localTime: "03:00" });
 
     const monthly = currentCommand(fixture.live, false);
-    monthly.coaching.monthly = { enabled: true, dayOfMonth: 1, localTime: "07:15" };
+    monthly.coaching.monthly = { enabled: false, dayOfMonth: 1, localTime: "07:15" };
     expect(await fixture.service.save(monthly)).toMatchObject({
       outcome: "success", committed: true, coachingChanged: true,
       photosChanged: false, photoReminderChanged: false, dexaChanged: false,
@@ -256,9 +256,9 @@ describe("Coaching Updates cross-owner strategy save", () => {
     expect(current.change.sameDayAmendments).toHaveLength(2);
     expect(resolveCoachingUpdatesReadModel({ protocol: root, version: current, goal: fixture.live.goals[0] }))
       .toMatchObject({
-        midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
-        weekly: { enabled: true, day: "sunday", localTime: "06:45" },
-        monthly: { enabled: true, dayOfMonth: 1, localTime: "07:15" },
+        midweek: { enabled: true, day: "wednesday", localTime: "03:00" },
+        weekly: { enabled: true, day: "saturday", localTime: "03:00" },
+        monthly: { enabled: false, dayOfMonth: 1, localTime: "03:00" },
       });
     expect(protectedSnapshot(fixture.live)).toBe(protectedAfterInitialSave);
     expect(fixture.live.protocolVersions.filter((item) =>

@@ -1,4 +1,5 @@
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
+import { BRIEFING_GENERATION_LOCAL_TIME } from "./BriefingScheduleAuthority";
 
 export const COACHING_UPDATES_SCHEMA_VERSION = "coaching_updates_schedule_v1";
 export const COACHING_NOTIFICATION_PREFERENCES = Object.freeze([
@@ -11,7 +12,9 @@ export const WEEKDAYS = Object.freeze([
   "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
 ]);
 
-const LEGACY_TIME = "00:00";
+// Recurring briefings generate at one system time; a stored surface localTime
+// (a former "preferred delivery time") is history, not a scheduling input.
+const LEGACY_TIME = BRIEFING_GENERATION_LOCAL_TIME;
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
 export function createCoachingUpdatesReadService({ repositories }) {
@@ -113,6 +116,9 @@ export function filterEligibleEventBriefingTypes(types = [], preferences = {}) {
 }
 
 function normalizeCanonicalCoachingUpdates(canonical, timeZone) {
+  const scheduled = (surface) => surface
+    ? { ...structuredClone(surface), localTime: BRIEFING_GENERATION_LOCAL_TIME }
+    : surface;
   return {
     ...structuredClone(canonical),
     // Enabled briefings notify on canonical publication. iOS notification
@@ -120,8 +126,10 @@ function normalizeCanonicalCoachingUpdates(canonical, timeZone) {
     // is retained only in historical protocol versions.
     notificationPreference: "notify_when_ready",
     timeZone: canonical.timeZone ?? timeZone,
-    monthly: structuredClone(canonical.monthly ?? {
-      enabled: true, dayOfMonth: 1, localTime: LEGACY_TIME,
+    midweek: scheduled(canonical.midweek),
+    weekly: scheduled(canonical.weekly),
+    monthly: scheduled(canonical.monthly ?? {
+      enabled: true, dayOfMonth: 1,
     }),
     daily: structuredClone(canonical.daily ?? { enabled: false }),
     eventBriefings: structuredClone(canonical.eventBriefings ?? {
@@ -164,7 +172,7 @@ function nextSurface(surface, localDate, weekday) {
   date.setUTCDate(date.getUTCDate() + offset);
   return Object.freeze({
     localDate: date.toISOString().slice(0, 10),
-    localTime: surface.localTime,
+    localTime: BRIEFING_GENERATION_LOCAL_TIME,
     day: surface.day,
   });
 }

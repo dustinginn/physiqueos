@@ -1,6 +1,7 @@
 import { formatGoalStartDate } from "../utils/goalStartDate";
 import { nutritionStrategy } from "./StrategyEditorService";
 import { resolveCoachingUpdatesReadModel } from "./CoachingUpdatesReadService";
+import { BRIEFING_GENERATION_LOCAL_TIME } from "./BriefingScheduleAuthority";
 import { describeEnergyStrategyIdentity } from "../presentation/strategyIdentityPresentation";
 
 // Operating Plan strategy pages describe the configured strategy. Their purpose
@@ -206,7 +207,7 @@ function proteinRule(strategy) {
 function cadenceSurface(surface) {
   if (!surface?.enabled) return "Off";
   const day = label(surface.day);
-  if (!surface.localTime || surface.localTime === "00:00") return day;
+  if (!surface.localTime || surface.localTime === BRIEFING_GENERATION_LOCAL_TIME) return day;
   const [hour, minute] = surface.localTime.split(":").map(Number);
   return `${day} · ${new Date(2000, 0, 1, hour, minute).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 }

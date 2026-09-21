@@ -11,6 +11,12 @@ import {
   applyRecurringBriefingPrecedence,
   createBriefingCadenceExecutionIdentity,
 } from "./IntelligenceLifecycleIdentityService";
+import {
+  BRIEFING_GENERATION_LOCAL_TIME,
+  hasReachedBriefingGenerationTime,
+  resolveBriefingDueInstant,
+  resolveBriefingTimeZone,
+} from "./BriefingScheduleAuthority";
 
 export const BRIEFING_CADENCE_REGISTRY_VERSION = "briefing_cadence_registry_v2";
 export const BRIEFING_CADENCE_CATCH_UP_POLICY = Object.freeze({
@@ -21,11 +27,10 @@ export const BRIEFING_CADENCE_CATCH_UP_POLICY = Object.freeze({
   generatorTimeoutMs: 15_000,
 });
 
-const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 const DEFAULT_SCHEDULE = Object.freeze({
-  midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
-  weekly: { enabled: true, day: "sunday", localTime: "00:00" },
-  monthly: { enabled: true, dayOfMonth: 1, localTime: "00:00" },
+  midweek: { enabled: true, day: "wednesday" },
+  weekly: { enabled: true, day: "sunday" },
+  monthly: { enabled: true, dayOfMonth: 1 },
   notificationPreference: "notify_when_ready",
 });
 
@@ -44,7 +49,7 @@ export async function resolveBriefingCadenceRegistry({
       .getCurrent({ userId: resolvedUserId })
     : null;
   const schedule = configured ?? DEFAULT_SCHEDULE;
-  const timeZone = schedule.timeZone ?? user?.timeZone ?? DEFAULT_TIME_ZONE;
+  const timeZone = resolveBriefingTimeZone({ coachingUpdates: schedule, user });
   const local = localParts(now, timeZone);
 
   const entries = [
@@ -134,7 +139,8 @@ function createEntry({
   const validLocalDayOfMonth = Number.isInteger(surface?.dayOfMonth)
     ? surface.dayOfMonth
     : null;
-  const localEligibleTime = surface?.localTime ?? "00:00";
+  // Generation time is one system authority, not a per-surface preference.
+  const localEligibleTime = BRIEFING_GENERATION_LOCAL_TIME;
   const correctLocalDay = validLocalDayOfMonth
     ? local.day === validLocalDayOfMonth
     : validLocalWeekdays.includes(local.weekday);
@@ -142,7 +148,7 @@ function createEntry({
     userId &&
     enabled &&
     correctLocalDay &&
-    local.time >= localEligibleTime
+    hasReachedBriefingGenerationTime(local.time)
   );
   const evidenceWindow = eligible || includeExpectedWindowWhenIneligible
     ? windowBuilder({ now, timeZone })
@@ -165,13 +171,17 @@ function createEntry({
           ? validLocalDayOfMonth
             ? "wrong_local_month_day"
             : "wrong_local_weekday"
-          : local.time < localEligibleTime
+          : !hasReachedBriefingGenerationTime(local.time)
             ? "before_local_eligible_time"
             : "eligible",
     evidenceWindow,
     expectedArtifactId: evidenceWindow ? artifactBuilder(evidenceWindow) : null,
     eligibleAt: eligible
       ? `${local.date}T${localEligibleTime}:00[${timeZone}]`
+      : null,
+    // The exact instant this occurrence became due (03:00 local, DST-safe).
+    dueAt: correctLocalDay
+      ? resolveBriefingDueInstant({ localDate: local.date, timeZone }).toISOString()
       : null,
     nextEligibility: nextEligibility({
       localDate: local.date,

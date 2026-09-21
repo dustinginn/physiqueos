@@ -29,8 +29,8 @@ describe("Coaching Updates editor model", () => {
       },
     });
     expect(model).toMatchObject({
-      midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
-      weekly: { enabled: true, day: "sunday", localTime: "00:00" },
+      midweek: { enabled: true, day: "wednesday", localTime: "03:00" },
+      weekly: { enabled: true, day: "sunday", localTime: "03:00" },
       daily: { enabled: false },
       notificationPreference: "notify_when_ready",
       eventBriefings: { photo: true, dexa: true },

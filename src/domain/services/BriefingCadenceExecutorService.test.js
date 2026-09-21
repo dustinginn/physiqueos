@@ -16,7 +16,7 @@ describe("production briefing cadence registry", () => {
     const midweek = entries.find((entry) => entry.cadence === "midweek");
     expect(midweek).toMatchObject({
       eligible: true,
-      localEligibleTime: "00:00",
+      localEligibleTime: "03:00",
       validLocalWeekdays: ["wednesday"],
       timeZone: "America/Los_Angeles",
       catchUpHorizon: "local_cadence_day",
@@ -43,7 +43,7 @@ describe("production briefing cadence registry", () => {
     });
     expect(entries.find((entry) => entry.cadence === "weekly")).toMatchObject({
       eligible: true,
-      localEligibleTime: "00:00",
+      localEligibleTime: "03:00",
       validLocalWeekdays: ["sunday"],
       expectedArtifactId: "weekly_briefing_2026-07-26_2026-08-01",
       evidenceWindow: {
