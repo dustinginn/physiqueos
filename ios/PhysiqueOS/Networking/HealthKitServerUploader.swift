@@ -6,18 +6,54 @@ enum HealthKitUploadResult: Equatable, Sendable {
     case rejected(code: String)
 }
 
+/// What the Server reported for one accepted observation. The Server alone
+/// decides whether a daily snapshot canonicalized; the app only shows it.
+struct HealthKitCanonicalizationReport: Equatable, Sendable {
+    let observationType: String
+    let outcome: String
+    let reconciliationState: String?
+    let reason: String?
+    let occurredAt: String?
+
+    var wasCanonicalized: Bool { reconciliationState?.hasSuffix("_day_canonicalized") == true }
+}
+
+/// Collects the Server's per-observation reconciliation from durable
+/// acknowledgements so the Founder screen can show canonicalized versus
+/// deferred, instead of treating every acknowledgement as success.
+final class HealthKitCanonicalizationLedger: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [HealthKitCanonicalizationReport] = []
+
+    func reset() { lock.lock(); stored = []; lock.unlock() }
+    func record(_ reports: [HealthKitCanonicalizationReport]) { lock.lock(); stored += reports; lock.unlock() }
+    func reports() -> [HealthKitCanonicalizationReport] { lock.lock(); defer { lock.unlock() }; return stored }
+}
+
 protocol HealthKitObservationUploader: Sendable {
     func upload(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult
 }
 
 struct ProductionHealthKitObservationUploader: HealthKitObservationUploader {
     private struct Result: Decodable, Sendable {
+        struct Observation: Decodable, Sendable {
+            struct Reconciliation: Decodable, Sendable {
+                let state: String?
+                let reason: String?
+            }
+            let observationType: String?
+            let outcome: String?
+            let occurredAt: String?
+            let reconciliation: Reconciliation?
+        }
         let status: String
         let batchId: String
         let cursorResponsibility: String
+        let observations: [Observation]?
     }
 
     let api: ProductionNativeAPI
+    var ledger: HealthKitCanonicalizationLedger? = nil
 
     func upload(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult {
         do {
@@ -36,6 +72,15 @@ struct ProductionHealthKitObservationUploader: HealthKitObservationUploader {
             else {
                 return .transientFailure(code: "healthkit_server_acknowledgement_invalid")
             }
+            ledger?.record((result.observations ?? []).map {
+                HealthKitCanonicalizationReport(
+                    observationType: $0.observationType ?? "unknown",
+                    outcome: $0.outcome ?? "unknown",
+                    reconciliationState: $0.reconciliation?.state,
+                    reason: $0.reconciliation?.reason,
+                    occurredAt: $0.occurredAt
+                )
+            })
             let receipt = outcome.receipt.commandId
                 ?? outcome.receipt.operationId
                 ?? "receipt:\(partition.identity)"

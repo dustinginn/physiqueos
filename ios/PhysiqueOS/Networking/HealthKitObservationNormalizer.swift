@@ -1,14 +1,18 @@
 import Foundation
 
 struct HealthKitObservationNormalizer: Sendable {
-    func normalize(_ addition: HealthKitQueryAddition) -> NormalizedHealthKitObservation {
+    func normalize(
+        _ addition: HealthKitQueryAddition,
+        externalIDNamespace: String? = nil
+    ) -> NormalizedHealthKitObservation {
         let externalID: String
+        let namespace = externalIDNamespace.map { "\($0):" } ?? ""
         if let uuid = addition.healthKitUUID {
             externalID = uuid.uuidString.lowercased()
         } else if case .activitySummary = addition.payload {
-            externalID = "activity-summary:\(addition.occurrence.localDate)"
+            externalID = "activity-summary:\(namespace)\(addition.occurrence.localDate)"
         } else if case .nutritionDailyTotal = addition.payload {
-            externalID = "nutrition-daily-total:\(addition.occurrence.localDate)"
+            externalID = "nutrition-daily-total:\(namespace)\(addition.occurrence.localDate)"
         } else {
             externalID = "source-object:\(addition.objectTypeIdentifier):\(addition.occurrence.localDate)"
         }
@@ -52,7 +56,12 @@ struct HealthKitBatchBuilder: Sendable {
         ingestionPurpose: HealthKitIngestionPurpose = .operational
     ) throws -> HealthKitStagedBatch {
         let normalizer = HealthKitObservationNormalizer()
-        let additions = queryResult.additions.map(normalizer.normalize).sorted(by: Self.observationOrder)
+        let namespace = scope.predicateVersion.hasPrefix(HealthKitCanonicalTestDay.predicatePrefix)
+            ? HealthKitCanonicalTestDay.externalIDNamespace
+            : nil
+        let additions = queryResult.additions
+            .map { normalizer.normalize($0, externalIDNamespace: namespace) }
+            .sorted(by: Self.observationOrder)
         let deletions = queryResult.deletions.map(normalizer.normalize).sorted {
             $0.immutableExternalID < $1.immutableExternalID
         }

@@ -194,13 +194,34 @@ struct HealthKitFounderCanaryView: View {
                     statusRow("Nutrition observations uploaded", String(testDayResult.nutrition.additionsDiscovered))
                     statusRow("Pending batches", String(testDayResult.activityDiagnostics.pendingBatchCount + testDayResult.nutritionDiagnostics.pendingBatchCount))
                     statusRow("Last acknowledgement", (testDayResult.nutritionDiagnostics.lastDurableAcknowledgement ?? testDayResult.activityDiagnostics.lastDurableAcknowledgement)?.formatted() ?? "None")
-                    if testDayResult.activity.additionsDiscovered == 0 && testDayResult.nutrition.additionsDiscovered == 0 {
+                    let reports = testDayResult.canonicalization
+                    let canonicalized = reports.filter(\.wasCanonicalized)
+                    statusRow("Server canonicalized", canonicalized.isEmpty ? "Nothing new" : canonicalized.map { Self.observationLabel($0.observationType) }.joined(separator: ", "))
+                    let deferred = reports.filter { !$0.wasCanonicalized && $0.reconciliationState?.contains("canonicalization_deferred") == true }
+                    if let reason = deferred.compactMap(\.reason).first {
+                        Text("The Server stored this day raw and did not canonicalize it (\(reason.replacingOccurrences(of: "_", with: " "))). Tell the coordinating agent before syncing again.")
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                    }
+                    if testDayResult.activity.resumedPendingBatch || testDayResult.nutrition.resumedPendingBatch {
+                        Text("Resumed an interrupted upload for this day.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    } else if testDayResult.activity.additionsDiscovered == 0 && testDayResult.nutrition.additionsDiscovered == 0 {
                         Text("Nothing changed since the last sync for this day.")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                 }
             }
+        }
+    }
+
+    private static func observationLabel(_ type: String) -> String {
+        switch type {
+        case "activity_summary": "Activity"
+        case "nutrition_daily_total": "Nutrition"
+        default: type
         }
     }
 

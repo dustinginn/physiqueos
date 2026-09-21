@@ -181,8 +181,14 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                             "stand_hours": summary.appleStandHours.doubleValue(for: .count()),
                         ]
                         supplementalMetrics[localDate]?.forEach { metrics[$0.key] = $0.value }
+                        // Coverage is part of the fingerprint: a partial day becoming
+                        // complete with identical numbers is a material revision.
+                        let dayCoverage: HealthKitQueryActivitySummary.Coverage =
+                            self.calendar.isDate(date, inSameDayAs: current) ? .partialDay : .completeDay
                         let fingerprint = HealthKitStableDigest.hex(
-                            try Self.stableEncoder.encode(metrics)
+                            try Self.stableEncoder.encode(
+                                HealthKitDailySnapshotFingerprint(coverage: dayCoverage.rawValue, metrics: metrics)
+                            )
                         )
                         let previous = prior.entries[localDate]
                         let revision = previous?.fingerprint == fingerprint
@@ -216,7 +222,7 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                             payload: .activitySummary(HealthKitQueryActivitySummary(
                                 dailyActivity: metrics,
                                 aggregationScope: "daily_total_including_workouts",
-                                coverage: self.calendar.isDate(date, inSameDayAs: current) ? .partialDay : .completeDay,
+                                coverage: dayCoverage,
                                 sourceRevision: revision
                             )),
                             allowlistedMetadata: [:]
@@ -656,20 +662,26 @@ struct HealthKitNutritionDailySnapshotBuilder {
             defer { day = nextDay }
             guard bounds.contains(localDate: localDate) else { continue }
 
-            let metrics: [String: Double]
+            // Only nutrients HealthKit actually reported are sent. An absent
+            // macronutrient is unknown, never an asserted 0 g.
+            var metrics: [String: Double]
             if let calories = energy[localDate] {
-                metrics = [
-                    "calories": calories,
-                    "protein_g": protein[localDate] ?? 0,
-                    "carbs_g": carbohydrates[localDate] ?? 0,
-                    "fat_g": fat[localDate] ?? 0,
-                ]
+                metrics = ["calories": calories]
+                if let value = protein[localDate] { metrics["protein_g"] = value }
+                if let value = carbohydrates[localDate] { metrics["carbs_g"] = value }
+                if let value = fat[localDate] { metrics["fat_g"] = value }
             } else if prior.entries[localDate] != nil {
-                metrics = ["calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0]
+                // A day uploaded before that now has no dietary energy is an
+                // explicit zero-calorie revision, never a silent stale total.
+                metrics = ["calories": 0]
             } else {
                 continue
             }
-            let fingerprint = HealthKitStableDigest.hex(try encoder.encode(metrics))
+            let coverage: HealthKitQueryActivitySummary.Coverage =
+                calendar.isDate(day, inSameDayAs: now) ? .partialDay : .completeDay
+            let fingerprint = HealthKitStableDigest.hex(
+                try encoder.encode(HealthKitDailySnapshotFingerprint(coverage: coverage.rawValue, metrics: metrics))
+            )
             let previous = prior.entries[localDate]
             let revision = previous?.fingerprint == fingerprint
                 ? previous!.revision
@@ -700,7 +712,7 @@ struct HealthKitNutritionDailySnapshotBuilder {
                 payload: .nutritionDailyTotal(HealthKitQueryNutritionDailyTotal(
                     dailyNutrition: metrics,
                     aggregationScope: HealthKitQueryNutritionDailyTotal.aggregationScope,
-                    coverage: calendar.isDate(day, inSameDayAs: now) ? .partialDay : .completeDay,
+                    coverage: coverage,
                     sourceRevision: revision
                 )),
                 allowlistedMetadata: [:]
@@ -713,4 +725,11 @@ struct HealthKitNutritionDailySnapshotBuilder {
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
     }
+}
+
+/// What makes one daily snapshot differ from the last: its numbers and its
+/// coverage.
+struct HealthKitDailySnapshotFingerprint: Encodable {
+    let coverage: String
+    let metrics: [String: Double]
 }

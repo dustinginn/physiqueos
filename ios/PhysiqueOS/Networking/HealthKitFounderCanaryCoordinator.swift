@@ -158,6 +158,7 @@ final class HealthKitFounderCanaryCoordinator {
     private let deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore
     private let calendar: Calendar
     private let now: @Sendable () -> Date
+    private let canonicalizationLedger: HealthKitCanonicalizationLedger?
 
     @MainActor private(set) var isEnabled = false
 
@@ -167,8 +168,10 @@ final class HealthKitFounderCanaryCoordinator {
         server: any HealthKitFounderCanaryServer,
         deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore = KeychainHealthKitCanaryDeviceIdentityStore(),
         calendar: Calendar = .autoupdatingCurrent,
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = Date.init,
+        canonicalizationLedger: HealthKitCanonicalizationLedger? = nil
     ) {
+        self.canonicalizationLedger = canonicalizationLedger
         self.authorization = authorization
         self.synchronizer = synchronizer
         self.server = server
@@ -218,6 +221,7 @@ final class HealthKitFounderCanaryCoordinator {
         }
         let activityScope = scope(.activitySummary)
         let nutritionScope = scope(.nutritionDailyTotal)
+        canonicalizationLedger?.reset()
         let activity = try await synchronizer.synchronizeCanonicalTestDay(
             scope: activityScope, testDay: testDay, calendar: calendar
         )
@@ -230,7 +234,8 @@ final class HealthKitFounderCanaryCoordinator {
             activity: activity,
             nutrition: nutrition,
             activityDiagnostics: try await synchronizer.diagnostics(scope: activityScope),
-            nutritionDiagnostics: try await synchronizer.diagnostics(scope: nutritionScope)
+            nutritionDiagnostics: try await synchronizer.diagnostics(scope: nutritionScope),
+            canonicalization: canonicalizationLedger?.reports() ?? []
         )
     }
 

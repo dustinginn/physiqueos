@@ -596,8 +596,9 @@ final class AppEnvironment {
             service: healthKitService,
             featureGate: healthKitFeatureGate
         )
+        let canonicalizationLedger = HealthKitCanonicalizationLedger()
         let uploader = healthKitObservationUploader
-            ?? ProductionHealthKitObservationUploader(api: productionNativeAPI)
+            ?? ProductionHealthKitObservationUploader(api: productionNativeAPI, ledger: canonicalizationLedger)
         self.healthKitSynchronizationEngine = HealthKitSynchronizationEngine(
             queryClient: healthKitQueryClient,
             observerClient: healthKitObserverClient,
@@ -620,7 +621,8 @@ final class AppEnvironment {
         self.healthKitFounderCanaryCoordinator = HealthKitFounderCanaryCoordinator(
             authorization: canaryAuthorization,
             synchronizer: canarySynchronizer,
-            server: productionNativeAPI
+            server: productionNativeAPI,
+            canonicalizationLedger: canonicalizationLedger
         )
     }
 

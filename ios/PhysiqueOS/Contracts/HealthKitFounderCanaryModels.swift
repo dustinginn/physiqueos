@@ -104,7 +104,12 @@ struct HealthKitCanonicalTestDay: Equatable, Sendable {
 
     var streams: [HealthKitSynchronizationStream] { Self.streams }
 
-    var predicateVersion: String { "healthkit-canonical-testday-v1:\(localDate)" }
+    static let predicatePrefix = "healthkit-canonical-testday-v1:"
+    /// Source-observation identities of the operational test day never share an
+    /// external id with the validation-only canary, whose purpose is immutable.
+    static let externalIDNamespace = "testday"
+
+    var predicateVersion: String { "\(Self.predicatePrefix)\(localDate)" }
 
     func isProvisional(now: Date, calendar: Calendar) -> Bool {
         localDate == HealthKitActivityValidationWindow.localDate(now, calendar: calendar)
@@ -118,6 +123,9 @@ struct HealthKitCanonicalTestDayRunResult: Equatable, Sendable {
     let nutrition: HealthKitCanarySyncSummary
     let activityDiagnostics: HealthKitStreamDiagnostics
     let nutritionDiagnostics: HealthKitStreamDiagnostics
+    /// What the Server reported for each uploaded observation (empty when the
+    /// acknowledgement carried no detail).
+    var canonicalization: [HealthKitCanonicalizationReport] = []
 }
 
 struct HealthKitQueryBounds: Equatable, Sendable {

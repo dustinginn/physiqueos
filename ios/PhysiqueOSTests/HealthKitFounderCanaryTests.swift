@@ -652,7 +652,7 @@ final class HealthKitCanonicalTestDayTests: XCTestCase {
         let addition = try XCTUnwrap(output.additions.first)
         guard case let .nutritionDailyTotal(total) = addition.payload else { return XCTFail("Expected nutrition daily total") }
         XCTAssertEqual(total.dailyNutrition, ["calories": 1800, "protein_g": 150, "carbs_g": 180, "fat_g": 55])
-        XCTAssertEqual(Set(total.dailyNutrition.keys), HealthKitQueryNutritionDailyTotal.permittedKeys)
+        XCTAssertTrue(Set(total.dailyNutrition.keys).isSubset(of: HealthKitQueryNutritionDailyTotal.permittedKeys))
         XCTAssertEqual(total.coverage, .partialDay)
         XCTAssertEqual(total.sourceRevision, 1)
         XCTAssertEqual(total.aggregationScope, "daily_total_all_sources")
@@ -661,11 +661,28 @@ final class HealthKitCanonicalTestDayTests: XCTestCase {
         XCTAssertNil(addition.healthKitUUID)
     }
 
-    func testSnapshotCompletedDayIsCompleteAndMissingMacrosAreZeroNotInvented() throws {
+    func testSnapshotCompletedDayIsCompleteAndAbsentMacrosAreOmittedNotAssertedAsZero() throws {
         let output = try Self.build(energy: ["2026-09-10": 2400], protein: [:], carbs: [:], fat: [:], start: "2026-09-10", end: "2026-09-10")
         guard case let .nutritionDailyTotal(total) = try XCTUnwrap(output.additions.first).payload else { return XCTFail("Expected nutrition daily total") }
         XCTAssertEqual(total.coverage, .completeDay)
-        XCTAssertEqual(total.dailyNutrition["protein_g"], 0)
+        XCTAssertEqual(total.dailyNutrition, ["calories": 2400])
+    }
+
+    func testPartialDayBecomingCompleteWithIdenticalNumbersIsANewRevision() throws {
+        let evening = try Self.build(energy: ["2026-09-11": 2400], protein: ["2026-09-11": 200], carbs: [:], fat: [:])
+        guard case let .nutritionDailyTotal(first) = try XCTUnwrap(evening.additions.first).payload else { return XCTFail("Expected first revision") }
+        XCTAssertEqual(first.coverage, .partialDay)
+        XCTAssertEqual(first.sourceRevision, 1)
+        // Next morning: identical totals, but the day is now complete.
+        let nextMorning = Date(timeIntervalSince1970: HealthKitFounderCanaryTests.now.timeIntervalSince1970 + 86_400)
+        let complete = try Self.build(energy: ["2026-09-11": 2400], protein: ["2026-09-11": 200], carbs: [:], fat: [:], prior: evening.cursor, now: nextMorning)
+        guard case let .nutritionDailyTotal(second) = try XCTUnwrap(complete.additions.first).payload else { return XCTFail("Coverage change must emit a revision") }
+        XCTAssertEqual(second.coverage, .completeDay)
+        XCTAssertEqual(second.sourceRevision, 2)
+        XCTAssertEqual(second.dailyNutrition, first.dailyNutrition)
+        // And once complete, an unchanged repeat is silent again.
+        let repeatRun = try Self.build(energy: ["2026-09-11": 2400], protein: ["2026-09-11": 200], carbs: [:], fat: [:], prior: complete.cursor, now: nextMorning)
+        XCTAssertTrue(repeatRun.additions.isEmpty)
     }
 
     func testSnapshotIsIdempotentAndAdvancesRevisionOnlyWhenTheDayChanges() throws {
@@ -688,7 +705,7 @@ final class HealthKitCanonicalTestDayTests: XCTestCase {
         let first = try Self.build(energy: ["2026-09-11": 900], protein: [:], carbs: [:], fat: [:])
         let cleared = try Self.build(energy: [:], protein: [:], carbs: [:], fat: [:], prior: first.cursor)
         guard case let .nutritionDailyTotal(total) = try XCTUnwrap(cleared.additions.first).payload else { return XCTFail("Expected zero revision") }
-        XCTAssertEqual(total.dailyNutrition, ["calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0])
+        XCTAssertEqual(total.dailyNutrition, ["calories": 0])
         XCTAssertEqual(total.sourceRevision, 2)
     }
 
@@ -715,7 +732,7 @@ final class HealthKitCanonicalTestDayTests: XCTestCase {
         let root = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         let observation = try XCTUnwrap((root["observations"] as? [[String: Any]])?.first)
         XCTAssertEqual(observation["observationType"] as? String, "nutrition_daily_total")
-        XCTAssertEqual(observation["externalId"] as? String, "nutrition-daily-total:2026-09-11")
+        XCTAssertEqual(observation["externalId"] as? String, "nutrition-daily-total:testday:2026-09-11")
         XCTAssertEqual(observation["ingestionPurpose"] as? String, "operational")
         let total = try XCTUnwrap(observation["nutritionDailyTotal"] as? [String: Any])
         XCTAssertEqual(total["aggregationScope"] as? String, "daily_total_all_sources")
@@ -840,6 +857,35 @@ final class HealthKitCanonicalTestDayTests: XCTestCase {
         XCTAssertTrue(uploads.isEmpty)
     }
 
+    func testTestDayIdentitiesNeverShareAnExternalIdWithTheValidationCanary() throws {
+        let addition = Self.rawAddition(localDate: "2026-09-11")
+        let testDayBatch = try HealthKitBatchBuilder().build(
+            scope: Self.scope(.activitySummary, "2026-09-11"), previousCursor: nil,
+            queryResult: .init(additions: [addition], deletions: [], proposedAnchorData: Data("a".utf8), completedAt: Self.now),
+            createdAt: Self.now, ingestionPurpose: .operational
+        )
+        let validationBatch = try HealthKitBatchBuilder().build(
+            scope: HealthKitFounderCanaryTests.scope(window: HealthKitFounderCanaryTests.window()), previousCursor: nil,
+            queryResult: .init(additions: [addition], deletions: [], proposedAnchorData: Data("a".utf8), completedAt: Self.now),
+            createdAt: Self.now, ingestionPurpose: .validationOnly
+        )
+        XCTAssertEqual(testDayBatch.partitions.first?.additions.first?.immutableExternalID, "activity-summary:testday:2026-09-11")
+        XCTAssertEqual(validationBatch.partitions.first?.additions.first?.immutableExternalID, "activity-summary:2026-09-11")
+    }
+
+    func testTheLedgerReportsWhatTheServerCanonicalizedVersusDeferred() {
+        let ledger = HealthKitCanonicalizationLedger()
+        ledger.record([
+            .init(observationType: "activity_summary", outcome: "created", reconciliationState: "activity_day_canonicalized", reason: nil, occurredAt: "2026-09-11"),
+            .init(observationType: "nutrition_daily_total", outcome: "created", reconciliationState: "nutrition_canonicalization_deferred", reason: "canonicalization_not_activated", occurredAt: "2026-09-11"),
+        ])
+        let reports = ledger.reports()
+        XCTAssertEqual(reports.filter(\.wasCanonicalized).map(\.observationType), ["activity_summary"])
+        XCTAssertEqual(reports.last?.reason, "canonicalization_not_activated")
+        ledger.reset()
+        XCTAssertTrue(ledger.reports().isEmpty)
+    }
+
     // MARK: coordinator
 
     @MainActor
@@ -915,7 +961,8 @@ final class HealthKitCanonicalTestDayTests: XCTestCase {
     private static func build(
         energy: [String: Double], protein: [String: Double], carbs: [String: Double], fat: [String: Double],
         prior: HealthKitNutritionDailySnapshotBuilder.Cursor = .init(entries: [:]),
-        start: String = "2026-09-11", end: String = "2026-09-11"
+        start: String = "2026-09-11", end: String = "2026-09-11",
+        now: Date = HealthKitFounderCanaryTests.now
     ) throws -> HealthKitNutritionDailySnapshotBuilder.Output {
         let window = try HealthKitActivityValidationWindow(startDate: start, endDate: end)
         return try HealthKitNutritionDailySnapshotBuilder.build(
