@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Build 48 photo diagnostics continuation (`build48-photo-diagnostics-continuation-20260921`)
+- Task: Photo legacy-session Server read-model fix (`photo-legacy-session-server-fix-20260921`)
 - Agent: claude
 - Status: blocked
-- Generated (UTC): 2026-09-21T13:29:30Z
+- Generated (UTC): 2026-09-21T14:10:00Z
 - Success: false
 
-Summary: Both photo defects share ONE evidence-proven root cause, and it is a Server read-model defect, not a Native one. The Server photos read projects a duplicate legacy-adapted Sep 19 session (five legacy progressPhotos rows written by the evidence-review confirm action, whose imagePath is the DNG ORIGINAL) that sorts ahead of the canonical Sep 19 session (whose views use the JPEG derivative). Native takes it as the latest set. Its DNG images hit the media route content-type allowlist and 404 (issue 1: permanent Retry), and photo-event for its legacy session id finds no briefing and 404s (issue 2: false 'being prepared'). Proof: object HEAD shows all ten Sep 19 objects healthy; production logs show every photo-event read in the window used the legacy session id with zero rows; the legacy session fingerprint recomputed from the five legacy rows equals that id exactly. Per the task, a Server correction is required and no Server deploy or production write is authorized, so the Build 48 release path was stopped. Issue 3 fix (8256db4b) recovered intact (it is HEAD of the current worktree) and unchanged. No Build 48 bump, archive or upload. No production mutation.
+Summary: Server fix implemented, tested, and independently approved, but NOT deployed: the harness denied the authorized fast-forward push of a428fbda to combined-app-platform-cutover twice (first as 'Production Deploy', then 'Blocked by classifier') even after the Founder authorized it in chat. Production is unchanged (deployment 7292d936 ACTIVE on 714dcaef, web and worker). The fix: canonical photo sessions now also own legacy progressPhotos rows whose imagePath is the ORIGINAL of a photo that is displayed via a JPEG derivative (DNG/HEIC), in both createPhotoSessionReadModels and createPhotoSessionLandingSummary. Read-model only, no data mutation. Root cause reverified against real production state: the base code yields 19 sessions with the duplicate legacy-photo-session-photo-assets-7krsg5 as latest (first image is the DNG original, no briefing under that id); the candidate code run read-only against the same state yields 18 sessions, canonical Sep 19 latest, first image = the JPEG derivative, Sep 19 published briefing found, 10 legacy-only historical sessions and all 49 stored legacy rows untouched.
 
-Detailed report: `agent-handoffs/reports/20260921T132921Z-build48-photo-diagnostics-root-cause.md`
+Detailed report: `agent-handoffs/reports/20260921T140935Z-photo-legacy-session-server-fix-blocked.md`
 
 Protocol: `agent-handoffs/README.md`
