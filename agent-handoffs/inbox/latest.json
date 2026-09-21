@@ -4,7 +4,7 @@
   "task": {
     "id": "build48-photo-diagnostics-continuation-20260921",
     "title": "Build 48 photo diagnostics continuation",
-    "status": "ready"
+    "status": "claimed"
   },
   "target": {
     "agent": "claude",
@@ -29,5 +29,9 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
+  },
+  "lifecycle": {
+    "claimed_by": "claude",
+    "claimed_at_utc": "2026-09-21T13:24:41Z"
   }
 }
