@@ -1,10 +1,15 @@
 {
  "schema_version": 1,
- "generated_at_utc": "2026-09-21T16:26:51Z",
- "task": {"id": "build48-admin-api-upload-final-retry-20260921", "title": "Build 48 Admin API upload final retry", "agent": "claude", "status": "completed"},
+ "generated_at_utc": "2026-09-21T17:05:45Z",
+ "task": {
+  "id": "pre-healthkit-storage-anchor-readiness-20260921",
+  "title": "Pre-HealthKit storage, authority and Remote Control anchor readiness",
+  "agent": "claude",
+  "status": "completed"
+ },
  "repository": "dustinginn/physiqueos",
  "authority": {
-  "base_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
+  "base_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
   "final_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
   "production_server_sha": "a428fbda42757620750264e63eaee18950ab7132",
   "production_deployment": "d3783f4c-bc14-469b-b10c-93635a047325",
@@ -12,22 +17,47 @@
   "native_build": 48
  },
  "result": {
-  "summary": "Build 48 (1.0 (48), existing archive, no rebuild) uploaded to App Store Connect via the guarded API-key path with the replacement Admin key. Cloud signing succeeded. Apple delivery id 92e3c133-d294-4d0d-bd24-11f5a55275c5; build-status VALID, import-status VALID. Auth-check and dry run passed every guard. Interactive Xcode auth not used. Production and HealthKit untouched. Narrow scoped permission rules added for future key replacement (unexercised).",
+  "summary": "Storage audited and cleaned (free 12.3 GB -> 17.1 GB; five stale worktrees and regenerable build products removed after no-unique-work proof; Build 47 and 48 archives kept). Remote Control anchor fast-forwarded in place from Build 47 to Build 48 bbb46e19, clean and exact; host binary resolves baseRef=head per spawn at the host cwd, so no restart needed and host and 7 sessions left running. Spawn proof pending one phone-started session. Production Server a428fbda verified live, nothing mutated. HealthKit foundation reviewed: Server ingestion and validation-only canary already in production, Native Build 48 contains N0/N1/canary code and entitlements; old foundation branches superseded. Flags: STORAGE_AUDIT_COMPLETE=YES SAFE_CLEANUP_COMPLETE=YES DISK_SPACE_HEALTHY=NO BUILD48_ARCHIVE_PRESERVED=YES ADMIN_KEY_SECURE_COPY_PRESERVED=YES REDUNDANT_ADMIN_KEY_DOWNLOAD_REMOVED=NOT_APPLICABLE(no copy found) REMOTE_CONTROL_ANCHOR_BUILD48=YES REMOTE_CONTROL_HOST_BUILD48_READY=YES REMOTE_CONTROL_SPAWN_BUILD48_PROVEN=NO PRODUCTION_SERVER_AUTHORITY_VERIFIED=YES HEALTHKIT_FOUNDATION_REVIEWED=YES THREE_AM_BRIEFING_CHANGE_QUEUED=YES PHONE_ONLY_HEALTHKIT_WORK_READY=YES(provisional) FOUNDER_MAC_ACTION_REQUIRED=NO PRODUCTION_DATA_MUTATED_DURING_READINESS=NO.",
   "success": true,
   "production_mutated": false,
   "deployed": false,
-  "testflight_uploaded": true
+  "testflight_uploaded": false
  },
  "validation": {
   "tests": null,
   "review": null,
-  "zero_write_audit": null
+  "zero_write_audit": {
+   "status": "passed",
+   "summary": "Only read-only production calls (doctl get, health GET). No production writes or deploys."
+  }
  },
- "decisions_required": ["Founder accepts Build 48 in TestFlight after it appears as ready for testing, then authorizes the next HealthKit phase."],
+ "decisions_required": [
+  "Authorize pushing a Native preservation branch (native/build48-accepted) to origin, since the Native history exists only on the Mac.",
+  "Decide whether to reclaim more disk (iPhone DeviceSupport 5.7 GB, extra simulator devices, old archives) since free space is still only 17 GB.",
+  "Send the confirming step: start one new phone session and check HEAD equals bbb46e19."
+ ],
  "blockers": [],
- "unexpected_findings": ["The first attempt under the earlier task id was blocked by the local classifier until the Founder authorized in chat; the newly added scoped permission rules have not yet been proven against it."],
- "backlog": ["3 AM briefing generation Server task", "Workout-draft cross-update persistence reliability", "Optional photo accessibility polish", "Optional: revoke old Developer-role API key"],
- "recommended_next_step": "Founder accepts Build 48 in TestFlight and confirms photo tap-to-expand; then start the HealthKit phase.",
- "full_report_path": "agent-handoffs/reports/20260921T162651Z-build48-admin-api-upload-final-retry.md",
- "safety": {"contains_secrets": false, "contains_credentials": false, "contains_production_exports": false, "contains_founder_evidence": false, "safe_for_chatgpt_retrieval": true}
+ "unexpected_findings": [
+  "Inbox latest.json was never activated for this task (still pointed at the previous completed task), so the inbox fetch gate refused; executed on the Founder's direct chat instruction and inbox not flipped.",
+  "Native Builds 41-48 history is not on any origin ref.",
+  "Local permission classifier blocked worktree removal and process kill until the Founder answered in chat.",
+  "An accidental claude rc --help left a hanging process; stopped safely, host unaffected.",
+  "APFS clone sharing made freed space smaller than du estimates."
+ ],
+ "backlog": [
+  "3 AM briefing generation Server task (all cadences, DST/timezone tests, no historical regeneration)",
+  "Workout Logger draft persistence across termination/eviction/restart/update",
+  "Photo Briefing Tap to expand fix in next accumulated-fixes build",
+  "Optional photo accessibility polish",
+  "HealthKit: Founder-authorized activation-policy mutation command; then Native operational sync and background delivery"
+ ],
+ "recommended_next_step": "Start one new phone session to confirm HEAD = bbb46e19, then send the Server-only 3 AM briefing task and, after the Founder runs the Build 48 canary, the HealthKit activation-policy slice from production a428fbda.",
+ "full_report_path": "agent-handoffs/reports/20260921T170545Z-pre-healthkit-storage-anchor-readiness.md",
+ "safety": {
+  "contains_secrets": false,
+  "contains_credentials": false,
+  "contains_production_exports": false,
+  "contains_founder_evidence": false,
+  "safe_for_chatgpt_retrieval": true
+ }
 }
