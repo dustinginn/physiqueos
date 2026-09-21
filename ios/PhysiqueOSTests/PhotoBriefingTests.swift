@@ -120,6 +120,45 @@ final class PhotoBriefingTests: XCTestCase {
         XCTAssertNotEqual(journey.priorSetId, recent.priorSetId)
     }
 
+    // MARK: - "Tap a photo to expand" is true for every comparison image
+
+    func testEveryComparisonImageWithASessionOpensItsOwnSessionAndPose() throws {
+        let store = makeStore()
+        for id in [
+            "event_briefing_progress_photo_photo-set-fixture-005",
+            "event_briefing_progress_photo_photo-set-fixture-003",
+        ] {
+            let photo = try XCTUnwrap(store.briefing(id: id)?.photo)
+            let entries = photo.ordinaryComparisons
+                + (photo.completionExperience?.recentComparisons ?? [])
+                + (photo.completionExperience?.journeyComparisons ?? [])
+            XCTAssertFalse(entries.isEmpty)
+            for entry in entries {
+                XCTAssertEqual(
+                    PhotoBriefingSections.expandDestination(for: entry, previous: false),
+                    .photoSetDetail(setId: entry.currentSetId, poseId: entry.poseId)
+                )
+                if let priorSetId = entry.priorSetId {
+                    XCTAssertEqual(
+                        PhotoBriefingSections.expandDestination(for: entry, previous: true),
+                        .photoSetDetail(setId: priorSetId, poseId: entry.poseId)
+                    )
+                } else {
+                    XCTAssertNil(PhotoBriefingSections.expandDestination(for: entry, previous: true))
+                }
+            }
+        }
+    }
+
+    func testComparisonTileWithoutASessionIsNotExpandable() {
+        let entry = PhotoComparisonEntry(
+            id: "e", poseId: .frontRelaxed, priorSetId: nil, priorDate: nil,
+            currentSetId: "", currentDate: "2026-09-19", roleLabel: nil, narrative: ""
+        )
+        XCTAssertNil(PhotoBriefingSections.expandDestination(for: entry, previous: true))
+        XCTAssertNil(PhotoBriefingSections.expandDestination(for: entry, previous: false))
+    }
+
     func testCompletedDecisionMirrorsTheRealProductsInertNextGoalButton() throws {
         let store = makeStore()
         let decision = try XCTUnwrap(store.briefing(id: "event_briefing_progress_photo_photo-set-fixture-003")?.photo?.completionExperience?.decision)

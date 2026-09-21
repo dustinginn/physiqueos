@@ -184,20 +184,15 @@ struct PhotoBriefingSections: View {
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
                         }
                     }
-                    Text("Tap a photo to expand")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.accent)
+                    if Self.expandDestination(for: entry, previous: true) != nil
+                        || Self.expandDestination(for: entry, previous: false) != nil {
+                        Text("Tap a photo to expand")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                            .foregroundStyle(PhysiqueOSTheme.accent)
+                    }
                     HStack(spacing: 8) {
-                        ProgressPhotoTile(
-                            roleLabel: "Previous",
-                            source: comparisonMediaSource(entry, previous: true),
-                            caption: entry.priorDate.map(BriefingDateFormatting.shortDate)
-                        )
-                        ProgressPhotoTile(
-                            roleLabel: "Current",
-                            source: comparisonMediaSource(entry, previous: false),
-                            caption: BriefingDateFormatting.shortDate(entry.currentDate)
-                        )
+                        expandableComparisonTile(entry, previous: true)
+                        expandableComparisonTile(entry, previous: false)
                     }
                     Text(entry.narrative)
                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
@@ -205,6 +200,38 @@ struct PhotoBriefingSections: View {
                 }
                 .padding(.vertical, 8)
             }
+        }
+    }
+
+    /// The enlarged presentation for one comparison image: the same server-owned
+    /// session + pose detail the snapshot grid opens. `nil` when the entry has no
+    /// session for that side (e.g. a new baseline's absent prior), so a tile that
+    /// cannot open never advertises expansion.
+    static func expandDestination(for entry: PhotoComparisonEntry, previous: Bool) -> AppDestination? {
+        let setId = previous ? entry.priorSetId : entry.currentSetId
+        guard let setId, !setId.isEmpty else { return nil }
+        return .photoSetDetail(setId: setId, poseId: entry.poseId)
+    }
+
+    @ViewBuilder
+    private func expandableComparisonTile(_ entry: PhotoComparisonEntry, previous: Bool) -> some View {
+        let tile = ProgressPhotoTile(
+            roleLabel: previous ? "Previous" : "Current",
+            source: comparisonMediaSource(entry, previous: previous),
+            caption: previous
+                ? entry.priorDate.map(BriefingDateFormatting.shortDate)
+                : BriefingDateFormatting.shortDate(entry.currentDate)
+        )
+        if let destination = Self.expandDestination(for: entry, previous: previous) {
+            // Not a Button: the tile's own Retry is a Button, and a Button nested in
+            // another Button's label never receives its tap.
+            tile
+                .contentShape(Rectangle())
+                .onTapGesture { onNavigate(destination) }
+                .accessibilityLabel("\(entry.poseId.label) \(previous ? "previous" : "current") photo, expand")
+                .accessibilityAddTraits(.isButton)
+        } else {
+            tile
         }
     }
 
