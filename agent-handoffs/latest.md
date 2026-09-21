@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Build 48 photo closure and API upload (`build48-photo-closure-api-upload-v2-20260921`)
+- Task: Build 48 photo diagnostics continuation (`build48-photo-diagnostics-continuation-20260921`)
 - Agent: claude
 - Status: blocked
-- Generated (UTC): 2026-09-21T07:11:00Z
+- Generated (UTC): 2026-09-21T13:29:30Z
 - Success: false
 
-Summary: Stopped safely before any Build 48 bump/archive/upload. Issue 3 (Photo Briefing 'Tap a photo to expand' did nothing) is diagnosed and fixed in a local, unpushed, not-yet-independently-reviewed Native commit (8256db4b, on top of Build 47 f372699f): comparison tiles had no tap target; each now opens its own session+pose photoSetDetail like the snapshot grid, and the hint only shows when a tile can open. 29/29 PhotoBriefingTests pass. Issues 1 (first Sep 19 photo Retry) and 2 (false 'Photo Briefing is being prepared') were investigated with the approved read-only production audit path (6 bounded READ ONLY transactions, all rolled back) but NOT proven: production metadata shows no discrepancy for issue 1, and the Server half of issue 2 is proven correct, so the remaining cause needs evidence outside the authorized read-only DB path. Per task rules no fix was guessed. API-key auth check passed read-only; no upload was attempted because no Build 48 archive exists.
+Summary: Both photo defects share ONE evidence-proven root cause, and it is a Server read-model defect, not a Native one. The Server photos read projects a duplicate legacy-adapted Sep 19 session (five legacy progressPhotos rows written by the evidence-review confirm action, whose imagePath is the DNG ORIGINAL) that sorts ahead of the canonical Sep 19 session (whose views use the JPEG derivative). Native takes it as the latest set. Its DNG images hit the media route content-type allowlist and 404 (issue 1: permanent Retry), and photo-event for its legacy session id finds no briefing and 404s (issue 2: false 'being prepared'). Proof: object HEAD shows all ten Sep 19 objects healthy; production logs show every photo-event read in the window used the legacy session id with zero rows; the legacy session fingerprint recomputed from the five legacy rows equals that id exactly. Per the task, a Server correction is required and no Server deploy or production write is authorized, so the Build 48 release path was stopped. Issue 3 fix (8256db4b) recovered intact (it is HEAD of the current worktree) and unchanged. No Build 48 bump, archive or upload. No production mutation.
 
-Detailed report: `agent-handoffs/reports/20260921T071100Z-build48-photo-closure-blocked.md`
+Detailed report: `agent-handoffs/reports/20260921T132921Z-build48-photo-diagnostics-root-cause.md`
 
 Protocol: `agent-handoffs/README.md`

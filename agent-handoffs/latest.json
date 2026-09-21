@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T07:11:00Z",
+  "generated_at_utc": "2026-09-21T13:29:30Z",
   "task": {
-    "id": "build48-photo-closure-api-upload-v2-20260921",
-    "title": "Build 48 photo closure and API upload",
+    "id": "build48-photo-diagnostics-continuation-20260921",
+    "title": "Build 48 photo diagnostics continuation",
     "agent": "claude",
     "status": "blocked"
   },
@@ -17,7 +17,7 @@
     "native_build": 47
   },
   "result": {
-    "summary": "Stopped safely before any Build 48 bump/archive/upload. Issue 3 (Photo Briefing 'Tap a photo to expand' did nothing) is diagnosed and fixed in a local, unpushed, not-yet-independently-reviewed Native commit (8256db4b, on top of Build 47 f372699f): comparison tiles had no tap target; each now opens its own session+pose photoSetDetail like the snapshot grid, and the hint only shows when a tile can open. 29/29 PhotoBriefingTests pass. Issues 1 (first Sep 19 photo Retry) and 2 (false 'Photo Briefing is being prepared') were investigated with the approved read-only production audit path (6 bounded READ ONLY transactions, all rolled back) but NOT proven: production metadata shows no discrepancy for issue 1, and the Server half of issue 2 is proven correct, so the remaining cause needs evidence outside the authorized read-only DB path. Per task rules no fix was guessed. API-key auth check passed read-only; no upload was attempted because no Build 48 archive exists.",
+    "summary": "Both photo defects share ONE evidence-proven root cause, and it is a Server read-model defect, not a Native one. The Server photos read projects a duplicate legacy-adapted Sep 19 session (five legacy progressPhotos rows written by the evidence-review confirm action, whose imagePath is the DNG ORIGINAL) that sorts ahead of the canonical Sep 19 session (whose views use the JPEG derivative). Native takes it as the latest set. Its DNG images hit the media route content-type allowlist and 404 (issue 1: permanent Retry), and photo-event for its legacy session id finds no briefing and 404s (issue 2: false 'being prepared'). Proof: object HEAD shows all ten Sep 19 objects healthy; production logs show every photo-event read in the window used the legacy session id with zero rows; the legacy session fingerprint recomputed from the five legacy rows equals that id exactly. Per the task, a Server correction is required and no Server deploy or production write is authorized, so the Build 48 release path was stopped. Issue 3 fix (8256db4b) recovered intact (it is HEAD of the current worktree) and unchanged. No Build 48 bump, archive or upload. No production mutation.",
     "success": false,
     "production_mutated": false,
     "deployed": false,
@@ -26,41 +26,42 @@
   "validation": {
     "tests": {
       "status": "not_run",
-      "summary": "Required release gates NOT run (release path not reached). Only a focused check was run: PhotoBriefingTests 29/29 pass on the iPhone 17 Pro simulator, including 2 new regression tests for comparison-tile expansion. Not run: full Native unit target, HealthKit suites, Debug and unsigned Release compile, deterministic project regeneration, git diff --check, launch smoke."
+      "summary": "No new Native code this task, so no new tests. Carried forward: PhotoBriefingTests 29/29 pass at 8256db4b (from the prior task). The Build 48 release gates were not run because the release path stopped."
     },
     "review": {
       "status": "not_run",
-      "summary": "Independent review was not run: issues 1 and 2 are undiagnosed, so there is no complete Build 48 candidate to review."
+      "summary": "No independent review: no Build 48 candidate beyond the already-reported issue 3 commit, and the required fix for issues 1 and 2 is on the Server side."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Production inspected only through the approved bounded App Platform console runner (saved context physiqueos-final-cutover-config, app and web component reverified, web and worker source both 714dcaef, runtime SHA and canonical owner asserted). Six task-specific payloads each did BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY, verified transaction_read_only=on, ran owner-scoped bounded SELECTs only, and ROLLBACK. One payload failed on a SQL alias syntax error and was rolled back by the finally block with no effect. No credentials printed, no storage keys or image pixels inspected, no writes."
+      "summary": "Reads only. Object-storage HEAD (no GET, no signed URLs) of 14 objects (10 Sep 19, 4 Aug 22) using the app's bindings inside the approved console path; database reads in BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY transactions with transaction_read_only=on verified, owner-scoped and bounded, then ROLLBACK; one bounded run-log read (last 3000 lines, filtered in a pipe, nothing persisted). App, component, web and worker SHA reverified before use. No credentials printed, no image bytes read, no writes."
     }
   },
   "decisions_required": [
-    "Issue 1: choose how to obtain object-level evidence for the first Sep 19 photo. Recommended: authorize one additional read-only check through the same approved console path that HEADs (existence, content-type, size, version) the ten Sep 19 media objects in object storage using the app's existing bindings, with no writes.",
-    "Issue 2: choose how to obtain the missing request-level evidence. Recommended: authorize read-only inspection of production application logs for native/read/photo-event responses around the Founder's Build 47 observation, to see which session id Native sent and what status the Server returned.",
-    "Alternatively authorize a diagnostic-only Build 48 that surfaces the media/briefing failure class (HTTP status and reason) on device, plus a separately authorized Server follow-up (media route returning distinct status codes and logging instead of masking every failure as 404)."
+    "Authorize a Server correction and deploy (separate task/authorization, not part of this Native task). Minimal correction: in the photo session read model (createPhotoSessionReadModels and createPhotoSessionLandingSummary), treat a legacy progressPhotos row as owned by a canonical session when its imagePath equals the canonical photo's ORIGINAL storage_path, not only its display/derivative path (add the original asset keys to the canonical asset key set). This suppresses the duplicate legacy session with no data mutation and needs a Server unit test (canonical DNG session with derivative plus a legacy row on the original must yield one session).",
+    "Decide whether Build 48 should proceed as an issue 3 only release (plus any retry-semantics hardening) once the Server fix is live, or whether Build 47 plus the Server fix is sufficient for the two photo defects and Build 48 can wait.",
+    "Optional Server hardening to authorize separately: the evidence-review confirm action should link legacy progress photo rows to the canonical session (source ids) or write the display reference, and the media route should return distinct status codes and log failures instead of masking everything as 404."
   ],
   "blockers": [
-    "Issue 1 root cause not proven. All ten Sep 19 media rows (five DNG originals, five JPEG analysis derivatives) are verified, correctly typed, same storage shape, unique hashes and same provider-version shape, and match the Aug 22 working photos structurally. The Server picks the JPEG derivative for display of DNG originals. The Server media route turns every failure (missing object, upstream error, content-type outside jpeg/png/heic/webp/pdf, auth) into a plain 404, so a permanent 404 is indistinguishable from a transient one. The remaining candidates (a storage-object-level fault for that one object, or a Native-side request/state defect) cannot be separated with database metadata alone.",
-    "Issue 2 root cause not proven. The exact photo-event store query returns the published artifact with its narrative for all six photo session ids, and the Sep 19 briefing record was created 2026-09-20T17:51Z, before Build 47 was uploaded. Native produces the 'being prepared' copy only from a pending availability result, which only arises from a 404 or a missing narrative, neither of which the Server returns for that session now. So the mismatch is not explained by Server data.",
-    "The Build 48 bump, archive, archive verification and API-key upload were not started because the task requires all three photo defects diagnosed with evidence and independent review clear first."
+    "Root cause requires a Server contract correction; the task forbids silently patching Server code and authorizes no Server deploy, so the Build 48 release path (review, bump, archive, API-key upload) was stopped.",
+    "Native cannot correctly fix this: hiding or deduplicating sessions in Native would be a shadow lifecycle, and a Native Retry cannot recover a server-chosen DNG reference."
   ],
   "unexpected_findings": [
-    "The Sep 19 photo session's five photos all use ProRAW DNG originals with JPEG analysis derivatives, while every older session uses plain JPEG originals; the Sep 19 tile is the only latest-set image that depends on the derivative display path.",
-    "Server media route swallows all errors into 404 with no logging, which makes photo failures undiagnosable from the Server side.",
-    "The first two production-adjacent reads in this session were denied by the harness before the Founder authorized the approved read-only path; after authorization the path worked and no denied action was worked around."
+    "The affected 'first/latest Sep 19 image' is not the canonical Sep 19 session at all; it is a legacy-adapted duplicate whose id starts with legacy-photo-session-photo-assets and which sorts before the canonical id on equal capture date.",
+    "The canonical Sep 19 photos and derivatives are healthy: HEAD 200, content type, size and version match the database rows, and the derivatives are JPEG. The Photo Briefing renders Sep 19 photos correctly because it references the canonical derivative ids.",
+    "The five legacy rows were created 2026-09-20 15:22 to 15:23 UTC by the Confirmed Photo Session projection in the evidence-review confirm action, which stores the original storage path as imagePath. Older JPEG sessions were unaffected only because original and display references were identical.",
+    "The media route allowlist (jpeg, png, heic, webp, pdf) rejects image/x-adobe-dng, so any DNG original served for display 404s permanently.",
+    "Run logs available covered only 2026-09-21 04:04 to 06:42 UTC (current deployment); the 8 photo-event 404s at 05:19 to 05:21 UTC are inside it. Media route failures are not logged, so issue 1 rests on HEAD, the route allowlist and the deterministic session selection rather than a logged request."
   ],
   "backlog": [
-    "Issue 1: first Sep 19 photo still shows Retry photo (undiagnosed).",
-    "Issue 2: Progress Photos shows 'Photo Briefing is being prepared' although the briefing is published (undiagnosed; Server data is correct).",
-    "Review and ship the issue 3 fix inside Build 48 once issues 1 and 2 are resolved.",
-    "Establish and prove the API-key upload path with the first real Build 48 upload (auth-check already passes; key installed and Developer role; cloud-signing under that role still unproven).",
-    "Server follow-up candidate: media route should return 401 for auth failures, distinguish permanent from transient failures and log them."
+    "Server fix for the duplicate legacy Sep 19 session (blocking issues 1 and 2), then Founder re-check on the existing Build 47.",
+    "Ship the issue 3 fix (8256db4b) in Build 48 after independent review and full gates.",
+    "Optional Native hardening: after a fresh-token second 404, show Photo unavailable rather than a Retry that cannot recover.",
+    "Prove the API-key upload path with the first real Build 48 upload (auth-check passes; cloud-signing sufficiency of the Developer role unproven).",
+    "Server hardening: distinct status codes and logging on the media route; link or suppress legacy progress photo rows at confirmation time."
   ],
-  "recommended_next_step": "Publish a new inbox task (new task id) that either authorizes the two read-only evidence checks above (object-store HEAD for the ten Sep 19 media objects, and read-only production log inspection for photo-event) or authorizes a diagnostic-only Build 48. The issue 3 fix is ready on the local worktree branch at 8256db4b and the archive plus API-key upload can proceed immediately once issues 1 and 2 are resolved and independently reviewed.",
-  "full_report_path": "agent-handoffs/reports/20260921T071100Z-build48-photo-closure-blocked.md",
+  "recommended_next_step": "Publish a new task authorizing a Server-side fix branch for the legacy-session ownership defect (unit test, review, then a separately authorized deploy from the production branch). After it is live, the Founder re-checks Progress Photos on Build 47; both defects should clear. Then run Build 48 as the issue 3 release (recover 8256db4b, gates, review, bump, archive, API-key upload).",
+  "full_report_path": "agent-handoffs/reports/20260921T132921Z-build48-photo-diagnostics-root-cause.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
