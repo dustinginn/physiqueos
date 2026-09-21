@@ -1,5 +1,9 @@
 # PhysiqueOS — AI Contributor Guide
 
+## Agent tasks and handoffs (GitHub control plane)
+
+PhysiqueOS agent tasks and completion handoffs may be transported through `agent-handoffs/`. Read `agent-handoffs/README.md` (on `origin/main`) for the protocol. When explicitly told to read the latest GitHub task, consume `agent-handoffs/inbox/latest.json` and its prompt before acting. At completion, publish the sanitized handoff according to the protocol.
+
 ## Purpose
 
 You are contributing to PhysiqueOS.
