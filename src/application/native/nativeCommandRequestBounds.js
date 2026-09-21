@@ -81,10 +81,14 @@ export const HEALTHKIT_OBSERVATION_WIRE_FIELDS = Object.freeze({
     localDate: "text", timeZone: "text", utcOffsetSeconds: "numeric",
     startedAt: "timestamp", endedAt: "timestamp",
   }),
-  // The three observation shapes are alternatives; one is present per observation.
+  // The observation shapes are alternatives; one is present per observation.
   activitySummary: Object.freeze({
     aggregationScope: Object.freeze({ exact: "daily_total_including_workouts" }),
     coverage: "text", sourceRevision: "numeric", dailyActivity: "metrics",
+  }),
+  nutritionDailyTotal: Object.freeze({
+    aggregationScope: Object.freeze({ exact: "daily_total_all_sources" }),
+    coverage: "text", sourceRevision: "numeric", dailyNutrition: "metrics",
   }),
   workout: Object.freeze({
     activityType: "text", durationSeconds: "numeric", activeCalories: "numeric", totalCalories: "numeric",
@@ -95,7 +99,7 @@ export const HEALTHKIT_OBSERVATION_WIRE_FIELDS = Object.freeze({
   }),
 });
 
-const ALTERNATIVE_SHAPES = Object.freeze(["activitySummary", "workout", "quantitySample"]);
+const ALTERNATIVE_SHAPES = Object.freeze(["activitySummary", "nutritionDailyTotal", "workout", "quantitySample"]);
 
 // Worst-case JSON encoding of one UTF-16 code unit is a six-byte \uXXXX escape
 // (for example a control character or \v padding that trim() removes).

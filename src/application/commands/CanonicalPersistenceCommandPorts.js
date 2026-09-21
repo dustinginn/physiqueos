@@ -37,17 +37,26 @@ import {
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
 import {
   HealthKitObservationError,
-  HEALTHKIT_ACTIVITY_ACTIVATION_POLICY_RECORD_ID,
+  HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
   HealthKitObservationType,
   HealthKitReconciliationState,
-  assessHealthKitActivityCanonicalization,
-  createHealthKitActivityDayPayload,
+  assessHealthKitCanonicalization,
   createHealthKitObservationRecord,
   isCompatibleHealthKitReplay,
-  isHealthKitActivitySummarySuperseded,
   normalizeHealthKitObservationBatch,
   reconcileHealthKitWorkoutObservation,
+  resolveHealthKitCanonicalActivationPolicy,
 } from "../../domain/services/HealthKitObservationService.js";
+import {
+  HEALTHKIT_CANONICAL_DAY_COLLECTION,
+  HealthKitCanonicalDomain,
+  getHealthKitCanonicalDayRecordId,
+  reconcileHealthKitCanonicalDay,
+} from "../../domain/services/HealthKitCanonicalDayService.js";
+import {
+  HealthKitEvidenceQuarantineError,
+  assertNotQuarantinedHealthKitEvidence,
+} from "../../domain/services/HealthKitEvidenceEligibilityPolicy.js";
 import {
   getCanonicalActivitySemanticFingerprint,
   selectActiveCanonicalActivityDays,
@@ -304,20 +313,29 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         error.field ? [{ field: error.field, code: "invalid", detail: error.message }] : []
       );
     }
-    const [existingObservations, canonicalObjects, activityActivationPolicy] = await Promise.all([
+    const [existingObservations, canonicalObjects, activationPolicyRecord, existingCanonicalDays] = await Promise.all([
       records.list({ ownerUserId: context.ownerUserId, collection: "healthKitObservations" }),
       records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
       records.get({
         ownerUserId: context.ownerUserId,
         collection: "healthKitConfiguration",
-        recordId: HEALTHKIT_ACTIVITY_ACTIVATION_POLICY_RECORD_ID,
+        recordId: HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
       }),
+      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }),
     ]);
+    const activationPolicy = resolveHealthKitCanonicalActivationPolicy(activationPolicyRecord);
+    const activationSnapshot = activationPolicy.enabled
+      ? {
+        policyRecordId: HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
+        policyVersion: activationPolicyRecord.version ?? null,
+        domains: [...activationPolicy.domains],
+        effectiveLocalDate: activationPolicy.effectiveLocalDate,
+        endLocalDate: activationPolicy.endLocalDate,
+      }
+      : null;
     const existingById = new Map(existingObservations.map((record) => [record.id, record]));
-    const activityRevisionHistory = existingObservations.filter((record) =>
-      record.observationType === HealthKitObservationType.ACTIVITY_SUMMARY &&
-      record.reconciliation?.state === HealthKitReconciliationState.ACTIVITY_DAY_CANONICALIZED
-    );
+    const canonicalDayById = new Map(existingCanonicalDays.map((record) => [record.id, record]));
+    const receivedAt = () => context.metadata.clientOccurredAt ?? now().toISOString();
     const results = [];
     for (const observation of batch.observations) {
       const existing = existingById.get(observation.id);
@@ -335,52 +353,52 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           "The HealthKit source identity already exists with different observation content."
         );
       }
+      const dailySnapshotDomain = healthKitDailySnapshotDomain(observation.observationType);
       let reconciliation;
-      let activityCanonicalization = null;
-      if (observation.observationType === HealthKitObservationType.ACTIVITY_SUMMARY) {
-        activityCanonicalization = assessHealthKitActivityCanonicalization({
-          observation,
-          activationPolicy: activityActivationPolicy,
-        });
-        const superseding = activityCanonicalization.eligible
-          ? isHealthKitActivitySummarySuperseded(activityRevisionHistory, observation)
-          : null;
+      if (dailySnapshotDomain) {
+        const states = DAILY_SNAPSHOT_STATES[dailySnapshotDomain];
+        const canonicalization = assessHealthKitCanonicalization({ observation, activationPolicy: activationPolicyRecord });
         if (existing) {
-          // An accepted raw Activity observation is never reconsidered on replay.
+          // An accepted raw daily snapshot is never reconsidered on replay.
           // This prevents later activation configuration from becoming a backfill.
           reconciliation = structuredClone(existing.reconciliation);
         } else if (observation.ingestionPurpose === "validation_only") {
           reconciliation = {
-            state: HealthKitReconciliationState.ACTIVITY_VALIDATION_ONLY,
-            reason: activityCanonicalization.reason,
+            state: states.validationOnly,
+            reason: canonicalization.reason,
             canonicalizationPermitted: false,
             canonicalizationPermanentBar: true,
           };
-        } else if (!activityCanonicalization.eligible) {
+        } else if (!canonicalization.eligible) {
           reconciliation = {
-            state: HealthKitReconciliationState.ACTIVITY_CANONICALIZATION_DEFERRED,
-            reason: activityCanonicalization.reason,
+            state: states.deferred,
+            reason: canonicalization.reason,
             canonicalizationPermitted: false,
-            canonicalizationPermanentBar: activityCanonicalization.permanent === true,
-            ...(activityCanonicalization.effectiveLocalDate
-              ? { effectiveLocalDate: activityCanonicalization.effectiveLocalDate }
+            canonicalizationPermanentBar: canonicalization.permanent === true,
+            ...(canonicalization.effectiveLocalDate
+              ? { effectiveLocalDate: canonicalization.effectiveLocalDate, endLocalDate: canonicalization.endLocalDate }
               : {}),
           };
-        } else if (superseding) {
-          reconciliation = {
-            state: HealthKitReconciliationState.ACTIVITY_SUMMARY_SUPERSEDED,
-            reason: superseding.measurement?.coverage === "complete_day" &&
-              observation.measurement.coverage === "partial_day"
-              ? "complete_day_summary_already_received"
-              : "newer_device_revision_already_received",
-            supersededBySourceObservationId: superseding.id,
-          };
         } else {
-          reconciliation = {
-            state: HealthKitReconciliationState.ACTIVITY_CANONICALIZATION_PENDING,
-            reason: activityCanonicalization.reason,
-            canonicalizationPermitted: true,
-          };
+          const preview = reconcileHealthKitCanonicalDay({
+            observation,
+            existing: canonicalDayById.get(getHealthKitCanonicalDayRecordId(dailySnapshotDomain, observation.occurrence.localDate)) ?? null,
+            ownerUserId: context.ownerUserId,
+            now: now(),
+            activation: activationSnapshot,
+            canonicalEvidenceObjects: canonicalObjects,
+          });
+          reconciliation = preview.action === "superseded"
+            ? {
+              state: states.superseded,
+              reason: preview.reason,
+              supersededBySourceObservationId: preview.record.current.sourceObservationId,
+            }
+            : {
+              state: states.pending,
+              reason: canonicalization.reason,
+              canonicalizationPermitted: true,
+            };
         }
       } else if (observation.observationType === HealthKitObservationType.WORKOUT) {
         reconciliation = reconcileHealthKitWorkoutObservation({ observation, canonicalObjects });
@@ -391,7 +409,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         observation,
         reconciliation,
         ownerUserId: context.ownerUserId,
-        receivedAt: context.metadata.clientOccurredAt ?? now().toISOString(),
+        receivedAt: receivedAt(),
       });
       const insertion = existing ? null : await records.putIfAbsent({
         ownerUserId: context.ownerUserId,
@@ -413,25 +431,68 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         );
       }
       const ownsCreation = !existing && insertion.created;
-      if (ownsCreation && reconciliation.state === HealthKitReconciliationState.ACTIVITY_CANONICALIZATION_PENDING) {
-        const payload = createHealthKitActivityDayPayload(observation);
-        const canonicalActivityResult = await upsertCanonicalDay({
-          ...context,
-          payload: {
-            localDate: observation.occurrence.localDate,
-            sourceIdentity: observation.id,
-          },
-        }, {
-          evidenceType: "activity_day",
-          payload,
-          serverOwnedDayRevision: true,
+      let canonicalDayOutcome = null;
+      if (ownsCreation && dailySnapshotDomain &&
+        reconciliation.state === DAILY_SNAPSHOT_STATES[dailySnapshotDomain].pending) {
+        const dayRecordId = getHealthKitCanonicalDayRecordId(dailySnapshotDomain, observation.occurrence.localDate);
+        // Re-read at the write boundary so the day's precedence is decided
+        // against committed state, not the batch-start snapshot.
+        const currentDay = await records.get({
+          ownerUserId: context.ownerUserId,
+          collection: HEALTHKIT_CANONICAL_DAY_COLLECTION,
+          recordId: dayRecordId,
         });
-        reconciliation = {
-          state: HealthKitReconciliationState.ACTIVITY_DAY_CANONICALIZED,
-          canonicalId: canonicalActivityResult.result.canonicalId,
-          canonicalRevision: canonicalActivityResult.result.revision,
-          aggregationPolicy: "authoritative_daily_total_no_workout_addition",
-        };
+        const decision = reconcileHealthKitCanonicalDay({
+          observation,
+          existing: currentDay,
+          ownerUserId: context.ownerUserId,
+          now: now(),
+          activation: activationSnapshot,
+          canonicalEvidenceObjects: canonicalObjects,
+        });
+        let persistedDay = decision.record;
+        if (decision.action === "create") {
+          const created = await records.putIfAbsent({
+            ownerUserId: context.ownerUserId,
+            collection: HEALTHKIT_CANONICAL_DAY_COLLECTION,
+            recordId: dayRecordId,
+            sourceIdentity: dayRecordId,
+            payload: decision.record,
+          });
+          if (!created.created) {
+            throw problem(409, "HEALTHKIT_CANONICAL_DAY_CONFLICT", "The HealthKit canonical day changed concurrently; retry the batch.");
+          }
+          persistedDay = created.record;
+        } else if (decision.action === "update") {
+          persistedDay = await records.put({
+            ownerUserId: context.ownerUserId,
+            collection: HEALTHKIT_CANONICAL_DAY_COLLECTION,
+            recordId: dayRecordId,
+            expectedVersion: currentDay.version,
+            sourceIdentity: dayRecordId,
+            payload: decision.record,
+          });
+        }
+        canonicalDayById.set(dayRecordId, persistedDay);
+        const states = DAILY_SNAPSHOT_STATES[dailySnapshotDomain];
+        reconciliation = decision.action === "create" || decision.action === "update"
+          ? {
+            state: states.canonicalized,
+            canonicalStore: HEALTHKIT_CANONICAL_DAY_COLLECTION,
+            canonicalId: dayRecordId,
+            canonicalRevision: persistedDay.revision,
+            canonicalAction: decision.action,
+            aggregationPolicy: dailySnapshotDomain === HealthKitCanonicalDomain.ACTIVITY
+              ? "authoritative_daily_total_no_workout_addition"
+              : "authoritative_daily_total_no_meal_objects",
+            evidenceEligibility: persistedDay.evidenceEligibility.state,
+            coexistenceState: persistedDay.coexistence?.state ?? null,
+          }
+          : {
+            state: states.superseded,
+            reason: decision.reason,
+            supersededBySourceObservationId: persistedDay.current.sourceObservationId,
+          };
         stored = await records.put({
           ownerUserId: context.ownerUserId,
           collection: "healthKitObservations",
@@ -440,6 +501,14 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           sourceIdentity: stored.id,
           payload: { ...stored, reconciliation },
         });
+        canonicalDayOutcome = {
+          domain: dailySnapshotDomain,
+          localDate: observation.occurrence.localDate,
+          action: decision.action,
+          revision: persistedDay.revision,
+          coverage: persistedDay.current.coverage,
+          coexistenceState: persistedDay.coexistence?.state ?? null,
+        };
       }
       const reconciliationChanged = existing &&
         observation.observationType === HealthKitObservationType.WORKOUT &&
@@ -454,12 +523,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
             payload: { ...existing, reconciliation },
           });
       }
-      if (ownsCreation) {
-        existingById.set(stored.id, stored);
-        if (stored.reconciliation?.state === HealthKitReconciliationState.ACTIVITY_DAY_CANONICALIZED) {
-          activityRevisionHistory.push(stored);
-        }
-      }
+      if (ownsCreation) existingById.set(stored.id, stored);
       results.push({
         sourceObservationId: stored.id,
         ingestionPurpose: stored.ingestionPurpose,
@@ -469,8 +533,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         observationType: stored.observationType,
         occurredAt: stored.occurredAt,
         reconciliation: stored.reconciliation,
+        ...(canonicalDayOutcome ? { canonicalDay: canonicalDayOutcome } : {}),
       });
     }
+    const canonicalizedBy = (domain) => results.filter((item) =>
+      item.reconciliation?.state === DAILY_SNAPSHOT_STATES[domain].canonicalized
+    ).length;
     return {
       status: "committed",
       result: {
@@ -480,12 +548,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         createdCount: results.filter((item) => item.outcome === "created").length,
         reconciledCount: results.filter((item) => item.outcome === "reconciled").length,
         matchedCount: results.filter((item) => item.outcome === "matched").length,
-        activityDayCanonicalizedCount: results.filter((item) =>
-          item.reconciliation?.state === HealthKitReconciliationState.ACTIVITY_DAY_CANONICALIZED
-        ).length,
+        activityDayCanonicalizedCount: canonicalizedBy(HealthKitCanonicalDomain.ACTIVITY),
+        nutritionDayCanonicalizedCount: canonicalizedBy(HealthKitCanonicalDomain.NUTRITION),
         validationOnlyAcceptedCount: results.filter((item) =>
           item.ingestionPurpose === "validation_only"
         ).length,
+        strategicEvidenceEligibility: "quarantined",
         cursorResponsibility: "device",
         observations: results,
       },
@@ -1854,7 +1922,21 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     };
   }
 
+  // Strategic Evidence write boundary: HealthKit-derived records are canonical
+  // days in their own quarantined store and can never be committed as Evidence.
+  function refuseQuarantinedHealthKitEvidence(objects) {
+    for (const object of objects ?? []) {
+      try {
+        assertNotQuarantinedHealthKitEvidence(object, { context: "canonical Evidence commit" });
+      } catch (error) {
+        if (error instanceof HealthKitEvidenceQuarantineError) throw problem(409, error.code, error.message);
+        throw error;
+      }
+    }
+  }
+
   async function commitCanonicalEvidencePackage(context, evidencePackage) {
+    refuseQuarantinedHealthKitEvidence(evidencePackage?.evidence_objects);
     const collections = [
       "user", "goals", "protocols", "protocolVersions", "dailyBriefings",
       "evidencePackages", "canonicalExerciseLibrary", "canonicalEvidenceObjects",
@@ -1970,6 +2052,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     payload,
     serverOwnedDayRevision = false,
   }) {
+    refuseQuarantinedHealthKitEvidence([payload]);
     const [existingCanonicalObjects, goals] = await Promise.all([
       records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
       records.list({ ownerUserId: context.ownerUserId, collection: "goals" }),
@@ -2118,6 +2201,29 @@ function assertManualActivitySource(source) {
 
 function recordIdentity(record, index = 0) {
   return String(record?.id ?? record?.canonicalId ?? record?.package_id ?? record?.review_id ?? `@index:${index}`);
+}
+
+const DAILY_SNAPSHOT_STATES = Object.freeze({
+  [HealthKitCanonicalDomain.ACTIVITY]: Object.freeze({
+    pending: HealthKitReconciliationState.ACTIVITY_CANONICALIZATION_PENDING,
+    canonicalized: HealthKitReconciliationState.ACTIVITY_DAY_CANONICALIZED,
+    deferred: HealthKitReconciliationState.ACTIVITY_CANONICALIZATION_DEFERRED,
+    validationOnly: HealthKitReconciliationState.ACTIVITY_VALIDATION_ONLY,
+    superseded: HealthKitReconciliationState.ACTIVITY_SUMMARY_SUPERSEDED,
+  }),
+  [HealthKitCanonicalDomain.NUTRITION]: Object.freeze({
+    pending: HealthKitReconciliationState.NUTRITION_CANONICALIZATION_PENDING,
+    canonicalized: HealthKitReconciliationState.NUTRITION_DAY_CANONICALIZED,
+    deferred: HealthKitReconciliationState.NUTRITION_CANONICALIZATION_DEFERRED,
+    validationOnly: HealthKitReconciliationState.NUTRITION_VALIDATION_ONLY,
+    superseded: HealthKitReconciliationState.NUTRITION_SUMMARY_SUPERSEDED,
+  }),
+});
+
+function healthKitDailySnapshotDomain(observationType) {
+  if (observationType === HealthKitObservationType.ACTIVITY_SUMMARY) return HealthKitCanonicalDomain.ACTIVITY;
+  if (observationType === HealthKitObservationType.NUTRITION_DAILY_TOTAL) return HealthKitCanonicalDomain.NUTRITION;
+  return null;
 }
 
 function comparableRecord(record) {

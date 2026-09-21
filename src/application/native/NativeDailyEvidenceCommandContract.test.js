@@ -26,13 +26,30 @@ describe("daily evidence canonical command ports", () => {
     expect(snapshot[0].nutritionRevisionHistory).toHaveLength(1);
   });
 
-  it("retains the non-Native legacy HealthKit port for Phase 3 compatibility", async () => {
+  it("refuses the non-Native legacy HealthKit Activity port: HealthKit never enters strategic Evidence", async () => {
     const records = recordStore();
     const ports = createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-09T18:00:00.000Z") });
     const payload = {
       localDate: "2026-09-09", sourceIdentity: "healthkit-day-2026-09-09",
       dailyActivity: { exercise_minutes: 45, move_calories: 700 },
       source: { application: "Apple Health", integration: "HealthKit", modality: "direct" },
+    };
+    await expect(ports.syncActivityDay(context("activity-one", payload)))
+      .rejects.toMatchObject({ status: 409, code: "HEALTHKIT_STRATEGIC_EVIDENCE_QUARANTINED" });
+    // The default source of this legacy alias is HealthKit, so it is refused too.
+    const { source: _ignored, ...withoutSource } = payload;
+    await expect(ports.syncActivityDay(context("activity-two", withoutSource)))
+      .rejects.toMatchObject({ status: 409, code: "HEALTHKIT_STRATEGIC_EVIDENCE_QUARANTINED" });
+    expect(records.snapshot().canonicalEvidenceObjects).toEqual([]);
+  });
+
+  it("keeps a non-HealthKit Activity day syncing through the same port with idempotent replay", async () => {
+    const records = recordStore();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-09T18:00:00.000Z") });
+    const payload = {
+      localDate: "2026-09-09", sourceIdentity: "screenshot-day-2026-09-09",
+      dailyActivity: { exercise_minutes: 45, move_calories: 700 },
+      source: { application: "Apple Fitness", modality: "screenshot" },
     };
     const first = await ports.syncActivityDay(context("activity-one", payload));
     const replay = await ports.syncActivityDay(context("activity-one", payload));
@@ -41,7 +58,6 @@ describe("daily evidence canonical command ports", () => {
     expect(first.result.semanticFingerprint).toMatch(/^sha256_[a-f0-9]{64}$/);
     expect(replay.result.status).toBe("unchanged");
     expect(snapshot).toHaveLength(1);
-    expect(snapshot[0].activityRevision.sourceClass).toBe("health_provider");
   });
 
   it("fails stale Nutrition and Activity corrections closed", async () => {
@@ -51,9 +67,10 @@ describe("daily evidence canonical command ports", () => {
     await expect(ports.upsertNutritionDay(context("nutrition-stale", {
       localDate: "2026-09-09", dailyTotals: { calories: 2500 }, expectedSemanticFingerprint: "sha256_stale",
     }))).rejects.toMatchObject({ code: "NUTRITION_REVISION_STALE" });
-    await ports.syncActivityDay(context("activity-first", { localDate: "2026-09-09", sourceIdentity: "health-1", dailyActivity: { move_calories: 700 } }));
+    const screenshot = { application: "Apple Fitness", modality: "screenshot" };
+    await ports.syncActivityDay(context("activity-first", { localDate: "2026-09-09", sourceIdentity: "shot-1", dailyActivity: { move_calories: 700 }, source: screenshot }));
     await expect(ports.syncActivityDay(context("activity-stale", {
-      localDate: "2026-09-09", sourceIdentity: "health-2", dailyActivity: { move_calories: 750 }, expectedSemanticFingerprint: "sha256_stale",
+      localDate: "2026-09-09", sourceIdentity: "shot-2", dailyActivity: { move_calories: 750 }, expectedSemanticFingerprint: "sha256_stale", source: screenshot,
     }))).rejects.toMatchObject({ code: "ACTIVITY_REVISION_STALE" });
   });
 });

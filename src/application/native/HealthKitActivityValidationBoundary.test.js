@@ -7,7 +7,7 @@ import { createCanonicalEvidenceObservationsV3 } from "../../domain/intelligence
 import { selectStrategicallyEligibleEvidenceV3 } from "../../domain/intelligence/v3/EvidenceEligibilityV3.js";
 
 const OWNER = "user_founder_001";
-const POLICY_ID = "healthkit_activity_activation_policy";
+const POLICY_ID = "healthkit_canonical_daily_activation_policy";
 
 describe("HealthKit Activity validation-only boundary", () => {
   it("persists validation-only Activity permanently raw without canonical or strategic mutation", async () => {
@@ -61,7 +61,7 @@ describe("HealthKit Activity validation-only boundary", () => {
     const records = store();
     const first = await ingest(records, activity());
     expect(first.result.activityDayCanonicalizedCount).toBe(0);
-    expect(records.snapshot().healthKitObservations[0].reconciliation.reason).toBe("activity_activation_not_configured");
+    expect(records.snapshot().healthKitObservations[0].reconciliation.reason).toBe("canonicalization_not_activated");
     await enable(records, "2026-09-10");
     const replay = await ingest(records, activity(), "batch-after-activation");
     expect(replay.result.activityDayCanonicalizedCount).toBe(0);
@@ -92,10 +92,11 @@ describe("HealthKit Activity validation-only boundary", () => {
   it("never lets a validation-only revision participate in later canonical precedence", async () => {
     const records = store();
     await ingest(records, activity({ ingestionPurpose: "validation_only", sourceRevision: 2 }));
-    await enable(records, "2026-09-01");
+    await enable(records, "2026-09-10");
     const operational = await ingest(records, activity({ sourceRevision: 1 }), "batch-operational-revision-one");
     expect(operational.result.activityDayCanonicalizedCount).toBe(1);
-    expect(records.snapshot().canonicalEvidenceObjects).toHaveLength(1);
+    expect(records.snapshot().healthKitCanonicalDays).toHaveLength(1);
+    expect(records.snapshot().canonicalEvidenceObjects).toEqual([]);
     expect(records.snapshot().healthKitObservations).toHaveLength(2);
   });
 
@@ -141,13 +142,27 @@ async function ingest(records, observation, batchId = "batch-one") {
     });
 }
 
-async function enable(records, effectiveLocalDate) {
+async function enable(records, effectiveLocalDate, endLocalDate = addDays(effectiveLocalDate, 6)) {
   await records.put({
     ownerUserId: OWNER,
     collection: "healthKitConfiguration",
     recordId: POLICY_ID,
-    payload: { id: POLICY_ID, status: "enabled", effectiveLocalDate, version: 1 },
+    payload: {
+      id: POLICY_ID,
+      schemaVersion: "healthkit-canonical-activation-policy-v1",
+      status: "enabled",
+      domains: ["activity", "nutrition"],
+      effectiveLocalDate,
+      endLocalDate,
+      strategicEvidenceEligibility: "quarantined",
+      historicalBackfill: false,
+      version: 1,
+    },
   });
+}
+
+function addDays(date, days) {
+  return new Date(Date.parse(`${date}T00:00:00.000Z`) + days * 86400000).toISOString().slice(0, 10);
 }
 
 function activity({ ingestionPurpose, localDate = "2026-09-12", externalId = "activity-summary-2026-09-12", sourceRevision = 1 } = {}) {
@@ -188,6 +203,7 @@ function store() {
     user: [{ id: OWNER, version: 1 }],
     healthKitObservations: [],
     healthKitConfiguration: [],
+    healthKitCanonicalDays: [],
     canonicalEvidenceObjects: [],
     ...Object.fromEntries(strategicCollections().map((name) => [name, [{ id: `${name}-sentinel`, version: 1 }]])),
   });

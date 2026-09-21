@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  HEALTHKIT_CANONICAL_ACTIVATION_POLICY_SCHEMA_VERSION,
   HealthKitReconciliationState,
-  createHealthKitActivityDayPayload,
+  assessHealthKitCanonicalization,
   createHealthKitObservationRecord,
-  isHealthKitActivitySummarySuperseded,
   normalizeHealthKitObservationBatch,
   reconcileHealthKitWorkoutObservation,
+  resolveHealthKitCanonicalActivationPolicy,
 } from "./HealthKitObservationService.js";
 
 describe("HealthKitObservationService V1 compatibility", () => {
@@ -64,39 +65,122 @@ describe("HealthKitObservationService V1 compatibility", () => {
     expect(record).not.toHaveProperty("phaseId");
   });
 
-  it("canonicalizes only an authoritative daily total and declares workout calories non-additive", () => {
+  it("keeps Activity daily-total scope strict: workout calories are never additive", () => {
     const observation = normalize("batch-one", [activitySummary()]).observations[0];
-    const payload = createHealthKitActivityDayPayload(observation);
-    expect(payload.daily_activity.move_calories).toBe(700);
-    expect(payload.metadata).toMatchObject({
-      aggregation_scope: "daily_total_including_workouts",
-      includes_workout_energy: true,
-      source_revision: 1,
-    });
-    expect(payload.derived_metrics).toEqual({
-      aggregation_policy: "authoritative_healthkit_daily_total",
-      workout_active_calories_additive: false,
-    });
-  });
-
-  it("applies complete-over-partial precedence before numeric source revision ordering", () => {
-    const complete = normalize("complete", [activitySummary({
+    expect(observation.measurement).toMatchObject({
+      aggregationScope: "daily_total_including_workouts",
       coverage: "complete_day",
       sourceRevision: 1,
-    })]).observations[0];
-    const newerPartial = normalize("partial", [activitySummary({
-      coverage: "partial_day",
-      sourceRevision: 2,
-    })]).observations[0];
-    expect(isHealthKitActivitySummarySuperseded([complete], newerPartial)).toBe(complete);
-    expect(isHealthKitActivitySummarySuperseded([newerPartial], complete)).toBeNull();
+    });
   });
 
-  it("uses numeric source revision ordering when coverage is equal", () => {
-    const revisionTwo = normalize("newer", [activitySummary({ sourceRevision: 2 })]).observations[0];
-    const revisionOne = normalize("older", [activitySummary({ sourceRevision: 1 })]).observations[0];
-    expect(isHealthKitActivitySummarySuperseded([revisionTwo], revisionOne)).toBe(revisionTwo);
-    expect(isHealthKitActivitySummarySuperseded([revisionOne], revisionTwo)).toBeNull();
+  describe("Nutrition daily totals", () => {
+    it("normalizes a HealthKit daily aggregate with calories, protein, carbohydrates, and fat only", () => {
+      const observation = normalize("nutrition", [nutritionDailyTotal()]).observations[0];
+      expect(observation.observationType).toBe("nutrition_daily_total");
+      expect(observation.measurement).toEqual({
+        aggregationScope: "daily_total_all_sources",
+        coverage: "complete_day",
+        sourceRevision: 1,
+        dailyNutrition: { calories: 2400, protein_g: 210, carbs_g: 240, fat_g: 70 },
+      });
+      expect(observation.occurrence.startedAt).toBeUndefined();
+    });
+
+    it("gives every device revision its own immutable identity and keeps one revision idempotent", () => {
+      const one = normalize("one", [nutritionDailyTotal()]).observations[0];
+      const replay = normalize("two", [nutritionDailyTotal()]).observations[0];
+      const next = normalize("three", [nutritionDailyTotal({ sourceRevision: 2 })]).observations[0];
+      expect(replay.id).toBe(one.id);
+      expect(next.id).not.toBe(one.id);
+    });
+
+    it("rejects an unlisted nutrient rather than silently dropping or expanding scope", () => {
+      const value = nutritionDailyTotal();
+      value.nutritionDailyTotal.dailyNutrition.fiber_g = 30;
+      expect(() => normalize("batch", [value])).toThrowError(expect.objectContaining({
+        code: "HEALTHKIT_CONTRACT_INVALID",
+      }));
+    });
+
+    it("requires daily dietary energy and non-negative numbers", () => {
+      const missing = nutritionDailyTotal();
+      delete missing.nutritionDailyTotal.dailyNutrition.calories;
+      expect(() => normalize("batch", [missing])).toThrowError(expect.objectContaining({ code: "HEALTHKIT_CONTRACT_INVALID" }));
+      const negative = nutritionDailyTotal();
+      negative.nutritionDailyTotal.dailyNutrition.protein_g = -1;
+      expect(() => normalize("batch", [negative])).toThrowError(expect.objectContaining({ code: "HEALTHKIT_CONTRACT_INVALID" }));
+    });
+
+    it("rejects any aggregation scope other than all-source daily statistics", () => {
+      const value = nutritionDailyTotal();
+      value.nutritionDailyTotal.aggregationScope = "single_source_samples";
+      expect(() => normalize("batch", [value])).toThrowError(expect.objectContaining({ code: "HEALTHKIT_CONTRACT_INVALID" }));
+    });
+  });
+
+  describe("canonical activation policy", () => {
+    const enabled = (overrides = {}) => ({
+      schemaVersion: HEALTHKIT_CANONICAL_ACTIVATION_POLICY_SCHEMA_VERSION,
+      status: "enabled",
+      domains: ["activity", "nutrition"],
+      effectiveLocalDate: "2026-09-23",
+      endLocalDate: "2026-09-23",
+      strategicEvidenceEligibility: "quarantined",
+      historicalBackfill: false,
+      ...overrides,
+    });
+
+    it("is disabled when no policy is configured", () => {
+      expect(resolveHealthKitCanonicalActivationPolicy(null)).toMatchObject({ enabled: false, source: "not_configured" });
+      const observation = normalize("b", [activitySummary()]).observations[0];
+      expect(assessHealthKitCanonicalization({ observation, activationPolicy: null })).toMatchObject({
+        eligible: false, permanent: false, reason: "canonicalization_not_activated",
+      });
+    });
+
+    it("scopes eligibility to the exact domains and the exact local-date window", () => {
+      const inWindow = normalize("a", [activitySummary({ localDate: "2026-09-23" })]).observations[0];
+      const before = normalize("b", [activitySummary({ localDate: "2026-09-22" })]).observations[0];
+      const after = normalize("c", [activitySummary({ localDate: "2026-09-24" })]).observations[0];
+      const policy = enabled();
+      expect(assessHealthKitCanonicalization({ observation: inWindow, activationPolicy: policy })).toMatchObject({ eligible: true });
+      expect(assessHealthKitCanonicalization({ observation: before, activationPolicy: policy })).toMatchObject({
+        eligible: false, permanent: true, reason: "before_activation_date",
+      });
+      expect(assessHealthKitCanonicalization({ observation: after, activationPolicy: policy })).toMatchObject({
+        eligible: false, permanent: true, reason: "after_activation_window",
+      });
+      const nutrition = normalize("d", [nutritionDailyTotal({ localDate: "2026-09-23" })]).observations[0];
+      expect(assessHealthKitCanonicalization({
+        observation: nutrition, activationPolicy: enabled({ domains: ["activity"] }),
+      })).toMatchObject({ eligible: false, permanent: true, reason: "domain_not_in_activation_scope" });
+    });
+
+    it("never canonicalizes validation-only observations, even inside an active window", () => {
+      const observation = normalize("v", [{ ...activitySummary({ localDate: "2026-09-23" }), ingestionPurpose: "validation_only" }]).observations[0];
+      expect(assessHealthKitCanonicalization({ observation, activationPolicy: enabled() })).toMatchObject({
+        eligible: false, permanent: true, reason: "validation_only_permanently_raw",
+      });
+    });
+
+    it.each([
+      ["a legacy or unversioned record", { schemaVersion: undefined }],
+      ["an open-ended window", { endLocalDate: undefined }],
+      ["an end before the start", { endLocalDate: "2026-09-22" }],
+      ["a window longer than seven days", { endLocalDate: "2026-10-01" }],
+      ["no domains", { domains: [] }],
+      ["an unsupported domain", { domains: ["activity", "sleep"] }],
+      ["a backfill request", { historicalBackfill: true }],
+      ["any strategic eligibility other than quarantined", { strategicEvidenceEligibility: "eligible" }],
+      ["a disabled status", { status: "disabled" }],
+      ["a malformed date", { effectiveLocalDate: "2026-02-31" }],
+    ])("fails closed on %s without throwing", (_label, overrides) => {
+      const policy = resolveHealthKitCanonicalActivationPolicy(enabled(overrides));
+      expect(policy.enabled).toBe(false);
+      const observation = normalize("x", [activitySummary({ localDate: "2026-09-23" })]).observations[0];
+      expect(assessHealthKitCanonicalization({ observation, activationPolicy: enabled(overrides) }).eligible).toBe(false);
+    });
   });
 
   it("uses canonical workout identity logic to propose—but not confirm—a strength match", () => {
@@ -204,16 +288,37 @@ function sample() {
   };
 }
 
+function nutritionDailyTotal({
+  coverage = "complete_day",
+  calories = 2400,
+  sourceRevision = 1,
+  localDate = "2026-09-12",
+} = {}) {
+  return {
+    observationType: "nutrition_daily_total",
+    externalId: `nutrition-daily-total:${localDate}`,
+    source: source(),
+    occurrence: { localDate, timeZone: "America/Los_Angeles" },
+    nutritionDailyTotal: {
+      aggregationScope: "daily_total_all_sources",
+      coverage,
+      sourceRevision,
+      dailyNutrition: { calories, protein_g: 210, carbs_g: 240, fat_g: 70 },
+    },
+  };
+}
+
 function activitySummary({
   coverage = "complete_day",
   moveCalories = 700,
   sourceRevision = 1,
+  localDate = "2026-09-12",
 } = {}) {
   return {
     observationType: "activity_summary",
-    externalId: "activity-summary-2026-09-12",
+    externalId: `activity-summary-${localDate}`,
     source: source(),
-    occurrence: { localDate: "2026-09-12", timeZone: "America/Los_Angeles" },
+    occurrence: { localDate, timeZone: "America/Los_Angeles" },
     activitySummary: {
       aggregationScope: "daily_total_including_workouts",
       coverage,

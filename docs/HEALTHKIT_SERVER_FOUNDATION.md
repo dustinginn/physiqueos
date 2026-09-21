@@ -14,9 +14,11 @@ This implementation reconciles the transferred V1 foundation at commit `5ec72e09
 
 Use `POST /api/v1/native/commands` with command type `healthkit.observations.ingest.v1`, existing Founder bearer authorization, and an `Idempotency-Key` header.
 
-Supported observation types are `activity_summary`, `workout`, and `quantity_sample`. Batches are bounded to 100 observations.
+Supported observation types are `activity_summary`, `nutrition_daily_total`, `workout`, and `quantity_sample`. Batches are bounded to 100 observations.
 
 Every observation has an immutable ingestion purpose. Omitted purpose preserves V1 compatibility as `operational`; the Founder canary sends `validation_only`. Purpose is part of semantic replay protection but is deliberately not part of the accepted V1 identity hash. Reusing an identity under another purpose fails closed with `HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE` and cannot promote or duplicate the raw record.
+
+`nutrition_daily_total` requires `aggregationScope = "daily_total_all_sources"`, `coverage`, a positive device-scoped `sourceRevision`, and `dailyNutrition` with `calories` and optionally `protein_g`, `carbs_g`, `fat_g` (no other keys).
 
 `activity_summary` requires:
 
@@ -73,22 +75,39 @@ The command receipt makes an exact HTTP retry replay-safe. Source-observation id
 
 Occurrence timestamps and intended local date are stored independently from first Server receipt time. Source bundle and device/product descriptors remain attached to the source observation.
 
-## Activity reconciliation and activation
+## Canonical days, activation, and the strategic quarantine
 
-Canonical HealthKit Activity is disabled unless the Server-owned `healthKit_activity_activation_policy` configuration has been explicitly enabled with a Founder-approved effective local date. No date is supplied by default, inferred from authorization, or inferred from a canary range. Operational observations accepted before configuration remain raw and are not reconsidered later; there is no historical backfill.
+Layers are separate and never collapsed:
 
-`validation_only` Activity is permanently raw regardless of its date or any later activation policy. Its reconciliation state records the permanent canonicalization bar. It cannot update ActivityDay, canonical Evidence, or strategic state.
+`HealthKit source observation -> canonical PhysiqueOS Activity/Nutrition day (healthKitCanonicalDays) -> separate Evidence eligibility gate -> V3 / Confidence / briefings only after explicit Founder authorization`
 
-Once explicitly activated, an authoritative non-validation HealthKit daily total on or after the effective date may update the existing one-per-local-date canonical ActivityDay. Precedence is deterministic:
+### Activation policy (server-owned, disabled by default)
 
-1. `complete_day` outranks `partial_day`.
-2. Within equal coverage from the same authenticated delivery device, the newer source revision wins.
-3. Exact replay is a no-op.
-4. A late accepted semantic change uses existing canonical Activity revision history.
+Canonicalization is off unless the server-owned `healthKitConfiguration` record `healthkit_canonical_daily_activation_policy` is `status: "enabled"` with schema `healthkit-canonical-activation-policy-v1`, explicit `domains` (`activity`, `nutrition`), and an exact inclusive `effectiveLocalDate`..`endLocalDate` window of at most 7 local dates. `historicalBackfill` is always false and `strategicEvidenceEligibility` is always `quarantined`; neither is a parameter, and a record that says otherwise is invalid. An invalid or unrecognized policy never throws: it resolves to disabled so a delivery is never turned into a permanent Native 400.
 
-Coverage is evaluated before stale numeric revision checks. A newer partial snapshot therefore cannot suppress or displace an older complete snapshot.
+The only writer is `HealthKitActivationPolicyRunner` (bundled by `scripts/operations/buildHealthKitPayload.mjs`, run through the accepted console runner): dry-run first, `expected` facts baked into apply, a drift fence, exactly two new/updated rows (the policy and one audit row), owner advisory lock, in-transaction verification, rollback on any failed invariant. `deactivate` sets the policy to disabled and never deletes a canonical day, source observation, or Evidence row. Windows are never widened in place; deactivate first.
 
-Workout active calories are never added to the daily total because the accepted daily scope already includes workout energy.
+An observation whose `occurrence.localDate` is before the window, after it, or in an unlisted domain is stored raw with a permanent bar. The observed local date, not receipt time, owns the day, so a delivery between 00:00 and 02:59 for the prior date canonicalizes to the prior date, and a new-day observation cannot leak into it. An accepted raw observation is never reconsidered on replay, so a later activation is never a backfill.
+
+`validation_only` observations are permanently raw regardless of date or policy.
+
+### Canonical day records
+
+One record per Founder-local date and domain in the application-only `healthKitCanonicalDays` collection (`canonical_training_records`, no schema change): `healthkit_canonical_day_<domain>_<date>`, logical keys `activity_day|<date>` and `nutrition|<date>` (the Evidence store's own shapes, so a later promotion maps one to one). Each record keeps the current snapshot, a revision counter and semantic fingerprint (coverage participates), a revision history of superseded values, source observation ids, HealthKit provenance, the activation window it was written under, and a coexistence assessment.
+
+Precedence is deterministic: `complete_day` outranks `partial_day`; within equal coverage from the same delivery device the newer device-scoped source revision wins; equal coverage from another device keeps the existing day; exact replay is a no-op; a snapshot that leaves values and coverage unchanged updates provenance without a new revision. A superseded snapshot stays raw and is marked so.
+
+Activity canonicalizes only the approved metrics (`move_calories`, `exercise_minutes`, `stand_hours`, `steps`, `walking_running_distance`, `flights_climbed`); any other key is reported, not silently dropped or expanded. Workout calories are never added to the daily total.
+
+Nutrition is a new observation type `nutrition_daily_total` (HealthKit daily statistics across all sources) for `calories`, `protein_g`, `carbs_g`, `fat_g` only; an unlisted nutrient is a contract violation. It uses the source-neutral NutritionDay semantics: a complete day is a `full_day_asserted` device aggregate (reliability high), a partial day is a low-reliability `partial_subtotal`; there are no meal objects and none are fabricated. Identity is source bundle, type, external id, delivery device, and device-scoped source revision, exactly like Activity summaries.
+
+### Coexistence with screenshot and manual sources
+
+During the proving period the Evidence store's screenshot/manual day remains the sole strategic authority and is never modified by HealthKit ingestion. The HealthKit canonical day is a separate record; ingestion records a coexistence assessment (`no_other_source`, `consistent`, `conflict_surfaced`, `other_source_not_comparable`) using the established Nutrition reconciliation tolerance (calories 25, protein/carbs/fat 2) and rounding-level Activity tolerance (move calories 1, exercise minutes 1, stand hours 0). A conflict beyond tolerance is surfaced with per-field deltas and both source identities; nothing is overwritten and no winner is applied. A partial HealthKit snapshot that trails a full-day source is reported, not a conflict. The audit recomputes the same assessment live.
+
+### Strategic quarantine
+
+`HealthKitEvidenceEligibilityPolicy` is the one explicit gate. `HEALTHKIT_STRATEGIC_EVIDENCE_ELIGIBLE` is a reviewed constant (false), not a setting. Canonical days carry `evidenceEligibility: { state: "quarantined", strategic: false }`. HealthKit-derived records are refused at both strategic Evidence write entry points (`upsertCanonicalDay` and the canonical Evidence package commit) with `HEALTHKIT_STRATEGIC_EVIDENCE_QUARANTINED`, including the legacy non-Native `activity-day.sync.v1` port whose default source was HealthKit. No V3, Confidence, Energy, briefing, Training, or Goal reader loads `healthKitCanonicalDays`. Promotion is a later change to that policy module, never an operator toggle.
 
 ## Workout boundary
 
@@ -104,7 +123,7 @@ Ingestion never adds, changes, or removes exercises, sets, reps, load, variants,
 
 Raw observations use the application-only `healthKitObservations` collection in the existing `canonical_training_records` JSON table. They are excluded from the canonical Founder runtime import/export inventory and from canonical Evidence reads.
 
-The activation policy uses the application-only `healthKitConfiguration` collection in that same generic table. This follow-up exposes no activation mutation command and sets no activation date.
+The activation policy and its audit rows use the application-only `healthKitConfiguration` collection, and canonical days use `healthKitCanonicalDays`, both in that same generic table. There is no public activation command; see the gated operation above.
 
 Founder-authenticated Native clients can read validation-only Activity observations through `/api/v1/native/read/healthkit-activity-canary?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`. Both dates are required, inclusive, and limited to 31 local dates. The projection exposes normalized Activity values and bounded provenance only; it omits anchors and strategic fields and has no canonical authority.
 
@@ -114,4 +133,4 @@ This foundation adds no table, column, index, migration, checkpoint table, infra
 
 ## Deferred work
 
-Native canary wiring, an explicitly Founder-authorized activation mutation path, background delivery, deletion/tombstone convergence, Nutrition canonicalization, sleep, cardio canonical commitment, explicit strength confirmation/link mutation, and strategic Evidence eligibility are later stages.
+Background delivery, deletion/tombstone convergence for per-sample streams, sleep, cardio canonical commitment, explicit strength confirmation/link mutation, promotion of canonical days into strategic Evidence, and a broader activation window are later, separately authorized stages.

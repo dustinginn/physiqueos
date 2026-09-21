@@ -17,6 +17,7 @@ describe("Phase 4 canonical domain schema", () => {
     expect(PHASE4_APPLICATION_RECORD_TABLES).toEqual({
       healthKitObservations: "canonical_training_records",
       healthKitConfiguration: "canonical_training_records",
+      healthKitCanonicalDays: "canonical_training_records",
     });
     expect(PHASE4_DOMAIN_TABLES.confidenceActivationArtifacts)
       .toBe("canonical_confidence_records");

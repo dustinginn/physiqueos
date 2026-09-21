@@ -40,7 +40,8 @@ describe("Native HealthKit V1 ingestion contract", () => {
     });
     const snapshot = records.snapshot();
     expect(snapshot.healthKitObservations).toHaveLength(2);
-    expect(snapshot.canonicalEvidenceObjects).toHaveLength(1);
+    expect(snapshot.healthKitCanonicalDays).toHaveLength(1);
+    expect(snapshot.canonicalEvidenceObjects).toEqual([]);
     expect(snapshot.evidencePackages).toEqual([]);
   });
 
@@ -91,13 +92,13 @@ describe("Native HealthKit V1 ingestion contract", () => {
       ],
     }));
     const snapshot = records.snapshot();
-    const day = snapshot.canonicalEvidenceObjects[0].payload;
+    const day = snapshot.healthKitCanonicalDays[0];
     const sourceWorkout = snapshot.healthKitObservations.find((item) => item.observationType === "workout");
 
     expect(result.result.activityDayCanonicalizedCount).toBe(1);
-    expect(day.daily_activity.move_calories).toBe(700);
-    expect(day.derived_metrics.workout_active_calories_additive).toBe(false);
-    expect(day.references.training_session_ids).toEqual([]);
+    expect(day.current.values.dailyActivity.move_calories).toBe(700);
+    expect(day.current.workoutActiveCaloriesAdditive).toBe(false);
+    expect(snapshot.canonicalEvidenceObjects).toEqual([]);
     expect(sourceWorkout.reconciliation).toMatchObject({
       state: "workout_canonicalization_deferred",
       reason: "canonical_workout_evidence_eligibility_boundary_not_yet_separate",
@@ -195,8 +196,9 @@ describe("Native HealthKit V1 ingestion contract", () => {
     }));
     const snapshot = records.snapshot();
     expect(stale.result.observations[0].reconciliation.state).toBe("activity_summary_superseded");
-    expect(snapshot.canonicalEvidenceObjects[0].payload.daily_activity.move_calories).toBe(800);
-    expect(snapshot.canonicalEvidenceObjects).toHaveLength(1);
+    expect(snapshot.healthKitCanonicalDays[0].current.values.dailyActivity.move_calories).toBe(800);
+    expect(snapshot.healthKitCanonicalDays).toHaveLength(1);
+    expect(snapshot.canonicalEvidenceObjects).toEqual([]);
   });
 
   it("does not let a newer partial revision displace an older complete Activity summary", async () => {
@@ -214,9 +216,8 @@ describe("Native HealthKit V1 ingestion contract", () => {
       state: "activity_summary_superseded",
       reason: "complete_day_summary_already_received",
     });
-    expect(records.snapshot().canonicalEvidenceObjects[0].payload).toMatchObject({
-      daily_activity: { move_calories: 700 },
-      metadata: { coverage: "complete_day", source_revision: 1 },
+    expect(records.snapshot().healthKitCanonicalDays[0]).toMatchObject({
+      current: { values: { dailyActivity: { move_calories: 700 } }, coverage: "complete_day", sourceRevision: 1 },
     });
   });
 
@@ -231,13 +232,13 @@ describe("Native HealthKit V1 ingestion contract", () => {
       batchId: "healthkit-activity-complete",
       observations: [activitySummary({ moveCalories: 700, sourceRevision: 1, coverage: "complete_day" })],
     }));
-    const day = records.snapshot().canonicalEvidenceObjects[0];
-    expect(day.payload).toMatchObject({
-      daily_activity: { move_calories: 700 },
-      metadata: { coverage: "complete_day", source_revision: 1 },
+    const day = records.snapshot().healthKitCanonicalDays[0];
+    expect(day).toMatchObject({
+      current: { values: { dailyActivity: { move_calories: 700 } }, coverage: "complete_day", sourceRevision: 1 },
     });
-    expect(day.activityRevision.revision).toBe(2);
-    expect(day.activityRevisionHistory).toHaveLength(1);
+    expect(day.revision).toBe(2);
+    expect(day.revisionHistory).toHaveLength(1);
+    expect(records.snapshot().canonicalEvidenceObjects).toEqual([]);
   });
 
   it("does not expose raw or candidate workouts to V3 observations or strategic eligibility", async () => {
@@ -364,10 +365,16 @@ function recordStore(canonicalEvidenceObjects = []) {
     user: [{ id: OWNER, timeZone: "America/Los_Angeles", version: 1 }],
     goals: [],
     healthKitObservations: [],
+    healthKitCanonicalDays: [],
     healthKitConfiguration: [{
-      id: "healthkit_activity_activation_policy",
+      id: "healthkit_canonical_daily_activation_policy",
+      schemaVersion: "healthkit-canonical-activation-policy-v1",
       status: "enabled",
+      domains: ["activity", "nutrition"],
       effectiveLocalDate: "2026-09-12",
+      endLocalDate: "2026-09-12",
+      strategicEvidenceEligibility: "quarantined",
+      historicalBackfill: false,
       version: 1,
     }],
     canonicalEvidenceObjects,

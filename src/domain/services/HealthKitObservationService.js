@@ -13,7 +13,18 @@ export const HEALTHKIT_MAX_NUMERIC_TEXT_LENGTH = 32;
 export const HEALTHKIT_MAX_DAILY_ACTIVITY_METRICS = 32;
 export const HEALTHKIT_MAX_DAILY_ACTIVITY_KEY_LENGTH = 64;
 export const HEALTHKIT_MAX_RING_COMPLETION_METRICS = 8;
-export const HEALTHKIT_ACTIVITY_ACTIVATION_POLICY_RECORD_ID = "healthkit_activity_activation_policy";
+export const HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID = "healthkit_canonical_daily_activation_policy";
+export const HEALTHKIT_CANONICAL_ACTIVATION_POLICY_SCHEMA_VERSION = "healthkit-canonical-activation-policy-v1";
+// One explicitly bounded proving window. It is a date range only so a test day
+// can finish after midnight; it is never an open-ended activation.
+export const HEALTHKIT_CANONICAL_ACTIVATION_MAX_DAYS = 7;
+export const HEALTHKIT_NUTRITION_MAX_FIELDS = 4;
+export const HEALTHKIT_NUTRITION_DAILY_TOTAL_SCOPE = "daily_total_all_sources";
+export const HealthKitCanonicalizationDomain = Object.freeze({
+  ACTIVITY: "activity",
+  NUTRITION: "nutrition",
+});
+const NUTRITION_FIELDS = Object.freeze(["calories", "protein_g", "carbs_g", "fat_g"]);
 
 export const HealthKitIngestionPurpose = Object.freeze({
   OPERATIONAL: "operational",
@@ -22,6 +33,7 @@ export const HealthKitIngestionPurpose = Object.freeze({
 
 export const HealthKitObservationType = Object.freeze({
   ACTIVITY_SUMMARY: "activity_summary",
+  NUTRITION_DAILY_TOTAL: "nutrition_daily_total",
   QUANTITY_SAMPLE: "quantity_sample",
   WORKOUT: "workout",
 });
@@ -33,6 +45,11 @@ export const HealthKitReconciliationState = Object.freeze({
   ACTIVITY_CANONICALIZATION_DEFERRED: "activity_canonicalization_deferred",
   ACTIVITY_VALIDATION_ONLY: "activity_validation_only",
   ACTIVITY_SUMMARY_SUPERSEDED: "activity_summary_superseded",
+  NUTRITION_DAY_CANONICALIZED: "nutrition_day_canonicalized",
+  NUTRITION_CANONICALIZATION_PENDING: "nutrition_canonicalization_pending",
+  NUTRITION_CANONICALIZATION_DEFERRED: "nutrition_canonicalization_deferred",
+  NUTRITION_VALIDATION_ONLY: "nutrition_validation_only",
+  NUTRITION_SUMMARY_SUPERSEDED: "nutrition_summary_superseded",
   WORKOUT_CANONICALIZATION_DEFERRED: "workout_canonicalization_deferred",
   TRAINING_MATCH_CANDIDATE: "training_match_candidate",
   TRAINING_MATCH_AMBIGUOUS: "training_match_ambiguous",
@@ -127,91 +144,90 @@ export function createHealthKitObservationRecord({
   });
 }
 
-export function createHealthKitActivityDayPayload(observation) {
-  if (observation?.observationType !== HealthKitObservationType.ACTIVITY_SUMMARY) {
-    throw invalid("observationType", "Only a HealthKit activity summary can canonicalize to ActivityDay.");
-  }
-  const dailyActivity = observation.measurement.dailyActivity;
-  return Object.freeze({
-    id: observation.id,
-    evidence_type: "activity_day",
-    observed_at: observation.occurrence.localDate,
-    daily_activity: structuredClone(dailyActivity),
-    metadata: {
-      date: observation.occurrence.localDate,
-      time_zone: observation.occurrence.timeZone,
-      aggregation_scope: observation.measurement.aggregationScope,
-      coverage: observation.measurement.coverage,
-      includes_workout_energy: true,
-      source_revision: observation.measurement.sourceRevision,
-      source_device_id: observation.ingestion.deliveryDeviceId,
-    },
-    derived_metrics: {
-      aggregation_policy: "authoritative_healthkit_daily_total",
-      workout_active_calories_additive: false,
-    },
-    references: { training_session_ids: [] },
-    source: {
-      application: "Apple Health",
-      integration: "HealthKit",
-      modality: "direct",
-      bundle_identifier: observation.source.bundleIdentifier,
-      source_external_id: observation.externalId,
-      source_observation_id: observation.id,
-    },
-    provenance: { source_observation_ids: [observation.id] },
+export function resolveHealthKitCanonicalActivationPolicy(record) {
+  const disabled = (source, invalidReason = null) => Object.freeze({
+    enabled: false,
+    domains: Object.freeze([]),
+    effectiveLocalDate: null,
+    endLocalDate: null,
+    source,
+    invalidReason,
   });
+  if (!record) return disabled("not_configured");
+  // Fail closed and never throw: a malformed policy must not turn every
+  // HealthKit delivery into a 4xx that Native would treat as permanent.
+  try {
+    if (record.status !== "enabled") return disabled("server_owned_configuration", "status_not_enabled");
+    if (record.schemaVersion !== HEALTHKIT_CANONICAL_ACTIVATION_POLICY_SCHEMA_VERSION) {
+      return disabled("invalid_configuration_fail_closed", "schema_version_unrecognized");
+    }
+    // The policy carries no strategic-eligibility control. A value other than
+    // the quarantine marker, or any backfill request, invalidates the record.
+    if (record.strategicEvidenceEligibility !== undefined && record.strategicEvidenceEligibility !== "quarantined") {
+      return disabled("invalid_configuration_fail_closed", "strategic_eligibility_not_quarantined");
+    }
+    if (record.historicalBackfill !== undefined && record.historicalBackfill !== false) {
+      return disabled("invalid_configuration_fail_closed", "historical_backfill_not_permitted");
+    }
+    const domains = Array.isArray(record.domains) ? [...new Set(record.domains)].sort() : [];
+    const supported = Object.values(HealthKitCanonicalizationDomain);
+    if (domains.length === 0 || domains.some((domain) => !supported.includes(domain))) {
+      return disabled("invalid_configuration_fail_closed", "domains_invalid");
+    }
+    const effectiveLocalDate = calendarDate(record.effectiveLocalDate, "effectiveLocalDate");
+    const endLocalDate = calendarDate(record.endLocalDate, "endLocalDate");
+    const days = Math.round((Date.parse(`${endLocalDate}T00:00:00.000Z`) - Date.parse(`${effectiveLocalDate}T00:00:00.000Z`)) / 86400000) + 1;
+    if (days < 1 || days > HEALTHKIT_CANONICAL_ACTIVATION_MAX_DAYS) {
+      return disabled("invalid_configuration_fail_closed", "window_invalid");
+    }
+    return Object.freeze({
+      enabled: true,
+      domains: Object.freeze(domains),
+      effectiveLocalDate,
+      endLocalDate,
+      source: "server_owned_configuration",
+      invalidReason: null,
+    });
+  } catch {
+    return disabled("invalid_configuration_fail_closed", "policy_unreadable");
+  }
 }
 
-export function resolveHealthKitActivityActivationPolicy(record) {
-  if (!record) {
-    return Object.freeze({ enabled: false, effectiveLocalDate: null, source: "not_configured" });
-  }
-  const enabled = record.status === "enabled";
-  const effectiveLocalDate = record.effectiveLocalDate == null
-    ? null
-    : calendarDate(record.effectiveLocalDate, "healthKitActivityActivationPolicy.effectiveLocalDate");
-  if (enabled && !effectiveLocalDate) {
-    throw invalid(
-      "healthKitActivityActivationPolicy.effectiveLocalDate",
-      "Enabled HealthKit Activity activation requires an explicit effective local date."
-    );
-  }
-  return Object.freeze({
-    enabled: enabled && Boolean(effectiveLocalDate),
-    effectiveLocalDate,
-    source: "server_owned_configuration",
-  });
-}
-
-export function assessHealthKitActivityCanonicalization({ observation, activationPolicy } = {}) {
-  if (observation?.observationType !== HealthKitObservationType.ACTIVITY_SUMMARY) {
-    return Object.freeze({ eligible: false, reason: "not_activity_summary" });
-  }
+export function assessHealthKitCanonicalization({ observation, activationPolicy } = {}) {
+  const domain = canonicalizationDomain(observation?.observationType);
+  if (!domain) return Object.freeze({ eligible: false, reason: "not_a_canonical_daily_snapshot" });
   if (observation.ingestionPurpose === HealthKitIngestionPurpose.VALIDATION_ONLY) {
     return Object.freeze({
       eligible: false,
+      domain,
       permanent: true,
       reason: "validation_only_permanently_raw",
     });
   }
-  const policy = resolveHealthKitActivityActivationPolicy(activationPolicy);
+  const policy = resolveHealthKitCanonicalActivationPolicy(activationPolicy);
   if (!policy.enabled) {
-    return Object.freeze({ eligible: false, permanent: false, reason: "activity_activation_not_configured" });
+    return Object.freeze({ eligible: false, domain, permanent: false, reason: "canonicalization_not_activated" });
   }
-  if (observation.occurrence.localDate < policy.effectiveLocalDate) {
-    return Object.freeze({
-      eligible: false,
-      permanent: true,
-      reason: "activity_before_activation_date",
-      effectiveLocalDate: policy.effectiveLocalDate,
-    });
+  const scope = {
+    effectiveLocalDate: policy.effectiveLocalDate,
+    endLocalDate: policy.endLocalDate,
+  };
+  if (!policy.domains.includes(domain)) {
+    return Object.freeze({ eligible: false, domain, permanent: true, reason: "domain_not_in_activation_scope", ...scope });
+  }
+  const localDate = observation.occurrence.localDate;
+  if (localDate < policy.effectiveLocalDate) {
+    return Object.freeze({ eligible: false, domain, permanent: true, reason: "before_activation_date", ...scope });
+  }
+  if (localDate > policy.endLocalDate) {
+    return Object.freeze({ eligible: false, domain, permanent: true, reason: "after_activation_window", ...scope });
   }
   return Object.freeze({
     eligible: true,
+    domain,
     permanent: false,
-    reason: "activity_on_or_after_activation_date",
-    effectiveLocalDate: policy.effectiveLocalDate,
+    reason: "within_activation_window",
+    ...scope,
   });
 }
 
@@ -284,36 +300,6 @@ export function reconcileHealthKitWorkoutObservation({
   });
 }
 
-export function compareHealthKitActivitySummaryPrecedence(left = {}, right = {}) {
-  const coverageDelta = activityCoverageRank(left.measurement?.coverage) -
-    activityCoverageRank(right.measurement?.coverage);
-  if (coverageDelta !== 0) return coverageDelta;
-  return Number(left.measurement?.sourceRevision ?? 0) -
-    Number(right.measurement?.sourceRevision ?? 0);
-}
-
-export function getLatestComparableActivityRevision(observations = [], incoming) {
-  if (incoming?.observationType !== HealthKitObservationType.ACTIVITY_SUMMARY) return null;
-  return observations
-    .filter((record) =>
-      record.observationType === HealthKitObservationType.ACTIVITY_SUMMARY &&
-      record.externalId === incoming.externalId &&
-      record.source?.bundleIdentifier === incoming.source?.bundleIdentifier &&
-      record.ingestion?.deliveryDeviceId === incoming.ingestion.deliveryDeviceId
-    )
-    .sort((left, right) =>
-      compareHealthKitActivitySummaryPrecedence(right, left)
-    )[0] ?? null;
-}
-
-export function isHealthKitActivitySummarySuperseded(observations = [], incoming) {
-  const preferredExisting = getLatestComparableActivityRevision(observations, incoming);
-  return preferredExisting &&
-    compareHealthKitActivitySummaryPrecedence(preferredExisting, incoming) > 0
-    ? preferredExisting
-    : null;
-}
-
 function normalizeObservation(value, { batchId, principalDeviceId, index }) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw invalid(`observations[${index}]`, "Each HealthKit observation must be an object.");
@@ -335,7 +321,8 @@ function normalizeObservation(value, { batchId, principalDeviceId, index }) {
   const occurrence = normalizeOccurrence(value.occurrence, observationType, index);
   const measurement = normalizeMeasurement(value, observationType, index);
   const identityParts = [source.bundleIdentifier, observationType, externalId];
-  if (observationType === HealthKitObservationType.ACTIVITY_SUMMARY) {
+  if (canonicalizationDomain(observationType)) {
+    // Daily snapshots legitimately change; device and revision are identity.
     identityParts.push(principalDeviceId, String(measurement.sourceRevision));
   }
   // V1 compatibility boundary: this NUL separator is deliberately preserved.
@@ -395,7 +382,7 @@ function normalizeOccurrence(occurrence, observationType, index) {
   const timeZone = validTimeZone(occurrence.timeZone, `observations[${index}].occurrence.timeZone`);
   const startedAt = occurrence.startedAt == null ? null : boundedIsoDateTime(occurrence.startedAt, `observations[${index}].occurrence.startedAt`);
   const endedAt = occurrence.endedAt == null ? null : boundedIsoDateTime(occurrence.endedAt, `observations[${index}].occurrence.endedAt`);
-  if (observationType !== HealthKitObservationType.ACTIVITY_SUMMARY && !startedAt) {
+  if (!canonicalizationDomain(observationType) && !startedAt) {
     throw invalid(`observations[${index}].occurrence.startedAt`, "Workout and sample occurrence time is required.");
   }
   if (endedAt && Date.parse(endedAt) < Date.parse(startedAt)) {
@@ -429,6 +416,26 @@ function normalizeMeasurement(value, observationType, index) {
       coverage: requiredEnum(summary.coverage, ["partial_day", "complete_day"], `observations[${index}].activitySummary.coverage`),
       sourceRevision,
       dailyActivity,
+    };
+  }
+  if (observationType === HealthKitObservationType.NUTRITION_DAILY_TOTAL) {
+    const summary = value.nutritionDailyTotal;
+    if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+      throw invalid(`observations[${index}].nutritionDailyTotal`, "Nutrition daily totals are required.");
+    }
+    if (summary.aggregationScope !== HEALTHKIT_NUTRITION_DAILY_TOTAL_SCOPE) {
+      throw invalid(
+        `observations[${index}].nutritionDailyTotal.aggregationScope`,
+        "Nutrition daily totals must be HealthKit daily statistics across all sources."
+      );
+    }
+    const sourceRevision = positiveInteger(summary.sourceRevision, `observations[${index}].nutritionDailyTotal.sourceRevision`);
+    const dailyNutrition = nutritionTotals(summary.dailyNutrition, `observations[${index}].nutritionDailyTotal.dailyNutrition`);
+    return {
+      aggregationScope: summary.aggregationScope,
+      coverage: requiredEnum(summary.coverage, ["partial_day", "complete_day"], `observations[${index}].nutritionDailyTotal.coverage`),
+      sourceRevision,
+      dailyNutrition,
     };
   }
   if (observationType === HealthKitObservationType.WORKOUT) {
@@ -503,10 +510,27 @@ function isStrengthWorkout(value) {
   return /strength|resistance|weight training|functional strength|traditional strength/i.test(String(value ?? ""));
 }
 
-function activityCoverageRank(value) {
-  if (value === "complete_day") return 2;
-  if (value === "partial_day") return 1;
-  return 0;
+function canonicalizationDomain(observationType) {
+  if (observationType === HealthKitObservationType.ACTIVITY_SUMMARY) return HealthKitCanonicalizationDomain.ACTIVITY;
+  if (observationType === HealthKitObservationType.NUTRITION_DAILY_TOTAL) return HealthKitCanonicalizationDomain.NUTRITION;
+  return null;
+}
+
+// Nutrition daily totals are exactly calories, protein, carbohydrates, fat.
+// An unlisted field is a contract violation, not something to drop silently.
+function nutritionTotals(value, field) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid(field, `${field} must be an object.`);
+  const entries = Object.entries(value);
+  if (entries.length === 0 || entries.length > HEALTHKIT_NUTRITION_MAX_FIELDS) {
+    throw invalid(field, `${field} accepts only ${NUTRITION_FIELDS.join(", ")}.`);
+  }
+  const totals = {};
+  for (const [key, item] of entries) {
+    if (!NUTRITION_FIELDS.includes(key)) throw invalid(field, `${field} accepts only ${NUTRITION_FIELDS.join(", ")}.`);
+    totals[key] = requiredFinite(item, `${field}.${key}`);
+  }
+  if (totals.calories === undefined) throw invalid(`${field}.calories`, "HealthKit daily dietary energy is required.");
+  return totals;
 }
 
 function numericObject(value, field, { maximumEntries, nested = false }) {

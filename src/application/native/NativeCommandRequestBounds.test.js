@@ -56,6 +56,7 @@ beforeEach(() => {
     user: [{ id: OWNER, version: 1 }],
     healthKitObservations: [],
     healthKitConfiguration: [],
+    healthKitCanonicalDays: [],
     canonicalEvidenceObjects: [],
     ...Object.fromEntries(STRATEGIC_COLLECTIONS.map((name) => [name, [{ id: `${name}-sentinel`, version: 1 }]])),
   });
@@ -147,7 +148,7 @@ describe("Founder canary failure boundary: the old 4 KiB body limit", () => {
       expect(record.ingestionPurpose).toBe("operational");
       expect(record.reconciliation).toMatchObject({
         state: "activity_canonicalization_deferred",
-        reason: "activity_activation_not_configured",
+        reason: "canonicalization_not_activated",
         canonicalizationPermitted: false,
       });
     }
