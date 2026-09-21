@@ -228,7 +228,7 @@ struct HealthKitFounderCanaryView: View {
     private var canSyncTestDay: Bool {
         canaryEnabled &&
         environment.healthKitFounderCanaryCoordinator.authorizationWasExplicitlyRequested &&
-        !isTestDayWorking
+        !isTestDayWorking && !isWorking
     }
 
     private func runCanonicalTestDay() {
@@ -256,7 +256,7 @@ struct HealthKitFounderCanaryView: View {
     private var canRun: Bool {
         canaryEnabled &&
         environment.healthKitFounderCanaryCoordinator.authorizationWasExplicitlyRequested &&
-        startDate != nil && endDate != nil && !isWorking
+        startDate != nil && endDate != nil && !isWorking && !isTestDayWorking
     }
 
     private var availabilityText: String {
