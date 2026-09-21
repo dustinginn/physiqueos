@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Configure Claude remote operations permissions (`claude-remote-ops-permissions-20260921`)
+- Task: Configure Claude remote operations permissions (with Server photo fix deploy) (`claude-remote-ops-permissions-20260921`)
 - Agent: claude
-- Status: blocked
-- Generated (UTC): 2026-09-21T14:28:02Z
-- Success: false
+- Status: completed
+- Generated (UTC): 2026-09-21T14:44:23Z
+- Success: true
 
-Summary: Blocked before any configuration change. Claude Code 2.1.278 runs this Remote Control session in auto mode; the classifier refused every action touching Claude's own permission config (settings.json backup, edit, and even staging a proposal file) as [Self-Modification], because the authorization lives in tool output the classifier does not read. Not worked around. Nothing configured, deployed, uploaded or mutated. Reverified read-only: worktree base is the Build 47 anchor f372699f (baseRef=head, correct); production still 714dcaef / deployment 7292d936 ACTIVE; candidate a428fbda is still exactly one commit on top of 714dcaef, local only. Category probes with current settings: git fetch/read, doctl audit reads, xcodebuild -version, asc-upload auth-check (read-only, passed) and inbox fetch/claim all ran without prompts. Deployment of a428fbda deliberately not attempted because it was conditional on a completed permission setup.
+Summary: After the Founder explicitly authorized it in chat, Claude user settings were configured (permissions.allow 55 narrow rules, permissions.ask 7 rules gating force pushes and amend, autoMode.environment/allow with $defaults; worktree.baseRef=head and other settings preserved; no secrets). With that, the previously approved Server read-model fix a428fbda (one commit on 714dcaef) was deployed: non-force fast-forward push, stamp-only spec update (which built the stale commit and was superseded), then create-deployment --force-rebuild. Deployment d3783f4c ACTIVE; web and worker source_commit_hash both a428fbda; /live and /ready 200; schema 000014 and instance sizes unchanged. Postdeploy zero-write audit: zero differences across all 29 collection digests, briefing digests and Sep 19 sections vs the predeploy baseline; compiled fix marker in 2 chunks. Functional proof against real state: 18 sessions (duplicate legacy Sep 19 suppressed), canonical Sep 19 latest, its 5 media are the JPEG derivatives, published Sep 19 briefing found, 49 legacy rows untouched. production_mutated is true only in the sense of the code deploy and 4 stamp env values; no production data was written. Xcode archive/exportArchive and a real API-key upload were not exercised (auth-check passes).
 
-Detailed report: `agent-handoffs/reports/20260921T142802Z-claude-remote-ops-permissions-blocked.md`
+Detailed report: `agent-handoffs/reports/20260921T144423Z-claude-remote-ops-permissions-and-photo-fix-deployed.md`
 
 Protocol: `agent-handoffs/README.md`

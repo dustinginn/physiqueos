@@ -1,52 +1,56 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T14:28:02Z",
+  "generated_at_utc": "2026-09-21T14:44:23Z",
   "task": {
     "id": "claude-remote-ops-permissions-20260921",
-    "title": "Configure Claude remote operations permissions",
+    "title": "Configure Claude remote operations permissions (with Server photo fix deploy)",
     "agent": "claude",
-    "status": "blocked"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "714dcaef03a28f53f7f34f1d825419b253744b53",
-    "final_sha": null,
-    "production_server_sha": "714dcaef03a28f53f7f34f1d825419b253744b53",
-    "production_deployment": "7292d936-bd71-4f1b-b242-acf740f1557f",
+    "final_sha": "a428fbda42757620750264e63eaee18950ab7132",
+    "production_server_sha": "a428fbda42757620750264e63eaee18950ab7132",
+    "production_deployment": "d3783f4c-bc14-469b-b10c-93635a047325",
     "native_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
     "native_build": 47
   },
   "result": {
-    "summary": "Blocked before any configuration change. Claude Code 2.1.278 runs this Remote Control session in auto mode; the classifier refused every action touching Claude's own permission config (settings.json backup, edit, and even staging a proposal file) as [Self-Modification], because the authorization lives in tool output the classifier does not read. Not worked around. Nothing configured, deployed, uploaded or mutated. Reverified read-only: worktree base is the Build 47 anchor f372699f (baseRef=head, correct); production still 714dcaef / deployment 7292d936 ACTIVE; candidate a428fbda is still exactly one commit on top of 714dcaef, local only. Category probes with current settings: git fetch/read, doctl audit reads, xcodebuild -version, asc-upload auth-check (read-only, passed) and inbox fetch/claim all ran without prompts. Deployment of a428fbda deliberately not attempted because it was conditional on a completed permission setup.",
-    "success": false,
-    "production_mutated": false,
-    "deployed": false,
+    "summary": "After the Founder explicitly authorized it in chat, Claude user settings were configured (permissions.allow 55 narrow rules, permissions.ask 7 rules gating force pushes and amend, autoMode.environment/allow with $defaults; worktree.baseRef=head and other settings preserved; no secrets). With that, the previously approved Server read-model fix a428fbda (one commit on 714dcaef) was deployed: non-force fast-forward push, stamp-only spec update (which built the stale commit and was superseded), then create-deployment --force-rebuild. Deployment d3783f4c ACTIVE; web and worker source_commit_hash both a428fbda; /live and /ready 200; schema 000014 and instance sizes unchanged. Postdeploy zero-write audit: zero differences across all 29 collection digests, briefing digests and Sep 19 sections vs the predeploy baseline; compiled fix marker in 2 chunks. Functional proof against real state: 18 sessions (duplicate legacy Sep 19 suppressed), canonical Sep 19 latest, its 5 media are the JPEG derivatives, published Sep 19 briefing found, 49 legacy rows untouched. production_mutated is true only in the sense of the code deploy and 4 stamp env values; no production data was written. Xcode archive/exportArchive and a real API-key upload were not exercised (auth-check passes).",
+    "success": true,
+    "production_mutated": true,
+    "deployed": true,
     "testflight_uploaded": false
   },
   "validation": {
-    "tests": null,
-    "review": null,
-    "zero_write_audit": null
+    "tests": {
+      "status": "passed",
+      "summary": "Inherited from the prior task for exact a428fbda: 9 new regression tests pass; full unit suite candidate 8194 tests / 298 failures vs base 8185 / 298 with zero candidate-only failures; phase suites zero candidate-only failures; production build compiled with the correction marker. Not rerun this task."
+    },
+    "review": {
+      "status": "approved",
+      "summary": "Independent fresh-context review APPROVE for exact a428fbda (prior task); SHA unchanged since."
+    },
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "Postdeploy read-only audit (REPEATABLE READ READ ONLY, transaction_read_only on, owner-scoped, ROLLBACK, marker present) vs predeploy baseline: 0 differences across 29 record digests, briefing digests, energy protocols, Sep 19 session/media/legacy/briefing sections, outbox counts, pending reviews, migrations (14, last 000014). Runtime SHA and build id confirmed in the component."
+    }
   },
-  "decisions_required": [
-    "Founder must clear the [Self-Modification] block once: say in the Claude session chat that the agent is authorized to edit ~/.claude/settings.json to add the proposed PhysiqueOS permissions/autoMode entries (option A in the report), or apply the entries locally via /permissions or /auto-mode-setup (option B)."
-  ],
-  "blockers": [
-    "Claude auto mode classifier denies Claude editing its own permission configuration ([Self-Modification]); this task's authorization is in GitHub prompt tool output, which the classifier does not read.",
-    "Same root cause as the prior Server task blocker: production deploy and deploy-branch push cannot be cleared by task text alone."
-  ],
+  "decisions_required": [],
+  "blockers": [],
   "unexpected_findings": [
-    "This session is in auto mode: blanket Bash(*) and wildcarded-interpreter allow rules are dropped, narrow allow rules and autoMode.environment/allow entries are honored, and Remote Control cannot switch to Auto or Bypass from the phone. So the fix is narrow permissions.allow plus autoMode entries (with $defaults) plus permissions.ask on force pushes, not a bare Bash allow or bypassPermissions.",
-    "Deploy verbs and deploy-branch push are intentionally not proposed for permissions.allow, because an allow rule resolves before the classifier and would remove its production-deploy gate; they are covered by a conditional autoMode.allow exception instead.",
-    "Publishing this blocked completion marks the inbox task completed, so a retry needs either the Founder saying so in this session chat or a new task id."
+    "The classifier refused all self-modification of Claude's permission config until the Founder authorized it in chat; task-prompt authorization alone was not visible to it. After the chat authorization the settings edit, deploy-branch push and doctl deploy verbs all ran.",
+    "The stamp-only spec update again built the OLD commit (deployment dccc8dfb on 714dcaef); the forced rebuild was required. Verified from the deployment API, not from stamps.",
+    "Running any inbox-completion publish marks the inbox task completed; the earlier blocked completion already did, so this final handoff is published as a non-inbox follow-up under the same task id."
   ],
   "backlog": [
-    "After the Founder clears the block: apply the proposed settings, verify with claude auto-mode config and safe probes, then resume the a428fbda deployment (fast-forward push, stamp update, force rebuild, source_commit_hash verification, health, schema/cost, zero-write postdeploy audit, functional proof).",
-    "Exercise xcodebuild archive/exportArchive and the read-only console runner under the new permissions.",
-    "Prove a real API-key TestFlight upload end to end (auth-check already passes)."
+    "Founder on-device Build 47 photo re-check (Sep 19 first image loads, photos 2-5 load, no 'preparing' banner, Read Photo Briefing opens the published briefing, Home and Briefing History unchanged).",
+    "Exercise xcodebuild archive/exportArchive and a real API-key TestFlight upload under the new permissions on the next Native task.",
+    "Later Native task: recover 8256db4b (issue 3), full Build 48 gates, review, bump, archive, API-key upload. Do not start Build 48 or HealthKit before the re-check."
   ],
-  "recommended_next_step": "Founder: tell the Claude session in chat that it is authorized to edit ~/.claude/settings.json with the PhysiqueOS permissions/autoMode entries described in the report and to continue the blocked Server deployment; or apply them yourself with /permissions or /auto-mode-setup and publish a new task id to resume the a428fbda deployment.",
-  "full_report_path": "agent-handoffs/reports/20260921T142802Z-claude-remote-ops-permissions-blocked.md",
+  "recommended_next_step": "Founder: re-check Build 47 Progress Photos on the device (five checks in the report). If it passes, authorize the Build 48 Native task; if anything fails, publish a new task with what you see.",
+  "full_report_path": "agent-handoffs/reports/20260921T144423Z-claude-remote-ops-permissions-and-photo-fix-deployed.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
