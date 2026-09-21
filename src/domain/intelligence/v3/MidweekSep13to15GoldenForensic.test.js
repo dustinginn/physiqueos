@@ -75,4 +75,23 @@ describe("Midweek Sep 13–15: unified V3 golden", () => {
     const { current } = computeMidweekEnergyObservations();
     expect(current.dailyRecords.length).toBe(3);
   });
+
+  it("keeps the Energy evidence when the Midweek producer omits an unformable estimate (food logged, no activity)", async () => {
+    const { observations } = computeMidweekEnergyObservations({ activityDays: [], includeInsufficientData: false });
+    expect(observations.some((item) => item.kind === "energy_balance")).toBe(false);
+    const prepared = await prepareMidweekV3({ energyObservations: observations });
+    const execution = prepared.strategicInterpretation.energyExecution;
+    expect(execution.estimate.averageKcalPerDay).toBeNull();
+    expect(execution.findings.find((item) => item.dimension === "intake")).toBeDefined();
+    expect(prepared.strategicInterpretation.uncertaintyProfile.map((item) => item.type))
+      .toEqual(expect.arrayContaining(["energy_intake_uncertainty", "energy_pairing_incomplete"]));
+    expect(prepared.strategicInterpretation.recommendation.strength).toBe("tempered");
+  });
+
+  it("does not present a prior week's Energy as this Midweek's evidence when the Midweek has none", async () => {
+    const prepared = await prepareMidweekV3({ energyObservations: [] });
+    expect(prepared.strategicInterpretation.energyExecution ?? null).toBeNull();
+    const ids = prepared.assessment.evidenceEligibility.eligibleObservations.map((item) => item.observationId);
+    expect(ids.filter((id) => /\|(energy|nutrition|activity)\|/.test(id))).toEqual([]);
+  });
 });

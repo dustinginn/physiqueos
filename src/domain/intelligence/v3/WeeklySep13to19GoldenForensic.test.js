@@ -272,4 +272,18 @@ describe("Sep 13–19 Weekly: corrected V3 forensic replay", () => {
     expect(ids.filter((id) => /\|(energy|nutrition|activity)\|/.test(id))).toEqual([]);
     expect(regenerated.strategicInterpretation.energyExecution?.estimate ?? null).toBeNull();
   });
+
+  it("treats a flat legacy Energy observation with no measured evidence as explicit ambiguity, never a firmer recommendation", async () => {
+    const legacy = [{
+      id: "energy|derived_balance_estimate", domain: "energy", kind: "energy_balance", status: "insufficient_data",
+      direction: "neutral", displayLabel: "Energy estimate", evidenceWindow: fixtures.weeklyPi.evidenceWindow,
+      confidence: { level: "low", limitations: [] }, supportingEvidenceIds: [],
+    }];
+    const prepared = await prepareWeeklyV3({ piEnvelope: weeklyPiEnvelope({ energyObservations: legacy }) });
+    const execution = prepared.strategicInterpretation.energyExecution;
+    expect(execution.estimate.averageKcalPerDay).toBeNull();
+    expect(prepared.strategicInterpretation.uncertaintyProfile.find((item) => item.type === "energy_pairing_incomplete").reasons)
+      .toContain("energy_evidence_unavailable");
+    expect(prepared.strategicInterpretation.recommendation.strength).toBe("tempered");
+  });
 });

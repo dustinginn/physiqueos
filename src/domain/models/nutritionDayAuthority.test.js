@@ -183,6 +183,24 @@ describe("Nutrition daily-total authority", () => {
     expect(authority.assertion.tier).toBe(NutritionAssertionTier.PARTIAL_SUBTOTAL);
   });
 
+  it("never understates a macronutrient when a calorie conflict takes the meal-derived day", () => {
+    const authority = resolveNutritionDayAuthority(day({
+      metadata: { daily_totals_scope: "full_day_summary" },
+      daily_totals: { calories: 1400, protein_g: 150, carbs_g: 100, fat_g: 40 },
+      meals: [meal("Lunch", 1500, 90, 150, 50)],
+    }));
+    expect(authority.assertion.tier).toBe(NutritionAssertionTier.MEAL_DERIVED_UNVERIFIED);
+    expect(authority.dailyTotals).toMatchObject({ calories: 1500, protein_g: 150, carbs_g: 150, fat_g: 50 });
+  });
+
+  it("does not promote a device total that carries its own partial marker", () => {
+    const authority = resolveNutritionDayAuthority(day({
+      source: { modality: "device" }, metadata: { completeness: "partial" },
+      quality: { status: "partial" }, daily_totals: { calories: 600 },
+    }));
+    expect(authority.assertion.tier).toBe(NutritionAssertionTier.PARTIAL_SUBTOTAL);
+  });
+
   it("orders source reliability by capture semantics rather than by integration name", () => {
     const base = { metadata: { daily_totals_scope: "full_day_summary", confidence: "high" }, daily_totals: { calories: 2400 } };
     const device = resolveNutritionDayAuthority(day({ ...base, source: { modality: "device" } }));

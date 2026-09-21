@@ -33,13 +33,24 @@ describe("current-window supersession", () => {
     expect(result.superseded).toEqual([]);
   });
 
-  it("does not let an insufficient current observation cover the capability outside its window", () => {
-    const stored = observation("prior|nutrition|coverage", "execution.nutrition", priorWeek);
+  it("never carries a completed window's Energy, Nutrition or Activity coverage into a briefing that has none of its own", () => {
     const result = supersedeStaleCadenceObservations({
-      stored: [stored],
-      current: [observation("weekly_b|nutrition|coverage", "execution.nutrition", week, "insufficient")],
+      stored: [
+        observation("prior|nutrition|coverage", "execution.nutrition", priorWeek),
+        observation("prior|energy|weekly.balance", "strategy.energy_balance_estimate", priorWeek),
+      ],
+      current: [observation("weekly_b|performance|overall", "execution.training", week)],
     });
-    expect(result.observations).toEqual([stored]);
+    expect(result.observations).toEqual([]);
+    expect(result.superseded.map((item) => item.reason)).toEqual([
+      "window_scoped_evidence_is_not_carried_forward", "window_scoped_evidence_is_not_carried_forward",
+    ]);
+  });
+
+  it("still carries forward evidence that is not window-scoped (training) when the current briefing lacks it", () => {
+    const training = observation("prior|performance|overall", "execution.training", priorWeek);
+    const result = supersedeStaleCadenceObservations({ stored: [training], current: [] });
+    expect(result.observations).toEqual([training]);
   });
 
   it("supersedes an older observation whose window sits inside a thin current window", () => {

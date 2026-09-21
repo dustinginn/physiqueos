@@ -108,8 +108,10 @@ export function resolveNutritionDayAuthority(record, {
   // A device or integration daily aggregate is a full-day assertion by
   // construction even when it carries no scope marker and no meal objects.
   // Only an explicit partial-subtotal scope keeps it from being one.
+  const declaredPartial = ["partial", "incomplete"].includes(String(metadata.completeness ?? "").toLowerCase()) ||
+    String(payload.quality?.status ?? "").toLowerCase() === "partial";
   const fullDayClaim = scope === NutritionDailyTotalsScope.FULL_DAY_SUMMARY ||
-    (scope === NutritionDailyTotalsScope.UNKNOWN && hasSource &&
+    (scope === NutritionDailyTotalsScope.UNKNOWN && hasSource && !declaredPartial &&
       capture.captureMethod === "device_aggregate") ||
     (scope === NutritionDailyTotalsScope.UNKNOWN && !meals.length && hasSource &&
       isLegacyCompleteMarker(metadata.completeness, payload.quality?.status));
@@ -125,7 +127,9 @@ export function resolveNutritionDayAuthority(record, {
       // and preserve the conflict rather than override it silently.
       tier = NutritionAssertionTier.MEAL_DERIVED_UNVERIFIED;
       origin = NutritionAssertionOrigin.MEAL_SUM;
-      dailyTotals = mergeTotals(mealSums, sourceTotals);
+      // Field by field, the larger of the two contradicting totals stands so a
+      // conflict never understates any macronutrient.
+      dailyTotals = largestTotals(mealSums, sourceTotals);
       state = NutritionReconciliationState.CONFLICT;
       conflictingFields = exceeding;
       ambiguity.push("intake_source_conflict");
@@ -313,6 +317,13 @@ function pickTotals(source = {}) {
   return Object.fromEntries(NUTRITION_AUTHORITY_ENERGY_TOTAL_FIELDS.map((field) => [
     field, finite(source?.[field]) ? Number(source[field]) : null,
   ]));
+}
+
+function largestTotals(left, right) {
+  return Object.fromEntries(NUTRITION_AUTHORITY_ENERGY_TOTAL_FIELDS.map((field) => {
+    const values = [left?.[field], right?.[field]].filter(finite).map(Number);
+    return [field, values.length ? Math.max(...values) : null];
+  }));
 }
 
 function emptyTotals() {

@@ -106,14 +106,26 @@ export function resolveWeeklyActivityTargetKcal(authority, days = 7) {
 
 function effectiveBy(value, cutoffMs) {
   if (cutoffMs == null || !value) return true;
+  // A date-only value is a local calendar day. Evidence cutoffs sit at the end
+  // of a local day, so compare it with the local date the cutoff closes.
+  if (/^\d{4}-\d{2}-\d{2}$/u.test(String(value))) {
+    return String(value) <= new Date(cutoffMs - 12 * 3_600_000).toISOString().slice(0, 10);
+  }
   const at = Date.parse(value);
   return !Number.isFinite(at) || at <= cutoffMs;
 }
 
 function selectPhaseStrategy({ goal, phaseId, phaseStrategies, cutoffMs }) {
-  const candidates = (phaseStrategies ?? []).filter((item) =>
-    item && (!phaseId || item.phaseId === phaseId) && item.status === "accepted" &&
-    !item.supersededAt && !item.supersededBy && effectiveBy(item.acceptedAt, cutoffMs));
+  // With a cutoff the strategy is read as it stood then: accepted by the cutoff
+  // and not yet superseded at the cutoff. Without one, only the current record.
+  const candidates = (phaseStrategies ?? []).filter((item) => {
+    if (!item || (phaseId && item.phaseId !== phaseId)) return false;
+    if (cutoffMs == null) {
+      return item.status === "accepted" && !item.supersededAt && !item.supersededBy;
+    }
+    return ["accepted", "superseded"].includes(item.status) && effectiveBy(item.acceptedAt, cutoffMs) &&
+      (!item.supersededAt || !effectiveBy(item.supersededAt, cutoffMs));
+  });
   const referenced = goal?.activePhaseStrategyId ?? goal?.timeline?.activePhaseStrategyId ?? null;
   return candidates.find((item) => (item.id ?? item.strategyId) === referenced) ??
     candidates.sort((left, right) =>
@@ -123,8 +135,10 @@ function selectPhaseStrategy({ goal, phaseId, phaseStrategies, cutoffMs }) {
 function resolveEnergyStrategy({ strategy, phaseId, protocols, protocolVersions, diagnostics, cutoffMs }) {
   const domain = strategy?.domains?.energy ?? null;
   const strategyId = strategy?.id ?? strategy?.strategyId ?? null;
+  // With a cutoff, a protocol since archived or superseded may still be the one
+  // that was in force; its versions' own effective dates decide.
   const energyProtocols = (protocols ?? []).filter((item) =>
-    item?.status === "active" &&
+    (cutoffMs == null ? item?.status === "active" : ["active", "archived", "superseded"].includes(item?.status)) &&
     [item.category, item.protocolType].some((value) => value === "energy") &&
     (!phaseId || item.phaseId === phaseId || (strategyId && item.phaseStrategyId === strategyId)));
   // The Energy protocol bound to the accepted phase strategy outranks any other

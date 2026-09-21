@@ -119,7 +119,8 @@ export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}
     .find((measurement) => measurement.capabilityId === "strategy.energy_balance_estimate") ?? null;
   const estimate = estimateMeasurement ? Object.freeze({
     observationId: estimateObservation.observationId,
-    averageKcalPerDay: estimateMeasurement.metadata?.valueAvailable === false ? null : estimateMeasurement.value,
+    averageKcalPerDay: estimateMeasurement.metadata?.valueAvailable === false ||
+      estimateObservation.quality.status === "insufficient" ? null : estimateMeasurement.value,
     comparisonAverageKcalPerDay: estimateMeasurement.comparisonValue ?? null,
     trendDirection: estimateMeasurement.metadata?.trendDirection ?? "not_applicable",
     measurementType: estimateMeasurement.metadata?.measurementType ?? "DERIVED_ESTIMATE",
@@ -128,6 +129,14 @@ export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}
     activityEvidence: estimateMeasurement.metadata?.activityEvidence ?? null,
     quality: estimateObservation.quality.status,
   }) : null;
+
+  // An Energy estimate was expected for this window but there is no measured
+  // Energy evidence behind it. That absence is itself ambiguity: it must never
+  // make a recommendation firmer than a week with partial evidence.
+  if (estimateObservation && estimate?.averageKcalPerDay == null && !findings.length && !pairing) {
+    ambiguity.push(entry(EnergyAmbiguityTypeV3.PAIRING, "high",
+      ["energy_evidence_unavailable"], [estimateObservation.observationId]));
+  }
 
   return Object.freeze({
     energyStrategy,

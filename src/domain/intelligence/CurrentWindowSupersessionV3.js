@@ -68,7 +68,20 @@ export function supersedeStaleCadenceObservations({
       const byCapability = covered.get(family);
       const byWindow = (currentWindows.get(family) ?? [])
         .find((item) => windowContains(item.window, observation.evidenceWindow));
-      if (!byCapability && !byWindow) continue;
+      if (!byCapability && !byWindow) {
+        // Energy, Nutrition and Activity coverage describe one completed window.
+        // Carried into a briefing that has no such measurement of its own, an
+        // earlier window's value would read as this window's evidence. It is
+        // never carried forward; an absent measurement is absent.
+        if (!WINDOW_SCOPED_FAMILIES.has(family)) continue;
+        superseded.push(Object.freeze({
+          observationId: observation.observationId,
+          capabilityId: measurement.capabilityId,
+          supersededBy: null,
+          reason: "window_scoped_evidence_is_not_carried_forward",
+        }));
+        return false;
+      }
       superseded.push(Object.freeze({
         observationId: observation.observationId,
         capabilityId: measurement.capabilityId,

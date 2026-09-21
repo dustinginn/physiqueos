@@ -20,6 +20,8 @@ import {
 // say. Structured fields (uncertainty, identity digests) are additive.
 const BASE_DEXA_TEXT_SHA256 = "75f822e7f5c4674742e3231c2e17f3fc7f0806a696dff076e1a40d764a02f13c";
 const BASE_PHOTO_TEXT_SHA256 = "75f822e7f5c4674742e3231c2e17f3fc7f0806a696dff076e1a40d764a02f13c";
+// The same events published with a prior Weekly in the store (production's normal shape).
+const BASE_WITH_PRIOR_WEEKLY_TEXT_SHA256 = "4269bad26fbba30f7945038865874d70cda7a59602f5c7c1bcb49844a1a2ae7f";
 // The accepted Sep 19 Photo artifact's stored V3 text (a stored artifact is served, never rebuilt).
 const ACCEPTED_SEP19_PHOTO_TEXT_SHA256 = "a139d9834a66e550998d7fb21f95254ed1707096b25d6f91eaa5cd834aab5791";
 
@@ -117,5 +119,26 @@ describe("Photo Event: unified V3 regression golden", () => {
     expect(enriched).not.toBe(narrative);
     expect(JSON.stringify(narrative)).toBe(before);
     expect(enriched.poseInterpretations).toEqual(narrative.poseInterpretations);
+  });
+
+  it("does not pull a prior Weekly's Energy into a Photo Event (text, recommendation and Confidence equal the pristine base)", async () => {
+    const { prepared, artifact } = await preparePhotoV3({ withPriorWeekly: true });
+    expect(textDigest(artifact.briefing.narrativeV3)).toBe(BASE_WITH_PRIOR_WEEKLY_TEXT_SHA256);
+    expect(prepared.assessment.currentPercentage).toBe(79);
+    expect(prepared.strategicInterpretation.energyExecution ?? null).toBeNull();
+    expect(artifact.briefing.narrativeV3.energy ?? null).toBeNull();
+    expect(prepared.strategicInterpretation.recommendation.strength).toBeUndefined();
+    expect(prepared.strategicInterpretation.uncertaintyProfile.some((item) => item.domain === "energy")).toBe(false);
+  });
+});
+
+describe("DEXA Event with a prior Weekly in the store", () => {
+  it("does not pull a prior Weekly's Energy into a DEXA Event (text, recommendation and Confidence equal the pristine base)", async () => {
+    const { prepared, artifact } = await prepareDexaV3({ withPriorWeekly: true });
+    expect(textDigest(artifact.briefing.narrativeV3)).toBe(BASE_WITH_PRIOR_WEEKLY_TEXT_SHA256);
+    expect(prepared.assessment.currentPercentage).toBe(79);
+    expect(prepared.strategicInterpretation.energyExecution ?? null).toBeNull();
+    expect(prepared.strategicInterpretation.recommendation.strength).toBeUndefined();
+    expect(artifact.briefing.narrativeV3.energy ?? null).toBeNull();
   });
 });

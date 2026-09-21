@@ -204,12 +204,12 @@ export function priorWeeklyArtifactSep6to12() {
   return artifact;
 }
 
-export function computeMidweekEnergyObservations() {
+export function computeMidweekEnergyObservations({ activityDays, includeInsufficientData = true } = {}) {
   const window = { startDate: "2026-09-13", endDate: "2026-09-15", timeZone: "America/Los_Angeles" };
   const comparisonWindow = { startDate: "2026-09-06", endDate: "2026-09-12", timeZone: window.timeZone };
   const input = {
     cadence: "midweek", timeZone: window.timeZone,
-    nutritionDays: nutritionActivity.nutritionDays, activityDays: nutritionActivity.activityDays,
+    nutritionDays: nutritionActivity.nutritionDays, activityDays: activityDays ?? nutritionActivity.activityDays,
     dexaScans, rmrStrategy: CADENCE_RMR_STRATEGIES.LATEST_ELIGIBLE_FOR_WINDOW,
   };
   const current = createCadenceEnergyAssessment({ ...input, window, comparisonWindow });
@@ -217,7 +217,7 @@ export function computeMidweekEnergyObservations() {
   const observations = createEnergyPIObservations({
     days: [...comparison.dailyRecords, ...current.dailyRecords],
     observationWindow: { ...window }, comparisonWindow, semanticHorizon: "midweek",
-    includeInsufficientData: true,
+    includeInsufficientData,
   });
   return { observations, current, comparison };
 }
@@ -266,13 +266,13 @@ export async function prepareMidweekV3({ withPriorWeekly = true, energyObservati
 // events' evidence. The recorded text hashes were produced by the pristine
 // production base (895935bd) on identical inputs.
 
-function eventStore(goal) {
+function eventStore(goal, dailyBriefings = []) {
   return {
     goals: [goal], phaseStrategies: [structuredClone(strategyAuthority.phaseStrategy)],
     protocols: structuredClone(strategyAuthority.protocols),
     protocolVersions: structuredClone(strategyAuthority.protocolVersions),
     dexaScans: structuredClone(dexaScans), weightEntries: structuredClone(weightEntries),
-    dailyBriefings: [], canonicalEvidenceObjects: [], goalConfidenceHistory: [],
+    dailyBriefings, canonicalEvidenceObjects: [], goalConfidenceHistory: [],
     goalConfidenceSnapshots: [], analyses: [],
   };
 }
@@ -286,10 +286,17 @@ function eventPredecessor({ goal, phase, sourceCutoff }) {
   };
 }
 
+function weeklyBoundToGoal(goal, phase) {
+  const artifact = structuredClone(weeklyArtifact);
+  artifact.goalId = goal.id;
+  artifact.phaseId = phase.id;
+  return artifact;
+}
+
 export const DEXA_SCAN_ID = "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12";
 export const DEXA_PRIOR_SCAN_ID = "dexa_submission_20260815181333895_review_pdf_1_2026_08_15";
 
-export async function prepareDexaV3() {
+export async function prepareDexaV3({ withPriorWeekly = false } = {}) {
   const goal = structuredClone(strategyAuthority.goal);
   const phase = resolveCommittedPhaseContext(goal, { asOf: "2026-09-13" }).activePhase;
   const scan = dexaScans.find((item) => item.id === DEXA_SCAN_ID);
@@ -303,7 +310,7 @@ export async function prepareDexaV3() {
   const prepared = await finalizer.prepare({
     publisherType: "dexa_event_briefing", userId: "user_founder_001",
     occurrenceId: artifact.id, artifactId: artifact.id, cadenceOrEventType: "dexa", goal, phase,
-    store: eventStore(goal), evidenceWindowId: `dexa_event|${scan.id}`, evidenceWindowClosed: true,
+    store: eventStore(goal, withPriorWeekly ? [priorWeeklyArtifactSep6to12()] : []), evidenceWindowId: `dexa_event|${scan.id}`, evidenceWindowClosed: true,
     buildAdditionalObservations: ({ goalContract }) => adaptCanonicalDexaScans({
       goalContract, phase, scans: [prior, scan], cutoff,
     }),
@@ -326,7 +333,7 @@ export async function prepareDexaV3() {
   return { prepared, artifact: composed, stored: dexaEventArtifact };
 }
 
-export async function preparePhotoV3({ structured = false } = {}) {
+export async function preparePhotoV3({ structured = false, withPriorWeekly = false } = {}) {
   const goal = structuredClone(strategyAuthority.goal);
   const phase = resolveCommittedPhaseContext(goal, { asOf: "2026-09-19" }).activePhase;
   const narrative = structuredClone(photoEventArtifact.briefing.photoEventNarrative);
@@ -341,7 +348,7 @@ export async function preparePhotoV3({ structured = false } = {}) {
   const prepared = await finalizer.prepare({
     publisherType: "photo_event_briefing", userId: "user_founder_001",
     occurrenceId: artifact.id, artifactId: artifact.id, cadenceOrEventType: "photo", goal, phase,
-    store: eventStore(goal), evidenceWindowId: `photo_event|${session.id}`, evidenceWindowClosed: true,
+    store: eventStore(goal, withPriorWeekly ? [weeklyBoundToGoal(goal, phase)] : []), evidenceWindowId: `photo_event|${session.id}`, evidenceWindowClosed: true,
     buildAdditionalObservations: ({ goalContract }) => adaptCanonicalPhotoObservations({
       goalContract, phase, store: { photoAnalyses: [{ ...session, interpretation }] }, cutoff,
     }),

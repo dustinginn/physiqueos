@@ -33,11 +33,24 @@ export function adaptEnergyObservationsV3({
   fallbackWindow = null,
 } = {}) {
   const energy = observations.filter((item) => item?.domain === "energy");
-  const balance = energy.find((item) => item.kind === "energy_balance");
-  if (!balance) return [];
   const intake = energy.find((item) => item.kind === "energy_intake");
   const expenditure = energy.find((item) => item.kind === "energy_expenditure");
   const coverage = energy.find((item) => item.kind === "paired_day_coverage");
+  // The producer omits the balance when it cannot be formed (for example food
+  // logged but no activity recorded). The remaining Energy evidence is still
+  // real, so the estimate is carried as explicitly unavailable, never dropped.
+  const balance = energy.find((item) => item.kind === "energy_balance") ??
+    ((intake || expenditure || coverage) ? {
+      id: "energy.balance_unavailable",
+      kind: "energy_balance",
+      status: "insufficient_data",
+      direction: "not_applicable",
+      evidenceWindow: (coverage ?? intake ?? expenditure).evidenceWindow ?? null,
+      explanationData: {},
+      confidence: { limitations: [] },
+      supportingEvidenceIds: [],
+    } : null);
+  if (!balance) return [];
   const weight = observations.find((item) => item?.domain === "weight" &&
     item.kind === "weight_average_change" && item.status !== "insufficient_data");
   const energyStrategy = goalContract?.strategy?.energyStrategy ?? null;

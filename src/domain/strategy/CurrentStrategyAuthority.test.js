@@ -93,6 +93,28 @@ describe("current strategy authority (Sep 13–19 Founder records)", () => {
     expect(authority.energyStrategy.protocolId).toBe(energyProtocol.id);
   });
 
+  it("reads a replay with the strategy and protocol that were in force, even if both are since replaced or archived", () => {
+    const energyProtocol = protocols.find((item) => item.category === "energy");
+    const v2Strategy = { ...phaseStrategy, id: "strategy_v2", revision: 2, acceptedAt: "2026-10-01T00:00:00.000Z" };
+    const retired = { ...phaseStrategy, supersededAt: "2026-10-01T00:00:00.000Z", supersededBy: "strategy_v2" };
+    const archived = protocols.map((item) => item.id === energyProtocol.id ? { ...item, status: "archived" } : item);
+    const replay = resolve({ phaseStrategies: [retired, v2Strategy], protocols: archived, evidenceCutoff: "2026-09-20T06:59:59.999Z" });
+    expect(replay.phaseStrategy.id).toBe(phaseStrategy.id);
+    expect(replay.energyStrategy.intakeTarget.value).toBe(2500);
+  });
+
+  it("treats a date-only effective date as a local calendar day the window has not yet reached", () => {
+    const energyProtocol = protocols.find((item) => item.category === "energy");
+    const v2 = protocolVersions.find((item) => item.protocolId === energyProtocol.id && item.versionNumber === 2);
+    const versions = [...protocolVersions, {
+      ...v2, id: `${energyProtocol.id}_v3`, versionNumber: 3, effectiveAt: "2026-09-20",
+      change: { ...v2.change, reviewedChanges: { ...v2.change.reviewedChanges, caloricIntakeTarget: { value: 2700, unit: "kcal/day" } } },
+    }];
+    // The window ends the evening of Sep 19 local time; a change effective Sep 20 must not apply to it.
+    expect(resolve({ protocolVersions: versions, evidenceCutoff: "2026-09-20T06:59:59.999Z" }).energyStrategy.intakeTarget.value).toBe(2500);
+    expect(resolve({ protocolVersions: versions, evidenceCutoff: "2026-09-21T06:59:59.999Z" }).energyStrategy.intakeTarget.value).toBe(2700);
+  });
+
   it("does not resolve a strategy from a different phase", () => {
     const authority = resolve({ phaseStrategies: [{ ...phaseStrategy, phaseId: "some_other_phase" }] });
     expect(authority.phaseStrategy).toBeNull();
