@@ -130,10 +130,20 @@ describe("Training authority repair runner: retroactive events", () => {
     // Keep only the Sep 13 event pair as "existing"; the Sep 20 event is the one to reconcile.
     const existing = targetEvents.filter((event) => event.workoutDate === "2026-09-13");
     const correction = { ...snapshot.canonicalEvidenceObjects[0], canonicalId: getCorrectedId(), payload: { ...snapshot.canonicalEvidenceObjects[0].payload, id: "dummy-correction", exercises: [] } };
-    const records = createInMemoryCanonicalRecordStore({
+    const memory = createInMemoryCanonicalRecordStore({
       user: snapshot.user, goals: snapshot.goals, trainingPerformanceEvents: existing, migrationMarkers: [],
       canonicalEvidenceObjects: [...snapshot.canonicalEvidenceObjects, correction],
     });
+    // Production has a UNIQUE (owner, collection, source_identity) index; enforce it here too.
+    const seenIdentities = new Set();
+    const records = { ...memory, putIfAbsent: async (input) => {
+      if (input.sourceIdentity) {
+        const key = `${input.collection}|${input.sourceIdentity}`;
+        if (seenIdentities.has(key)) throw Object.assign(new Error("duplicate key value violates unique constraint"), { code: "23505" });
+        seenIdentities.add(key);
+      }
+      return memory.putIfAbsent(input);
+    } };
     const approvedEvents = targetEvents.filter((event) => event.workoutDate === "2026-09-20").map((event) => ({ id: event.id, date: event.workoutDate, exercise: event.canonicalExerciseId, type: event.eventType, load: event.load ?? null, prior: event.previousBaselineValue, value: event.currentValue }));
     expect(approvedEvents).toHaveLength(1);
     const authorization = { ...AUTH, approvedEvents };
@@ -143,12 +153,12 @@ describe("Training authority repair runner: retroactive events", () => {
     expect((await runTrainingAuthorityRepair({ records, authorization, phase: "retroactive_events", apply: true, now: NOW })).outcome).toBe("drifted");
     const applied = await runTrainingAuthorityRepair({ records, authorization, phase: "retroactive_events", apply: true, expected: dry.facts, now: NOW });
     expect(applied).toMatchObject({ outcome: "applied", createdCount: 1, invariants: { exactlyTwelveNew: true, existingEventsUnchanged: true, approvedEventsPresent: true, everyEventLive: true } });
-    const after = records.snapshot();
+    const after = memory.snapshot();
     expect(after.trainingPerformanceEvents).toHaveLength(existing.length + 1);
     expect(existing.map((event) => digest(after.trainingPerformanceEvents.find((candidate) => candidate.id === event.id)))).toEqual(originals);
     expect(after.migrationMarkers).toHaveLength(1);
     expect((await runTrainingAuthorityRepair({ records, authorization, phase: "retroactive_events", apply: true, expected: dry.facts, now: NOW })).outcome).toBe("already_applied");
-    expect(records.snapshot().trainingPerformanceEvents).toHaveLength(existing.length + 1);
+    expect(memory.snapshot().trainingPerformanceEvents).toHaveLength(existing.length + 1);
   });
 
   it("refuses when the correction is not active, and refuses a recalculated set that differs from the approved set", async () => {

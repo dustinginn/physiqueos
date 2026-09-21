@@ -149,13 +149,13 @@ async function runRetroactiveEvents({ records, authorization, apply, expected, n
   const writtenAt = now().toISOString();
   for (const event of proposed) {
     const written = await records.putIfAbsent({
-      ownerUserId, collection: "trainingPerformanceEvents", recordId: event.id, sourceIdentity: authorization.repairId,
+      ownerUserId, collection: "trainingPerformanceEvents", recordId: event.id, sourceIdentity: `${authorization.repairId}|${event.id}`,
       payload: { ...event, createdAt: writtenAt },
     });
     if (!written.created) throw Object.assign(new Error("An event row already existed."), { code: "EVENT_ROW_EXISTS" });
   }
   const marker = await records.putIfAbsent({
-    ownerUserId, collection: "migrationMarkers", recordId: markerId, sourceIdentity: authorization.repairId,
+    ownerUserId, collection: "migrationMarkers", recordId: markerId, sourceIdentity: `${authorization.repairId}|marker`,
     payload: {
       id: markerId, schemaVersion: TRAINING_RETROACTIVE_EVENT_SOURCE, repairId: authorization.repairId,
       correctedCanonicalId, reconciledEventIds: proposed.map((event) => event.id).sort(), reconciledAt: writtenAt,
