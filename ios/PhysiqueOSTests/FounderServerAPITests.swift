@@ -2136,6 +2136,48 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(review?.items[5].dexaMeasurements?.leanMassLb, 148.3)
     }
 
+    /// The Server's corrected provenance owns the label: a Training review whose
+    /// screenshots are large images reads "Screenshot", never "Progress photos", and
+    /// Native renders exactly what the Server sent, for every evidence type.
+    func testTrainingReviewShowsServerScreenshotProvenanceNeverProgressPhotos() async throws {
+        let corrected = productionEvidenceReviewJSON
+            .replacingOccurrences(of: #""sourceLabel":"Imported workout""#, with: #""sourceLabel":"Screenshot""#)
+            .replacingOccurrences(of: #""sourceLabel":"Uploaded evidence""#, with: #""sourceLabel":"Progress photos""#)
+            .replacingOccurrences(of: #"{"label":"Exercises","value":"1"}"#, with: #"{"label":"Exercises","value":"1"},{"label":"Source","value":"Screenshot"}"#)
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["evidence-review": corrected]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionEvidenceReviewAPI(api: native).fetchReview(reviewId: "review-1")
+        let review = try XCTUnwrap(fetched)
+        let byType = Dictionary(uniqueKeysWithValues: review.items.map { ($0.type, $0) })
+
+        XCTAssertEqual(byType["training"]?.sourceLabel, "Screenshot")
+        XCTAssertEqual(byType["training"]?.metrics.first { $0.label == "Source" }?.value, "Screenshot")
+        for item in review.items where item.type != "photo_session" && item.type != "photos" {
+            XCTAssertFalse((item.sourceLabel ?? "").contains("Progress photos"), "\(item.type) must not show Progress photos provenance")
+            XCTAssertFalse(item.metrics.contains { $0.value.contains("Progress photos") }, "\(item.type) Source metric")
+        }
+        // The other evidence types decode with their Server-supplied provenance intact.
+        XCTAssertEqual(byType["weight"]?.sourceLabel, "Typed evidence")
+        XCTAssertEqual(byType["activity"]?.sourceLabel, "Screenshot")
+        XCTAssertEqual(byType["nutrition"]?.sourceLabel, "Typed evidence")
+        XCTAssertEqual(byType["dexa"]?.sourceLabel, "BodySpec PDF")
+        XCTAssertEqual(byType["photo_session"]?.sourceLabel, "Progress photos", "a genuine Progress Photos item keeps its provenance")
+    }
+
+    func testNativeNeverDerivesProvenanceFromImageSizeOrFormat() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        for path in ["PhysiqueOS/Networking/EvidenceReviewAPI.swift", "PhysiqueOS/Presentation/Evidence/EvidenceReviewDetailView.swift"] {
+            let source = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+            XCTAssertFalse(source.contains("Progress photos\""), "\(path) must not author 'Progress photos' provenance")
+            XCTAssertFalse(source.lowercased().contains("byteCount"), "\(path) must not classify by image size")
+        }
+    }
+
     func testProductionEvidenceReviewReturnsNilWhenReviewIsMissing() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),

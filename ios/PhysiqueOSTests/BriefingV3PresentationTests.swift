@@ -161,6 +161,14 @@ final class BriefingV3PresentationTests: XCTestCase {
         XCTAssertEqual(monthly.heroBody, "Monthly V3 meaning.")
     }
 
+    func testMonthlyV3NeverGetsNativeAuthoredLeadFeatures() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Briefings/MonthlyBriefingSections.swift"), encoding: .utf8)
+        let gate = try XCTUnwrap(source.range(of: "if content.strategicSummaryV3 != nil { return [] }"))
+        let fallback = try XCTUnwrap(source.range(of: "value: \"Early momentum\""))
+        XCTAssertLessThan(gate.lowerBound, fallback.lowerBound, "the V3 gate must precede the Native fallback features")
+    }
+
     func testMonthlyStrategicCardOmitsSectionsThatRepeatTheHeroBody() {
         let summary = MonthlyStrategicSummaryV3(result: "R", meaning: "Hero body", action: "A")
         let card = MonthlyStrategicSummaryCard(summary: summary, heroBody: "Hero body")

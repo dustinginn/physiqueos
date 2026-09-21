@@ -58,6 +58,9 @@ struct MonthlyBriefingSections: View {
                 )
             }
         }
+        // A canonical V3 Monthly never gets Native-authored lead features: the Server's
+        // hero highlights (or none) are the whole lead.
+        if content.strategicSummaryV3 != nil { return [] }
         return [
             content.trainingProgress.map { training in BriefingLeadFeature(
                 icon: "dumbbell.fill",
