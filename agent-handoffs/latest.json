@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T05:55:04Z",
+  "generated_at_utc": "2026-09-21T06:14:01Z",
   "task": {
-    "id": "handoff-protocol-setup-20260921",
-    "title": "Formalize PhysiqueOS GitHub agent-handoff protocol",
+    "id": "bidirectional-control-plane-setup-20260921",
+    "title": "Set up bidirectional GitHub agent-control protocol",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "2d69065c588fed6eb066c6c9160fd899ba45a016",
-    "final_sha": null,
+    "base_sha": "25003f9e3148d2e46e1b22d75d8d0619843f8566",
+    "final_sha": "884e5d71656561d0263e1c54202fdc8a22fb251d",
     "production_server_sha": "714dcaef03a28f53f7f34f1d825419b253744b53",
     "production_deployment": "7292d936-bd71-4f1b-b242-acf740f1557f",
     "native_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
     "native_build": 47
   },
   "result": {
-    "summary": "Installed the agent-handoff protocol on main: README (schema, security boundary, procedure, ChatGPT consumption), compact latest.json, immutable reports directory with this task's report, and a local sanitization-gated publisher. Replaced the transport-test artifact. No application, Server, Native or infrastructure change.",
+    "summary": "Added the ChatGPT -> GitHub -> agent inbox on main: README (both directions, branch model, agent behavior, context rule, replay safety, security), a short docs/CODEX.md pointer, a sanitized-publish/consume inbox tool with claim/cancel, and --inbox-task-id identity + replay enforcement in the completion publisher. Published one harmless test task (github-bidirectional-transport-test-20260921, status ready, unexecuted). No application, Server, Native or infrastructure change.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,32 +26,35 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Publisher gate exercised: 1 passing dry run and 23 negative cases (bad schema/keys/types, unsafe safety flags, stale timestamp, bad SHA, wrong repository, report path traversal, PEM/JWT/DigitalOcean/GitHub tokens, credential URLs and assignments, email, base64 blob, data URI, oversize file, overlong line, report missing task id); all 24 behaved as expected."
+      "summary": "Inbox publisher: 40 dry-run cases each asserting the specific guard (schema, unsafe safety flags, bad/traversal/absolute/missing prompt, stale timestamp, wrong repository, secrets/JWT/tokens/URLs/email, raw-export-like size/line/blob/data-URI). 3 unexpected-staged-file and 2 wrong-repo refusals. Completion publisher regression 16 + 7 cases. Sandbox lifecycle rehearsal 37/37 (fetch refusals, replay evidence, claim, identity, completion flip). Real-remote read-only gate check: executable for claude, refused for codex."
     },
     "review": {
       "status": "not_run",
-      "summary": "No independent review; setup-only task with no application code."
+      "summary": "No independent review; control-plane tooling and documentation only, no application code."
     },
     "zero_write_audit": {
       "status": "not_applicable",
-      "summary": "No production writes and no production data access; the only production contact was a read-only lookup of the active deployment record to confirm authority values."
+      "summary": "No production writes and no production data access; only a read-only lookup of the active deployment record to confirm authority values."
     }
   },
   "decisions_required": [
-    "Add a short pointer to agent-handoffs/README.md in the repo AGENTS.md/CLAUDE.md so Codex follows the protocol; not done here because it edits repo instruction files outside agent-handoffs/.",
-    "Confirm main stays the handoff branch (it is stale relative to production but safe: it is not the deploy branch)."
+    "No AGENTS.md or CLAUDE.md exists in the repo; the pointer was added only to the existing docs/CODEX.md, and only on main. Decide whether to add root AGENTS.md/CLAUDE.md pointers and whether to propagate the pointer to branches agents actually work on (production and feature branches do not have it).",
+    "Confirm ChatGPT can write files to the repo through its GitHub connection; retrieval is proven, publishing a task from ChatGPT is untested. If it cannot write, an agent can publish ChatGPT's task with physiqueos-inbox publish."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Native Build 47 SHA f372699f exists only in a local worktree (branch codex/build47-native-closure is not pushed), so ChatGPT cannot resolve it on GitHub.",
-    "Local main is behind origin/main by the handoff commits; harmless."
+    "Validation caught a scanner false positive: the long prompt_path tripped the base64-blob pattern and masked the intended failure of the secret-pattern tests. Fixed by masking only strictly-structured handoff paths; the harness now asserts the specific guard per case.",
+    "docs/CODEX.md is asserted by an existing unit test (mobile-first phrases); the pointer is additive (+4/-0 lines) and those assertions were rechecked.",
+    "Native Build 47 SHA f372699f is still local-only (branch not pushed).",
+    "Agents working in worktrees on other branches will not see the docs/CODEX.md pointer; the Founder's explicit instruction and the assistant's memory carry discovery for now."
   ],
   "backlog": [
-    "Build 48 (not started in this task).",
+    "Founder runs the reverse test: tell Claude to read the latest task from GitHub and execute it, then tell ChatGPT that Claude finished.",
+    "Build 48 (not started).",
     "Optionally push codex/build47-native-closure so the Native SHA is retrievable."
   ],
-  "recommended_next_step": "Proceed with Build 48 planning; agents should publish a handoff at the end of every substantial task using the publisher documented in agent-handoffs/README.md.",
-  "full_report_path": "agent-handoffs/reports/20260921T055504Z-handoff-protocol-setup.md",
+  "recommended_next_step": "Run the end-to-end reverse test by telling Claude: Read the latest PhysiqueOS task from GitHub and execute it.",
+  "full_report_path": "agent-handoffs/reports/20260921T061401Z-bidirectional-control-plane-setup.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
