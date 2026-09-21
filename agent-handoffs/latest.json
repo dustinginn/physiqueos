@@ -1,44 +1,66 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T06:27:00Z",
+  "generated_at_utc": "2026-09-21T07:11:00Z",
   "task": {
-    "id": "chatgpt-roundtrip-test-20260921",
-    "title": "ChatGPT Claude roundtrip transport test",
+    "id": "build48-photo-closure-api-upload-v2-20260921",
+    "title": "Build 48 photo closure and API upload",
     "agent": "claude",
-    "status": "completed"
+    "status": "blocked"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "22f090f64156c18f249b3320825cc085de906df6",
-    "final_sha": null,
+    "base_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
+    "final_sha": "8256db4b1a37184b7cebfd344a1878c07c321a54",
     "production_server_sha": "714dcaef03a28f53f7f34f1d825419b253744b53",
     "production_deployment": "7292d936-bd71-4f1b-b242-acf740f1557f",
-    "native_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
+    "native_sha": "8256db4b1a37184b7cebfd344a1878c07c321a54",
     "native_build": 47
   },
   "result": {
-    "summary": "Fetched task chatgpt-roundtrip-test-20260921 from the inbox (all gate checks passed), read the full prompt, and confirmed agent-handoffs/README.md exists on origin/main and documents the bidirectional GitHub control-plane protocol. The literal marker CHATGPT_CLAUDE_ROUNDTRIP_20260921 was not found inside README.md itself; it appears verbatim only in the task prompt file, which was retrieved unmodified from origin/main. Reverified production authority read-only (physiqueos-audit context): active deployment 7292d936-bd71-4f1b-b242-acf740f1557f, phase ACTIVE, source_commit_hash 714dcaef03a28f53f7f34f1d825419b253744b53, matching the task's expected values. Native SHA/build reused from the prior known record (not independently re-verified this session; no Native artifact exists to check for a control-plane-only task). No application, Server, Native, infrastructure, or production state was mutated.",
-    "success": true,
+    "summary": "Stopped safely before any Build 48 bump/archive/upload. Issue 3 (Photo Briefing 'Tap a photo to expand' did nothing) is diagnosed and fixed in a local, unpushed, not-yet-independently-reviewed Native commit (8256db4b, on top of Build 47 f372699f): comparison tiles had no tap target; each now opens its own session+pose photoSetDetail like the snapshot grid, and the hint only shows when a tile can open. 29/29 PhotoBriefingTests pass. Issues 1 (first Sep 19 photo Retry) and 2 (false 'Photo Briefing is being prepared') were investigated with the approved read-only production audit path (6 bounded READ ONLY transactions, all rolled back) but NOT proven: production metadata shows no discrepancy for issue 1, and the Server half of issue 2 is proven correct, so the remaining cause needs evidence outside the authorized read-only DB path. Per task rules no fix was guessed. API-key auth check passed read-only; no upload was attempted because no Build 48 archive exists.",
+    "success": false,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
-    "tests": null,
-    "review": null,
+    "tests": {
+      "status": "not_run",
+      "summary": "Required release gates NOT run (release path not reached). Only a focused check was run: PhotoBriefingTests 29/29 pass on the iPhone 17 Pro simulator, including 2 new regression tests for comparison-tile expansion. Not run: full Native unit target, HealthKit suites, Debug and unsigned Release compile, deterministic project regeneration, git diff --check, launch smoke."
+    },
+    "review": {
+      "status": "not_run",
+      "summary": "Independent review was not run: issues 1 and 2 are undiagnosed, so there is no complete Build 48 candidate to review."
+    },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Only read-only actions taken: inbox fetch/claim, git show/log/grep against origin/main, and a read-only doctl apps get / get-deployment call against physiqueos-audit. No files outside agent-handoffs/ were touched; no application, config, or infrastructure changes made."
+      "summary": "Production inspected only through the approved bounded App Platform console runner (saved context physiqueos-final-cutover-config, app and web component reverified, web and worker source both 714dcaef, runtime SHA and canonical owner asserted). Six task-specific payloads each did BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY, verified transaction_read_only=on, ran owner-scoped bounded SELECTs only, and ROLLBACK. One payload failed on a SQL alias syntax error and was rolled back by the finally block with no effect. No credentials printed, no storage keys or image pixels inspected, no writes."
     }
   },
-  "decisions_required": [],
-  "blockers": [],
-  "unexpected_findings": [
-    "The task prompt asked to confirm the marker CHATGPT_CLAUDE_ROUNDTRIP_20260921 was present in agent-handoffs/README.md, but the marker does not appear anywhere in README.md (grep on origin/main:agent-handoffs/README.md returned no match). The marker only appears in the prompt file itself (agent-handoffs/inbox/prompts/20260921T062000Z-chatgpt-roundtrip-test-20260921.md). Reporting this literally rather than claiming a false match: the README-existence and protocol-content checks passed, but the marker-in-README check did not."
+  "decisions_required": [
+    "Issue 1: choose how to obtain object-level evidence for the first Sep 19 photo. Recommended: authorize one additional read-only check through the same approved console path that HEADs (existence, content-type, size, version) the ten Sep 19 media objects in object storage using the app's existing bindings, with no writes.",
+    "Issue 2: choose how to obtain the missing request-level evidence. Recommended: authorize read-only inspection of production application logs for native/read/photo-event responses around the Founder's Build 47 observation, to see which session id Native sent and what status the Server returned.",
+    "Alternatively authorize a diagnostic-only Build 48 that surfaces the media/briefing failure class (HTTP status and reason) on device, plus a separately authorized Server follow-up (media route returning distinct status codes and logging instead of masking every failure as 404)."
   ],
-  "backlog": [],
-  "recommended_next_step": "If the intent was for the marker to live inside README.md, ChatGPT should publish a follow-up task; otherwise this roundtrip is fully verified (task retrieved intact from GitHub, executed, and reported back with the exact marker text preserved).",
-  "full_report_path": "agent-handoffs/reports/20260921T062700Z-chatgpt-roundtrip-test.md",
+  "blockers": [
+    "Issue 1 root cause not proven. All ten Sep 19 media rows (five DNG originals, five JPEG analysis derivatives) are verified, correctly typed, same storage shape, unique hashes and same provider-version shape, and match the Aug 22 working photos structurally. The Server picks the JPEG derivative for display of DNG originals. The Server media route turns every failure (missing object, upstream error, content-type outside jpeg/png/heic/webp/pdf, auth) into a plain 404, so a permanent 404 is indistinguishable from a transient one. The remaining candidates (a storage-object-level fault for that one object, or a Native-side request/state defect) cannot be separated with database metadata alone.",
+    "Issue 2 root cause not proven. The exact photo-event store query returns the published artifact with its narrative for all six photo session ids, and the Sep 19 briefing record was created 2026-09-20T17:51Z, before Build 47 was uploaded. Native produces the 'being prepared' copy only from a pending availability result, which only arises from a 404 or a missing narrative, neither of which the Server returns for that session now. So the mismatch is not explained by Server data.",
+    "The Build 48 bump, archive, archive verification and API-key upload were not started because the task requires all three photo defects diagnosed with evidence and independent review clear first."
+  ],
+  "unexpected_findings": [
+    "The Sep 19 photo session's five photos all use ProRAW DNG originals with JPEG analysis derivatives, while every older session uses plain JPEG originals; the Sep 19 tile is the only latest-set image that depends on the derivative display path.",
+    "Server media route swallows all errors into 404 with no logging, which makes photo failures undiagnosable from the Server side.",
+    "The first two production-adjacent reads in this session were denied by the harness before the Founder authorized the approved read-only path; after authorization the path worked and no denied action was worked around."
+  ],
+  "backlog": [
+    "Issue 1: first Sep 19 photo still shows Retry photo (undiagnosed).",
+    "Issue 2: Progress Photos shows 'Photo Briefing is being prepared' although the briefing is published (undiagnosed; Server data is correct).",
+    "Review and ship the issue 3 fix inside Build 48 once issues 1 and 2 are resolved.",
+    "Establish and prove the API-key upload path with the first real Build 48 upload (auth-check already passes; key installed and Developer role; cloud-signing under that role still unproven).",
+    "Server follow-up candidate: media route should return 401 for auth failures, distinguish permanent from transient failures and log them."
+  ],
+  "recommended_next_step": "Publish a new inbox task (new task id) that either authorizes the two read-only evidence checks above (object-store HEAD for the ten Sep 19 media objects, and read-only production log inspection for photo-event) or authorizes a diagnostic-only Build 48. The issue 3 fix is ready on the local worktree branch at 8256db4b and the archive plus API-key upload can proceed immediately once issues 1 and 2 are resolved and independently reviewed.",
+  "full_report_path": "agent-handoffs/reports/20260921T071100Z-build48-photo-closure-blocked.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
