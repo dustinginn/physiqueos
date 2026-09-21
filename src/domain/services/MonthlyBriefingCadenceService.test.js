@@ -19,7 +19,8 @@ import {
 
 const timeZone = "America/Los_Angeles";
 const julyDeployment = new Date("2026-07-30T05:30:00.000Z");
-const augustEligibility = new Date("2026-08-01T07:00:00.000Z");
+// 03:00 PDT: recurring briefings generate at the shared 03:00 local time.
+const augustEligibility = new Date("2026-08-01T10:00:00.000Z");
 
 describe("Monthly production cadence", () => {
   it("formats Monthly periods with canonical Unicode separators through UTF-8 serialization", () => {
@@ -93,10 +94,10 @@ describe("Monthly production cadence", () => {
       enabled: true,
       eligible: false,
       eligibilityReason: "wrong_local_month_day",
-      localEligibleTime: "00:00",
+      localEligibleTime: "03:00",
       nextEligibility: {
         localDate: "2026-08-01",
-        localTime: "00:00",
+        localTime: "03:00",
       },
       evidenceWindow: {
         briefingMonth: "2026-07",
@@ -112,7 +113,16 @@ describe("Monthly production cadence", () => {
     expect(generators.monthly.generateForCurrentWindow).not.toHaveBeenCalled();
   });
 
-  it("becomes eligible at local midnight on August 1", async () => {
+  it("becomes eligible at 03:00 local on August 1, not at local midnight", async () => {
+    const midnight = await resolveBriefingCadenceRegistry({
+      repositories: FounderRepositories,
+      generators: {},
+      now: new Date("2026-08-01T07:00:00.000Z"),
+    });
+    expect(midnight.find((entry) => entry.cadence === "monthly")).toMatchObject({
+      eligible: false,
+      eligibilityReason: "before_local_eligible_time",
+    });
     const registry = await resolveBriefingCadenceRegistry({
       repositories: FounderRepositories,
       generators: {},
@@ -120,7 +130,7 @@ describe("Monthly production cadence", () => {
     });
     expect(registry.find((entry) => entry.cadence === "monthly")).toMatchObject({
       eligible: true,
-      eligibleAt: "2026-08-01T00:00:00[America/Los_Angeles]",
+      eligibleAt: "2026-08-01T03:00:00[America/Los_Angeles]",
       evidenceWindow: {
         briefingMonth: "2026-07",
         closed: true,

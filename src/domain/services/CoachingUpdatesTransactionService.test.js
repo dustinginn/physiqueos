@@ -116,6 +116,39 @@ describe("Coaching Updates canonical transaction", () => {
     expect(snapshot(duplicate)).toBe(duplicateBefore);
   });
 
+  it("treats a resave of a stored non-03:00 configuration as unchanged and writes nothing", async () => {
+    const stored = {
+      ...version(),
+      coachingUpdates: {
+        schemaVersion: "coaching_updates_schedule_v1",
+        timeZone: "America/Los_Angeles",
+        midweek: { enabled: true, day: "wednesday", localTime: "05:30" },
+        weekly: { enabled: true, day: "sunday", localTime: "05:30" },
+        monthly: { enabled: true, dayOfMonth: 1, localTime: "05:30" },
+        daily: { enabled: false },
+        eventBriefings: { photo: true, dexa: true },
+        notificationPreference: "notify_when_ready",
+        scheduleApplication: { status: "active", appliesTo: "future_eligible_runs" },
+      },
+    };
+    const fixture = createFixture({ versions: [stored] });
+    // Read side: the stored 05:30 is history; the effective time is the shared 03:00.
+    expect(currentModel(fixture.liveStore)).toMatchObject({
+      midweek: { day: "wednesday", localTime: "03:00" },
+      weekly: { day: "sunday", localTime: "03:00" },
+      monthly: { dayOfMonth: 1, localTime: "03:00" },
+    });
+    const before = snapshot(fixture);
+    const resave = command({
+      midweek: { enabled: true, day: "wednesday", localTime: "05:30" },
+      weekly: { enabled: true, day: "sunday", localTime: "05:30" },
+    });
+    expect((await fixture.service.update(resave)).outcome).toBe(O.UNCHANGED_CONFIGURATION);
+    expect(snapshot(fixture)).toBe(before);
+    // The stored version keeps its own history untouched.
+    expect(fixture.liveStore.protocolVersions[0].coachingUpdates.weekly.localTime).toBe("05:30");
+  });
+
   it("keeps a true successor ordering violation fail-closed", async () => {
     const fixture = createFixture();
     fixture.liveStore.protocolVersions[0].effectiveAt = "2026-09-17";

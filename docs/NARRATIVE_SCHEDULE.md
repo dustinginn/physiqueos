@@ -52,7 +52,7 @@ Eligibility and windows remain:
 
 ### Generation time and evidence cutoff (`briefing_schedule_authority_v1`)
 
-Recurring briefings generate at one system time, `03:00` in the briefing timezone (the Coaching Updates timezone, then the profile timezone, then `America/Los_Angeles`; never the server timezone). `BriefingScheduleAuthority` owns that time. The cadence registry, each generator's own gate, Home routing, and the Coaching Updates read model all consume it; a stored per-surface `localTime` (the former "preferred delivery time") is history and is not a scheduling input. Saved schedules record the shared time, so a time-only edit is an unchanged configuration.
+Recurring briefings generate at one system time, `03:00` in the briefing timezone. The cadence registry resolves that timezone from the Coaching Updates timezone, then the profile timezone, then `America/Los_Angeles`, and each generator gates on the profile timezone; these are identical for the Founder (`America/Los_Angeles`), and neither ever uses the server timezone. `BriefingScheduleAuthority` owns that time. The cadence registry, each generator's own gate, Home routing, and the Coaching Updates read model all consume it; a stored per-surface `localTime` (the former "preferred delivery time") is history and is not a scheduling input. Saved schedules record the shared time, so a time-only edit is an unchanged configuration.
 
 Generation time and evidence cutoff are separate:
 
