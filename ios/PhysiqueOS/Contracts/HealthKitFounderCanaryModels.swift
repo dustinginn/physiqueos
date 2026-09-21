@@ -79,6 +79,47 @@ struct HealthKitActivityValidationWindow: Equatable, Codable, Sendable {
     }
 }
 
+/// One exact Founder-local day for the controlled canonical proving period.
+/// It is deliberately a single date (never a range), it may not be in the
+/// future, and it may not be older than a few days, so a foreground run can
+/// only ever upload the day the Server was activated for.
+struct HealthKitCanonicalTestDay: Equatable, Sendable {
+    static let maximumAgeDays = 3
+    static let streams: [HealthKitSynchronizationStream] = [.activitySummary, .nutritionDailyTotal]
+
+    let localDate: String
+    let window: HealthKitActivityValidationWindow
+
+    init(localDate: String, now: Date = Date(), calendar: Calendar = .autoupdatingCurrent) throws {
+        let window = try HealthKitActivityValidationWindow(startDate: localDate, endDate: localDate)
+        let today = HealthKitActivityValidationWindow.localDate(now, calendar: calendar)
+        guard let oldest = calendar.date(byAdding: .day, value: -Self.maximumAgeDays, to: calendar.startOfDay(for: now)) else {
+            throw HealthKitCanaryError.invalidCanonicalTestDay
+        }
+        let oldestDate = HealthKitActivityValidationWindow.localDate(oldest, calendar: calendar)
+        guard localDate <= today, localDate >= oldestDate else { throw HealthKitCanaryError.invalidCanonicalTestDay }
+        self.localDate = localDate
+        self.window = window
+    }
+
+    var streams: [HealthKitSynchronizationStream] { Self.streams }
+
+    var predicateVersion: String { "healthkit-canonical-testday-v1:\(localDate)" }
+
+    func isProvisional(now: Date, calendar: Calendar) -> Bool {
+        localDate == HealthKitActivityValidationWindow.localDate(now, calendar: calendar)
+    }
+}
+
+struct HealthKitCanonicalTestDayRunResult: Equatable, Sendable {
+    let testDay: HealthKitCanonicalTestDay
+    let endDateIsProvisional: Bool
+    let activity: HealthKitCanarySyncSummary
+    let nutrition: HealthKitCanarySyncSummary
+    let activityDiagnostics: HealthKitStreamDiagnostics
+    let nutritionDiagnostics: HealthKitStreamDiagnostics
+}
+
 struct HealthKitQueryBounds: Equatable, Sendable {
     let startDateInclusive: Date
     let endDateExclusive: Date
@@ -98,6 +139,14 @@ struct HealthKitCanaryServerContract: Equatable, Sendable {
     let observationTypes: Set<String>
     let ingestionPurposes: Set<String>
     let diagnosticEndpoint: String
+    /// Present only on a Server that supports the controlled canonical test day.
+    var additionalObservationTypes: Set<String> = []
+    var hasCanonicalDailyActivation = false
+
+    var supportsCanonicalTestDay: Bool {
+        additionalObservationTypes.contains(HealthKitServerIngestionContract.nutritionDailyTotalObservationType) &&
+        hasCanonicalDailyActivation
+    }
 
     var isCompatible: Bool {
         commandType == HealthKitServerIngestionContract.commandType &&
@@ -200,6 +249,8 @@ enum HealthKitCanaryError: Error, Equatable, Sendable, LocalizedError {
     case serverContractMismatch
     case diagnosticBoundaryViolation
     case stableDeviceIdentityUnavailable
+    case invalidCanonicalTestDay
+    case canonicalTestDayUnsupported
 
     var errorDescription: String? {
         switch self {
@@ -210,6 +261,8 @@ enum HealthKitCanaryError: Error, Equatable, Sendable, LocalizedError {
         case .serverContractMismatch: "Founder Production does not advertise the required validation-only HealthKit contract."
         case .diagnosticBoundaryViolation: "The Server diagnostic response did not preserve the validation-only boundary."
         case .stableDeviceIdentityUnavailable: "A stable enrolled-device identity could not be established."
+        case .invalidCanonicalTestDay: "Choose today or one of the last three local days for the canonical test day."
+        case .canonicalTestDayUnsupported: "Founder Production does not advertise the controlled canonical test-day contract."
         }
     }
 }

@@ -21,6 +21,18 @@ protocol HealthKitActivityCanarySynchronizing: Sendable {
 
 extension HealthKitSynchronizationEngine: HealthKitActivityCanarySynchronizing {}
 
+/// Adds the exact-day operational path without widening the base canary
+/// protocol, so existing validation-only test doubles are unaffected.
+protocol HealthKitCanonicalTestDaySynchronizing: HealthKitActivityCanarySynchronizing {
+    func synchronizeCanonicalTestDay(
+        scope: HealthKitCursorScope,
+        testDay: HealthKitCanonicalTestDay,
+        calendar: Calendar
+    ) async throws -> HealthKitCanarySyncSummary
+}
+
+extension HealthKitSynchronizationEngine: HealthKitCanonicalTestDaySynchronizing {}
+
 protocol HealthKitFounderCanaryServer: Sendable {
     func healthKitCanaryContract() async throws -> HealthKitCanaryServerContract
     func founderOwnerIdentity() async throws -> String
@@ -60,7 +72,9 @@ extension ProductionNativeAPI: HealthKitFounderCanaryServer {
             maximumBatchSize: healthKit.maximumBatchSize,
             observationTypes: Set(healthKit.observationTypes),
             ingestionPurposes: Set(healthKit.ingestionPurposes),
-            diagnosticEndpoint: HealthKitServerIngestionContract.activityCanaryDiagnosticEndpoint
+            diagnosticEndpoint: HealthKitServerIngestionContract.activityCanaryDiagnosticEndpoint,
+            additionalObservationTypes: Set(healthKit.additionalObservationTypes ?? []),
+            hasCanonicalDailyActivation: !(healthKit.canonicalDailyActivation ?? "").isEmpty
         )
     }
 
@@ -175,6 +189,49 @@ final class HealthKitFounderCanaryCoordinator {
     func requestAuthorization() async -> HealthKitAuthorizationOutcome {
         guard isEnabled else { return .blockedByFeatureGate }
         return await authorization.requestAuthorization(for: .initialRead)
+    }
+
+    /// Foreground, exact-day Activity + Nutrition upload for the controlled
+    /// canonical test day. Nothing here runs at launch, and the Server alone
+    /// decides whether the day canonicalizes (its own activation window) and
+    /// keeps the result quarantined from V3, Confidence, and briefings.
+    @MainActor
+    func synchronizeCanonicalTestDay(_ testDay: HealthKitCanonicalTestDay) async throws -> HealthKitCanonicalTestDayRunResult {
+        guard isEnabled else { throw HealthKitCanaryError.disabled }
+        guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
+        guard let synchronizer = synchronizer as? any HealthKitCanonicalTestDaySynchronizing else {
+            throw HealthKitCanaryError.canonicalTestDayUnsupported
+        }
+
+        let contract = try await server.healthKitCanaryContract()
+        guard contract.isCompatible else { throw HealthKitCanaryError.serverContractMismatch }
+        guard contract.supportsCanonicalTestDay else { throw HealthKitCanaryError.canonicalTestDayUnsupported }
+        let ownerIdentity = try await server.founderOwnerIdentity()
+        let deviceIdentity = try deviceIdentityStore.stableIdentity()
+        func scope(_ stream: HealthKitSynchronizationStream) -> HealthKitCursorScope {
+            HealthKitCursorScope(
+                ownerIdentity: ownerIdentity,
+                enrolledDeviceIdentity: deviceIdentity,
+                stream: stream,
+                predicateVersion: testDay.predicateVersion
+            )
+        }
+        let activityScope = scope(.activitySummary)
+        let nutritionScope = scope(.nutritionDailyTotal)
+        let activity = try await synchronizer.synchronizeCanonicalTestDay(
+            scope: activityScope, testDay: testDay, calendar: calendar
+        )
+        let nutrition = try await synchronizer.synchronizeCanonicalTestDay(
+            scope: nutritionScope, testDay: testDay, calendar: calendar
+        )
+        return HealthKitCanonicalTestDayRunResult(
+            testDay: testDay,
+            endDateIsProvisional: testDay.isProvisional(now: now(), calendar: calendar),
+            activity: activity,
+            nutrition: nutrition,
+            activityDiagnostics: try await synchronizer.diagnostics(scope: activityScope),
+            nutritionDiagnostics: try await synchronizer.diagnostics(scope: nutritionScope)
+        )
     }
 
     @MainActor

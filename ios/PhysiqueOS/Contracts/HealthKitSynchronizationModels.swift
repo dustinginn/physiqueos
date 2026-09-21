@@ -13,6 +13,9 @@ enum HealthKitSynchronizationStream: String, CaseIterable, Codable, Hashable, Se
     case nutritionCarbohydrates
     case nutritionTotalFat
     case nutritionFiber
+    /// Synthetic, explicitly bounded daily aggregate (calories, protein,
+    /// carbohydrates, fat) across all sources. Not a per-sample stream.
+    case nutritionDailyTotal
     case workouts
     case heartRate
     case cyclingDistance
@@ -24,7 +27,7 @@ enum HealthKitSynchronizationStream: String, CaseIterable, Codable, Hashable, Se
              .stepCount, .walkingRunningDistance, .flightsClimbed:
             .activity
         case .nutritionEnergy, .nutritionProtein, .nutritionCarbohydrates,
-             .nutritionTotalFat, .nutritionFiber:
+             .nutritionTotalFat, .nutritionFiber, .nutritionDailyTotal:
             .nutrition
         case .workouts, .heartRate, .cyclingDistance:
             .workouts
@@ -47,6 +50,7 @@ enum HealthKitSynchronizationStream: String, CaseIterable, Codable, Hashable, Se
         case .nutritionCarbohydrates: "HKQuantityTypeIdentifierDietaryCarbohydrates"
         case .nutritionTotalFat: "HKQuantityTypeIdentifierDietaryFatTotal"
         case .nutritionFiber: "HKQuantityTypeIdentifierDietaryFiber"
+        case .nutritionDailyTotal: "PhysiqueOSNutritionDailyTotal"
         case .workouts: "HKWorkoutTypeIdentifier"
         case .heartRate: "HKQuantityTypeIdentifierHeartRate"
         case .cyclingDistance: "HKQuantityTypeIdentifierDistanceCycling"
@@ -57,6 +61,7 @@ enum HealthKitSynchronizationStream: String, CaseIterable, Codable, Hashable, Se
     var deliveryCapability: HealthKitStreamDeliveryCapability {
         switch self {
         case .activitySummary: .s1(observationType: .activitySummary)
+        case .nutritionDailyTotal: .s1(observationType: .nutritionDailyTotal)
         case .workouts: .s1(observationType: .workout)
         case .sleepAnalysis: .localOnly(reason: "server_sleep_contract_deferred")
         default: .s1(observationType: .quantitySample)
@@ -66,6 +71,7 @@ enum HealthKitSynchronizationStream: String, CaseIterable, Codable, Hashable, Se
 
 enum HealthKitS1ObservationType: String, Codable, Sendable {
     case activitySummary = "activity_summary"
+    case nutritionDailyTotal = "nutrition_daily_total"
     case workout
     case quantitySample = "quantity_sample"
 }
@@ -137,6 +143,18 @@ struct HealthKitQueryActivitySummary: Equatable, Codable, Sendable {
     let sourceRevision: UInt64
 }
 
+/// HealthKit daily dietary statistics across all sources. Calories, protein,
+/// carbohydrates, and fat only; there are no meal objects.
+struct HealthKitQueryNutritionDailyTotal: Equatable, Codable, Sendable {
+    static let aggregationScope = "daily_total_all_sources"
+    static let permittedKeys: Set<String> = ["calories", "protein_g", "carbs_g", "fat_g"]
+
+    let dailyNutrition: [String: Double]
+    let aggregationScope: String
+    let coverage: HealthKitQueryActivitySummary.Coverage
+    let sourceRevision: UInt64
+}
+
 struct HealthKitQuerySleep: Equatable, Codable, Sendable {
     let stageValue: Int
 }
@@ -145,6 +163,7 @@ enum HealthKitQueryPayload: Equatable, Codable, Sendable {
     case quantity(HealthKitQueryQuantity)
     case workout(HealthKitQueryWorkout)
     case activitySummary(HealthKitQueryActivitySummary)
+    case nutritionDailyTotal(HealthKitQueryNutritionDailyTotal)
     case sleep(HealthKitQuerySleep)
 }
 

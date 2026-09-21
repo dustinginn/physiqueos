@@ -7,6 +7,8 @@ struct HealthKitObservationNormalizer: Sendable {
             externalID = uuid.uuidString.lowercased()
         } else if case .activitySummary = addition.payload {
             externalID = "activity-summary:\(addition.occurrence.localDate)"
+        } else if case .nutritionDailyTotal = addition.payload {
+            externalID = "nutrition-daily-total:\(addition.occurrence.localDate)"
         } else {
             externalID = "source-object:\(addition.objectTypeIdentifier):\(addition.occurrence.localDate)"
         }
@@ -258,6 +260,13 @@ struct HealthKitS1WireObservation: Encodable, Sendable {
         let dailyActivity: [String: Double]
     }
 
+    struct NutritionDailyTotal: Encodable, Sendable {
+        let aggregationScope: String
+        let coverage: String
+        let sourceRevision: UInt64
+        let dailyNutrition: [String: Double]
+    }
+
     struct Workout: Encodable, Sendable {
         let activityType: String
         let durationSeconds: Double?
@@ -281,6 +290,7 @@ struct HealthKitS1WireObservation: Encodable, Sendable {
     let source: Source
     let occurrence: Occurrence
     let activitySummary: ActivitySummary?
+    let nutritionDailyTotal: NutritionDailyTotal?
     let workout: Workout?
     let quantitySample: QuantitySample?
 }
@@ -341,6 +351,30 @@ enum HealthKitS1WireMapper {
                     sourceRevision: summary.sourceRevision,
                     dailyActivity: summary.dailyActivity
                 ),
+                nutritionDailyTotal: nil,
+                workout: nil,
+                quantitySample: nil
+            )
+        case let .nutritionDailyTotal(total):
+            guard total.aggregationScope == HealthKitQueryNutritionDailyTotal.aggregationScope,
+                  total.dailyNutrition["calories"] != nil,
+                  total.sourceRevision > 0,
+                  Set(total.dailyNutrition.keys).isSubset(of: HealthKitQueryNutritionDailyTotal.permittedKeys),
+                  total.dailyNutrition.values.allSatisfy({ $0.isFinite && $0 >= 0 })
+            else { throw HealthKitSyncError.operational(code: "healthkit_nutrition_daily_total_invalid") }
+            return HealthKitS1WireObservation(
+                observationType: HealthKitS1ObservationType.nutritionDailyTotal.rawValue,
+                externalId: observation.immutableExternalID,
+                ingestionPurpose: ingestionPurpose.rawValue,
+                source: source,
+                occurrence: occurrence,
+                activitySummary: nil,
+                nutritionDailyTotal: .init(
+                    aggregationScope: total.aggregationScope,
+                    coverage: total.coverage.rawValue,
+                    sourceRevision: total.sourceRevision,
+                    dailyNutrition: total.dailyNutrition
+                ),
                 workout: nil,
                 quantitySample: nil
             )
@@ -352,6 +386,7 @@ enum HealthKitS1WireMapper {
                 source: source,
                 occurrence: occurrence,
                 activitySummary: nil,
+                nutritionDailyTotal: nil,
                 workout: .init(
                     activityType: workout.activityType,
                     durationSeconds: workout.durationSeconds,
@@ -375,6 +410,7 @@ enum HealthKitS1WireMapper {
                 source: source,
                 occurrence: occurrence,
                 activitySummary: nil,
+                nutritionDailyTotal: nil,
                 workout: nil,
                 quantitySample: .init(
                     sampleType: observation.objectTypeIdentifier,

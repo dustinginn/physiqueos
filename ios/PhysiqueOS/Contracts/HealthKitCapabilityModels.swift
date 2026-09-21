@@ -73,6 +73,8 @@ enum HealthKitServerIngestionContract {
     static let queryCursorAuthority = "device"
     static let activityCanaryDiagnosticResource = "healthkit-activity-canary"
     static let activityCanaryDiagnosticEndpoint = "/api/v1/native/read/healthkit-activity-canary"
+    /// Accepted by the Server in addition to the original three observation types.
+    static let nutritionDailyTotalObservationType = "nutrition_daily_total"
 }
 
 /// Opaque HealthKit query state is device-owned. These bytes must never be

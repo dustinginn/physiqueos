@@ -56,6 +56,9 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         if stream == .activitySummary {
             return try await executeActivitySummary(after: anchorData, bounds: bounds)
         }
+        if stream == .nutritionDailyTotal {
+            return try await executeNutritionDailyTotal(after: anchorData, bounds: bounds)
+        }
         guard let sampleType = Self.sampleType(for: stream) else {
             throw HealthKitSyncError.operational(code: "healthkit_stream_type_unavailable")
         }
@@ -247,6 +250,102 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         }
     }
 
+    /// Explicitly bounded daily dietary totals across all sources (HealthKit
+    /// statistics, so an edited or deleted entry is reflected in the next
+    /// total rather than left stale). The cursor keeps a per-day fingerprint
+    /// and device revision exactly like the Activity summary. A day that was
+    /// uploaded before and is now empty becomes a zero revision, never a
+    /// silent stale total.
+    private func executeNutritionDailyTotal(
+        after cursorData: Data?,
+        bounds: HealthKitQueryBounds?
+    ) async throws -> HealthKitAnchoredQueryResult {
+        guard let bounds else {
+            throw HealthKitSyncError.operational(code: "healthkit_nutrition_bounds_required")
+        }
+        let prior: ActivityCursor
+        do {
+            prior = try cursorData.map { try JSONDecoder().decode(ActivityCursor.self, from: $0) }
+                ?? ActivityCursor(entries: [:])
+        } catch {
+            throw HealthKitSyncError.corruptCursor
+        }
+        let current = now()
+        async let energy = dailyCumulativeValues(identifier: .dietaryEnergyConsumed, unit: .kilocalorie(), bounds: bounds)
+        async let protein = dailyCumulativeValues(identifier: .dietaryProtein, unit: .gram(), bounds: bounds)
+        async let carbohydrates = dailyCumulativeValues(identifier: .dietaryCarbohydrates, unit: .gram(), bounds: bounds)
+        async let fat = dailyCumulativeValues(identifier: .dietaryFatTotal, unit: .gram(), bounds: bounds)
+        let (energyValues, proteinValues, carbValues, fatValues) = try await (energy, protein, carbohydrates, fat)
+
+        var nextEntries = prior.entries
+        var additions: [HealthKitQueryAddition] = []
+        var day = bounds.startDateInclusive
+        while day < bounds.endDateExclusive {
+            let dayStart = calendar.startOfDay(for: day)
+            let localDate = Self.localDate(dayStart, calendar: calendar)
+            let nextDay = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? bounds.endDateExclusive
+            defer { day = nextDay }
+            guard bounds.contains(localDate: localDate) else { continue }
+
+            let metrics: [String: Double]
+            if let calories = energyValues[localDate] {
+                metrics = [
+                    "calories": calories,
+                    "protein_g": proteinValues[localDate] ?? 0,
+                    "carbs_g": carbValues[localDate] ?? 0,
+                    "fat_g": fatValues[localDate] ?? 0,
+                ]
+            } else if prior.entries[localDate] != nil {
+                metrics = ["calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0]
+            } else {
+                continue
+            }
+            let fingerprint = HealthKitStableDigest.hex(try Self.stableEncoder.encode(metrics))
+            let previous = prior.entries[localDate]
+            let revision = previous?.fingerprint == fingerprint
+                ? previous!.revision
+                : (previous?.revision ?? 0) + 1
+            nextEntries[localDate] = ActivityCursor.Entry(fingerprint: fingerprint, revision: revision)
+            guard previous?.fingerprint != fingerprint else { continue }
+            let zone = calendar.timeZone
+            additions.append(HealthKitQueryAddition(
+                healthKitUUID: nil,
+                objectTypeIdentifier: HealthKitSynchronizationStream.nutritionDailyTotal.objectTypeIdentifier,
+                source: HealthKitQuerySource(
+                    bundleIdentifier: "com.apple.Health",
+                    sourceName: "Apple Health",
+                    sourceRevision: nil,
+                    productType: nil,
+                    privacySafeDeviceProvenance: nil
+                ),
+                occurrence: HealthKitQueryOccurrence(
+                    startedAt: nil,
+                    endedAt: nil,
+                    localDate: localDate,
+                    calendarIdentifier: String(describing: calendar.identifier),
+                    timeZoneIdentifier: zone.identifier,
+                    utcOffsetSeconds: zone.secondsFromGMT(for: dayStart),
+                    localDayStartedAt: dayStart,
+                    localDayEndedAt: nextDay
+                ),
+                payload: .nutritionDailyTotal(HealthKitQueryNutritionDailyTotal(
+                    dailyNutrition: metrics,
+                    aggregationScope: HealthKitQueryNutritionDailyTotal.aggregationScope,
+                    coverage: calendar.isDate(dayStart, inSameDayAs: current) ? .partialDay : .completeDay,
+                    sourceRevision: revision
+                )),
+                allowlistedMetadata: [:]
+            ))
+        }
+        let proposed = try Self.stableEncoder.encode(ActivityCursor(entries: nextEntries))
+        return HealthKitAnchoredQueryResult(
+            additions: additions,
+            deletions: [],
+            proposedAnchorData: proposed,
+            completedAt: current
+        )
+    }
+
     /// HealthKit's activity-summary predicate requires both operands to carry
     /// a calendar in addition to era/year/month/day: without one it raises an
     /// uncaught `NSInvalidArgumentException` ("startDateComponents: Date
@@ -418,7 +517,7 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
 
     private static func sampleType(for stream: HealthKitSynchronizationStream) -> HKSampleType? {
         switch stream {
-        case .activitySummary: nil
+        case .activitySummary, .nutritionDailyTotal: nil
         case .activeEnergy: HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)
         case .exerciseTime: HKObjectType.quantityType(forIdentifier: .appleExerciseTime)
         case .standTime: HKObjectType.quantityType(forIdentifier: .appleStandTime)
