@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T06:09:02Z",
+  "generated_at_utc": "2026-09-21T06:20:00Z",
   "task": {
-    "id": "github-bidirectional-transport-test-20260921",
-    "title": "GitHub bidirectional transport test",
+    "id": "chatgpt-roundtrip-test-20260921",
+    "title": "ChatGPT Claude roundtrip transport test",
     "status": "ready"
   },
   "target": {
     "agent": "claude",
     "reasoning": "low",
-    "chat_preference": "either"
+    "chat_preference": "new_chat"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -18,7 +18,7 @@
     "expected_production_deployment": "7292d936-bd71-4f1b-b242-acf740f1557f",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260921T060902Z-github-bidirectional-transport-test-20260921.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260921T062000Z-chatgpt-roundtrip-test-20260921.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
