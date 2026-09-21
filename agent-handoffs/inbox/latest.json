@@ -4,7 +4,7 @@
   "task": {
     "id": "healthkit-activity-nutrition-canonical-testday-20260921",
     "title": "HealthKit Activity and Nutrition canonical test day",
-    "status": "claimed"
+    "status": "completed"
   },
   "target": {
     "agent": "claude",
@@ -32,6 +32,9 @@
   },
   "lifecycle": {
     "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-21T18:32:01Z"
+    "claimed_at_utc": "2026-09-21T18:32:01Z",
+    "completed_at_utc": "2026-09-21T19:45:41Z",
+    "completion_status": "completed",
+    "completion_handoff_path": "agent-handoffs/reports/20260921T195000Z-healthkit-activity-nutrition-canonical-testday.md"
   }
 }

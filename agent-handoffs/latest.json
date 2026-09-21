@@ -1,64 +1,65 @@
 {
  "schema_version": 1,
- "generated_at_utc": "2026-09-21T18:14:43Z",
+ "generated_at_utc": "2026-09-21T19:50:00Z",
  "task": {
-  "id": "native-preserve-and-3am-briefings-v2-20260921",
-  "title": "Preserve Build 48 and move scheduled briefings to 3 AM",
+  "id": "healthkit-activity-nutrition-canonical-testday-20260921",
+  "title": "HealthKit Activity and Nutrition canonical test day",
   "agent": "claude",
   "status": "completed"
  },
  "repository": "dustinginn/physiqueos",
  "authority": {
-  "base_sha": "a428fbda42757620750264e63eaee18950ab7132",
-  "final_sha": "ba250af13e66b967a4dc8add09c5c5942b0606dd",
-  "production_server_sha": "ba250af13e66b967a4dc8add09c5c5942b0606dd",
-  "production_deployment": "c353b945-0d36-4867-9f6e-386cb15f4b13",
-  "native_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
-  "native_build": 48
+  "base_sha": "ba250af13e66b967a4dc8add09c5c5942b0606dd",
+  "final_sha": "a40c0b53c49240d5666d2a3475d48541cfd5f57e",
+  "production_server_sha": "a40c0b53c49240d5666d2a3475d48541cfd5f57e",
+  "production_deployment": "dda84642-c713-4091-a3a2-126e02345d3b",
+  "native_sha": "2bfbf54ad105a3a18189e811f06afc421741a7da",
+  "native_build": 49
  },
  "result": {
-  "summary": "Native Build 48 preserved on origin as native/build48-accepted (exactly bbb46e19; main and the prod branch untouched). Midweek, Weekly and Monthly now generate at 03:00 local from one BriefingScheduleAuthority on their existing cadence dates; the Founder's stored 05:30 is overridden with no data mutation and Monthly's own 00:00 gate is unified. Cutoff and observed-date eligibility are unchanged, so prior-day evidence landing 00:00-02:59 joins and new-day evidence never does; later evidence follows the existing reconciliation contract. DST and boundary proofs pass; unit suite equals pristine base (no new failures); ESLint, build and phase gates clean; independent review approved the exact SHA. Deployed with the Founder's chat authorization (deployment c353b945, web and worker on ba250af1 after a forced rebuild); zero-write audit had no differences. Next due at 03:00 PDT: Wed 2026-09-23, Sun 2026-09-27, Thu 2026-10-01. Schema, cost, V3, HealthKit and DEXA/Photo event behavior unchanged. Flags in report: all YES/NONE as required; HISTORICAL_BRIEFINGS_MUTATED=NO; READY_FOR_HEALTHKIT_NEXT_PHASE=YES after the Founder's Build 48 canary.",
+  "summary": "Server a40c0b53 deployed (deployment dda84642, zero-write audit identical) and the controlled canonical test day is ACTIVATED for 2026-09-21: Activity + Nutrition daily totals canonicalize into a separate quarantined healthKitCanonicalDays store, never strategic Evidence; V3, Confidence and briefings eligibility OFF, no historical backfill, deactivation preserves history. Build 48 could not do operational sync and had no Nutrition daily totals, so Native Build 49 (2bfbf54a) was built, reviewed, archived and uploaded (VALID, delivery 67a72613). Founder: install Build 49, enable the canary, tap Sync test day now for 2026-09-21, then tap once more after midnight (date 2026-09-21) for the complete-day revision. Server unit 8326 tests with the same 298 pre-existing failures as base and zero new; all phase gates equal base; Native 1244 tests green; independent review approved after fixes. Follow-up read-only acceptance audit needs a new task id.",
   "success": true,
   "production_mutated": true,
   "deployed": true,
-  "testflight_uploaded": false
+  "testflight_uploaded": true
  },
  "validation": {
   "tests": {
    "status": "passed",
-   "summary": "Unit 8246 tests, 298 failures identical to pristine base a428fbda (8194/298); phase3/phase6/phase6.photo/migration-safety no new failures; phase2/4/5/6.training/access-gate/foundation green; ESLint, diff check, production build clean."
+   "summary": "Server unit 8326 (+80 new) with 298 failures identical to pristine base, zero new; phase2/3/4/5/6/6.photo/6.training/access-gate/foundation/migration-safety equal to base; ESLint, diff check and exact-SHA production build clean; Native 1244 tests, 0 failures."
   },
   "review": {
    "status": "approved",
-   "summary": "Independent fresh-context review APPROVE on 2bdaf4d3 with no blockers and APPROVE on exact final ba250af1 (delta test/doc only)."
+   "summary": "Fresh-context review: Server APPROVE on a40c0b53; Native blocker (coverage not in daily fingerprint) and identity/surfacing findings fixed and re-reviewed, APPROVE with non-blocking follow-ups on f5735476; later delta is the Build 49 metadata bump and a view guard, full Native suite re-run green."
   },
   "zero_write_audit": {
    "status": "passed",
-   "summary": "Bounded read-only baseline before and after deploy: 29 canonical collections, cadence operation records, HealthKit rows, migrations, outbox all identical; zero differences."
+   "summary": "Bounded read-only baseline before and after the Server deploy: zero differing sections. Post-activation acceptance audit: only the policy and audit rows were added; strategic collections unchanged; zero HealthKit-derived strategic Evidence."
   }
  },
  "decisions_required": [
-  "The Founder's stored 05:30 delivery time is now overridden by the shared 03:00 authority. Decide whether to hide or lock the 'Preferred delivery time' picker in the Web and Native editors so it does not imply a choice.",
-  "Run the Build 48 HealthKit canary on device, then authorize the HealthKit activation-policy slice (recommended task in the report).",
-  "Optionally decide whether Home should show the previous briefing (instead of nothing) on the 1st before Monthly is generated at 03:00."
+  "After the Founder's test-day syncs, authorize a new read-only acceptance-audit task, then decide whether to deactivate the activation policy (reversible, keeps canonical history) or authorize the next slice.",
+  "Decide whether a second proving day should cross a 03:00 briefing (for example Tue 2026-09-22 with a sync between 00:00 and 02:59 on Wed 2026-09-23); that needs a deactivate and a new exact-window activation, never an in-place widening.",
+  "Decide when to add a durable revision floor and background delivery (reviewer follow-ups) before any wider HealthKit rollout."
  ],
  "blockers": [],
  "unexpected_findings": [
-  "The Founder's stored Coaching Updates schedule was 05:30 for all three cadences, not midnight; Monthly's own generator gate was hard-coded 00:00 and disagreed with the registry.",
-  "The auto-mode classifier blocked the production-branch push until the Founder authorized it in chat.",
-  "A stamp-only spec update built the stale commit again (deployment 016112a7); create-deployment --force-rebuild produced the correct deployment.",
-  "Registry timezone is config-first while generators use the profile timezone; identical for the Founder today.",
-  "Two Monthly cadence test assertions depend on gitignored Founder fixtures that are absent on this machine; updated by inspection only."
+  "Build 48 canary was hard-wired to validation_only and could not perform operational sync; Nutrition had no daily-total path, so a new TestFlight build was required.",
+  "The legacy non-Native activity-day.sync.v1 alias defaulted to a HealthKit source and wrote strategic Evidence; it is now refused.",
+  "The activation policy record id changed to healthkit_canonical_daily_activation_policy; the id named in the previous handoff is not read.",
+  "A spec-stamp deployment again built the stale commit; a force-rebuild deployment produced the correct one.",
+  "The phase7B reference-index unit test fails identically on the production base."
  ],
  "backlog": [
-  "HealthKit: Build 48 canary, activation-policy write, Native operational sync and background delivery (report Part C)",
-  "Workout Logger draft survival across termination, eviction, restart and TestFlight update",
+  "HealthKit acceptance audit and policy decision after the test day",
+  "HealthKit background delivery and durable Native revision floor",
+  "HealthKit follow-ups FU-1 pre-auth parse cost and FU-2 Native HTTP 400 permanence",
+  "Workout Logger draft survival across termination and TestFlight update",
   "Photo Briefing real-production Tap to expand mismatch",
-  "Optional photo accessibility polish",
   "Coaching Updates editor delivery-time control cleanup"
  ],
- "recommended_next_step": "Founder runs the Build 48 HealthKit canary and accepts Build 48; then publish the HealthKit activation-policy and operational-sync task from Server ba250af1 and Native bbb46e19 as specified in the report.",
- "full_report_path": "agent-handoffs/reports/20260921T183500Z-native-preserve-and-3am-briefings.md",
+ "recommended_next_step": "Founder installs Build 49 and performs the two syncs for 2026-09-21; then publish a read-only acceptance-audit task with a new task id.",
+ "full_report_path": "agent-handoffs/reports/20260921T195000Z-healthkit-activity-nutrition-canonical-testday.md",
  "safety": {
   "contains_secrets": false,
   "contains_credentials": false,
