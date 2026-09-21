@@ -17,6 +17,7 @@ const ALLOWED = new Set([
   "domain/services/HealthKitEvidenceEligibilityPolicy.js",
   "domain/services/HealthKitObservationService.js",
   "domain/services/HealthKitWorkoutLinkService.js",
+  "domain/services/HealthKitWorkoutRelationshipService.js",
   "domain/services/HealthKitWorkoutService.js",
   "platform/migration/phase4DomainCollections.js",
   "platform/operations/HealthKitActivationPolicyRunner.js",
@@ -27,6 +28,7 @@ const NEEDLES = [
   "healthKitCanonicalDays", "healthKitObservations", "HEALTHKIT_CANONICAL_DAY_COLLECTION",
   "healthKitCanonicalWorkouts", "healthKitWorkoutLinks",
   "HEALTHKIT_CANONICAL_WORKOUT_COLLECTION", "HEALTHKIT_WORKOUT_LINK_COLLECTION",
+  "healthKitWorkoutLinkClaims", "HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION",
 ];
 
 function walk(directory) {

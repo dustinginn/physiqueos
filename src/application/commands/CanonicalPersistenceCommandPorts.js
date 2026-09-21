@@ -759,8 +759,14 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         const heldByAnother = single && workoutLinks.some((link) =>
           link.loggerSessionCanonicalId === session && link.canonicalWorkoutId !== workout.id &&
           [HealthKitWorkoutLinkStatus.CANDIDATE, HealthKitWorkoutLinkStatus.CONFIRMED].includes(link.status));
+        // An established (confirmed) relationship is never crowded by a new candidate:
+        // this workout, or any duplicate of it, already has a confirmed session.
+        const groupIds = new Set(duplicates);
+        const workoutAlreadyLinked = workoutLinks.some((link) =>
+          link.status === HealthKitWorkoutLinkStatus.CONFIRMED && (link.canonicalWorkoutId === workout.id || groupIds.has(link.canonicalWorkoutId)));
         const suppressed = !isPrimary ? "possible_duplicate_of_another_canonical_workout"
-          : heldByAnother ? "session_already_linked_to_another_workout" : null;
+          : workoutAlreadyLinked ? "workout_or_duplicate_already_linked"
+            : heldByAnother ? "session_already_linked_to_another_workout" : null;
         patch = {
           linkAssessment: {
             outcome: assessment.outcome,
@@ -788,7 +794,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         }
         if (wanted) {
           const candidate = createHealthKitWorkoutLinkCandidate({
-            canonicalWorkout: workout, assessment, ownerUserId: context.ownerUserId, now: at, existingLinks: workoutLinks,
+            canonicalWorkout: workout, assessment, ownerUserId: context.ownerUserId, now: at,
           });
           const existing = workoutLinks.find((item) => item.id === candidate.id);
           if (!existing) {

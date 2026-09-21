@@ -23,10 +23,12 @@ import { isActiveDetailedStrengthSession } from "./HealthKitObservationService.j
 export const HEALTHKIT_WORKOUT_LINK_COLLECTION = "healthKitWorkoutLinks";
 export const HEALTHKIT_WORKOUT_LINK_ID_PREFIX = "healthkit_workout_link_";
 export const HEALTHKIT_WORKOUT_LINK_SCHEMA_VERSION = "healthkit-workout-link-v1";
-export const HEALTHKIT_WORKOUT_MATCHER_VERSION = "healthkit-strength-matcher-v2";
+export const HEALTHKIT_WORKOUT_MATCHER_VERSION = "healthkit-strength-matcher-v3";
 // A confident match is only a CANDIDATE. Turning any candidate into a
-// confirmed link is a separate, explicit act. This is a reviewed constant, not
-// a policy option (the activation policy rejects any attempt to set it).
+// confirmed link is a separate, explicit act that must go through the guarded
+// relationship service (claims + one-to-one + duplicate-group checks). Link
+// creation never confirms, not even for an explicit source identity. The
+// constant is asserted false; the activation policy rejects any attempt to set it.
 export const HEALTHKIT_STRENGTH_LINK_AUTO_CONFIRM = false;
 
 // Thresholds are the existing product semantics for "same workout", reused
@@ -36,6 +38,11 @@ export const HEALTHKIT_STRENGTH_MATCH_THRESHOLDS = Object.freeze({
   possible: POSSIBLE_DUPLICATE_CONFIDENCE_THRESHOLD,
   temporalToleranceMinutes: TEMPORAL_TOLERANCE_MINUTES,
 });
+
+// A runner-up inside the width of the "possible" band (confident minus
+// possible) is not clearly behind the best candidate, so the match is
+// ambiguous. Derived from the existing thresholds, not a new arbitrary number.
+export const HEALTHKIT_STRENGTH_TIE_MARGIN = DUPLICATE_CONFIDENCE_THRESHOLD - POSSIBLE_DUPLICATE_CONFIDENCE_THRESHOLD;
 
 export const HealthKitStrengthMatchOutcome = Object.freeze({
   CONFIDENT: "confident_match",
@@ -106,6 +113,12 @@ export function assessHealthKitStrengthLinkCandidates({
       continue;
     }
     const assessment = assessWorkoutDuplicatePair(hkCandidate, normalized.payload);
+    const facts = explicit ? null : boundaryFacts(current, normalized.payload.metadata);
+    // Adjacent is not the same workout: a session whose window merely touches or
+    // sits beside the Apple workout has no real overlap and is not a candidate,
+    // whatever its duration or calories say. (The shared duplicate service counts
+    // a touching boundary as overlap; that stays untouched for its other callers.)
+    if (!explicit && !facts.substantiveOverlap) continue;
     // An explicit binding: the Logger session already names this exact Apple
     // workout. The canonical record never stores the private HealthKit id, so
     // the session's source ids are hashed the same way the record id is.
@@ -114,7 +127,12 @@ export function assessHealthKitStrengthLinkCandidates({
       outcome: explicit ? "duplicate" : assessment.outcome,
       confidence: explicit ? 100 : assessment.confidence,
       reasons: explicit ? ["The Logger session already names this exact Apple workout"] : assessment.reasons,
-      overlapping: explicit || assessment.signals?.temporal?.overlapping === true,
+      // Confident needs a real overlap AND at least one boundary that agrees
+      // within the existing tolerance (start with start, or end with end).
+      qualified: explicit || (assessment.outcome === "duplicate" && facts.substantiveOverlap && (facts.startAligned || facts.endAligned)),
+      overlapSeconds: explicit ? null : Math.round(facts.overlapMs / 1000),
+      startAligned: explicit ? null : facts.startAligned,
+      endAligned: explicit ? null : facts.endAligned,
       explicit,
     });
   }
@@ -128,6 +146,9 @@ export function assessHealthKitStrengthLinkCandidates({
     confidence: candidate.confidence,
     reasons: Object.freeze([...candidate.reasons]),
     basis: candidate.explicit ? "explicit_source_identity" : "temporal_and_telemetry",
+    overlapSeconds: candidate.overlapSeconds,
+    startAligned: candidate.startAligned,
+    endAligned: candidate.endAligned,
   })));
 
   if (eligible.length === 0) {
@@ -141,7 +162,11 @@ export function assessHealthKitStrengthLinkCandidates({
       candidates: Object.freeze([]),
     });
   }
-  if (eligible.length > 1) {
+  const [best, second] = eligible;
+  // The result depends only on the candidates' scores and facts, never on the
+  // order they were supplied in: equal scores can never produce a winner.
+  const clearlyAhead = !second || best.confidence - second.confidence >= HEALTHKIT_STRENGTH_TIE_MARGIN;
+  if (!clearlyAhead) {
     return Object.freeze({
       ...base,
       outcome: HealthKitStrengthMatchOutcome.AMBIGUOUS,
@@ -150,16 +175,15 @@ export function assessHealthKitStrengthLinkCandidates({
       candidates: summarize(eligible),
     });
   }
-  const [only] = eligible;
-  const confident = only.explicit || (only.outcome === "duplicate" && only.overlapping && unverifiable === 0);
+  const confident = best.explicit || (best.qualified && unverifiable === 0);
   return Object.freeze({
     ...base,
     outcome: confident ? HealthKitStrengthMatchOutcome.CONFIDENT : HealthKitStrengthMatchOutcome.POSSIBLE,
-    reason: only.explicit
+    reason: best.explicit
       ? "explicit_source_identity"
       : confident
-        ? "single_overlapping_session"
-        : only.outcome === "duplicate" && only.overlapping && unverifiable > 0
+        ? (second ? "single_clearly_dominant_session" : "single_overlapping_session")
+        : best.qualified && unverifiable > 0
           ? "unverifiable_same_day_session_present"
           : "single_session_below_confident_threshold",
     unverifiableSessionCount: unverifiable,
@@ -235,18 +259,26 @@ export function assessHealthKitCardioCoexistence({ canonicalWorkout, canonicalOb
 export function findPossibleDuplicateCanonicalWorkouts(canonicalWorkout, allWorkouts = []) {
   const a = canonicalWorkout?.current;
   if (!a) return Object.freeze([]);
-  const startA = Date.parse(a.startedAt);
-  const endA = Date.parse(a.endedAt ?? a.startedAt);
   const tolerance = TEMPORAL_TOLERANCE_MINUTES * 60000;
+  const window = (current) => {
+    const start = Date.parse(current.startedAt);
+    const end = current.endedAt ? Date.parse(current.endedAt)
+      : Number.isFinite(current.telemetry?.durationSeconds) ? start + current.telemetry.durationSeconds * 1000 : start;
+    return { start, end };
+  };
+  const wa = window(a);
   return Object.freeze(allWorkouts
     .filter((other) => other.id !== canonicalWorkout.id && other.current &&
       other.current.family === a.family && other.current.canonicalType === a.canonicalType &&
       other.localDate === canonicalWorkout.localDate)
     .filter((other) => {
-      const startB = Date.parse(other.current.startedAt);
-      const endB = Date.parse(other.current.endedAt ?? other.current.startedAt);
-      if (![startA, endA, startB, endB].every(Number.isFinite)) return false;
-      return (startA <= endB && startB <= endA) || Math.abs(startA - startB) <= tolerance;
+      const wb = window(other.current);
+      if (![wa.start, wa.end, wb.start, wb.end].every(Number.isFinite)) return false;
+      // The same physical workout overlaps for real AND has an aligned boundary.
+      // Back-to-back workouts that only touch, or overlap without any aligned
+      // boundary, are different workouts.
+      const overlap = Math.min(wa.end, wb.end) - Math.max(wa.start, wb.start);
+      return overlap > tolerance && (Math.abs(wa.start - wb.start) <= tolerance || Math.abs(wa.end - wb.end) <= tolerance);
     })
     .map((other) => other.id)
     .sort());
@@ -267,40 +299,33 @@ export function getHealthKitWorkoutLinkRecordId(canonicalWorkoutId, loggerSessio
  * confirmed, and only when it would not break the one-to-one rule; everything
  * else needs a separate explicit confirmation.
  */
-export function createHealthKitWorkoutLinkCandidate({ canonicalWorkout, assessment, ownerUserId, now, existingLinks = [] } = {}) {
+export function createHealthKitWorkoutLinkCandidate({ canonicalWorkout, assessment, ownerUserId, now } = {}) {
   const outcome = assessment?.outcome;
   if (![HealthKitStrengthMatchOutcome.CONFIDENT, HealthKitStrengthMatchOutcome.POSSIBLE].includes(outcome)) {
     throw new HealthKitWorkoutLinkError("LINK_CANDIDATE_NOT_ELIGIBLE", `A ${outcome} match never produces a link record.`);
   }
   const [candidate] = assessment.candidates;
   const at = new Date(now).toISOString();
-  const explicit = candidate.basis === "explicit_source_identity";
-  const id = getHealthKitWorkoutLinkRecordId(canonicalWorkout.id, candidate.loggerSessionCanonicalId);
-  const oneToOneClash = existingLinks.some((other) =>
-    other.id !== id && other.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
-    (other.canonicalWorkoutId === canonicalWorkout.id || other.loggerSessionCanonicalId === candidate.loggerSessionCanonicalId));
-  const status = (explicit && !oneToOneClash) || HEALTHKIT_STRENGTH_LINK_AUTO_CONFIRM
-    ? HealthKitWorkoutLinkStatus.CONFIRMED
-    : HealthKitWorkoutLinkStatus.CANDIDATE;
-  const createdBy = explicit && status === HealthKitWorkoutLinkStatus.CONFIRMED
-    ? { kind: "explicit_source_identity", ref: HEALTHKIT_WORKOUT_MATCHER_VERSION }
-    : { kind: "system_matcher", ref: HEALTHKIT_WORKOUT_MATCHER_VERSION };
+  // Creation never confirms, not even for an explicit source identity: every
+  // confirmation goes through the guarded relationship service.
+  const createdBy = { kind: "system_matcher", ref: HEALTHKIT_WORKOUT_MATCHER_VERSION };
   return Object.freeze({
     schemaVersion: HEALTHKIT_WORKOUT_LINK_SCHEMA_VERSION,
-    id,
+    id: getHealthKitWorkoutLinkRecordId(canonicalWorkout.id, candidate.loggerSessionCanonicalId),
     userId: ownerUserId,
     localDate: canonicalWorkout.localDate,
     canonicalWorkoutId: canonicalWorkout.id,
     loggerSessionCanonicalId: candidate.loggerSessionCanonicalId,
-    status,
+    status: HealthKitWorkoutLinkStatus.CANDIDATE,
     matchOutcome: outcome,
+    matchBasis: candidate.basis,
     confidence: candidate.confidence,
     reasons: [...candidate.reasons],
     matcherVersion: assessment.matcherVersion,
     // Links describe an association; they never move authority.
     contentAuthority: { trainingContent: "workout_logger", telemetry: "healthkit" },
     createdBy,
-    statusHistory: [{ status, at, by: createdBy }],
+    statusHistory: [{ status: HealthKitWorkoutLinkStatus.CANDIDATE, at, by: createdBy }],
     evidenceEligibility: createHealthKitQuarantinedEligibility(),
     createdAt: at,
     updatedAt: at,
@@ -319,7 +344,12 @@ export function refreshHealthKitWorkoutLinkCandidate(link, { assessment, now, ex
   const lastEntry = link.statusHistory.at(-1);
   if (link.status === HealthKitWorkoutLinkStatus.UNLINKED &&
     lastEntry?.reason === "assessment_changed" && lastEntry?.by?.kind === "system_matcher") {
-    assertOneToOne(link, existingLinks);
+    // A restore that would collide with an established confirmed link simply
+    // stays released; it must never throw and fail an ingest batch.
+    if (existingLinks.some((other) => other.id !== link.id && other.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
+      (other.canonicalWorkoutId === link.canonicalWorkoutId || other.loggerSessionCanonicalId === link.loggerSessionCanonicalId))) {
+      return link;
+    }
     return transition({ ...link, matchOutcome: assessment.outcome, confidence: candidate.confidence, reasons: [...candidate.reasons], matcherVersion: assessment.matcherVersion },
       HealthKitWorkoutLinkStatus.CANDIDATE, { by: { kind: "system_matcher", ref: assessment.matcherVersion }, now: at, reason: "assessment_restored" });
   }
@@ -337,9 +367,16 @@ export function refreshHealthKitWorkoutLinkCandidate(link, { assessment, now, ex
   });
 }
 
-export function confirmHealthKitWorkoutLink(link, { by, now, existingLinks = [] } = {}) {
+/**
+ * Pure state transition for a confirmation. It FAILS CLOSED: the full
+ * relationship context (every existing link and every canonical workout) is
+ * required, so a caller can no longer bypass the one-to-one rules by leaving it
+ * out. Durable, race-safe confirmation is `confirmHealthKitWorkoutRelationship`
+ * in HealthKitWorkoutRelationshipService, which adds atomic claim rows.
+ */
+export function confirmHealthKitWorkoutLink(link, { by, now, existingLinks, canonicalWorkouts } = {}) {
   if (link.status === HealthKitWorkoutLinkStatus.CONFIRMED) return link;
-  assertOneToOne(link, existingLinks);
+  assertHealthKitWorkoutLinkAllowed(link, { existingLinks, canonicalWorkouts });
   return transition(link, HealthKitWorkoutLinkStatus.CONFIRMED, { by, now });
 }
 
@@ -349,14 +386,30 @@ export function unlinkHealthKitWorkoutLink(link, { by, now, reason = null } = {}
   return transition(link, HealthKitWorkoutLinkStatus.UNLINKED, { by, now, reason });
 }
 
-/** At most one confirmed link per Apple workout and per Logger session. */
-export function assertOneToOne(link, existingLinks = []) {
-  const clash = existingLinks.find((other) =>
-    other.id !== link.id &&
-    other.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
-    (other.canonicalWorkoutId === link.canonicalWorkoutId || other.loggerSessionCanonicalId === link.loggerSessionCanonicalId));
-  if (clash) {
+/**
+ * The relationship invariant for a link about to become active (confirmed):
+ *   - one Apple workout has at most one confirmed Logger session;
+ *   - one Logger session has at most one confirmed Apple workout;
+ *   - one PHYSICAL workout (a re-created HealthKit UUID or a second source,
+ *     found by the duplicate rule) has at most one confirmed session.
+ * It never overwrites an established link: a conflicting second relationship is
+ * refused. Candidates may mention alternatives; only confirmed links are checked.
+ */
+export function assertHealthKitWorkoutLinkAllowed(link, { existingLinks, canonicalWorkouts } = {}) {
+  if (!Array.isArray(existingLinks) || !Array.isArray(canonicalWorkouts)) {
+    throw new HealthKitWorkoutLinkError("LINK_CONTEXT_REQUIRED", "A confirmation needs the full relationship context (existing links and canonical workouts).");
+  }
+  const confirmed = existingLinks.filter((other) => other.id !== link.id && other.status === HealthKitWorkoutLinkStatus.CONFIRMED);
+  if (confirmed.some((other) => other.canonicalWorkoutId === link.canonicalWorkoutId || other.loggerSessionCanonicalId === link.loggerSessionCanonicalId)) {
     throw new HealthKitWorkoutLinkError("LINK_ONE_TO_ONE_VIOLATION", "An Apple workout and a Logger session can each have only one confirmed link.");
+  }
+  const workout = canonicalWorkouts.find((candidate) => candidate.id === link.canonicalWorkoutId);
+  if (!workout) {
+    throw new HealthKitWorkoutLinkError("LINK_WORKOUT_UNAVAILABLE", "The canonical Apple workout for this link is no longer available.");
+  }
+  const group = new Set(findPossibleDuplicateCanonicalWorkouts(workout, canonicalWorkouts));
+  if (confirmed.some((other) => group.has(other.canonicalWorkoutId))) {
+    throw new HealthKitWorkoutLinkError("LINK_DUPLICATE_GROUP_CONFLICT", "This Apple workout duplicates one that already has a confirmed link.");
   }
 }
 
@@ -368,6 +421,33 @@ function transition(link, status, { by, now, reason = null }) {
     updatedAt: at,
     statusHistory: [...link.statusHistory, { status, at, by, ...(reason ? { reason } : {}) }],
   });
+}
+
+// How the Logger session's window sits against the Apple workout's window, in
+// absolute instants: real overlap, and whether either boundary agrees within the
+// existing five-minute tolerance. A missing session end is treated as a start-only
+// window that must begin inside the workout (or within tolerance before it).
+function boundaryFacts(current, sessionMetadata) {
+  const tolerance = TEMPORAL_TOLERANCE_MINUTES * 60000;
+  const hkStart = Date.parse(current.startedAt);
+  const hkEnd = current.endedAt ? Date.parse(current.endedAt)
+    : Number.isFinite(current.telemetry?.durationSeconds) ? hkStart + current.telemetry.durationSeconds * 1000 : hkStart;
+  const sStart = Date.parse(sessionMetadata.start_time);
+  const sEnd = sessionMetadata.end_time ? Date.parse(sessionMetadata.end_time) : null;
+  const overlapMs = sEnd !== null
+    ? Math.min(hkEnd, sEnd) - Math.max(hkStart, sStart)
+    : (sStart >= hkStart - tolerance && sStart < hkEnd ? hkEnd - Math.max(sStart, hkStart) : 0);
+  const overlap = Number.isFinite(overlapMs) ? Math.max(0, overlapMs) : 0;
+  const shorter = Math.min(hkEnd - hkStart, sEnd !== null ? sEnd - sStart : Infinity);
+  return {
+    overlapMs: overlap,
+    // Overlap within the existing temporal tolerance is clock skew at a shared
+    // boundary, not the same workout. (Only a window shorter than the tolerance
+    // itself can be substantive by covering its whole length.)
+    substantiveOverlap: overlap > 0 && overlap >= Math.min(tolerance + 1, Math.max(shorter, 1)),
+    startAligned: Math.abs(hkStart - sStart) <= tolerance,
+    endAligned: sEnd !== null && Math.abs(hkEnd - sEnd) <= tolerance,
+  };
 }
 
 function dateOf(payload) {

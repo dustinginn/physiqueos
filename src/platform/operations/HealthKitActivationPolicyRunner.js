@@ -12,6 +12,7 @@ import {
 import { HEALTHKIT_CANONICAL_DAY_COLLECTION } from "../../domain/services/HealthKitEvidenceEligibilityPolicy.js";
 import { HEALTHKIT_CANONICAL_WORKOUT_COLLECTION, classifyHealthKitWorkoutType, deriveHealthKitWorkoutLocalDate } from "../../domain/services/HealthKitWorkoutService.js";
 import { HEALTHKIT_WORKOUT_LINK_COLLECTION } from "../../domain/services/HealthKitWorkoutLinkService.js";
+import { HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
 
 export const HEALTHKIT_ACTIVATION_AUDIT_RECORD_PREFIX = "healthkit_canonical_activation_audit_";
 export const HEALTHKIT_WORKOUT_ACTIVATION_AUDIT_RECORD_PREFIX = "healthkit_workout_activation_audit_";
@@ -82,16 +83,17 @@ export async function runHealthKitActivationPolicy({
   }
   const { ownerUserId } = authorization;
   const list = (collection) => records.list({ ownerUserId, collection });
-  const [policyRecord, otherPolicyRecord, observations, canonicalDays, canonicalWorkouts, links, evidence] = await Promise.all([
+  const [policyRecord, otherPolicyRecord, observations, canonicalDays, canonicalWorkouts, links, claims, evidence] = await Promise.all([
     records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: kind.recordId }),
     records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: kind.otherRecordId }),
     list(OBSERVATION_COLLECTION),
     list(HEALTHKIT_CANONICAL_DAY_COLLECTION),
     list(HEALTHKIT_CANONICAL_WORKOUT_COLLECTION),
     list(HEALTHKIT_WORKOUT_LINK_COLLECTION),
+    list(HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION),
     list(EVIDENCE_COLLECTION),
   ]);
-  const facts = collectFacts({ policyRecord, otherPolicyRecord, observations, canonicalDays, canonicalWorkouts, links, evidence });
+  const facts = collectFacts({ policyRecord, otherPolicyRecord, observations, canonicalDays, canonicalWorkouts, links, claims, evidence });
   const current = kind.resolve(policyRecord);
 
   const planned = action === "activate"
@@ -172,13 +174,14 @@ export async function runHealthKitActivationPolicy({
       payload: nextPolicy,
     })).record;
   // In-transaction verification. Any failure throws and the caller rolls back.
-  const [afterPolicy, afterOther, afterObservations, afterDays, afterWorkouts, afterLinks, afterEvidence] = await Promise.all([
+  const [afterPolicy, afterOther, afterObservations, afterDays, afterWorkouts, afterLinks, afterClaims, afterEvidence] = await Promise.all([
     records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: kind.recordId }),
     records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: kind.otherRecordId }),
     list(OBSERVATION_COLLECTION),
     list(HEALTHKIT_CANONICAL_DAY_COLLECTION),
     list(HEALTHKIT_CANONICAL_WORKOUT_COLLECTION),
     list(HEALTHKIT_WORKOUT_LINK_COLLECTION),
+    list(HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION),
     list(EVIDENCE_COLLECTION),
   ]);
   const resolved = kind.resolve(afterPolicy);
@@ -198,6 +201,7 @@ export async function runHealthKitActivationPolicy({
     canonicalDaysUnchanged: afterDays.length === facts.canonicalDayCount && listDigest(afterDays) === facts.canonicalDaysDigest,
     canonicalWorkoutsUnchanged: afterWorkouts.length === facts.canonicalWorkoutCount && listDigest(afterWorkouts) === facts.canonicalWorkoutsDigest,
     linksUnchanged: afterLinks.length === facts.linkCount && listDigest(afterLinks) === facts.linksDigest,
+    claimsUnchanged: afterClaims.length === facts.claimCount && listDigest(afterClaims) === facts.claimsDigest,
     evidenceUnchanged: afterEvidence.length === facts.evidenceCount && listDigest(afterEvidence) === facts.evidenceDigest,
   };
   if (Object.values(invariants).some((ok) => ok !== true)) {
@@ -288,7 +292,7 @@ function planDeactivation({ policyRecord, current }) {
   };
 }
 
-function collectFacts({ policyRecord, otherPolicyRecord, observations, canonicalDays, canonicalWorkouts, links, evidence }) {
+function collectFacts({ policyRecord, otherPolicyRecord, observations, canonicalDays, canonicalWorkouts, links, claims, evidence }) {
   return {
     policyPresent: Boolean(policyRecord),
     policyStatus: policyRecord?.status ?? null,
@@ -302,6 +306,8 @@ function collectFacts({ policyRecord, otherPolicyRecord, observations, canonical
     canonicalWorkoutsDigest: listDigest(canonicalWorkouts),
     linkCount: links.length,
     linksDigest: listDigest(links),
+    claimCount: claims.length,
+    claimsDigest: listDigest(claims),
     evidenceCount: evidence.length,
     evidenceDigest: listDigest(evidence),
   };

@@ -122,31 +122,36 @@ describe("link record lifecycle", () => {
     expect(link.id).toMatch(/^healthkit_workout_link_[0-9a-f]{40}$/);
   });
 
-  it("creates an already confirmed link only for an explicit source identity", () => {
+  it("never confirms at creation, not even for an explicit source identity", () => {
     const explicit = logger("session-x", "18:00", "19:00");
     explicit.payload.metadata.source_workout_id = HK_UUID;
     const { link } = candidateFor([explicit]);
-    expect(link).toMatchObject({ status: "confirmed", createdBy: { kind: "explicit_source_identity" } });
+    expect(link).toMatchObject({ status: "candidate", matchBasis: "explicit_source_identity", confidence: 100, createdBy: { kind: "system_matcher" } });
   });
 
   it("confirms, unlinks, and relinks without deleting or rewriting either record", () => {
-    const { link } = candidateFor();
-    const confirmed = confirmHealthKitWorkoutLink(link, { by: { kind: "founder", ref: "confirm-1" }, now: "2026-09-23T21:00:00.000Z" });
+    const { hk, link } = candidateFor();
+    const context = { existingLinks: [], canonicalWorkouts: [hk] };
+    const confirmed = confirmHealthKitWorkoutLink(link, { by: { kind: "founder", ref: "confirm-1" }, now: "2026-09-23T21:00:00.000Z", ...context });
     expect(confirmed.status).toBe("confirmed");
     const unlinked = unlinkHealthKitWorkoutLink(confirmed, { by: { kind: "founder", ref: "unlink-1" }, now: "2026-09-23T22:00:00.000Z", reason: "wrong workout" });
     expect(unlinked).toMatchObject({ status: "unlinked", canonicalWorkoutId: link.canonicalWorkoutId, loggerSessionCanonicalId: link.loggerSessionCanonicalId });
-    const relinked = confirmHealthKitWorkoutLink(unlinked, { by: { kind: "founder", ref: "relink-1" }, now: "2026-09-23T23:00:00.000Z" });
+    const relinked = confirmHealthKitWorkoutLink(unlinked, { by: { kind: "founder", ref: "relink-1" }, now: "2026-09-23T23:00:00.000Z", ...context });
     expect(relinked.status).toBe("confirmed");
     expect(relinked.statusHistory.map((entry) => entry.status)).toEqual(["candidate", "confirmed", "unlinked", "confirmed"]);
     expect(link.status).toBe("candidate");
   });
 
-  it("enforces one confirmed link per Apple workout and per Logger session", () => {
-    const { link } = candidateFor();
+  it("enforces one confirmed link per Apple workout and per Logger session, and fails closed without context", () => {
+    const { hk, link } = candidateFor();
     const rival = { ...link, id: "healthkit_workout_link_rival", canonicalWorkoutId: "healthkit_canonical_workout_other", status: "confirmed" };
-    expect(() => confirmHealthKitWorkoutLink(link, { by: { kind: "founder" }, now: NOW, existingLinks: [rival] })).toThrowError(expect.objectContaining({ code: "LINK_ONE_TO_ONE_VIOLATION" }));
+    const sameSession = { by: { kind: "founder" }, now: NOW, existingLinks: [rival], canonicalWorkouts: [hk] };
+    expect(() => confirmHealthKitWorkoutLink(link, sameSession)).toThrowError(expect.objectContaining({ code: "LINK_ONE_TO_ONE_VIOLATION" }));
     const rivalWorkout = { ...link, id: "healthkit_workout_link_rival2", loggerSessionCanonicalId: "session-b", status: "confirmed" };
-    expect(() => confirmHealthKitWorkoutLink(link, { by: { kind: "founder" }, now: NOW, existingLinks: [rivalWorkout] })).toThrowError(expect.objectContaining({ code: "LINK_ONE_TO_ONE_VIOLATION" }));
+    expect(() => confirmHealthKitWorkoutLink(link, { ...sameSession, existingLinks: [rivalWorkout] })).toThrowError(expect.objectContaining({ code: "LINK_ONE_TO_ONE_VIOLATION" }));
+    // omitting the context is no longer a bypass
+    expect(() => confirmHealthKitWorkoutLink(link, { by: { kind: "founder" }, now: NOW })).toThrowError(expect.objectContaining({ code: "LINK_CONTEXT_REQUIRED" }));
+    expect(() => confirmHealthKitWorkoutLink(link, { by: { kind: "founder" }, now: NOW, existingLinks: [] })).toThrowError(expect.objectContaining({ code: "LINK_CONTEXT_REQUIRED" }));
   });
 });
 
@@ -293,19 +298,6 @@ describe("real Evidence time shapes (review MAJOR-1)", () => {
 });
 
 describe("link safety refinements", () => {
-  it("creates an explicit-identity link as a confirmed link only when it keeps the one-to-one rule", () => {
-    const explicit = logger("session-y", "18:00", "19:00");
-    explicit.payload.metadata.source_workout_id = HK_UUID;
-    const hk = hkStrength();
-    const assessment = assess(hk, [explicit]);
-    const clash = [{ id: "healthkit_workout_link_x", canonicalWorkoutId: hk.id, loggerSessionCanonicalId: "session-x", status: "confirmed" }];
-    const link = createHealthKitWorkoutLinkCandidate({ canonicalWorkout: hk, assessment, ownerUserId: OWNER, now: NOW, existingLinks: clash });
-    expect(link.status).toBe("candidate");
-    expect(link.createdBy.kind).toBe("system_matcher");
-    const clean = createHealthKitWorkoutLinkCandidate({ canonicalWorkout: hk, assessment, ownerUserId: OWNER, now: NOW, existingLinks: [] });
-    expect(clean.status).toBe("confirmed");
-  });
-
   it("refreshes a system candidate when the assessment changes and restores one the system released", () => {
     const hk = hkStrength();
     const first = assess(hk, [logger("session-a", "10:04", "11:20", 4560)]);

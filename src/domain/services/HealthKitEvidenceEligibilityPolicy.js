@@ -27,7 +27,7 @@ export const HEALTHKIT_OBSERVATION_ID_PREFIX = "healthkit_observation_";
 export const HEALTHKIT_CANONICAL_DAY_ID_PREFIX = "healthkit_canonical_day_";
 export const HEALTHKIT_CANONICAL_WORKOUT_COLLECTION_NAME = "healthKitCanonicalWorkouts";
 export const HEALTHKIT_WORKOUT_LINK_COLLECTION_NAME = "healthKitWorkoutLinks";
-export const HEALTHKIT_WORKOUT_RECORD_ID_PREFIXES = Object.freeze(["healthkit_canonical_workout_", "healthkit_workout_link_"]);
+export const HEALTHKIT_WORKOUT_RECORD_ID_PREFIXES = Object.freeze(["healthkit_canonical_workout_", "healthkit_workout_link_", "healthkit_link_claim_"]);
 
 /**
  * Whether any HealthKit-derived record may currently be strategic Evidence.

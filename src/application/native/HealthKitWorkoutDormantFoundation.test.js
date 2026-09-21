@@ -293,6 +293,7 @@ function store({ workoutPolicy = true, workoutPolicyOverrides = {}, dailyPolicy 
     healthKitCanonicalDays: [],
     healthKitCanonicalWorkouts: [],
     healthKitWorkoutLinks: [],
+    healthKitWorkoutLinkClaims: [],
     healthKitConfiguration: configuration,
     canonicalEvidenceObjects: evidence,
     evidencePackages: [],
@@ -438,5 +439,66 @@ describe("review hardening: real storage, duplicates, and shapes", () => {
     await ingest(records, [walk()], "b1");
     await ingest(records, [walk({ sourceRevision: 2, activeCalories: 160 })], "b2");
     expect(records.snapshot().healthKitCanonicalWorkouts[0]).toMatchObject({ revision: 2, coexistence: { state: "matches_existing_evidence_workout" } });
+  });
+});
+
+describe("link hardening through the real ingest path", () => {
+  const withClaims = (records) => records;
+  const confirmLink = async (records, linkId) => {
+    const { confirmHealthKitWorkoutRelationship } = await import("../../domain/services/HealthKitWorkoutRelationshipService.js");
+    return confirmHealthKitWorkoutRelationship({ records: withClaims(records), ownerUserId: OWNER, linkId, by: { kind: "founder", ref: "c" }, now: "2026-09-23T22:00:00.000Z" });
+  };
+  const storeWithClaims = (options) => {
+    const inner = store(options);
+    return inner;
+  };
+
+  it("never creates a confirmed link or a claim from ingestion, even for an explicit source identity", async () => {
+    const explicit = logger("session-x", "18:00", "19:00");
+    explicit.payload.metadata.source_workout_id = HK_UUID;
+    const records = storeWithClaims({ evidence: [explicit] });
+    await ingest(records, [workout()], "b1");
+    const snapshot = records.snapshot();
+    expect(snapshot.healthKitWorkoutLinks).toHaveLength(1);
+    expect(snapshot.healthKitWorkoutLinks[0]).toMatchObject({ status: "candidate", matchBasis: "explicit_source_identity", confidence: 100 });
+    expect(snapshot.healthKitWorkoutLinkClaims ?? []).toEqual([]);
+  });
+
+  it("does not treat a sequential session that only touches the Apple workout as a match", async () => {
+    const records = store({ evidence: [logger("session-a", "09:00", "10:00", 3600)] });
+    const result = await ingest(records, [workout()], "b1");
+    expect(result.result.workoutRelationships.candidateLinksCreated).toBe(0);
+    expect(records.snapshot().healthKitCanonicalWorkouts[0].linkAssessment).toMatchObject({ outcome: "no_match", reason: "no_plausible_logger_session" });
+    expect(records.snapshot().healthKitWorkoutLinks).toEqual([]);
+  });
+
+  it("makes adjacent Logger sessions a clear match for the right one and ambiguous when the Apple workout straddles", async () => {
+    const a = logger("A", "09:00", "10:00", 3600);
+    const b = logger("B", "10:00", "11:00", 3600);
+    const clear = store({ evidence: [a, b] });
+    await ingest(clear, [workout({ startedAt: `${DAY}T10:00:00-07:00`, endedAt: `${DAY}T11:00:00-07:00` })], "b1");
+    expect(clear.snapshot().healthKitWorkoutLinks.map((l) => l.loggerSessionCanonicalId)).toEqual(["B"]);
+    const straddle = store({ evidence: [a, b] });
+    await ingest(straddle, [workout({ startedAt: `${DAY}T09:45:00-07:00`, endedAt: `${DAY}T10:45:00-07:00` })], "b1");
+    expect(straddle.snapshot().healthKitCanonicalWorkouts[0].linkAssessment).toMatchObject({ outcome: "ambiguous_multiple" });
+    expect(straddle.snapshot().healthKitWorkoutLinks).toEqual([]);
+  });
+
+  it("never crowds an established confirmed link: a re-created UUID and further replays add no candidate", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    // the claims collection must exist for the guarded service
+    await ingest(records, [workout({ externalId: "original-uuid" })], "b1");
+    const linkId = records.snapshot().healthKitWorkoutLinks[0].id;
+    await confirmLink(records, linkId);
+    const confirmed = structuredClone(records.snapshot().healthKitWorkoutLinks[0]);
+    const recreated = await ingest(records, [workout({ externalId: "recreated-uuid" })], "b2");
+    const replay = await ingest(records, [workout({ externalId: "original-uuid" })], "b3");
+    const snapshot = records.snapshot();
+    expect(recreated.result.workoutRelationships.candidateLinksCreated).toBe(0);
+    expect(replay.result.workoutRelationships).toMatchObject({ candidateLinksCreated: 0, candidateLinksReleased: 0 });
+    expect(snapshot.healthKitWorkoutLinks).toHaveLength(1);
+    expect(snapshot.healthKitWorkoutLinks[0]).toEqual(confirmed);
+    const dup = snapshot.healthKitCanonicalWorkouts.find((w) => w.linkAssessment?.linkSuppressed);
+    expect(dup.linkAssessment.linkSuppressed).toMatch(/possible_duplicate_of_another_canonical_workout|workout_or_duplicate_already_linked/);
   });
 });

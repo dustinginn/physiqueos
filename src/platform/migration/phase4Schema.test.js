@@ -20,6 +20,7 @@ describe("Phase 4 canonical domain schema", () => {
       healthKitCanonicalDays: "canonical_training_records",
       healthKitCanonicalWorkouts: "canonical_training_records",
       healthKitWorkoutLinks: "canonical_training_records",
+      healthKitWorkoutLinkClaims: "canonical_training_records",
     });
     expect(PHASE4_DOMAIN_TABLES.confidenceActivationArtifacts)
       .toBe("canonical_confidence_records");

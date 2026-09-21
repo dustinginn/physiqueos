@@ -53,6 +53,7 @@ export const PHASE4_APPLICATION_RECORD_TABLES = Object.freeze({
   healthKitCanonicalDays: "canonical_training_records",
   healthKitCanonicalWorkouts: "canonical_training_records",
   healthKitWorkoutLinks: "canonical_training_records",
+  healthKitWorkoutLinkClaims: "canonical_training_records",
 });
 
 export const PHASE4_DOMAIN_TABLES = Object.freeze({

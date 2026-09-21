@@ -9,6 +9,7 @@ import {
   HealthKitStrengthMatchOutcome,
   assessHealthKitStrengthLinkCandidates,
 } from "../../domain/services/HealthKitWorkoutLinkService.js";
+import { findHealthKitWorkoutRelationshipViolations } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
 import { isActiveDetailedStrengthSession } from "../../domain/services/HealthKitObservationService.js";
 
 const hash = (value) => createHash("sha256").update(String(value)).digest("hex").slice(0, 10);
@@ -26,6 +27,7 @@ export function summarizeHealthKitWorkoutCanary({
   observations = [],
   canonicalWorkouts = [],
   links = [],
+  claims = [],
   canonicalEvidenceObjects = [],
   startLocalDate,
   endLocalDate,
@@ -98,6 +100,7 @@ export function summarizeHealthKitWorkoutCanary({
     workouts: perWorkout,
     loggerStrengthSessionsInWindow: loggerSessionsInWindow.length,
     linkStatusCounts: links.filter((link) => inWindow(link.localDate)).reduce((acc, link) => ({ ...acc, [link.status]: (acc[link.status] ?? 0) + 1 }), {}),
+    oneToOneIntegrity: findHealthKitWorkoutRelationshipViolations({ links, claims }),
     ambiguousAutoLinked: links.filter((link) => link.matchOutcome === HealthKitStrengthMatchOutcome.AMBIGUOUS).length,
     strategic: {
       healthKitWorkoutsStrategicEligible: perWorkout.filter((item) => item.strategicEligible).length,
