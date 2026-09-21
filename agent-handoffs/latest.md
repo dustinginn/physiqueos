@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Configure Claude remote operations permissions (with Server photo fix deploy) (`claude-remote-ops-permissions-20260921`)
+- Task: Build 48 photo expansion and API upload (archived; API-key upload blocked by cloud-signing permission) (`build48-photo-expand-api-upload-20260921`)
 - Agent: claude
-- Status: completed
-- Generated (UTC): 2026-09-21T14:44:23Z
-- Success: true
+- Status: blocked
+- Generated (UTC): 2026-09-21T15:07:40Z
+- Success: false
 
-Summary: After the Founder explicitly authorized it in chat, Claude user settings were configured (permissions.allow 55 narrow rules, permissions.ask 7 rules gating force pushes and amend, autoMode.environment/allow with $defaults; worktree.baseRef=head and other settings preserved; no secrets). With that, the previously approved Server read-model fix a428fbda (one commit on 714dcaef) was deployed: non-force fast-forward push, stamp-only spec update (which built the stale commit and was superseded), then create-deployment --force-rebuild. Deployment d3783f4c ACTIVE; web and worker source_commit_hash both a428fbda; /live and /ready 200; schema 000014 and instance sizes unchanged. Postdeploy zero-write audit: zero differences across all 29 collection digests, briefing digests and Sep 19 sections vs the predeploy baseline; compiled fix marker in 2 chunks. Functional proof against real state: 18 sessions (duplicate legacy Sep 19 suppressed), canonical Sep 19 latest, its 5 media are the JPEG derivatives, published Sep 19 briefing found, 49 legacy rows untouched. production_mutated is true only in the sense of the code deploy and 4 stamp env values; no production data was written. Xcode archive/exportArchive and a real API-key upload were not exercised (auth-check passes).
+Summary: Build 48 (1.0 (48)) is built, reviewed and archived from clean final SHA bbb46e19 (local unpushed commits: 5dcb52d8 = recovered photo tap-to-expand fix via clean cherry-pick of 8256db4b, bbb46e19 = metadata-only bump). All gates passed and an independent review approved. The Founder-authorized guarded API-key upload (dry run passed every guard; execute run) FAILED at Apple signing: xcodebuild -exportArchive returned 'Cloud signing permission error: You have not been given access to cloud-managed distribution certificates' and 'No iOS Distribution signing certificate for team 33GMTRM6G9 with a private key was found'. No delivery was created; nothing reached App Store Connect; last-uploaded-build stays 47. No fallback to interactive Xcode authentication was attempted. The archive is retained unchanged. Founder Apple-side action is required.
 
-Detailed report: `agent-handoffs/reports/20260921T144423Z-claude-remote-ops-permissions-and-photo-fix-deployed.md`
+Detailed report: `agent-handoffs/reports/20260921T150740Z-build48-photo-expand-api-upload-blocked.md`
 
 Protocol: `agent-handoffs/README.md`

@@ -1,56 +1,59 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T14:44:23Z",
+  "generated_at_utc": "2026-09-21T15:07:40Z",
   "task": {
-    "id": "claude-remote-ops-permissions-20260921",
-    "title": "Configure Claude remote operations permissions (with Server photo fix deploy)",
+    "id": "build48-photo-expand-api-upload-20260921",
+    "title": "Build 48 photo expansion and API upload (archived; API-key upload blocked by cloud-signing permission)",
     "agent": "claude",
-    "status": "completed"
+    "status": "blocked"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "714dcaef03a28f53f7f34f1d825419b253744b53",
-    "final_sha": "a428fbda42757620750264e63eaee18950ab7132",
+    "base_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
+    "final_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
     "production_server_sha": "a428fbda42757620750264e63eaee18950ab7132",
     "production_deployment": "d3783f4c-bc14-469b-b10c-93635a047325",
-    "native_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
-    "native_build": 47
+    "native_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
+    "native_build": 48
   },
   "result": {
-    "summary": "After the Founder explicitly authorized it in chat, Claude user settings were configured (permissions.allow 55 narrow rules, permissions.ask 7 rules gating force pushes and amend, autoMode.environment/allow with $defaults; worktree.baseRef=head and other settings preserved; no secrets). With that, the previously approved Server read-model fix a428fbda (one commit on 714dcaef) was deployed: non-force fast-forward push, stamp-only spec update (which built the stale commit and was superseded), then create-deployment --force-rebuild. Deployment d3783f4c ACTIVE; web and worker source_commit_hash both a428fbda; /live and /ready 200; schema 000014 and instance sizes unchanged. Postdeploy zero-write audit: zero differences across all 29 collection digests, briefing digests and Sep 19 sections vs the predeploy baseline; compiled fix marker in 2 chunks. Functional proof against real state: 18 sessions (duplicate legacy Sep 19 suppressed), canonical Sep 19 latest, its 5 media are the JPEG derivatives, published Sep 19 briefing found, 49 legacy rows untouched. production_mutated is true only in the sense of the code deploy and 4 stamp env values; no production data was written. Xcode archive/exportArchive and a real API-key upload were not exercised (auth-check passes).",
-    "success": true,
-    "production_mutated": true,
-    "deployed": true,
+    "summary": "Build 48 (1.0 (48)) is built, reviewed and archived from clean final SHA bbb46e19 (local unpushed commits: 5dcb52d8 = recovered photo tap-to-expand fix via clean cherry-pick of 8256db4b, bbb46e19 = metadata-only bump). All gates passed and an independent review approved. The Founder-authorized guarded API-key upload (dry run passed every guard; execute run) FAILED at Apple signing: xcodebuild -exportArchive returned 'Cloud signing permission error: You have not been given access to cloud-managed distribution certificates' and 'No iOS Distribution signing certificate for team 33GMTRM6G9 with a private key was found'. No delivery was created; nothing reached App Store Connect; last-uploaded-build stays 47. No fallback to interactive Xcode authentication was attempted. The archive is retained unchanged. Founder Apple-side action is required.",
+    "success": false,
+    "production_mutated": false,
+    "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Inherited from the prior task for exact a428fbda: 9 new regression tests pass; full unit suite candidate 8194 tests / 298 failures vs base 8185 / 298 with zero candidate-only failures; phase suites zero candidate-only failures; production build compiled with the correction marker. Not rerun this task."
+      "summary": "PhotoBriefingTests 29/29 (incl. 2 new regression tests); full Native unit target 1225/1225 (rerun on final SHA bbb46e19, includes HealthKit suites and the renamed build-48 regression); Debug simulator build and unsigned generic Release build succeeded; project regeneration deterministic (identical hash twice) before and after the bump; git diff --check clean; release configuration verified 1.0 (48); launch smoke ok; one temporary simulator UI test (reverted, not committed) showed the hint and tile tap opening Progress Photo detail."
     },
     "review": {
       "status": "approved",
-      "summary": "Independent fresh-context review APPROVE for exact a428fbda (prior task); SHA unchanged since."
+      "summary": "Independent fresh-context review of the exact candidate 5dcb52d8 (diff scope two files; metadata commit then only touches build number): APPROVED, no blockers, covering tap-to-expand correctness, no layout or text change, no V3/Training/DEXA/HealthKit/Server/Progress-Photos-upload change, historical V2 compatibility, and upload-helper security. Non-blockers deferred to backlog."
     },
-    "zero_write_audit": {
-      "status": "passed",
-      "summary": "Postdeploy read-only audit (REPEATABLE READ READ ONLY, transaction_read_only on, owner-scoped, ROLLBACK, marker present) vs predeploy baseline: 0 differences across 29 record digests, briefing digests, energy protocols, Sep 19 session/media/legacy/briefing sections, outbox counts, pending reviews, migrations (14, last 000014). Runtime SHA and build id confirmed in the component."
-    }
+    "zero_write_audit": null
   },
-  "decisions_required": [],
-  "blockers": [],
+  "decisions_required": [
+    "Founder Apple-side action: give the upload path access to cloud-managed distribution certificates. Either (a) create a new App Store Connect team API key (Users and Access > Integrations > App Store Connect API) whose role includes cloud-managed distribution certificate access (the Admin role is the known-sufficient choice), save its private key file under the owner-only ~/.appstoreconnect/private_keys and update ASC_KEY_ID in ~/.physiqueos-release/config/release.conf, or (b) install an iOS Distribution certificate with its private key in the Mac login keychain (for example from Xcode account certificate management by the Account Holder or an Admin) so export can sign locally. Never paste key contents into chat or GitHub. Then publish a NEW task id to retry the upload of the existing archive."
+  ],
+  "blockers": [
+    "API-key upload failed: the installed Developer-role key cannot use cloud-managed distribution signing and no local iOS Distribution certificate with a private key exists for team 33GMTRM6G9. Archive preserved; no interactive fallback used."
+  ],
   "unexpected_findings": [
-    "The classifier refused all self-modification of Claude's permission config until the Founder authorized it in chat; task-prompt authorization alone was not visible to it. After the chat authorization the settings edit, deploy-branch push and doctl deploy verbs all ran.",
-    "The stamp-only spec update again built the OLD commit (deployment dccc8dfb on 714dcaef); the forced rebuild was required. Verified from the deployment API, not from stamps.",
-    "Running any inbox-completion publish marks the inbox task completed; the earlier blocked completion already did, so this final handoff is published as a non-inbox follow-up under the same task id."
+    "The auto-mode classifier denied even the default dry-run of physiqueos-asc-upload until the Founder authorized it in chat, despite the configured narrative allow rule. After chat authorization the dry run passed all 24 guards. A permissions.allow rule for the whole helper (python3 ~/.physiqueos-release/bin/physiqueos-asc-upload *) was then added to the Claude user settings at the Founder's explicit request; no other setting changed.",
+    "The upload failure is at signing, not authentication: the API key authenticates read-only (list-apps) but the Developer role lacks cloud distribution certificate access.",
+    "Because this blocked completion is published with the inbox task id, the inbox task becomes completed; the retry needs a new task id."
   ],
   "backlog": [
-    "Founder on-device Build 47 photo re-check (Sep 19 first image loads, photos 2-5 load, no 'preparing' banner, Read Photo Briefing opens the published briefing, Home and Briefing History unchanged).",
-    "Exercise xcodebuild archive/exportArchive and a real API-key TestFlight upload under the new permissions on the next Native task.",
-    "Later Native task: recover 8256db4b (issue 3), full Build 48 gates, review, bump, archive, API-key upload. Do not start Build 48 or HealthKit before the re-check."
+    "Retry TestFlight upload of the existing Build 48 archive (do not rebuild, rebump or rearchive) after the Founder Apple-side change; prove the API-key path end to end.",
+    "Next Server task (do not implement now): move ALL scheduled briefing generation to 3:00 AM local time, preserving cadence dates, with evidence cutoff semantics that deliberately include the completed prior day plus an ingestion/reconciliation buffer that covers HealthKit sync latency; audit Midweek, Weekly, Monthly and scheduled DEXA/event briefing paths; test timezone/DST and post-midnight/pre-3AM evidence; do not regenerate historical briefings.",
+    "Optional Native polish: the new Photo Briefing tile accessibility label drops the capture date (same trait as the snapshot grid); add a view-level test for the tap wiring.",
+    "Helper hardening (non-blocking, reviewer suggestions): hard-code the team id beside the bundle id; document that -allowProvisioningUpdates can create or modify certificates and profiles via the key; a killed upload leaves a stale state lock that must be removed by hand.",
+    "HealthKit work remains not started."
   ],
-  "recommended_next_step": "Founder: re-check Build 47 Progress Photos on the device (five checks in the report). If it passes, authorize the Build 48 Native task; if anything fails, publish a new task with what you see.",
-  "full_report_path": "agent-handoffs/reports/20260921T144423Z-claude-remote-ops-permissions-and-photo-fix-deployed.md",
+  "recommended_next_step": "Founder: fix Apple-side signing access as described in decisions_required (Admin-role API key with cloud-managed distribution certificate access, or a local iOS Distribution certificate with private key), then publish a new task id to upload the retained Build 48 archive via the guarded helper. Do not start HealthKit until Build 48 is accepted.",
+  "full_report_path": "agent-handoffs/reports/20260921T150740Z-build48-photo-expand-api-upload-blocked.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
