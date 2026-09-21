@@ -297,6 +297,7 @@ enum HealthKitCanaryError: Error, Equatable, Sendable, LocalizedError {
     case stableDeviceIdentityUnavailable
     case invalidCanonicalTestDay
     case canonicalTestDayUnsupported
+    case workoutCanaryUnsupported
 
     var errorDescription: String? {
         switch self {
@@ -309,6 +310,7 @@ enum HealthKitCanaryError: Error, Equatable, Sendable, LocalizedError {
         case .stableDeviceIdentityUnavailable: "A stable enrolled-device identity could not be established."
         case .invalidCanonicalTestDay: "Choose today or one of the last three local days for the canonical test day."
         case .canonicalTestDayUnsupported: "Founder Production does not advertise the controlled canonical test-day contract."
+        case .workoutCanaryUnsupported: "Founder Production does not advertise the Workout canary contract."
         }
     }
 }

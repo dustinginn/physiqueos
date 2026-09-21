@@ -260,11 +260,11 @@ final class HealthKitFounderCanaryCoordinator {
         guard isEnabled else { throw HealthKitCanaryError.disabled }
         guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
         guard let synchronizer = synchronizer as? any HealthKitWorkoutCanarySynchronizing else {
-            throw HealthKitCanaryError.canonicalTestDayUnsupported
+            throw HealthKitCanaryError.workoutCanaryUnsupported
         }
         let contract = try await server.healthKitCanaryContract()
         guard contract.isCompatible else { throw HealthKitCanaryError.serverContractMismatch }
-        guard contract.supportsWorkoutCanary else { throw HealthKitCanaryError.canonicalTestDayUnsupported }
+        guard contract.supportsWorkoutCanary else { throw HealthKitCanaryError.workoutCanaryUnsupported }
         let scope = HealthKitCursorScope(
             ownerIdentity: try await server.founderOwnerIdentity(),
             enrolledDeviceIdentity: try deviceIdentityStore.stableIdentity(),

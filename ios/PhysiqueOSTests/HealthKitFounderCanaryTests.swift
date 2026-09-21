@@ -1227,7 +1227,7 @@ final class HealthKitWorkoutCanaryTests: XCTestCase {
         let old = WorkoutCoordinatorHarness(supportsWorkout: false)
         old.coordinator.setEnabled(true)
         _ = await old.coordinator.requestAuthorization()
-        await XCTAssertThrowsCanaryError(.canonicalTestDayUnsupported) { _ = try await old.coordinator.synchronizeWorkoutCanary(day) }
+        await XCTAssertThrowsCanaryError(.workoutCanaryUnsupported) { _ = try await old.coordinator.synchronizeWorkoutCanary(day) }
         let oldScopes = await old.synchronizer.scopes()
         XCTAssertTrue(oldScopes.isEmpty)
 
@@ -1235,7 +1235,7 @@ final class HealthKitWorkoutCanaryTests: XCTestCase {
         let base = CanaryCoordinatorHarness()
         base.coordinator.setEnabled(true)
         _ = await base.coordinator.requestAuthorization()
-        await XCTAssertThrowsCanaryError(.canonicalTestDayUnsupported) { _ = try await base.coordinator.synchronizeWorkoutCanary(day) }
+        await XCTAssertThrowsCanaryError(.workoutCanaryUnsupported) { _ = try await base.coordinator.synchronizeWorkoutCanary(day) }
     }
 
     func testTheOriginalContractChecksAreUnchangedByTheWorkoutFlag() {

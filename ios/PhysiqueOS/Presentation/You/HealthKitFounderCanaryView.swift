@@ -290,7 +290,7 @@ struct HealthKitFounderCanaryView: View {
                 Text("Workout canary")
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text("Uploads Apple Health workouts for one exact day so a strength session can be matched to your Workout Logger session as a candidate. Nothing is linked automatically, the Logger keeps exercises, sets, and load, and workouts are never used for V3, Confidence, or briefings. Do nothing here unless the coordinating agent asks.")
+                Text("Uploads Apple Health workouts for one exact day so a strength session can be matched to your Workout Logger session as a candidate. Nothing is linked automatically, the Logger keeps exercises, sets, and load, and workouts are never used for V3, Confidence, or briefings. Only sync after the coordinating agent confirms the Workout canary is active for that day: a workout uploaded before activation is stored raw and cannot be canonicalized afterward.")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 Button {
@@ -324,11 +324,10 @@ struct HealthKitFounderCanaryView: View {
                     statusRow("Pending batches", String(workoutResult.diagnostics.pendingBatchCount))
                     let canonicalized = workoutResult.canonicalization.filter(\.wasCanonicalized).count
                     statusRow("Server canonicalized", canonicalized == 0 ? "Nothing new" : "\(canonicalized) workout(s)")
-                    if let reason = workoutResult.canonicalization
-                        .first(where: { !$0.wasCanonicalized && $0.reconciliationState?.contains("canonicalization_deferred") == true })?.reason {
-                        Text("The Server stored these workouts raw and did not canonicalize them (\(reason.replacingOccurrences(of: "_", with: " "))). This is expected until the Workout canary is activated.")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    if canonicalized == 0 && workoutResult.synchronization.additionsDiscovered > 0 {
+                        Text("The Server stored these workouts without canonicalizing them. Tell the coordinating agent before syncing this day again.")
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.chartEffort)
                     }
                     if workoutResult.synchronization.resumedPendingBatch {
                         Text("Resumed an interrupted upload for this day.")
