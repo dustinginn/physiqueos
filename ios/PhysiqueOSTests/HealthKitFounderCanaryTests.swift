@@ -1106,3 +1106,265 @@ private struct CanonicalCoordinatorHarness {
         )
     }
 }
+
+// MARK: - Dormant Workout canary
+
+final class HealthKitWorkoutCanaryTests: XCTestCase {
+    private static let now = HealthKitFounderCanaryTests.now // 2026-09-11T12:00:00Z = 05:00 PDT
+    private static var calendar: Calendar { HealthKitFounderCanaryTests.calendar }
+
+    func testWorkoutCanaryDayIsOneExactRecentLocalDateNeverARangeOrFuture() throws {
+        let day = try HealthKitWorkoutCanaryDay(localDate: "2026-09-11", now: Self.now, calendar: Self.calendar)
+        XCTAssertEqual(day.window.startDate, "2026-09-11")
+        XCTAssertEqual(day.window.endDate, "2026-09-11")
+        XCTAssertEqual(day.predicateVersion, "healthkit-workout-canary-v1:2026-09-11")
+        XCTAssertNoThrow(try HealthKitWorkoutCanaryDay(localDate: "2026-09-08", now: Self.now, calendar: Self.calendar))
+        for invalid in ["2026-09-07", "2026-09-12", "2026-02-31", "", "2026-9-11"] {
+            XCTAssertThrowsError(try HealthKitWorkoutCanaryDay(localDate: invalid, now: Self.now, calendar: Self.calendar), invalid)
+        }
+    }
+
+    func testEngineUploadsOperationalWorkoutsForTheExactDayOnlyAndDropsDeletions() async throws {
+        let day = try Self.day()
+        let harness = try WorkoutCanaryEngineHarness(
+            day: day,
+            additions: [Self.workout(localDate: "2026-09-10"), Self.workout(localDate: "2026-09-11"), Self.workout(localDate: "2026-09-12")],
+            deletions: [.init(healthKitUUID: UUID(), immutableExternalID: nil, objectTypeIdentifier: "HKWorkoutTypeIdentifier")]
+        )
+        let summary = try await harness.engine.synchronizeWorkoutCanary(scope: harness.scope, day: day, calendar: Self.calendar)
+        let partitions = await harness.uploader.partitions()
+        let bounds = await harness.query.bounds()
+        XCTAssertEqual(summary.additionsDiscovered, 3)
+        XCTAssertEqual(summary.additionsFilteredByWindow, 2)
+        XCTAssertEqual(summary.deletionsFilteredByWindow, 1)
+        XCTAssertEqual(partitions.count, 1)
+        XCTAssertEqual(partitions[0].ingestionPurpose, .operational)
+        XCTAssertEqual(partitions[0].additions.map(\.occurrence.localDate), ["2026-09-11"])
+        XCTAssertTrue(partitions[0].deletions.isEmpty)
+        XCTAssertEqual(bounds.count, 1)
+        XCTAssertEqual(bounds[0]?.startLocalDate, "2026-09-11")
+        XCTAssertEqual(bounds[0]?.endLocalDate, "2026-09-11")
+    }
+
+    func testEngineRefusesAScopeThatIsNotTheWorkoutStreamBoundToThatDay() async throws {
+        let day = try Self.day()
+        let harness = try WorkoutCanaryEngineHarness(day: day, additions: [Self.workout()])
+        let wrongStream = HealthKitCursorScope(ownerIdentity: "o", enrolledDeviceIdentity: "d", stream: .activitySummary, predicateVersion: day.predicateVersion)
+        let wrongDate = HealthKitCursorScope(ownerIdentity: "o", enrolledDeviceIdentity: "d", stream: .workouts, predicateVersion: "healthkit-workout-canary-v1:2026-09-10")
+        let testDayScope = HealthKitCursorScope(ownerIdentity: "o", enrolledDeviceIdentity: "d", stream: .workouts, predicateVersion: "healthkit-canonical-testday-v1:2026-09-11")
+        for scope in [wrongStream, wrongDate, testDayScope] {
+            do {
+                _ = try await harness.engine.synchronizeWorkoutCanary(scope: scope, day: day, calendar: Self.calendar)
+                XCTFail("Expected refusal for \(scope.predicateVersion)")
+            } catch {
+                XCTAssertEqual(error as? HealthKitSyncError, .ownerOrDeviceMismatch)
+            }
+        }
+        let calls = await harness.query.callCount()
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testLostAcknowledgementReplaysTheExactWorkoutPartitionWithoutRequery() async throws {
+        let day = try Self.day()
+        let harness = try WorkoutCanaryEngineHarness(day: day, additions: [Self.workout()], uploadModes: [.transient, .accept])
+        _ = try await harness.engine.synchronizeWorkoutCanary(scope: harness.scope, day: day, calendar: Self.calendar)
+        let replay = try await harness.engine.synchronizeWorkoutCanary(scope: harness.scope, day: day, calendar: Self.calendar)
+        let identities = await harness.uploader.identities()
+        XCTAssertTrue(replay.resumedPendingBatch)
+        XCTAssertEqual(identities.count, 2)
+        XCTAssertEqual(identities[0], identities[1])
+        let queryCount = await harness.query.callCount()
+        XCTAssertEqual(queryCount, 1)
+    }
+
+    func testWirePayloadCarriesAppleTelemetryOnlyAndNeverFabricatesExercisesOrSets() throws {
+        let addition = Self.workout()
+        let batch = try HealthKitBatchBuilder().build(
+            scope: HealthKitCursorScope(ownerIdentity: "o", enrolledDeviceIdentity: "d", stream: .workouts, predicateVersion: "healthkit-workout-canary-v1:2026-09-11"),
+            previousCursor: nil,
+            queryResult: .init(additions: [addition], deletions: [], proposedAnchorData: Data("a".utf8), completedAt: Self.now),
+            createdAt: Self.now,
+            ingestionPurpose: .operational
+        )
+        let encoded = try JSONEncoder().encode(try HealthKitS1WireMapper.payload(for: try XCTUnwrap(batch.partitions.first)))
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        let observation = try XCTUnwrap((root["observations"] as? [[String: Any]])?.first)
+        XCTAssertEqual(observation["observationType"] as? String, "workout")
+        XCTAssertEqual(observation["ingestionPurpose"] as? String, "operational")
+        let workout = try XCTUnwrap(observation["workout"] as? [String: Any])
+        XCTAssertEqual(workout["activityType"] as? String, "50")
+        XCTAssertEqual(Set(workout.keys), ["activityType", "durationSeconds", "activeCalories", "averageHeartRate"])
+        XCTAssertNil(observation["activitySummary"])
+        XCTAssertNil(observation["nutritionDailyTotal"])
+        let text = String(decoding: encoded, as: UTF8.self)
+        for forbidden in ["exercises", "sets", "reps", "weight", "Confidence", "Narrative", "Goal", "Strategy", "opaqueAnchor"] {
+            XCTAssertFalse(text.contains(forbidden), "Workout payload contained forbidden field: \(forbidden)")
+        }
+    }
+
+    func testTheLedgerCountsAWorkoutAsCanonicalizedAndADeferralAsNot() {
+        let canonical = HealthKitCanonicalizationReport(observationType: "workout", outcome: "created", reconciliationState: "workout_canonicalized", reason: nil, occurredAt: nil)
+        let deferred = HealthKitCanonicalizationReport(observationType: "workout", outcome: "created", reconciliationState: "workout_canonicalization_deferred", reason: "workout_canonicalization_not_activated", occurredAt: nil)
+        XCTAssertTrue(canonical.wasCanonicalized)
+        XCTAssertFalse(deferred.wasCanonicalized)
+    }
+
+    @MainActor
+    func testCoordinatorRequiresEnableAuthorizationAndTheServerWorkoutContract() async throws {
+        let day = try Self.day()
+        let harness = WorkoutCoordinatorHarness()
+        await XCTAssertThrowsCanaryError(.disabled) { _ = try await harness.coordinator.synchronizeWorkoutCanary(day) }
+        harness.coordinator.setEnabled(true)
+        await XCTAssertThrowsCanaryError(.authorizationRequired) { _ = try await harness.coordinator.synchronizeWorkoutCanary(day) }
+        _ = await harness.coordinator.requestAuthorization()
+        let result = try await harness.coordinator.synchronizeWorkoutCanary(day)
+        let scopes = await harness.synchronizer.scopes()
+        XCTAssertEqual(scopes.map(\.stream), [.workouts])
+        XCTAssertEqual(scopes.first?.predicateVersion, day.predicateVersion)
+        XCTAssertEqual(result.day, day)
+
+        // An older Server without the Workout contract fails closed before any query.
+        let old = WorkoutCoordinatorHarness(supportsWorkout: false)
+        old.coordinator.setEnabled(true)
+        _ = await old.coordinator.requestAuthorization()
+        await XCTAssertThrowsCanaryError(.canonicalTestDayUnsupported) { _ = try await old.coordinator.synchronizeWorkoutCanary(day) }
+        let oldScopes = await old.synchronizer.scopes()
+        XCTAssertTrue(oldScopes.isEmpty)
+
+        // The validation-only synchronizer cannot perform the workout path.
+        let base = CanaryCoordinatorHarness()
+        base.coordinator.setEnabled(true)
+        _ = await base.coordinator.requestAuthorization()
+        await XCTAssertThrowsCanaryError(.canonicalTestDayUnsupported) { _ = try await base.coordinator.synchronizeWorkoutCanary(day) }
+    }
+
+    func testTheOriginalContractChecksAreUnchangedByTheWorkoutFlag() {
+        let contract = HealthKitCanaryServerContract(
+            commandType: HealthKitServerIngestionContract.commandType,
+            contractVersion: HealthKitServerIngestionContract.contractVersion,
+            maximumBatchSize: HealthKitServerIngestionContract.maximumObservationsPerBatch,
+            observationTypes: ["activity_summary", "workout", "quantity_sample"],
+            ingestionPurposes: ["operational", "validation_only"],
+            diagnosticEndpoint: HealthKitServerIngestionContract.activityCanaryDiagnosticEndpoint,
+            hasWorkoutCanonicalActivation: true
+        )
+        XCTAssertTrue(contract.isCompatible)
+        XCTAssertTrue(contract.supportsWorkoutCanary)
+        XCTAssertFalse(contract.supportsCanonicalTestDay)
+    }
+
+    private static func day() throws -> HealthKitWorkoutCanaryDay {
+        try HealthKitWorkoutCanaryDay(localDate: "2026-09-11", now: now, calendar: calendar)
+    }
+
+    fileprivate static func workout(localDate: String = "2026-09-11") -> HealthKitQueryAddition {
+        let day = Int(localDate.suffix(2))!
+        let start = calendar.date(from: DateComponents(year: 2026, month: 9, day: day, hour: 10))!
+        return HealthKitQueryAddition(
+            healthKitUUID: UUID(),
+            objectTypeIdentifier: "HKWorkoutTypeIdentifier",
+            source: .init(bundleIdentifier: "com.apple.health.watch", sourceName: "Apple Watch", sourceRevision: nil, productType: "Watch7,5", privacySafeDeviceProvenance: nil),
+            occurrence: .init(
+                startedAt: start, endedAt: start.addingTimeInterval(3600), localDate: localDate, calendarIdentifier: "gregorian",
+                timeZoneIdentifier: calendar.timeZone.identifier, utcOffsetSeconds: calendar.timeZone.secondsFromGMT(for: start),
+                localDayStartedAt: calendar.startOfDay(for: start), localDayEndedAt: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: start))!
+            ),
+            payload: .workout(.init(
+                activityType: "50", durationSeconds: 3600, activeCalories: 400, totalCalories: nil,
+                distance: nil, distanceUnit: nil, averageHeartRate: 122, telemetryTypeIdentifiers: []
+            )),
+            allowlistedMetadata: [:]
+        )
+    }
+}
+
+private final class WorkoutCanaryEngineHarness {
+    let root: URL
+    let scope: HealthKitCursorScope
+    let store: FileHealthKitSynchronizationStore
+    let query: CanaryQueryMock
+    let uploader: CanaryUploaderMock
+    let engine: HealthKitSynchronizationEngine
+
+    init(
+        day: HealthKitWorkoutCanaryDay,
+        additions: [HealthKitQueryAddition],
+        deletions: [HealthKitQueryDeletion] = [],
+        uploadModes: [CanaryUploaderMock.Mode] = [.accept]
+    ) throws {
+        root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSWorkoutCanaryTests-\(UUID().uuidString)", isDirectory: true)
+        scope = HealthKitCursorScope(
+            ownerIdentity: "user_founder_001", enrolledDeviceIdentity: "founder-device-stable",
+            stream: .workouts, predicateVersion: day.predicateVersion
+        )
+        store = FileHealthKitSynchronizationStore(root: root)
+        query = CanaryQueryMock(result: .init(
+            additions: additions, deletions: deletions,
+            proposedAnchorData: Data("private-device-anchor".utf8), completedAt: HealthKitFounderCanaryTests.now
+        ))
+        uploader = CanaryUploaderMock(modes: uploadModes)
+        engine = HealthKitSynchronizationEngine(
+            queryClient: query, observerClient: CanaryObserverMock(), store: store, uploader: uploader,
+            featureGate: .founderActivityValidation, now: { HealthKitFounderCanaryTests.now }
+        )
+    }
+
+    deinit { try? FileManager.default.removeItem(at: root) }
+}
+
+private actor WorkoutSynchronizerMock: HealthKitWorkoutCanarySynchronizing {
+    private var capturedScopes: [HealthKitCursorScope] = []
+
+    func synchronizeActivityValidation(
+        scope: HealthKitCursorScope, window: HealthKitActivityValidationWindow, calendar: Calendar
+    ) async throws -> HealthKitCanarySyncSummary {
+        XCTFail("The workout canary must not use the validation-only path")
+        throw HealthKitSyncError.featureDisabled
+    }
+
+    func synchronizeWorkoutCanary(
+        scope: HealthKitCursorScope, day: HealthKitWorkoutCanaryDay, calendar: Calendar
+    ) async throws -> HealthKitCanarySyncSummary {
+        capturedScopes.append(scope)
+        return .init(batchIdentity: "healthkit_batch_workout", additionsDiscovered: 1, deletionsDiscovered: 0,
+                     additionsFilteredByWindow: 0, deletionsFilteredByWindow: 0, resumedPendingBatch: false)
+    }
+
+    func diagnostics(scope: HealthKitCursorScope) async throws -> HealthKitStreamDiagnostics {
+        .init(
+            enabled: true, availability: .available, authorizationState: "available_without_read_denial_inference",
+            lastObserverWakeup: nil, lastSuccessfulAnchoredQuery: HealthKitFounderCanaryTests.now, cursorGeneration: 1,
+            cursorDigest: "digest", pendingBatchCount: 0, lastUploadAttempt: HealthKitFounderCanaryTests.now,
+            lastDurableAcknowledgement: HealthKitFounderCanaryTests.now, lastErrorCode: nil, boundedRecoveryCount: 0
+        )
+    }
+
+    func scopes() -> [HealthKitCursorScope] { capturedScopes }
+}
+
+@MainActor
+private struct WorkoutCoordinatorHarness {
+    let synchronizer: WorkoutSynchronizerMock
+    let coordinator: HealthKitFounderCanaryCoordinator
+
+    init(supportsWorkout: Bool = true) {
+        let authorization = CanaryAuthorizationMock()
+        let synchronizer = WorkoutSynchronizerMock()
+        let contract = HealthKitCanaryServerContract(
+            commandType: HealthKitServerIngestionContract.commandType,
+            contractVersion: HealthKitServerIngestionContract.contractVersion,
+            maximumBatchSize: HealthKitServerIngestionContract.maximumObservationsPerBatch,
+            observationTypes: ["activity_summary", "workout", "quantity_sample"],
+            ingestionPurposes: ["operational", "validation_only"],
+            diagnosticEndpoint: HealthKitServerIngestionContract.activityCanaryDiagnosticEndpoint,
+            hasWorkoutCanonicalActivation: supportsWorkout
+        )
+        self.synchronizer = synchronizer
+        self.coordinator = HealthKitFounderCanaryCoordinator(
+            authorization: authorization, synchronizer: synchronizer, server: CanaryServerMock(contract: contract),
+            deviceIdentityStore: CanaryDeviceIdentityStore(), calendar: HealthKitFounderCanaryTests.calendar,
+            now: { HealthKitFounderCanaryTests.now }
+        )
+    }
+}
