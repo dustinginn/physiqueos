@@ -9,7 +9,7 @@
   "target": {
     "agent": "claude",
     "reasoning": "high",
-    "chat_preference": "same_chat_healthkit_phase_2"
+    "chat_preference": "continue_current_chat"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
