@@ -1059,7 +1059,9 @@ struct ProductionTrainingAPI: TrainingAPI {
         ).data
         let occurrences = payload.report.entries.flatMap { session in
             session.exercises.filter { $0.canonicalExerciseId == exerciseId }.map { exercise in
-                TrainingExerciseHistoryOccurrence(
+                var exercise = exercise
+                exercise.sets = exercise.sets.map { $0.classified(defaultLoadType: canonicalExercise.defaultLoadType) }
+                return TrainingExerciseHistoryOccurrence(
                     sessionId: session.id,
                     sessionDate: session.date,
                     exercise: exercise,
@@ -1369,7 +1371,7 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                         defaultLoadType: exercise.defaultLoadType,
                         previouslyPerformed: payload.initialPerformedExerciseIds.contains(exercise.canonicalExerciseId),
                         inMyLibrary: payload.initialMyLibraryExerciseIds.contains(exercise.canonicalExerciseId),
-                        history: Self.history(for: exercise.canonicalExerciseId, in: history),
+                        history: Self.history(for: exercise.canonicalExerciseId, defaultLoadType: exercise.defaultLoadType, in: history),
                         progressionRecommendation: recommendations[exercise.canonicalExerciseId]
                     )
                 }
@@ -1378,8 +1380,9 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         )
     }
 
-    private static func history(
+    static func history(
         for exerciseID: String,
+        defaultLoadType: String? = nil,
         in sessions: [HistorySession]
     ) -> [TrainingLoggerHistoryRecord] {
         sessions.flatMap { session in
@@ -1397,8 +1400,9 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                             weightUnit: set.weightUnit,
                             durationSeconds: set.durationSeconds,
                             loadType: set.loadType,
-                            setType: set.measurementType
-                        )
+                            setType: set.measurementType,
+                            loadSemantics: set.loadSemantics
+                        ).classified(defaultLoadType: defaultLoadType)
                     }
                 )
             }
@@ -1423,13 +1427,13 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
     /// with each set reduced to `{reps, weight, weight_unit}`. Reusing
     /// `TrainingSessionDetailReadModel` here was a Native-side type
     /// mismatch, not a server contract gap.
-    private struct HistorySession: Decodable {
+    struct HistorySession: Decodable {
         var id: String
         var observedAt: String
         var exercises: [HistoryExercise]
     }
 
-    private struct HistoryExercise: Decodable {
+    struct HistoryExercise: Decodable {
         var canonicalExerciseId: String?
         var executionVariant: TrainingExecutionVariant?
         var sets: [HistorySet]
@@ -1440,13 +1444,15 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
     /// array position, mirroring the server's own `index + 1` fallback
     /// wherever it lacks an explicit `set_number`, never a Native
     /// invention.
-    private struct HistorySet: Decodable {
+    struct HistorySet: Decodable {
         var reps: Double?
         var weight: Double?
         var weightUnit: String?
         var durationSeconds: Double?
         var loadType: String?
         var measurementType: String?
+        /// Server `load_semantics` (read-time set-level classification).
+        var loadSemantics: String?
     }
     private struct RawRecommendation: Decodable {
         var canonicalExerciseId: String

@@ -185,16 +185,29 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
             guard let previous = exercise.previousPerformance else { return nil }
             let completed = exercise.sets.filter(\.isCompleted)
             switch exercise.measurement {
-            case .repsLoad:
-                let improved = completed.contains { current in
-                    guard let load = current.load, let reps = current.reps else { return false }
-                    guard let priorBest = previous.sets.filter({ $0.weight == load }).compactMap(\.reps).max() else { return false }
+            case .repsLoad, .bodyweightReps:
+                // Set-level load semantics, not the exercise's default class: reps
+                // only compare at a matched comparison load (bodyweight is the zero
+                // baseline; weighted bodyweight and external loads compare at their
+                // own load), mirroring the Server's `getComparisonLoad`.
+                var priorBestByLoad: [Double: Double] = [:]
+                for set in previous.sets {
+                    let semantics = set.semantics ?? TrainingSetLoadSemantics.classify(
+                        weight: set.weight, weightUnit: set.weightUnit, loadType: set.loadType,
+                        setType: set.setType, defaultLoadType: exercise.defaultLoadType
+                    )
+                    guard let load = semantics.comparisonLoad(weight: set.weight), let reps = set.reps else { continue }
+                    priorBestByLoad[load] = max(priorBestByLoad[load] ?? 0, reps)
+                }
+                let improving = completed.filter { current in
+                    guard let reps = current.reps,
+                          let load = current.loadSemantics(defaultLoadType: exercise.defaultLoadType).comparisonLoad(weight: current.load),
+                          let priorBest = priorBestByLoad[load] else { return false }
                     return reps > priorBest
                 }
-                return improved ? "\(exercise.name) · better reps at matched load" : nil
-            case .bodyweightReps:
-                guard let priorBest = previous.sets.compactMap(\.reps).max() else { return nil }
-                return completed.compactMap(\.reps).max().map { $0 > priorBest } == true ? "\(exercise.name) · bodyweight rep best" : nil
+                guard !improving.isEmpty else { return nil }
+                let onlyBodyweight = improving.allSatisfy { $0.loadSemantics(defaultLoadType: exercise.defaultLoadType) == .bodyweight }
+                return onlyBodyweight ? "\(exercise.name) · bodyweight rep best" : "\(exercise.name) · better reps at matched load"
             case .duration:
                 guard let priorBest = previous.sets.compactMap(\.durationSeconds).max() else { return nil }
                 return completed.compactMap(\.durationSeconds).max().map { $0 > priorBest } == true ? "\(exercise.name) · duration best" : nil
@@ -318,10 +331,31 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
         id = UUID().uuidString
         setNumber = number
         reps = source.reps
-        load = source.weight
-        loadType = source.loadType
+        (load, loadType) = Self.prepopulatedLoad(from: source)
         durationSeconds = source.durationSeconds
         isCompleted = false
+    }
+
+    /// A historical bodyweight set is bodyweight whether it was stored as a
+    /// null load or a numeric `0 lb`; prepopulation carries the bodyweight
+    /// meaning (no load), never the stored zero. Stored history is untouched.
+    static func prepopulatedLoad(from source: TrainingSet) -> (load: Double?, loadType: String?) {
+        source.semantics == .bodyweight ? (nil, "bodyweight") : (source.weight, source.loadType)
+    }
+
+    /// This set's semantic classification, with the exercise default as the
+    /// bodyweight base.
+    func loadSemantics(defaultLoadType: String?) -> TrainingSetLoadSemantics {
+        TrainingSetLoadSemantics.classify(weight: load, loadType: loadType, defaultLoadType: defaultLoadType)
+    }
+
+    /// The canonical write shape. A bodyweight set (any encoding: no load or a
+    /// zero load) is `bodyweight` with no external load; a weighted bodyweight
+    /// or external-load set is `external_load` at its load.
+    func writeRepresentation(defaultLoadType: String?) -> (load: Double?, loadType: String, unit: String) {
+        loadSemantics(defaultLoadType: defaultLoadType) == .bodyweight
+            ? (nil, "bodyweight", "bodyweight")
+            : (load, "external_load", "lb")
     }
 
     func validationMessage(for measurement: TrainingLoggerMeasurement) -> String? {
@@ -582,10 +616,12 @@ extension TrainingLoggerDraft {
         exercises[index].progressionChoice = .suggestion
         for setIndex in exercises[index].sets.indices {
             exercises[index].sets[setIndex].reps = suggestedReps
-            exercises[index].sets[setIndex].load = recommendation.suggestedLoadType == "bodyweight"
-                ? nil
-                : recommendation.suggestedLoad
-            exercises[index].sets[setIndex].loadType = recommendation.suggestedLoadType
+            let suggestedSemantics = TrainingSetLoadSemantics.classify(
+                weight: recommendation.suggestedLoad, loadType: recommendation.suggestedLoadType,
+                defaultLoadType: exercises[index].defaultLoadType
+            )
+            exercises[index].sets[setIndex].load = suggestedSemantics == .bodyweight ? nil : recommendation.suggestedLoad
+            exercises[index].sets[setIndex].loadType = suggestedSemantics == .bodyweight ? "bodyweight" : recommendation.suggestedLoadType
             exercises[index].sets[setIndex].isCompleted = false
         }
     }
@@ -598,8 +634,7 @@ extension TrainingLoggerDraft {
         for setIndex in exercises[index].sets.indices {
             let source = previous.sets[min(setIndex, previous.sets.count - 1)]
             exercises[index].sets[setIndex].reps = source.reps
-            exercises[index].sets[setIndex].load = source.weight
-            exercises[index].sets[setIndex].loadType = source.loadType
+            (exercises[index].sets[setIndex].load, exercises[index].sets[setIndex].loadType) = TrainingLoggerDraftSet.prepopulatedLoad(from: source)
             exercises[index].sets[setIndex].durationSeconds = source.durationSeconds
             exercises[index].sets[setIndex].isCompleted = false
         }
@@ -674,7 +709,11 @@ extension TrainingLoggerDraft {
             relationship: relationship
         ) else { return nil }
         let context = [occurrence.exercise.executionVariant?.label, occurrence.relationship?.label].compactMap { $0 }.joined(separator: " · ")
-        return .init(workoutDate: occurrence.sessionDate, sets: occurrence.exercise.sets, contextLabel: context.isEmpty ? "Ordinary · Standalone" : context)
+        return .init(
+            workoutDate: occurrence.sessionDate,
+            sets: occurrence.exercise.sets.map { $0.classified(defaultLoadType: item.defaultLoadType) },
+            contextLabel: context.isEmpty ? "Ordinary · Standalone" : context
+        )
     }
 
     private mutating func refreshPreviousPerformance(at index: Int, catalog: [TrainingLoggerCatalogExercise]) {

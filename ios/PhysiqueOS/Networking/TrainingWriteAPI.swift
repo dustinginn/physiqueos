@@ -114,15 +114,14 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                 occurrenceId: exercise.id,
                 executionVariant: exercise.executionVariant,
                 sets: completed.map { set in
-                    let defaultsToBodyweight = exercise.defaultLoadType == "bodyweight"
-                    let bodyweightOnly = defaultsToBodyweight && set.load == nil
+                    let write = set.writeRepresentation(defaultLoadType: exercise.defaultLoadType)
                     return SetPayload(
                         setId: set.id,
                         reps: set.reps,
                         durationSeconds: set.durationSeconds,
-                        load: bodyweightOnly ? nil : set.load,
-                        loadType: bodyweightOnly ? "bodyweight" : "external_load",
-                        unit: bodyweightOnly ? "bodyweight" : "lb"
+                        load: write.load,
+                        loadType: write.loadType,
+                        unit: write.unit
                     )
                 }
             )
@@ -310,15 +309,13 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             let actualSets = actual.sets.sorted { $0.setNumber < $1.setNumber }
             guard expectedSets.count == actualSets.count else { return false }
             for (left, right) in zip(expectedSets, actualSets) {
-                let expectedLoadType = left.loadType ?? (expected.defaultLoadType == "bodyweight" && left.load == nil
-                    ? "bodyweight" : "external_load")
-                let expectedWeightUnit = expectedLoadType == "bodyweight" ? "bodyweight" : "lb"
+                let write = left.writeRepresentation(defaultLoadType: expected.defaultLoadType)
                 guard left.setNumber == right.setNumber,
                       left.reps == right.reps,
                       left.durationSeconds == right.durationSeconds,
-                      left.load == right.weight,
-                      expectedLoadType == right.loadType,
-                      expectedWeightUnit == right.weightUnit
+                      write.load == right.weight,
+                      write.loadType == right.loadType,
+                      write.unit == right.weightUnit
                 else { return false }
             }
         }

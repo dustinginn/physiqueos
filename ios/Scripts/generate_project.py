@@ -380,6 +380,7 @@ test_files = [
     ("PhysiqueOSTests", "TrainingSessionDetailPresentationTests.swift"),
     ("PhysiqueOSTests", "TrainingStrategyAPITests.swift"),
     ("PhysiqueOSTests", "BriefingV3PresentationTests.swift"),
+    ("PhysiqueOSTests", "TrainingLoadSemanticsTests.swift"),
 ]
 
 ui_test_files = [

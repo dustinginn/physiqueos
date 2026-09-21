@@ -437,8 +437,52 @@ struct TrainingSet: Codable, Equatable, Identifiable {
     var durationSeconds: Double?
     var loadType: String?
     var setType: String?
+    /// The Server's read-time set-level load semantics (`load_semantics`:
+    /// `bodyweight`, `weighted_bodyweight`, `external_load`, `unknown`).
+    /// Present on the Training Logger history and performance projections;
+    /// nil elsewhere, where Native may only classify with a known exercise
+    /// default (see `TrainingSetLoadSemantics.classify`).
+    var loadSemantics: String? = nil
 
     var id: String { String(setNumber) }
+}
+
+/// Swift mirror of the Server's `classifyTrainingSetLoad`
+/// (`src/domain/models/trainingSetLoadSemantics.js`). It is a read-time
+/// classification that never rewrites history: a bodyweight-default
+/// exercise with a null or numeric-zero load is bodyweight, with a positive
+/// load it is weighted bodyweight (the load is added weight), and any other
+/// exercise's numeric load, including zero, is an external load. Native uses
+/// this only where the Server has not already supplied `load_semantics`.
+enum TrainingSetLoadSemantics: String, Equatable {
+    case bodyweight
+    case weightedBodyweight = "weighted_bodyweight"
+    case externalLoad = "external_load"
+    case unknown
+
+    static func classify(
+        weight: Double?, weightUnit: String? = nil, loadType: String? = nil,
+        setType: String? = nil, defaultLoadType: String? = nil
+    ) -> Self {
+        if let weight, !weight.isFinite || weight < 0 { return .unknown }
+        let explicitBodyweight = loadType == "bodyweight" || weightUnit == "bodyweight" || setType == "bodyweight_reps"
+        if explicitBodyweight { return (weight ?? 0) > 0 ? .unknown : .bodyweight }
+        if defaultLoadType == "bodyweight" {
+            return (weight ?? 0) == 0 ? .bodyweight : .weightedBodyweight
+        }
+        return weight == nil ? .unknown : .externalLoad
+    }
+
+    /// The load a set is compared at for "reps at load": bodyweight is the
+    /// zero baseline whatever its stored encoding; an unclassifiable set has
+    /// no comparable load.
+    func comparisonLoad(weight: Double?) -> Double? {
+        switch self {
+        case .bodyweight: 0
+        case .unknown: nil
+        case .weightedBodyweight, .externalLoad: weight
+        }
+    }
 }
 
 /// `src/domain/models/trainingExerciseRelationship.js` — the only
@@ -453,9 +497,22 @@ struct TrainingExerciseRelationshipGroup: Codable, Equatable, Identifiable {
 // MARK: - Presentation helpers mirroring `src/presentation/trainingPresentation.js`
 
 extension TrainingSet {
-    /// Mirrors `isBodyweightSet`.
+    /// The Server's semantic classification when supplied.
+    var semantics: TrainingSetLoadSemantics? {
+        loadSemantics.flatMap(TrainingSetLoadSemantics.init(rawValue:))
+    }
+
+    /// Mirrors `isBodyweightSet`, deferring to the Server's set-level
+    /// semantics when present so a historical `0 lb` bodyweight set reads
+    /// the same as a null-load one, and a weighted bodyweight set never
+    /// reads as bodyweight.
     var isBodyweight: Bool {
-        weightUnit == "bodyweight" || loadType == "bodyweight" || setType == "bodyweight_reps"
+        switch semantics {
+        case .bodyweight: true
+        case .weightedBodyweight, .externalLoad: false
+        case .unknown, nil:
+            weightUnit == "bodyweight" || loadType == "bodyweight" || setType == "bodyweight_reps"
+        }
     }
 
     /// Mirrors `formatTrainingLoad`.
@@ -463,6 +520,18 @@ extension TrainingSet {
         if durationSeconds != nil { return "Timed" }
         guard let weight, !isBodyweight else { return "BW" }
         return "\(Self.formatNumber(weight)) \(weightUnit ?? "lb")"
+    }
+
+    /// The same set stamped with a semantic classification when the Server
+    /// supplied none and the exercise's default load type is known.
+    func classified(defaultLoadType: String?) -> TrainingSet {
+        guard loadSemantics == nil else { return self }
+        var copy = self
+        copy.loadSemantics = TrainingSetLoadSemantics.classify(
+            weight: weight, weightUnit: weightUnit, loadType: loadType,
+            setType: setType, defaultLoadType: defaultLoadType
+        ).rawValue
+        return copy
     }
 
     /// Mirrors the session-detail screen's own `formatSetDetail`

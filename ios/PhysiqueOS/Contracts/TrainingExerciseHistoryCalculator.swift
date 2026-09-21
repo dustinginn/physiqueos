@@ -13,13 +13,23 @@ enum TrainingExerciseHistoryCalculator {
     /// means `lhs` is the better set; `0` means equal; positive means
     /// `rhs` is better.
     static func compare(_ lhs: TrainingSet?, _ rhs: TrainingSet?) -> Int {
-        let lhsWeight = lhs?.weight ?? -1
-        let rhsWeight = rhs?.weight ?? -1
+        let lhsWeight = rankingLoad(lhs)
+        let rhsWeight = rankingLoad(rhs)
         if lhsWeight != rhsWeight { return lhsWeight > rhsWeight ? -1 : 1 }
         let lhsReps = lhs?.reps ?? -1
         let rhsReps = rhs?.reps ?? -1
         if lhsReps != rhsReps { return lhsReps > rhsReps ? -1 : 1 }
         return 0
+    }
+
+    /// A set with Server (or default-classified) semantics ranks at its
+    /// comparison load, so a null-load and a numeric-zero bodyweight set are
+    /// the same performance; an unclassified set keeps the source's raw
+    /// weight, `-1` when missing.
+    private static func rankingLoad(_ set: TrainingSet?) -> Double {
+        guard let set else { return -1 }
+        if let semantics = set.semantics { return semantics.comparisonLoad(weight: set.weight) ?? -1 }
+        return set.weight ?? -1
     }
 
     /// The single best set among `sets`, per `compare(_:_:)`. `nil` for an

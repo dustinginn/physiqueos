@@ -2956,6 +2956,8 @@ final class FounderServerAPITests: XCTestCase {
                 sets: [
                     TrainingLoggerDraftSet(id: "set-bw", setNumber: 1, reps: 8, load: nil, loadType: "bodyweight", durationSeconds: nil, isCompleted: true),
                     TrainingLoggerDraftSet(id: "set-added", setNumber: 2, reps: 6, load: 25, loadType: "external_load", durationSeconds: nil, isCompleted: true),
+                    // A historical numeric zero must never reach the wire as external_load 0 lb.
+                    TrainingLoggerDraftSet(id: "set-zero", setNumber: 3, reps: 5, load: 0, loadType: "external_load", durationSeconds: nil, isCompleted: true),
                 ],
                 previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
                 isProvisional: false, provenance: nil
@@ -2986,6 +2988,10 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertNil(bodyweightSets[0]["load"])
         XCTAssertEqual(bodyweightSets[1]["loadType"] as? String, "external_load")
         XCTAssertEqual(bodyweightSets[1]["load"] as? Double, 25)
+        XCTAssertEqual(bodyweightSets[1]["unit"] as? String, "lb")
+        XCTAssertEqual(bodyweightSets[2]["loadType"] as? String, "bodyweight")
+        XCTAssertNil(bodyweightSets[2]["load"], "unweighted bodyweight carries no external load value")
+        XCTAssertEqual(bodyweightSets[2]["unit"] as? String, "bodyweight")
     }
 
     func testProductionTrainingCommitRecoversLostAcknowledgementWithSameIdempotencyKey() async throws {
