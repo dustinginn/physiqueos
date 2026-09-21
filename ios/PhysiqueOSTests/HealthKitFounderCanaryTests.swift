@@ -615,3 +615,447 @@ private func XCTAssertThrowsCanaryError<T>(
         XCTFail("Unexpected error: \(error)", file: file, line: line)
     }
 }
+
+// MARK: - Controlled canonical test day (Activity + Nutrition)
+
+final class HealthKitCanonicalTestDayTests: XCTestCase {
+    private static let now = HealthKitFounderCanaryTests.now // 2026-09-12T12:00:00Z = 05:00 PDT
+    private static var calendar: Calendar { HealthKitFounderCanaryTests.calendar }
+
+    // MARK: exact-day model
+
+    func testTestDayIsOneExactRecentLocalDateNeverARangeOrFuture() throws {
+        let today = try HealthKitCanonicalTestDay(localDate: "2026-09-11", now: Self.now, calendar: Self.calendar)
+        XCTAssertEqual(today.window.startDate, "2026-09-11")
+        XCTAssertEqual(today.window.endDate, "2026-09-11")
+        XCTAssertEqual(today.predicateVersion, "healthkit-canonical-testday-v1:2026-09-11")
+        XCTAssertTrue(today.isProvisional(now: Self.now, calendar: Self.calendar))
+        XCTAssertEqual(today.streams, [.activitySummary, .nutritionDailyTotal])
+        XCTAssertNoThrow(try HealthKitCanonicalTestDay(localDate: "2026-09-10", now: Self.now, calendar: Self.calendar))
+        XCTAssertNoThrow(try HealthKitCanonicalTestDay(localDate: "2026-09-08", now: Self.now, calendar: Self.calendar))
+        for invalid in ["2026-09-07", "2026-09-12", "2026-02-31", "", "2026-9-11"] {
+            XCTAssertThrowsError(try HealthKitCanonicalTestDay(localDate: invalid, now: Self.now, calendar: Self.calendar), invalid)
+        }
+    }
+
+    func testNutritionDailyTotalStreamIsDeliverableNutritionDomainAndNotAPerSampleStream() {
+        XCTAssertEqual(HealthKitSynchronizationStream.nutritionDailyTotal.deliveryCapability, .s1(observationType: .nutritionDailyTotal))
+        XCTAssertEqual(HealthKitSynchronizationStream.nutritionDailyTotal.domain, .nutrition)
+        XCTAssertEqual(HealthKitS1ObservationType.nutritionDailyTotal.rawValue, "nutrition_daily_total")
+        XCTAssertEqual(HealthKitSynchronizationStream.nutritionEnergy.deliveryCapability, .s1(observationType: .quantitySample))
+    }
+
+    // MARK: snapshot rules
+
+    func testSnapshotEmitsCaloriesProteinCarbsFatOnlyWithPartialCoverageForToday() throws {
+        let output = try Self.build(energy: ["2026-09-11": 1800], protein: ["2026-09-11": 150], carbs: ["2026-09-11": 180], fat: ["2026-09-11": 55])
+        let addition = try XCTUnwrap(output.additions.first)
+        guard case let .nutritionDailyTotal(total) = addition.payload else { return XCTFail("Expected nutrition daily total") }
+        XCTAssertEqual(total.dailyNutrition, ["calories": 1800, "protein_g": 150, "carbs_g": 180, "fat_g": 55])
+        XCTAssertEqual(Set(total.dailyNutrition.keys), HealthKitQueryNutritionDailyTotal.permittedKeys)
+        XCTAssertEqual(total.coverage, .partialDay)
+        XCTAssertEqual(total.sourceRevision, 1)
+        XCTAssertEqual(total.aggregationScope, "daily_total_all_sources")
+        XCTAssertEqual(addition.occurrence.localDate, "2026-09-11")
+        XCTAssertNil(addition.occurrence.startedAt)
+        XCTAssertNil(addition.healthKitUUID)
+    }
+
+    func testSnapshotCompletedDayIsCompleteAndMissingMacrosAreZeroNotInvented() throws {
+        let output = try Self.build(energy: ["2026-09-10": 2400], protein: [:], carbs: [:], fat: [:], start: "2026-09-10", end: "2026-09-10")
+        guard case let .nutritionDailyTotal(total) = try XCTUnwrap(output.additions.first).payload else { return XCTFail("Expected nutrition daily total") }
+        XCTAssertEqual(total.coverage, .completeDay)
+        XCTAssertEqual(total.dailyNutrition["protein_g"], 0)
+    }
+
+    func testSnapshotIsIdempotentAndAdvancesRevisionOnlyWhenTheDayChanges() throws {
+        let first = try Self.build(energy: ["2026-09-11": 1800], protein: ["2026-09-11": 150], carbs: [:], fat: [:])
+        XCTAssertEqual(first.additions.count, 1)
+        let unchanged = try Self.build(energy: ["2026-09-11": 1800], protein: ["2026-09-11": 150], carbs: [:], fat: [:], prior: first.cursor)
+        XCTAssertTrue(unchanged.additions.isEmpty)
+        XCTAssertEqual(unchanged.cursor, first.cursor)
+        let changed = try Self.build(energy: ["2026-09-11": 2100], protein: ["2026-09-11": 170], carbs: [:], fat: [:], prior: first.cursor)
+        guard case let .nutritionDailyTotal(total) = try XCTUnwrap(changed.additions.first).payload else { return XCTFail("Expected nutrition daily total") }
+        XCTAssertEqual(total.sourceRevision, 2)
+        XCTAssertEqual(total.dailyNutrition["calories"], 2100)
+    }
+
+    func testEmptyDayWithNoPriorUploadEmitsNothingButPreviouslyUploadedDayBecomesZeroRevision() throws {
+        let empty = try Self.build(energy: [:], protein: [:], carbs: [:], fat: [:])
+        XCTAssertTrue(empty.additions.isEmpty)
+        XCTAssertTrue(empty.cursor.entries.isEmpty)
+
+        let first = try Self.build(energy: ["2026-09-11": 900], protein: [:], carbs: [:], fat: [:])
+        let cleared = try Self.build(energy: [:], protein: [:], carbs: [:], fat: [:], prior: first.cursor)
+        guard case let .nutritionDailyTotal(total) = try XCTUnwrap(cleared.additions.first).payload else { return XCTFail("Expected zero revision") }
+        XCTAssertEqual(total.dailyNutrition, ["calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0])
+        XCTAssertEqual(total.sourceRevision, 2)
+    }
+
+    func testSnapshotIgnoresDaysOutsideTheBounds() throws {
+        let output = try Self.build(energy: ["2026-09-10": 2000, "2026-09-12": 300], protein: [:], carbs: [:], fat: [:])
+        XCTAssertTrue(output.additions.isEmpty)
+    }
+
+    // MARK: wire contract
+
+    func testWirePayloadCarriesNutritionDailyTotalOperationalWithNoMealsOrStrategicFields() throws {
+        let output = try Self.build(energy: ["2026-09-11": 1800], protein: ["2026-09-11": 150], carbs: ["2026-09-11": 180], fat: ["2026-09-11": 55])
+        let scope = Self.scope(.nutritionDailyTotal, "2026-09-11")
+        let batch = try HealthKitBatchBuilder().build(
+            scope: scope,
+            previousCursor: nil,
+            queryResult: .init(additions: output.additions, deletions: [], proposedAnchorData: try output.encodedCursor(), completedAt: Self.now),
+            createdAt: Self.now,
+            ingestionPurpose: .operational
+        )
+        let partition = try XCTUnwrap(batch.partitions.first)
+        XCTAssertEqual(partition.ingestionPurpose, .operational)
+        let encoded = try JSONEncoder().encode(try HealthKitS1WireMapper.payload(for: partition))
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        let observation = try XCTUnwrap((root["observations"] as? [[String: Any]])?.first)
+        XCTAssertEqual(observation["observationType"] as? String, "nutrition_daily_total")
+        XCTAssertEqual(observation["externalId"] as? String, "nutrition-daily-total:2026-09-11")
+        XCTAssertEqual(observation["ingestionPurpose"] as? String, "operational")
+        let total = try XCTUnwrap(observation["nutritionDailyTotal"] as? [String: Any])
+        XCTAssertEqual(total["aggregationScope"] as? String, "daily_total_all_sources")
+        XCTAssertEqual(total["coverage"] as? String, "partial_day")
+        XCTAssertEqual(total["sourceRevision"] as? Int, 1)
+        XCTAssertEqual(Set(try XCTUnwrap(total["dailyNutrition"] as? [String: Double]).keys), ["calories", "protein_g", "carbs_g", "fat_g"])
+        XCTAssertNil(observation["activitySummary"])
+        XCTAssertNil(observation["quantitySample"])
+        let text = String(decoding: encoded, as: UTF8.self)
+        for forbidden in ["meals", "Meal", "opaqueAnchor", "Confidence", "Narrative", "Goal", "Strategy", "coaching", "fiber"] {
+            XCTAssertFalse(text.contains(forbidden), "Wire payload contained forbidden field: \(forbidden)")
+        }
+    }
+
+    func testWireMapperRefusesNutritionWithUnlistedKeysMissingCaloriesOrNegativeValues() throws {
+        func addition(_ nutrition: [String: Double], scope: String = "daily_total_all_sources", revision: UInt64 = 1) -> NormalizedHealthKitObservation {
+            var value = Self.rawAddition()
+            value = HealthKitQueryAddition(
+                healthKitUUID: nil,
+                objectTypeIdentifier: value.objectTypeIdentifier,
+                source: value.source,
+                occurrence: value.occurrence,
+                payload: .nutritionDailyTotal(.init(dailyNutrition: nutrition, aggregationScope: scope, coverage: .completeDay, sourceRevision: revision)),
+                allowlistedMetadata: [:]
+            )
+            return HealthKitObservationNormalizer().normalize(value)
+        }
+        XCTAssertTrue(HealthKitS1WireMapper.canDeliver(addition(["calories": 1, "protein_g": 1, "carbs_g": 1, "fat_g": 1])))
+        XCTAssertFalse(HealthKitS1WireMapper.canDeliver(addition(["calories": 1, "fiber_g": 3])))
+        XCTAssertFalse(HealthKitS1WireMapper.canDeliver(addition(["protein_g": 10])))
+        XCTAssertFalse(HealthKitS1WireMapper.canDeliver(addition(["calories": -1])))
+        XCTAssertFalse(HealthKitS1WireMapper.canDeliver(addition(["calories": 1], scope: "single_source")))
+        XCTAssertFalse(HealthKitS1WireMapper.canDeliver(addition(["calories": 1], revision: 0)))
+    }
+
+    // MARK: engine
+
+    func testEngineUploadsOperationalExactDayOnlyAndDropsDeletions() async throws {
+        let testDay = try Self.testDay()
+        let harness = try CanonicalEngineHarness(
+            stream: .activitySummary,
+            testDay: testDay,
+            additions: [
+                Self.rawAddition(localDate: "2026-09-10"),
+                Self.rawAddition(localDate: "2026-09-11"),
+                Self.rawAddition(localDate: "2026-09-12"),
+            ],
+            deletions: [.init(healthKitUUID: UUID(), immutableExternalID: "activity-summary:2026-09-11", objectTypeIdentifier: "HKActivitySummaryType")]
+        )
+        let summary = try await harness.engine.synchronizeCanonicalTestDay(scope: harness.scope, testDay: testDay, calendar: Self.calendar)
+        let partitions = await harness.uploader.partitions()
+        let bounds = await harness.query.bounds()
+        XCTAssertEqual(summary.additionsDiscovered, 3)
+        XCTAssertEqual(summary.additionsFilteredByWindow, 2)
+        XCTAssertEqual(summary.deletionsFilteredByWindow, 1)
+        XCTAssertEqual(partitions.count, 1)
+        XCTAssertEqual(partitions[0].ingestionPurpose, .operational)
+        XCTAssertEqual(partitions[0].additions.map(\.occurrence.localDate), ["2026-09-11"])
+        XCTAssertTrue(partitions[0].deletions.isEmpty)
+        XCTAssertEqual(bounds.count, 1)
+        XCTAssertEqual(bounds[0]?.startLocalDate, "2026-09-11")
+        XCTAssertEqual(bounds[0]?.endLocalDate, "2026-09-11")
+        let cursor = try await harness.store.authoritativeCursor(for: harness.scope)
+        XCTAssertNotNil(cursor)
+    }
+
+    func testEngineRefusesAScopeThatIsNotBoundToTheTestDayOrAnUnsupportedStream() async throws {
+        let testDay = try Self.testDay()
+        let harness = try CanonicalEngineHarness(stream: .activitySummary, testDay: testDay, additions: [Self.rawAddition()])
+        let wrongDate = HealthKitCursorScope(ownerIdentity: "o", enrolledDeviceIdentity: "d", stream: .activitySummary, predicateVersion: "healthkit-canonical-testday-v1:2026-09-10")
+        let wrongStream = HealthKitCursorScope(ownerIdentity: "o", enrolledDeviceIdentity: "d", stream: .workouts, predicateVersion: testDay.predicateVersion)
+        let validationScope = HealthKitCursorScope(ownerIdentity: "o", enrolledDeviceIdentity: "d", stream: .activitySummary, predicateVersion: HealthKitFounderCanaryTests.window().predicateVersion)
+        for scope in [wrongDate, wrongStream, validationScope] {
+            do {
+                _ = try await harness.engine.synchronizeCanonicalTestDay(scope: scope, testDay: testDay, calendar: Self.calendar)
+                XCTFail("Expected refusal for \(scope.predicateVersion)")
+            } catch {
+                XCTAssertEqual(error as? HealthKitSyncError, .ownerOrDeviceMismatch)
+            }
+        }
+        let calls = await harness.query.callCount()
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testLostAcknowledgementReplaysTheExactOperationalPartitionWithoutRequery() async throws {
+        let testDay = try Self.testDay()
+        let harness = try CanonicalEngineHarness(
+            stream: .nutritionDailyTotal, testDay: testDay,
+            additions: [Self.rawAddition(stream: .nutritionDailyTotal)],
+            uploadModes: [.transient, .accept]
+        )
+        _ = try await harness.engine.synchronizeCanonicalTestDay(scope: harness.scope, testDay: testDay, calendar: Self.calendar)
+        let pending = try await harness.store.pendingBatches(for: harness.scope)
+        XCTAssertEqual(pending.first?.ingestionPurpose, .operational)
+        let replay = try await harness.engine.synchronizeCanonicalTestDay(scope: harness.scope, testDay: testDay, calendar: Self.calendar)
+        let identities = await harness.uploader.identities()
+        XCTAssertTrue(replay.resumedPendingBatch)
+        XCTAssertEqual(identities.count, 2)
+        XCTAssertEqual(identities[0], identities[1])
+        let queryCount = await harness.query.callCount()
+        XCTAssertEqual(queryCount, 1)
+    }
+
+    func testAPendingValidationOnlyBatchIsNeverResumedAsOperational() async throws {
+        let testDay = try Self.testDay()
+        let harness = try CanonicalEngineHarness(stream: .activitySummary, testDay: testDay, additions: [Self.rawAddition()])
+        let batch = try HealthKitBatchBuilder().build(
+            scope: harness.scope,
+            previousCursor: nil,
+            queryResult: .init(additions: [Self.rawAddition()], deletions: [], proposedAnchorData: Data("a".utf8), completedAt: Self.now),
+            createdAt: Self.now,
+            ingestionPurpose: .validationOnly
+        )
+        try await harness.store.stage(batch)
+        do {
+            _ = try await harness.engine.synchronizeCanonicalTestDay(scope: harness.scope, testDay: testDay, calendar: Self.calendar)
+            XCTFail("A validation-only batch must never be uploaded as operational")
+        } catch {
+            XCTAssertEqual(error as? HealthKitSyncError, .ownerOrDeviceMismatch)
+        }
+        let uploads = await harness.uploader.partitions()
+        XCTAssertTrue(uploads.isEmpty)
+    }
+
+    // MARK: coordinator
+
+    @MainActor
+    func testCoordinatorRunsActivityThenNutritionBoundToTheTestDayAfterExplicitEnableAndAuthorization() async throws {
+        let harness = CanonicalCoordinatorHarness()
+        let testDay = try Self.testDay()
+        await XCTAssertThrowsCanaryError(.disabled) { _ = try await harness.coordinator.synchronizeCanonicalTestDay(testDay) }
+        harness.coordinator.setEnabled(true)
+        await XCTAssertThrowsCanaryError(.authorizationRequired) { _ = try await harness.coordinator.synchronizeCanonicalTestDay(testDay) }
+        let untouched = await harness.synchronizer.scopes()
+        XCTAssertTrue(untouched.isEmpty)
+
+        _ = await harness.coordinator.requestAuthorization()
+        let result = try await harness.coordinator.synchronizeCanonicalTestDay(testDay)
+        let scopes = await harness.synchronizer.scopes()
+        XCTAssertEqual(scopes.map(\.stream), [.activitySummary, .nutritionDailyTotal])
+        XCTAssertTrue(scopes.allSatisfy { $0.predicateVersion == testDay.predicateVersion })
+        XCTAssertTrue(scopes.allSatisfy { $0.ownerIdentity == "user_founder_001" && $0.enrolledDeviceIdentity == "founder-device-stable" })
+        XCTAssertTrue(result.endDateIsProvisional)
+        XCTAssertEqual(result.testDay, testDay)
+    }
+
+    @MainActor
+    func testCoordinatorFailsClosedWithoutTheServerCanonicalContractOrACapableSynchronizer() async throws {
+        let testDay = try Self.testDay()
+        // Server without the canonical contract (an older Server).
+        let old = CanonicalCoordinatorHarness(supportsCanonical: false)
+        old.coordinator.setEnabled(true)
+        _ = await old.coordinator.requestAuthorization()
+        await XCTAssertThrowsCanaryError(.canonicalTestDayUnsupported) { _ = try await old.coordinator.synchronizeCanonicalTestDay(testDay) }
+        let oldScopes = await old.synchronizer.scopes()
+        XCTAssertTrue(oldScopes.isEmpty)
+
+        // The original validation-only synchronizer cannot perform the operational path.
+        let base = CanaryCoordinatorHarness()
+        base.coordinator.setEnabled(true)
+        _ = await base.coordinator.requestAuthorization()
+        await XCTAssertThrowsCanaryError(.canonicalTestDayUnsupported) { _ = try await base.coordinator.synchronizeCanonicalTestDay(testDay) }
+        let baseCount = await base.synchronizer.syncCount()
+        XCTAssertEqual(baseCount, 0)
+    }
+
+    func testTheOriginalThreeTypeContractStillPassesTheValidationCanaryCompatibilityCheck() {
+        let contract = HealthKitCanaryServerContract(
+            commandType: HealthKitServerIngestionContract.commandType,
+            contractVersion: HealthKitServerIngestionContract.contractVersion,
+            maximumBatchSize: HealthKitServerIngestionContract.maximumObservationsPerBatch,
+            observationTypes: ["activity_summary", "workout", "quantity_sample"],
+            ingestionPurposes: ["operational", "validation_only"],
+            diagnosticEndpoint: HealthKitServerIngestionContract.activityCanaryDiagnosticEndpoint,
+            additionalObservationTypes: ["nutrition_daily_total"],
+            hasCanonicalDailyActivation: true
+        )
+        XCTAssertTrue(contract.isCompatible)
+        XCTAssertTrue(contract.supportsCanonicalTestDay)
+    }
+
+    // MARK: helpers
+
+    private static func testDay() throws -> HealthKitCanonicalTestDay {
+        try HealthKitCanonicalTestDay(localDate: "2026-09-11", now: now, calendar: calendar)
+    }
+
+    fileprivate static func scope(_ stream: HealthKitSynchronizationStream, _ date: String) -> HealthKitCursorScope {
+        HealthKitCursorScope(
+            ownerIdentity: "user_founder_001",
+            enrolledDeviceIdentity: "founder-device-stable",
+            stream: stream,
+            predicateVersion: "healthkit-canonical-testday-v1:\(date)"
+        )
+    }
+
+    private static func build(
+        energy: [String: Double], protein: [String: Double], carbs: [String: Double], fat: [String: Double],
+        prior: HealthKitNutritionDailySnapshotBuilder.Cursor = .init(entries: [:]),
+        start: String = "2026-09-11", end: String = "2026-09-11"
+    ) throws -> HealthKitNutritionDailySnapshotBuilder.Output {
+        let window = try HealthKitActivityValidationWindow(startDate: start, endDate: end)
+        return try HealthKitNutritionDailySnapshotBuilder.build(
+            energy: energy, protein: protein, carbohydrates: carbs, fat: fat, prior: prior,
+            bounds: try window.queryBounds(calendar: calendar), calendar: calendar, now: now
+        )
+    }
+
+    fileprivate static func rawAddition(
+        localDate: String = "2026-09-11",
+        stream: HealthKitSynchronizationStream = .activitySummary
+    ) -> HealthKitQueryAddition {
+        let day = Int(localDate.suffix(2))!
+        let start = calendar.date(from: DateComponents(year: 2026, month: 9, day: day))!
+        let payload: HealthKitQueryPayload = stream == .nutritionDailyTotal
+            ? .nutritionDailyTotal(.init(
+                dailyNutrition: ["calories": 1800, "protein_g": 150, "carbs_g": 180, "fat_g": 55],
+                aggregationScope: "daily_total_all_sources", coverage: .partialDay, sourceRevision: 1))
+            : .activitySummary(.init(
+                dailyActivity: ["move_calories": 600, "exercise_minutes": 30, "stand_hours": 10],
+                aggregationScope: "daily_total_including_workouts", coverage: .partialDay, sourceRevision: 1))
+        return HealthKitQueryAddition(
+            healthKitUUID: nil,
+            objectTypeIdentifier: stream.objectTypeIdentifier,
+            source: .init(bundleIdentifier: "com.apple.Health", sourceName: "Apple Health", sourceRevision: nil, productType: nil, privacySafeDeviceProvenance: nil),
+            occurrence: .init(
+                startedAt: nil, endedAt: nil, localDate: localDate, calendarIdentifier: "gregorian",
+                timeZoneIdentifier: calendar.timeZone.identifier, utcOffsetSeconds: calendar.timeZone.secondsFromGMT(for: start),
+                localDayStartedAt: start, localDayEndedAt: calendar.date(byAdding: .day, value: 1, to: start)!
+            ),
+            payload: payload,
+            allowlistedMetadata: [:]
+        )
+    }
+}
+
+private final class CanonicalEngineHarness {
+    let root: URL
+    let scope: HealthKitCursorScope
+    let store: FileHealthKitSynchronizationStore
+    let query: CanaryQueryMock
+    let uploader: CanaryUploaderMock
+    let engine: HealthKitSynchronizationEngine
+
+    init(
+        stream: HealthKitSynchronizationStream,
+        testDay: HealthKitCanonicalTestDay,
+        additions: [HealthKitQueryAddition],
+        deletions: [HealthKitQueryDeletion] = [],
+        uploadModes: [CanaryUploaderMock.Mode] = [.accept]
+    ) throws {
+        root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSCanonicalTestDayTests-\(UUID().uuidString)", isDirectory: true)
+        scope = HealthKitCursorScope(
+            ownerIdentity: "user_founder_001",
+            enrolledDeviceIdentity: "founder-device-stable",
+            stream: stream,
+            predicateVersion: testDay.predicateVersion
+        )
+        store = FileHealthKitSynchronizationStore(root: root)
+        query = CanaryQueryMock(result: .init(
+            additions: additions,
+            deletions: deletions,
+            proposedAnchorData: Data("private-device-anchor".utf8),
+            completedAt: HealthKitFounderCanaryTests.now
+        ))
+        uploader = CanaryUploaderMock(modes: uploadModes)
+        engine = HealthKitSynchronizationEngine(
+            queryClient: query,
+            observerClient: CanaryObserverMock(),
+            store: store,
+            uploader: uploader,
+            featureGate: .founderActivityValidation,
+            now: { HealthKitFounderCanaryTests.now }
+        )
+    }
+
+    deinit { try? FileManager.default.removeItem(at: root) }
+}
+
+private actor CanonicalSynchronizerMock: HealthKitCanonicalTestDaySynchronizing {
+    private var capturedScopes: [HealthKitCursorScope] = []
+
+    func synchronizeActivityValidation(
+        scope: HealthKitCursorScope, window: HealthKitActivityValidationWindow, calendar: Calendar
+    ) async throws -> HealthKitCanarySyncSummary {
+        XCTFail("The canonical test day must not use the validation-only path")
+        throw HealthKitSyncError.featureDisabled
+    }
+
+    func synchronizeCanonicalTestDay(
+        scope: HealthKitCursorScope, testDay: HealthKitCanonicalTestDay, calendar: Calendar
+    ) async throws -> HealthKitCanarySyncSummary {
+        capturedScopes.append(scope)
+        return .init(
+            batchIdentity: "healthkit_batch_canonical", additionsDiscovered: 1, deletionsDiscovered: 0,
+            additionsFilteredByWindow: 0, deletionsFilteredByWindow: 0, resumedPendingBatch: false
+        )
+    }
+
+    func diagnostics(scope: HealthKitCursorScope) async throws -> HealthKitStreamDiagnostics {
+        .init(
+            enabled: true, availability: .available, authorizationState: "available_without_read_denial_inference",
+            lastObserverWakeup: nil, lastSuccessfulAnchoredQuery: HealthKitFounderCanaryTests.now, cursorGeneration: 1,
+            cursorDigest: "digest", pendingBatchCount: 0, lastUploadAttempt: HealthKitFounderCanaryTests.now,
+            lastDurableAcknowledgement: HealthKitFounderCanaryTests.now, lastErrorCode: nil, boundedRecoveryCount: 0
+        )
+    }
+
+    func scopes() -> [HealthKitCursorScope] { capturedScopes }
+}
+
+@MainActor
+private struct CanonicalCoordinatorHarness {
+    let authorization: CanaryAuthorizationMock
+    let synchronizer: CanonicalSynchronizerMock
+    let coordinator: HealthKitFounderCanaryCoordinator
+
+    init(supportsCanonical: Bool = true) {
+        let authorization = CanaryAuthorizationMock()
+        let synchronizer = CanonicalSynchronizerMock()
+        let contract = HealthKitCanaryServerContract(
+            commandType: HealthKitServerIngestionContract.commandType,
+            contractVersion: HealthKitServerIngestionContract.contractVersion,
+            maximumBatchSize: HealthKitServerIngestionContract.maximumObservationsPerBatch,
+            observationTypes: ["activity_summary", "workout", "quantity_sample"],
+            ingestionPurposes: ["operational", "validation_only"],
+            diagnosticEndpoint: HealthKitServerIngestionContract.activityCanaryDiagnosticEndpoint,
+            additionalObservationTypes: supportsCanonical ? ["nutrition_daily_total"] : [],
+            hasCanonicalDailyActivation: supportsCanonical
+        )
+        self.authorization = authorization
+        self.synchronizer = synchronizer
+        self.coordinator = HealthKitFounderCanaryCoordinator(
+            authorization: authorization,
+            synchronizer: synchronizer,
+            server: CanaryServerMock(contract: contract),
+            deviceIdentityStore: CanaryDeviceIdentityStore(),
+            calendar: HealthKitFounderCanaryTests.calendar,
+            now: { HealthKitFounderCanaryTests.now }
+        )
+    }
+}
