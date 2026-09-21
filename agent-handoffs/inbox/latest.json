@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T17:30:00Z",
+  "generated_at_utc": "2026-09-21T17:45:00Z",
   "task": {
-    "id": "native-preserve-and-3am-briefings-20260921",
+    "id": "native-preserve-and-3am-briefings-v2-20260921",
     "title": "Preserve Build 48 and move scheduled briefings to 3 AM",
     "status": "ready"
   },
@@ -15,11 +15,19 @@
   "authority": {
     "expected_server_sha": "a428fbda42757620750264e63eaee18950ab7132",
     "expected_native_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
-    "expected_production_deployment": "d3783f4c-bc14-469b-b10c-93635a047325"
+    "expected_production_deployment": "d3783f4c-bc14-469b-b10c-93635a047325",
+    "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260921T173000Z-native-preserve-and-3am-briefings-20260921.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260921T174500Z-native-preserve-and-3am-briefings-v2-20260921.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
+  },
+  "safety": {
+    "contains_secrets": false,
+    "contains_credentials": false,
+    "contains_production_exports": false,
+    "contains_founder_evidence": false,
+    "safe_for_agent_retrieval": true
   }
 }
