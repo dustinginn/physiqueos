@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-09-21T05:55:04Z",
+  "task": {
+    "id": "handoff-protocol-setup-20260921",
+    "title": "Formalize PhysiqueOS GitHub agent-handoff protocol",
+    "agent": "claude",
+    "status": "completed"
+  },
+  "repository": "dustinginn/physiqueos",
+  "authority": {
+    "base_sha": "2d69065c588fed6eb066c6c9160fd899ba45a016",
+    "final_sha": null,
+    "production_server_sha": "714dcaef03a28f53f7f34f1d825419b253744b53",
+    "production_deployment": "7292d936-bd71-4f1b-b242-acf740f1557f",
+    "native_sha": "f372699fc6dfd4501d77c2a570a80c00d256a0ec",
+    "native_build": 47
+  },
+  "result": {
+    "summary": "Installed the agent-handoff protocol on main: README (schema, security boundary, procedure, ChatGPT consumption), compact latest.json, immutable reports directory with this task's report, and a local sanitization-gated publisher. Replaced the transport-test artifact. No application, Server, Native or infrastructure change.",
+    "success": true,
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
+  },
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "summary": "Publisher gate exercised: 1 passing dry run and 23 negative cases (bad schema/keys/types, unsafe safety flags, stale timestamp, bad SHA, wrong repository, report path traversal, PEM/JWT/DigitalOcean/GitHub tokens, credential URLs and assignments, email, base64 blob, data URI, oversize file, overlong line, report missing task id); all 24 behaved as expected."
+    },
+    "review": {
+      "status": "not_run",
+      "summary": "No independent review; setup-only task with no application code."
+    },
+    "zero_write_audit": {
+      "status": "not_applicable",
+      "summary": "No production writes and no production data access; the only production contact was a read-only lookup of the active deployment record to confirm authority values."
+    }
+  },
+  "decisions_required": [
+    "Add a short pointer to agent-handoffs/README.md in the repo AGENTS.md/CLAUDE.md so Codex follows the protocol; not done here because it edits repo instruction files outside agent-handoffs/.",
+    "Confirm main stays the handoff branch (it is stale relative to production but safe: it is not the deploy branch)."
+  ],
+  "blockers": [],
+  "unexpected_findings": [
+    "Native Build 47 SHA f372699f exists only in a local worktree (branch codex/build47-native-closure is not pushed), so ChatGPT cannot resolve it on GitHub.",
+    "Local main is behind origin/main by the handoff commits; harmless."
+  ],
+  "backlog": [
+    "Build 48 (not started in this task).",
+    "Optionally push codex/build47-native-closure so the Native SHA is retrievable."
+  ],
+  "recommended_next_step": "Proceed with Build 48 planning; agents should publish a handoff at the end of every substantial task using the publisher documented in agent-handoffs/README.md.",
+  "full_report_path": "agent-handoffs/reports/20260921T055504Z-handoff-protocol-setup.md",
+  "safety": {
+    "contains_secrets": false,
+    "contains_credentials": false,
+    "contains_production_exports": false,
+    "contains_founder_evidence": false,
+    "safe_for_chatgpt_retrieval": true
+  }
+}
