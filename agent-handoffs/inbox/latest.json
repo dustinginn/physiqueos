@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-22T18:20:00Z",
+  "generated_at_utc": "2026-09-22T20:30:00Z",
   "task": {
-    "id": "healthkit-build51-foreground-catchup-regression-20260922",
-    "title": "Diagnose Build 51 HealthKit automatic catch-up regression",
-    "status": "claimed"
+    "id": "healthkit-build51-regression-recovery-ship-20260922",
+    "title": "Recover and ship Build 51 HealthKit regression fix",
+    "status": "ready"
   },
   "target": {
     "agent": "claude",
@@ -14,11 +14,11 @@
   "repository": "dustinginn/physiqueos",
   "authority": {
     "expected_server_sha": "924d5e556ba418ceb64de828d4c6a7c06d99f769",
-    "expected_native_sha": "63d925e0",
+    "expected_native_sha": "cccd7e2e1ed71d2c9a9c8f81c26a2b8645e16025",
     "expected_production_deployment": "c2442650-a9a0-499e-bc42-59b81c0c8bae",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260922T182000Z-healthkit-build51-foreground-catchup-regression-20260922.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260922T203000Z-healthkit-build51-regression-recovery-ship-20260922.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
@@ -29,9 +29,5 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
-  },
-  "lifecycle": {
-    "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T18:16:43Z"
   }
 }
