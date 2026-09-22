@@ -4,7 +4,7 @@
   "task": {
     "id": "healthkit-activity-nutrition-graduation-ready-20260921",
     "title": "Prepare HealthKit Activity and Nutrition graduation path",
-    "status": "ready"
+    "status": "claimed"
   },
   "target": {
     "agent": "claude",
@@ -29,5 +29,9 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
+  },
+  "lifecycle": {
+    "claimed_by": "claude",
+    "claimed_at_utc": "2026-09-22T00:11:17Z"
   }
 }
