@@ -4,7 +4,7 @@
   "task": {
     "id": "healthkit-build51-regression-recovery-ship-20260922",
     "title": "Recover and ship Build 51 HealthKit regression fix",
-    "status": "claimed"
+    "status": "completed"
   },
   "target": {
     "agent": "claude",
@@ -32,6 +32,9 @@
   },
   "lifecycle": {
     "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T20:33:43Z"
+    "claimed_at_utc": "2026-09-22T20:33:43Z",
+    "completed_at_utc": "2026-09-22T21:40:45Z",
+    "completion_status": "blocked",
+    "completion_handoff_path": "agent-handoffs/reports/20260922T214500Z-healthkit-build51-regression-recovery-ship.md"
   }
 }

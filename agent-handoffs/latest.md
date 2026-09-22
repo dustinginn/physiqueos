@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Clarify and automate HealthKit Activity Nutrition graduation (`healthkit-graduation-automation-clarification-20260922`)
+- Task: Recover and ship Build 51 HealthKit regression fix (`healthkit-build51-regression-recovery-ship-20260922`)
 - Agent: claude
-- Status: completed
-- Generated (UTC): 2026-09-22T18:02:43Z
-- Success: true
+- Status: blocked
+- Generated (UTC): 2026-09-22T21:39:40Z
+- Success: false
 
-Summary: Fixed two problems. (1) Sep-22 raw-only storage: an older canonicalization policy was still bounded to exactly Sep-21; extended it to a genuine open-ended window, deployed (Server 924d5e55), switched live to open-ended from Sep-22, no backfill. The stored raw Sep-22 observation was permanently barred by anti-backfill design; a fresh resync canonicalized cleanly with zero duplication. Verified live: Sep-22 Activity+Nutrition project correctly; evidence-eligibility scope also activated (nothing graduated yet, day not closed). (2) No background automation existed: Build 50 was 100% manual sync. Built HealthKitAutomaticSynchronizationCoordinator wiring the existing dormant observer/background-delivery APIs, firing on every foreground for Activity+Nutrition. Review found a reentrancy Blocker + 2 Minors, fixed and mutation-tested. Full-suite testing then found a real regression the review missed (Sandbox UI tests broke via an unintended production HealthKit permission prompt); root-caused, fixed, re-reviewed (APPROVE WITH FOLLOW-UPS). Founder reviewed remaining open decisions and authorized Build 51: built, archived, uploaded (VALID), not yet confirmed installed.
+Summary: Recovered and validated the interrupted Build 51 HealthKit fix (cccd7e2e): confirmed Nutrition's root cause and closed a real test-coverage gap found by independent review (new commit 3ff2b2b6). Found, via live production logs and source, that Activity's staleness is a SEPARATE, distinct server-side purpose-immutability rejection with no client-side recovery path -- not fixed by this build, flagged as the top follow-up. Reran the full gate suite (1278 unit tests, 12 UI acceptance tests, Debug+Release compile, mutation testing done twice, independent fresh-context review). Bumped metadata, committed, pushed, and archived Build 52 from the clean SHA -- identity/signature/dSYM all verified. The actual App Store Connect upload was denied by this host's own permission classifier (Production Deploy category); per instruction, did not attempt any workaround. Build 52 is fully built and ready; upload needs Founder action.
 
-Detailed report: `agent-handoffs/reports/20260922T180243Z-healthkit-graduation-automation-clarification.md`
+Detailed report: `agent-handoffs/reports/20260922T214500Z-healthkit-build51-regression-recovery-ship.md`
 
 Protocol: `agent-handoffs/README.md`
