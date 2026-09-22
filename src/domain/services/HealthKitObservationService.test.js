@@ -201,6 +201,13 @@ describe("HealthKitObservationService V1 compatibility", () => {
       });
     });
 
+    it("takes the bounded path identically whether openEnded is explicitly false or simply absent", () => {
+      const explicit = resolveHealthKitCanonicalActivationPolicy(enabled({ openEnded: false }));
+      const absent = resolveHealthKitCanonicalActivationPolicy(enabled());
+      expect(explicit).toEqual(absent);
+      expect(explicit).toMatchObject({ enabled: true, openEnded: false });
+    });
+
     it.each([
       ["an open-ended record that also names an end date", { openEnded: true, endLocalDate: "2026-09-30" }],
       ["a non-boolean openEnded flag", { openEnded: "yes" }],

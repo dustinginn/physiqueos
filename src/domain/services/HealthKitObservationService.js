@@ -187,8 +187,9 @@ export function resolveHealthKitCanonicalActivationPolicy(record) {
       return disabled("invalid_configuration_fail_closed", "open_ended_flag_invalid");
     }
     const openEnded = record.openEnded === true;
+    // calendarDate() only ever returns a valid YYYY-MM-DD string or throws
+    // (caught below), so effectiveLocalDate is never falsy here.
     const effectiveLocalDate = calendarDate(record.effectiveLocalDate, "effectiveLocalDate");
-    if (!effectiveLocalDate) return disabled("invalid_configuration_fail_closed", "window_invalid");
     // Open-ended (permanent, forward-only) operation: no end date, exactly the
     // capability normal daily-driver ingestion needs. Still no backfill -- a
     // date before effectiveLocalDate is refused exactly as the bounded case,

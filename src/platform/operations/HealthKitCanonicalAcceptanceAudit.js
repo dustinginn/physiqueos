@@ -87,6 +87,7 @@ export function summarizeHealthKitCanonicalAcceptance({
       domains: policy.domains,
       effectiveLocalDate: policy.effectiveLocalDate,
       endLocalDate: policy.endLocalDate,
+      openEnded: policy.openEnded ?? false,
       strategicEvidenceEligibility: policyRecord?.strategicEvidenceEligibility ?? null,
       historicalBackfill: policyRecord?.historicalBackfill ?? null,
       invalidReason: policy.invalidReason,
