@@ -419,3 +419,15 @@ describe("normal Progress reporting of a graduated day", () => {
     expect(activity.dataSources.find((source) => source.name === "Apple Health")).toEqual({ name: "Apple Health", status: "Suggested" });
   });
 });
+
+describe("Evidence Hub timeline", () => {
+  it("shows a graduated Activity day as one ordinary Daily Activity item and never a second copy", async () => {
+    const { createEvidenceTimelineItems } = await import("./EvidenceTimelineService.js");
+    const alone = createEvidenceTimelineItems({ canonicalEvidenceObjects: overlay([], [activityDay()], policyRecord()).objects });
+    expect(alone.filter((item) => item.type === "Daily Activity")).toEqual([
+      expect.objectContaining({ date: DATE, title: "612 active cal / 41 exercise min", tone: "effort" }),
+    ]);
+    const withShot = createEvidenceTimelineItems({ canonicalEvidenceObjects: overlay([screenshotActivity()], [activityDay()], policyRecord()).objects });
+    expect(withShot.filter((item) => item.type === "Daily Activity")).toHaveLength(1);
+  });
+});
