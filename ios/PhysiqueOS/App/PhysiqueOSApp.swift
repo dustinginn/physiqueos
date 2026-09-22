@@ -54,8 +54,24 @@ struct PhysiqueOSApp: App {
                 // termination its catch-up: a fully terminated app is not
                 // guaranteed a background wake, so the next time the Founder
                 // opens it is the only place that catch-up can happen.
+                //
+                // Gated to Founder Production, matching every other
+                // production-backed feature's `nativeAuthority` switch
+                // elsewhere in this codebase (see `AppEnvironment`'s
+                // `evidenceReviewAPI`/`briefingAPI`/etc.): there is no real
+                // Founder owner identity to canonicalize HealthKit facts
+                // against in Sandbox, and firing a real authenticated
+                // request there was a genuine bug this candidate had until
+                // it broke `TrainingAcceptanceUITests`, which deliberately
+                // launches pinned to `-physiqueos.native.authority-
+                // selection.v1 sandbox` -- the automatic coordinator was
+                // still reaching real Founder Production regardless,
+                // including requesting the real HealthKit system
+                // permission prompt on a fresh simulator, which blocks
+                // XCUITest's element queries behind an alert outside the
+                // app's accessibility hierarchy.
                 .onChange(of: scenePhase, initial: true) { _, phase in
-                    guard phase == .active else { return }
+                    guard phase == .active, environment.nativeAuthority == .founderProduction else { return }
                     Task { await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap() }
                 }
         }

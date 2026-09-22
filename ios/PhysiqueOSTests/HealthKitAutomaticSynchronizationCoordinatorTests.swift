@@ -103,7 +103,7 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer)
         let outcome = await harness.coordinator.bootstrap()
 
-        XCTAssertEqual(outcome.streamErrors[.activitySummary], "observer_registration_failed")
+        XCTAssertEqual(outcome.streamErrors[.activitySummary], ["observer_registration_failed"])
         XCTAssertNil(outcome.streamErrors[.nutritionDailyTotal])
         XCTAssertEqual(outcome.caughtUpStreams, [.activitySummary, .nutritionDailyTotal])
         let scopes = await synchronizer.observedScopes()
@@ -117,7 +117,7 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer)
         let outcome = await harness.coordinator.bootstrap()
 
-        XCTAssertEqual(outcome.streamErrors[.nutritionDailyTotal], "background_delivery_registration_failed")
+        XCTAssertEqual(outcome.streamErrors[.nutritionDailyTotal], ["background_delivery_registration_failed"])
         XCTAssertNil(outcome.streamErrors[.activitySummary])
         // Registration failing does not skip the catch-up sync for that stream.
         XCTAssertEqual(outcome.caughtUpStreams, [.activitySummary, .nutritionDailyTotal])
@@ -130,9 +130,71 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer)
         let outcome = await harness.coordinator.bootstrap()
 
-        XCTAssertEqual(outcome.streamErrors[.activitySummary], "catch_up_sync_failed")
+        XCTAssertEqual(outcome.streamErrors[.activitySummary], ["catch_up_sync_failed"])
         XCTAssertFalse(outcome.caughtUpStreams.contains(.activitySummary))
         XCTAssertTrue(outcome.caughtUpStreams.contains(.nutritionDailyTotal))
+    }
+
+    /// The exact race the review flagged: two `bootstrap()` calls launched
+    /// before the first one's async work (an authenticated server round
+    /// trip, standing in for a real network delay) completes. Without
+    /// coalescing, both would race past the `authorizationWasRequested`
+    /// check and both would drive a full, concurrent synchronize pass.
+    @MainActor
+    func testOverlappingBootstrapCallsCoalesceIntoOneExecution() async {
+        let server = AutomaticServerMock(ownerIdentityDelayNanoseconds: 20_000_000)
+        let synchronizer = AutomaticSynchronizerMock()
+        let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer, server: server)
+
+        async let first = harness.coordinator.bootstrap()
+        async let second = harness.coordinator.bootstrap()
+        let (outcomeA, outcomeB) = await (first, second)
+
+        XCTAssertEqual(outcomeA, outcomeB)
+        XCTAssertEqual(harness.authorization.requestCount, 1)
+        let observeCount = await synchronizer.observeCallCount()
+        let syncCount = await synchronizer.syncCallCount()
+        let ownerIdentityCalls = await server.ownerIdentityCallCount()
+        // Two streams, ONE execution -- not two.
+        XCTAssertEqual(observeCount, 2)
+        XCTAssertEqual(syncCount, 2)
+        XCTAssertEqual(ownerIdentityCalls, 1)
+    }
+
+    /// A THIRD, non-overlapping call after the first fully completes must
+    /// still work (the coordinator is reusable across the app's lifetime,
+    /// not a one-shot), and should reuse the cached owner identity rather
+    /// than re-fetching it.
+    @MainActor
+    func testSequentialBootstrapsAfterCompletionReuseTheCachedOwnerIdentity() async {
+        let server = AutomaticServerMock()
+        let synchronizer = AutomaticSynchronizerMock()
+        let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer, server: server)
+
+        _ = await harness.coordinator.bootstrap()
+        let outcome = await harness.coordinator.bootstrap()
+
+        XCTAssertEqual(outcome.caughtUpStreams, [.activitySummary, .nutritionDailyTotal])
+        let ownerIdentityCalls = await server.ownerIdentityCallCount()
+        XCTAssertEqual(ownerIdentityCalls, 1)
+        let syncCount = await synchronizer.syncCallCount()
+        XCTAssertEqual(syncCount, 4)
+    }
+
+    /// If more than one of the three per-stream calls fails, all of them must
+    /// be recorded -- not just the last one to run.
+    @MainActor
+    func testMultipleFailuresForTheSameStreamAreAllRecordedNotOverwritten() async {
+        let synchronizer = AutomaticSynchronizerMock()
+        synchronizer.streamsToFailObserving = [.activitySummary]
+        synchronizer.streamsToFailSync = [.activitySummary]
+        let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer)
+        let outcome = await harness.coordinator.bootstrap()
+
+        XCTAssertEqual(
+            outcome.streamErrors[.activitySummary],
+            ["observer_registration_failed", "catch_up_sync_failed"]
+        )
     }
 
     @MainActor
@@ -198,9 +260,12 @@ private actor AutomaticSynchronizerMock: HealthKitAutomaticSynchronizing {
 
 private actor AutomaticServerMock: HealthKitFounderCanaryServer {
     private let ownerIdentityError: Error?
+    private let ownerIdentityDelayNanoseconds: UInt64
+    private var ownerIdentityCalls = 0
 
-    init(ownerIdentityError: Error? = nil) {
+    init(ownerIdentityError: Error? = nil, ownerIdentityDelayNanoseconds: UInt64 = 0) {
         self.ownerIdentityError = ownerIdentityError
+        self.ownerIdentityDelayNanoseconds = ownerIdentityDelayNanoseconds
     }
 
     func healthKitCanaryContract() async throws -> HealthKitCanaryServerContract {
@@ -215,9 +280,13 @@ private actor AutomaticServerMock: HealthKitFounderCanaryServer {
     }
 
     func founderOwnerIdentity() async throws -> String {
+        ownerIdentityCalls += 1
+        if ownerIdentityDelayNanoseconds > 0 { try? await Task.sleep(nanoseconds: ownerIdentityDelayNanoseconds) }
         if let ownerIdentityError { throw ownerIdentityError }
         return "user_founder_001"
     }
+
+    func ownerIdentityCallCount() -> Int { ownerIdentityCalls }
 
     func healthKitActivityValidation(startDate: String, endDate: String) async throws -> HealthKitActivityCanaryDiagnostic {
         fatalError("not exercised by these tests")

@@ -36,16 +36,42 @@ extension HealthKitSynchronizationEngine: HealthKitAutomaticSynchronizing {}
 ///      `HealthKitSynchronizationEngine.startObserving` and
 ///      `SystemHealthKitObserverClient.enableBackgroundDelivery`).
 ///   3. Run one immediate incremental sync per stream as relaunch/foreground
-///      catch-up. iOS does not guarantee a background wake for a fully
-///      terminated app, so this foreground catch-up is the only way to
-///      recover changes that happened while PhysiqueOS was not running.
+///      catch-up. This is the documented fallback, not merely a nicety: this
+///      codebase has no `BGTaskScheduler`/app-delegate background-task
+///      infrastructure, so whether `enableBackgroundDelivery` alone is
+///      sufficient for iOS to relaunch a FULLY TERMINATED (not merely
+///      suspended) PhysiqueOS process for a HealthKit change is Apple
+///      background-execution behavior this candidate cannot verify without a
+///      real device. Regardless of whether that proactive wake succeeds,
+///      this foreground catch-up guarantees nothing is permanently missed:
+///      worst case, a change is caught on the next time the Founder opens
+///      the app rather than the moment it happened.
 ///
 /// Every step degrades gracefully: no step throws out of `bootstrap()`, and a
 /// failure (offline, HealthKit unavailable, server unreachable) is recorded
 /// in the returned outcome for diagnostics rather than surfaced to the
 /// Founder or retried aggressively in a loop. The next foreground transition
 /// tries again.
-final class HealthKitAutomaticSynchronizationCoordinator {
+///
+/// Reentrancy: `bootstrap()` is called on every `scenePhase == .active`
+/// transition, so an overlapping call (a quick app-switcher-and-back before
+/// the first call finishes) is expected, not exceptional. A second call
+/// while one is already running awaits and returns the SAME in-flight
+/// result rather than starting a concurrent second execution -- without
+/// this, two overlapping `synchronize()` calls for the identical scope
+/// could each read the same not-yet-advanced cursor and each stage/upload a
+/// redundant duplicate batch.
+/// `@unchecked Sendable`: every mutable stored property (`lastBootstrapOutcome`,
+/// `cachedOwnerIdentity`, `inFlightTask`) is written only from inside
+/// `bootstrap()`/`runBootstrap()`, both `@MainActor`-isolated, matching this
+/// codebase's existing pattern for actor-adjacent coordinator classes (see
+/// `KeychainHealthKitCanaryDeviceIdentityStore`). The `init` only assigns
+/// immutable `let`s, so it is safe to call from a non-isolated context (as
+/// `AppEnvironment`'s own synchronous init does). This conformance is what
+/// lets `bootstrap()` be awaited from two overlapping child tasks (e.g. a
+/// test's `async let`, or two quick `scenePhase` transitions), which the
+/// in-flight-task guard above requires being able to express.
+final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     static let predicateVersion = "healthkit-automatic-v1"
     static let streams: [HealthKitSynchronizationStream] = [.activitySummary, .nutritionDailyTotal]
 
@@ -55,6 +81,18 @@ final class HealthKitAutomaticSynchronizationCoordinator {
     private let deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore
 
     private(set) var lastBootstrapOutcome: HealthKitAutomaticBootstrapOutcome?
+    /// The Founder's owner identity almost never changes within one signed-in
+    /// session; caching it avoids an authenticated server round trip on every
+    /// single foreground transition and shrinks the window in which two
+    /// bootstraps could ever observe different identity values.
+    private var cachedOwnerIdentity: String?
+    /// Coalesces overlapping `bootstrap()` calls into one execution. Without
+    /// this, a quick app-switcher-and-back (two `scenePhase == .active`
+    /// transitions before the first bootstrap finishes) could run two
+    /// authorization requests concurrently, or two `synchronize()` calls for
+    /// the identical scope that both read the same not-yet-advanced cursor
+    /// and each stage/upload a redundant duplicate batch.
+    private var inFlightTask: Task<HealthKitAutomaticBootstrapOutcome, Never>?
 
     init(
         authorization: any HealthKitCanaryAuthorizationCoordinating,
@@ -71,8 +109,31 @@ final class HealthKitAutomaticSynchronizationCoordinator {
     @MainActor
     @discardableResult
     func bootstrap() async -> HealthKitAutomaticBootstrapOutcome {
+        if let inFlightTask {
+            return await inFlightTask.value
+        }
+        let task = Task { @MainActor in
+            await self.runBootstrap()
+        }
+        inFlightTask = task
+        let outcome = await task.value
+        inFlightTask = nil
+        return outcome
+    }
+
+    @MainActor
+    private func runBootstrap() async -> HealthKitAutomaticBootstrapOutcome {
         var outcome = HealthKitAutomaticBootstrapOutcome()
         if !authorization.authorizationWasRequested {
+            // Known, reviewed tradeoff (not fixed here; a Founder decision):
+            // `.initialRead` is the SAME full V1 read scope (Activity,
+            // Nutrition, Workouts, Sleep) the diagnostic screen's button has
+            // always requested -- this diff does not widen WHAT is asked for,
+            // only WHEN, moving it from a deliberate Founder tap to the first
+            // automatic foreground. For an already-decided Founder (the real
+            // case today) this is a silent no-op; for a hypothetical fresh
+            // install it would show the standard one-time HealthKit consent
+            // prompt automatically rather than only after a screen visit.
             outcome.authorizationOutcome = await authorization.requestAuthorization(for: .initialRead)
         }
         guard case .available = authorization.currentAvailability else {
@@ -80,7 +141,13 @@ final class HealthKitAutomaticSynchronizationCoordinator {
             lastBootstrapOutcome = outcome
             return outcome
         }
-        guard let ownerIdentity = try? await server.founderOwnerIdentity() else {
+        let ownerIdentity: String
+        if let cachedOwnerIdentity {
+            ownerIdentity = cachedOwnerIdentity
+        } else if let fetched = try? await server.founderOwnerIdentity() {
+            ownerIdentity = fetched
+            cachedOwnerIdentity = fetched
+        } else {
             outcome.skippedReason = "owner_identity_unavailable"
             lastBootstrapOutcome = outcome
             return outcome
@@ -98,16 +165,16 @@ final class HealthKitAutomaticSynchronizationCoordinator {
                 predicateVersion: Self.predicateVersion
             )
             do { try await synchronizer.startObserving(scope: scope) } catch {
-                outcome.streamErrors[stream] = "observer_registration_failed"
+                outcome.streamErrors[stream, default: []].append("observer_registration_failed")
             }
             do { try await synchronizer.enableBackgroundDelivery(scope: scope) } catch {
-                outcome.streamErrors[stream] = "background_delivery_registration_failed"
+                outcome.streamErrors[stream, default: []].append("background_delivery_registration_failed")
             }
             do {
                 try await synchronizer.synchronize(scope: scope, stagingCompletion: nil)
                 outcome.caughtUpStreams.insert(stream)
             } catch {
-                outcome.streamErrors[stream] = "catch_up_sync_failed"
+                outcome.streamErrors[stream, default: []].append("catch_up_sync_failed")
             }
         }
         lastBootstrapOutcome = outcome
@@ -119,5 +186,5 @@ struct HealthKitAutomaticBootstrapOutcome: Equatable {
     var authorizationOutcome: HealthKitAuthorizationOutcome?
     var skippedReason: String?
     var caughtUpStreams: Set<HealthKitSynchronizationStream> = []
-    var streamErrors: [HealthKitSynchronizationStream: String] = [:]
+    var streamErrors: [HealthKitSynchronizationStream: [String]] = [:]
 }
