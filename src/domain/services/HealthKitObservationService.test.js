@@ -164,6 +164,51 @@ describe("HealthKitObservationService V1 compatibility", () => {
       });
     });
 
+    it("regresses against the exact live Sep-21 bounded proving-period record shape (no openEnded field at all)", () => {
+      const liveRecord = {
+        schemaVersion: HEALTHKIT_CANONICAL_ACTIVATION_POLICY_SCHEMA_VERSION,
+        status: "enabled",
+        domains: ["activity", "nutrition"],
+        effectiveLocalDate: "2026-09-21",
+        endLocalDate: "2026-09-21",
+        strategicEvidenceEligibility: "quarantined",
+        historicalBackfill: false,
+      };
+      expect(resolveHealthKitCanonicalActivationPolicy(liveRecord)).toMatchObject({
+        enabled: true, effectiveLocalDate: "2026-09-21", endLocalDate: "2026-09-21", openEnded: false,
+      });
+      const sep22 = normalize("live", [activitySummary({ localDate: "2026-09-22" })]).observations[0];
+      expect(assessHealthKitCanonicalization({ observation: sep22, activationPolicy: liveRecord })).toMatchObject({
+        eligible: false, permanent: true, reason: "after_activation_window",
+      });
+    });
+
+    it("resolves a true open-ended window (no end date) and canonicalizes prospectively without an upper bound", () => {
+      const policy = enabled({ openEnded: true, endLocalDate: undefined, effectiveLocalDate: "2026-09-22" });
+      const resolved = resolveHealthKitCanonicalActivationPolicy(policy);
+      expect(resolved).toMatchObject({ enabled: true, effectiveLocalDate: "2026-09-22", endLocalDate: null, openEnded: true });
+      const sep22 = normalize("o1", [activitySummary({ localDate: "2026-09-22" })]).observations[0];
+      const farFuture = normalize("o2", [activitySummary({ localDate: "2027-06-15" })]).observations[0];
+      expect(assessHealthKitCanonicalization({ observation: sep22, activationPolicy: policy })).toMatchObject({ eligible: true });
+      expect(assessHealthKitCanonicalization({ observation: farFuture, activationPolicy: policy })).toMatchObject({ eligible: true });
+    });
+
+    it("still refuses (permanently) a date before an open-ended policy's effective date -- no backfill even when open-ended", () => {
+      const policy = enabled({ openEnded: true, endLocalDate: undefined, effectiveLocalDate: "2026-09-22" });
+      const before = normalize("b1", [activitySummary({ localDate: "2026-09-21" })]).observations[0];
+      expect(assessHealthKitCanonicalization({ observation: before, activationPolicy: policy })).toMatchObject({
+        eligible: false, permanent: true, reason: "before_activation_date",
+      });
+    });
+
+    it.each([
+      ["an open-ended record that also names an end date", { openEnded: true, endLocalDate: "2026-09-30" }],
+      ["a non-boolean openEnded flag", { openEnded: "yes" }],
+    ])("fails closed on %s without throwing", (_label, overrides) => {
+      const policy = resolveHealthKitCanonicalActivationPolicy(enabled(overrides));
+      expect(policy.enabled).toBe(false);
+    });
+
     it.each([
       ["a legacy or unversioned record", { schemaVersion: undefined }],
       ["an open-ended window", { endLocalDate: undefined }],

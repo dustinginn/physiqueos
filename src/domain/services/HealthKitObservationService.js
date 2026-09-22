@@ -158,6 +158,7 @@ export function resolveHealthKitCanonicalActivationPolicy(record) {
     domains: Object.freeze([]),
     effectiveLocalDate: null,
     endLocalDate: null,
+    openEnded: false,
     source,
     invalidReason,
   });
@@ -182,7 +183,32 @@ export function resolveHealthKitCanonicalActivationPolicy(record) {
     if (domains.length === 0 || domains.some((domain) => !supported.includes(domain))) {
       return disabled("invalid_configuration_fail_closed", "domains_invalid");
     }
+    if (record.openEnded !== undefined && typeof record.openEnded !== "boolean") {
+      return disabled("invalid_configuration_fail_closed", "open_ended_flag_invalid");
+    }
+    const openEnded = record.openEnded === true;
     const effectiveLocalDate = calendarDate(record.effectiveLocalDate, "effectiveLocalDate");
+    if (!effectiveLocalDate) return disabled("invalid_configuration_fail_closed", "window_invalid");
+    // Open-ended (permanent, forward-only) operation: no end date, exactly the
+    // capability normal daily-driver ingestion needs. Still no backfill -- a
+    // date before effectiveLocalDate is refused exactly as the bounded case,
+    // by assessHealthKitCanonicalization below.
+    if (openEnded) {
+      if (record.endLocalDate !== undefined && record.endLocalDate !== null) {
+        return disabled("invalid_configuration_fail_closed", "open_ended_window_must_have_no_end_date");
+      }
+      return Object.freeze({
+        enabled: true,
+        domains: Object.freeze(domains),
+        effectiveLocalDate,
+        endLocalDate: null,
+        openEnded: true,
+        source: "server_owned_configuration",
+        invalidReason: null,
+      });
+    }
+    // Bounded (proving-period) window: unchanged semantics, exact end date
+    // required, capped at HEALTHKIT_CANONICAL_ACTIVATION_MAX_DAYS.
     const endLocalDate = calendarDate(record.endLocalDate, "endLocalDate");
     const days = Math.round((Date.parse(`${endLocalDate}T00:00:00.000Z`) - Date.parse(`${effectiveLocalDate}T00:00:00.000Z`)) / 86400000) + 1;
     if (days < 1 || days > HEALTHKIT_CANONICAL_ACTIVATION_MAX_DAYS) {
@@ -193,6 +219,7 @@ export function resolveHealthKitCanonicalActivationPolicy(record) {
       domains: Object.freeze(domains),
       effectiveLocalDate,
       endLocalDate,
+      openEnded: false,
       source: "server_owned_configuration",
       invalidReason: null,
     });
@@ -227,7 +254,9 @@ export function assessHealthKitCanonicalization({ observation, activationPolicy 
   if (localDate < policy.effectiveLocalDate) {
     return Object.freeze({ eligible: false, domain, permanent: true, reason: "before_activation_date", ...scope });
   }
-  if (localDate > policy.endLocalDate) {
+  // An open-ended (null endLocalDate) policy has no upper bound; the window
+  // never closes prospectively, so nothing is ever "after" it.
+  if (policy.endLocalDate !== null && localDate > policy.endLocalDate) {
     return Object.freeze({ eligible: false, domain, permanent: true, reason: "after_activation_window", ...scope });
   }
   return Object.freeze({

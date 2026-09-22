@@ -165,6 +165,97 @@ describe("HealthKit canonical activation policy operation", () => {
   });
 });
 
+describe("open-ended (permanent, forward-only) canonicalization", () => {
+  const openEndedAuth = {
+    ownerUserId: OWNER,
+    domains: ["activity", "nutrition"],
+    effectiveLocalDate: "2026-09-22",
+    openEnded: true,
+    authorizationReference: "founder-chat-2026-09-22-open-ended-canonicalization",
+  };
+
+  it("dry-run predicts an open-ended window with no end date and no HEALTHKIT_CANONICAL_ACTIVATION_MAX_DAYS refusal", async () => {
+    const records = store();
+    const result = await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "activate" });
+    expect(result).toMatchObject({
+      outcome: "dry_run",
+      policy: { status: "enabled", domains: ["activity", "nutrition"], effectiveLocalDate: "2026-09-22", endLocalDate: null },
+    });
+  });
+
+  it("applies an open-ended policy, and it resolves with no upper bound", async () => {
+    const records = store();
+    const dry = await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "activate" });
+    const applied = await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "activate", apply: true, expected: dry.facts });
+    expect(applied.outcome).toBe("applied");
+    expect(Object.values(applied.invariants).every(Boolean)).toBe(true);
+    const policy = (await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: POLICY_ID }));
+    expect(resolveHealthKitCanonicalActivationPolicy(policy)).toMatchObject({ enabled: true, effectiveLocalDate: "2026-09-22", endLocalDate: null, openEnded: true });
+  });
+
+  it("deactivates an open-ended policy exactly like a bounded one, preserving canonical history", async () => {
+    const records = store();
+    const dry = await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "activate" });
+    await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "activate", apply: true, expected: dry.facts });
+    const dryOff = await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "deactivate" });
+    const off = await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "deactivate", apply: true, expected: dryOff.facts });
+    expect(off.outcome).toBe("applied");
+    const policy = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: POLICY_ID });
+    expect(policy.status).toBe("disabled");
+  });
+
+  it("refuses an open-ended request for the Workout policy kind (no scope creep; Workout stays bounded-only)", async () => {
+    const records = store();
+    const result = await runHealthKitActivationPolicy({
+      records,
+      authorization: { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-25", openEnded: true, authorizationReference: "founder-chat-workout-open-ended" },
+      action: "activate",
+      policyKind: "workout",
+    });
+    expect(result.outcome).toBe("refused");
+    expect(result.reasons[0]).toMatch(/does not support an open-ended window/);
+    expect(records.getMutationCount()).toBe(0);
+  });
+
+  it("counts observations correctly inside an open-ended (no upper bound) window", async () => {
+    const records = store();
+    await records.put({
+      ownerUserId: OWNER, collection: "healthKitObservations", recordId: "healthkit_observation_today",
+      payload: { id: "healthkit_observation_today", observationType: "activity_summary", occurrenceDate: "2026-09-22", ingestionPurpose: "operational" },
+    });
+    await records.put({
+      ownerUserId: OWNER, collection: "healthKitObservations", recordId: "healthkit_observation_far_future",
+      payload: { id: "healthkit_observation_far_future", observationType: "activity_summary", occurrenceDate: "2027-01-01", ingestionPurpose: "operational" },
+    });
+    await records.put({
+      ownerUserId: OWNER, collection: "healthKitObservations", recordId: "healthkit_observation_before",
+      payload: { id: "healthkit_observation_before", observationType: "activity_summary", occurrenceDate: "2026-09-21", ingestionPurpose: "operational" },
+    });
+    const result = await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "activate" });
+    expect(result.outcome).toBe("dry_run");
+    expect(result.existingObservationsInWindowRemainRaw).toBe(2);
+  });
+
+  it("refuses activation when a validation-only observation exists anywhere inside an open-ended window", async () => {
+    const records = store();
+    await records.put({
+      ownerUserId: OWNER, collection: "healthKitObservations", recordId: "healthkit_observation_val",
+      payload: { id: "healthkit_observation_val", observationType: "activity_summary", occurrenceDate: "2026-11-15", ingestionPurpose: "validation_only" },
+    });
+    const result = await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "activate" });
+    expect(result.outcome).toBe("refused");
+    expect(result.reasons[0]).toMatch(/validation-only/);
+  });
+
+  it("still refuses an already-enabled policy, open-ended or not (windows are never widened in place)", async () => {
+    const records = store();
+    const dry = await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "activate" });
+    await runHealthKitActivationPolicy({ records, authorization: openEndedAuth, action: "activate", apply: true, expected: dry.facts });
+    const second = await runHealthKitActivationPolicy({ records, authorization: { ...openEndedAuth, authorizationReference: "founder-chat-again" }, action: "activate" });
+    expect(second.outcome).toBe("refused");
+  });
+});
+
 function store() {
   return createInMemoryCanonicalRecordStore({
     user: [{ id: OWNER, timeZone: "America/Los_Angeles", version: 1 }],

@@ -35,6 +35,10 @@ const POLICY_KINDS = Object.freeze({
     resolve: resolveHealthKitCanonicalActivationPolicy,
     supportedDomains: ["activity", "nutrition"],
     dailyObservationTypes: ["activity_summary", "nutrition_daily_total"],
+    // Normal, permanent daily-driver operation needs a forward window with no
+    // end date. Workout stays proving-period-only (Part I): no open-ended
+    // support there, on purpose, no scope creep.
+    supportsOpenEnded: true,
   }),
   [HealthKitPolicyKind.WORKOUT]: Object.freeze({
     recordId: HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
@@ -45,6 +49,7 @@ const POLICY_KINDS = Object.freeze({
     resolve: resolveHealthKitWorkoutActivationPolicy,
     supportedDomains: ["workout"],
     dailyObservationTypes: [],
+    supportsOpenEnded: false,
   }),
 });
 
@@ -189,7 +194,8 @@ export async function runHealthKitActivationPolicy({
     policyIsExactlyTheAuthorizedRecord: action === "activate"
       ? resolved.enabled &&
         resolved.effectiveLocalDate === authorization.effectiveLocalDate &&
-        resolved.endLocalDate === authorization.endLocalDate &&
+        (authorization.openEnded === true ? resolved.endLocalDate === null : resolved.endLocalDate === authorization.endLocalDate) &&
+        (resolved.openEnded === true) === (authorization.openEnded === true) &&
         sameSet(resolved.domains ?? kind.supportedDomains, authorization.domains)
       : afterPolicy?.status === "disabled" && resolved.enabled === false,
     strategicEligibilityQuarantined: afterPolicy?.strategicEvidenceEligibility === "quarantined",
@@ -211,13 +217,16 @@ export async function runHealthKitActivationPolicy({
 }
 
 function planActivation({ kind, policyKind, authorization, policyRecord, current, observations }) {
-  const { domains, effectiveLocalDate, endLocalDate } = authorization;
+  const { domains, effectiveLocalDate, endLocalDate, openEnded } = authorization;
+  if (openEnded === true && !kind.supportsOpenEnded) {
+    return { refusal: `The ${policyKind} policy does not support an open-ended window; provide an exact endLocalDate at most ${kind.maxDays} local days from effectiveLocalDate.` };
+  }
   const candidate = {
     schemaVersion: kind.schemaVersion,
     status: "enabled",
     domains: [...new Set(domains ?? [])].sort(),
     effectiveLocalDate,
-    endLocalDate,
+    ...(openEnded === true ? { openEnded: true } : { endLocalDate }),
     strategicEvidenceEligibility: "quarantined",
     historicalBackfill: false,
     ...(policyKind === HealthKitPolicyKind.WORKOUT ? { linkAutoConfirm: false } : {}),
@@ -225,14 +234,19 @@ function planActivation({ kind, policyKind, authorization, policyRecord, current
   };
   const resolved = kind.resolve(candidate);
   if (!resolved.enabled) {
-    return { refusal: `The requested policy is not valid (${resolved.invalidReason ?? "unknown"}): domains must be ${kind.supportedDomains.join(" and/or ")} and the window at most ${kind.maxDays} local days.` };
+    const windowDescription = kind.supportsOpenEnded
+      ? `the window either open-ended (no end date) or at most ${kind.maxDays} local days`
+      : `the window at most ${kind.maxDays} local days`;
+    return { refusal: `The requested policy is not valid (${resolved.invalidReason ?? "unknown"}): domains must be ${kind.supportedDomains.join(" and/or ")} and ${windowDescription}.` };
   }
   // A workout's day is derived from its own start in its own time zone, the
-  // same rule ingestion applies, not from the client label.
+  // same rule ingestion applies, not from the client label. An open-ended
+  // resolved window has no upper bound: nothing is ever after it.
   const effectiveDate = (record) => (record.observationType === "workout"
     ? deriveHealthKitWorkoutLocalDate({ startedAt: record.occurrence?.startedAt, timeZone: record.occurrence?.timeZone })
     : null) ?? record.occurrenceDate;
-  const inWindow = (record) => effectiveDate(record) >= resolved.effectiveLocalDate && effectiveDate(record) <= resolved.endLocalDate;
+  const inWindow = (record) => effectiveDate(record) >= resolved.effectiveLocalDate &&
+    (resolved.endLocalDate === null || effectiveDate(record) <= resolved.endLocalDate);
   const validationOnlyInWindow = observations.filter((record) =>
     inWindow(record) && kind.dailyObservationTypes.includes(record.observationType) &&
     record.ingestionPurpose === "validation_only"
