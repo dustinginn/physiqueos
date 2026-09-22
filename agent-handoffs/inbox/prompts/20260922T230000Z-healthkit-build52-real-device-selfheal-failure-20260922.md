@@ -164,3 +164,25 @@ CANARY_USED
 SEP21_UNCHANGED
 WORKOUT_ACTIVATION_ENABLED
 READY_FOR_REAL_DEVICE_RETEST
+
+
+LIVE FOUNDER UPDATE — 2026-09-22 approximately 16:41 Founder-local
+
+While this task is being investigated, without using the canary or manual Sync, Nutrition eventually advanced automatically on Build 52 after a long delay. The ordinary Log now shows:
+- Nutrition 2,406 calories
+- 178g protein
+- 174g carbohydrates
+- 109g fat
+- source Apple Health
+
+Activity remains stale at 166 active calories on the same Log screen.
+
+This materially narrows the failure:
+- automatic Nutrition ingestion/canonicalization/projection can succeed on Build 52, though latency may be significant;
+- the automatic coordinator is therefore not globally dead;
+- Activity remains independently stuck/stale and should remain the primary failure to trace;
+- investigate timestamps of the successful Nutrition observation/upload/canonical revision to determine whether it arrived from background delivery, foreground catch-up, delayed retry, or another automatic trigger;
+- quantify the observed latency if possible and decide whether it is expected iOS/HealthKit delivery behavior or a PhysiqueOS retry/scheduling problem;
+- do not regress Nutrition while fixing Activity.
+
+Updated acceptance: Activity must still self-heal without canary/manual Sync. Nutrition should continue advancing automatically, and its latency characteristics must be explained rather than simply marked pass/fail.
