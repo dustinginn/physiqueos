@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-21T23:55:00Z",
+  "generated_at_utc": "2026-09-22T04:05:00Z",
   "task": {
-    "id": "healthkit-activity-nutrition-graduation-ready-20260921",
-    "title": "Prepare HealthKit Activity and Nutrition graduation path",
-    "status": "completed"
+    "id": "native-core-page-cold-load-performance-audit-20260921",
+    "title": "Audit Native core-page cold-load performance",
+    "status": "ready"
   },
   "target": {
     "agent": "claude",
     "reasoning": "high",
-    "chat_preference": "continue_current_chat"
+    "chat_preference": "new_chat"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "expected_server_sha": "3e5e6758e19b0b06885eb356a8a06a2b631251fb",
+    "expected_server_sha": "93491bc5d829d3693aa29023cd79e96922012130",
     "expected_native_sha": "2bfbf54ad105a3a18189e811f06afc421741a7da",
-    "expected_production_deployment": "0438721d-e4c1-44f9-9555-0d9ef4b91eec",
+    "expected_production_deployment": "1156849f-d5af-47ec-a5d3-d247a99033ee",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260921T235500Z-healthkit-activity-nutrition-graduation-ready-20260921.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260922T040500Z-native-core-page-cold-load-performance-audit-20260921.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
@@ -29,12 +29,5 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
-  },
-  "lifecycle": {
-    "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T00:11:17Z",
-    "completed_at_utc": "2026-09-22T02:32:08Z",
-    "completion_status": "completed",
-    "completion_handoff_path": "agent-handoffs/reports/20260922T023038Z-healthkit-activity-nutrition-graduation-ready.md"
   }
 }
