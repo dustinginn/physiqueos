@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-22T22:00:00Z",
+  "generated_at_utc": "2026-09-22T23:00:00Z",
   "task": {
-    "id": "healthkit-automatic-partition-recovery-build52-20260922",
-    "title": "Fix HealthKit automatic identity and rejection recovery for Build 52",
-    "status": "completed"
+    "id": "healthkit-build52-real-device-selfheal-failure-20260922",
+    "title": "Diagnose Build 52 real-device HealthKit self-heal failure",
+    "status": "ready"
   },
   "target": {
     "agent": "claude",
@@ -14,11 +14,11 @@
   "repository": "dustinginn/physiqueos",
   "authority": {
     "expected_server_sha": "924d5e556ba418ceb64de828d4c6a7c06d99f769",
-    "expected_native_sha": "c638124317e27717c234976e6ac61e22f00f30d",
+    "expected_native_sha": "4894e162b42f018745a12506ceacfe243a5fbb50",
     "expected_production_deployment": "c2442650-a9a0-499e-bc42-59b81c0c8bae",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260922T220000Z-healthkit-automatic-partition-recovery-build52-20260922.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260922T230000Z-healthkit-build52-real-device-selfheal-failure-20260922.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
@@ -29,12 +29,5 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
-  },
-  "lifecycle": {
-    "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T21:47:51Z",
-    "completed_at_utc": "2026-09-22T22:39:31Z",
-    "completion_status": "blocked",
-    "completion_handoff_path": "agent-handoffs/reports/20260922T223832Z-healthkit-automatic-partition-recovery-build52.md"
   }
 }
