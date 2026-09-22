@@ -326,6 +326,7 @@ n1_test_files = [
     ("PhysiqueOSTests", "HealthKitSynchronizationTests.swift"),
     ("PhysiqueOSTests", "HealthKitFounderCanaryTests.swift"),
     ("PhysiqueOSTests", "HealthKitAutomaticSynchronizationCoordinatorTests.swift"),
+    ("PhysiqueOSTests", "HealthKitQueryClientDefaultBoundsTests.swift"),
 ]
 
 late_reference_only_files = [

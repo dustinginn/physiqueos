@@ -123,6 +123,33 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         }
     }
 
+    /// Shared fallback for the two daily-aggregate streams (Activity Summary,
+    /// Nutrition daily total) when no explicit bounds are supplied. Neither
+    /// type has a native per-sample HealthKit anchor, so the general
+    /// incremental sync path (which never computes its own bounds) can only
+    /// ever see a fresh, current snapshot by re-querying a bounded window
+    /// ending today; `activityLookbackDays` back is a deliberately generous
+    /// catch-up window for a device that has not foregrounded in a while.
+    private func defaultLookbackBounds(from current: Date) -> HealthKitQueryBounds {
+        Self.defaultLookbackBounds(from: current, lookbackDays: activityLookbackDays, calendar: calendar)
+    }
+
+    /// Pure, HealthKit-independent so it is directly unit-testable: no
+    /// `HKHealthStore` involved. `lookbackDays` back through the end of
+    /// `current`'s local day, inclusive of today.
+    static func defaultLookbackBounds(from current: Date, lookbackDays: Int, calendar: Calendar) -> HealthKitQueryBounds {
+        let currentStart = calendar.startOfDay(for: current)
+        let startDate = calendar.date(byAdding: .day, value: -lookbackDays, to: currentStart) ?? currentStart
+        let endExclusive = calendar.date(byAdding: .day, value: 1, to: currentStart) ?? currentStart
+        return HealthKitQueryBounds(
+            startDateInclusive: startDate,
+            endDateExclusive: endExclusive,
+            startLocalDate: Self.localDate(startDate, calendar: calendar),
+            endLocalDate: Self.localDate(currentStart, calendar: calendar),
+            timeZoneIdentifier: calendar.timeZone.identifier
+        )
+    }
+
     private func executeActivitySummary(
         after cursorData: Data?,
         bounds requestedBounds: HealthKitQueryBounds?
@@ -135,21 +162,7 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
             throw HealthKitSyncError.corruptCursor
         }
         let current = now()
-        let bounds: HealthKitQueryBounds
-        if let requestedBounds {
-            bounds = requestedBounds
-        } else {
-            let currentStart = calendar.startOfDay(for: current)
-            let startDate = calendar.date(byAdding: .day, value: -activityLookbackDays, to: currentStart) ?? currentStart
-            let endExclusive = calendar.date(byAdding: .day, value: 1, to: currentStart) ?? currentStart
-            bounds = HealthKitQueryBounds(
-                startDateInclusive: startDate,
-                endDateExclusive: endExclusive,
-                startLocalDate: Self.localDate(startDate, calendar: calendar),
-                endLocalDate: Self.localDate(currentStart, calendar: calendar),
-                timeZoneIdentifier: calendar.timeZone.identifier
-            )
-        }
+        let bounds = requestedBounds ?? defaultLookbackBounds(from: current)
         let components = Self.activitySummaryPredicateComponents(bounds: bounds, calendar: calendar)
         let predicate = HKQuery.predicate(
             forActivitySummariesBetweenStart: components.start,
@@ -256,17 +269,29 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         }
     }
 
-    /// Explicitly bounded daily dietary totals across all sources (HealthKit
-    /// statistics, so an edited or deleted entry is reflected in the next
-    /// total rather than left stale). The snapshot rules live in
+    /// Daily dietary totals across all sources (HealthKit statistics, so an
+    /// edited or deleted entry is reflected in the next total rather than
+    /// left stale). The snapshot rules live in
     /// `HealthKitNutritionDailySnapshotBuilder` so they are unit-testable.
+    ///
+    /// Falls back to `defaultLookbackBounds` when no explicit bounds are
+    /// given, exactly like `executeActivitySummary` -- both are daily
+    /// aggregate types with no native per-sample anchor concept, so the
+    /// general incremental sync path (`HealthKitSynchronizationEngine.
+    /// synchronize`, which always calls `execute(..., bounds: nil)`) can
+    /// only ever produce a fresh snapshot by re-querying a bounded window,
+    /// never by an anchor alone. This method used to require an explicit
+    /// caller-supplied `bounds` and throw otherwise -- that made automatic
+    /// Nutrition catch-up unconditionally fail on every single foreground
+    /// (a real Build 51 production regression: the general sync path never
+    /// supplies bounds), even though `HealthKitNutritionDailySnapshotBuilder.
+    /// build` already iterates an arbitrary multi-day window correctly, the
+    /// same way Activity Summary's own default-bounds fallback already did.
     private func executeNutritionDailyTotal(
         after cursorData: Data?,
-        bounds: HealthKitQueryBounds?
+        bounds requestedBounds: HealthKitQueryBounds?
     ) async throws -> HealthKitAnchoredQueryResult {
-        guard let bounds else {
-            throw HealthKitSyncError.operational(code: "healthkit_nutrition_bounds_required")
-        }
+        let bounds = requestedBounds ?? defaultLookbackBounds(from: now())
         let prior: HealthKitNutritionDailySnapshotBuilder.Cursor
         do {
             prior = try cursorData.map { try JSONDecoder().decode(HealthKitNutritionDailySnapshotBuilder.Cursor.self, from: $0) }
