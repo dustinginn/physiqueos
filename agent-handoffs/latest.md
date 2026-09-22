@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Audit Native core-page cold-load performance (`native-core-page-cold-load-performance-audit-20260921`)
+- Task: HealthKit completed-day acceptance audit (`healthkit-completed-day-audit-20260922`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-22T04:40:00Z
+- Generated (UTC): 2026-09-22T12:44:15Z
 - Success: true
 
-Summary: Measurement-first audit of the Founder's reported 3-5s Native cold-load-after-idle. No Founder Production credentials were available, so no live authenticated device trace was obtained (none sought/fabricated). Used real production runtime logs from an actual recent Founder session (Home 2.4s/3.6MB, Log 2.3s/9.2MB, Nutrition/Activity/Energy ~1-1.4s/~4MB each, DB pool waitingCount hit 10 vs pool of 5), full code-level architecture mapping of Native (2bfbf54a) and exact-prod Server (93491bc5), and a local fixture-scale render experiment ruling out client rendering as dominant. Dominant causes: (C) unbounded full-history Server queries with no DB-level pagination, and (E) Native's in-memory-only cache plus an explicit flag disabling iOS's HTTP disk cache, so every cold launch is a guaranteed full miss. Secondary: (A) mandatory post-idle auth refresh plus an unmeasured per-request 5-DB-round-trip auth check; (D) a confirmed cheap-to-fix duplicate-fetch bug (Weight/Nutrition/Activity scope mismatches Evidence Hub/Log). Delivered ranked P0/P1/P2 bottlenecks and a sequenced plan; recommend deferring all fixes to Build 51 (HealthKit Build 50 verified untouched). Audit only, no implementation.
+Summary: GREEN. Read-only production audit of the three-sync 2026-09-21 completed-day lineage for Activity and Nutrition. Both domains: exactly one raw observation per sync (3 total each), strictly increasing device-scoped revision, singleton canonical day per domain with zero duplicates, current canonical values match the final (completed) raw HealthKit observation exactly field-by-field, coverage correctly advanced partial_day to complete_day. Activity: move calories, exercise minutes, stand hours and steps confirmed. Nutrition: calories/protein/carbs/fat confirmed, zero fabricated meals, device full-day-total assertion. Strategic quarantine held throughout with hard zero counters (no HealthKit-derived record ever entered strategic Evidence), so Confidence/briefings/Training/strategy were not and could not have been changed. Graduation plumbing verified dormant and ready live: both policy scopes (projection, evidence eligibility) resolve to disabled, Workout activation disabled with clean one-to-one integrity, and a live read-only graduation dry run executed successfully, proving the simulation/dry-run path is functional without writing anything. No code changed, no deployment, no policy write, no resync, no upload -- audit only, as scoped.
 
-Detailed report: `agent-handoffs/reports/20260922T044000Z-native-core-page-cold-load-performance-audit.md`
+Detailed report: `agent-handoffs/reports/20260922T124415Z-healthkit-completed-day-audit.md`
 
 Protocol: `agent-handoffs/README.md`

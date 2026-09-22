@@ -4,7 +4,7 @@
   "task": {
     "id": "healthkit-completed-day-audit-20260922",
     "title": "HealthKit completed-day acceptance audit",
-    "status": "claimed"
+    "status": "completed"
   },
   "target": {
     "agent": "claude",
@@ -32,6 +32,9 @@
   },
   "lifecycle": {
     "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T12:39:47Z"
+    "claimed_at_utc": "2026-09-22T12:39:47Z",
+    "completed_at_utc": "2026-09-22T12:45:17Z",
+    "completion_status": "completed",
+    "completion_handoff_path": "agent-handoffs/reports/20260922T124415Z-healthkit-completed-day-audit.md"
   }
 }

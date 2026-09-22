@@ -1,23 +1,23 @@
 {
  "schema_version": 1,
- "generated_at_utc": "2026-09-22T04:40:00Z",
+ "generated_at_utc": "2026-09-22T12:44:15Z",
  "task": {
-  "id": "native-core-page-cold-load-performance-audit-20260921",
-  "title": "Audit Native core-page cold-load performance",
+  "id": "healthkit-completed-day-audit-20260922",
+  "title": "HealthKit completed-day acceptance audit",
   "agent": "claude",
   "status": "completed"
  },
  "repository": "dustinginn/physiqueos",
  "authority": {
-  "base_sha": "bbb46e19084a7b7e0860a1d5e84e20e2f6649d1a",
-  "final_sha": null,
+  "base_sha": "93491bc5d829d3693aa29023cd79e96922012130",
+  "final_sha": "93491bc5d829d3693aa29023cd79e96922012130",
   "production_server_sha": "93491bc5d829d3693aa29023cd79e96922012130",
   "production_deployment": "1156849f-d5af-47ec-a5d3-d247a99033ee",
   "native_sha": "2bfbf54ad105a3a18189e811f06afc421741a7da",
   "native_build": 49
  },
  "result": {
-  "summary": "Measurement-first audit of the Founder's reported 3-5s Native cold-load-after-idle. No Founder Production credentials were available, so no live authenticated device trace was obtained (none sought/fabricated). Used real production runtime logs from an actual recent Founder session (Home 2.4s/3.6MB, Log 2.3s/9.2MB, Nutrition/Activity/Energy ~1-1.4s/~4MB each, DB pool waitingCount hit 10 vs pool of 5), full code-level architecture mapping of Native (2bfbf54a) and exact-prod Server (93491bc5), and a local fixture-scale render experiment ruling out client rendering as dominant. Dominant causes: (C) unbounded full-history Server queries with no DB-level pagination, and (E) Native's in-memory-only cache plus an explicit flag disabling iOS's HTTP disk cache, so every cold launch is a guaranteed full miss. Secondary: (A) mandatory post-idle auth refresh plus an unmeasured per-request 5-DB-round-trip auth check; (D) a confirmed cheap-to-fix duplicate-fetch bug (Weight/Nutrition/Activity scope mismatches Evidence Hub/Log). Delivered ranked P0/P1/P2 bottlenecks and a sequenced plan; recommend deferring all fixes to Build 51 (HealthKit Build 50 verified untouched). Audit only, no implementation.",
+  "summary": "GREEN. Read-only production audit of the three-sync 2026-09-21 completed-day lineage for Activity and Nutrition. Both domains: exactly one raw observation per sync (3 total each), strictly increasing device-scoped revision, singleton canonical day per domain with zero duplicates, current canonical values match the final (completed) raw HealthKit observation exactly field-by-field, coverage correctly advanced partial_day to complete_day. Activity: move calories, exercise minutes, stand hours and steps confirmed. Nutrition: calories/protein/carbs/fat confirmed, zero fabricated meals, device full-day-total assertion. Strategic quarantine held throughout with hard zero counters (no HealthKit-derived record ever entered strategic Evidence), so Confidence/briefings/Training/strategy were not and could not have been changed. Graduation plumbing verified dormant and ready live: both policy scopes (projection, evidence eligibility) resolve to disabled, Workout activation disabled with clean one-to-one integrity, and a live read-only graduation dry run executed successfully, proving the simulation/dry-run path is functional without writing anything. No code changed, no deployment, no policy write, no resync, no upload -- audit only, as scoped.",
   "success": true,
   "production_mutated": false,
   "deployed": false,
@@ -26,45 +26,36 @@
  "validation": {
   "tests": {
    "status": "not_applicable",
-   "summary": "No code changes were made (audit-only task); no test suite was run beyond a local Debug build succeeding for the fixture-scale render measurement."
+   "summary": "Read-only production audit task; no code changed, so no test suite was run."
   },
   "review": {
    "status": "not_applicable",
-   "summary": "No code changes were made; nothing to review."
+   "summary": "No code change to review; this task only reads production state."
   },
   "zero_write_audit": {
    "status": "passed",
-   "summary": "All production access was read-only (doctl apps get-deployment/apps logs/apps spec get, and unauthenticated curl connection-timing probes returning 401/405 with no data). No Native app was run against Founder Production. No Server code was built for or deployed to production."
+   "summary": "Every audit payload ran inside a REPEATABLE READ READ ONLY transaction with the transaction_read_only fence checked before any query and an explicit ROLLBACK; PRODUCTION_MUTATED_DURING_AUDIT is NO."
   }
  },
  "decisions_required": [
-  "Whether to authorize a follow-up pass with a live authenticated on-device trace (requires the Founder to log into Founder Production once on a Debug build in a fresh simulator, or to provide/authorize a bounded test-account token) to replace the fixture-scale render measurement and production-log-based server timing with a true end-to-end device trace.",
-  "Whether to fold the single small additive item (promoting NativePerformanceDiagnostics to release builds) into the pending Build 50, or defer everything including that item to Build 51 as recommended.",
-  "Authorize the P0 fixes for a Build 51 performance pass: server-side query bounding (Home/Training/Nutrition/Weight/Timeline/Photos), Native persisted-snapshot cache redesign, and the Weight/Nutrition/Activity scope-mismatch fix.",
-  "Authorize the low-risk Server ops changes (raise PHYSIQUEOS_DATABASE_POOL_MAX, commit PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS=1 into the checked-in template) independently of the larger Build 51 work, since they need no Native build at all."
+  "Authorize Build 50 (c116867f, reviewed, carrying both the Activity/Nutrition graduation UI and the Workout canary) for archive, upload and install.",
+  "Authorize the graduation dry run and, if accepted, the projection-scope policy transition for 2026-09-21.",
+  "Authorize the evidence-eligibility scope transition separately, after projection is verified.",
+  "Choose the strength Workout canary day after Activity/Nutrition graduation is accepted and Build 50 is installed."
  ],
- "blockers": [
-  "No Founder Production credentials/authenticated session available in this environment, so a true live on-device cold-launch/idle-resume trace (COLD_LAUNCH_MEASURED / IDLE_RESUME_MEASURED at full fidelity) could not be obtained. Worked around via real production runtime logs plus fixture-scale local rendering, but this is a real gap versus the task's ideal method — flagged rather than silently worked around."
- ],
- "unexpected_findings": [
-  "PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS=1 is set in the live deployed App Platform spec but not in the checked-in infra/digitalocean/*.yaml templates -- a redeploy-from-template would silently lose the per-query diagnostics this audit relied on.",
-  "A concrete, narrow, cheap-to-fix duplicate-fetch bug: Weight/Nutrition/Activity screens default to context=build-lean-mass while Evidence Hub and Log use context=all, so drilling from Evidence Hub into any of those three screens is a guaranteed cache-miss re-fetch of data just displayed seconds earlier.",
-  "The Native client explicitly sets request.cachePolicy = .reloadIgnoringLocalCacheData on every request, which disables iOS's own free HTTP disk cache on top of the custom in-memory cache being empty on every cold launch -- there is no caching fallback at any layer for a freshly launched process.",
-  "The primary Server bulk-read path (NativeProductionContractService.read(), backing every page in this audit) has zero success-path latency logging; the rich per-query diagnostics that produced this report's numbers exist only via the undocumented live spec env-var override noted above.",
-  "DB connection pool is fixed at the default of 5 and was observed queuing for real (waitingCount reaching 10) under Evidence Hub's own 7-concurrent-GET fan-out -- a real, currently-live concurrency bottleneck, not a hypothetical one.",
-  "'Home priority navigation' as a specifically named prior feature/incident was not found in the codebase or git history under that name; closest candidates identified and flagged rather than guessed."
- ],
+ "blockers": [],
+ "unexpected_findings": [],
  "backlog": [
-  "Build 51 performance pass: bound unbounded full-history Server queries (Home/Training/Nutrition/Weight/Timeline/Photos) with real SQL-level LIMIT/date-window filtering",
-  "Build 51 performance pass: Native persisted last-known-snapshot cache with explicit freshness semantics, replacing the in-memory-only cache and removing the blanket .reloadIgnoringLocalCacheData",
-  "Native fix: align Weight/Nutrition/Activity default query scope with Evidence Hub/Log's context=all to eliminate the confirmed duplicate-fetch path",
-  "Server ops: raise PHYSIQUEOS_DATABASE_POOL_MAX and commit PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS=1 into the checked-in app-spec template",
-  "Server: short-TTL cache for per-request auth-token validation and for the canonical exercise registry lookup",
-  "Native: promote NativePerformanceDiagnostics (network/decode/shell timing) from #if DEBUG to a redacted, rate-limited release build metric",
-  "Follow-up task: live authenticated on-device cold-launch/idle-resume trace once Founder credentials/test-account access is arranged"
+  "Build 50 archive and upload (c116867f, now unblocked by GREEN acceptance -- Founder decision)",
+  "Graduation dry run and, if authorized, projection then evidence-eligibility activation for 2026-09-21",
+  "Strength Workout canary, then cardio, then background delivery and a durable Native revision floor",
+  "HealthKit background delivery and durable Native revision floor",
+  "Workout Logger draft survival across termination and update",
+  "Photo Briefing tap-to-expand production mismatch",
+  "Coaching Updates delivery-time UI cleanup"
  ],
- "recommended_next_step": "Decide whether to authorize a live authenticated on-device follow-up trace, then sequence the Build 51 performance work per the report's optimization plan starting with the zero-code Server ops changes (DB pool size, diagnostics env var) and the small Native scope-mismatch fix, both independently low-risk and not blocked on anything else.",
- "full_report_path": "agent-handoffs/reports/20260922T044000Z-native-core-page-cold-load-performance-audit.md",
+ "recommended_next_step": "Founder decides whether to proceed with Build 50 archive/upload and the graduation dry run now that the completed-day audit is GREEN.",
+ "full_report_path": "agent-handoffs/reports/20260922T124415Z-healthkit-completed-day-audit.md",
  "safety": {
   "contains_secrets": false,
   "contains_credentials": false,
