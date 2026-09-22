@@ -50,6 +50,7 @@ export function createPostgresProgressEvidenceReadStore({
       queryCount = 0;
       rowCount = 0;
       payloadBytes = 0;
+      graduation.beginRun();
       const startedAt = performance.now();
       try {
         return await callback();

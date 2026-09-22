@@ -21,20 +21,29 @@ import {
 export function createHealthKitGraduationReader({ records, query, ownerUserId, onError = null } = {}) {
   const store = records ?? (query ? createPhase4CanonicalRecordStore({ query }) : null);
   if (!store || !ownerUserId) throw new Error("HealthKit graduation reads require a record store and owner.");
+  // One policy lookup per read run: a read that consumes several evidence
+  // lists (Energy) asks once. `beginRun` starts a fresh run.
+  let pending = null;
+  const lookup = () => {
+    pending ??= store.get({
+      ownerUserId,
+      collection: HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION,
+      recordId: HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
+    });
+    return pending;
+  };
   return Object.freeze({
+    beginRun() { pending = null; },
     /**
      * @param canonicalObjects the ordinary canonical evidence array
      * @param purpose projection (UI read models) or evidence (V3 / Energy / briefings)
      * @param domains restrict to the domains this reader consumes
+     * @param policyRecord a policy record the caller already loaded in its own
+     *   query (null when none exists); skips the lookup entirely
      */
-    async overlay(canonicalObjects, { purpose = HealthKitGraduationPurpose.PROJECTION, domains = ["activity", "nutrition"], keepDateOrder = false } = {}) {
+    async overlay(canonicalObjects, { purpose = HealthKitGraduationPurpose.PROJECTION, domains = ["activity", "nutrition"], keepDateOrder = false, policyRecord } = {}) {
       try {
-        const policyRecord = await store.get({
-          ownerUserId,
-          collection: HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION,
-          recordId: HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
-        });
-        const policy = resolveHealthKitGraduationPolicy(policyRecord);
+        const policy = resolveHealthKitGraduationPolicy(policyRecord === undefined ? await lookup() : policyRecord);
         const scope = purpose === HealthKitGraduationPurpose.EVIDENCE ? policy.evidenceEligibility : policy.projection;
         if (!scope.enabled || !domains.some((domain) => scope.domains.includes(domain))) return canonicalObjects;
         const days = (await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }))

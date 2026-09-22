@@ -13,7 +13,8 @@ describe("PostgresEvidenceTimelineReadStore", () => {
     const result = await createPostgresEvidenceTimelineReadStore({ pool, ownerUserId: "owner" }).load();
 
     expect(result.analyses[0].summary.recent_pr_count).toBe(2);
-    expect(query).toHaveBeenCalledTimes(9);
+    // Nine collection reads plus the single graduation-policy lookup.
+    expect(query).toHaveBeenCalledTimes(10);
     for (const [, values] of query.mock.calls) expect(values[0]).toBe("owner");
     const sql = query.mock.calls.map(([text]) => text).join("\n");
     expect(sql).toContain("jsonb_build_object");

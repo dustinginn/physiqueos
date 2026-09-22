@@ -15,6 +15,9 @@ const ALLOWED = new Set([
   "application/native/nativeProductionContractManifest.js",
   "domain/services/HealthKitCanonicalDayService.js",
   "domain/services/HealthKitEvidenceEligibilityPolicy.js",
+  // Graduation: read-time overlay of accepted canonical days (policy-controlled).
+  "domain/services/HealthKitGraduation.js",
+  "platform/database/HealthKitGraduationReader.js",
   "domain/services/HealthKitObservationService.js",
   "domain/services/HealthKitWorkoutLinkService.js",
   "domain/services/HealthKitWorkoutRelationshipService.js",
@@ -22,6 +25,7 @@ const ALLOWED = new Set([
   "platform/migration/phase4DomainCollections.js",
   "platform/operations/HealthKitActivationPolicyRunner.js",
   "platform/operations/HealthKitCanonicalAcceptanceAudit.js",
+  "platform/operations/HealthKitGraduationPolicyRunner.js",
   "platform/operations/HealthKitWorkoutCanaryAudit.js",
 ]);
 const NEEDLES = [
@@ -50,5 +54,40 @@ describe("HealthKit strategic read boundary", () => {
 
   it("keeps every allowlisted file real, so the allowlist cannot silently rot", () => {
     for (const relative of ALLOWED) expect(fs.existsSync(path.join(ROOT, relative)), relative).toBe(true);
+  });
+
+  // The graduation reader is the ONE sanctioned way a normal reader sees a
+  // canonical HealthKit day. It is enumerated so a new reader cannot start
+  // consuming HealthKit days by accident, and no write path may import it.
+  const READER_IMPORTERS = new Set([
+    "application/composition/providerBriefingCadenceComposition.js",
+    "platform/database/PostgresCoreNavigationReadStore.js",
+    "platform/database/PostgresEvidenceTimelineReadStore.js",
+    "platform/database/PostgresProgressEvidenceReadStore.js",
+  ]);
+  const importersOf = (needle) => walk(ROOT)
+    .map((file) => path.relative(ROOT, file))
+    .filter((relative) => fs.readFileSync(path.join(ROOT, relative), "utf8").includes(needle));
+
+  it("enumerates every reader of graduated HealthKit days", () => {
+    const importers = importersOf("HealthKitGraduationReader").filter((relative) => relative !== "platform/database/HealthKitGraduationReader.js");
+    expect(new Set(importers)).toEqual(READER_IMPORTERS);
+  });
+
+  it("keeps graduated days out of every write, command, repair and ingestion path", () => {
+    const writePaths = walk(ROOT)
+      .map((file) => path.relative(ROOT, file))
+      .filter((relative) => /^(application\/commands|application\/native\/nativeCommand|domain\/services\/.*(Repair|Commit|Recovery|Migration))/.test(relative));
+    expect(writePaths.length).toBeGreaterThan(0);
+    for (const relative of writePaths) {
+      const source = fs.readFileSync(path.join(ROOT, relative), "utf8");
+      expect(source, relative).not.toMatch(/HealthKitGraduation|overlayGraduatedHealthKitDays/);
+    }
+  });
+
+  it("uses the strategic (evidence) purpose only where briefings are generated", () => {
+    const strategic = importersOf("HealthKitGraduationPurpose.EVIDENCE")
+      .filter((relative) => !/^domain\/services\/HealthKitGraduation\.js$|^platform\/database\/HealthKitGraduationReader\.js$|^platform\/operations\/HealthKitGraduationPolicyRunner\.js$/.test(relative));
+    expect(strategic).toEqual(["application/composition/providerBriefingCadenceComposition.js"]);
   });
 });

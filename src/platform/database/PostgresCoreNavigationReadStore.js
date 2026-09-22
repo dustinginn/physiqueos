@@ -1,5 +1,9 @@
 import { PHASE4_DOMAIN_TABLES } from "../migration/phase4DomainCollections.js";
 import { createHealthKitGraduationReader } from "./HealthKitGraduationReader.js";
+import {
+  HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION,
+  HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
+} from "../../domain/services/HealthKitGraduation.js";
 
 // Read models whose Activity / Nutrition rows may show graduated HealthKit days
 // (policy-controlled, OFF by default). Every other model is untouched.
@@ -29,6 +33,10 @@ export function createPostgresCoreNavigationReadStore({
       const readCollections = async (collections) => {
         const requested = [...new Set(collections ?? [])];
         if (requested.length === 0) return Object.freeze({});
+        // The graduation policy row rides in this same query (one provider
+        // query stays one), and is removed from the result before it returns.
+        const graduated = requested.includes("canonicalEvidenceObjects") && HEALTHKIT_GRADUATED_READ_MODELS.has(readModel);
+        if (graduated) requested.push(HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION);
         const grouped = groupCollectionsByTable(requested);
         const values = [ownerUserId];
         const selections = [...grouped].map(([table, names], index) => {
@@ -54,9 +62,14 @@ export function createPostgresCoreNavigationReadStore({
           output[row.collection_name].push(Object.freeze(row.payload));
           if (row.runtime_metadata) runtimeMetadata = Object.freeze(row.runtime_metadata);
         }
-        if (output.canonicalEvidenceObjects && HEALTHKIT_GRADUATED_READ_MODELS.has(readModel)) {
-          queryCount += 1;
-          output.canonicalEvidenceObjects = await graduation.overlay(output.canonicalEvidenceObjects);
+        if (graduated) {
+          const policyRecord = (output[HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION] ?? [])
+            .find((record) => record?.id === HEALTHKIT_GRADUATION_POLICY_RECORD_ID) ?? null;
+          delete output[HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION];
+          const before = output.canonicalEvidenceObjects;
+          // The operating plan reads Activity only; Log reads both.
+          const domains = readModel === "core.navigation.operating-plan" ? ["activity"] : ["activity", "nutrition"];
+          output.canonicalEvidenceObjects = await graduation.overlay(before, { policyRecord, domains });
         }
         return Object.freeze(output);
       };
@@ -148,6 +161,16 @@ function normalizeCollection(value) {
 }
 
 function canonicalEvidencePredicate(readModel) {
+  return `${graduationPolicyPredicate(readModel)}${evidenceTypePredicate(readModel)}`;
+}
+
+function graduationPolicyPredicate(readModel) {
+  return HEALTHKIT_GRADUATED_READ_MODELS.has(readModel)
+    ? `AND (collection_name<>'${HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION}' OR record_id='${HEALTHKIT_GRADUATION_POLICY_RECORD_ID}')`
+    : "";
+}
+
+function evidenceTypePredicate(readModel) {
   if (["core.navigation.home", "core.navigation.goals", "core.navigation.training-logger", "core.navigation.training-my-library"].includes(readModel)) {
     return `AND (collection_name<>'canonicalEvidenceObjects' OR
       COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')='training')`;

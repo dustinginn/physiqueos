@@ -3,12 +3,15 @@ import { createPostgresProgressEvidenceReadStore } from "./PostgresProgressEvide
 
 describe("PostgreSQL Progress evidence read store", () => {
   it.each([
-    ["progress.evidence.dexa", ["getUser", "listGoals", "listDEXAScans", "listDEXAMediaObjects"], 4],
-    ["progress.evidence.weight", ["getUser", "listGoals", "listWeightEntries", "listDEXAScans"], 4],
-    ["progress.evidence.nutrition", ["getUser", "listGoals", "getNutritionContext", "listCanonicalNutritionEvidenceObjects"], 4],
-    ["progress.evidence.activity", ["getUser", "listGoals", "listCanonicalActivityAndTrainingEvidenceObjects"], 3],
-    ["progress.evidence.energy", ["getUser", "listGoals", "listDEXAScans", "getNutritionContext", "listCanonicalNutritionEvidenceObjects", "listCanonicalActivityAndTrainingEvidenceObjects"], 6],
-  ])("uses bounded queries for %s", async (readModel, methods, expectedQueries) => {
+    // The last column is the single graduation-policy lookup a run makes when it
+    // reads Activity or Nutrition evidence (memoized per run: Energy asks once).
+    ["progress.evidence.dexa", ["getUser", "listGoals", "listDEXAScans", "listDEXAMediaObjects"], 4, 0],
+    ["progress.evidence.weight", ["getUser", "listGoals", "listWeightEntries", "listDEXAScans"], 4, 0],
+    ["progress.evidence.nutrition", ["getUser", "listGoals", "getNutritionContext", "listCanonicalNutritionEvidenceObjects"], 4, 1],
+    ["progress.evidence.activity", ["getUser", "listGoals", "listCanonicalActivityAndTrainingEvidenceObjects"], 3, 1],
+    ["progress.evidence.energy", ["getUser", "listGoals", "listDEXAScans", "getNutritionContext", "listCanonicalNutritionEvidenceObjects", "listCanonicalActivityAndTrainingEvidenceObjects"], 6, 1],
+  ])("uses bounded queries for %s", async (readModel, methods, baseQueries, policyLookups) => {
+    const expectedQueries = baseQueries + policyLookups;
     const query = vi.fn(async () => ({ rows: [] }));
     const complete = vi.fn();
     const store = createPostgresProgressEvidenceReadStore({
@@ -25,7 +28,7 @@ describe("PostgreSQL Progress evidence read store", () => {
       readModel,
       queryCount: expectedQueries,
       rowCount: 0,
-      payloadBytes: expectedQueries * 2,
+      payloadBytes: baseQueries * 2,
       compatibilityRuntimeLoadCount: 0,
       pool: { totalCount: 2, idleCount: 2, waitingCount: 0 },
     }));
