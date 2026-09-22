@@ -186,3 +186,45 @@ This materially narrows the failure:
 - do not regress Nutrition while fixing Activity.
 
 Updated acceptance: Activity must still self-heal without canary/manual Sync. Nutrition should continue advancing automatically, and its latency characteristics must be explained rather than simply marked pass/fail.
+
+
+FOUNDER REQUIREMENT — Nutrition latency is also a correctness/usability issue
+
+Do not treat Nutrition as fully accepted merely because it eventually updated. The Founder considers the observed delay too long and wants the expected update timeframe understood and, if PhysiqueOS-controlled, improved.
+
+Investigate the full timing chain for the successful Build 52 Nutrition update:
+- Apple Health sample write/update time(s), where safely inferable without exposing private payloads;
+- HKObserverQuery/background-delivery callback time, if any;
+- app foreground/cold-launch trigger times;
+- HealthKit aggregate query completion;
+- local revision/batch creation;
+- upload attempt/acknowledgement;
+- Server raw acceptance;
+- canonicalization revision;
+- projection/read-model availability;
+- when the Native Log could have observed the new revision.
+
+Separate latency into:
+1. Apple/iOS/HealthKit delivery latency outside PhysiqueOS control;
+2. PhysiqueOS Native scheduling/query/retry latency;
+3. network/upload latency;
+4. Server canonicalization/projection latency;
+5. Native refresh/cache latency.
+
+State what update behavior a user should reasonably expect in normal operation for Activity and Nutrition in each state:
+- app active/foregrounded;
+- app backgrounded but not terminated;
+- app fully terminated;
+- device offline then reconnected;
+- HealthKit data revised later in the same day.
+
+Do not promise an iOS background-delivery SLA Apple does not guarantee. But ordinary foreground/cold-launch catch-up is PhysiqueOS-controlled and should have a concrete product target. Audit current behavior and recommend/implement the smallest changes needed so that when the app is opened normally with newer HealthKit data available, the canonical Log/Evidence view catches up promptly rather than many minutes/hours later.
+
+Use measured evidence to propose an acceptance target. Unless architecture demonstrates a reason otherwise, treat foreground catch-up taking more than a few seconds as suspect and identify where the time is spent. Preserve the separate core-page performance backlog; this task is specifically ingestion-to-canonical/read-model freshness, not general screen-render optimization.
+
+Final report must include:
+- observed Nutrition end-to-end latency for this event as closely as evidence permits;
+- which component(s) caused it;
+- expected user-visible update timeframe after ordinary foreground;
+- expected behavior while backgrounded/terminated, with iOS limitations clearly distinguished;
+- whether additional code changes are required before Activity/Nutrition automatic ingestion can be accepted as daily-driver ready.
