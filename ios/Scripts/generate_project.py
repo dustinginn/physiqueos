@@ -314,6 +314,7 @@ n1_app_files = [
     ("Networking", "HealthKitServerUploader.swift"),
     ("Networking", "HealthKitSynchronizationEngine.swift"),
     ("Networking", "HealthKitFounderCanaryCoordinator.swift"),
+    ("Networking", "HealthKitAutomaticSynchronizationCoordinator.swift"),
     ("Presentation/You", "HealthKitFounderCanaryView.swift"),
 ]
 
@@ -324,6 +325,7 @@ late_test_files = [
 n1_test_files = [
     ("PhysiqueOSTests", "HealthKitSynchronizationTests.swift"),
     ("PhysiqueOSTests", "HealthKitFounderCanaryTests.swift"),
+    ("PhysiqueOSTests", "HealthKitAutomaticSynchronizationCoordinatorTests.swift"),
 ]
 
 late_reference_only_files = [

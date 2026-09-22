@@ -11,6 +11,7 @@ import UserNotifications
 struct PhysiqueOSApp: App {
     @State private var environment: AppEnvironment
     @State private var notificationDelegate: PriorityNotificationDelegate
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         // A notification action may be the process-launch event. Registering
@@ -18,7 +19,7 @@ struct PhysiqueOSApp: App {
         // Complete/Snooze before the delegate had its environment, losing the
         // specialized command before dispatch. Establish the response path
         // before SwiftUI creates the first scene.
-        let environment = AppEnvironment()
+        let environment = AppEnvironment(healthKitFeatureGate: .n1Automatic)
         let notificationDelegate = PriorityNotificationDelegate(environment: environment)
         UNUserNotificationCenter.current().delegate = notificationDelegate
         PriorityNotificationCategoryRegistrar.registerCategories()
@@ -43,6 +44,19 @@ struct PhysiqueOSApp: App {
                     // Idempotent defensive refresh. The action-response path
                     // is already live from init; this is not its authority.
                     PriorityNotificationCategoryRegistrar.registerCategories()
+                }
+                // Cold launch and every foreground resume both surface here
+                // as a transition into `.active`. `bootstrap()` is itself
+                // idempotent (a second observer/background-delivery
+                // registration is a no-op, and a redundant catch-up sync is
+                // harmless), so calling it on every activation — rather than
+                // only once at cold launch — is what gives relaunch-after-
+                // termination its catch-up: a fully terminated app is not
+                // guaranteed a background wake, so the next time the Founder
+                // opens it is the only place that catch-up can happen.
+                .onChange(of: scenePhase, initial: true) { _, phase in
+                    guard phase == .active else { return }
+                    Task { await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap() }
                 }
         }
     }

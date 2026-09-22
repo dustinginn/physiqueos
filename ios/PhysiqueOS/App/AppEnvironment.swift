@@ -245,15 +245,21 @@ final class AppEnvironment {
     /// Durable staged Progress Photos transport state (plan + exact bytes)
     /// that survives navigation, suspension, termination, and reboot.
     let stagedPhotoIntakeStore: any StagedPhotoIntakeStore
-    /// N0 capability shell. The default gate enables no operation, and the
-    /// app lifecycle never invokes the coordinator automatically.
+    /// N1's permanent capability shell (`.n1Automatic`): read, upload, and
+    /// background delivery for Activity + Nutrition, never HealthKit writes.
+    /// `healthKitAutomaticSynchronizationCoordinator` is what actually
+    /// invokes it, from the root scene's `scenePhase` transitions.
     let healthKitFeatureGate: HealthKitFeatureGate
     let healthKitAuthorizationCoordinator: HealthKitAuthorizationCoordinator
     let healthKitSynchronizationEngine: HealthKitSynchronizationEngine
-    /// Temporary Founder-only foreground canary. Its capability shell can
-    /// query and upload only after the coordinator's runtime switch is
-    /// explicitly enabled; background delivery and HealthKit writes are not
-    /// present in this gate.
+    /// The permanent, background-eligible Activity + Nutrition path. Bound to
+    /// the main `healthKitSynchronizationEngine`/`healthKitAuthorizationCoordinator`
+    /// above (this gate), independent of the diagnostic canary below.
+    let healthKitAutomaticSynchronizationCoordinator: HealthKitAutomaticSynchronizationCoordinator
+    /// Founder Production diagnostic screen: manual foreground sync and
+    /// acceptance-audit tooling. Its own narrower capability shell
+    /// (`.founderActivityValidation`) and cursor namespace never overlap
+    /// with the automatic path's.
     let healthKitFounderCanaryCoordinator: HealthKitFounderCanaryCoordinator
 
     var weightEvidenceAPI: WeightEvidenceAPI {
@@ -605,6 +611,11 @@ final class AppEnvironment {
             store: healthKitSynchronizationStore,
             uploader: uploader,
             featureGate: healthKitFeatureGate
+        )
+        self.healthKitAutomaticSynchronizationCoordinator = HealthKitAutomaticSynchronizationCoordinator(
+            authorization: self.healthKitAuthorizationCoordinator,
+            synchronizer: self.healthKitSynchronizationEngine,
+            server: productionNativeAPI
         )
         let canaryGate = HealthKitFeatureGate.founderActivityValidation
         let canaryAuthorization = HealthKitAuthorizationCoordinator(

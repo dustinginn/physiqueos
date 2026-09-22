@@ -27,6 +27,19 @@ struct HealthKitFeatureGate: Equatable, Sendable {
         .serverUpload,
     ])
 
+    /// N1's permanent, background-eligible Activity + Nutrition ingestion.
+    /// Deliberately still excludes `.healthKitWrite`: automatic operation
+    /// only ever reads and uploads observations, never writes to Apple
+    /// Health, exactly like every other N1 capability shipped so far.
+    /// `.canonicalSynchronization` is not included: nothing in the codebase
+    /// checks it today, so it would be a false-capability signal.
+    static let n1Automatic = HealthKitFeatureGate(enabledOperations: [
+        .requestAuthorization,
+        .observationQuery,
+        .serverUpload,
+        .backgroundDelivery,
+    ])
+
     func allows(_ operation: HealthKitCapabilityOperation) -> Bool {
         enabledOperations.contains(operation)
     }
