@@ -252,8 +252,10 @@ final class NutritionReportingCalculatorTests: XCTestCase {
             day("healthkit", "2026-09-21", calories: 2140, protein: 182, carbs: 205, fat: 68, meals: []),
         ]
         let report = NutritionReportingCalculator.mealsReport(days: days, macroMixSlot: .all, trendSlot: .all, trendMetric: .mealCount)
-        let average = report.periodSummary.first { $0.label == "Average Meals per Logged Day" }
-        XCTAssertEqual(average?.value, "2.0")
+        let average = report.periodSummary.first { $0.label == "Average Meals per Detailed Day" }
+        // Locale-independent: parse back rather than compare the formatted string,
+        // since String(format:) can localize the decimal separator.
+        XCTAssertEqual(Double(average?.value ?? ""), 2.0)
         // Both days are still logged days; the totals-only day is not dropped.
         XCTAssertEqual(report.periodSummary.first { $0.label == "Logged Days" }?.value, "2 days")
     }
@@ -268,7 +270,7 @@ final class NutritionReportingCalculatorTests: XCTestCase {
     func testAMealsOnlyPeriodWithNoMealDetailStaysPendingNotZero() {
         let days = [day("healthkit", "2026-09-21", calories: 2140, protein: 182, carbs: 205, fat: 68, meals: [])]
         let report = NutritionReportingCalculator.mealsReport(days: days, macroMixSlot: .all, trendSlot: .all, trendMetric: .mealCount)
-        XCTAssertEqual(report.periodSummary.first { $0.label == "Average Meals per Logged Day" }?.value, "Pending")
+        XCTAssertEqual(report.periodSummary.first { $0.label == "Average Meals per Detailed Day" }?.value, "Pending")
     }
 
     func testTotalsOnlyDayIsDescribedAsTotalsOnlyNeverAsMissing() {

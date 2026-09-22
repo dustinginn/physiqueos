@@ -179,6 +179,13 @@ final class NutritionReadModelTests: XCTestCase {
 
     // MARK: - Apple Health daily total with no meal objects
 
+    func testTotalsOnlyCopyTriggersOnAnyPopulatedMacroNotCaloriesAlone() {
+        // A partial HealthKit delivery is not guaranteed to carry `calories`
+        // specifically; any populated macro is still a real totals-only day.
+        let macrosOnly = NutritionMacroTotals(calories: nil, proteinG: 150, carbsG: 200, fatG: 60, fiberG: nil)
+        XCTAssertEqual(NutritionDayView.emptyMealsCopy(totals: macrosOnly), "Daily totals only. No meal detail for this day.")
+    }
+
     func testAppleHealthDailyTotalWithZeroMealsDecodesAsAValidDay() throws {
         let json = """
         {

@@ -115,7 +115,10 @@ extension NutritionDayView {
     /// A day with daily totals and no meal objects (an Apple Health daily total)
     /// is complete and valid; it is described as totals-only, never as missing.
     static func emptyMealsCopy(totals: NutritionMacroTotals) -> String {
-        totals.calories != nil
+        // A partial HealthKit daily-total delivery does not guarantee `calories`
+        // specifically is present — any populated macro is a real totals-only
+        // day, not a day with nothing recorded.
+        [totals.calories, totals.proteinG, totals.carbsG, totals.fatG].contains(where: { $0 != nil })
             ? "Daily totals only. No meal detail for this day."
             : "No meals recorded for this day."
     }

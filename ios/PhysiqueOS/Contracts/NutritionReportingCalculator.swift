@@ -377,7 +377,11 @@ enum NutritionReportingCalculator {
 
         return NutritionMealsReport(
             periodSummary: [
-                NutritionReportSummaryItem(label: "Average Meals per Logged Day", value: averageMealsPerDay.map { String(format: "%.1f", $0) } ?? "Pending"),
+                // Named "per Detailed Day", not "per Logged Day": its denominator
+                // (days that carry meal detail) differs from the adjacent "Logged
+                // Days" tile's denominator (every day with any evidence), and a
+                // totals-only HealthKit day is logged but has no meal detail.
+                NutritionReportSummaryItem(label: "Average Meals per Detailed Day", value: averageMealsPerDay.map { String(format: "%.1f", $0) } ?? "Pending"),
                 NutritionReportSummaryItem(label: "Most Common Meal Slot", value: mostCommonSlot?.label ?? "Pending"),
                 NutritionReportSummaryItem(label: "Average Calories per Meal", value: formatCalories(averageCaloriesPerMeal)),
                 NutritionReportSummaryItem(label: "Logged Days", value: "\(days.count) days"),
