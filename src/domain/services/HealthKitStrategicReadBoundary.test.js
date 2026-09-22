@@ -66,8 +66,6 @@ describe("HealthKit strategic read boundary", () => {
     "platform/database/PostgresProgressHubReadStore.js",
     "platform/database/PostgresEvidenceTimelineReadStore.js",
     "platform/database/PostgresProgressEvidenceReadStore.js",
-    "platform/database/PostgresProgressHubReadStore.js",
-    "platform/database/PostgresPhotoEventReadStore.js",
   ]);
   const importersOf = (needle) => walk(ROOT)
     .map((file) => path.relative(ROOT, file))
