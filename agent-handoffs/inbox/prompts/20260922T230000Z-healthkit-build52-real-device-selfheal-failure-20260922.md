@@ -228,3 +228,24 @@ Final report must include:
 - expected user-visible update timeframe after ordinary foreground;
 - expected behavior while backgrounded/terminated, with iOS limitations clearly distinguished;
 - whether additional code changes are required before Activity/Nutrition automatic ingestion can be accepted as daily-driver ready.
+
+
+FOUNDER UI CORRECTION — Nutrition numeric formatting
+
+The live Nutrition Evidence Report is rendering raw floating-point precision, e.g. approximately:
+- 2405.5120239257812 calories
+- 178.25211668014526g protein
+- 173.8842658996582g carbohydrates
+- 109.46525192260742g fat
+
+This is not acceptable user-facing formatting and should be corrected in the next Native candidate while this HealthKit Nutrition path is being fixed.
+
+Desired presentation:
+- Calories: whole-number calories only, e.g. 2405 calories (use the product's established rounding convention consistently; do not display floating-point tails).
+- Protein/carbohydrates/fat: remove floating-point tails. Use the existing compact macro convention used elsewhere in Native; for this screen prefer whole grams unless an established canonical formatter intentionally uses at most one decimal for meaningful fractional grams.
+- Apply the same formatter consistently to the Nutrition day headline and metric cards so they cannot disagree.
+- Do not mutate canonical stored values merely for presentation; this is a Native/read-model formatting concern unless audit proves raw precision is leaking because of a broader serialization defect.
+- Audit other HealthKit-backed Nutrition surfaces for the same raw-double leakage (Log currently appears compact/correct) and centralize/reuse formatting rather than one-off string interpolation.
+- Add regression tests using long binary floating-point values so raw precision cannot reappear.
+
+This UI correction is in scope for the next HealthKit acceptance build because the defect became visible only after the real HealthKit daily-total projection was exercised. Do not defer it to the general design/performance backlog.
