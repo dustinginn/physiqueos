@@ -123,17 +123,15 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         }
     }
 
-    /// Shared fallback for the two daily-aggregate streams (Activity Summary,
-    /// Nutrition daily total) when no explicit bounds are supplied. Neither
-    /// type has a native per-sample HealthKit anchor, so the general
-    /// incremental sync path (which never computes its own bounds) can only
-    /// ever see a fresh, current snapshot by re-querying a bounded window
-    /// ending today; `activityLookbackDays` back is a deliberately generous
-    /// catch-up window for a device that has not foregrounded in a while.
-    private func defaultLookbackBounds(from current: Date) -> HealthKitQueryBounds {
-        Self.defaultLookbackBounds(from: current, lookbackDays: activityLookbackDays, calendar: calendar)
-    }
-
+    /// Fallback bounds for the two daily-aggregate streams (Activity Summary,
+    /// Nutrition daily total) when no explicit bounds are supplied, reached
+    /// through `resolvedBounds` below. Neither type has a native per-sample
+    /// HealthKit anchor, so the general incremental sync path (which never
+    /// computes its own bounds) can only ever see a fresh, current snapshot
+    /// by re-querying a bounded window ending today; `activityLookbackDays`
+    /// back is a deliberately generous catch-up window for a device that has
+    /// not foregrounded in a while.
+    ///
     /// Pure, HealthKit-independent so it is directly unit-testable: no
     /// `HKHealthStore` involved. `lookbackDays` back through the end of
     /// `current`'s local day, inclusive of today.
@@ -150,6 +148,29 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         )
     }
 
+    /// The exact seam both daily-aggregate streams resolve their bounds
+    /// through. Deliberately non-optional and non-throwing so the specific
+    /// Build 51 production regression -- `executeNutritionDailyTotal`
+    /// unconditionally throwing `healthkit_nutrition_bounds_required`
+    /// whenever the general incremental sync path called it with
+    /// `bounds: nil` (which it always does) -- cannot be silently
+    /// reintroduced through this call site: reintroducing a "bounds
+    /// required" throw would require actively adding a new guard/throw
+    /// here, not merely deleting a fallback. Pure, so directly
+    /// unit-testable without a real `HKHealthStore`.
+    private func resolvedBounds(requested: HealthKitQueryBounds?, from current: Date) -> HealthKitQueryBounds {
+        Self.resolvedBounds(requested: requested, from: current, lookbackDays: activityLookbackDays, calendar: calendar)
+    }
+
+    static func resolvedBounds(
+        requested: HealthKitQueryBounds?,
+        from current: Date,
+        lookbackDays: Int,
+        calendar: Calendar
+    ) -> HealthKitQueryBounds {
+        requested ?? defaultLookbackBounds(from: current, lookbackDays: lookbackDays, calendar: calendar)
+    }
+
     private func executeActivitySummary(
         after cursorData: Data?,
         bounds requestedBounds: HealthKitQueryBounds?
@@ -162,7 +183,7 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
             throw HealthKitSyncError.corruptCursor
         }
         let current = now()
-        let bounds = requestedBounds ?? defaultLookbackBounds(from: current)
+        let bounds = resolvedBounds(requested: requestedBounds, from: current)
         let components = Self.activitySummaryPredicateComponents(bounds: bounds, calendar: calendar)
         let predicate = HKQuery.predicate(
             forActivitySummariesBetweenStart: components.start,
@@ -291,7 +312,7 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         after cursorData: Data?,
         bounds requestedBounds: HealthKitQueryBounds?
     ) async throws -> HealthKitAnchoredQueryResult {
-        let bounds = requestedBounds ?? defaultLookbackBounds(from: now())
+        let bounds = resolvedBounds(requested: requestedBounds, from: now())
         let prior: HealthKitNutritionDailySnapshotBuilder.Cursor
         do {
             prior = try cursorData.map { try JSONDecoder().decode(HealthKitNutritionDailySnapshotBuilder.Cursor.self, from: $0) }
