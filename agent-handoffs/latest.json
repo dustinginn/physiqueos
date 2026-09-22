@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-22T22:38:32Z",
+  "generated_at_utc": "2026-09-22T22:52:02Z",
   "task": {
     "id": "healthkit-automatic-partition-recovery-build52-20260922",
     "title": "Fix HealthKit automatic identity and rejection recovery for Build 52",
     "agent": "claude",
-    "status": "blocked"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -17,38 +17,34 @@
     "native_build": 52
   },
   "result": {
-    "summary": "Fixed both architectural defects behind Build 52's remaining Activity problem: (1) the automatic HealthKit path's daily-aggregate identities were unnamespaced and collided with the Founder canary's earlier validation-only identities (proven from source and the Server's own persistence-layer check, not just the log string) -- fixed with a single exhaustive namespace function covering all four known callers; (2) a rejected partition had no recovery path and permanently stalled that domain/device forever -- fixed with abandonPendingBatch, which retires the stuck batch without ever advancing the cursor, so real data resurfaces and self-heals within two ordinary foregrounds, no reinstall. Confirmed no Server change needed by reading the Server's own identity/reconciliation code directly. Discarded the superseded c6381243 archive, re-archived Build 52 from the fixed, reviewed, fully-tested SHA -- identity/signature/dSYM verified, 1287 unit tests and 12 UI tests passing, independent fresh-context review APPROVE. The App Store Connect upload was denied again by this host's permission classifier; per instruction, did not attempt any workaround. Build 52 is fully built, fixed, and ready; upload needs Founder action.",
-    "success": false,
+    "summary": "Follow-up to the earlier 'blocked' handoff for this same task: the Founder explicitly authorized the App Store Connect upload in chat, naming Build 52, the exact reviewed SHA (4894e162), and the guarded tool. Reverified the archive was unchanged before executing. Upload succeeded: xcodebuild -exportArchive reported EXPORT SUCCEEDED, App Store Connect accepted delivery 6b7d449f-ca94-49fa-957d-1534d20ec52d, and Apple's processing state polled and independently reconfirmed VALID (import status also VALID). Build 52 -- the fixed candidate with the namespace + permanent-rejection-recovery corrections, 1287 unit tests, 12 UI tests, independent review APPROVE -- is now live in TestFlight, ready for the Founder to install and retest.",
+    "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "1287 unit tests (1278 + 9 net new/changed), 0 failures, rerun clean and uncontended after every change. 12/12 UI acceptance tests, 0 failures, uncontended this time (learned from the prior task's concurrency mistake). Mutation-tested both fixed guards (namespace branch, abandon-on-rejection call sites); each caught by name-matching test failures, then fully reverted and reconfirmed against the intended diff (one revert mistake using git checkout -- caught immediately, since it also wiped the legitimate fix, and corrected by re-applying the exact intended content)."
+      "summary": "Unchanged from the immediately-prior handoff for this task: 1287 unit tests and 12 UI tests, 0 failures. No code changed between that handoff and this upload; only the upload step itself was performed."
     },
     "review": {
       "status": "approved",
-      "summary": "Second fresh-context adversarial review: APPROVE, no blocking issues. Five real findings incorporated before finalizing: registered the Workout canary's namespace for exhaustiveness (was silently relying on it always carrying a real HealthKit UUID), replaced a near-tautological convergence test with one that actually exercises the automatic scope's daily-aggregate branch and the (identity, purpose) pair, clarified that the generic (non-collision) permanent-rejection case is bounded per-call but not yet bounded across repeated foregrounds (tracked as backlog, not fixed here), reconciled the Server duplicate-canonical-day question with direct evidence I already had, and added a decode-backward-compatibility test."
+      "summary": "Unchanged from the immediately-prior handoff: independent fresh-context review APPROVE, no blocking issues, five findings incorporated before the archive was built."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "No Server code touched. Only production contact was read-only: reconfirmed the active Server SHA/deployment, and read Server source files (HealthKitObservationService.js, HealthKitCanonicalDayService.js, CanonicalPersistenceCommandPorts.js) to prove no Server change was needed -- no Server file was written. No App Store Connect mutation (upload was denied before execution, twice)."
+      "summary": "The only new production/external contact since the prior handoff was the authorized upload itself (App Store Connect, explicitly approved) and two read-only status polls confirming VALID. No Server code or data touched. No credential material read, printed, or logged; the API key's contents were never accessed, only its file path passed to xcodebuild."
     }
   },
   "decisions_required": [
-    "Approve the Build 52 upload: this host's permission classifier denied it again (category: Production Deploy). The corrected archive is built, verified, and ready at ~/Library/Developer/Xcode/Archives/2026-09-22/PhysiqueOS Build 52.xcarchive. Either approve a session to run physiqueos-asc-upload upload ... --execute --confirm \"UPLOAD com.physiqueos.native.dev 1.0 (52)\", or upload it yourself (Xcode Organizer interactive-account fallback, or a terminal).",
-    "Build 53 backlog, in priority order per independent review: (1) wire abandonedBatchCount into a circuit breaker/backoff for the generic (non-identity) permanent-rejection case, which is currently bounded per-call but not across repeated foregrounds/background wakes; (2) namespace daily-aggregate deletions before deletion delivery ever ships (currently dormant/harmless: s1 deletions are always locally deferred, never delivered); (3) surface lastAbandonedBatchCode/abandonedBatchCount in the Founder diagnostic screen, since nothing currently displays them.",
-    "Disposition of the old inbox task healthkit-build51-foreground-catchup-regression-20260922, left stale/claimed since the first recovery task (cannot be safely auto-completed by protocol design)."
+    "Founder: install Build 52 from TestFlight and run the real-device retest. Remember the previously-poisoned Activity day needs two ordinary foregrounds to heal, not one (see the report's Step 6): the first foreground after installing retires the old stuck state and still reports that attempt as failed; the second one queries HealthKit fresh and actually delivers. Do not conclude anything from the very first reopen alone.",
+    "Build 53 backlog, in priority order per independent review (unchanged from the prior handoff): (1) wire abandonedBatchCount into a circuit breaker/backoff for the generic (non-identity) permanent-rejection case; (2) namespace daily-aggregate deletions before deletion delivery ever ships; (3) surface the new diagnostics fields in the Founder diagnostic screen.",
+    "Disposition of the old inbox task healthkit-build51-foreground-catchup-regression-20260922, left stale/claimed since the first recovery task."
   ],
-  "blockers": [
-    "App Store Connect upload of Build 52 denied a second time by this host's permission classifier (Production Deploy category); requires Founder approval or Founder-performed upload. See decisions_required."
-  ],
+  "blockers": [],
   "unexpected_findings": [
-    "A real, latent process gap from the prior task: TrainingLoggerTests.swift hardcoded CFBundleVersion == \"51\", never updated when Build 52's metadata was bumped, because the full suite was never rerun after that specific commit in the prior session. Caught here (the full suite failed immediately on this exact assertion) and fixed (updated to \"52\", renamed to not bake in a build number that will go stale again, with a comment pointing at the actual coupling to generate_project.py's APP_BUILD_NUMBER).",
-    "Independent review found the Workout canary's predicateVersion prefix was never registered in the namespace function, and that the doc comment's exhaustiveness claim was overstated. Harmless today (Workout observations always carry a real HealthKit UUID and never reach the affected branch) but registered anyway as defense-in-depth, since this is exactly the class of gap that caused the original production bug.",
-    "My own mistake during mutation-testing: used a bare git checkout -- to revert a deliberate mutation, which wiped ALL uncommitted changes to that file including the legitimate fix, not just the mutation. Caught immediately (the next build failed to compile) and corrected by re-applying the exact intended content from memory, then verified byte-for-byte against the intended diff before proceeding. No incorrect state was ever committed or pushed."
+    "None new since the prior handoff for this task; see that report for the process-gap and review findings already surfaced and fixed before this upload."
   ],
   "backlog": [
     "Wire abandonedBatchCount into a circuit breaker/backoff for generic permanent rejections (Build 53 priority).",
@@ -56,10 +52,10 @@
     "Surface the new diagnostics fields in the Founder diagnostic screen.",
     "Build 53: previously-planned performance optimization and Training performance-record work, still deliberately kept out of this hotfix.",
     "Push codex/build47-native-closure so that Native SHA is resolvable on GitHub (outstanding from an earlier handoff).",
-    "Once Build 52 uploads and is VALID, run the Step 6 real-device retest (including both foregrounds) and report result."
+    "Run the Step 6 real-device retest (including both foregrounds) and report result -- this is now the only remaining step."
   ],
-  "recommended_next_step": "Founder: approve/perform the Build 52 App Store Connect upload (archive is built, fixed, reviewed, and verified), then run the real-device retest -- remember the previously-poisoned Activity day needs two ordinary foregrounds to heal, not one.",
-  "full_report_path": "agent-handoffs/reports/20260922T223832Z-healthkit-automatic-partition-recovery-build52.md",
+  "recommended_next_step": "Founder: install Build 52 from TestFlight, do not enable canary or press manual Sync, open the app normally twice (two ordinary foregrounds), and compare Apple Health Activity/Nutrition against PhysiqueOS's Log/Evidence -- report whether both catch up, including the previously-stuck Activity day.",
+  "full_report_path": "agent-handoffs/reports/20260922T225202Z-healthkit-automatic-partition-recovery-build52-uploaded.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
