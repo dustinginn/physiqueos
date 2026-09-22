@@ -16,8 +16,13 @@
 //   - HealthKit canonical days live in their own application-only collection,
 //     so no Evidence, Training, Energy, Confidence, or briefing reader loads
 //     them, and the strategic Evidence collection refuses them (below);
-//   - promotion into Evidence is a later, separately authorized change to this
-//     file, not an operator toggle.
+//   - promotion into Evidence is a later, separately authorized act, never a
+//     stored-record flag. It is the Server-owned graduation policy
+//     (HealthKitGraduation.js): a READ-TIME overlay that hands a complete
+//     canonical day to ordinary readers as an ordinary activity_day / nutrition
+//     object when its evidence-eligibility scope is on. Stored HealthKit
+//     records stay quarantined, the write guard below still refuses them, and
+//     turning the scope off stops future use without deleting anything.
 
 export const HEALTHKIT_STRATEGIC_EVIDENCE_POLICY_VERSION = "healthkit-strategic-evidence-quarantine-v1";
 export const HEALTHKIT_QUARANTINE_STATE = "quarantined";
@@ -34,7 +39,7 @@ export const HEALTHKIT_WORKOUT_RECORD_ID_PREFIXES = Object.freeze(["healthkit_ca
  * This is a constant on purpose: flipping it is a reviewed code change made in
  * the later, Founder-authorized promotion task, never a runtime setting.
  */
-export const HEALTHKIT_STRATEGIC_EVIDENCE_ELIGIBLE = false;
+export const HEALTHKIT_STRATEGIC_EVIDENCE_ELIGIBLE = false; // stored records only; see the graduation overlay above
 
 export class HealthKitEvidenceQuarantineError extends Error {
   constructor(message) {

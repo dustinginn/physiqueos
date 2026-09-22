@@ -4,6 +4,8 @@
 //     --action activate|deactivate --domains activity,nutrition --effective YYYY-MM-DD --end YYYY-MM-DD \
 //     --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
 //   (policy) add --policy-kind daily|workout (default daily)
+//   node scripts/operations/buildHealthKitPayload.mjs --kind graduation --sha <40-hex> --mode dry-run|apply \
+//     --desired '<json: {"projection":{...},"evidenceEligibility":{...}}>' [--authorization-ref <text>] [--expected <json file>] [--no-values] --out <file>
 //   node scripts/operations/buildHealthKitPayload.mjs --kind workout-audit --sha <40-hex> --start YYYY-MM-DD --end YYYY-MM-DD [--no-values] --out <file>
 //   node scripts/operations/buildHealthKitPayload.mjs --kind audit --sha <40-hex> \
 //     --start YYYY-MM-DD --end YYYY-MM-DD [--no-values] --out <file>
@@ -18,7 +20,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function buildHealthKitPayload({
   kind, sha, action, policyKind = "daily", domains = "", effective = "", end = "", start = "", mode = "dry-run",
-  authorizationReference = "", expected = "", includeValues = true, marker,
+  authorizationReference = "", expected = "", includeValues = true, marker, desired = "",
 } = {}) {
   if (!/^[0-9a-f]{40}$/.test(String(sha ?? ""))) throw new Error("--sha must be the 40-hex production commit the payload is authorized for.");
   const suffix = randomBytes(4).toString("hex");
@@ -40,6 +42,27 @@ export async function buildHealthKitPayload({
         __DOMAINS__: JSON.stringify(domains), __EFFECTIVE__: JSON.stringify(effective), __END__: JSON.stringify(end),
         __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference)), __EXPECTED_JSON__: JSON.stringify(String(expected)),
         __MARKER__: JSON.stringify(successMarker),
+      },
+    });
+    return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
+  }
+  if (kind === "graduation") {
+    if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
+    let parsed;
+    try { parsed = JSON.parse(String(desired)); } catch { throw new Error("--desired must be valid JSON."); }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("--desired must be a JSON object.");
+    if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
+      throw new Error("apply mode requires --authorization-ref and --expected.");
+    }
+    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_GRADUATION_${mode === "apply" ? "APPLY" : "DRYRUN"}_SUCCESS_${suffix}`;
+    const result = await build({
+      entryPoints: [path.join(root, "scripts/operations/healthKitGraduationPolicy.entry.mjs")],
+      bundle: true, write: false, format: "esm", platform: "node", target: "node22", legalComments: "none", minify: true,
+      external: ["pg"],
+      define: {
+        __EXPECTED_GIT_SHA__: JSON.stringify(sha), __MODE__: JSON.stringify(mode), __DESIRED_JSON__: JSON.stringify(JSON.stringify(parsed)),
+        __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference)), __EXPECTED_JSON__: JSON.stringify(String(expected)),
+        __INCLUDE_VALUES__: JSON.stringify(Boolean(includeValues)), __MARKER__: JSON.stringify(successMarker),
       },
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
@@ -72,7 +95,7 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
-  throw new Error("--kind must be policy, audit, or workout-audit.");
+  throw new Error("--kind must be policy, graduation, audit, or workout-audit.");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -81,7 +104,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const expected = args.expected ? fs.readFileSync(args.expected, "utf8").trim() : "";
   const { code, marker } = await buildHealthKitPayload({
     kind: args.kind, sha: args.sha, action: args.action, policyKind: args["policy-kind"] ?? "daily", domains: args.domains, effective: args.effective, end: args.end,
-    start: args.start, mode: args.mode, authorizationReference: args["authorization-ref"], expected,
+    start: args.start, mode: args.mode, authorizationReference: args["authorization-ref"], expected, desired: args.desired,
     includeValues: !args["no-values"],
   });
   if (!args.out) throw new Error("--out is required.");
