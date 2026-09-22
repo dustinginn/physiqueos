@@ -23,12 +23,13 @@ describe("PostgreSQL Progress hub read store", () => {
       ]);
     });
 
-    expect(query).toHaveBeenCalledTimes(6);
+    // Five reads, the photo-input read, and the single graduation-policy lookup.
+    expect(query).toHaveBeenCalledTimes(7);
     expect(query.mock.calls.every(([, values]) => values[0] === "owner-one"))
       .toBe(true);
     expect(complete).toHaveBeenCalledWith(expect.objectContaining({
       readModel: "progress.hub",
-      queryCount: 6,
+      queryCount: 7,
       compatibilityRuntimeLoadCount: 0,
       pool: { totalCount: 1, idleCount: 1, waitingCount: 0 },
     }));

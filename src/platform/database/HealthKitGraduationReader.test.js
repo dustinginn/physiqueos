@@ -62,9 +62,22 @@ describe("HealthKit graduation reader", () => {
     expect(await reader.overlay(objects, { purpose: Purpose.EVIDENCE })).toBe(objects);
   });
 
+  it("looks the policy up every time outside a run, so a long-lived worker never sees a stale policy", async () => {
+    const { records, spy } = tracked({ healthKitConfiguration: [policy()], healthKitCanonicalDays: [day("activity")] });
+    const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+    await reader.overlay(ordinary());
+    await reader.overlay(ordinary());
+    expect(spy.get).toHaveBeenCalledTimes(2);
+    // The policy is switched off between two uses of the same reader instance.
+    await records.put({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: HEALTHKIT_GRADUATION_POLICY_RECORD_ID, payload: policy({ projection: { enabled: false } }), expectedVersion: 1 });
+    const objects = ordinary();
+    expect(await reader.overlay(objects)).toBe(objects);
+  });
+
   it("asks for the policy once per run and again after beginRun", async () => {
     const { records, spy } = tracked({ healthKitConfiguration: [policy()], healthKitCanonicalDays: [day("activity"), day("nutrition")] });
     const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+    reader.beginRun();
     await reader.overlay(ordinary(), { domains: ["nutrition"] });
     await reader.overlay(ordinary(), { domains: ["activity"] });
     expect(spy.get).toHaveBeenCalledTimes(1);

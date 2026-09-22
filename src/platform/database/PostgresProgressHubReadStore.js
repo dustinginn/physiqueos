@@ -1,6 +1,7 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 import { selectValidDexaScans } from "../../domain/services/DEXAReadModelAdapter.js";
+import { createHealthKitGraduationReader } from "./HealthKitGraduationReader.js";
 
 const HUB_EVIDENCE_TYPES = Object.freeze([
   "activity_day",
@@ -24,6 +25,10 @@ export function createPostgresProgressHubReadStore({
     },
   });
   const list = (collection) => records.list({ ownerUserId, collection });
+  // The Evidence Hub landing summarizes Activity and Nutrition from ordinary
+  // evidence, so a graduated day (policy-controlled, OFF by default) appears in
+  // its stream cards exactly as it does in the detail and history screens.
+  const graduation = createHealthKitGraduationReader({ records, ownerUserId });
   const queryRecords = async (text, values) => {
     queryCount += 1;
     const result = await pool.query(text, values);
@@ -36,6 +41,7 @@ export function createPostgresProgressHubReadStore({
   return Object.freeze({
     async run(readModel, callback) {
       queryCount = 0;
+      graduation.beginRun();
       const startedAt = performance.now();
       try {
         return await callback();
@@ -87,13 +93,13 @@ export function createPostgresProgressHubReadStore({
       return contexts.at(-1) ?? null;
     },
     listEvidencePackages: () => list("evidencePackages"),
-    listProgressHubCanonicalEvidenceObjects: () => queryRecords(
+    listProgressHubCanonicalEvidenceObjects: async () => graduation.overlay(await queryRecords(
       `SELECT payload,version FROM physiqueos.canonical_evidence_records
        WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
          AND COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')=ANY($2::text[])
        ORDER BY record_id`,
       [ownerUserId, HUB_EVIDENCE_TYPES]
-    ),
+    )),
   });
 }
 

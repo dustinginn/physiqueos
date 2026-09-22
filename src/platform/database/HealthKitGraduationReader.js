@@ -21,19 +21,24 @@ import {
 export function createHealthKitGraduationReader({ records, query, ownerUserId, onError = null } = {}) {
   const store = records ?? (query ? createPhase4CanonicalRecordStore({ query }) : null);
   if (!store || !ownerUserId) throw new Error("HealthKit graduation reads require a record store and owner.");
-  // One policy lookup per read run: a read that consumes several evidence
-  // lists (Energy) asks once. `beginRun` starts a fresh run.
+  // A read that consumes several evidence lists (Energy) can share one policy
+  // lookup, but ONLY inside an explicit run: `beginRun` starts one. A reader that
+  // never begins a run (a long-lived worker) looks the policy up every time, so a
+  // policy change is never masked by a stale memo.
   let pending = null;
+  let inRun = false;
+  const fetchPolicy = () => store.get({
+    ownerUserId,
+    collection: HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION,
+    recordId: HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
+  });
   const lookup = () => {
-    pending ??= store.get({
-      ownerUserId,
-      collection: HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION,
-      recordId: HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
-    });
+    if (!inRun) return fetchPolicy();
+    pending ??= fetchPolicy();
     return pending;
   };
   return Object.freeze({
-    beginRun() { pending = null; },
+    beginRun() { pending = null; inRun = true; },
     /**
      * @param canonicalObjects the ordinary canonical evidence array
      * @param purpose projection (UI read models) or evidence (V3 / Energy / briefings)

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createPostgresProgressEvidenceReadStore } from "./PostgresProgressEvidenceReadStore.js";
 import { createPostgresEvidenceTimelineReadStore } from "./PostgresEvidenceTimelineReadStore.js";
 import { createPostgresCoreNavigationReadStore } from "./PostgresCoreNavigationReadStore.js";
+import { createPostgresProgressHubReadStore } from "./PostgresProgressHubReadStore.js";
 import {
   HEALTHKIT_GRADUATION_POLICY_RECORD_ID as POLICY_ID,
   HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION as SCHEMA,
@@ -80,6 +81,31 @@ describe("graduation seams: Evidence Hub timeline", () => {
     expect(off.canonicalEvidenceObjects).toEqual([]);
     const on = await createPostgresEvidenceTimelineReadStore({ pool: pool({ policyRecord: policy(), days: [hkDay("nutrition"), hkDay("activity")] }), ownerUserId: OWNER }).load();
     expect(on.canonicalEvidenceObjects.map((object) => object.payload.evidence_type).sort()).toEqual(["activity_day", "nutrition"]);
+  });
+});
+
+describe("graduation seams: Evidence Hub landing (Progress hub streams)", () => {
+  const read = (options) => {
+    const store = createPostgresProgressHubReadStore({ pool: pool(options), ownerUserId: OWNER });
+    return store.run("progress.hub", () => store.listProgressHubCanonicalEvidenceObjects());
+  };
+
+  it("is unchanged when the policy is absent", async () => {
+    expect(await read({ days: [hkDay("activity"), hkDay("nutrition")] })).toEqual([]);
+  });
+
+  it("shows graduated Activity and Nutrition in the hub stream inputs when projection is on", async () => {
+    const objects = await read({ policyRecord: policy(), days: [hkDay("activity"), hkDay("nutrition")] });
+    expect(objects.map((object) => object.payload.evidence_type).sort()).toEqual(["activity_day", "nutrition"]);
+  });
+
+  it("feeds the hub report so its Nutrition and Activity streams reflect the day", async () => {
+    const { createProviderProgressHubReport } = await import("../../domain/services/ProgressReportingService.js");
+    const objects = await read({ policyRecord: policy(), days: [hkDay("activity"), hkDay("nutrition")] });
+    const report = createProviderProgressHubReport({ canonicalEvidenceObjects: objects });
+    const stream = (id) => report.streams.find((item) => item.id === id);
+    expect(stream("nutrition").metric).toBe("1 day");
+    expect(stream("activity").metric).toMatch(/612/);
   });
 });
 

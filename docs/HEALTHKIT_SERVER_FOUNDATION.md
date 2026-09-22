@@ -167,7 +167,7 @@ HealthKit switch: V3 reads ordinary evidence. A malformed record disables both s
 `historicalBriefingRegeneration` is not a parameter; a record naming it anything but `false` is invalid.
 
 **Seams (enumerated by a structural test).** Projection: Progress evidence store (Activity, Nutrition and Energy
-lists), Evidence timeline store, Core Log and operating-plan read models (the policy row rides in the same query,
+lists), Progress hub store (the Evidence Hub landing streams), Evidence timeline store, Core Log and operating-plan read models (the policy row rides in the same query,
 so the Log read stays one provider query). Evidence: `providerBriefingCadenceComposition` only, as a read-only
 snapshot; the publication and Confidence stores keep the raw runtime. No write, command, repair or ingestion
 path may import the overlay.
