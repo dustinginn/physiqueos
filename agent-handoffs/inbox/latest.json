@@ -4,7 +4,7 @@
   "task": {
     "id": "healthkit-graduation-automation-clarification-20260922",
     "title": "Clarify and automate HealthKit Activity Nutrition graduation",
-    "status": "claimed"
+    "status": "completed"
   },
   "target": {
     "agent": "claude",
@@ -32,6 +32,9 @@
   },
   "lifecycle": {
     "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T13:24:19Z"
+    "claimed_at_utc": "2026-09-22T13:24:19Z",
+    "completed_at_utc": "2026-09-22T18:04:45Z",
+    "completion_status": "completed",
+    "completion_handoff_path": "agent-handoffs/reports/20260922T180243Z-healthkit-graduation-automation-clarification.md"
   }
 }

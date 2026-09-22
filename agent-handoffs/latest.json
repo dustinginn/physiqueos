@@ -1,61 +1,60 @@
 {
  "schema_version": 1,
- "generated_at_utc": "2026-09-22T12:44:15Z",
+ "generated_at_utc": "2026-09-22T18:02:43Z",
  "task": {
-  "id": "healthkit-completed-day-audit-20260922",
-  "title": "HealthKit completed-day acceptance audit",
+  "id": "healthkit-graduation-automation-clarification-20260922",
+  "title": "Clarify and automate HealthKit Activity Nutrition graduation",
   "agent": "claude",
   "status": "completed"
  },
  "repository": "dustinginn/physiqueos",
  "authority": {
   "base_sha": "93491bc5d829d3693aa29023cd79e96922012130",
-  "final_sha": "93491bc5d829d3693aa29023cd79e96922012130",
-  "production_server_sha": "93491bc5d829d3693aa29023cd79e96922012130",
-  "production_deployment": "1156849f-d5af-47ec-a5d3-d247a99033ee",
-  "native_sha": "2bfbf54ad105a3a18189e811f06afc421741a7da",
-  "native_build": 49
+  "final_sha": "924d5e556ba418ceb64de828d4c6a7c06d99f769",
+  "production_server_sha": "924d5e556ba418ceb64de828d4c6a7c06d99f769",
+  "production_deployment": "c2442650-a9a0-499e-bc42-59b81c0c8bae",
+  "native_sha": "63d925e0",
+  "native_build": 51
  },
  "result": {
-  "summary": "GREEN. Read-only production audit of the three-sync 2026-09-21 completed-day lineage for Activity and Nutrition. Both domains: exactly one raw observation per sync (3 total each), strictly increasing device-scoped revision, singleton canonical day per domain with zero duplicates, current canonical values match the final (completed) raw HealthKit observation exactly field-by-field, coverage correctly advanced partial_day to complete_day. Activity: move calories, exercise minutes, stand hours and steps confirmed. Nutrition: calories/protein/carbs/fat confirmed, zero fabricated meals, device full-day-total assertion. Strategic quarantine held throughout with hard zero counters (no HealthKit-derived record ever entered strategic Evidence), so Confidence/briefings/Training/strategy were not and could not have been changed. Graduation plumbing verified dormant and ready live: both policy scopes (projection, evidence eligibility) resolve to disabled, Workout activation disabled with clean one-to-one integrity, and a live read-only graduation dry run executed successfully, proving the simulation/dry-run path is functional without writing anything. No code changed, no deployment, no policy write, no resync, no upload -- audit only, as scoped.",
+  "summary": "Fixed two problems. (1) Sep-22 raw-only storage: an older canonicalization policy was still bounded to exactly Sep-21; extended it to a genuine open-ended window, deployed (Server 924d5e55), switched live to open-ended from Sep-22, no backfill. The stored raw Sep-22 observation was permanently barred by anti-backfill design; a fresh resync canonicalized cleanly with zero duplication. Verified live: Sep-22 Activity+Nutrition project correctly; evidence-eligibility scope also activated (nothing graduated yet, day not closed). (2) No background automation existed: Build 50 was 100% manual sync. Built HealthKitAutomaticSynchronizationCoordinator wiring the existing dormant observer/background-delivery APIs, firing on every foreground for Activity+Nutrition. Review found a reentrancy Blocker + 2 Minors, fixed and mutation-tested. Full-suite testing then found a real regression the review missed (Sandbox UI tests broke via an unintended production HealthKit permission prompt); root-caused, fixed, re-reviewed (APPROVE WITH FOLLOW-UPS). Founder reviewed remaining open decisions and authorized Build 51: built, archived, uploaded (VALID), not yet confirmed installed.",
   "success": true,
-  "production_mutated": false,
-  "deployed": false,
-  "testflight_uploaded": false
+  "production_mutated": true,
+  "deployed": true,
+  "testflight_uploaded": true
  },
  "validation": {
   "tests": {
-   "status": "not_applicable",
-   "summary": "Read-only production audit task; no code changed, so no test suite was run."
+   "status": "passed",
+   "summary": "Server: full unit suite same count/failures as base (0 new), all 10 phase gates match base, ESLint clean, exact-SHA build succeeded. Native unit: 1272 tests, 0 failures. Native UI (TrainingAcceptanceUITests, full class): 12/12 passed on a freshly-privacy-reset simulator after the Sandbox-regression fix. Every new/changed guard was mutation-tested (reverted, confirmed the corresponding test fails, restored, confirmed clean git status)."
   },
   "review": {
-   "status": "not_applicable",
-   "summary": "No code change to review; this task only reads production state."
+   "status": "approved",
+   "summary": "Server open-ended policy change: independent review approved with non-blocking follow-ups after two small fixes. Native automatic-sync coordinator: independent review returned BLOCK on the first candidate (reentrancy Blocker, two Minors); fixed and re-reviewed on the corrected candidate, updated verdict approved with non-blocking follow-ups. Two Major items (broad auth scope; unverifiable real-device background-wake behavior) remain open by design, documented in code and presented to the Founder as explicit decisions rather than silently resolved."
   },
   "zero_write_audit": {
    "status": "passed",
-   "summary": "Every audit payload ran inside a REPEATABLE READ READ ONLY transaction with the transaction_read_only fence checked before any query and an explicit ROLLBACK; PRODUCTION_MUTATED_DURING_AUDIT is NO."
+   "summary": "Server policy writes were each preceded by a dry run capturing expected facts and followed by a post-apply invariant check; all other production reads (live graduation verification, authority reverification) ran read-only."
   }
  },
  "decisions_required": [
-  "Authorize Build 50 (c116867f, reviewed, carrying both the Activity/Nutrition graduation UI and the Workout canary) for archive, upload and install.",
-  "Authorize the graduation dry run and, if accepted, the projection-scope policy transition for 2026-09-21.",
-  "Authorize the evidence-eligibility scope transition separately, after projection is verified.",
-  "Choose the strength Workout canary day after Activity/Nutrition graduation is accepted and Build 50 is installed."
+  "Install Build 51 (delivery 04e929ea-c751-4a84-b4aa-5331f5d6b20d, VALID) once TestFlight processing completes, and confirm automatic Activity/Nutrition ingestion works without visiting the diagnostic screen.",
+  "Decide whether to pursue real-device verification of true background wake after full process termination, or continue relying on the foreground catch-up sync as the guaranteed recovery path.",
+  "Decide whether/when to start the Workout strength canary (explicitly out of scope for this task; Workout remains fully untouched)."
  ],
  "blockers": [],
- "unexpected_findings": [],
- "backlog": [
-  "Build 50 archive and upload (c116867f, now unblocked by GREEN acceptance -- Founder decision)",
-  "Graduation dry run and, if authorized, projection then evidence-eligibility activation for 2026-09-21",
-  "Strength Workout canary, then cardio, then background delivery and a durable Native revision floor",
-  "HealthKit background delivery and durable Native revision floor",
-  "Workout Logger draft survival across termination and update",
-  "Photo Briefing tap-to-expand production mismatch",
-  "Coaching Updates delivery-time UI cleanup"
+ "unexpected_findings": [
+  "Running the full Native test suite (not just the independently reviewed unit test class) surfaced a real regression the review's narrower scope had missed: the automatic sync coordinator reached real Founder Production unconditionally, breaking 12/12 Sandbox-mode UI acceptance tests via an unexpected system HealthKit permission prompt. Root-caused, fixed, and re-reviewed before proceeding."
  ],
- "recommended_next_step": "Founder decides whether to proceed with Build 50 archive/upload and the graduation dry run now that the completed-day audit is GREEN.",
- "full_report_path": "agent-handoffs/reports/20260922T124415Z-healthkit-completed-day-audit.md",
+ "backlog": [
+  "Real-device verification of background wake after full process termination (currently unprovable in this environment)",
+  "Narrow follow-up: an in-flight background registration from a prior Founder Production session is not torn down on a mid-process switch to Sandbox via the in-app authority picker (narrow, not currently reachable by any test or normal flow)",
+  "Workout strength canary (deliberately not started in this task)",
+  "Cardio Workout canary (after strength)",
+  "Retire/relabel the Founder diagnostic canary controls in production builds, if ever desired (not attempted -- unrequested design change)"
+ ],
+ "recommended_next_step": "Founder installs Build 51 via TestFlight and confirms automatic Activity/Nutrition ingestion works with no daily canary toggle and no manual Sync required.",
+ "full_report_path": "agent-handoffs/reports/20260922T180243Z-healthkit-graduation-automation-clarification.md",
  "safety": {
   "contains_secrets": false,
   "contains_credentials": false,
