@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-22T13:05:00Z",
+  "generated_at_utc": "2026-09-22T13:30:00Z",
   "task": {
-    "id": "healthkit-graduate-from-sep22-build50-20260922",
-    "title": "Graduate HealthKit Activity Nutrition from Sep 22 and ship Build 50",
-    "status": "claimed"
+    "id": "healthkit-graduation-automation-clarification-20260922",
+    "title": "Clarify and automate HealthKit Activity Nutrition graduation",
+    "status": "ready"
   },
   "target": {
     "agent": "claude",
@@ -14,11 +14,11 @@
   "repository": "dustinginn/physiqueos",
   "authority": {
     "expected_server_sha": "93491bc5d829d3693aa29023cd79e96922012130",
-    "expected_native_sha": "2bfbf54ad105a3a18189e811f06afc421741a7da",
+    "expected_native_sha": "b09f476d",
     "expected_production_deployment": "1156849f-d5af-47ec-a5d3-d247a99033ee",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260922T130500Z-healthkit-graduate-from-sep22-build50-20260922.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260922T132500Z-healthkit-graduation-automation-clarification-20260922.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
@@ -29,9 +29,5 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
-  },
-  "lifecycle": {
-    "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T12:52:45Z"
   }
 }
