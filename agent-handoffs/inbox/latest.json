@@ -4,7 +4,7 @@
   "task": {
     "id": "healthkit-automatic-partition-recovery-build52-20260922",
     "title": "Fix HealthKit automatic identity and rejection recovery for Build 52",
-    "status": "claimed"
+    "status": "completed"
   },
   "target": {
     "agent": "claude",
@@ -32,6 +32,9 @@
   },
   "lifecycle": {
     "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T21:47:51Z"
+    "claimed_at_utc": "2026-09-22T21:47:51Z",
+    "completed_at_utc": "2026-09-22T22:39:31Z",
+    "completion_status": "blocked",
+    "completion_handoff_path": "agent-handoffs/reports/20260922T223832Z-healthkit-automatic-partition-recovery-build52.md"
   }
 }
