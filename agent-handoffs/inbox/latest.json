@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-22T04:05:00Z",
+  "generated_at_utc": "2026-09-22T12:45:00Z",
   "task": {
-    "id": "native-core-page-cold-load-performance-audit-20260921",
-    "title": "Audit Native core-page cold-load performance",
-    "status": "completed"
+    "id": "healthkit-completed-day-audit-20260922",
+    "title": "HealthKit completed-day acceptance audit",
+    "status": "ready"
   },
   "target": {
     "agent": "claude",
     "reasoning": "high",
-    "chat_preference": "new_chat"
+    "chat_preference": "continue_current_chat"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -18,7 +18,7 @@
     "expected_production_deployment": "1156849f-d5af-47ec-a5d3-d247a99033ee",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260922T040500Z-native-core-page-cold-load-performance-audit-20260921.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260922T124500Z-healthkit-completed-day-audit-20260922.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
@@ -29,12 +29,5 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
-  },
-  "lifecycle": {
-    "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T04:19:52Z",
-    "completed_at_utc": "2026-09-22T04:41:16Z",
-    "completion_status": "completed",
-    "completion_handoff_path": "agent-handoffs/reports/20260922T044000Z-native-core-page-cold-load-performance-audit.md"
   }
 }
