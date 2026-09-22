@@ -231,6 +231,27 @@ describe("Activity graduation", () => {
     expect(merged.daily_activity.move_calories).toBe(612);
   });
 
+  it("never lets a device silently override an existing explicit Founder correction", () => {
+    const correction = screenshotActivity({
+      source: { application: "PhysiqueOS", modality: "manual" },
+      correction: true,
+      daily_activity: { move_calories: 200, exercise_minutes: 41, stand_hours: 11 },
+    });
+    const { objects, applied } = overlay([correction], [activityDay()], policyRecord());
+    expect(applied[0].mode).toBe("existing_kept");
+    expect(objects).toEqual([correction]);
+    const selected = selectActiveCanonicalActivityDays(objects, { date: DATE }).records[0].payload;
+    expect(selected.daily_activity.move_calories).toBe(200);
+    expect(selected.source.application).toBe("PhysiqueOS");
+  });
+
+  it("never lets a device silently override an existing manual-source Activity day (no explicit correction marker needed)", () => {
+    const manual = screenshotActivity({ source: { application: "PhysiqueOS", modality: "manual" }, daily_activity: { move_calories: 500, exercise_minutes: 30, stand_hours: 9 } });
+    const { objects, applied } = overlay([manual], [activityDay()], policyRecord());
+    expect(applied[0].mode).toBe("existing_kept");
+    expect(objects).toEqual([manual]);
+  });
+
   it("never lets a partial so-far HealthKit day outrank an ordinary day", () => {
     const shot = screenshotActivity();
     const { objects, applied } = overlay([shot], [activityDay({ coverage: "partial_day", moveCalories: 90 })], policyRecord());
@@ -307,6 +328,15 @@ describe("Nutrition graduation", () => {
     const merged = objects[0].payload;
     expect(merged.metadata.healthkit_reconciliation.state).toBe("consistent");
     expect(merged.metadata.daily_totals_reconciliation.competing_source.application).toBe("MyFitnessPal");
+  });
+
+  it("attributes the Log row to Apple Health when a device total is authoritative even with independent meal detail present", () => {
+    const meals = [{ name: "Breakfast", totals: { calories: 700 } }, { name: "Lunch", totals: { calories: 650 } }];
+    const shot = mfpNutrition({ meals, totals: { calories: 2140, protein_g: 182, carbs_g: 205, fat_g: 68 } });
+    const { objects } = overlay([shot], [nutritionDay()], policyRecord());
+    const row = composeLoggedTodaySummary({ canonicalObjects: objects, dateKey: DATE }).rows[1];
+    expect(row.summary).toBe("2 meals · 2,140 calories");
+    expect(row.context).toBe("Apple Health");
   });
 
   it("preserves independent meal detail as detail without letting it override the device total", () => {

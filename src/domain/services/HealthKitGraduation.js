@@ -1,4 +1,8 @@
-import { createCanonicalActivityDayRecord } from "./CanonicalActivityDayService.js";
+import {
+  createCanonicalActivityDayRecord,
+  getActivitySourceAuthority,
+  isExplicitCorrection,
+} from "./CanonicalActivityDayService.js";
 import { resolveNutritionDayAuthority } from "../models/nutritionDayAuthority.js";
 import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayReadModel.js";
 import { selectActiveCanonicalNutritionDays } from "./CanonicalNutritionDayService.js";
@@ -267,6 +271,14 @@ function graduateActivityDay({ objects, day, purpose }) {
   const coexistence = assessHealthKitCoexistence({ domain: day.domain, localDate: day.localDate, healthKitDay: day, canonicalEvidenceObjects: objects });
   // A partial "so far" HealthKit snapshot never outranks an ordinary day.
   if (day.current.coverage !== "complete_day") return { objects, mode: "existing_kept", coexistence };
+  // An existing explicit Founder correction (or an already-manual entry) is
+  // never silently overridden by a device: HealthKit's source-authority rank
+  // is deliberately high so it beats a screenshot on ordinary precedence, but
+  // an explicit statement is not "ordinary" and must not be last-write-wins.
+  const existingPayload = existing.payload ?? existing;
+  if (isExplicitCorrection(existingPayload) || getActivitySourceAuthority(existingPayload).sourceClass === "manual") {
+    return { objects, mode: "existing_kept", coexistence };
+  }
   const merged = createCanonicalActivityDayRecord({
     canonicalId: existing.canonicalId,
     canonicalProvenance: existing.provenance,
@@ -373,7 +385,14 @@ function projectionMarker(day, purpose, mode = "projected_alone") {
   });
 }
 
-/** A projected object must never be persisted: the marker exists so a write guard can refuse it. */
+/**
+ * A projected object must never be persisted. The real write guard
+ * (`assertNotQuarantinedHealthKitEvidence`) already refuses it independently
+ * via its HealthKit-lineage detection (source, provenance, id prefix), which a
+ * projected object legitimately carries regardless of this marker. This flag
+ * is a second, structural signal for callers that want to detect a projection
+ * directly, and for tests; it is not itself what the write guard checks.
+ */
 export function isHealthKitGraduationProjection(record) {
   return record?.healthKitProjection?.readOnly === true;
 }

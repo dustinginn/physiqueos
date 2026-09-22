@@ -283,7 +283,7 @@ function activityCoverageRank(value) {
   return 0;
 }
 
-function isExplicitCorrection(value = {}) {
+export function isExplicitCorrection(value = {}) {
   return Boolean(
     value.correction ||
     value.correctsEvidenceId ||

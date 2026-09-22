@@ -119,6 +119,11 @@ function composeNutritionRow(days) {
   const calories = Number.isFinite(calorieValue) ? calorieValue : 0;
   const mealLabel = `${mealCount} meal${mealCount === 1 ? "" : "s"}`;
   const deviceTotals = isDeviceDailyTotal(day);
+  // The authoritative total can be a device daily total even on a day that
+  // also carries independent meal detail (a graduated HealthKit day merged
+  // with existing meals); attribution follows the total's actual source,
+  // not whether meal detail happens to exist alongside it.
+  const deviceSourced = isAppleHealthDirect(day);
 
   return Object.freeze({
     id: "nutrition",
@@ -128,7 +133,7 @@ function composeNutritionRow(days) {
     summary: deviceTotals && mealCount === 0
       ? calories > 0 ? `${formatNumber(calories)} calories` : "Nutrition logged"
       : calories > 0 ? `${mealLabel} · ${formatNumber(calories)} calories` : `${mealLabel} logged`,
-    context: deviceTotals ? formatDeviceNutritionContext(day) : null,
+    context: deviceTotals ? formatDeviceNutritionContext(day) : deviceSourced ? APPLE_HEALTH_LABEL : null,
     href: day?.id
       ? `/progress/nutrition/day/${encodeURIComponent(day.id)}`
       : "/progress/nutrition",

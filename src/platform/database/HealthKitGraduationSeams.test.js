@@ -74,6 +74,22 @@ describe("graduation seams: Progress evidence (Activity / Nutrition / Energy)", 
     ]));
     expect(p.query.mock.calls.filter(([text]) => /record_id=\$3/.test(text))).toHaveLength(1);
   });
+
+  it("re-fetches the policy on a second top-level run() on the same store instance, so a later policy change is never masked", async () => {
+    // Same store instance reused across two separate requests. A naive
+    // memoization that outlives one run() would keep serving the first
+    // policy forever.
+    const off = { policyRecord: null, days: [hkDay("activity")] };
+    const on = { policyRecord: policy(), days: [hkDay("activity")] };
+    let current = off;
+    const p = { query: vi.fn(async (text, values = []) => pool(current).query(text, values)) };
+    const store = createPostgresProgressEvidenceReadStore({ pool: p, ownerUserId: OWNER });
+    const first = await store.run("progress.evidence.activity", () => store.listCanonicalActivityAndTrainingEvidenceObjects());
+    expect(first).toEqual([]);
+    current = on;
+    const second = await store.run("progress.evidence.activity", () => store.listCanonicalActivityAndTrainingEvidenceObjects());
+    expect(second.map((object) => object.payload.evidence_type)).toEqual(["activity_day"]);
+  });
 });
 
 describe("graduation seams: Evidence Hub timeline", () => {
