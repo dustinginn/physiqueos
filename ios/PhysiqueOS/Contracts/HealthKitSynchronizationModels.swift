@@ -272,6 +272,17 @@ struct HealthKitStreamDiagnostics: Equatable, Codable, Sendable {
     var lastDurableAcknowledgement: Date?
     var lastErrorCode: String?
     var boundedRecoveryCount: Int
+    /// Set only when `HealthKitSynchronizationEngine.deliverPending` retires
+    /// a permanently-rejected batch (see `abandonPendingBatch`). All three
+    /// are `Optional`, not defaulted, so decoding an envelope persisted by
+    /// an older build before this field existed (e.g. an already-poisoned
+    /// Build 51 device) still succeeds -- a missing key decodes as `nil`,
+    /// never a decode failure that would quarantine unrelated pending/cursor
+    /// state. `abandonedBatchCount` is `Int?` for the same reason: it is
+    /// read as `?? 0` everywhere it is incremented or reported.
+    var lastAbandonedBatchCode: String?
+    var lastAbandonedAt: Date?
+    var abandonedBatchCount: Int?
 }
 
 enum HealthKitSyncError: Error, Equatable, Sendable {

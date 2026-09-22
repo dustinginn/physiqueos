@@ -73,6 +73,20 @@ extension HealthKitSynchronizationEngine: HealthKitAutomaticSynchronizing {}
 /// in-flight-task guard above requires being able to express.
 final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     static let predicateVersion = "healthkit-automatic-v1"
+    /// Source-observation identities of the permanent automatic path never
+    /// share an external id with the Founder canary's validation-only
+    /// uploads or the canonical-test-day's own `testday` namespace, exactly
+    /// like those two are already kept apart from each other. Before this
+    /// existed, the automatic path's daily-aggregate identities (Activity
+    /// Summary, Nutrition daily total) were bare `activity-summary:<date>` /
+    /// `nutrition-daily-total:<date>` strings -- identical to whatever the
+    /// canary had already used for that same day. A real production
+    /// collision (`HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE`, since the
+    /// canary's purpose, `validation_only`, is permanently bound to that
+    /// identity on the Server) is what made Build 51's Activity path get
+    /// stuck: see `HealthKitSynchronizationEngine.deliverPending`'s
+    /// abandon-on-rejection recovery, the other half of this fix.
+    static let externalIDNamespace = "automatic"
     static let streams: [HealthKitSynchronizationStream] = [.activitySummary, .nutritionDailyTotal]
 
     private let authorization: any HealthKitCanaryAuthorizationCoordinating

@@ -123,6 +123,17 @@ struct HealthKitCanonicalTestDay: Equatable, Sendable {
 struct HealthKitWorkoutCanaryDay: Equatable, Sendable {
     static let maximumAgeDays = 3
     static let predicatePrefix = "healthkit-workout-canary-v1:"
+    /// Registered in `HealthKitBatchBuilder.externalIDNamespace(for:)` for
+    /// exhaustiveness/defense-in-depth even though it is a no-op today:
+    /// every Workout observation currently carries a real HealthKit
+    /// `healthKitUUID` (`HealthKitObservationNormalizer.normalize` uses it
+    /// before ever reaching the namespace-dependent daily-aggregate
+    /// branches), so this namespace is not yet load-bearing. It exists so a
+    /// future Workout-canary change that emits a UUID-less aggregate falls
+    /// through to a *registered* namespace instead of silently colliding
+    /// with the canary's bare identity, the way Activity/Nutrition did
+    /// before this fix.
+    static let externalIDNamespace = "workoutcanary"
 
     let localDate: String
     let window: HealthKitActivityValidationWindow

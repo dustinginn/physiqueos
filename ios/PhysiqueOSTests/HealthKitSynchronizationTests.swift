@@ -87,7 +87,15 @@ final class HealthKitSynchronizationTests: XCTestCase {
         XCTAssertNotNil(cursor)
     }
 
-    func testServerRejectionLeavesPriorCursorAuthoritative() async throws {
+    /// A rejection must not advance the cursor past undelivered data (a
+    /// prior acceptance's cursor must stay authoritative), but it also must
+    /// NOT leave the scope permanently stuck: this is the Build 51 defect
+    /// (the rejected partition, and the whole scope behind it, blocked
+    /// every future foreground indefinitely, recoverable in production only
+    /// by a reinstall). `abandonPendingBatch` retires the rejected batch
+    /// immediately, without touching the cursor, so the next synchronize()
+    /// re-queries fresh instead of re-encountering the same dead end.
+    func testServerRejectionLeavesPriorCursorAuthoritativeButDoesNotPermanentlyBlockTheScope() async throws {
         let first = Self.quantityResult(anchor: "anchor-1", UUID(uuidString: "00000000-0000-0000-0000-000000000001")!)
         let second = Self.quantityResult(anchor: "anchor-2", UUID(uuidString: "00000000-0000-0000-0000-000000000002")!)
         let harness = try Harness(
@@ -103,8 +111,99 @@ final class HealthKitSynchronizationTests: XCTestCase {
 
         let cursorAfterRejection = try await harness.store.authoritativeCursor(for: harness.scope)
         let pendingAfterRejection = try await harness.store.pendingBatches(for: harness.scope)
-        XCTAssertEqual(cursorAfterRejection, accepted)
+        XCTAssertEqual(cursorAfterRejection, accepted, "the prior acceptance must remain authoritative")
+        XCTAssertTrue(pendingAfterRejection.isEmpty, "the rejected batch must be retired, not left stuck forever")
+
+        let diagnostics = try await harness.store.diagnostics(for: harness.scope)
+        XCTAssertEqual(diagnostics.lastAbandonedBatchCode, "synthetic_rejection")
+        XCTAssertEqual(diagnostics.abandonedBatchCount, 1)
+        XCTAssertNotNil(diagnostics.lastAbandonedAt, "abandonment must be durably diagnosable, not just in-memory")
+    }
+
+    /// The defect this heals: with the OLD `deliverPending` (which merely
+    /// threw on an already-`.rejected` partition, never retiring it),
+    /// `pendingBatches` would stay stuck at 1 forever and a THIRD
+    /// synchronize() call would never even re-query HealthKit. On the fixed
+    /// engine, once the doomed batch is retired, a later, corrected/new
+    /// revision is queried fresh and delivered normally -- proving actual
+    /// recovery, not merely that the stuck state was renamed.
+    func testPermanentRejectionRecoversOnANewRevisionInsteadOfStayingPoisoned() async throws {
+        let first = Self.quantityResult(anchor: "anchor-1", UUID(uuidString: "00000000-0000-0000-0000-000000000001")!)
+        let second = Self.quantityResult(anchor: "anchor-2", UUID(uuidString: "00000000-0000-0000-0000-000000000002")!)
+        let third = Self.quantityResult(anchor: "anchor-3", UUID(uuidString: "00000000-0000-0000-0000-000000000003")!)
+        let harness = try Harness(
+            stream: .activeEnergy,
+            gate: .enabled,
+            queryResults: [first, second, third],
+            uploadModes: [.accept, .reject, .accept]
+        )
+        try await harness.engine.synchronize(scope: harness.scope)
+        await XCTAssertThrowsErrorAsync { try await harness.engine.synchronize(scope: harness.scope) }
+
+        // The poisoned scope's very next synchronize() must re-query
+        // HealthKit (not silently no-op on a stuck pending batch) and
+        // successfully deliver the new, corrected revision.
+        try await harness.engine.synchronize(scope: harness.scope)
+
+        let queryCount = await harness.query.callCount()
+        let finalCursor = try await harness.store.authoritativeCursor(for: harness.scope)
+        let pending = try await harness.store.pendingBatches(for: harness.scope)
+        XCTAssertEqual(queryCount, 3, "the third call must re-query HealthKit, not skip it")
+        XCTAssertEqual(finalCursor?.opaqueAnchorData, Data("anchor-3".utf8))
+        XCTAssertTrue(pending.isEmpty)
+    }
+
+    /// Simulates the exact real-world poisoned state: a batch already
+    /// persisted as `.rejected` from a *prior* app version/session (not
+    /// freshly rejected in this run). The engine must recognize and retire
+    /// it the same way on the very next synchronize() -- this is what heals
+    /// an already-poisoned Build 51 device with no migration step.
+    func testAlreadyPersistedRejectedPartitionFromAPriorSessionSelfHealsOnNextSync() async throws {
+        let harness = try Harness(stream: .activeEnergy, gate: .queryOnly)
+        try await harness.engine.synchronize(scope: harness.scope)
+        let pendingBeforeRejection = try await harness.store.pendingBatches(for: harness.scope)
+        let staged = try XCTUnwrap(pendingBeforeRejection.first)
+        let partition = try XCTUnwrap(staged.partitions.first)
+        // Simulate the pre-fix persisted state directly, bypassing
+        // deliverPending entirely -- exactly what a real poisoned device's
+        // on-disk envelope already contains before this fix ever runs.
+        try await harness.store.markRejected(batchID: staged.identity, partitionID: partition.identity, code: "HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE")
+        let pendingAfterRejection = try await harness.store.pendingBatches(for: harness.scope)
         XCTAssertEqual(pendingAfterRejection.count, 1)
+
+        let uploader = MockUploader(modes: [.accept])
+        let healedEngine = HealthKitSynchronizationEngine(
+            queryClient: MockQueryClient(results: [Self.quantityResult(
+                anchor: "anchor-healed", UUID(uuidString: "00000000-0000-0000-0000-000000000099")!
+            )]),
+            observerClient: MockObserverClient(), store: harness.store, uploader: uploader,
+            featureGate: .enabled, now: { Self.now }
+        )
+        // First post-update call encounters the already-poisoned partition
+        // and retires it (still honestly reporting THIS attempt as failed);
+        // the very next call is the one that proves recovery by querying
+        // HealthKit fresh and delivering successfully -- no reinstall.
+        await XCTAssertThrowsErrorAsync { try await healedEngine.synchronize(scope: harness.scope) }
+        try await healedEngine.synchronize(scope: harness.scope)
+
+        let pendingAfterHeal = try await harness.store.pendingBatches(for: harness.scope)
+        let cursorAfterHeal = try await harness.store.authoritativeCursor(for: harness.scope)
+        let diagnostics = try await harness.store.diagnostics(for: harness.scope)
+        XCTAssertTrue(pendingAfterHeal.isEmpty)
+        XCTAssertEqual(cursorAfterHeal?.opaqueAnchorData, Data("anchor-healed".utf8))
+        XCTAssertEqual(diagnostics.lastAbandonedBatchCode, "HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE")
+    }
+
+    /// A partition that fails validation on this device (truly invalid
+    /// payload) is retried at most once per foreground -- never in a tight
+    /// loop within a single call -- and never silently blocks the scope.
+    func testTrulyInvalidPermanentPayloadDoesNotRetryForeverWithinOneCall() async throws {
+        let harness = try Harness(stream: .activeEnergy, gate: .enabled, uploadModes: [.reject])
+        await XCTAssertThrowsErrorAsync { try await harness.engine.synchronize(scope: harness.scope) }
+        let uploadAttempts = await harness.uploader.receivedCount()
+        let pending = try await harness.store.pendingBatches(for: harness.scope)
+        XCTAssertEqual(uploadAttempts, 1, "a rejected upload must not be retried within the same call")
+        XCTAssertTrue(pending.isEmpty, "must not remain permanently blocking after being surfaced")
     }
 
     func testCrashAfterStagingRecoversPendingBatchFromProtectedFile() async throws {
@@ -235,6 +334,163 @@ final class HealthKitSynchronizationTests: XCTestCase {
         })
     }
 
+    // MARK: - Automatic-ingestion identity namespacing (Build 51/52 root cause)
+
+    /// This is the exact collision that produced the real
+    /// `HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE` 409 in production: before
+    /// namespacing, the canary's validation-only predicate version and the
+    /// automatic path's predicate version both resolved to `nil` (no
+    /// namespace), so both produced the bare `activity-summary:<date>` /
+    /// `nutrition-daily-total:<date>` external id for the same day.
+    func testCanaryAndAutomaticPredicateVersionsNoLongerShareAnExternalIDNamespace() {
+        let canaryPredicateVersion = "healthkit-activity-validation-only-v1:2026-09-22:2026-09-22"
+        XCTAssertNil(HealthKitBatchBuilder.externalIDNamespace(for: canaryPredicateVersion))
+        XCTAssertEqual(
+            HealthKitBatchBuilder.externalIDNamespace(for: HealthKitAutomaticSynchronizationCoordinator.predicateVersion),
+            "automatic"
+        )
+        XCTAssertNotEqual(
+            HealthKitBatchBuilder.externalIDNamespace(for: canaryPredicateVersion),
+            HealthKitBatchBuilder.externalIDNamespace(for: HealthKitAutomaticSynchronizationCoordinator.predicateVersion)
+        )
+    }
+
+    /// All four known callers -- canary (stays un-namespaced: the original
+    /// V1-compatible format every other caller must now avoid), canonical
+    /// test day, automatic, and Workout canary -- resolve to distinct,
+    /// non-colliding identity spaces. Registering a caller here is what
+    /// makes it exempt from the Build 51/52 collision class; this test
+    /// exists so adding a fifth caller without registering it here changes
+    /// this test's own list and forces the question to be asked.
+    func testAllFourKnownPredicateVersionsProduceDistinctNamespaces() {
+        let canary = HealthKitBatchBuilder.externalIDNamespace(for: "healthkit-activity-validation-only-v1:2026-09-22:2026-09-22")
+        let testDay = HealthKitBatchBuilder.externalIDNamespace(for: "healthkit-canonical-testday-v1:2026-09-22")
+        let workoutCanary = HealthKitBatchBuilder.externalIDNamespace(for: "healthkit-workout-canary-v1:2026-09-22")
+        let automatic = HealthKitBatchBuilder.externalIDNamespace(for: HealthKitAutomaticSynchronizationCoordinator.predicateVersion)
+        XCTAssertEqual(canary, nil)
+        XCTAssertEqual(testDay, "testday")
+        XCTAssertEqual(workoutCanary, "workoutcanary")
+        XCTAssertEqual(automatic, "automatic")
+        let registered = [testDay, workoutCanary, automatic].compactMap { $0 }
+        XCTAssertEqual(registered.count, Set(registered).count, "every registered namespace must be pairwise distinct")
+    }
+
+    /// End-to-end proof at the `HealthKitBatchBuilder` level (one step
+    /// short of the real Server round trip, but exercising the exact same
+    /// identity-construction code the Server sees): building an Activity
+    /// Summary batch for the canary's scope and for the automatic scope, on
+    /// the same day, must never produce the same external id.
+    func testBuildingTheSameDayForCanaryAndAutomaticScopesNeverProducesTheSameExternalID() throws {
+        let day = "2027-01-15" // matches Self.occurrence()'s fixture localDate
+        let summary = Self.activitySummaryAddition(moveCalories: 624)
+        let result = HealthKitAnchoredQueryResult(
+            additions: [summary], deletions: [], proposedAnchorData: Data("scope-check".utf8), completedAt: Self.now
+        )
+        let canaryScope = HealthKitCursorScope(
+            ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a",
+            stream: .activitySummary, predicateVersion: "healthkit-activity-validation-only-v1:\(day):\(day)"
+        )
+        let automaticScope = HealthKitCursorScope(
+            ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a",
+            stream: .activitySummary, predicateVersion: HealthKitAutomaticSynchronizationCoordinator.predicateVersion
+        )
+        let canaryBatch = try HealthKitBatchBuilder().build(
+            scope: canaryScope, previousCursor: nil, queryResult: result, createdAt: Self.now,
+            ingestionPurpose: .validationOnly
+        )
+        let automaticBatch = try HealthKitBatchBuilder().build(
+            scope: automaticScope, previousCursor: nil, queryResult: result, createdAt: Self.now
+        )
+        let canaryExternalID = try XCTUnwrap(canaryBatch.partitions.first?.additions.first?.immutableExternalID)
+        let automaticExternalID = try XCTUnwrap(automaticBatch.partitions.first?.additions.first?.immutableExternalID)
+        XCTAssertEqual(canaryExternalID, "activity-summary:\(day)", "the canary's identity format must stay exactly as-is (V1 compatibility)")
+        XCTAssertEqual(automaticExternalID, "activity-summary:automatic:\(day)")
+        XCTAssertNotEqual(canaryExternalID, automaticExternalID)
+    }
+
+    /// Activity and Nutrition must never collide with each other under the
+    /// same namespace either -- they already don't (different string
+    /// prefixes), and this fix must not change that.
+    func testAutomaticActivityAndNutritionNeverShareAnExternalIDEvenOnTheSameDay() throws {
+        let day = "2027-01-15" // matches Self.occurrence()'s fixture localDate
+        let activityResult = HealthKitAnchoredQueryResult(
+            additions: [Self.activitySummaryAddition(moveCalories: 624)], deletions: [],
+            proposedAnchorData: Data("activity".utf8), completedAt: Self.now
+        )
+        let nutritionAddition = HealthKitQueryAddition(
+            healthKitUUID: nil, objectTypeIdentifier: HealthKitSynchronizationStream.nutritionDailyTotal.objectTypeIdentifier,
+            source: HealthKitQuerySource(bundleIdentifier: "com.apple.Health", sourceName: "Apple Health", sourceRevision: nil, productType: nil, privacySafeDeviceProvenance: nil),
+            occurrence: Self.occurrence(),
+            payload: .nutritionDailyTotal(HealthKitQueryNutritionDailyTotal(dailyNutrition: ["calories": 456], aggregationScope: HealthKitQueryNutritionDailyTotal.aggregationScope, coverage: .completeDay, sourceRevision: 1)),
+            allowlistedMetadata: [:]
+        )
+        let nutritionResult = HealthKitAnchoredQueryResult(
+            additions: [nutritionAddition], deletions: [], proposedAnchorData: Data("nutrition".utf8), completedAt: Self.now
+        )
+        let activityScope = HealthKitCursorScope(
+            ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a",
+            stream: .activitySummary, predicateVersion: HealthKitAutomaticSynchronizationCoordinator.predicateVersion
+        )
+        let nutritionScope = HealthKitCursorScope(
+            ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a",
+            stream: .nutritionDailyTotal, predicateVersion: HealthKitAutomaticSynchronizationCoordinator.predicateVersion
+        )
+        let activityBatch = try HealthKitBatchBuilder().build(scope: activityScope, previousCursor: nil, queryResult: activityResult, createdAt: Self.now)
+        let nutritionBatch = try HealthKitBatchBuilder().build(scope: nutritionScope, previousCursor: nil, queryResult: nutritionResult, createdAt: Self.now)
+        let activityID = try XCTUnwrap(activityBatch.partitions.first?.additions.first?.immutableExternalID)
+        let nutritionID = try XCTUnwrap(nutritionBatch.partitions.first?.additions.first?.immutableExternalID)
+        XCTAssertEqual(activityID, "activity-summary:automatic:\(day)")
+        XCTAssertEqual(nutritionID, "nutrition-daily-total:automatic:\(day)")
+        XCTAssertNotEqual(activityID, nutritionID)
+    }
+
+    /// Background wake and foreground catch-up both call
+    /// `HealthKitBatchBuilder.build` with the identical `HealthKitCursorScope`
+    /// (same `predicateVersion`) the coordinator constructs once per
+    /// bootstrap -- this exercises the actual daily-aggregate branch that
+    /// collided in production (a `.activeEnergy`-style UUID-bearing sample
+    /// would short-circuit past the namespace entirely and prove nothing
+    /// about this bug). "One identity, not two" is a claim about the PAIR
+    /// the Server's purpose-immutability check keys on: (external id,
+    /// ingestion purpose) -- not the external id alone, and not the
+    /// per-attempt envelope/batch identity (which legitimately differs
+    /// each call, chained to the prior cursor digest).
+    func testAutomaticDailyAggregateConvergesOnOneExternalIDAndPurposeAcrossRepeatedBuilds() throws {
+        let scope = HealthKitCursorScope(
+            ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a",
+            stream: .activitySummary, predicateVersion: HealthKitAutomaticSynchronizationCoordinator.predicateVersion
+        )
+        let result = HealthKitAnchoredQueryResult(
+            additions: [Self.activitySummaryAddition(moveCalories: 624)], deletions: [],
+            proposedAnchorData: Data("unchanged-day".utf8), completedAt: Self.now
+        )
+        // Same scope, same unchanged content, built twice -- simulating a
+        // foreground catch-up and a background observer wake for the
+        // identical revision. Neither call path passes an explicit
+        // ingestionPurpose, so both take the default.
+        let foreground = try HealthKitBatchBuilder().build(scope: scope, previousCursor: nil, queryResult: result, createdAt: Self.now)
+        let background = try HealthKitBatchBuilder().build(scope: scope, previousCursor: nil, queryResult: result, createdAt: Self.now.addingTimeInterval(30))
+        let foregroundObservation = try XCTUnwrap(foreground.partitions.first?.additions.first)
+        let backgroundObservation = try XCTUnwrap(background.partitions.first?.additions.first)
+        XCTAssertEqual(foregroundObservation.immutableExternalID, backgroundObservation.immutableExternalID)
+        XCTAssertEqual(foreground.ingestionPurpose, .operational, "the automatic path always uses the default (omitted) purpose")
+        XCTAssertEqual(foreground.ingestionPurpose, background.ingestionPurpose)
+
+        // The exact shape of the Build 51/52 collision: the SAME external
+        // id submitted under a DIFFERENT purpose (as if some other caller
+        // mistakenly reused the automatic identity for a validation-only
+        // upload). The identity alone is unaffected by purpose -- purpose
+        // travels on the batch, not the identity string -- which is
+        // precisely why namespacing the identity, not the purpose, is what
+        // this fix relies on to keep automatic and canary uploads apart.
+        let mismatchedPurpose = try HealthKitBatchBuilder().build(
+            scope: scope, previousCursor: nil, queryResult: result, createdAt: Self.now, ingestionPurpose: .validationOnly
+        )
+        let mismatchedObservation = try XCTUnwrap(mismatchedPurpose.partitions.first?.additions.first)
+        XCTAssertEqual(mismatchedObservation.immutableExternalID, foregroundObservation.immutableExternalID)
+        XCTAssertNotEqual(mismatchedPurpose.ingestionPurpose, foreground.ingestionPurpose)
+    }
+
     func testActivityTotalIncludesWorkoutEnergyWithoutAddingWorkoutCalories() throws {
         let summary = Self.activitySummaryAddition(moveCalories: 500)
         let result = HealthKitAnchoredQueryResult(
@@ -347,6 +603,54 @@ final class HealthKitSynchronizationTests: XCTestCase {
         let diagnostics = try await reopened.diagnostics(for: harness.scope)
         XCTAssertEqual(diagnostics.boundedRecoveryCount, 1)
         XCTAssertEqual(diagnostics.lastErrorCode, "healthkit_cursor_corrupt_full_rescan_required")
+    }
+
+    /// The three new diagnostics fields (`lastAbandonedBatchCode`,
+    /// `lastAbandonedAt`, `abandonedBatchCount`) are `Optional`, not
+    /// defaulted, specifically so decoding a real pre-fix envelope --
+    /// persisted by a build that predates this fix and therefore never
+    /// wrote those keys at all -- still succeeds, rather than hitting
+    /// `load`'s generic decode-failure path (which would QUARANTINE the
+    /// envelope and silently reset the cursor and any pending batch, wiping
+    /// exactly the state this fix needs intact to self-heal).
+    ///
+    /// Swift's synthesized `Encodable` conformance omits an `Optional`
+    /// property's key entirely when its value is `nil` (`encodeIfPresent`,
+    /// not `encode` -- it does not write `null`), so ANY envelope written
+    /// before an abandonment has ever happened is *already*, structurally,
+    /// exactly what a real pre-fix envelope looks like for these three
+    /// keys: this is not a scenario that needs manufacturing. This test
+    /// proves both directions of the same guarantee: decoding succeeds
+    /// when the keys are genuinely absent (before any abandonment), and
+    /// still succeeds, now round-tripping real values, after a genuine
+    /// abandonment has occurred and been persisted.
+    func testDecodingEnvelopesWithAndWithoutTheNewDiagnosticsKeysBothSucceed() async throws {
+        let first = Self.quantityResult(anchor: "anchor-1", UUID(uuidString: "00000000-0000-0000-0000-000000000001")!)
+        let second = Self.quantityResult(anchor: "anchor-2", UUID(uuidString: "00000000-0000-0000-0000-000000000002")!)
+        let harness = try Harness(
+            stream: .activeEnergy, gate: .enabled, queryResults: [first, second], uploadModes: [.accept, .reject]
+        )
+        try await harness.engine.synchronize(scope: harness.scope)
+
+        let dataBefore = try Data(contentsOf: await harness.store.stateFileURL(for: harness.scope))
+        let jsonBefore = try XCTUnwrap(JSONSerialization.jsonObject(with: dataBefore) as? [String: Any])
+        let diagnosticsBefore = try XCTUnwrap(jsonBefore["diagnostics"] as? [String: Any])
+        for key in ["lastAbandonedBatchCode", "lastAbandonedAt", "abandonedBatchCount"] {
+            XCTAssertNil(diagnosticsBefore[key], "a pre-abandonment envelope must omit \(key) entirely, matching a real pre-fix envelope")
+        }
+        let reopenedBefore = FileHealthKitSynchronizationStore(root: harness.root)
+        let cursorBefore = try await reopenedBefore.authoritativeCursor(for: harness.scope)
+        XCTAssertNotNil(cursorBefore, "decoding an envelope missing these keys must not quarantine the cursor")
+
+        // Trigger a real rejection/abandonment, then confirm a fresh reopen
+        // still decodes correctly with the keys now genuinely present.
+        await XCTAssertThrowsErrorAsync { try await harness.engine.synchronize(scope: harness.scope) }
+        let reopenedAfter = FileHealthKitSynchronizationStore(root: harness.root)
+        let diagnosticsAfter = try await reopenedAfter.diagnostics(for: harness.scope)
+        XCTAssertEqual(diagnosticsAfter.lastAbandonedBatchCode, "synthetic_rejection")
+        XCTAssertNotNil(diagnosticsAfter.lastAbandonedAt)
+        XCTAssertEqual(diagnosticsAfter.abandonedBatchCount, 1)
+        XCTAssertNotEqual(diagnosticsAfter.lastErrorCode, "healthkit_cursor_corrupt_full_rescan_required", "must not be treated as corrupt")
     }
 
     func testDiagnosticsContainOnlyOperationalMetadata() async throws {

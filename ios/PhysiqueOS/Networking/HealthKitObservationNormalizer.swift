@@ -56,9 +56,7 @@ struct HealthKitBatchBuilder: Sendable {
         ingestionPurpose: HealthKitIngestionPurpose = .operational
     ) throws -> HealthKitStagedBatch {
         let normalizer = HealthKitObservationNormalizer()
-        let namespace = scope.predicateVersion.hasPrefix(HealthKitCanonicalTestDay.predicatePrefix)
-            ? HealthKitCanonicalTestDay.externalIDNamespace
-            : nil
+        let namespace = Self.externalIDNamespace(for: scope.predicateVersion)
         let additions = queryResult.additions
             .map { normalizer.normalize($0, externalIDNamespace: namespace) }
             .sorted(by: Self.observationOrder)
@@ -194,6 +192,47 @@ struct HealthKitBatchBuilder: Sendable {
             attemptCount: 0,
             lastAttemptAt: nil
         )
+    }
+
+    /// Every known caller of `HealthKitAnchoredQueryClient.execute` --
+    /// canary, canonical test day, automatic, Workout canary -- is
+    /// namespaced here by its `predicateVersion`, so two callers can never
+    /// emit the same daily-aggregate external id for the same day. The
+    /// Founder canary's own validation-only predicate versions
+    /// (`healthkit-activity-validation-only-v1:...`) are deliberately left
+    /// un-namespaced: that bare `activity-summary:<date>` /
+    /// `nutrition-daily-total:<date>` format is the original V1-compatible
+    /// identity, and it is the one every other caller must now avoid, not
+    /// the one to change retroactively.
+    ///
+    /// This does not (and cannot, from a `predicateVersion` string alone)
+    /// protect a caller that is simply never registered here. It is a
+    /// closed, explicit switch specifically so a missing registration is
+    /// visible in a diff and testable by name, rather than because the
+    /// function can detect its own incompleteness. The Workout canary's
+    /// namespace is registered even though it is a no-op today (Workout
+    /// observations carry a real `healthKitUUID` and never reach the
+    /// daily-aggregate branches below) -- exactly so that if that ever
+    /// changes, it inherits a real namespace instead of repeating the
+    /// Activity/Nutrition collision this function exists to prevent. Note
+    /// deletions (`normalize(_ deletion:)` below, and the generic anchored
+    /// -query deletion path in `HealthKitQueryClient.execute`) are not
+    /// namespaced by this function at all: today every deletion the
+    /// automatic/canary/test-day paths can produce either carries a real
+    /// `healthKitUUID` or is only ever locally deferred, never delivered --
+    /// namespacing daily-aggregate *deletions* is tracked as a follow-up
+    /// for whenever deletion delivery ships, not before.
+    static func externalIDNamespace(for predicateVersion: String) -> String? {
+        if predicateVersion.hasPrefix(HealthKitCanonicalTestDay.predicatePrefix) {
+            return HealthKitCanonicalTestDay.externalIDNamespace
+        }
+        if predicateVersion.hasPrefix(HealthKitWorkoutCanaryDay.predicatePrefix) {
+            return HealthKitWorkoutCanaryDay.externalIDNamespace
+        }
+        if predicateVersion == HealthKitAutomaticSynchronizationCoordinator.predicateVersion {
+            return HealthKitAutomaticSynchronizationCoordinator.externalIDNamespace
+        }
+        return nil
     }
 
     private static func observationOrder(

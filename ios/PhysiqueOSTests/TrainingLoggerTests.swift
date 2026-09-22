@@ -1239,11 +1239,15 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildFiftyOneInSourceControlledConfiguration() throws {
+    /// `CFBundleVersion` must be bumped in lockstep with
+    /// `ios/Scripts/generate_project.py`'s `APP_BUILD_NUMBER` on every
+    /// release; this assertion was last updated for Build 52 and needs the
+    /// same one-line bump on the next release, exactly like that constant.
+    func testAppDeclaresExemptEncryptionAndCurrentBuildInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "51")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "52")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }

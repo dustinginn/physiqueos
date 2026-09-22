@@ -354,13 +354,31 @@ actor HealthKitSynchronizationEngine {
         return value
     }
 
+    /// A `.rejected` outcome -- whether already persisted from a prior
+    /// attempt, or freshly returned by `uploader.upload` just below -- means
+    /// the Server will never accept this exact request: retrying identical
+    /// data cannot change a permanent per-identity/per-purpose rejection.
+    /// Immediately retiring the whole batch (`abandonPendingBatch`) is what
+    /// makes this recoverable rather than a permanent local block: the next
+    /// `synchronize()` call sees an empty `pendingBatches` and re-queries
+    /// HealthKit fresh, so a corrected identity (see `HealthKitBatchBuilder`
+    /// 's per-caller namespacing) or a genuinely new revision can still get
+    /// through. This throw still reports THIS attempt as failed -- that is
+    /// correct and honest -- it is only the *next* attempt that is no
+    /// longer poisoned. This is also what heals an already-poisoned Build
+    /// 51 device: its already-persisted `.rejected` partition is retired
+    /// the first time this scope is synchronized after updating, with no
+    /// migration step and no reinstall.
     private func deliverPending(scope: HealthKitCursorScope) async throws {
         let batches = try await store.pendingBatches(for: scope)
         for batch in batches.sorted(by: { $0.createdAt < $1.createdAt }) {
             for partition in batch.partitions.sorted(by: { $0.index < $1.index }) {
                 guard case .serverRequired = partition.disposition else { continue }
                 if partition.attemptState.permitsCursorAdvance { continue }
-                if case .rejected = partition.attemptState { throw HealthKitSyncError.serverRejected(code: "healthkit_batch_rejected") }
+                if case let .rejected(code) = partition.attemptState {
+                    try await store.abandonPendingBatch(batchID: batch.identity, code: code, at: now())
+                    throw HealthKitSyncError.serverRejected(code: code)
+                }
                 let attemptAt = now()
                 try await store.markUploadAttempt(
                     batchID: batch.identity,
@@ -384,11 +402,7 @@ actor HealthKitSynchronizationEngine {
                     )
                     return
                 case let .rejected(code):
-                    try await store.markRejected(
-                        batchID: batch.identity,
-                        partitionID: partition.identity,
-                        code: code
-                    )
+                    try await store.abandonPendingBatch(batchID: batch.identity, code: code, at: now())
                     throw HealthKitSyncError.serverRejected(code: code)
                 }
             }

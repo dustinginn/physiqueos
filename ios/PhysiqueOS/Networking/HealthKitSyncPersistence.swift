@@ -8,6 +8,17 @@ protocol HealthKitSynchronizationStore: Sendable {
     func markUploadAttempt(batchID: String, partitionID: String, at: Date) async throws
     func markTransientFailure(batchID: String, partitionID: String, code: String) async throws
     func markRejected(batchID: String, partitionID: String, code: String) async throws
+    /// Retires an entire batch whose rejection can never be resolved by
+    /// retrying the identical request (a permanent per-identity/per-purpose
+    /// rejection, e.g. `HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE`), so that
+    /// scope's automatic sync stops being permanently blocked by it.
+    /// Deliberately does NOT advance `authoritativeCursor`: this batch's
+    /// additions were never durably delivered, so the cursor must stay
+    /// exactly where it was before this attempt -- otherwise the abandoned
+    /// day's fingerprint would be remembered as "already seen" and its
+    /// real HealthKit data would never resurface on the next query. A
+    /// no-op if the batch is already gone (idempotent under retry/relaunch).
+    func abandonPendingBatch(batchID: String, code: String, at: Date) async throws
     func acknowledge(
         batchID: String,
         partitionID: String,
@@ -98,6 +109,22 @@ actor FileHealthKitSynchronizationStore: HealthKitSynchronizationStore {
             envelope.pendingBatches[batchIndex].partitions[partitionIndex].attemptState = .rejected(code: code)
             envelope.diagnostics.lastErrorCode = code
         }
+    }
+
+    func abandonPendingBatch(batchID: String, code: String, at: Date) throws {
+        // Look up the scope the ordinary way first; a batch already
+        // abandoned by a concurrent/prior call (or one that was somehow
+        // never staged under this exact id) simply has nothing to do.
+        guard let scope = try? scopeContaining(batchID: batchID) else { return }
+        var envelope = try load(scope)
+        guard let index = envelope.pendingBatches.firstIndex(where: { $0.identity == batchID }) else { return }
+        envelope.pendingBatches.remove(at: index)
+        envelope.diagnostics.lastAbandonedBatchCode = code
+        envelope.diagnostics.lastAbandonedAt = at
+        envelope.diagnostics.abandonedBatchCount = (envelope.diagnostics.abandonedBatchCount ?? 0) + 1
+        envelope.diagnostics.lastErrorCode = code
+        envelope.diagnostics.pendingBatchCount = envelope.pendingBatches.count
+        try save(envelope)
     }
 
     func acknowledge(
@@ -232,7 +259,10 @@ actor FileHealthKitSynchronizationStore: HealthKitSynchronizationStore {
                 lastUploadAttempt: nil,
                 lastDurableAcknowledgement: nil,
                 lastErrorCode: nil,
-                boundedRecoveryCount: 0
+                boundedRecoveryCount: 0,
+                lastAbandonedBatchCode: nil,
+                lastAbandonedAt: nil,
+                abandonedBatchCount: nil
             )
         )
     }
