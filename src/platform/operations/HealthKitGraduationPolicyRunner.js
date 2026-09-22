@@ -49,8 +49,15 @@ export async function runHealthKitGraduationPolicy({
   apply = false,
   expected = null,
   includeValues = true,
+  simulateComplete = false,
   now = () => new Date(),
 } = {}) {
+  // Simulation-only: predict what the completed-day revision will produce when
+  // the stored day is still a partial "so far" day. It changes nothing stored
+  // and can never be applied.
+  if (simulateComplete && apply) {
+    throw Object.assign(new Error("The completed-day simulation is dry-run only."), { code: "SIMULATION_NOT_APPLICABLE" });
+  }
   const { ownerUserId } = authorization;
   const list = (collection) => records.list({ ownerUserId, collection });
   const getConfiguration = (recordId) => records.get({ ownerUserId, collection: HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION, recordId });
@@ -72,7 +79,13 @@ export async function runHealthKitGraduationPolicy({
   if (planned.refusal) return Object.freeze({ outcome: "refused", reasons: [planned.refusal], facts });
 
   const auditRecordId = `${HEALTHKIT_GRADUATION_AUDIT_RECORD_PREFIX}${digest(authorization.authorizationReference ?? "").slice(0, 12)}_set`;
-  const simulation = simulateGraduation({ evidence, canonicalDays, current, candidate: planned.resolved, includeValues });
+  const simulation = simulateGraduation({
+    evidence,
+    canonicalDays: simulateComplete ? canonicalDays.map(asCompleteDay) : canonicalDays,
+    current,
+    candidate: planned.resolved,
+    includeValues,
+  });
   const summary = {
     action: "set",
     policy: {
@@ -96,6 +109,7 @@ export async function runHealthKitGraduationPolicy({
     },
     historicalBriefingRegeneration: false,
     trainingAndWorkoutChanges: "none",
+    simulatedAsCompleteDay: simulateComplete,
     simulation,
     facts,
   };
@@ -201,6 +215,14 @@ function planPolicy({ policyRecord, current, desired, authorization }) {
   const before = stable({ projection: describeScope(current.projection), evidenceEligibility: describeScope(current.evidenceEligibility) });
   const after = stable({ projection: describeScope(resolved.projection), evidenceEligibility: describeScope(resolved.evidenceEligibility) });
   return { record, resolved, changed: before !== after || !policyRecord };
+}
+
+// The stored day with its coverage set to a finished day, for the simulation only.
+function asCompleteDay(day) {
+  const values = day.domain === "nutrition"
+    ? { ...day.current.values, dailyTotalsScope: "full_day_summary" }
+    : day.current.values;
+  return { ...day, current: { ...day.current, coverage: "complete_day", values } };
 }
 
 const describeScope = (scope) => (scope.enabled

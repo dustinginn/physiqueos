@@ -154,4 +154,18 @@ describe("HealthKit graduation policy operation", () => {
     expect(result.simulation.evidenceEligibility.daysGraduated).toHaveLength(0);
     expect(result.simulation.v3.eligibleObservationDaysAdded).toBe(0);
   });
+
+  it("simulates the completed-day revision for a partial stored day, writes nothing, and can never be applied", async () => {
+    const records = store({ coverage: "partial_day" });
+    const before = records.snapshot();
+    const result = await runHealthKitGraduationPolicy({ records, authorization, desired: both, simulateComplete: true });
+    expect(result).toMatchObject({ outcome: "dry_run", simulatedAsCompleteDay: true });
+    expect(result.simulation.evidenceEligibility.daysGraduated).toHaveLength(2);
+    expect(result.simulation.v3.eligibleObservationDaysAdded).toBe(2);
+    expect(result.simulation.evidenceEligibility.predicted[0].nutritionAuthority).toMatchObject({ tier: "full_day_asserted", energyCompleteness: "complete" });
+    expect(records.snapshot()).toEqual(before);
+    await expect(runHealthKitGraduationPolicy({ records, authorization, desired: both, simulateComplete: true, apply: true, expected: result.facts }))
+      .rejects.toMatchObject({ code: "SIMULATION_NOT_APPLICABLE" });
+    expect(records.getMutationCount()).toBe(0);
+  });
 });

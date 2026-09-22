@@ -137,6 +137,72 @@ Cardio. One HealthKit workout maps idempotently to one canonical record. Coexist
 
 Strategic quarantine holds for workouts exactly as for daily days: canonical workouts and links are quarantined, refused at the Evidence write boundary, absent from every strategic reader (pinned by the structural read-boundary test), and produce no Training performance events, PRs, Library records, or Goal changes.
 
+## Graduation of accepted Activity and Nutrition (dormant)
+
+Once a HealthKit canonical Activity or Nutrition day is accepted, it becomes ordinary PhysiqueOS data:
+V3 reasons about the canonical facts and does not treat HealthKit as a separate strategic universe.
+Source and provenance matter only where the measurement genuinely differs (Apple Watch expenditure
+stays a wearable estimate; a HealthKit Nutrition day stays a daily-total assertion).
+
+**Mechanism: a read-time overlay, never a write.** `HealthKitGraduation.js` hands a canonical day to a
+reader as an ordinary `activity_day` / `nutrition` object. Nothing is written to `canonicalEvidenceObjects`,
+so stored HealthKit records stay quarantined, the write guard still refuses them, published briefings and
+Training/Workout records are never touched, and turning a switch off stops future use and deletes nothing.
+
+**Why the days were invisible.** `healthKitCanonicalDays` is an application-only collection; every Log,
+Evidence, Energy and V3 reader consumes a `canonicalEvidenceObjects` array that never contained them, and
+`HEALTHKIT_STRATEGIC_EVIDENCE_ELIGIBLE` is a constant `false`.
+
+**Two independent Server-owned scopes** (one record, `healthkit_canonical_graduation_policy`; only writer
+`HealthKitGraduationPolicyRunner`, dry-run first, drift fence, audit row):
+
+| Scope | Feeds | Requires |
+| --- | --- | --- |
+| `projection` | Log rows, Activity / Nutrition detail and history, Energy detail, Evidence Hub, operating plan | any coverage (a partial "so far" day is shown as partial) |
+| `evidenceEligibility` | V3 / Energy observations / briefings, through the cadence generation snapshot only | a complete day |
+
+Each scope is an exact domain list (`activity`, `nutrition`), an exact start date and an optional end date.
+Projection never implies eligibility and eligibility does not require projection. There is no V3
+HealthKit switch: V3 reads ordinary evidence. A malformed record disables both scopes and never throws.
+`historicalBriefingRegeneration` is not a parameter; a record naming it anything but `false` is invalid.
+
+**Seams (enumerated by a structural test).** Projection: Progress evidence store (Activity, Nutrition and Energy
+lists), Evidence timeline store, Core Log and operating-plan read models (the policy row rides in the same query,
+so the Log read stays one provider query). Evidence: `providerBriefingCadenceComposition` only, as a read-only
+snapshot; the publication and Confidence stores keep the raw runtime. No write, command, repair or ingestion
+path may import the overlay.
+
+**One logical day per domain and date, semantic precedence.** Activity uses the ordinary source authority
+and coverage precedence (direct Apple Health outranks an Apple Fitness screenshot; the screenshot's goals and
+rings are retained; nothing stacks). Nutrition uses the assertion contract: a device full-day total outranks
+meal-derived, partial or OCR-summary totals, meal detail is preserved as detail and cannot override the
+device total, a Founder-typed full-day total is never overridden, and a partial HealthKit day never outranks
+an ordinary day. Disagreement is surfaced (`healthkit_reconciliation`, `daily_totals_reconciliation`), never
+silently overwritten. The observed local date owns the day. Workout energy is never added to Activity.
+
+**Zero-meal Nutrition** is a complete, valid, high-reliability day (`full_day_asserted`, `device_aggregate`).
+No meal is fabricated and the Log row never describes it by a meal count.
+
+**Rollback** is prospective: switch a scope off with the same operation. Canonical history, source
+observations and Evidence are untouched.
+
+### Graduation runbook (do not run until the completed Sep 21 audit is GREEN and the Founder authorizes)
+
+1. Verify the completed-day Activity + Nutrition audit is GREEN.
+2. Verify Server authority (this overlay deployed, both scopes absent) and, if the Native UI delta is needed,
+   the prepared Native build is archived, uploaded and installed.
+3. Run the graduation dry run (`buildHealthKitPayload --kind graduation --mode dry-run --desired <json>`).
+   It lists the exact dates and domains, projection changes, duplicate suppression, predicted Log rows,
+   Energy inputs, Nutrition authority, V3 eligible days added, and states no historical briefing
+   regeneration and no Training/Workout change. Add `--simulate-complete` to preview a still-partial day.
+4. The Founder authorizes the transition in chat.
+5. Apply with the dry-run facts and an authorization reference: projection first, then a separate apply for
+   evidence eligibility.
+6. Verify Log / Evidence / Activity / Nutrition rows and the Apple Health source label.
+7. Verify V3 sees the canonical facts once (a single observation per day and domain).
+8. Verify no historical briefing changed.
+9. Continue normal operation. Rollback is the same operation with a scope set off.
+
 ## Storage and schema
 
 Raw observations use the application-only `healthKitObservations` collection in the existing `canonical_training_records` JSON table. They are excluded from the canonical Founder runtime import/export inventory and from canonical Evidence reads.

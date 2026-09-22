@@ -23,6 +23,7 @@ const EXPECTED_GIT_SHA = typeof __EXPECTED_GIT_SHA__ === "undefined" ? "" : __EX
 const MODE = typeof __MODE__ === "undefined" ? "dry-run" : __MODE__;
 const DESIRED_JSON = typeof __DESIRED_JSON__ === "undefined" ? "" : __DESIRED_JSON__;
 const INCLUDE_VALUES = typeof __INCLUDE_VALUES__ === "undefined" ? true : __INCLUDE_VALUES__;
+const SIMULATE_COMPLETE = typeof __SIMULATE_COMPLETE__ === "undefined" ? false : __SIMULATE_COMPLETE__;
 const AUTHORIZATION_REFERENCE = typeof __AUTHORIZATION_REFERENCE__ === "undefined" ? "" : __AUTHORIZATION_REFERENCE__;
 const EXPECTED_JSON = typeof __EXPECTED_JSON__ === "undefined" ? "" : __EXPECTED_JSON__;
 const MARKER = typeof __MARKER__ === "undefined" ? "PHYSIQUEOS_HEALTHKIT_GRADUATION_SUCCESS" : __MARKER__;
@@ -38,6 +39,7 @@ function stop(code, status = 1) {
 const sanitizedCode = (error) => (/^[A-Za-z0-9_]{3,60}$/.test(String(error?.code ?? "")) ? String(error.code) : "GRADUATION_ERROR");
 
 if (!["dry-run", "apply"].includes(MODE)) stop("MODE_INVALID");
+if (SIMULATE_COMPLETE && MODE !== "dry-run") stop("SIMULATION_NOT_APPLICABLE");
 let desired = null;
 try { desired = JSON.parse(DESIRED_JSON); } catch { stop("DESIRED_POLICY_INVALID"); }
 if (!desired || typeof desired !== "object" || Array.isArray(desired)) stop("DESIRED_POLICY_INVALID");
@@ -96,6 +98,7 @@ try {
     apply,
     expected,
     includeValues: INCLUDE_VALUES,
+    simulateComplete: SIMULATE_COMPLETE,
   });
   await client.query(apply && result.outcome === "applied" ? "COMMIT" : "ROLLBACK");
   open = false;
