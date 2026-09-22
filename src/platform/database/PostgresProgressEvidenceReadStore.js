@@ -1,6 +1,7 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 import { selectValidDexaScans } from "../../domain/services/DEXAReadModelAdapter.js";
+import { createHealthKitGraduationReader } from "./HealthKitGraduationReader.js";
 
 export function createPostgresProgressEvidenceReadStore({
   pool,
@@ -18,6 +19,15 @@ export function createPostgresProgressEvidenceReadStore({
       queryCount += 1;
       return pool.query(text, values);
     },
+  });
+  // Normal Activity / Nutrition / Energy reads see graduated HealthKit days
+  // through the ordinary evidence lists (policy-controlled, OFF by default).
+  const graduation = createHealthKitGraduationReader({
+    query: async (text, values) => {
+      queryCount += 1;
+      return pool.query(text, values);
+    },
+    ownerUserId,
   });
   const tracked = (values) => {
     const result = Array.isArray(values) ? values : [];
@@ -92,20 +102,20 @@ export function createPostgresProgressEvidenceReadStore({
       return contexts.at(-1) ?? null;
     },
     listEvidencePackages: () => list("evidencePackages"),
-    listCanonicalNutritionEvidenceObjects: () => queryRecords(
+    listCanonicalNutritionEvidenceObjects: async () => graduation.overlay(await queryRecords(
       `SELECT payload,version FROM physiqueos.canonical_evidence_records
        WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
          AND COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')='nutrition'
        ORDER BY COALESCE(payload#>>'{payload,observed_at}',payload->>'observed_at'),record_id`,
       [ownerUserId]
-    ),
-    listCanonicalActivityAndTrainingEvidenceObjects: () => queryRecords(
+    ), { domains: ["nutrition"], keepDateOrder: true }),
+    listCanonicalActivityAndTrainingEvidenceObjects: async () => graduation.overlay(await queryRecords(
       `SELECT payload,version FROM physiqueos.canonical_evidence_records
        WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
          AND COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type') IN ('activity_day','training')
        ORDER BY COALESCE(payload#>>'{payload,observed_at}',payload->>'observed_at'),record_id`,
       [ownerUserId]
-    ),
+    ), { domains: ["activity"], keepDateOrder: true }),
   });
 }
 

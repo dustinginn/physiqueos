@@ -21,6 +21,9 @@ import {
   createPostgresBriefingCadenceExecutionStore,
 } from "../../platform/database/PostgresBriefingCadenceExecution";
 
+import { createHealthKitGraduationReader } from "../../platform/database/HealthKitGraduationReader.js";
+import { HealthKitGraduationPurpose } from "../../domain/services/HealthKitGraduation.js";
+
 export function createProviderBriefingCadenceRunner({
   pool,
   ownerUserId,
@@ -44,6 +47,10 @@ export function createProviderBriefingCadenceRunner({
     pool,
     ownerUserId,
   });
+  const healthKitGraduation = createHealthKitGraduationReader({
+    query: (text, values) => pool.query(text, values),
+    ownerUserId,
+  });
   return Object.freeze({
     async execute({ asOf = now() } = {}) {
       await assertProviderAuthority(authorityStore);
@@ -51,7 +58,18 @@ export function createProviderBriefingCadenceRunner({
         loadCanonicalRuntime(),
         loadCanonicalCommitBindings(),
       ]);
-      const repositories = createSeedRepositories(canonicalRuntime, {
+      // Ordinary evidence for generation. Graduated HealthKit Activity / Nutrition
+      // days join it ONLY under the separate evidence-eligibility scope and only
+      // as complete days, as read-time objects in this read-only snapshot. The
+      // publication and Confidence stores keep the raw runtime.
+      const evidenceRuntime = {
+        ...canonicalRuntime,
+        canonicalEvidenceObjects: await healthKitGraduation.overlay(
+          canonicalRuntime.canonicalEvidenceObjects ?? [],
+          { purpose: HealthKitGraduationPurpose.EVIDENCE },
+        ),
+      };
+      const repositories = createSeedRepositories(evidenceRuntime, {
         onChange() {
           const error = new Error(
             "Provider briefing cadence snapshot repositories are read-only."

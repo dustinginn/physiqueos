@@ -264,7 +264,7 @@ function graduateActivityDay({ objects, day, purpose }) {
   const existing = selectActiveCanonicalActivityDays(objects, { date: day.localDate }).records[0] ?? null;
   const projected = projectHealthKitCanonicalDay(day, { purpose });
   if (!existing) return { objects: [...objects, projected], mode: "projected_alone" };
-  const coexistence = assessHealthKitCoexistence({ domain: day.domain, localDate: day.localDate, healthKitDay: day, canonicalObjects: objects });
+  const coexistence = assessHealthKitCoexistence({ domain: day.domain, localDate: day.localDate, healthKitDay: day, canonicalEvidenceObjects: objects });
   // A partial "so far" HealthKit snapshot never outranks an ordinary day.
   if (day.current.coverage !== "complete_day") return { objects, mode: "existing_kept", coexistence };
   const merged = createCanonicalActivityDayRecord({
@@ -293,7 +293,7 @@ function graduateNutritionDay({ objects, day, purpose }) {
   const existing = selectActiveCanonicalNutritionDays(objects, { date: day.localDate }).records[0] ?? null;
   const projected = projectHealthKitCanonicalDay(day, { purpose });
   if (!existing) return { objects: [...objects, projected], mode: "projected_alone" };
-  const coexistence = assessHealthKitCoexistence({ domain: day.domain, localDate: day.localDate, healthKitDay: day, canonicalObjects: objects });
+  const coexistence = assessHealthKitCoexistence({ domain: day.domain, localDate: day.localDate, healthKitDay: day, canonicalEvidenceObjects: objects });
   if (day.current.coverage !== "complete_day") return { objects, mode: "existing_kept", coexistence };
   const other = resolveNutritionDayAuthority(existing);
   const incoming = resolveNutritionDayAuthority(projected);

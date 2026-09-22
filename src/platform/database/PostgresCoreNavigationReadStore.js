@@ -1,4 +1,9 @@
 import { PHASE4_DOMAIN_TABLES } from "../migration/phase4DomainCollections.js";
+import { createHealthKitGraduationReader } from "./HealthKitGraduationReader.js";
+
+// Read models whose Activity / Nutrition rows may show graduated HealthKit days
+// (policy-controlled, OFF by default). Every other model is untouched.
+const HEALTHKIT_GRADUATED_READ_MODELS = new Set(["core.navigation.log", "core.navigation.operating-plan"]);
 
 export function createPostgresCoreNavigationReadStore({
   pool,
@@ -9,6 +14,10 @@ export function createPostgresCoreNavigationReadStore({
     throw new Error("Core navigation storage requires a PostgreSQL pool and owner.");
   }
 
+  const graduation = createHealthKitGraduationReader({
+    query: (text, values) => pool.query(text, values),
+    ownerUserId,
+  });
   return Object.freeze({
     getOwnerUserId: () => ownerUserId,
     async run(readModel, callback) {
@@ -44,6 +53,10 @@ export function createPostgresCoreNavigationReadStore({
         for (const row of result.rows) {
           output[row.collection_name].push(Object.freeze(row.payload));
           if (row.runtime_metadata) runtimeMetadata = Object.freeze(row.runtime_metadata);
+        }
+        if (output.canonicalEvidenceObjects && HEALTHKIT_GRADUATED_READ_MODELS.has(readModel)) {
+          queryCount += 1;
+          output.canonicalEvidenceObjects = await graduation.overlay(output.canonicalEvidenceObjects);
         }
         return Object.freeze(output);
       };

@@ -1,4 +1,5 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
+import { createHealthKitGraduationReader } from "./HealthKitGraduationReader.js";
 
 export function createPostgresEvidenceTimelineReadStore({ pool, ownerUserId, onComplete = null } = {}) {
   if (!pool?.query || !ownerUserId) throw new Error("Evidence Timeline storage requires a PostgreSQL pool and owner.");
@@ -17,6 +18,9 @@ export function createPostgresEvidenceTimelineReadStore({ pool, ownerUserId, onC
       };
       const records = createPhase4CanonicalRecordStore({ query });
       const list = (collection) => records.list({ ownerUserId, collection });
+      // Evidence Hub shows graduated HealthKit Activity / Nutrition days as ordinary
+      // days (policy-controlled, OFF by default; one representation per day).
+      const graduation = createHealthKitGraduationReader({ records, ownerUserId });
       try {
         const [weights, photos, dexaScans, protocols, checkIns, canonicalEvidenceObjects, analysisRows, briefingRows, packageRows] = await Promise.all([
           list("weightEntries"),
@@ -24,7 +28,7 @@ export function createPostgresEvidenceTimelineReadStore({ pool, ownerUserId, onC
           list("dexaScans"),
           list("protocols"),
           list("dailyCheckIns"),
-          list("canonicalEvidenceObjects"),
+          list("canonicalEvidenceObjects").then((objects) => graduation.overlay(objects)),
           query(
             `SELECT jsonb_build_object(
                'id',payload->'id','createdAt',payload->'createdAt','title',payload->'title',

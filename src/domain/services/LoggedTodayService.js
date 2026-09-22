@@ -118,12 +118,17 @@ function composeNutritionRow(days) {
   const calorieValue = Number(day.daily_totals?.calories);
   const calories = Number.isFinite(calorieValue) ? calorieValue : 0;
   const mealLabel = `${mealCount} meal${mealCount === 1 ? "" : "s"}`;
+  const deviceTotals = isDeviceDailyTotal(day);
 
   return Object.freeze({
     id: "nutrition",
     label: "Nutrition",
-    summary: calories > 0 ? `${mealLabel} · ${formatNumber(calories)} calories` : `${mealLabel} logged`,
-    context: null,
+    // A device daily total with no meal objects is a complete, valid day: it is
+    // never described by a meal count it does not have.
+    summary: deviceTotals && mealCount === 0
+      ? calories > 0 ? `${formatNumber(calories)} calories` : "Nutrition logged"
+      : calories > 0 ? `${mealLabel} · ${formatNumber(calories)} calories` : `${mealLabel} logged`,
+    context: deviceTotals ? formatDeviceNutritionContext(day) : null,
     href: day?.id
       ? `/progress/nutrition/day/${encodeURIComponent(day.id)}`
       : "/progress/nutrition",
@@ -147,10 +152,30 @@ function composeActivityRow(days) {
     summary: linkedTrainingType
       ? `${formatTrainingLabel(linkedTrainingType)} · ${calorieSummary}`
       : calorieSummary,
-    context: null,
+    context: isAppleHealthDirect(latest) ? APPLE_HEALTH_LABEL : null,
     href: "/progress/activity",
     recordId: latest._canonicalId ?? latest.canonicalId ?? latest.id ?? null,
   });
+}
+
+const APPLE_HEALTH_LABEL = "Apple Health";
+
+// Existing source treatment only: the row's existing secondary line names the
+// source and, for a device daily total, the macros the compact row can hold.
+function isAppleHealthDirect(record) {
+  return /apple health/i.test(String(record?.source?.application ?? "")) &&
+    /^(direct|api|device|integration|wearable)$/i.test(String(record?.source?.modality ?? ""));
+}
+
+function isDeviceDailyTotal(day) {
+  return isAppleHealthDirect(day) && (day.meals?.length ?? 0) === 0;
+}
+
+function formatDeviceNutritionContext(day) {
+  const totals = day.daily_totals ?? {};
+  const macro = (value, letter) => (Number.isFinite(Number(value)) && value !== null ? `${Math.round(Number(value))}${letter}` : null);
+  const macros = [macro(totals.protein_g, "P"), macro(totals.carbs_g, "C"), macro(totals.fat_g, "F")].filter(Boolean);
+  return [macros.length ? macros.join(" · ") : null, APPLE_HEALTH_LABEL].filter(Boolean).join(" · ");
 }
 
 function emptyRow(id, label) {
