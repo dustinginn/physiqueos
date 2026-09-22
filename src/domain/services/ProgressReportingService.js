@@ -166,7 +166,7 @@ function buildPlaceholderReportFromContext({ context, options = {}, streamId }) 
 
   return {
     ...stream,
-    dataSources: getDataSources(streamId),
+    dataSources: withAppleHealthConnection(getDataSources(streamId), streamId === "nutrition" ? scopedContext.nutritionDays : []),
     entries: getPlaceholderEntries(streamId, scopedContext),
     relatedGoals: getStreamRelatedGoals(streamId, context.goals),
     ...getStreamReportExtras(streamId, scopedContext),
@@ -914,7 +914,7 @@ function buildActivityReport(context) {
     tone: latestActivityDay ? "success" : "effort",
     lastUpdated: latestActivityDay?.observed_at ?? null,
     relatedGoals: getStreamRelatedGoals("activity", goals),
-    dataSources: getDataSources("activity"),
+    dataSources: withAppleHealthConnection(getDataSources("activity"), activityDays),
     latestActivityDay: latestActivityDay
       ? createActivityDayRecord(latestActivityDay)
       : null,
@@ -2879,6 +2879,20 @@ function getRegionalMassCharts(scans = []) {
       }))
       .filter((chart) => chart.points.length > 1)
   );
+}
+
+// A graduated HealthKit day is direct Apple Health data, so the stream's Apple
+// Health source is connected, not merely suggested. Only a day that names Apple
+// Health as its direct source flips it; nothing else in the list changes.
+function withAppleHealthConnection(sources, days = []) {
+  const direct = days.some((day) =>
+    /apple health/i.test(String(day?.source?.application ?? "")) &&
+    /^(direct|api|device|integration|wearable)$/i.test(String(day?.source?.modality ?? "")));
+  if (!direct) return sources;
+  const connected = { name: "Apple Health", status: "Connected" };
+  return sources.some((source) => source.name === "Apple Health")
+    ? sources.map((source) => (source.name === "Apple Health" ? connected : source))
+    : [...sources, connected];
 }
 
 function getDataSources(streamId) {

@@ -392,3 +392,30 @@ describe("boundary with strategic storage", () => {
     expect(overlay([], [activityDay()], bothOn(), Purpose.EVIDENCE).objects[0].payload.evidenceEligibility.state).toBe("eligible");
   });
 });
+
+describe("normal Progress reporting of a graduated day", () => {
+  it("shows Apple Health as a connected source for Activity and Nutrition and never a meal count it does not have", async () => {
+    const { createProviderActivityEvidenceReport, createProviderNutritionEvidenceReports } = await import("./ProgressReportingService.js");
+    const objects = overlay([], [activityDay(), nutritionDay()], policyRecord()).objects;
+    const activity = createProviderActivityEvidenceReport({ canonicalEvidenceObjects: objects });
+    expect(activity.dataSources.find((source) => source.name === "Apple Health")).toEqual({ name: "Apple Health", status: "Connected" });
+    expect(activity.latestActivityDay).toMatchObject({ activeCalories: 612, exerciseMinutes: 41, standHours: 11 });
+    expect(activity.latestActivityDay.workoutActiveCalories).toBeNull();
+
+    const { scopedReport } = createProviderNutritionEvidenceReports({ canonicalEvidenceObjects: objects });
+    const day = scopedReport.latestNutritionDay ?? scopedReport.entries?.[0];
+    expect(scopedReport.dataSources.find((source) => source.name === "Apple Health")).toEqual({ name: "Apple Health", status: "Connected" });
+    expect(day).toBeTruthy();
+    expect(day.value).toBe("2140 calories");
+    expect(day.detail).toBe("182g protein · 205g carbs · 68g fat");
+    expect(day.detail).not.toMatch(/meal/i);
+    expect(day.sourceEvidence).toEqual(["Apple Health"]);
+    expect(day.meals).toEqual([]);
+  });
+
+  it("leaves the static source list unchanged for ordinary days", async () => {
+    const { createProviderActivityEvidenceReport } = await import("./ProgressReportingService.js");
+    const activity = createProviderActivityEvidenceReport({ canonicalEvidenceObjects: [screenshotActivity()] });
+    expect(activity.dataSources.find((source) => source.name === "Apple Health")).toEqual({ name: "Apple Health", status: "Suggested" });
+  });
+});
