@@ -16,7 +16,8 @@ describe("PostgresPhotoEventReadStore", () => {
       sessionId: "opaque-session-id",
     });
 
-    expect(pool.query).toHaveBeenCalledTimes(10);
+    // Ten reads plus the single graduation-policy lookup.
+    expect(pool.query).toHaveBeenCalledTimes(11);
     expect(result.canonicalObjects.map((item) => item.id)).toEqual([
       "photo-session", "training-support",
     ]);
@@ -34,7 +35,7 @@ describe("PostgresPhotoEventReadStore", () => {
     expect(Object.keys(result.publicationStore)).not.toContain("protocols");
     expect(diagnostics).toHaveBeenCalledWith(expect.objectContaining({
       readModel: "photo-event",
-      queryCount: 10,
+      queryCount: 11,
       compatibilityRuntimeLoadCount: 0,
       pool: { totalCount: 2, idleCount: 2, waitingCount: 0 },
     }));
@@ -129,6 +130,7 @@ function fakePool() {
       row("protocolVersions", "energy-protocol-v2", { id: "energy-protocol-v2", protocolId: "energy-protocol" }),
     ] };
     if (sql.includes("canonical_briefing_records")) return { rows: [] };
+    if (sql.includes("canonical_training_records") && sql.includes("record_id=$3")) return { rows: [] };
     if (sql.includes("canonical_runtime_metadata")) return { rows: [{
       runtime_version: "founder-seed-v2", revision: 29,
       last_command_id: "prior-command",

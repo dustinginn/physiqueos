@@ -1,5 +1,7 @@
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
+import { createHealthKitGraduationReader } from "./HealthKitGraduationReader.js";
+import { HealthKitGraduationPurpose } from "../../domain/services/HealthKitGraduation.js";
 
 export function createPostgresPhotoEventReadStore({
   pool,
@@ -28,6 +30,13 @@ export function createPostgresPhotoEventReadStore({
         payloadBytes += Buffer.byteLength(JSON.stringify(result.rows));
         return result.rows;
       };
+      const graduation = createHealthKitGraduationReader({
+        query: async (text, values) => {
+          queryCount += 1;
+          return pool.query(text, values);
+        },
+        ownerUserId,
+      });
       const payloads = (rows) => rows.map((row) => Object.freeze({
         ...row.payload,
         version: Number(row.version),
@@ -139,6 +148,13 @@ export function createPostgresPhotoEventReadStore({
         const byCollection = (rows, name) => payloads(rows.filter((row) =>
           row.collection_name === name));
         const canonicalObjects = byCollection(evidenceRows, "canonicalEvidenceObjects");
+        // The V3 evidence universe: complete graduated Activity / Nutrition days
+        // inside the event window join it as ordinary evidence (evidence
+        // eligibility scope only). The plain `canonicalObjects` stay raw.
+        const v3CanonicalObjects = await graduation.overlay(canonicalObjects, {
+          purpose: HealthKitGraduationPurpose.EVIDENCE,
+          dateWindow: { startDate: windowStart, endDate: eventDate },
+        });
         const legacyPhotos = byCollection(evidenceRows, "progressPhotos");
         const dexaScans = byCollection(evidenceRows, "dexaScans");
         // A Goal is handed to the Goal Contract V3 adapter, which derives its
@@ -183,7 +199,7 @@ export function createPostgresPhotoEventReadStore({
             protocols: byCollection(protocolRows, "protocols"),
             protocolVersions: byCollection(protocolRows, "protocolVersions"),
             dailyBriefings: payloads(priorCadenceRows),
-            canonicalEvidenceObjects: canonicalObjects,
+            canonicalEvidenceObjects: v3CanonicalObjects,
             analyses,
           }),
         });

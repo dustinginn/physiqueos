@@ -3,6 +3,7 @@ import { createPostgresProgressEvidenceReadStore } from "./PostgresProgressEvide
 import { createPostgresEvidenceTimelineReadStore } from "./PostgresEvidenceTimelineReadStore.js";
 import { createPostgresCoreNavigationReadStore } from "./PostgresCoreNavigationReadStore.js";
 import { createPostgresProgressHubReadStore } from "./PostgresProgressHubReadStore.js";
+import { createPostgresPhotoEventReadStore } from "./PostgresPhotoEventReadStore.js";
 import {
   HEALTHKIT_GRADUATION_POLICY_RECORD_ID as POLICY_ID,
   HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION as SCHEMA,
@@ -143,5 +144,36 @@ describe("graduation seams: Core Log and operating plan", () => {
     expect(query).toHaveBeenCalledTimes(1);
     expect(result.canonicalEvidenceObjects).toEqual([]);
     expect(query.mock.calls[0][0]).not.toContain("healthKitConfiguration");
+  });
+});
+
+describe("graduation seams: Photo Event V3 evidence universe", () => {
+  const sessionRow = () => ({ rows: [{ record_id: "sess", payload: { canonicalId: "sess", payload: { evidence_type: "photo_session", sessionId: "sess", captureDate: DATE } } }] });
+  function photoPool({ policyRecord = null, days = [] } = {}) {
+    const query = vi.fn(async (text, values = []) => {
+      if (text.includes("payload#>>'{payload,sessionId}'")) return sessionRow();
+      if (text.includes("canonical_evidence_records") && text.includes("occurrence_date")) return { rows: [] };
+      if (text.includes("record_id=$3")) return { rows: policyRecord ? [{ payload: policyRecord, version: 1 }] : [] };
+      if (values[1] === "healthKitCanonicalDays") return { rows: days.map((payload) => ({ payload, version: 1 })) };
+      if (text.includes("canonical_checkin_records") || text.includes("canonical_goal_records") ||
+        text.includes("canonical_execution_records") || text.includes("canonical_confidence_records") ||
+        text.includes("canonical_protocol_records") || text.includes("canonical_briefing_records")) return { rows: [] };
+      if (text.includes("canonical_runtime_metadata")) return { rows: [{ runtime_version: "v", revision: 1, last_command_id: null, updated_at: null, imported_at: null }] };
+      return { rows: [] };
+    });
+    return { query, totalCount: 1, idleCount: 1, waitingCount: 0 };
+  }
+
+  it("adds only a COMPLETE graduated day, inside the event window, to the V3 evidence universe (not the plain canonicalObjects)", async () => {
+    const store = createPostgresPhotoEventReadStore({ pool: photoPool({ policyRecord: policy({ evidenceEligibility: { enabled: true, domains: ["activity", "nutrition"], startLocalDate: DATE, endLocalDate: null } }), days: [hkDay("activity")] }), ownerUserId: OWNER });
+    const result = await store.loadInputs({ userId: OWNER, sessionId: "sess" });
+    expect(result.canonicalObjects.some((object) => object.evidence_type === "activity_day")).toBe(false);
+    expect(result.publicationStore.v3ReadOnlyEvidence.canonicalEvidenceObjects.some((object) => object.payload?.evidence_type === "activity_day" || object.evidence_type === "activity_day")).toBe(true);
+  });
+
+  it("is unchanged when evidence eligibility is off", async () => {
+    const store = createPostgresPhotoEventReadStore({ pool: photoPool({ policyRecord: policy(), days: [hkDay("activity")] }), ownerUserId: OWNER });
+    const result = await store.loadInputs({ userId: OWNER, sessionId: "sess" });
+    expect(result.publicationStore.v3ReadOnlyEvidence.canonicalEvidenceObjects).toEqual(result.canonicalObjects);
   });
 });

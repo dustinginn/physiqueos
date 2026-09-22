@@ -62,9 +62,12 @@ describe("HealthKit strategic read boundary", () => {
   const READER_IMPORTERS = new Set([
     "application/composition/providerBriefingCadenceComposition.js",
     "platform/database/PostgresCoreNavigationReadStore.js",
+    "platform/database/PostgresPhotoEventReadStore.js",
+    "platform/database/PostgresProgressHubReadStore.js",
     "platform/database/PostgresEvidenceTimelineReadStore.js",
     "platform/database/PostgresProgressEvidenceReadStore.js",
     "platform/database/PostgresProgressHubReadStore.js",
+    "platform/database/PostgresPhotoEventReadStore.js",
   ]);
   const importersOf = (needle) => walk(ROOT)
     .map((file) => path.relative(ROOT, file))
@@ -86,9 +89,12 @@ describe("HealthKit strategic read boundary", () => {
     }
   });
 
-  it("uses the strategic (evidence) purpose only where briefings are generated", () => {
+  it("uses the strategic (evidence) purpose only where briefings are generated or the V3 evidence universe is assembled", () => {
     const strategic = importersOf("HealthKitGraduationPurpose.EVIDENCE")
       .filter((relative) => !/^domain\/services\/HealthKitGraduation\.js$|^platform\/database\/HealthKitGraduationReader\.js$|^platform\/operations\/HealthKitGraduationPolicyRunner\.js$/.test(relative));
-    expect(strategic).toEqual(["application/composition/providerBriefingCadenceComposition.js"]);
+    expect(new Set(strategic)).toEqual(new Set([
+      "application/composition/providerBriefingCadenceComposition.js",
+      "platform/database/PostgresPhotoEventReadStore.js",
+    ]));
   });
 });

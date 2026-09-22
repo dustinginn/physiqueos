@@ -43,16 +43,20 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
      * @param canonicalObjects the ordinary canonical evidence array
      * @param purpose projection (UI read models) or evidence (V3 / Energy / briefings)
      * @param domains restrict to the domains this reader consumes
+     * @param dateWindow `{ startDate, endDate }` (inclusive) restricting the days to
+     *   the window a reader actually loaded, so a windowed read never gains a day
+     *   outside its window
      * @param policyRecord a policy record the caller already loaded in its own
      *   query (null when none exists); skips the lookup entirely
      */
-    async overlay(canonicalObjects, { purpose = HealthKitGraduationPurpose.PROJECTION, domains = ["activity", "nutrition"], keepDateOrder = false, policyRecord } = {}) {
+    async overlay(canonicalObjects, { purpose = HealthKitGraduationPurpose.PROJECTION, domains = ["activity", "nutrition"], keepDateOrder = false, dateWindow = null, policyRecord } = {}) {
       try {
         const policy = resolveHealthKitGraduationPolicy(policyRecord === undefined ? await lookup() : policyRecord);
         const scope = purpose === HealthKitGraduationPurpose.EVIDENCE ? policy.evidenceEligibility : policy.projection;
         if (!scope.enabled || !domains.some((domain) => scope.domains.includes(domain))) return canonicalObjects;
         const days = (await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }))
-          .filter((day) => domains.includes(day?.domain));
+          .filter((day) => domains.includes(day?.domain))
+          .filter((day) => !dateWindow || (day.localDate >= dateWindow.startDate && day.localDate <= dateWindow.endDate));
         if (days.length === 0) return canonicalObjects;
         const { objects } = overlayGraduatedHealthKitDays({ canonicalObjects, healthKitDays: days, policy, purpose });
         if (objects === canonicalObjects) return canonicalObjects;
