@@ -51,7 +51,7 @@ struct NutritionDayView: View {
                 header(for: day)
                 summaryCard(day)
                 totalsCard(day.totals)
-                mealsCard(day.meals)
+                mealsCard(day.meals, totals: day.totals)
             }
         }
     }
@@ -91,12 +91,12 @@ struct NutritionDayView: View {
         }
     }
 
-    private func mealsCard(_ meals: [NutritionMealRecord]) -> some View {
+    private func mealsCard(_ meals: [NutritionMealRecord], totals: NutritionMacroTotals) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Meals")
                 if meals.isEmpty {
-                    Text("No meals recorded for this day.")
+                    Text(NutritionDayView.emptyMealsCopy(totals: totals))
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 } else {
@@ -108,6 +108,16 @@ struct NutritionDayView: View {
                 }
             }
         }
+    }
+}
+
+extension NutritionDayView {
+    /// A day with daily totals and no meal objects (an Apple Health daily total)
+    /// is complete and valid; it is described as totals-only, never as missing.
+    static func emptyMealsCopy(totals: NutritionMacroTotals) -> String {
+        totals.calories != nil
+            ? "Daily totals only. No meal detail for this day."
+            : "No meals recorded for this day."
     }
 }
 

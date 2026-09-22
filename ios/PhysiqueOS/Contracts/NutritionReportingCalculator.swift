@@ -365,7 +365,10 @@ enum NutritionReportingCalculator {
 
     static func mealsReport(days: [NutritionDayRecord], macroMixSlot: NutritionMealSlotFilter, trendSlot: NutritionMealSlotFilter, trendMetric: NutritionMealTrendMetric) -> NutritionMealsReport {
         let meals = allMeals(days: days)
-        let mealCountsPerDay = days.map { Double($0.meals.count) }
+        // A day that carries daily totals but no meal objects (an Apple Health daily
+        // total, for example) is a valid day without meal detail, not a day on which
+        // zero meals were eaten, so it does not lower the per-day meal average.
+        let mealCountsPerDay = days.filter { !$0.meals.isEmpty }.map { Double($0.meals.count) }
         let averageMealsPerDay = mealCountsPerDay.isEmpty ? nil : mealCountsPerDay.reduce(0, +) / Double(mealCountsPerDay.count)
         let bySlotCount = Dictionary(grouping: meals) { $0.meal.slot }.mapValues(\.count)
         let mostCommonSlot = bySlotCount.max { $0.value < $1.value }?.key

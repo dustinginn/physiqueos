@@ -176,4 +176,29 @@ final class NutritionReadModelTests: XCTestCase {
         let day = try await api.fetchNutritionDay(dayId: "context")
         XCTAssertNil(day)
     }
+
+    // MARK: - Apple Health daily total with no meal objects
+
+    func testAppleHealthDailyTotalWithZeroMealsDecodesAsAValidDay() throws {
+        let json = """
+        {
+          "id": "healthkit_canonical_day_nutrition_2026-09-21",
+          "date": "2026-09-21",
+          "value": "2140 calories",
+          "detail": "182g protein · 205g carbs · 68g fat",
+          "sourceEvidence": ["Apple Health"],
+          "totals": { "calories": 2140, "protein_g": 182, "carbs_g": 205, "fat_g": 68 },
+          "meals": []
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let day = try decoder.decode(NutritionDayRecord.self, from: Data(json.utf8))
+        XCTAssertEqual(day.sourceEvidence, ["Apple Health"])
+        XCTAssertEqual(day.totals.calories, 2140)
+        XCTAssertTrue(day.meals.isEmpty)
+        XCTAssertFalse(day.detail.contains("meal"))
+        XCTAssertEqual(NutritionDayView.emptyMealsCopy(totals: day.totals), "Daily totals only. No meal detail for this day.")
+        XCTAssertEqual(day.destination, .nutritionDay(dayId: "healthkit_canonical_day_nutrition_2026-09-21"))
+    }
 }

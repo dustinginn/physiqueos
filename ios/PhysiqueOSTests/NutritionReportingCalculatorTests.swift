@@ -241,4 +241,39 @@ final class NutritionReportingCalculatorTests: XCTestCase {
         let landing = try await api.fetchNutritionLanding()
         XCTAssertTrue(landing.nutritionAreas.allSatisfy { $0.destination == nil })
     }
+
+    // MARK: - Zero-meal daily totals (Apple Health)
+
+    func testAverageMealsPerLoggedDayIgnoresDaysThatCarryTotalsButNoMealDetail() {
+        let breakfast = meal("m1", slot: .breakfast, calories: 500, protein: 30, carbs: 50, fat: 15, foodNames: ["Oats"])
+        let lunch = meal("m2", slot: .lunch, calories: 700, protein: 45, carbs: 60, fat: 20, foodNames: ["Rice"])
+        let days = [
+            day("detailed", "2026-09-19", calories: 2100, protein: 150, carbs: 200, fat: 70, meals: [breakfast, lunch]),
+            day("healthkit", "2026-09-21", calories: 2140, protein: 182, carbs: 205, fat: 68, meals: []),
+        ]
+        let report = NutritionReportingCalculator.mealsReport(days: days, macroMixSlot: .all, trendSlot: .all, trendMetric: .mealCount)
+        let average = report.periodSummary.first { $0.label == "Average Meals per Logged Day" }
+        XCTAssertEqual(average?.value, "2.0")
+        // Both days are still logged days; the totals-only day is not dropped.
+        XCTAssertEqual(report.periodSummary.first { $0.label == "Logged Days" }?.value, "2 days")
+    }
+
+    func testTotalsOnlyDaysStillFeedTheCalorieAndMacroReports() {
+        let days = [day("healthkit", "2026-09-21", calories: 2140, protein: 182, carbs: 205, fat: 68, meals: [])]
+        let calories = NutritionReportingCalculator.caloriesReport(days: days)
+        XCTAssertFalse(calories.periodSummary.isEmpty)
+        XCTAssertNotNil(NutritionReportingCalculator.macrosReport(days: days, selectedMacro: .protein))
+    }
+
+    func testAMealsOnlyPeriodWithNoMealDetailStaysPendingNotZero() {
+        let days = [day("healthkit", "2026-09-21", calories: 2140, protein: 182, carbs: 205, fat: 68, meals: [])]
+        let report = NutritionReportingCalculator.mealsReport(days: days, macroMixSlot: .all, trendSlot: .all, trendMetric: .mealCount)
+        XCTAssertEqual(report.periodSummary.first { $0.label == "Average Meals per Logged Day" }?.value, "Pending")
+    }
+
+    func testTotalsOnlyDayIsDescribedAsTotalsOnlyNeverAsMissing() {
+        let totals = NutritionMacroTotals(calories: 2140, proteinG: 182, carbsG: 205, fatG: 68, fiberG: nil)
+        XCTAssertEqual(NutritionDayView.emptyMealsCopy(totals: totals), "Daily totals only. No meal detail for this day.")
+        XCTAssertEqual(NutritionDayView.emptyMealsCopy(totals: NutritionMacroTotals(calories: nil, proteinG: nil, carbsG: nil, fatG: nil, fiberG: nil)), "No meals recorded for this day.")
+    }
 }
