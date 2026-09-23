@@ -575,6 +575,27 @@ final class HealthKitAutomaticWorkoutFloorEngineTests: XCTestCase {
         XCTAssertEqual(uploadedAfterLateCallback, 1, "The late first query must never stage or upload.")
     }
 
+    func testSameScopeSynchronizationCannotOverlapWhileUploadIsStillRunning() async throws {
+        let harness = AutomaticWorkoutEngineHarness(
+            floor: HealthKitWorkoutActivationFloor(calendar: Self.calendar),
+            additions: [Self.workout(start: (23, 10, 0), end: (23, 11, 0))]
+        )
+        await harness.uploader.setDelayNanoseconds(80_000_000)
+
+        async let first: Void = harness.engine.synchronize(scope: harness.scope)
+        try? await Task.sleep(for: .milliseconds(10))
+        do {
+            try await harness.engine.synchronize(scope: harness.scope)
+            XCTFail("A timed-out caller must not overlap the still-running exact scope.")
+        } catch let error as HealthKitSyncError {
+            XCTAssertEqual(error, .operational(code: "healthkit_sync_in_progress"))
+        }
+        try await first
+
+        let uploads = await harness.uploader.partitions()
+        XCTAssertEqual(uploads.count, 1)
+    }
+
     // MARK: fixtures
 
     private static func workout(start: (day: Int, hour: Int, minute: Int), end: (day: Int, hour: Int, minute: Int)) -> HealthKitQueryAddition {
@@ -657,13 +678,16 @@ private final class AutomaticWorkoutObserverMock: HealthKitObserverClient, @unch
 
 private actor AutomaticWorkoutUploaderMock: HealthKitObservationUploader {
     private var received: [HealthKitStagedPartition] = []
+    private var delayNanoseconds: UInt64 = 0
 
     func upload(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult {
+        if delayNanoseconds > 0 { try? await Task.sleep(nanoseconds: delayNanoseconds) }
         received.append(partition)
         return .durablyAccepted(batchID: partition.identity, receiptIdentity: "receipt")
     }
 
     func partitions() -> [HealthKitStagedPartition] { received }
+    func setDelayNanoseconds(_ value: UInt64) { delayNanoseconds = value }
 }
 
 private final class AutomaticWorkoutEngineHarness {

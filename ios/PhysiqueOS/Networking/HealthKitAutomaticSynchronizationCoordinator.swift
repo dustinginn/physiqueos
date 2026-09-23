@@ -245,7 +245,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     ) async -> HealthKitAutomaticStepOutcome {
         await withCheckedContinuation { continuation in
             let gate = HealthKitAutomaticStepGate(continuation: continuation)
-            Task {
+            let operationTask = Task {
                 do {
                     try await operation()
                     gate.resolve(.succeeded)
@@ -258,7 +258,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             Task {
                 do { try await Task.sleep(for: stepTimeout) }
                 catch { return }
-                gate.resolve(.timedOut)
+                if gate.resolve(.timedOut) { operationTask.cancel() }
             }
         }
     }
@@ -281,12 +281,14 @@ private final class HealthKitAutomaticStepGate: @unchecked Sendable {
         self.continuation = continuation
     }
 
-    func resolve(_ outcome: HealthKitAutomaticStepOutcome) {
+    @discardableResult
+    func resolve(_ outcome: HealthKitAutomaticStepOutcome) -> Bool {
         lock.lock()
         let current = continuation
         continuation = nil
         lock.unlock()
         current?.resume(returning: outcome)
+        return current != nil
     }
 }
 

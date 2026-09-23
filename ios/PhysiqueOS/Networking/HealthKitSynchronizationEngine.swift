@@ -16,6 +16,12 @@ actor HealthKitSynchronizationEngine {
     /// the canary's. The explicit canary paths below never consult it.
     private let workoutActivationFloor: HealthKitWorkoutActivationFloor?
     private var registrations: [HealthKitCursorScope: HealthKitObserverRegistration] = [:]
+    /// Actor reentrancy means a second call can enter while the first is
+    /// awaiting HealthKit or the network. Keep both query/stage work and
+    /// delivery single-flight per exact cursor scope so an outer timeout can
+    /// never turn into concurrent cursor or partition mutation.
+    private var activeSynchronizations: Set<HealthKitCursorScope> = []
+    private var activeDeliveries: Set<HealthKitCursorScope> = []
 
     init(
         queryClient: any HealthKitAnchoredQueryClient,
@@ -103,6 +109,11 @@ actor HealthKitSynchronizationEngine {
         stagingCompletion: (@Sendable () -> Void)? = nil
     ) async throws {
         guard featureGate.allows(.observationQuery) else { throw HealthKitSyncError.featureDisabled }
+        guard activeSynchronizations.insert(scope).inserted else {
+            throw HealthKitSyncError.operational(code: "healthkit_sync_in_progress")
+        }
+        defer { activeSynchronizations.remove(scope) }
+        try Task.checkCancellation()
         let pending = try await store.pendingBatches(for: scope)
         if !pending.isEmpty {
             stagingCompletion?()
@@ -122,6 +133,7 @@ actor HealthKitSynchronizationEngine {
             cursor = nil
             raw = try await executeBoundedQuery(stream: scope.stream, after: nil, bounds: nil)
         }
+        try Task.checkCancellation()
         let result = applyWorkoutActivationFloor(to: raw, scope: scope)
         try await store.recordSuccessfulQuery(for: scope, at: result.completedAt)
         let batch = try batchBuilder.build(
@@ -132,6 +144,7 @@ actor HealthKitSynchronizationEngine {
         )
         try await store.stage(batch)
         stagingCompletion?()
+        try Task.checkCancellation()
         if featureGate.allows(.serverUpload) { try await deliverPending(scope: scope) }
     }
 
@@ -414,6 +427,7 @@ actor HealthKitSynchronizationEngine {
     /// never reruns an anchored query while a batch is unresolved.
     func resumePending(scope: HealthKitCursorScope) async throws {
         guard featureGate.allows(.serverUpload) else { throw HealthKitSyncError.featureDisabled }
+        try Task.checkCancellation()
         try await deliverPending(scope: scope)
     }
 
@@ -441,9 +455,15 @@ actor HealthKitSynchronizationEngine {
     /// the first time this scope is synchronized after updating, with no
     /// migration step and no reinstall.
     private func deliverPending(scope: HealthKitCursorScope) async throws {
+        guard activeDeliveries.insert(scope).inserted else {
+            throw HealthKitSyncError.operational(code: "healthkit_delivery_in_progress")
+        }
+        defer { activeDeliveries.remove(scope) }
+        try Task.checkCancellation()
         let batches = try await store.pendingBatches(for: scope)
         for batch in batches.sorted(by: { $0.createdAt < $1.createdAt }) {
             for partition in batch.partitions.sorted(by: { $0.index < $1.index }) {
+                try Task.checkCancellation()
                 guard case .serverRequired = partition.disposition else { continue }
                 if partition.attemptState.permitsCursorAdvance { continue }
                 if case let .rejected(code) = partition.attemptState {
@@ -456,7 +476,9 @@ actor HealthKitSynchronizationEngine {
                     partitionID: partition.identity,
                     at: attemptAt
                 )
-                switch await uploader.upload(partition) {
+                let uploadResult = await uploader.upload(partition)
+                try Task.checkCancellation()
+                switch uploadResult {
                 case let .durablyAccepted(acknowledgedBatchID, receiptIdentity):
                     try await store.acknowledge(
                         batchID: batch.identity,
