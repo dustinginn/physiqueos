@@ -159,8 +159,9 @@ export function assessHealthKitStrengthLinkCandidates({
           : assessment.reasons,
       // Confident needs a real overlap AND at least one boundary that agrees
       // within the existing tolerance (start with start, or end with end).
-      qualified: explicit || (deterministicLoggerWindow && facts.endAligned) ||
-        (assessment.outcome === "duplicate" && facts.substantiveOverlap && (facts.startAligned || facts.endAligned)),
+      qualified: explicit || (deterministicLoggerWindow
+        ? facts.endAligned
+        : assessment.outcome === "duplicate" && facts.substantiveOverlap && (facts.startAligned || facts.endAligned)),
       overlapSeconds: explicit ? null : Math.round(facts.overlapMs / 1000),
       startAligned: explicit ? null : facts.startAligned,
       endAligned: explicit ? null : facts.endAligned,

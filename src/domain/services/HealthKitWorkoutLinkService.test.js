@@ -88,6 +88,16 @@ describe("strength link matcher", () => {
     expect(assess(morningWorkout, [morningSession])).toMatchObject({ outcome: Outcome.POSSIBLE });
     expect(assess(morningWorkout, [morningSession], new Map([["morning-logger", "not-an-instant"]])))
       .toMatchObject({ outcome: Outcome.POSSIBLE });
+
+    const alignedSession = liveLogger("aligned-logger", "2026-09-23T10:04:00Z", "2026-09-23T12:00:00.000Z");
+    alignedSession.payload.metadata.duration_seconds = 7220;
+    for (const commitTimestamp of [null, "not-an-instant", "2026-09-23T09:00:00Z", "2026-09-23T13:00:00Z"]) {
+      const timestamps = commitTimestamp === null ? new Map() : new Map([["aligned-logger", commitTimestamp]]);
+      expect(assess(morningWorkout, [alignedSession], timestamps)).toMatchObject({
+        outcome: Outcome.POSSIBLE,
+        candidates: [{ basis: "logger_session_window", endAligned: false }],
+      });
+    }
   });
 
   it("does not call the Logger-window rule confident when same-day uniqueness is absent", () => {
