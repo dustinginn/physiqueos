@@ -124,7 +124,18 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
-  throw new Error("--kind must be policy, graduation, audit, workout-audit, or link-confirm.");
+  if (kind === "training-audit") {
+    if (!DATE.test(start)) throw new Error("--start must be the YYYY-MM-DD local date to audit.");
+    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_TRAINING_AUDIT_SUCCESS_${suffix}`;
+    const result = await build({
+      entryPoints: [path.join(root, "scripts/operations/healthKitTrainingReconciliationAudit.entry.mjs")],
+      bundle: true, write: false, format: "esm", platform: "node", target: "node22", legalComments: "none", minify: true,
+      external: ["pg"],
+      define: { __EXPECTED_GIT_SHA__: JSON.stringify(sha), __START__: JSON.stringify(start), __MARKER__: JSON.stringify(successMarker) },
+    });
+    return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
+  }
+  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, or training-audit.");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
