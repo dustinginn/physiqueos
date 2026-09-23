@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T04:20:00Z",
+  "generated_at_utc": "2026-09-23T04:45:00Z",
   "task": {
-    "id": "healthkit-sep22-workout-canary-activation-20260923",
-    "title": "Activate and audit Sep 22 Workout canary",
-    "status": "completed"
+    "id": "healthkit-strength-link-confirmation-hardening-20260923",
+    "title": "Harden and confirm Sep 22 Strength Workout link",
+    "status": "ready"
   },
   "target": {
     "agent": "claude",
@@ -18,7 +18,7 @@
     "expected_production_deployment": "d4754b09-ff14-4c1f-ab9b-8d4ea5814d85",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260923T042000Z-healthkit-sep22-workout-canary-activation-20260923.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260923T044500Z-healthkit-strength-link-confirmation-hardening-20260923.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
@@ -29,12 +29,5 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
-  },
-  "lifecycle": {
-    "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-23T04:12:59Z",
-    "completed_at_utc": "2026-09-23T04:30:40Z",
-    "completion_status": "completed",
-    "completion_handoff_path": "agent-handoffs/reports/20260923T043023Z-healthkit-sep22-workout-canary-accepted.md"
   }
 }
