@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T03:42:14Z",
+  "generated_at_utc": "2026-09-23T04:05:37Z",
   "task": {
-    "id": "healthkit-evidence-summary-formatting-cleanup-20260923",
-    "title": "Finish HealthKit Evidence summary formatting",
+    "id": "healthkit-formatting-deploy-workout-readiness-20260923",
+    "title": "Deploy HealthKit formatting fix and audit Workout canary readiness",
     "agent": "claude",
     "status": "completed"
   },
@@ -11,51 +11,51 @@
   "authority": {
     "base_sha": "ccff693b61c98737b670be620f7916c375cb37ce",
     "final_sha": "4b362591cb5f80c599f8f45eb7f392de7c44a36f",
-    "production_server_sha": "ccff693b61c98737b670be620f7916c375cb37ce",
-    "production_deployment": "0bdc1748-d918-452f-a84a-52a9bfdc5373",
+    "production_server_sha": "4b362591cb5f80c599f8f45eb7f392de7c44a36f",
+    "production_deployment": "d4754b09-ff14-4c1f-ab9b-8d4ea5814d85",
     "native_sha": "1c57556f",
     "native_build": 53
   },
   "result": {
-    "summary": "The residual raw-double leak on the Activity/Nutrition Evidence headline, subheadline, Activity Areas, protocol-support/trend, Web hub metric, and Evidence-timeline strings is fixed -- but it was never a Native defect: those strings are built server-side and decoded verbatim, so the fix is Server code (3 commits, final 4b362591, one shared whole-number helper mirroring the Native cards). Two adversarial review passes; all three findings fixed and re-verified; final re-audit clean in scope. No Native change, so no Build 54 is needed for this. Not deployed (code/test/review only): it takes effect on the next Server deploy, which needs the Founder's go-ahead.",
+    "summary": "Part 1: the reviewed Evidence formatting fix (4b362591) is deployed with the Founder's chat authorization -- fast-forward push, apps update --spec (only PHYSIQUEOS_GIT_SHA/BUILD_ID changed), force-rebuild after the update reused the old commit. Deployment d4754b09 ACTIVE, source_commit_hash 4b362591, health 200/200, runtime label corrected on web+worker (it had been stale at 924d5e55 since the previous deploy -- found and fixed here). Zero-write proven: Sep 22 canonical acceptance audit before/after shows identical policy, canonical-day revisions, observation states, strategic counts, all 26 strategic digests and migration count. Part 2: read-only Workout canary readiness for Sep 22 is GREEN -- code audit passes every flag with file:line evidence, and the production Workout audit shows policy OFF, 0 workout observations, 0 canonical workouts/links/claims, 1 Logger strength session, 0 ambiguous auto-links, 0 strategic leakage. Nothing activated; Founder not asked to sync. Exact bounded policy values, dry-run/zero-write checks, Founder action and post-sync audit are specified, not executed.",
     "success": true,
-    "production_mutated": false,
-    "deployed": false,
+    "production_mutated": true,
+    "deployed": true,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server: new HealthKitEvidenceSummaryFormatting.test.js 9/9 driving the real exported builders with the Founder's exact reported values plus the reviewer's .5-tie vectors; phase3 282/283 (the one failure is the pre-existing gitignored private/founder/runtime-store.json fixture, present before any change), foundation 38/38, phase2 97/97, phase4 137/137; eslint clean. Mutation-tested three times (each hunk reverted in isolation fails exactly its own tests, reproducing the reported strings; restores byte-identical). Native untouched at 1c57556f: unit 1289/1289; UI target 12/12 across two runs -- one environmental flake on an untouched Training journey (testReportingJourneys, 809 s full run) passed in 44.5 s re-run in isolation, disclosed in the report."
+      "summary": "Minimal deploy revalidation at 4b362591 before acting: formatting regression tests 9/9, phase3 282/283 (the one failure is the pre-existing gitignored private/founder/runtime-store.json fixture), worktree clean; candidate confirmed to be exactly the three independently reviewed commits with no drift and no db/migration files. No Native change; Native untouched at 1c57556f."
     },
     "review": {
       "status": "approved",
-      "summary": "Fresh-context adversarial review (isolated worktree) of 44edddb7 verified guarding, rounding parity with Swift, behavior preservation, real test path, hygiene, and found two in-scope misses (formatActivityProtocolSupport feeding the headline card's protocolStatus/report trend/hub trend; formatActivityHubMetric feeding the Web hub) -- fixed in d2aa86e0 with tests. Delta verification confirmed both and caught one last real 1-off (difference-rounding not tie-safe vs the cards) -- fixed in 4b362591 exactly as prescribed, with the reviewer's tie vectors as tests. Final re-audit: no remaining raw HealthKit-double interpolation on any Activity/Nutrition Evidence surface, Native or Web; only the task-excluded Training sites remain."
+      "summary": "Deployed candidate carries the two adversarial review passes from the prior task (all findings fixed, final re-audit clean). Part 2 used a fresh-context read-only code audit in an isolated worktree (Server at ccff693b, Native at 1c57556f), every claim cited file:line; overall GREEN with one operational precondition: activate the Sep 22 workout policy BEFORE the Founder taps the control, or the day's workouts are stored raw and never reconsidered."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "No production mutation: nothing deployed, no archive/upload, no canary, no manual Sync, Workout activation untouched. Authority reverified before acting (deployment 0bdc1748 ACTIVE on ccff693b via its own source_commit_hash; Native 1c57556f clean). All work on a fresh branch from the deployed commit; only the branch and the handoff files were pushed."
+      "summary": "Before/after Sep 22 canonical acceptance audits (REPEATABLE READ READ ONLY, explicit ROLLBACK, --no-values): policy, canonical-day revisions (activity 16, nutrition 2), observation-state histogram, strategic counts (all 0), all 26 strategic digests and migrations (14) identical. Workout audit under the true SHA: policy OFF, 0 observations, 0 canonical workouts, 0 links, 0 claims, oneToOneIntegrity all zero, ambiguousAutoLinked 0, 1 Logger strength session. No HealthKit data mutated to test formatting. No schema change. Workout policy not activated. Spec secrets are DigitalOcean-encrypted values and were never written into any handoff."
     }
   },
   "decisions_required": [
-    "Founder: authorize the Server deploy of claude/healthkit-evidence-summary-formatting-cleanup (final SHA 4b362591) -- the fix is code/test/review complete but takes effect only when deployed; until then the device keeps showing the raw strings on those surfaces. No Native build is needed for it.",
-    "Task framing correction to carry forward: this class of defect (Evidence summary strings) is Server read-model formatting, not Native; the Native cards were already correct.",
-    "Backlog annotation: the task-excluded Training sites (formatTrainingRecordValue, EvidenceTimelineService.formatTrainingDetail, trainingOverview Active Calories) interpolate HealthKit HKWorkout doubles too, not just manual Training data."
+    "Founder: when convenient, open the Activity and Nutrition Evidence Reports on Build 53 and confirm the headline/subheadline/Activity Areas strings now match the cards (e.g. '2406 calories', '782 active cal / 42 min'). No reinstall needed; it is a Server change.",
+    "Founder/agent: authorize the next slice -- exact-date Sep 22 Workout canary activation (policy-kind workout, effective 2026-09-22, end 2026-09-22, quarantined, no backfill, no auto-confirm) with the dry-run/zero-write sequence in the report, followed by the single 'Sync workouts for this day' tap. Activation must precede the tap.",
+    "Process: future Server deploys must include the apps update --spec step that bumps PHYSIQUEOS_GIT_SHA/BUILD_ID; a force-rebuild alone leaves the runtime label stale and the audit identity gate refusing."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Root cause location contradicted the task framing: server-side, not Native. No Build 54 needed.",
-    "Independent review found three real gaps in my first pass (two missed in-scope builders, one tie-rounding 1-off); all fixed before completion.",
-    "One environmental UI-test flake on an untouched Training journey during the long full-target run; green in isolation."
+    "The previous deploy (0bdc1748, ccff693b) had left PHYSIQUEOS_GIT_SHA/BUILD_ID at 924d5e55, so production self-identified as the wrong commit and the zero-write audits' RUNTIME_SHA_MISMATCH gate refused under the true SHA. Corrected by this deploy; the gate was not bypassed.",
+    "The 'env-only spec update reuses the old commit' gotcha reproduced exactly (deployment 6c997fe9 built ccff693b); force-rebuild d4754b09 superseded it with 4b362591.",
+    "Build 53 emits no sourceRevision for workouts, so a re-query producing different aggregates for the same HKWorkout UUID is refused (409) rather than applied -- fail-closed, not blocking the canary."
   ],
   "backlog": [
-    "Deploy 4b362591 (Founder go-ahead), then Founder real-device check of Activity/Nutrition Evidence headlines vs cards.",
-    "Training raw-double sites (HealthKit HKWorkout doubles): formatTrainingRecordValue, formatTrainingDetail, trainingOverview Active Calories -- excluded here by task scope.",
-    "Native non-HealthKit raw-double sites from the prior handoff (Training exercise history, Training Logger reps/load field, photo-scanned nutrition prefill) -- separate spawned task.",
-    "Consider a shared Web/Server formatting note so future Evidence strings use HealthKitEvidenceNumberFormatting rather than raw interpolation."
+    "Sep 22 Workout canary activation + single tap + post-sync audit (next authorized slice; fully specified in the report).",
+    "Add the spec env bump to the documented deploy checklist so the runtime label cannot drift again.",
+    "Workout sourceRevision on Native so revised HKWorkout aggregates can be applied rather than refused (post-canary).",
+    "Training raw-double sites (HealthKit HKWorkout doubles) and Native non-HealthKit raw-double sites -- unchanged, on the existing backlog."
   ],
-  "recommended_next_step": "Founder: approve deploying claude/healthkit-evidence-summary-formatting-cleanup (4b362591); after deploy, open the Activity and Nutrition Evidence Reports and confirm the headline/subheadline/Areas strings now match the cards (e.g. '2406 calories', '782 active cal / 42 min').",
-  "full_report_path": "agent-handoffs/reports/20260923T034214Z-healthkit-evidence-summary-formatting-cleanup-fixed.md",
+  "recommended_next_step": "Founder: visually confirm the Evidence headlines on Build 53, then authorize the Sep 22 Workout canary activation slice (activate policy for exactly 2026-09-22 via dry-run then apply, re-audit, then tap 'Sync workouts for this day' once).",
+  "full_report_path": "agent-handoffs/reports/20260923T040537Z-healthkit-formatting-deployed-workout-readiness-green.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
