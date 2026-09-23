@@ -41,7 +41,12 @@ export function summarizeHealthKitWorkoutCanary({
   const loggerSessionsInWindow = canonicalEvidenceObjects.filter((record) =>
     isActiveDetailedStrengthSession(record) && inWindow(String((record.payload ?? record).observed_at ?? "").slice(0, 10)));
   const perWorkout = workouts.map((workout) => {
-    const live = assessHealthKitStrengthLinkCandidates({ canonicalWorkout: workout, canonicalObjects: canonicalEvidenceObjects, existingLinks: links });
+    const live = assessHealthKitStrengthLinkCandidates({
+      canonicalWorkout: workout,
+      canonicalObjects: canonicalEvidenceObjects,
+      existingLinks: links,
+      canonicalWorkouts: workouts,
+    });
     const own = links.filter((link) => link.canonicalWorkoutId === workout.id);
     return {
       canonicalWorkout: hash(workout.id),

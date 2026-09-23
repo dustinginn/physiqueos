@@ -277,6 +277,35 @@ describe("TrainingLoggerAppleHealthService", () => {
       duration_seconds: 4500,
     });
   });
+
+  it("uses the immutable commit instant when an older live client omits finishedAt", () => {
+    const capturedAt = "2026-09-23T14:56:31.000Z";
+    const live = buildTrainingLoggerEvidencePackage({
+      draft: {
+        ...draft({
+          normalizedEvidence: [],
+          selectedStrengthSourceId: null,
+          continueWithoutStrength: true,
+          additionalEvidenceActions: [],
+          finalized: true,
+        }),
+        mode: "live",
+        startedAt: "2026-09-23T13:53:26.000Z",
+      },
+      capturedAt,
+      userId: "user_1",
+    });
+
+    expect(live.evidence_objects[0]).toMatchObject({
+      captured_at: capturedAt,
+      metadata: {
+        start_time: "2026-09-23T13:53:26.000Z",
+        end_time: capturedAt,
+        duration_seconds: 3785,
+      },
+      quality: { limitations: [] },
+    });
+  });
 });
 
 function appleWorkout(id, activityType, metadata = {}) {

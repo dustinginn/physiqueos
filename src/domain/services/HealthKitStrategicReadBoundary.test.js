@@ -29,6 +29,8 @@ const ALLOWED = new Set([
   "platform/operations/HealthKitWorkoutCanaryAudit.js",
   // Guarded, explicitly authorized link confirmation: the only production caller of the relationship service.
   "platform/operations/HealthKitWorkoutLinkConfirmationRunner.js",
+  // Guarded, candidate-only reassessment of one already-canonical workout.
+  "platform/operations/HealthKitWorkoutLinkReassessmentRunner.js",
 ]);
 const NEEDLES = [
   "healthKitCanonicalDays", "healthKitObservations", "HEALTHKIT_CANONICAL_DAY_COLLECTION",

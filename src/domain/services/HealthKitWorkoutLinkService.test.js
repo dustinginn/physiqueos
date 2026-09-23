@@ -41,6 +41,63 @@ describe("strength link matcher", () => {
     expect(result.candidates[0].confidence).toBeLessThan(80);
   });
 
+  it("matches the real Logger-only shape by its unique session window and commit-time end fallback", () => {
+    const hk = canonical({
+      startedAt: "2026-09-23T13:47:54Z",
+      endedAt: "2026-09-23T14:57:12Z",
+      durationSeconds: 4158,
+    });
+    const session = liveLogger("sep23-logger", "2026-09-23T13:53:26Z", "2026-09-23T14:56:31Z");
+
+    const result = assess(hk, [session]);
+
+    expect(result).toMatchObject({
+      outcome: Outcome.CONFIDENT,
+      reason: "single_overlapping_session",
+      candidates: [{
+        loggerSessionCanonicalId: "sep23-logger",
+        confidence: 95,
+        basis: "logger_session_window",
+        endAligned: true,
+      }],
+    });
+    expect(session.payload.metadata.end_time).toBeUndefined();
+    expect(session.payload.metadata.duration_seconds).toBeUndefined();
+  });
+
+  it("does not call the Logger-window rule confident when same-day uniqueness is absent", () => {
+    const hk = canonical({ startedAt: "2026-09-23T13:47:54Z", endedAt: "2026-09-23T14:57:12Z" });
+    const secondWorkout = canonical({
+      externalId: "second-strength",
+      startedAt: "2026-09-23T18:00:00Z",
+      endedAt: "2026-09-23T19:00:00Z",
+    });
+    const session = liveLogger("sep23-logger", "2026-09-23T13:53:26Z", "2026-09-23T14:56:31Z");
+    const result = assessHealthKitStrengthLinkCandidates({
+      canonicalWorkout: hk,
+      canonicalObjects: [session],
+      existingLinks: [],
+      canonicalWorkouts: [hk, secondWorkout],
+    });
+    expect(result.outcome).not.toBe(Outcome.CONFIDENT);
+    expect(result.candidates[0]?.basis).not.toBe("logger_session_window");
+  });
+
+  it("keeps the Logger-window rule off when the caller omits the workout universe", () => {
+    const hk = canonical({
+      startedAt: "2026-09-23T13:47:54Z",
+      endedAt: "2026-09-23T14:57:12Z",
+      durationSeconds: 4158,
+    });
+    const result = assessHealthKitStrengthLinkCandidates({
+      canonicalWorkout: hk,
+      canonicalObjects: [liveLogger("sep23-logger", "2026-09-23T13:53:26Z", "2026-09-23T14:56:31Z")],
+      existingLinks: [],
+    });
+    expect(result.outcome).not.toBe(Outcome.CONFIDENT);
+    expect(result.candidates[0]?.basis).not.toBe("logger_session_window");
+  });
+
   it("returns no match for a different time of day, a different date, or no strength session at all", () => {
     expect(assess(hkStrength(), [logger("late", "16:00", "17:00")]).outcome).toBe(Outcome.NONE);
     expect(assess(hkStrength(), [logger("other-day", "10:00", "11:00", 3600, "2026-09-22")]).outcome).toBe(Outcome.NONE);
@@ -182,7 +239,12 @@ describe("cardio coexistence (no double counting against existing Evidence worko
 });
 
 function assess(canonicalWorkout, canonicalObjects) {
-  return assessHealthKitStrengthLinkCandidates({ canonicalWorkout, canonicalObjects, existingLinks: [] });
+  return assessHealthKitStrengthLinkCandidates({
+    canonicalWorkout,
+    canonicalObjects,
+    existingLinks: [],
+    canonicalWorkouts: [canonicalWorkout],
+  });
 }
 
 function hkStrength() {
@@ -224,6 +286,28 @@ function logger(id, start, end, duration = 3540, date = "2026-09-23", exercises 
         duration_seconds: duration,
       },
       exercises,
+    },
+  };
+}
+
+function liveLogger(id, startedAt, capturedAt) {
+  return {
+    canonicalId: id,
+    version: 1,
+    quality: { status: "active" },
+    payload: {
+      id,
+      evidence_type: "training",
+      observed_at: "2026-09-23",
+      captured_at: capturedAt,
+      source: { application: "Training Logger", modality: "manual" },
+      metadata: {
+        activity_type: "Traditional Strength Training",
+        logger_origin: "training_logger",
+        logger_mode: "live",
+        start_time: startedAt,
+      },
+      exercises: [{ name: "Bench Press", sets: [{ reps: 8, weight: 185 }] }],
     },
   };
 }

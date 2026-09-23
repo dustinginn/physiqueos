@@ -776,7 +776,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       const isPrimary = primary.id === workout.id;
       let patch;
       if (workout.current.family === HealthKitWorkoutFamily.STRENGTH) {
-        const assessment = assessHealthKitStrengthLinkCandidates({ canonicalWorkout: workout, canonicalObjects, existingLinks: workoutLinks });
+        const assessment = assessHealthKitStrengthLinkCandidates({
+          canonicalWorkout: workout,
+          canonicalObjects,
+          existingLinks: workoutLinks,
+          canonicalWorkouts: inWindow,
+        });
         const single = [HealthKitStrengthMatchOutcome.CONFIDENT, HealthKitStrengthMatchOutcome.POSSIBLE].includes(assessment.outcome);
         const session = single ? assessment.candidates[0].loggerSessionCanonicalId : null;
         const heldByAnother = single && workoutLinks.some((link) =>
@@ -2129,6 +2134,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       },
       sourcePackage: supportingReview?.interpretedEvidence ?? null,
       userId: context.ownerUserId,
+      capturedAt,
     });
     return {
       supportingReview,

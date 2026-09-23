@@ -90,6 +90,7 @@ export function buildTrainingLoggerEvidencePackage({
   draft,
   sourcePackage = null,
   userId,
+  capturedAt = new Date().toISOString(),
 } = {}) {
   assertProductionDraft(draft);
   const reconciliation = draft.reconciliation ?? {};
@@ -127,6 +128,7 @@ export function buildTrainingLoggerEvidencePackage({
     draftArtifactId,
     matchedStrength,
     supportingMediaByArtifactId,
+    capturedAt,
   });
   const additional = (reconciliation.additionalEvidenceActions ?? [])
     .filter((action) => action.included)
@@ -137,7 +139,6 @@ export function buildTrainingLoggerEvidencePackage({
       return attachDurableSourceLinkage(raw, normalized, action.canonicalOwnerType);
     })
     .filter(Boolean);
-  const capturedAt = new Date().toISOString();
   const packageId = `training_logger_submission_${cleanId(draft.draftId)}`;
   const sourceArtifacts = [
     ...(sourcePackage?.provenance?.source_artifacts ?? []),
@@ -232,15 +233,21 @@ function createDetailedTrainingSession({
   draftArtifactId,
   matchedStrength,
   supportingMediaByArtifactId = {},
+  capturedAt,
 }) {
   const appleRefs = matchedStrength?.sourceArtifactRefs ?? [];
   const sourceArtifactRefs = [...new Set([draftArtifactId, ...appleRefs])];
   const supportingMediaReferences = appleRefs.map((ref) => supportingMediaByArtifactId[ref]).filter(Boolean);
+  // Native Build 55 supplies `finishedAt`. The commit instant remains a
+  // server-owned fallback for older/live clients so a completed Logger
+  // session never stays start-only. It is captured once for the package and
+  // cannot move on reconciliation replay.
+  const finishedAt = draft.finishedAt ?? (draft.mode === "live" ? capturedAt : null);
   const liveTiming = !matchedStrength && draft.mode === "live" && draft.startedAt
     ? {
         start_time: draft.startedAt,
-        end_time: draft.finishedAt ?? null,
-        duration_seconds: getDurationSeconds(draft.startedAt, draft.finishedAt),
+        end_time: finishedAt,
+        duration_seconds: getDurationSeconds(draft.startedAt, finishedAt),
       }
     : {};
   const metadata = {
@@ -258,7 +265,7 @@ function createDetailedTrainingSession({
     supporting_media: supportingMediaReferences.map((mediaReference) => ({ mediaReference })),
   };
   const object = createTrainingSessionEvidenceObject({
-    capturedAt: new Date().toISOString(),
+    capturedAt,
     confidence: { extraction: "high", interpretation: "high" },
     exerciseRelationshipGroups: draft.exerciseRelationshipGroups,
     exercises: draft.exercises.map((exercise) => ({
@@ -298,7 +305,8 @@ function createDetailedTrainingSession({
     },
     quality: {
       status: "complete",
-      limitations: matchedStrength ? [] : ["Exact start time, end time, and duration are unknown."],
+      limitations: matchedStrength || (liveTiming.end_time && liveTiming.duration_seconds != null)
+        ? [] : ["Exact end time and duration are unknown."],
     },
     source: {
       modality: matchedStrength ? "mixed" : "manual",

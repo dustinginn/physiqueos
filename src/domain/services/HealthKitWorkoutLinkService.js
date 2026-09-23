@@ -23,7 +23,7 @@ import { isActiveDetailedStrengthSession } from "./HealthKitObservationService.j
 export const HEALTHKIT_WORKOUT_LINK_COLLECTION = "healthKitWorkoutLinks";
 export const HEALTHKIT_WORKOUT_LINK_ID_PREFIX = "healthkit_workout_link_";
 export const HEALTHKIT_WORKOUT_LINK_SCHEMA_VERSION = "healthkit-workout-link-v1";
-export const HEALTHKIT_WORKOUT_MATCHER_VERSION = "healthkit-strength-matcher-v3";
+export const HEALTHKIT_WORKOUT_MATCHER_VERSION = "healthkit-strength-matcher-v4";
 // A confident match is only a CANDIDATE. Turning any candidate into a
 // confirmed link is a separate, explicit act that must go through the guarded
 // relationship service (claims + one-to-one + duplicate-group checks). Link
@@ -86,6 +86,9 @@ export function assessHealthKitStrengthLinkCandidates({
   canonicalWorkout,
   canonicalObjects = [],
   existingLinks = [],
+  // Required for the deterministic Logger rule: without the complete
+  // same-day workout universe, uniqueness is unproven and the rule stays off.
+  canonicalWorkouts = [],
 } = {}) {
   const base = { matcherVersion: HEALTHKIT_WORKOUT_MATCHER_VERSION, thresholds: HEALTHKIT_STRENGTH_MATCH_THRESHOLDS };
   const current = canonicalWorkout?.current;
@@ -96,6 +99,13 @@ export function assessHealthKitStrengthLinkCandidates({
   const confirmedElsewhere = new Set(existingLinks
     .filter((link) => link.status === HealthKitWorkoutLinkStatus.CONFIRMED && link.canonicalWorkoutId !== canonicalWorkout.id)
     .map((link) => link.loggerSessionCanonicalId));
+  const sameDayNativeLoggerSessions = canonicalObjects.filter((record) => {
+    const payload = record.payload ?? record;
+    return isActiveDetailedStrengthSession(record) && dateOf(payload) === current.localDate && isNativeLiveLoggerSession(payload);
+  });
+  const sameDayStrengthWorkouts = canonicalWorkouts.filter((workout) =>
+    workout?.current?.family === HealthKitWorkoutFamily.STRENGTH && workout.localDate === current.localDate);
+  const deterministicLoggerRuleAvailable = sameDayNativeLoggerSessions.length === 1 && sameDayStrengthWorkouts.length === 1;
 
   let unverifiable = 0;
   const assessed = [];
@@ -114,26 +124,43 @@ export function assessHealthKitStrengthLinkCandidates({
     }
     const assessment = assessWorkoutDuplicatePair(hkCandidate, normalized.payload);
     const facts = explicit ? null : boundaryFacts(current, normalized.payload.metadata);
+    const deterministicLoggerWindow = !explicit && deterministicLoggerRuleAvailable &&
+      (record.canonicalId ?? payload.id) === (sameDayNativeLoggerSessions[0].canonicalId ?? sameDayNativeLoggerSessions[0].payload?.id) &&
+      facts.startInsideWorkoutWindow;
     // Adjacent is not the same workout: a session whose window merely touches or
     // sits beside the Apple workout has no real overlap and is not a candidate,
     // whatever its duration or calories say. (The shared duplicate service counts
     // a touching boundary as overlap; that stays untouched for its other callers.)
-    if (!explicit && !facts.substantiveOverlap) continue;
+    if (!explicit && !facts.substantiveOverlap && !deterministicLoggerWindow) continue;
     // An explicit binding: the Logger session already names this exact Apple
     // workout. The canonical record never stores the private HealthKit id, so
     // the session's source ids are hashed the same way the record id is.
     assessed.push({
       canonicalId: record.canonicalId ?? payload.id,
-      outcome: explicit ? "duplicate" : assessment.outcome,
-      confidence: explicit ? 100 : assessment.confidence,
-      reasons: explicit ? ["The Logger session already names this exact Apple workout"] : assessment.reasons,
+      outcome: explicit ? "duplicate" : deterministicLoggerWindow
+        ? (facts.endAligned ? "duplicate" : "possible_duplicate") : assessment.outcome,
+      confidence: explicit ? 100 : deterministicLoggerWindow
+        ? (facts.endAligned ? 95 : Math.max(POSSIBLE_DUPLICATE_CONFIDENCE_THRESHOLD, assessment.confidence))
+        : assessment.confidence,
+      reasons: explicit ? ["The Logger session already names this exact Apple workout"]
+        : deterministicLoggerWindow
+          ? [
+              "The only same-day live Logger strength session starts inside the Apple workout window",
+              facts.endAligned
+                ? "The Logger completion aligns with the Apple workout end"
+                : "The Logger completion does not yet align with the Apple workout end",
+            ]
+          : assessment.reasons,
       // Confident needs a real overlap AND at least one boundary that agrees
       // within the existing tolerance (start with start, or end with end).
-      qualified: explicit || (assessment.outcome === "duplicate" && facts.substantiveOverlap && (facts.startAligned || facts.endAligned)),
+      qualified: explicit || (deterministicLoggerWindow && facts.endAligned) ||
+        (assessment.outcome === "duplicate" && facts.substantiveOverlap && (facts.startAligned || facts.endAligned)),
       overlapSeconds: explicit ? null : Math.round(facts.overlapMs / 1000),
       startAligned: explicit ? null : facts.startAligned,
       endAligned: explicit ? null : facts.endAligned,
       explicit,
+      basis: explicit ? "explicit_source_identity"
+        : deterministicLoggerWindow ? "logger_session_window" : "temporal_and_telemetry",
     });
   }
   const candidates = assessed
@@ -145,7 +172,7 @@ export function assessHealthKitStrengthLinkCandidates({
     loggerSessionCanonicalId: candidate.canonicalId,
     confidence: candidate.confidence,
     reasons: Object.freeze([...candidate.reasons]),
-    basis: candidate.explicit ? "explicit_source_identity" : "temporal_and_telemetry",
+    basis: candidate.basis,
     overlapSeconds: candidate.overlapSeconds,
     startAligned: candidate.startAligned,
     endAligned: candidate.endAligned,
@@ -447,6 +474,7 @@ function boundaryFacts(current, sessionMetadata) {
     substantiveOverlap: overlap > 0 && overlap >= Math.min(tolerance + 1, Math.max(shorter, 1)),
     startAligned: Math.abs(hkStart - sStart) <= tolerance,
     endAligned: sEnd !== null && Math.abs(hkEnd - sEnd) <= tolerance,
+    startInsideWorkoutWindow: Number.isFinite(sStart) && sStart >= hkStart - tolerance && sStart < hkEnd,
   };
 }
 
@@ -461,11 +489,14 @@ function normalizeSessionTimes(payload, timeZone) {
   const metadata = payload.metadata ?? {};
   const dateKey = dateOf(payload);
   const rawStart = metadata.start_time ?? metadata.started_at ?? metadata.start ?? null;
-  const rawEnd = metadata.end_time ?? metadata.ended_at ?? metadata.end ?? null;
+  const rawEnd = metadata.end_time ?? metadata.ended_at ?? metadata.end ??
+    (isNativeLiveLoggerSession(payload) ? payload.captured_at ?? null : null);
   const start = normalizeWorkoutTimeToInstant(rawStart, { dateKey, timeZone });
   let end = normalizeWorkoutTimeToInstant(rawEnd, { dateKey, timeZone });
   // A bare or naive wall-clock end before its start crossed midnight.
   if (start && end && Date.parse(end) < Date.parse(start)) end = new Date(Date.parse(end) + 86400000).toISOString();
+  const durationSeconds = metadata.duration_seconds ??
+    (start && end ? Math.round((Date.parse(end) - Date.parse(start)) / 1000) : null);
   return {
     usable: start !== null,
     payload: {
@@ -474,9 +505,14 @@ function normalizeSessionTimes(payload, timeZone) {
         ...metadata,
         start_time: start ?? undefined, started_at: undefined, start: undefined,
         end_time: end ?? undefined, ended_at: undefined, end: undefined,
+        duration_seconds: durationSeconds ?? undefined,
       },
     },
   };
+}
+
+function isNativeLiveLoggerSession(payload) {
+  return payload?.metadata?.logger_origin === "training_logger" && payload?.metadata?.logger_mode === "live";
 }
 
 // The canonical Apple workout expressed in the shape the shared duplicate
