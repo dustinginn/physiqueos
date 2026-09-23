@@ -502,3 +502,77 @@ describe("link hardening through the real ingest path", () => {
     expect(dup.linkAssessment.linkSuppressed).toMatch(/possible_duplicate_of_another_canonical_workout|workout_or_duplicate_already_linked/);
   });
 });
+
+describe("prospective (open-ended, Strength-only) Workout policy", () => {
+  const LATER = "2026-10-03"; // ten days after effectiveLocalDate: beyond any bounded window
+  const prospective = { openEnded: true, endLocalDate: undefined, families: ["strength"] };
+  const laterLogger = (id) => {
+    const session = logger(id, "10:01", "10:59");
+    return { ...session, payload: { ...session.payload, observed_at: LATER, metadata: { ...session.payload.metadata,
+      start_time: `${LATER}T10:01:00-07:00`, end_time: `${LATER}T10:59:00-07:00` } } };
+  };
+
+  it("resolves open-ended with no end date and an explicit family scope; absent families mean every family", () => {
+    expect(resolveHealthKitWorkoutActivationPolicy(policy(prospective))).toMatchObject({
+      enabled: true, effectiveLocalDate: DAY, endLocalDate: null, openEnded: true, families: ["strength"],
+    });
+    expect(resolveHealthKitWorkoutActivationPolicy(policy())).toMatchObject({ enabled: true, openEnded: false, families: ["cardio", "strength"] });
+    expect(resolveHealthKitWorkoutActivationPolicy(policy({ families: ["strength", "cardio", "strength"] })).families).toEqual(["cardio", "strength"]);
+  });
+
+  it.each([
+    ["an open-ended flag together with an end date", { openEnded: true, families: ["strength"] }, "open_ended_window_must_have_no_end_date"],
+    ["a non-boolean open-ended flag", { openEnded: "yes" }, "open_ended_flag_invalid"],
+    ["an empty family list", { families: [] }, "families_invalid"],
+    ["an unknown family", { families: ["strength", "unsupported"] }, "families_invalid"],
+    ["a non-array family scope", { families: "strength" }, "families_invalid"],
+  ])("fails closed on %s", async (_label, overrides, invalidReason) => {
+    expect(resolveHealthKitWorkoutActivationPolicy(policy(overrides))).toMatchObject({ enabled: false, invalidReason });
+    const records = store({ workoutPolicyOverrides: overrides });
+    await ingest(records, [workout()]);
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
+  });
+
+  it("canonicalizes a strength workout far past the effective date and still creates the link candidate (no upper bound)", async () => {
+    const records = store({ workoutPolicyOverrides: prospective, evidence: [laterLogger("session-later")] });
+    const before = records.snapshot();
+    const result = await ingest(records, [workout({ startedAt: `${LATER}T10:00:00-07:00`, endedAt: `${LATER}T11:00:00-07:00`, clientLocalDate: LATER })]);
+    expect(result.result).toMatchObject({ workoutCanonicalizedCount: 1, workoutRelationships: { assessed: 1, candidateLinksCreated: 1 } });
+    const [canonical] = records.snapshot().healthKitCanonicalWorkouts;
+    expect(canonical).toMatchObject({
+      localDate: LATER, current: { family: "strength" },
+      activation: { effectiveLocalDate: DAY, endLocalDate: null, openEnded: true, families: ["strength"] },
+      linkAssessment: { outcome: "confident_match", candidates: [{ loggerSessionCanonicalId: "session-later" }] },
+      evidenceEligibility: { state: "quarantined", strategic: false },
+    });
+    expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(1);
+    expect(records.snapshot().healthKitWorkoutLinks[0]).toMatchObject({ status: "candidate", loggerSessionCanonicalId: "session-later" });
+    for (const name of [...SENTINELS, "canonicalEvidenceObjects", "evidencePackages"]) expect(records.snapshot()[name]).toEqual(before[name]);
+  });
+
+  it("keeps a cardio workout raw under a Strength-only scope, not permanently, with no canonical record or coexistence", async () => {
+    const records = store({ workoutPolicyOverrides: prospective });
+    const walk = workout({ externalId: "walk-uuid", activityType: "52", startedAt: `${LATER}T07:00:00-07:00`, endedAt: `${LATER}T07:40:00-07:00`, clientLocalDate: LATER });
+    const result = await ingest(records, [walk]);
+    expect(result.result.workoutCanonicalizedCount).toBe(0);
+    expect(result.result.observations[0].reconciliation.state).not.toBe("workout_canonicalized");
+    const [stored] = records.snapshot().healthKitObservations;
+    expect(stored.reconciliation.state).not.toBe("workout_canonicalized");
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
+    expect(records.snapshot().healthKitWorkoutLinks).toEqual([]);
+  });
+
+  it("still refuses a workout whose own day is before the effective date (no backfill through an open window)", async () => {
+    const records = store({ workoutPolicyOverrides: prospective });
+    const result = await ingest(records, [workout({ startedAt: "2026-09-22T10:00:00-07:00", endedAt: "2026-09-22T11:00:00-07:00", clientLocalDate: "2026-09-22" })]);
+    expect(result.result.workoutCanonicalizedCount).toBe(0);
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
+  });
+
+  it("a bounded policy naming both families still canonicalizes cardio exactly as before", async () => {
+    const records = store({ workoutPolicyOverrides: { families: ["cardio", "strength"] } });
+    await ingest(records, [workout({ externalId: "walk-uuid", activityType: "52", startedAt: `${DAY}T07:00:00-07:00`, endedAt: `${DAY}T07:40:00-07:00` })]);
+    expect(records.snapshot().healthKitCanonicalWorkouts).toHaveLength(1);
+    expect(records.snapshot().healthKitCanonicalWorkouts[0].current.family).toBe("cardio");
+  });
+});

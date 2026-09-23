@@ -37,7 +37,7 @@ describe("Workout canary audit", () => {
       canonicalWorkouts: snapshot.healthKitCanonicalWorkouts, links: snapshot.healthKitWorkoutLinks,
       canonicalEvidenceObjects: snapshot.canonicalEvidenceObjects, startLocalDate: "2026-09-24", endLocalDate: "2026-09-26", includeValues: false,
     });
-    expect(summary.policy).toMatchObject({ enabled: true, strategicEvidenceEligibility: "quarantined", historicalBackfill: false, linkAutoConfirm: false });
+    expect(summary.policy).toMatchObject({ enabled: true, openEnded: false, families: ["cardio", "strength"], strategicEvidenceEligibility: "quarantined", historicalBackfill: false, linkAutoConfirm: false });
     expect(summary.canonicalWorkoutCount).toBe(1);
     expect(summary.duplicateCanonicalWorkoutsByWindow).toBe(0);
     expect(summary.loggerStrengthSessionsInWindow).toBe(1);
@@ -62,6 +62,13 @@ describe("Workout canary audit", () => {
     const policy = await buildHealthKitPayload({ kind: "policy", policyKind: "workout", sha: SHA, action: "activate", domains: "workout", effective: DAY, end: DAY });
     expect(policy.code).toContain(SHA);
     expect(policy.marker).toContain("WORKOUT_ACTIVATION");
+    const prospective = await buildHealthKitPayload({ kind: "policy", policyKind: "workout", sha: SHA, action: "activate", domains: "workout", effective: DAY, openEnded: true, families: "strength" });
+    expect(prospective.code).toContain(SHA);
+    expect(prospective.marker).toContain("WORKOUT_ACTIVATION_ACTIVATE_DRYRUN");
+    await expect(buildHealthKitPayload({ kind: "policy", policyKind: "daily", sha: SHA, action: "activate", domains: "activity", effective: DAY, openEnded: true, families: "strength" }))
+      .rejects.toThrow(/families/);
+    await expect(buildHealthKitPayload({ kind: "policy", policyKind: "workout", sha: SHA, action: "activate", domains: "workout", effective: DAY, openEnded: true, families: "swimming" }))
+      .rejects.toThrow(/families/);
     await expect(buildHealthKitPayload({ kind: "policy", policyKind: "sleep", sha: SHA, action: "activate", domains: "workout", effective: DAY, end: DAY }))
       .rejects.toThrow(/policy-kind/);
   });

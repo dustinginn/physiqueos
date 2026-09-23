@@ -361,6 +361,8 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         policyVersion: workoutPolicyRecord.version ?? null,
         effectiveLocalDate: workoutPolicy.effectiveLocalDate,
         endLocalDate: workoutPolicy.endLocalDate,
+        openEnded: workoutPolicy.openEnded === true,
+        families: [...workoutPolicy.families],
       }
       : null;
     const canonicalWorkoutById = new Map(existingCanonicalWorkouts.map((record) => [record.id, record]));
@@ -452,7 +454,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           timeZone: observation.occurrence.timeZone,
         }) ?? observation.occurrence.localDate;
         const workoutAssessment = assessHealthKitWorkoutCanonicalization({
-          observation, effectiveLocalDate, activationPolicy: workoutPolicyRecord,
+          observation, effectiveLocalDate, family: classification.family, activationPolicy: workoutPolicyRecord,
         });
         if (existing && WORKOUT_TERMINAL_STATES.has(existing.reconciliation?.state)) {
           // A canonicalized (or superseded) workout is never reconsidered on replay.
@@ -732,8 +734,10 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
   async function reassessWorkoutRelationships({ context, workoutPolicy, canonicalWorkoutById, workoutLinks, canonicalObjects }) {
     const summary = { assessed: 0, updated: 0, candidateLinksCreated: 0, candidateLinksReleased: 0, candidateLinksRefreshed: 0 };
     const at = now().toISOString();
+    // An open-ended policy (null endLocalDate) has no upper bound.
     const inWindow = [...canonicalWorkoutById.values()].filter((workout) =>
-      workout.localDate >= workoutPolicy.effectiveLocalDate && workout.localDate <= workoutPolicy.endLocalDate);
+      workout.localDate >= workoutPolicy.effectiveLocalDate &&
+      (workoutPolicy.endLocalDate === null || workout.localDate <= workoutPolicy.endLocalDate));
     const saveLink = async (link, next) => {
       const saved = await records.put({
         ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION, recordId: link.id,

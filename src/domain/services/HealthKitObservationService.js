@@ -269,11 +269,18 @@ export function assessHealthKitCanonicalization({ observation, activationPolicy 
   });
 }
 
+// The workout families a Workout policy may scope itself to. A policy without
+// an explicit `families` list keeps the original canary meaning: every family
+// the foundation canonicalizes. `unsupported` is never an option.
+export const HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES = Object.freeze(["cardio", "strength"]);
+
 export function resolveHealthKitWorkoutActivationPolicy(record) {
   const disabled = (source, invalidReason = null) => Object.freeze({
     enabled: false,
     effectiveLocalDate: null,
     endLocalDate: null,
+    openEnded: false,
+    families: Object.freeze([]),
     source,
     invalidReason,
   });
@@ -297,7 +304,39 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
     if (!Array.isArray(record.domains) || record.domains.length !== 1 || record.domains[0] !== "workout") {
       return disabled("invalid_configuration_fail_closed", "domains_invalid");
     }
+    // Family scope: absent means every canonicalizable family (the original
+    // canary meaning); present means exactly those families, nothing else.
+    if (record.families !== undefined) {
+      if (!Array.isArray(record.families) || record.families.length === 0 ||
+        record.families.some((family) => !HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES.includes(family))) {
+        return disabled("invalid_configuration_fail_closed", "families_invalid");
+      }
+    }
+    const families = Object.freeze(record.families === undefined
+      ? [...HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES]
+      : [...new Set(record.families)].sort());
+    if (record.openEnded !== undefined && typeof record.openEnded !== "boolean") {
+      return disabled("invalid_configuration_fail_closed", "open_ended_flag_invalid");
+    }
+    const openEnded = record.openEnded === true;
     const effectiveLocalDate = calendarDate(record.effectiveLocalDate, "effectiveLocalDate");
+    // Open-ended (permanent, forward-only) operation, the same shape the daily
+    // policy uses: no end date, still no backfill (a workout whose own day is
+    // before effectiveLocalDate is refused exactly as in the bounded case).
+    if (openEnded) {
+      if (record.endLocalDate !== undefined && record.endLocalDate !== null) {
+        return disabled("invalid_configuration_fail_closed", "open_ended_window_must_have_no_end_date");
+      }
+      return Object.freeze({
+        enabled: true,
+        effectiveLocalDate,
+        endLocalDate: null,
+        openEnded: true,
+        families,
+        source: "server_owned_configuration",
+        invalidReason: null,
+      });
+    }
     const endLocalDate = calendarDate(record.endLocalDate, "endLocalDate");
     const days = Math.round((Date.parse(`${endLocalDate}T00:00:00.000Z`) - Date.parse(`${effectiveLocalDate}T00:00:00.000Z`)) / 86400000) + 1;
     if (days < 1 || days > HEALTHKIT_WORKOUT_ACTIVATION_MAX_DAYS) {
@@ -307,6 +346,8 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
       enabled: true,
       effectiveLocalDate,
       endLocalDate,
+      openEnded: false,
+      families,
       source: "server_owned_configuration",
       invalidReason: null,
     });
@@ -318,9 +359,11 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
 /**
  * Whether one workout may be canonicalized. The effective local date is
  * supplied by the caller, derived from the workout's own start and time zone,
- * never from the client label or the ingestion time.
+ * never from the client label or the ingestion time. `family` is the workout's
+ * own classification; a family outside the policy's scope stays raw (not a
+ * permanent bar: a later policy for that family is a separate decision).
  */
-export function assessHealthKitWorkoutCanonicalization({ observation, effectiveLocalDate, activationPolicy } = {}) {
+export function assessHealthKitWorkoutCanonicalization({ observation, effectiveLocalDate, family, activationPolicy } = {}) {
   if (observation?.observationType !== HealthKitObservationType.WORKOUT) {
     return Object.freeze({ eligible: false, reason: "not_a_workout" });
   }
@@ -331,11 +374,17 @@ export function assessHealthKitWorkoutCanonicalization({ observation, effectiveL
   if (!policy.enabled) {
     return Object.freeze({ eligible: false, permanent: false, reason: "workout_canonicalization_not_activated" });
   }
-  const scope = { effectiveLocalDate: policy.effectiveLocalDate, endLocalDate: policy.endLocalDate };
+  const scope = { effectiveLocalDate: policy.effectiveLocalDate, endLocalDate: policy.endLocalDate, families: policy.families };
+  // Only a canonicalizable family can be out of scope; an unsupported type is
+  // still the ingestion path's own "source_only / unsupported_workout_type".
+  if (HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES.includes(family) && !policy.families.includes(family)) {
+    return Object.freeze({ eligible: false, permanent: false, reason: "family_not_in_activation_scope", ...scope });
+  }
   if (effectiveLocalDate < policy.effectiveLocalDate) {
     return Object.freeze({ eligible: false, permanent: true, reason: "before_activation_date", ...scope });
   }
-  if (effectiveLocalDate > policy.endLocalDate) {
+  // An open-ended (null endLocalDate) policy has no upper bound.
+  if (policy.endLocalDate !== null && effectiveLocalDate > policy.endLocalDate) {
     return Object.freeze({ eligible: false, permanent: true, reason: "after_activation_window", ...scope });
   }
   return Object.freeze({ eligible: true, permanent: false, reason: "within_activation_window", ...scope });

@@ -4,6 +4,7 @@ import { createCanonicalPersistenceCommandPorts } from "../../application/comman
 import {
   HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID as POLICY_ID,
   resolveHealthKitCanonicalActivationPolicy,
+  resolveHealthKitWorkoutActivationPolicy,
 } from "../../domain/services/HealthKitObservationService.js";
 import { runHealthKitActivationPolicy } from "./HealthKitActivationPolicyRunner.js";
 
@@ -204,16 +205,45 @@ describe("open-ended (permanent, forward-only) canonicalization", () => {
     expect(policy.status).toBe("disabled");
   });
 
-  it("refuses an open-ended request for the Workout policy kind (no scope creep; Workout stays bounded-only)", async () => {
+  it("activates a prospective Strength-only open-ended Workout policy: no end date, explicit families, auto-confirm off", async () => {
     const records = store();
-    const result = await runHealthKitActivationPolicy({
-      records,
-      authorization: { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-25", openEnded: true, authorizationReference: "founder-chat-workout-open-ended" },
-      action: "activate",
-      policyKind: "workout",
+    const authorization = { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-23", openEnded: true, families: ["strength"], authorizationReference: "founder-chat-strength-prospective" };
+    const dry = await runHealthKitActivationPolicy({ records, authorization, action: "activate", policyKind: "workout" });
+    expect(dry).toMatchObject({
+      outcome: "dry_run",
+      policy: { status: "enabled", domains: ["workout"], effectiveLocalDate: "2026-09-23", endLocalDate: null, openEnded: true, families: ["strength"] },
     });
-    expect(result.outcome).toBe("refused");
-    expect(result.reasons[0]).toMatch(/does not support an open-ended window/);
+    expect(records.getMutationCount()).toBe(0);
+    const applied = await runHealthKitActivationPolicy({ records, authorization, action: "activate", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(applied.outcome).toBe("applied");
+    expect(applied.invariants).toMatchObject({ linkAutoConfirmOff: true, familiesAreExactlyAuthorized: true, otherPolicyUntouched: true });
+    const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: "healthkit_workout_canonical_activation_policy" });
+    expect(stored).toMatchObject({ status: "enabled", openEnded: true, families: ["strength"], linkAutoConfirm: false, historicalBackfill: false, strategicEvidenceEligibility: "quarantined" });
+    expect(stored.endLocalDate).toBeUndefined();
+    expect(resolveHealthKitWorkoutActivationPolicy(stored)).toMatchObject({ enabled: true, endLocalDate: null, openEnded: true, families: ["strength"] });
+    const deactivated = await runHealthKitActivationPolicy({
+      records, authorization: { ownerUserId: OWNER, authorizationReference: "founder-chat-strength-prospective-off" }, action: "deactivate", policyKind: "workout", apply: true,
+      expected: (await runHealthKitActivationPolicy({ records, authorization: { ownerUserId: OWNER }, action: "deactivate", policyKind: "workout" })).facts,
+    });
+    expect(deactivated).toMatchObject({ outcome: "applied", policy: { status: "disabled", openEnded: true, families: ["strength"] } });
+  });
+
+  it("writes the family scope explicitly (every family when none is named) and refuses families on the daily kind or an invalid scope", async () => {
+    const records = store();
+    const bounded = await runHealthKitActivationPolicy({
+      records, authorization: { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-25", endLocalDate: "2026-09-25" }, action: "activate", policyKind: "workout",
+    });
+    expect(bounded.policy).toMatchObject({ openEnded: false, endLocalDate: "2026-09-25", families: ["cardio", "strength"] });
+    const daily = await runHealthKitActivationPolicy({
+      records, authorization: { ownerUserId: OWNER, domains: ["activity"], effectiveLocalDate: "2026-09-25", openEnded: true, families: ["strength"] }, action: "activate", policyKind: "daily",
+    });
+    expect(daily.outcome).toBe("refused");
+    expect(daily.reasons[0]).toMatch(/no family scope/);
+    const invalid = await runHealthKitActivationPolicy({
+      records, authorization: { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-25", openEnded: true, families: ["swimming"] }, action: "activate", policyKind: "workout",
+    });
+    expect(invalid.outcome).toBe("refused");
+    expect(invalid.reasons[0]).toMatch(/families_invalid/);
     expect(records.getMutationCount()).toBe(0);
   });
 

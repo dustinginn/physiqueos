@@ -3,6 +3,7 @@ import {
   HEALTHKIT_CANONICAL_ACTIVATION_MAX_DAYS,
   HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
   HEALTHKIT_CANONICAL_ACTIVATION_POLICY_SCHEMA_VERSION,
+  HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES,
   HEALTHKIT_WORKOUT_ACTIVATION_MAX_DAYS,
   HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
   HEALTHKIT_WORKOUT_ACTIVATION_POLICY_SCHEMA_VERSION,
@@ -36,9 +37,9 @@ const POLICY_KINDS = Object.freeze({
     supportedDomains: ["activity", "nutrition"],
     dailyObservationTypes: ["activity_summary", "nutrition_daily_total"],
     // Normal, permanent daily-driver operation needs a forward window with no
-    // end date. Workout stays proving-period-only (Part I): no open-ended
-    // support there, on purpose, no scope creep.
+    // end date.
     supportsOpenEnded: true,
+    supportsFamilies: false,
   }),
   [HealthKitPolicyKind.WORKOUT]: Object.freeze({
     recordId: HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
@@ -49,7 +50,11 @@ const POLICY_KINDS = Object.freeze({
     resolve: resolveHealthKitWorkoutActivationPolicy,
     supportedDomains: ["workout"],
     dailyObservationTypes: [],
-    supportsOpenEnded: false,
+    // Prospective (open-ended) Workout operation is scoped by family: the
+    // Strength graduation enables exactly ["strength"], cardio stays a
+    // separate, later decision. A bounded canary may still name every family.
+    supportsOpenEnded: true,
+    supportsFamilies: true,
   }),
 });
 
@@ -200,7 +205,17 @@ export async function runHealthKitActivationPolicy({
       : afterPolicy?.status === "disabled" && resolved.enabled === false,
     strategicEligibilityQuarantined: afterPolicy?.strategicEvidenceEligibility === "quarantined",
     noBackfillRequested: afterPolicy?.historicalBackfill === false,
-    ...(policyKind === HealthKitPolicyKind.WORKOUT ? { linkAutoConfirmOff: afterPolicy?.linkAutoConfirm === false } : {}),
+    ...(policyKind === HealthKitPolicyKind.WORKOUT
+      ? {
+        linkAutoConfirmOff: afterPolicy?.linkAutoConfirm === false,
+        // The stored and resolved family scope is exactly what was authorized
+        // (an activation without an explicit list means every family).
+        familiesAreExactlyAuthorized: action === "activate"
+          ? sameSet(afterPolicy?.families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES, planned.families) &&
+            sameSet(resolved.families, planned.families)
+          : true,
+      }
+      : {}),
     auditRowPresent: audit.record?.id === auditRecordId,
     otherPolicyUntouched: (afterOther ? digest(stable(afterOther)) : null) === facts.otherPolicyDigest,
     observationsUnchanged: afterObservations.length === facts.observationCount && listDigest(afterObservations) === facts.observationsDigest,
@@ -217,10 +232,18 @@ export async function runHealthKitActivationPolicy({
 }
 
 function planActivation({ kind, policyKind, authorization, policyRecord, current, observations }) {
-  const { domains, effectiveLocalDate, endLocalDate, openEnded } = authorization;
+  const { domains, effectiveLocalDate, endLocalDate, openEnded, families } = authorization;
   if (openEnded === true && !kind.supportsOpenEnded) {
     return { refusal: `The ${policyKind} policy does not support an open-ended window; provide an exact endLocalDate at most ${kind.maxDays} local days from effectiveLocalDate.` };
   }
+  if (families !== undefined && !kind.supportsFamilies) {
+    return { refusal: `The ${policyKind} policy has no family scope; families apply to the workout policy only.` };
+  }
+  // The family scope is always written explicitly so the stored record says
+  // what it covers; an authorization without one means every family.
+  const plannedFamilies = kind.supportsFamilies
+    ? [...new Set(families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES)].sort()
+    : null;
   const candidate = {
     schemaVersion: kind.schemaVersion,
     status: "enabled",
@@ -229,7 +252,7 @@ function planActivation({ kind, policyKind, authorization, policyRecord, current
     ...(openEnded === true ? { openEnded: true } : { endLocalDate }),
     strategicEvidenceEligibility: "quarantined",
     historicalBackfill: false,
-    ...(policyKind === HealthKitPolicyKind.WORKOUT ? { linkAutoConfirm: false } : {}),
+    ...(policyKind === HealthKitPolicyKind.WORKOUT ? { linkAutoConfirm: false, families: plannedFamilies } : {}),
     authorizationReference: String(authorization.authorizationReference ?? ""),
   };
   const resolved = kind.resolve(candidate);
@@ -237,7 +260,8 @@ function planActivation({ kind, policyKind, authorization, policyRecord, current
     const windowDescription = kind.supportsOpenEnded
       ? `the window either open-ended (no end date) or at most ${kind.maxDays} local days`
       : `the window at most ${kind.maxDays} local days`;
-    return { refusal: `The requested policy is not valid (${resolved.invalidReason ?? "unknown"}): domains must be ${kind.supportedDomains.join(" and/or ")} and ${windowDescription}.` };
+    const familiesDescription = kind.supportsFamilies ? `, families a non-empty subset of ${HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES.join("/")}` : "";
+    return { refusal: `The requested policy is not valid (${resolved.invalidReason ?? "unknown"}): domains must be ${kind.supportedDomains.join(" and/or ")} and ${windowDescription}${familiesDescription}.` };
   }
   // A workout's day is derived from its own start in its own time zone, the
   // same rule ingestion applies, not from the client label. An open-ended
@@ -260,11 +284,14 @@ function planActivation({ kind, policyKind, authorization, policyRecord, current
   const workoutPreview = policyKind === HealthKitPolicyKind.WORKOUT ? previewWorkouts(observations.filter(inWindow)) : null;
   return {
     record: candidate,
+    families: plannedFamilies,
     summary: {
       status: "enabled",
       domains: resolved.domains ?? kind.supportedDomains,
       effectiveLocalDate: resolved.effectiveLocalDate,
       endLocalDate: resolved.endLocalDate,
+      openEnded: resolved.openEnded === true,
+      ...(kind.supportsFamilies ? { families: resolved.families } : {}),
     },
     observationsInWindow: policyKind === HealthKitPolicyKind.WORKOUT
       ? observations.filter((record) => inWindow(record) && record.observationType === "workout").length
@@ -302,6 +329,8 @@ function planDeactivation({ policyRecord, current }) {
       domains: current.domains ?? ["workout"],
       effectiveLocalDate: current.effectiveLocalDate,
       endLocalDate: current.endLocalDate,
+      openEnded: current.openEnded === true,
+      ...(current.families ? { families: current.families } : {}),
     },
   };
 }

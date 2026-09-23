@@ -86,6 +86,8 @@ export function summarizeHealthKitWorkoutCanary({
       enabled: policy.enabled,
       effectiveLocalDate: policy.effectiveLocalDate,
       endLocalDate: policy.endLocalDate,
+      openEnded: policy.openEnded === true,
+      families: policy.families ?? [],
       strategicEvidenceEligibility: policyRecord?.strategicEvidenceEligibility ?? null,
       historicalBackfill: policyRecord?.historicalBackfill ?? null,
       linkAutoConfirm: policyRecord?.linkAutoConfirm ?? null,

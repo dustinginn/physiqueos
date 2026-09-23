@@ -26,6 +26,9 @@ const DOMAINS = typeof __DOMAINS__ === "undefined" ? "" : __DOMAINS__;
 const EFFECTIVE = typeof __EFFECTIVE__ === "undefined" ? "" : __EFFECTIVE__;
 const END = typeof __END__ === "undefined" ? "" : __END__;
 const OPEN_ENDED = typeof __OPEN_ENDED__ === "undefined" ? false : __OPEN_ENDED__;
+// Workout policy only: comma-separated family scope (e.g. "strength"). Empty
+// means the runner's default (every canonicalizable family).
+const FAMILIES = typeof __FAMILIES__ === "undefined" ? "" : __FAMILIES__;
 const AUTHORIZATION_REFERENCE = typeof __AUTHORIZATION_REFERENCE__ === "undefined" ? "" : __AUTHORIZATION_REFERENCE__;
 const EXPECTED_JSON = typeof __EXPECTED_JSON__ === "undefined" ? "" : __EXPECTED_JSON__;
 const MARKER = typeof __MARKER__ === "undefined" ? "PHYSIQUEOS_HEALTHKIT_ACTIVATION_SUCCESS" : __MARKER__;
@@ -43,7 +46,7 @@ const sanitizedCode = (error) => (/^[A-Za-z0-9_]{3,60}$/.test(String(error?.code
 if (!["dry-run", "apply"].includes(MODE)) stop("MODE_INVALID");
 if (!["activate", "deactivate"].includes(ACTION)) stop("ACTION_INVALID");
 if (!["daily", "workout"].includes(POLICY_KIND)) stop("POLICY_KIND_INVALID");
-if (OPEN_ENDED && !["daily"].includes(POLICY_KIND)) stop("OPEN_ENDED_NOT_SUPPORTED_FOR_POLICY_KIND");
+if (FAMILIES && POLICY_KIND !== "workout") stop("FAMILIES_NOT_SUPPORTED_FOR_POLICY_KIND");
 if (MODE === "apply" && !AUTHORIZATION_REFERENCE.trim()) stop("AUTHORIZATION_REFERENCE_REQUIRED");
 if (MODE === "apply" && !EXPECTED_JSON) stop("EXPECTED_FACTS_REQUIRED");
 if (!/^[0-9a-f]{40}$/.test(EXPECTED_GIT_SHA)) stop("EXPECTED_GIT_SHA_REQUIRED");
@@ -117,7 +120,7 @@ try {
   clearTimeout(watchdog);
 }
 if (failure || !result) stop(failure ?? "ACTIVATION_INCOMPLETE");
-process.stdout.write(`PHYSIQUEOS_HEALTHKIT_ACTIVATION_JSON:${JSON.stringify({ mode: MODE, action: ACTION, policyKind: POLICY_KIND, openEnded: OPEN_ENDED, authorizationReference: AUTHORIZATION_REFERENCE || null, ...result })}\n`);
+process.stdout.write(`PHYSIQUEOS_HEALTHKIT_ACTIVATION_JSON:${JSON.stringify({ mode: MODE, action: ACTION, policyKind: POLICY_KIND, openEnded: OPEN_ENDED, families: FAMILIES || null, authorizationReference: AUTHORIZATION_REFERENCE || null, ...result })}\n`);
 // The success marker means the operation did what was asked: a dry run that
 // planned, or an apply that committed. Refused, drifted, or otherwise
 // rolled-back outcomes end non-zero with no marker.
