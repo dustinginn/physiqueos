@@ -18,6 +18,26 @@ const nutritionReview = (status) => ({
 });
 
 describe("Log accepted-processing evidence semantics", () => {
+  it("projects one typed ambiguous workout reconciliation item without treating it as evidence intake", () => {
+    const projected = projectPendingReviews([{
+      schemaVersion: "healthkit-workout-reconciliation-v1",
+      reviewKind: "healthkit_workout_reconciliation",
+      id: "healthkit_workout_reconciliation_one",
+      status: "pending",
+      localDate: "2026-09-23",
+      createdAt: "2026-09-23T23:00:00.000Z",
+      version: 1,
+      candidates: [{ loggerSessionCanonicalId: "a" }, { loggerSessionCanonicalId: "b" }],
+    }]);
+    expect(projected).toEqual([expect.objectContaining({
+      id: "healthkit_workout_reconciliation_one",
+      kind: "healthkit_workout_reconciliation",
+      localDate: "2026-09-23",
+      title: "Match Apple Health workout",
+      summary: "2 possible Logger sessions",
+    })]);
+  });
+
   it("keeps only Founder-actionable reviews in Ready to Review", () => {
     const reviews = [
       nutritionReview("pending"),

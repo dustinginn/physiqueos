@@ -12,6 +12,9 @@
 //   node scripts/operations/buildHealthKitPayload.mjs --kind link-confirm --sha <40-hex> \
 //     --start YYYY-MM-DD --end YYYY-MM-DD --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
 //   (link-confirm) confirms the single candidate strength link in the window through the guarded relationship service
+//   node scripts/operations/buildHealthKitPayload.mjs --kind strength-auto-confirm --sha <40-hex> \
+//     --start YYYY-MM-DD --end YYYY-MM-DD --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
+//   (strength-auto-confirm) additionally proves the deterministic gate and records inert reconciliation history
 //   node scripts/operations/buildHealthKitPayload.mjs --kind link-reassess --sha <40-hex> \
 //     --start YYYY-MM-DD --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
 import fs from "node:fs";
@@ -26,22 +29,26 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 export async function buildHealthKitPayload({
   kind, sha, action, policyKind = "daily", domains = "", effective = "", end = "", start = "", mode = "dry-run",
   authorizationReference = "", expected = "", includeValues = true, marker, desired = "", simulateComplete = false,
-  openEnded = false, families = "",
+  openEnded = false, families = "", linkAutoConfirm = null,
 } = {}) {
   if (!/^[0-9a-f]{40}$/.test(String(sha ?? ""))) throw new Error("--sha must be the 40-hex production commit the payload is authorized for.");
   const suffix = randomBytes(4).toString("hex");
   if (kind === "policy") {
-    if (!["activate", "deactivate"].includes(action)) throw new Error("--action must be activate or deactivate.");
+    if (!["activate", "deactivate", "set-link-auto-confirm"].includes(action)) throw new Error("--action must be activate, deactivate, or set-link-auto-confirm.");
     if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
     if (!["daily", "workout"].includes(policyKind)) throw new Error("--policy-kind must be daily or workout.");
     if (families && policyKind !== "workout") throw new Error("--families is only supported for --policy-kind workout.");
+    if (action === "set-link-auto-confirm" && (policyKind !== "workout" || typeof linkAutoConfirm !== "boolean")) {
+      throw new Error("set-link-auto-confirm requires --policy-kind workout and --link-auto-confirm true|false.");
+    }
     if (families && !/^(strength|cardio)(,(strength|cardio))*$/.test(families)) throw new Error("--families must be a comma-separated subset of strength,cardio.");
-    if (!DATE.test(effective)) throw new Error("--effective must be YYYY-MM-DD.");
-    if (!openEnded && !DATE.test(end)) throw new Error("--end must be YYYY-MM-DD (or pass --open-ended with no --end).");
+    if (action === "activate" && !DATE.test(effective)) throw new Error("--effective must be YYYY-MM-DD.");
+    if (action === "activate" && !openEnded && !DATE.test(end)) throw new Error("--end must be YYYY-MM-DD (or pass --open-ended with no --end).");
     if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
       throw new Error("apply mode requires --authorization-ref and --expected.");
     }
-    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_${policyKind === "workout" ? "WORKOUT_" : ""}ACTIVATION_${action.toUpperCase()}_${mode === "apply" ? "APPLY" : "DRYRUN"}_SUCCESS_${suffix}`;
+    const markerAction = action.toUpperCase().replaceAll("-", "_");
+    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_${policyKind === "workout" ? "WORKOUT_" : ""}ACTIVATION_${markerAction}_${mode === "apply" ? "APPLY" : "DRYRUN"}_SUCCESS_${suffix}`;
     const result = await build({
       entryPoints: [path.join(root, "scripts/operations/healthKitActivationPolicy.entry.mjs")],
       bundle: true, write: false, format: "esm", platform: "node", target: "node22", legalComments: "none", minify: true,
@@ -50,6 +57,7 @@ export async function buildHealthKitPayload({
         __EXPECTED_GIT_SHA__: JSON.stringify(sha), __MODE__: JSON.stringify(mode), __ACTION__: JSON.stringify(action), __POLICY_KIND__: JSON.stringify(policyKind),
         __DOMAINS__: JSON.stringify(domains), __EFFECTIVE__: JSON.stringify(effective), __END__: JSON.stringify(end),
         __OPEN_ENDED__: JSON.stringify(Boolean(openEnded)), __FAMILIES__: JSON.stringify(String(families ?? "")),
+        __LINK_AUTO_CONFIRM__: JSON.stringify(linkAutoConfirm),
         __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference)), __EXPECTED_JSON__: JSON.stringify(String(expected)),
         __MARKER__: JSON.stringify(successMarker),
       },
@@ -107,13 +115,14 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
-  if (kind === "link-confirm") {
+  if (["link-confirm", "strength-auto-confirm"].includes(kind)) {
     if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
     if (!DATE.test(start) || !DATE.test(end) || start > end) throw new Error("--start and --end must be an ordered YYYY-MM-DD window.");
     if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
       throw new Error("apply mode requires --authorization-ref and --expected.");
     }
-    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_LINK_CONFIRMATION_${mode === "apply" ? "APPLY" : "DRYRUN"}_SUCCESS_${suffix}`;
+    const autoConfirmAcceptance = kind === "strength-auto-confirm";
+    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_${autoConfirmAcceptance ? "STRENGTH_AUTO_CONFIRM_ACCEPTANCE" : "LINK_CONFIRMATION"}_${mode === "apply" ? "APPLY" : "DRYRUN"}_SUCCESS_${suffix}`;
     const result = await build({
       entryPoints: [path.join(root, "scripts/operations/healthKitWorkoutLinkConfirmation.entry.mjs")],
       bundle: true, write: false, format: "esm", platform: "node", target: "node22", legalComments: "none", minify: true,
@@ -122,7 +131,7 @@ export async function buildHealthKitPayload({
         __EXPECTED_GIT_SHA__: JSON.stringify(sha), __MODE__: JSON.stringify(mode),
         __START__: JSON.stringify(start), __END__: JSON.stringify(end),
         __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference)), __EXPECTED_JSON__: JSON.stringify(String(expected)),
-        __MARKER__: JSON.stringify(successMarker),
+        __MARKER__: JSON.stringify(successMarker), __AUTO_CONFIRM_ACCEPTANCE__: JSON.stringify(autoConfirmAcceptance),
       },
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
@@ -157,17 +166,22 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
-  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, link-reassess, or training-audit.");
+  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, or training-audit.");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
     (value.startsWith("--") ? [...pairs, [value.slice(2), value.startsWith("--no-") ? true : all[index + 1]]] : pairs), []));
   const expected = args.expected ? fs.readFileSync(args.expected, "utf8").trim() : "";
+  const linkAutoConfirm = args["link-auto-confirm"] === undefined
+    ? null
+    : args["link-auto-confirm"] === "true" ? true
+      : args["link-auto-confirm"] === "false" ? false
+        : "invalid";
   const { code, marker } = await buildHealthKitPayload({
     kind: args.kind, sha: args.sha, action: args.action, policyKind: args["policy-kind"] ?? "daily", domains: args.domains, effective: args.effective, end: args.end,
     start: args.start, mode: args.mode, authorizationReference: args["authorization-ref"], expected, desired: args.desired, simulateComplete: Boolean(args["simulate-complete"]),
-    includeValues: !args["no-values"], openEnded: Boolean(args["open-ended"]), families: args.families ?? "",
+    includeValues: !args["no-values"], openEnded: Boolean(args["open-ended"]), families: args.families ?? "", linkAutoConfirm,
   });
   if (!args.out) throw new Error("--out is required.");
   fs.writeFileSync(args.out, code, { mode: 0o600 });

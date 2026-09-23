@@ -1,4 +1,8 @@
 import { createEvidenceReviewPresentation } from "../../domain/services/EvidenceReviewPresentationService.js";
+import {
+  isHealthKitWorkoutReconciliationReview,
+  projectHealthKitWorkoutReconciliationPresentation,
+} from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 
 export function createEvidenceReviewReadService({ store } = {}) {
   if (!store?.run) throw new Error("Evidence Review reads require a read store.");
@@ -18,6 +22,14 @@ export function createEvidenceReviewReadService({ store } = {}) {
       return store.run("evidence.review.detail", async () => {
         const review = await store.getReview(reviewId);
         if (!review) return null;
+        if (isHealthKitWorkoutReconciliationReview(review)) {
+          return Object.freeze({
+            review,
+            evidencePackage: null,
+            canonicalObjects: Object.freeze([]),
+            presentation: projectHealthKitWorkoutReconciliationPresentation(review),
+          });
+        }
         const packageId = review.interpretedEvidence?.package_id ?? null;
         const nutritionDates = [...new Set(
           (review.interpretedEvidence?.evidence_objects ?? [])

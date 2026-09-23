@@ -10,6 +10,7 @@ export const Phase3Command = Object.freeze({
   EDIT_EVIDENCE_REVIEW: "evidence-review.edit.v1",
   CONFIRM_EVIDENCE_REVIEW: "evidence-review.confirm.v1",
   DISPOSE_EVIDENCE_REVIEW: "evidence-review.dispose.v1",
+  RESOLVE_WORKOUT_RECONCILIATION: "workout-reconciliation.resolve.v1",
   COMPLETE_PRIORITY: "priority.complete.v1",
   RECONCILE_PREVIOUS_DAY: "previous-day.reconcile.v1",
   EDIT_PROTOCOL: "protocol.edit.v1",
@@ -47,6 +48,7 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.EDIT_EVIDENCE_REVIEW]: define("editEvidenceReview", ["reviewId"], true),
   [Phase3Command.CONFIRM_EVIDENCE_REVIEW]: define("confirmEvidenceReview", ["reviewId"], true),
   [Phase3Command.DISPOSE_EVIDENCE_REVIEW]: define("disposeEvidenceReview", ["reviewId", "disposition"], true),
+  [Phase3Command.RESOLVE_WORKOUT_RECONCILIATION]: define("resolveWorkoutReconciliation", ["reviewId", "action"], true),
   [Phase3Command.COMPLETE_PRIORITY]: define("completePriority", ["priorityId", "occurrenceDate"], true),
   [Phase3Command.RECONCILE_PREVIOUS_DAY]: define("reconcilePreviousDay", ["localDate", "items"], true),
   [Phase3Command.EDIT_PROTOCOL]: define("editProtocol", ["protocolId"], true),
@@ -165,6 +167,17 @@ function validatePayload(commandType, payload) {
   if (commandType === Phase3Command.DISPOSE_EVIDENCE_REVIEW && payload.disposition !== "discarded") {
     throw validation("disposition", "Evidence Review disposition must be discarded.");
   }
+  if (commandType === Phase3Command.RESOLVE_WORKOUT_RECONCILIATION) {
+    if (!["confirm", "no_match"].includes(payload.action)) {
+      throw validation("action", "Workout reconciliation action must be confirm or no_match.");
+    }
+    if (payload.action === "confirm" && !String(payload.loggerSessionCanonicalId ?? "").trim()) {
+      throw validation("loggerSessionCanonicalId", "loggerSessionCanonicalId is required when confirming a workout reconciliation.");
+    }
+    if (payload.action === "no_match" && payload.loggerSessionCanonicalId != null) {
+      throw validation("loggerSessionCanonicalId", "No Logger session may be supplied for a no_match resolution.");
+    }
+  }
   if (payload.exercises != null && (!Array.isArray(payload.exercises) || payload.exercises.length === 0)) throw validation("exercises", "exercises must be a non-empty array.");
   if (payload.supportingEvidenceReviewVersion != null && (!Number.isInteger(Number(payload.supportingEvidenceReviewVersion)) || Number(payload.supportingEvidenceReviewVersion) < 1)) {
     throw validation("supportingEvidenceReviewVersion", "supportingEvidenceReviewVersion must be a positive integer.");
@@ -173,7 +186,7 @@ function validatePayload(commandType, payload) {
   if (payload.draft != null && (!payload.draft || typeof payload.draft !== "object" || Array.isArray(payload.draft))) {
     throw validation("draft", "draft must be an object.");
   }
-  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId", "expectedCurrentVersionId", "canonicalExerciseId", "canonicalName", "primaryMuscleGroupId", "batchId"]) {
+  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId", "expectedCurrentVersionId", "canonicalExerciseId", "canonicalName", "primaryMuscleGroupId", "batchId", "loggerSessionCanonicalId"]) {
     if (payload[field] != null && !String(payload[field]).trim()) throw validation(field, `${field} must be a non-empty identity.`);
   }
 }

@@ -19,6 +19,7 @@
 // Executing this is a separate, explicitly authorized act. Nothing here runs it.
 import { createRequire } from "node:module";
 import { runHealthKitWorkoutLinkConfirmation } from "../../src/platform/operations/HealthKitWorkoutLinkConfirmationRunner.js";
+import { runHealthKitStrengthAutoConfirmAcceptance } from "../../src/platform/operations/HealthKitStrengthAutoConfirmAcceptanceRunner.js";
 import { createPhase4CanonicalRecordStore } from "../../src/platform/database/Phase4CanonicalRecordStore.js";
 
 const EXPECTED_GIT_SHA = typeof __EXPECTED_GIT_SHA__ === "undefined" ? "" : __EXPECTED_GIT_SHA__;
@@ -28,6 +29,7 @@ const END = typeof __END__ === "undefined" ? "" : __END__;
 const AUTHORIZATION_REFERENCE = typeof __AUTHORIZATION_REFERENCE__ === "undefined" ? "" : __AUTHORIZATION_REFERENCE__;
 const EXPECTED_JSON = typeof __EXPECTED_JSON__ === "undefined" ? "" : __EXPECTED_JSON__;
 const MARKER = typeof __MARKER__ === "undefined" ? "PHYSIQUEOS_HEALTHKIT_LINK_CONFIRMATION_SUCCESS" : __MARKER__;
+const AUTO_CONFIRM_ACCEPTANCE = typeof __AUTO_CONFIRM_ACCEPTANCE__ === "undefined" ? false : __AUTO_CONFIRM_ACCEPTANCE__;
 const OWNER = "user_founder_001";
 const REQUIRE_ROOT = "/app/server.js";
 const SSL_URL_PARAMETERS = Object.freeze(["ssl", "sslmode", "sslcert", "sslkey", "sslrootcert", "sslnegotiation", "uselibpqcompat"]);
@@ -66,7 +68,9 @@ const pool = new pg.Pool({
   connectionString,
   ssl: { ca: certificate, rejectUnauthorized: true },
   max: 1,
-  application_name: "physiqueos-healthkit-link-confirmation",
+  application_name: AUTO_CONFIRM_ACCEPTANCE
+    ? "physiqueos-healthkit-strength-auto-confirm-acceptance"
+    : "physiqueos-healthkit-link-confirmation",
   statement_timeout: 30_000,
   idle_in_transaction_session_timeout: 60_000,
   connectionTimeoutMillis: 8_000,
@@ -89,7 +93,10 @@ try {
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:${OWNER}`]);
   }
   const records = createPhase4CanonicalRecordStore({ query: (text, values) => client.query(text, values) });
-  result = await runHealthKitWorkoutLinkConfirmation({
+  const operation = AUTO_CONFIRM_ACCEPTANCE
+    ? runHealthKitStrengthAutoConfirmAcceptance
+    : runHealthKitWorkoutLinkConfirmation;
+  result = await operation({
     records,
     authorization: { ownerUserId: OWNER, startLocalDate: START, endLocalDate: END, authorizationReference: AUTHORIZATION_REFERENCE },
     apply,

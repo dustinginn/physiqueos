@@ -72,8 +72,11 @@ const POLICY_KINDS = Object.freeze({
  *
  *   activate    enable canonicalization for explicit domains and an exact
  *               local-date window. Strategic Evidence eligibility is fixed at
- *               "quarantined", historical backfill at false, and (Workout) link
- *               auto-confirm at false; none of them is a parameter.
+ *               "quarantined" and historical backfill at false.
+ *   set-link-auto-confirm
+ *               separately toggle only the Workout auto-confirm flag while
+ *               preserving the already-active scope, window, families, and
+ *               every strategic/backfill guard.
  *   deactivate  set the policy to disabled. Canonical days, workouts, links,
  *               source observations, and Evidence are never deleted or changed.
  */
@@ -88,7 +91,7 @@ export async function runHealthKitActivationPolicy({
 } = {}) {
   const kind = POLICY_KINDS[policyKind];
   if (!kind) throw Object.assign(new Error("Unsupported policy kind."), { code: "POLICY_KIND_INVALID" });
-  if (!["activate", "deactivate"].includes(action)) {
+  if (!["activate", "deactivate", "set-link-auto-confirm"].includes(action)) {
     throw Object.assign(new Error("Unsupported activation action."), { code: "ACTION_INVALID" });
   }
   const { ownerUserId } = authorization;
@@ -108,7 +111,9 @@ export async function runHealthKitActivationPolicy({
 
   const planned = action === "activate"
     ? planActivation({ kind, policyKind, authorization, policyRecord, current, observations })
-    : planDeactivation({ policyRecord, current });
+    : action === "deactivate"
+      ? planDeactivation({ policyRecord, current })
+      : planLinkAutoConfirm({ policyKind, authorization, policyRecord, current });
   if (planned.refusal) return Object.freeze({ outcome: "refused", action, policyKind, reasons: [planned.refusal], facts });
 
   const auditRecordId = `${kind.auditPrefix}${digest(authorization.authorizationReference ?? "").slice(0, 12)}_${action}`;
@@ -202,12 +207,19 @@ export async function runHealthKitActivationPolicy({
         (authorization.openEnded === true ? resolved.endLocalDate === null : resolved.endLocalDate === authorization.endLocalDate) &&
         (resolved.openEnded === true) === (authorization.openEnded === true) &&
         sameSet(resolved.domains ?? kind.supportedDomains, authorization.domains)
-      : afterPolicy?.status === "disabled" && resolved.enabled === false,
+      : action === "deactivate"
+        ? afterPolicy?.status === "disabled" && resolved.enabled === false
+        : resolved.enabled && resolved.linkAutoConfirm === authorization.linkAutoConfirm &&
+          afterPolicy?.effectiveLocalDate === policyRecord?.effectiveLocalDate &&
+          (afterPolicy?.endLocalDate ?? null) === (policyRecord?.endLocalDate ?? null) &&
+          sameSet(afterPolicy?.families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES, policyRecord?.families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES),
     strategicEligibilityQuarantined: afterPolicy?.strategicEvidenceEligibility === "quarantined",
     noBackfillRequested: afterPolicy?.historicalBackfill === false,
     ...(policyKind === HealthKitPolicyKind.WORKOUT
       ? {
-        linkAutoConfirmOff: afterPolicy?.linkAutoConfirm === false,
+        ...(action === "set-link-auto-confirm"
+          ? { linkAutoConfirmIsExactlyAuthorized: afterPolicy?.linkAutoConfirm === authorization.linkAutoConfirm }
+          : { linkAutoConfirmOff: afterPolicy?.linkAutoConfirm === false }),
         // The stored and resolved family scope is exactly what was authorized
         // (an activation without an explicit list means every family).
         familiesAreExactlyAuthorized: action === "activate"
@@ -335,6 +347,35 @@ function planDeactivation({ policyRecord, current }) {
       openEnded: current.openEnded === true,
       ...(current.families ? { families: current.families } : {}),
     },
+  };
+}
+
+function planLinkAutoConfirm({ policyKind, authorization, policyRecord, current }) {
+  if (policyKind !== HealthKitPolicyKind.WORKOUT) {
+    return { refusal: "Automatic link confirmation belongs to the workout policy only." };
+  }
+  if (typeof authorization.linkAutoConfirm !== "boolean") {
+    return { refusal: "linkAutoConfirm must be an explicit boolean." };
+  }
+  if (!policyRecord || !current.enabled) {
+    return { refusal: "The workout activation policy must already be enabled before automatic link confirmation is configured." };
+  }
+  if (current.linkAutoConfirm === authorization.linkAutoConfirm) {
+    return { refusal: `Workout automatic link confirmation is already ${authorization.linkAutoConfirm ? "enabled" : "disabled"}.` };
+  }
+  return {
+    record: { ...policyRecord, linkAutoConfirm: authorization.linkAutoConfirm },
+    summary: {
+      status: "enabled",
+      domains: ["workout"],
+      effectiveLocalDate: current.effectiveLocalDate,
+      endLocalDate: current.endLocalDate,
+      openEnded: current.openEnded === true,
+      families: current.families,
+      linkAutoConfirm: authorization.linkAutoConfirm,
+    },
+    observationsInWindow: 0,
+    previouslyPresent: true,
   };
 }
 

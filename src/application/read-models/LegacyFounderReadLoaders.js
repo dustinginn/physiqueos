@@ -10,6 +10,10 @@ import { createLogReadService } from "../log/LogReadService.js";
 import { createOperatingPlanReadService } from "../plan/OperatingPlanReadService.js";
 import { Phase3ReadModel } from "./Phase3ReadModelService.js";
 import { createTrainingReadService } from "../training/TrainingReadService.js";
+import {
+  isHealthKitWorkoutReconciliationReview,
+  projectHealthKitWorkoutReconciliationPresentation,
+} from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 
 export function createLegacyFounderReadLoaders({ repositories, readRuntimeStore, now = () => new Date() } = {}) {
   const goals = createGoalsHubReadService({ repositories, readRuntimeStore });
@@ -31,6 +35,9 @@ export function createLegacyFounderReadLoaders({ repositories, readRuntimeStore,
     [Phase3ReadModel.EVIDENCE_REVIEW]: async ({ principal, reviewId }) => {
       const review = await repositories.evidenceReviews.getReviewById(reviewId);
       if (!review || review.userId !== principal.userId) return null;
+      if (isHealthKitWorkoutReconciliationReview(review)) {
+        return { ...projectHealthKitWorkoutReconciliationPresentation(review), version: String(review.version ?? "1") };
+      }
       return { id: review.id, status: review.status, version: String(review.version ?? review.updatedAt ?? "1"), ...createEvidenceReviewPresentation({ evidencePackage: review.interpretedEvidence, itemDecisions: review.itemDecisions }) };
     },
     [Phase3ReadModel.GOALS]: ({ principal }) => goals.getGoalsHub({ principal }),

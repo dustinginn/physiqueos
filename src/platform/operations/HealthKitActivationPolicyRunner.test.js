@@ -228,6 +228,38 @@ describe("open-ended (permanent, forward-only) canonicalization", () => {
     expect(deactivated).toMatchObject({ outcome: "applied", policy: { status: "disabled", openEnded: true, families: ["strength"] } });
   });
 
+  it("changes only the enabled Workout policy's explicit auto-confirm flag through a separately guarded action", async () => {
+    const records = store();
+    const activation = { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-23", openEnded: true, families: ["strength"], authorizationReference: "activate-before-auto-confirm" };
+    const activationDry = await runHealthKitActivationPolicy({ records, authorization: activation, action: "activate", policyKind: "workout" });
+    await runHealthKitActivationPolicy({ records, authorization: activation, action: "activate", policyKind: "workout", apply: true, expected: activationDry.facts });
+    const before = records.snapshot();
+    const authorization = { ownerUserId: OWNER, linkAutoConfirm: true, authorizationReference: "founder-enable-deterministic-auto-confirm" };
+    const dry = await runHealthKitActivationPolicy({ records, authorization, action: "set-link-auto-confirm", policyKind: "workout" });
+    expect(dry).toMatchObject({
+      outcome: "dry_run",
+      policy: { status: "enabled", openEnded: true, families: ["strength"], linkAutoConfirm: true },
+      predictedMutations: [
+        { collection: "healthKitConfiguration", recordId: "healthkit_workout_canonical_activation_policy", operation: "update" },
+        { collection: "healthKitConfiguration", operation: "create" },
+      ],
+    });
+    expect(records.snapshot()).toEqual(before);
+    const applied = await runHealthKitActivationPolicy({ records, authorization, action: "set-link-auto-confirm", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(applied.invariants).toMatchObject({
+      policyIsExactlyTheAuthorizedRecord: true,
+      linkAutoConfirmIsExactlyAuthorized: true,
+      strategicEligibilityQuarantined: true,
+      noBackfillRequested: true,
+      canonicalWorkoutsUnchanged: true,
+      linksUnchanged: true,
+      evidenceUnchanged: true,
+    });
+    const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: "healthkit_workout_canonical_activation_policy" });
+    expect(resolveHealthKitWorkoutActivationPolicy(stored)).toMatchObject({ enabled: true, linkAutoConfirm: true, families: ["strength"], openEnded: true });
+    expect(stored).toMatchObject({ strategicEvidenceEligibility: "quarantined", historicalBackfill: false });
+  });
+
   it("writes the family scope explicitly (every family when none is named) and refuses families on the daily kind or an invalid scope", async () => {
     const records = store();
     const bounded = await runHealthKitActivationPolicy({

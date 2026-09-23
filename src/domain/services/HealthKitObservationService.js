@@ -281,6 +281,7 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
     endLocalDate: null,
     openEnded: false,
     families: Object.freeze([]),
+    linkAutoConfirm: false,
     source,
     invalidReason,
   });
@@ -297,9 +298,11 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
     if (record.historicalBackfill !== undefined && record.historicalBackfill !== false) {
       return disabled("invalid_configuration_fail_closed", "historical_backfill_not_permitted");
     }
-    // A confirmed link is always a separate, explicit act; it is never a policy option.
-    if (record.linkAutoConfirm !== undefined && record.linkAutoConfirm !== false) {
-      return disabled("invalid_configuration_fail_closed", "link_auto_confirm_not_permitted");
+    // Automatic confirmation is an independently controlled relationship
+    // policy. Only a literal boolean is accepted; omission and false keep it
+    // off. The deterministic gate still re-proves every hard invariant.
+    if (record.linkAutoConfirm !== undefined && typeof record.linkAutoConfirm !== "boolean") {
+      return disabled("invalid_configuration_fail_closed", "link_auto_confirm_invalid");
     }
     if (!Array.isArray(record.domains) || record.domains.length !== 1 || record.domains[0] !== "workout") {
       return disabled("invalid_configuration_fail_closed", "domains_invalid");
@@ -333,6 +336,7 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
         endLocalDate: null,
         openEnded: true,
         families,
+        linkAutoConfirm: record.linkAutoConfirm === true,
         source: "server_owned_configuration",
         invalidReason: null,
       });
@@ -348,6 +352,7 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
       endLocalDate,
       openEnded: false,
       families,
+      linkAutoConfirm: record.linkAutoConfirm === true,
       source: "server_owned_configuration",
       invalidReason: null,
     });

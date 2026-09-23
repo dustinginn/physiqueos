@@ -32,6 +32,7 @@ const FAMILIES = typeof __FAMILIES__ === "undefined" ? "" : __FAMILIES__;
 // The family restriction the authorization carries into the runner; absent
 // means the runner's default (every canonicalizable family).
 const AUTHORIZED_FAMILIES = FAMILIES ? FAMILIES.split(",").filter(Boolean) : undefined;
+const LINK_AUTO_CONFIRM = typeof __LINK_AUTO_CONFIRM__ === "undefined" ? null : __LINK_AUTO_CONFIRM__;
 const AUTHORIZATION_REFERENCE = typeof __AUTHORIZATION_REFERENCE__ === "undefined" ? "" : __AUTHORIZATION_REFERENCE__;
 const EXPECTED_JSON = typeof __EXPECTED_JSON__ === "undefined" ? "" : __EXPECTED_JSON__;
 const MARKER = typeof __MARKER__ === "undefined" ? "PHYSIQUEOS_HEALTHKIT_ACTIVATION_SUCCESS" : __MARKER__;
@@ -47,7 +48,7 @@ function stop(code, status = 1) {
 const sanitizedCode = (error) => (/^[A-Za-z0-9_]{3,60}$/.test(String(error?.code ?? "")) ? String(error.code) : "ACTIVATION_ERROR");
 
 if (!["dry-run", "apply"].includes(MODE)) stop("MODE_INVALID");
-if (!["activate", "deactivate"].includes(ACTION)) stop("ACTION_INVALID");
+if (!["activate", "deactivate", "set-link-auto-confirm"].includes(ACTION)) stop("ACTION_INVALID");
 if (!["daily", "workout"].includes(POLICY_KIND)) stop("POLICY_KIND_INVALID");
 if (FAMILIES && POLICY_KIND !== "workout") stop("FAMILIES_NOT_SUPPORTED_FOR_POLICY_KIND");
 if (MODE === "apply" && !AUTHORIZATION_REFERENCE.trim()) stop("AUTHORIZATION_REFERENCE_REQUIRED");
@@ -106,6 +107,7 @@ try {
       effectiveLocalDate: EFFECTIVE,
       ...(OPEN_ENDED ? { openEnded: true } : { endLocalDate: END }),
       ...(AUTHORIZED_FAMILIES ? { families: AUTHORIZED_FAMILIES } : {}),
+      ...(ACTION === "set-link-auto-confirm" ? { linkAutoConfirm: LINK_AUTO_CONFIRM } : {}),
       authorizationReference: AUTHORIZATION_REFERENCE,
     },
     action: ACTION,

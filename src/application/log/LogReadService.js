@@ -6,6 +6,10 @@ import {
 } from "../../domain/utils/localDate.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
 import { scopeRepositoryReadService } from "../read-models/RepositoryReadScope.js";
+import {
+  isHealthKitWorkoutReconciliationReview,
+  projectHealthKitWorkoutReconciliationPresentation,
+} from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 
 export function createLogReadService({ repositories, now = () => new Date() } = {}) {
   return scopeRepositoryReadService({ repositories, namespace: "log", service: Object.freeze({
@@ -44,6 +48,20 @@ export function projectPendingReviews(reviews = []) {
     .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
   const fingerprints = new Set();
   return pending.map((review) => {
+    if (isHealthKitWorkoutReconciliationReview(review)) {
+      const presentation = projectHealthKitWorkoutReconciliationPresentation(review);
+      return Object.freeze({
+        id: review.id,
+        kind: presentation.kind,
+        date: formatPendingReviewDate(review.localDate),
+        localDate: review.localDate,
+        title: presentation.title,
+        summary: `${review.candidates?.length ?? 0} possible Logger sessions`,
+        likelyDuplicate: false,
+        href: `/evidence/review/${encodeURIComponent(review.id)}`,
+        version: String(review.version ?? "1"),
+      });
+    }
     const objects = review.interpretedEvidence?.evidence_objects ?? [];
     const presentation = createEvidenceReviewPresentation({ evidencePackage: review.interpretedEvidence, itemDecisions: review.itemDecisions });
     const fingerprint = JSON.stringify(objects.map((item) => [item.evidence_type, String(item.observed_at).slice(0, 10), item.source_file ?? item.provenance?.source_artifact_refs]).sort());

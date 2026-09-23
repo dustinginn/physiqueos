@@ -11,6 +11,11 @@ const payloads = {
   [Phase3Command.EDIT_EVIDENCE_REVIEW]: { reviewId: "review-one", corrections: [] },
   [Phase3Command.CONFIRM_EVIDENCE_REVIEW]: { reviewId: "review-one" },
   [Phase3Command.DISPOSE_EVIDENCE_REVIEW]: { reviewId: "review-one", disposition: "discarded" },
+  [Phase3Command.RESOLVE_WORKOUT_RECONCILIATION]: {
+    reviewId: "healthkit_workout_reconciliation_one",
+    action: "confirm",
+    loggerSessionCanonicalId: "logger-session-one",
+  },
   [Phase3Command.COMPLETE_PRIORITY]: { priorityId: "priority-one", occurrenceDate: "2026-08-11" },
   [Phase3Command.RECONCILE_PREVIOUS_DAY]: { localDate: "2026-08-10", items: [{ id: "item-one", complete: true }] },
   [Phase3Command.EDIT_PROTOCOL]: { protocolId: "protocol-one", patch: { active: true } },
@@ -153,6 +158,7 @@ function commandPort(commandType) {
   return ({
     [Phase3Command.SUBMIT_WEIGHT]: "submitWeight", [Phase3Command.SUBMIT_CHECK_IN]: "submitCheckIn", [Phase3Command.CREATE_EVIDENCE_INTAKE]: "createEvidenceIntake",
     [Phase3Command.EDIT_EVIDENCE_REVIEW]: "editEvidenceReview", [Phase3Command.CONFIRM_EVIDENCE_REVIEW]: "confirmEvidenceReview", [Phase3Command.DISPOSE_EVIDENCE_REVIEW]: "disposeEvidenceReview",
+    [Phase3Command.RESOLVE_WORKOUT_RECONCILIATION]: "resolveWorkoutReconciliation",
     [Phase3Command.COMPLETE_PRIORITY]: "completePriority", [Phase3Command.RECONCILE_PREVIOUS_DAY]: "reconcilePreviousDay", [Phase3Command.EDIT_PROTOCOL]: "editProtocol",
     [Phase3Command.EDIT_GOAL]: "editGoal", [Phase3Command.TRANSITION_GOAL]: "transitionGoal", [Phase3Command.CREATE_TRAINING_SESSION]: "createTrainingSession",
     [Phase3Command.CORRECT_TRAINING_SESSION]: "correctTrainingSession", [Phase3Command.COMPLETE_TRAINING_LOGGER]: "completeTrainingLogger", [Phase3Command.CONFIRM_NUTRITION]: "confirmNutritionEvidence",

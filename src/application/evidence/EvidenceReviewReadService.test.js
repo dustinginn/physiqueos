@@ -2,6 +2,42 @@ import { describe, expect, it, vi } from "vitest";
 import { createEvidenceReviewReadService } from "./EvidenceReviewReadService.js";
 
 describe("EvidenceReviewReadService native detail", () => {
+  it("returns a typed workout reconciliation presentation without loading evidence objects", async () => {
+    const review = {
+      schemaVersion: "healthkit-workout-reconciliation-v1",
+      reviewKind: "healthkit_workout_reconciliation",
+      id: "healthkit_workout_reconciliation_one",
+      userId: "founder",
+      status: "pending",
+      version: 2,
+      localDate: "2026-09-23",
+      workout: { family: "strength", canonicalType: "traditional_strength_training" },
+      candidates: [{ loggerSessionCanonicalId: "session-a", confidence: 95, basis: "logger_session_window" }],
+    };
+    const store = {
+      run: vi.fn(async (_scope, operation) => operation()),
+      getReview: vi.fn(async () => review),
+      getPackage: vi.fn(),
+      listRelevantCanonicalObjects: vi.fn(),
+    };
+    const result = await createEvidenceReviewReadService({ store }).getReview(review.id);
+    expect(result).toMatchObject({
+      evidencePackage: null,
+      canonicalObjects: [],
+      presentation: {
+        kind: "healthkit_workout_reconciliation",
+        version: "2",
+        actions: [
+          { action: "confirm", loggerSessionCanonicalId: "session-a" },
+          { action: "no_match" },
+        ],
+        strategicEvidenceEligibility: "quarantined",
+      },
+    });
+    expect(store.getPackage).not.toHaveBeenCalled();
+    expect(store.listRelevantCanonicalObjects).not.toHaveBeenCalled();
+  });
+
   it("returns the same systemic presentation used by the web review surface", async () => {
     const interpretedEvidence = {
       package_id: "package-1",
