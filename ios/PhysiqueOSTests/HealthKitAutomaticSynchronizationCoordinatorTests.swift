@@ -596,6 +596,25 @@ final class HealthKitAutomaticWorkoutFloorEngineTests: XCTestCase {
         XCTAssertEqual(uploads.count, 1)
     }
 
+    func testOverlappingObserverWakeStillCompletesExactlyOnce() async throws {
+        let harness = AutomaticWorkoutEngineHarness(
+            floor: HealthKitWorkoutActivationFloor(calendar: Self.calendar),
+            additions: [Self.workout(start: (23, 10, 0), end: (23, 11, 0))]
+        )
+        await harness.uploader.setDelayNanoseconds(80_000_000)
+        let completion = AutomaticCompletionCounter()
+
+        async let foreground: Void = harness.engine.synchronize(scope: harness.scope)
+        try? await Task.sleep(for: .milliseconds(10))
+        await harness.engine.handleObserverWake(scope: harness.scope) {
+            completion.increment()
+        }
+
+        XCTAssertEqual(completion.value, 1)
+        try await foreground
+        XCTAssertEqual(completion.value, 1, "The deferred error-path completion must not double-complete after staging.")
+    }
+
     // MARK: fixtures
 
     private static func workout(start: (day: Int, hour: Int, minute: Int), end: (day: Int, hour: Int, minute: Int)) -> HealthKitQueryAddition {
@@ -688,6 +707,23 @@ private actor AutomaticWorkoutUploaderMock: HealthKitObservationUploader {
 
     func partitions() -> [HealthKitStagedPartition] { received }
     func setDelayNanoseconds(_ value: UInt64) { delayNanoseconds = value }
+}
+
+private final class AutomaticCompletionCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
 }
 
 private final class AutomaticWorkoutEngineHarness {

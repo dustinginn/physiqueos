@@ -77,16 +77,18 @@ actor HealthKitSynchronizationEngine {
         errorCode: String? = nil,
         completion: @escaping @Sendable () -> Void
     ) async {
-        guard featureGate.allows(.observationQuery) else {
-            completion()
-            return
-        }
+        let completionGate = HealthKitObserverCompletionGate(completion: completion)
+        // HealthKit requires every observer callback to be completed. Staging
+        // may complete it early, but feature gates, same-scope overlap, store
+        // failures, cancellation, and upload errors must also release it once.
+        defer { completionGate.complete() }
+        guard featureGate.allows(.observationQuery) else { return }
         do {
             try await store.recordObserverWakeup(for: scope, at: now())
             if let errorCode {
                 try await store.recordOperationalError(for: scope, code: errorCode)
             }
-            try await synchronize(scope: scope, stagingCompletion: completion)
+            try await synchronize(scope: scope, stagingCompletion: { completionGate.complete() })
         } catch let error as HealthKitSyncError {
             try? await store.recordOperationalError(for: scope, code: error.diagnosticCode)
         } catch {
@@ -528,5 +530,22 @@ private final class HealthKitQueryResultGate: @unchecked Sendable {
         continuation = nil
         lock.unlock()
         current?.resume(returning: result)
+    }
+}
+
+private final class HealthKitObserverCompletionGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var completion: (@Sendable () -> Void)?
+
+    init(completion: @escaping @Sendable () -> Void) {
+        self.completion = completion
+    }
+
+    func complete() {
+        lock.lock()
+        let current = completion
+        completion = nil
+        lock.unlock()
+        current?()
     }
 }
