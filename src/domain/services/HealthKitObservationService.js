@@ -282,6 +282,7 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
     openEnded: false,
     families: Object.freeze([]),
     linkAutoConfirm: false,
+    linkAutoConfirmEffectiveAt: null,
     source,
     invalidReason,
   });
@@ -304,6 +305,11 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
     if (record.linkAutoConfirm !== undefined && typeof record.linkAutoConfirm !== "boolean") {
       return disabled("invalid_configuration_fail_closed", "link_auto_confirm_invalid");
     }
+    const linkAutoConfirmEffectiveAt = record.linkAutoConfirm === true &&
+      typeof record.linkAutoConfirmEffectiveAt === "string" &&
+      Number.isFinite(Date.parse(record.linkAutoConfirmEffectiveAt))
+      ? new Date(record.linkAutoConfirmEffectiveAt).toISOString()
+      : null;
     if (!Array.isArray(record.domains) || record.domains.length !== 1 || record.domains[0] !== "workout") {
       return disabled("invalid_configuration_fail_closed", "domains_invalid");
     }
@@ -336,7 +342,8 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
         endLocalDate: null,
         openEnded: true,
         families,
-        linkAutoConfirm: record.linkAutoConfirm === true,
+        linkAutoConfirm: record.linkAutoConfirm === true && linkAutoConfirmEffectiveAt !== null,
+        linkAutoConfirmEffectiveAt,
         source: "server_owned_configuration",
         invalidReason: null,
       });
@@ -352,7 +359,8 @@ export function resolveHealthKitWorkoutActivationPolicy(record) {
       endLocalDate,
       openEnded: false,
       families,
-      linkAutoConfirm: record.linkAutoConfirm === true,
+      linkAutoConfirm: record.linkAutoConfirm === true && linkAutoConfirmEffectiveAt !== null,
+      linkAutoConfirmEffectiveAt,
       source: "server_owned_configuration",
       invalidReason: null,
     });

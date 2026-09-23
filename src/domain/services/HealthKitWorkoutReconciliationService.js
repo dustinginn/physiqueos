@@ -200,6 +200,11 @@ export function projectHealthKitWorkoutReconciliationPresentation(review) {
     summary: "Choose the Workout Logger session that belongs to this Apple Health workout, or choose No match.",
     workout: review.workout,
     candidates: Object.freeze((review.candidates ?? []).map((candidate) => Object.freeze({ ...candidate }))),
+    resolution: review.resolution ? Object.freeze({
+      action: review.resolution.action,
+      selectedLoggerSessionCanonicalId: review.resolution.selectedLoggerSessionCanonicalId ?? null,
+      linkId: review.resolution.linkId ?? null,
+    }) : null,
     actions: Object.freeze([
       ...((review.candidates ?? []).map((candidate) => Object.freeze({
         id: `confirm:${candidate.loggerSessionCanonicalId}`,

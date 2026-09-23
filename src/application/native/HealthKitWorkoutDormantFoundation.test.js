@@ -182,6 +182,39 @@ describe("controlled Workout window (policy enabled)", () => {
     expect(records.snapshot().evidenceReviews).toEqual([review]);
   });
 
+  it("creates exactly one Founder review for a single plausible match that cannot auto-confirm", async () => {
+    const records = store({ evidence: [logger("session-a", "10:04", "11:20", 4560)] });
+    await ingest(records, [workout()], "possible-1");
+    const first = records.snapshot();
+    expect(first.healthKitCanonicalWorkouts[0].linkAssessment.outcome).toBe("possible_match");
+    expect(first.evidenceReviews).toHaveLength(1);
+    expect(first.evidenceReviews[0]).toMatchObject({
+      reviewKind: "healthkit_workout_reconciliation",
+      status: "pending",
+      candidates: [{ loggerSessionCanonicalId: "session-a" }],
+    });
+    const review = structuredClone(first.evidenceReviews[0]);
+    await ingest(records, [workout()], "possible-2");
+    expect(records.snapshot().evidenceReviews).toEqual([review]);
+  });
+
+  it("creates a Founder review when a high-confidence candidate lacks an allowlisted deterministic basis", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "confident-but-not-deterministic");
+    const snapshot = records.snapshot();
+    expect(snapshot.healthKitCanonicalWorkouts[0].linkAssessment.outcome).toBe("confident_match");
+    expect(snapshot.healthKitWorkoutLinks).toEqual([
+      expect.objectContaining({ status: "candidate", loggerSessionCanonicalId: "session-a" }),
+    ]);
+    expect(snapshot.evidenceReviews).toEqual([
+      expect.objectContaining({
+        reviewKind: "healthkit_workout_reconciliation",
+        status: "pending",
+        candidates: [expect.objectContaining({ loggerSessionCanonicalId: "session-a" })],
+      }),
+    ]);
+  });
+
   it("auto-confirms only the deterministic unique Logger-window match when explicitly enabled", async () => {
     const rawSession = logger("session-a", "10:01", "10:59");
     const session = {
@@ -196,7 +229,10 @@ describe("controlled Workout window (policy enabled)", () => {
       },
     };
     const records = store({
-      workoutPolicyOverrides: { linkAutoConfirm: true },
+      workoutPolicyOverrides: {
+        linkAutoConfirm: true,
+        linkAutoConfirmEffectiveAt: "2026-09-23T23:00:00.000Z",
+      },
       evidence: [session],
     });
     const before = records.snapshot();
@@ -225,6 +261,29 @@ describe("controlled Workout window (policy enabled)", () => {
     await ingest(records, [workout()], "auto-2");
     expect(records.snapshot().evidenceReviews[0].resolutionHistory).toHaveLength(1);
     expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(1);
+  });
+
+  it("never retroactively auto-confirms a workout created before the separately authorized cutoff", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "before-auto", { receivedAt: "2026-09-23T23:30:00.000Z" });
+    const currentPolicy = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID });
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "healthKitConfiguration",
+      recordId: WORKOUT_POLICY_ID,
+      expectedVersion: currentPolicy.version,
+      payload: { ...currentPolicy, linkAutoConfirm: true, linkAutoConfirmEffectiveAt: "2026-09-23T23:31:00.000Z" },
+    });
+
+    const replay = await ingest(records, [workout()], "after-auto", { receivedAt: "2026-09-23T23:32:00.000Z" });
+
+    expect(replay.result.workoutRelationships.automaticConfirmationRefusals).toEqual([
+      expect.objectContaining({ reasons: ["workout_predates_auto_confirm_activation"] }),
+    ]);
+    expect(records.snapshot().healthKitWorkoutLinks).toEqual([
+      expect.objectContaining({ status: "candidate", loggerSessionCanonicalId: "session-a" }),
+    ]);
+    expect(records.snapshot().healthKitWorkoutLinkClaims).toEqual([]);
   });
 
   it("resolves one ambiguous review by explicit Founder selection without changing Logger detail", async () => {
@@ -291,6 +350,47 @@ describe("controlled Workout window (policy enabled)", () => {
     expect(after.healthKitWorkoutLinkClaims ?? []).toEqual([]);
     expect(after.trainingPerformanceEvents).toEqual(before.trainingPerformanceEvents);
     expect(after.canonicalEvidenceObjects).toEqual(before.canonicalEvidenceObjects);
+  });
+
+  it("never overrides a terminal Founder no-match when later facts become uniquely auto-confirmable", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59"), logger("session-b", "10:02", "11:01")] });
+    await ingest(records, [workout()], "terminal-no-match-1");
+    const [review] = records.snapshot().evidenceReviews;
+    await createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-23T23:31:00.000Z") })
+      .resolveWorkoutReconciliation({
+        ownerUserId: OWNER,
+        principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+        metadata: { commandId: "terminal-no-match", expectedVersion: String(review.version), idempotencyKey: "terminal-no-match" },
+        payload: { reviewId: review.id, action: "no_match" },
+      });
+    const sessionB = await records.get({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-b" });
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "canonicalEvidenceObjects",
+      recordId: "session-b",
+      expectedVersion: sessionB.version,
+      payload: { ...sessionB, quality: { status: "superseded" } },
+    });
+    const currentPolicy = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID });
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "healthKitConfiguration",
+      recordId: WORKOUT_POLICY_ID,
+      expectedVersion: currentPolicy.version,
+      payload: { ...currentPolicy, linkAutoConfirm: true, linkAutoConfirmEffectiveAt: "2026-09-23T23:00:00.000Z" },
+    });
+
+    const replay = await ingest(records, [workout()], "terminal-no-match-2", { receivedAt: "2026-09-23T23:32:00.000Z" });
+
+    expect(replay.result.workoutRelationships.automaticConfirmationRefusals).toEqual([
+      expect.objectContaining({ reasons: ["founder_reconciliation_already_resolved"] }),
+    ]);
+    const after = records.snapshot();
+    expect(after.evidenceReviews).toHaveLength(1);
+    expect(after.evidenceReviews[0]).toMatchObject({ status: "resolved_no_match", resolution: { action: "no_match" } });
+    expect(after.evidenceReviews[0].resolutionHistory).toHaveLength(1);
+    expect(after.healthKitWorkoutLinks.filter((link) => link.status === "confirmed")).toEqual([]);
+    expect(after.healthKitWorkoutLinkClaims).toEqual([]);
   });
 
   it("canonicalizes cardio idempotently and records coexistence with an existing Apple Fitness walk (no double count)", async () => {

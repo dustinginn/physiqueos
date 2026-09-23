@@ -638,6 +638,7 @@ describe("Native production contract boundary", () => {
       "training-session.commit.v1", "nutrition-day.upsert.v1", "activity-day.upsert.v1",
       "healthkit.observations.ingest.v1",
       "dexa-review.measurements.v1", "evidence-review.commit.v1", "evidence-review.dispose.v1",
+      "workout-reconciliation.resolve.v1",
       "operating-plan.recurring-support.save.v1", "operating-plan.nutrition-strategy.save.v1",
       "training-catalog.my-library.add.v1", "training-catalog.exercise.create.v1",
       "operating-plan.training-strategy.save.v1",

@@ -108,12 +108,13 @@ export async function runHealthKitActivationPolicy({
   ]);
   const facts = collectFacts({ policyRecord, otherPolicyRecord, observations, canonicalDays, canonicalWorkouts, links, claims, evidence });
   const current = kind.resolve(policyRecord);
+  const operationAt = now().toISOString();
 
   const planned = action === "activate"
     ? planActivation({ kind, policyKind, authorization, policyRecord, current, observations })
     : action === "deactivate"
       ? planDeactivation({ policyRecord, current })
-      : planLinkAutoConfirm({ policyKind, authorization, policyRecord, current });
+      : planLinkAutoConfirm({ policyKind, authorization, policyRecord, current, operationAt });
   if (planned.refusal) return Object.freeze({ outcome: "refused", action, policyKind, reasons: [planned.refusal], facts });
 
   const auditRecordId = `${kind.auditPrefix}${digest(authorization.authorizationReference ?? "").slice(0, 12)}_${action}`;
@@ -148,7 +149,7 @@ export async function runHealthKitActivationPolicy({
     throw Object.assign(new Error("Apply requires an authorization reference."), { code: "AUTHORIZATION_REFERENCE_REQUIRED" });
   }
 
-  const at = now().toISOString();
+  const at = operationAt;
   const nextPolicy = { ...planned.record, id: kind.recordId, auditRecordId, updatedAt: at };
   const audit = await records.putIfAbsent({
     ownerUserId,
@@ -210,6 +211,7 @@ export async function runHealthKitActivationPolicy({
       : action === "deactivate"
         ? afterPolicy?.status === "disabled" && resolved.enabled === false
         : resolved.enabled && resolved.linkAutoConfirm === authorization.linkAutoConfirm &&
+          resolved.linkAutoConfirmEffectiveAt === (authorization.linkAutoConfirm ? at : null) &&
           afterPolicy?.effectiveLocalDate === policyRecord?.effectiveLocalDate &&
           (afterPolicy?.endLocalDate ?? null) === (policyRecord?.endLocalDate ?? null) &&
           sameSet(afterPolicy?.families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES, policyRecord?.families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES),
@@ -218,7 +220,12 @@ export async function runHealthKitActivationPolicy({
     ...(policyKind === HealthKitPolicyKind.WORKOUT
       ? {
         ...(action === "set-link-auto-confirm"
-          ? { linkAutoConfirmIsExactlyAuthorized: afterPolicy?.linkAutoConfirm === authorization.linkAutoConfirm }
+          ? {
+              linkAutoConfirmIsExactlyAuthorized: afterPolicy?.linkAutoConfirm === authorization.linkAutoConfirm,
+              linkAutoConfirmIsProspective: authorization.linkAutoConfirm
+                ? resolved.linkAutoConfirmEffectiveAt === at
+                : resolved.linkAutoConfirmEffectiveAt === null,
+            }
           : { linkAutoConfirmOff: afterPolicy?.linkAutoConfirm === false }),
         // The stored and resolved family scope is exactly what was authorized
         // (an activation without an explicit list means every family).
@@ -267,7 +274,9 @@ function planActivation({ kind, policyKind, authorization, policyRecord, current
     ...(openEnded === true ? { openEnded: true } : { endLocalDate }),
     strategicEvidenceEligibility: "quarantined",
     historicalBackfill: false,
-    ...(policyKind === HealthKitPolicyKind.WORKOUT ? { linkAutoConfirm: false, families: plannedFamilies } : {}),
+    ...(policyKind === HealthKitPolicyKind.WORKOUT
+      ? { linkAutoConfirm: false, linkAutoConfirmEffectiveAt: null, families: plannedFamilies }
+      : {}),
     authorizationReference: String(authorization.authorizationReference ?? ""),
   };
   const resolved = kind.resolve(candidate);
@@ -350,7 +359,7 @@ function planDeactivation({ policyRecord, current }) {
   };
 }
 
-function planLinkAutoConfirm({ policyKind, authorization, policyRecord, current }) {
+function planLinkAutoConfirm({ policyKind, authorization, policyRecord, current, operationAt }) {
   if (policyKind !== HealthKitPolicyKind.WORKOUT) {
     return { refusal: "Automatic link confirmation belongs to the workout policy only." };
   }
@@ -363,8 +372,13 @@ function planLinkAutoConfirm({ policyKind, authorization, policyRecord, current 
   if (current.linkAutoConfirm === authorization.linkAutoConfirm) {
     return { refusal: `Workout automatic link confirmation is already ${authorization.linkAutoConfirm ? "enabled" : "disabled"}.` };
   }
+  const effectiveAt = authorization.linkAutoConfirm ? operationAt : null;
   return {
-    record: { ...policyRecord, linkAutoConfirm: authorization.linkAutoConfirm },
+    record: {
+      ...policyRecord,
+      linkAutoConfirm: authorization.linkAutoConfirm,
+      linkAutoConfirmEffectiveAt: effectiveAt,
+    },
     summary: {
       status: "enabled",
       domains: ["workout"],
@@ -373,6 +387,7 @@ function planLinkAutoConfirm({ policyKind, authorization, policyRecord, current 
       openEnded: current.openEnded === true,
       families: current.families,
       linkAutoConfirm: authorization.linkAutoConfirm,
+      linkAutoConfirmEffectiveAt: effectiveAt,
     },
     observationsInWindow: 0,
     previouslyPresent: true,

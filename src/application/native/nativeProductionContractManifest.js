@@ -107,6 +107,7 @@ const writes = Object.freeze([
   write(Phase3Command.EDIT_DEXA_REVIEW, ["reviewId", "evidenceObjectId", "measurements"], "If-Match required for every edit"),
   write(Phase3Command.COMMIT_EVIDENCE_REVIEW, ["reviewId"], "If-Match required to start the canonical Evidence Review lifecycle"),
   write(Phase3Command.DISPOSE_EVIDENCE_REVIEW, ["reviewId", "disposition"], "If-Match required; disposition must be discarded"),
+  write(Phase3Command.RESOLVE_WORKOUT_RECONCILIATION, ["reviewId", "action"], "If-Match required; confirm requires one current Logger session identity and no_match omits it"),
   write(Phase3Command.SAVE_RECURRING_SUPPORT, ["protocolId", "protocolCategory", "executionId", "reminderId", "draft"], "If-Match required; expectedVersion compares against the execution item's own executionRevision"),
   write(Phase3Command.SAVE_NUTRITION_STRATEGY, ["protocolId", "expectedCurrentVersionId", "draft"], "If-Match not used; concurrency is enforced via expectedCurrentVersionId matching the protocol's own currentVersionId"),
   write(Phase3Command.ADD_TO_MY_LIBRARY, ["canonicalExerciseId"], "If-Match not used; idempotent add of an existing canonical exercise to My Library"),

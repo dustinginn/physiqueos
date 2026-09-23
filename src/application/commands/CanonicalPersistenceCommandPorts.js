@@ -145,6 +145,7 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "upsertNutritionDay", "syncActivityDay", "commitTrainingSession", "upsertActivityDay",
   "ingestHealthKitObservations",
   "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport", "saveNutritionStrategy",
+  "resolveWorkoutReconciliation",
   "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
   "saveSupplementSupport",
   "saveSupplementStrategy", "changeSupplementLifecycle",
@@ -884,8 +885,17 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
           recordId: reviewId,
         });
+        const hasTerminalFounderResolution = isHealthKitWorkoutReconciliationReview(existingReview) &&
+          ["resolved_confirmed", "resolved_no_match"].includes(existingReview.status);
+        const plausibleButNotDeterministic = assessment.outcome === HealthKitStrengthMatchOutcome.AMBIGUOUS ||
+          assessment.outcome === HealthKitStrengthMatchOutcome.POSSIBLE ||
+          (assessment.outcome === HealthKitStrengthMatchOutcome.CONFIDENT && autoGate?.eligible !== true);
         const needsFounderResolution = isPrimary && !workoutAlreadyLinked &&
-          assessment.outcome === HealthKitStrengthMatchOutcome.AMBIGUOUS;
+          !hasTerminalFounderResolution && plausibleButNotDeterministic;
+        const prospectiveAutoConfirm = workoutPolicy.linkAutoConfirm === true &&
+          instantAtOrAfter(workout.createdAt, workoutPolicy.linkAutoConfirmEffectiveAt);
+        const willAutomaticallyConfirm = prospectiveAutoConfirm && currentLink &&
+          autoGate?.eligible === true && !hasTerminalFounderResolution;
         if (needsFounderResolution) {
           const desired = createHealthKitWorkoutReconciliationReview({
             ownerUserId: context.ownerUserId,
@@ -923,7 +933,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
             }
           }
         } else if (isHealthKitWorkoutReconciliationReview(existingReview) && existingReview.status === "pending" &&
-          !(workoutPolicy.linkAutoConfirm === true && autoGate?.eligible)) {
+          !willAutomaticallyConfirm) {
           await records.put({
             ownerUserId: context.ownerUserId,
             collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
@@ -937,14 +947,19 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
 
         if (workoutPolicy.linkAutoConfirm === true && currentLink) {
           const gate = autoGate;
-          if (!gate?.eligible) {
+          const refusalReasons = !prospectiveAutoConfirm
+            ? ["workout_predates_auto_confirm_activation"]
+            : hasTerminalFounderResolution
+              ? ["founder_reconciliation_already_resolved"]
+              : [...(gate?.reasons ?? (gate?.eligible ? [] : ["gate_unavailable"]))];
+          if (refusalReasons.length > 0) {
             summary.automaticConfirmationRefusals.push({
               canonicalWorkoutId: workout.id,
-              reasons: [...(gate?.reasons ?? ["gate_unavailable"])],
+              reasons: refusalReasons,
               candidate: gate?.candidate ?? null,
             });
           }
-          if (gate.eligible) {
+          if (prospectiveAutoConfirm && !hasTerminalFounderResolution && gate?.eligible) {
             const confirmed = await confirmHealthKitWorkoutRelationship({
               records,
               ownerUserId: context.ownerUserId,
@@ -2829,6 +2844,12 @@ function stableJson(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+}
+
+function instantAtOrAfter(value, lowerBound) {
+  const instant = Date.parse(value);
+  const cutoff = Date.parse(lowerBound);
+  return Number.isFinite(instant) && Number.isFinite(cutoff) && instant >= cutoff;
 }
 
 const WORKOUT_TERMINAL_STATES = new Set([

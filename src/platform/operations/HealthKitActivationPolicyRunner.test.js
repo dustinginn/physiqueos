@@ -249,6 +249,7 @@ describe("open-ended (permanent, forward-only) canonicalization", () => {
     expect(applied.invariants).toMatchObject({
       policyIsExactlyTheAuthorizedRecord: true,
       linkAutoConfirmIsExactlyAuthorized: true,
+      linkAutoConfirmIsProspective: true,
       strategicEligibilityQuarantined: true,
       noBackfillRequested: true,
       canonicalWorkoutsUnchanged: true,
@@ -256,8 +257,18 @@ describe("open-ended (permanent, forward-only) canonicalization", () => {
       evidenceUnchanged: true,
     });
     const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: "healthkit_workout_canonical_activation_policy" });
-    expect(resolveHealthKitWorkoutActivationPolicy(stored)).toMatchObject({ enabled: true, linkAutoConfirm: true, families: ["strength"], openEnded: true });
-    expect(stored).toMatchObject({ strategicEvidenceEligibility: "quarantined", historicalBackfill: false });
+    expect(resolveHealthKitWorkoutActivationPolicy(stored)).toMatchObject({
+      enabled: true,
+      linkAutoConfirm: true,
+      linkAutoConfirmEffectiveAt: expect.any(String),
+      families: ["strength"],
+      openEnded: true,
+    });
+    expect(stored).toMatchObject({
+      strategicEvidenceEligibility: "quarantined",
+      historicalBackfill: false,
+      linkAutoConfirmEffectiveAt: expect.any(String),
+    });
   });
 
   it("writes the family scope explicitly (every family when none is named) and refuses families on the daily kind or an invalid scope", async () => {

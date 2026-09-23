@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createAuthenticationPrincipal } from "../auth/principal.js";
 import { createInMemoryFoundationTransactionStore } from "../../platform/commands/InMemoryFoundationTransactionStore.js";
 import { createPhase3CommandService, listPhase3CommandContracts, Phase3Command } from "./Phase3CommandService.js";
+import { CANONICAL_PERSISTENCE_PORT_NAMES } from "./CanonicalPersistenceCommandPorts.js";
 
 const principal = createAuthenticationPrincipal({ userId: "owner-one", deviceId: "device-one", sessionId: "session-one" });
 const payloads = {
@@ -83,6 +84,12 @@ const payloads = {
 };
 
 describe("Phase 3 task command parity boundary", () => {
+  it("composes every registered command through the production transaction-bound port allowlist", () => {
+    const registeredPorts = listPhase3CommandContracts().map((contract) => commandPort(contract.commandType));
+    expect(new Set(CANONICAL_PERSISTENCE_PORT_NAMES)).toEqual(new Set(registeredPorts));
+    expect(CANONICAL_PERSISTENCE_PORT_NAMES).toContain("resolveWorkoutReconciliation");
+  });
+
   it("dispatches every approved task to one canonical owner-scoped port", async () => {
     const ports = Object.fromEntries(listPhase3CommandContracts().map((contract) => {
       const portName = commandPort(contract.commandType);

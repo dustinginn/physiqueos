@@ -156,6 +156,14 @@ describe("structured reconciliation history", () => {
       },
       evidenceEligibility: { state: "quarantined", strategic: false },
     });
+    expect(projectHealthKitWorkoutReconciliationPresentation({ ...resolved, version: 2 })).toMatchObject({
+      status: "resolved_confirmed",
+      resolution: {
+        action: "confirm",
+        selectedLoggerSessionCanonicalId: "logger-sep23",
+        linkId: "link-sep23",
+      },
+    });
     expect(resolved.resolutionHistory).toHaveLength(1);
     expect(resolveHealthKitWorkoutReconciliationRecord(resolved, {
       action: "confirm",
