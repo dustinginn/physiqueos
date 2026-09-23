@@ -2170,8 +2170,8 @@ function formatActivityHubMetric(activityDay = {}) {
   const moveCalories = activityDay.daily_activity?.move_calories;
   const exerciseMinutes = activityDay.daily_activity?.exercise_minutes;
 
-  if (Number.isFinite(moveCalories)) return `${moveCalories} active cal`;
-  if (Number.isFinite(exerciseMinutes)) return `${exerciseMinutes} exercise min`;
+  if (Number.isFinite(moveCalories)) return `${formatWholeNumber(moveCalories)} active cal`;
+  if (Number.isFinite(exerciseMinutes)) return `${formatWholeNumber(exerciseMinutes)} exercise min`;
 
   return "Activity day";
 }
@@ -2184,13 +2184,15 @@ export function formatActivityProtocolSupport(activityDay = {}) {
     return "Activity context available.";
   }
 
+  // Round the difference (not the operands) so it stays consistent with the
+  // whole-number calories the cards show for the same day.
   const difference = moveCalories - effectiveTarget;
 
   if (difference >= 0) {
-    return `${difference} active calories above the recorded daily target.`;
+    return `${formatWholeNumber(difference)} active calories above the recorded daily target.`;
   }
 
-  return `${Math.abs(difference)} active calories below the recorded daily target.`;
+  return `${formatWholeNumber(Math.abs(difference))} active calories below the recorded daily target.`;
 }
 
 export function getEffectiveTargetForActivityDay(activityDay = {}) {

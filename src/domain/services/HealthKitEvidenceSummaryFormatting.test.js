@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { formatWholeNumber } from "./HealthKitEvidenceNumberFormatting";
 import {
   createProviderActivityEvidenceReport,
+  createProviderProgressHubReport,
+  formatActivityProtocolSupport,
   getNutritionReportExtras,
 } from "./ProgressReportingService";
 import { createEvidenceTimelineItems } from "./EvidenceTimelineService";
@@ -144,5 +146,43 @@ describe("HealthKit Evidence summary formatting", () => {
     });
     expect(item.title).toBe("782 active calories");
     expect(item.detail).toBe("Activity history updated");
+  });
+
+  // Found by independent review: a HealthKit day merged onto a screenshot day
+  // that carries move_goal reaches the protocol-support string on the headline
+  // card (`protocolStatus`), the report `trend`, and the Progress-hub trend.
+  it("rounds the protocol-support difference on the headline card, report trend, and Progress hub", () => {
+    const withGoal = {
+      ...ACTIVITY_PAYLOAD,
+      daily_activity: { ...ACTIVITY_PAYLOAD.daily_activity, move_goal: 1000 },
+    };
+    const objects = [{ canonicalId: "activity-goal", payload: withGoal }];
+    const report = createProviderActivityEvidenceReport({ canonicalEvidenceObjects: objects });
+
+    expect(report.trend).toBe("218 active calories below the recorded daily target.");
+    expect(report.latestActivityDay.protocolStatus).toBe("218 active calories below the recorded daily target.");
+    expect(report.activityHistory[0].protocolStatus).toBe("218 active calories below the recorded daily target.");
+    expect(report.latestActivityDay.moveGoal).toBe(1000);
+    expect(report.latestActivityDay.activeCalories).toBe(782.1669999999962);
+
+    const hub = createProviderProgressHubReport({ canonicalEvidenceObjects: objects });
+    const activityStream = Object.values(hub)
+      .flatMap((value) => (Array.isArray(value) ? value : []))
+      .find((entry) => entry?.id === "activity");
+    expect(activityStream).toBeDefined();
+    expect(activityStream.metric).toBe("782 active cal");
+    expect(activityStream.trend).toBe("218 active calories below the recorded daily target.");
+    for (const text of [report.trend, report.latestActivityDay.protocolStatus, activityStream.metric, activityStream.trend]) {
+      expect(text).not.toMatch(RAW_DOUBLE_TAIL);
+    }
+  });
+
+  it("rounds the above-target protocol-support difference too", () => {
+    expect(formatActivityProtocolSupport({
+      daily_activity: { move_calories: 1099.5000000000002, move_goal: 900 },
+    })).toBe("200 active calories above the recorded daily target.");
+    expect(formatActivityProtocolSupport({
+      daily_activity: { move_calories: 782.1669999999962 },
+    })).toBe("Activity context available.");
   });
 });
