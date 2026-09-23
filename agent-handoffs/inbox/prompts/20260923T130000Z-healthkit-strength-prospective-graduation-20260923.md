@@ -191,3 +191,24 @@ WORKOUT_STRATEGIC_ELIGIBILITY_ENABLED
 ACTIVITY_NUTRITION_UNCHANGED
 STRENGTH_GRADUATION_VERDICT
 READY_FOR_CARDIO_CANARY
+
+
+FOUNDER TIMING CLARIFICATION — today's workout may precede rollout
+
+Founder expects to start the normal 2026-09-23 strength workout within approximately one hour and should NOT delay the workout for this engineering task or a new Native build.
+
+Required graduation semantics:
+- eligibility is based on the workout's Founder-local occurrence date/time relative to the prospective policy effective date, NOT on whether PhysiqueOS happened to observe/upload it after activation;
+- a qualifying Strength workout occurring on 2026-09-23 must be ingestible by normal automatic/foreground catch-up even if the workout completed before the new policy/build became live;
+- a workout already in progress during rollout should be handled normally once Apple Health exposes/saves the completed HKWorkout; no mid-workout PhysiqueOS capture requirement;
+- a workout completed earlier today before rollout must be discovered on the next eligible HealthKit catch-up after rollout;
+- this same-day catch-up is NOT historical backfill and must not require Founder canary/manual Workout Sync;
+- Sep 22 and older workouts must not be swept in merely because a catch-up query runs after rollout;
+- do not require the Founder to postpone, restart, re-record, re-upload, or otherwise structure the workout around deployment timing.
+
+Explicit acceptance case for today's first live Strength event:
+Founder may start/finish the Sep 23 Workout Logger + Apple Watch Strength workout before engineering finishes. Once the prospective Strength capability/policy is live, ordinary app foreground/catch-up must discover the already-completed Sep 23 HKWorkout, canonicalize it exactly once, and reconcile it to the correct Sep 23 Logger session without screenshots or Founder canary/manual sync.
+
+If the current Native automatic Workout query cannot discover an already-completed eligible same-day workout after rollout, treat that as a graduation blocker and fix/review it before declaring Strength live. Do not work around it by asking Founder to manually sync.
+
+When notifying Founder that the live acceptance is ready, account for whether today's workout is then in progress or already completed and give only normal-use instructions.
