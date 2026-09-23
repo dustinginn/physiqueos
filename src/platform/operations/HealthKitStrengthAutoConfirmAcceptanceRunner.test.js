@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createCanonicalPersistenceCommandPorts } from "../../application/commands/CanonicalPersistenceCommandPorts.js";
 import { createInMemoryCanonicalRecordStore } from "../database/Phase4CanonicalRecordStore.js";
 import { runHealthKitStrengthAutoConfirmAcceptance } from "./HealthKitStrengthAutoConfirmAcceptanceRunner.js";
+import { buildHealthKitPayload } from "../../../scripts/operations/buildHealthKitPayload.mjs";
 
 const OWNER = "user_founder_001";
 const DAY = "2026-09-23";
@@ -12,6 +13,7 @@ const AUTHORIZATION = {
   endLocalDate: DAY,
   authorizationReference: "founder-approved-sep23-auto-confirm",
 };
+const SHA = "1".repeat(40);
 
 describe("bounded Strength deterministic auto-confirm acceptance", () => {
   it("dry-runs without writes, then applies once with claims, audit, and inert history", async () => {
@@ -63,7 +65,7 @@ describe("bounded Strength deterministic auto-confirm acceptance", () => {
     expect(after.trainingPerformanceEvents).toEqual(before.trainingPerformanceEvents);
 
     const replay = await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, apply: true, expected: dry.facts, now: () => new Date(NOW) });
-    expect(replay.outcome).toBe("already_confirmed");
+    expect(replay).toMatchObject({ outcome: "already_confirmed", reasons: [] });
     expect(records.snapshot().evidenceReviews[0].resolutionHistory).toHaveLength(1);
   });
 
@@ -92,6 +94,41 @@ describe("bounded Strength deterministic auto-confirm acceptance", () => {
     expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("candidate");
     expect(records.snapshot().healthKitWorkoutLinkClaims).toEqual([]);
     expect(records.snapshot().evidenceReviews ?? []).toEqual([]);
+  });
+
+  it.each([
+    ["2026-09-22", "2026-09-22"],
+    ["2026-09-23", "2026-09-24"],
+    ["2026-09-24", "2026-09-24"],
+  ])("refuses every acceptance window outside the exact September 23 day: %s to %s", async (startLocalDate, endLocalDate) => {
+    const records = await productionShapedWorld();
+    const before = records.snapshot();
+    await expect(buildHealthKitPayload({
+      kind: "strength-auto-confirm",
+      sha: SHA,
+      start: startLocalDate,
+      end: endLocalDate,
+      mode: "dry-run",
+    })).rejects.toThrow("bounded to --start 2026-09-23 --end 2026-09-23");
+    expect(await runHealthKitStrengthAutoConfirmAcceptance({
+      records,
+      authorization: { ...AUTHORIZATION, startLocalDate, endLocalDate },
+      now: () => new Date(NOW),
+    })).toEqual({ outcome: "refused", reasons: ["acceptance_window_not_september_23"] });
+    expect(records.snapshot()).toEqual(before);
+  });
+
+  it.each(["missing", "foreign"])("refuses an already-confirmed replay with %s exact claims", async (corruption) => {
+    const records = await productionShapedWorld();
+    const dry = await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, now: () => new Date(NOW) });
+    await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, apply: true, expected: dry.facts, now: () => new Date(NOW) });
+    const snapshot = records.snapshot();
+    snapshot.healthKitWorkoutLinkClaims = corruption === "missing"
+      ? []
+      : snapshot.healthKitWorkoutLinkClaims.map((claim) => ({ ...claim, holderLinkId: "foreign-link" }));
+    const corrupt = createInMemoryCanonicalRecordStore(snapshot);
+    const result = await runHealthKitStrengthAutoConfirmAcceptance({ records: corrupt, authorization: AUTHORIZATION, now: () => new Date(NOW) });
+    expect(result).toMatchObject({ outcome: "refused", reasons: ["stored_relationship_violations"] });
   });
 });
 

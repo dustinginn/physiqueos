@@ -118,6 +118,9 @@ export async function buildHealthKitPayload({
   if (["link-confirm", "strength-auto-confirm"].includes(kind)) {
     if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
     if (!DATE.test(start) || !DATE.test(end) || start > end) throw new Error("--start and --end must be an ordered YYYY-MM-DD window.");
+    if (kind === "strength-auto-confirm" && (start !== "2026-09-23" || end !== "2026-09-23")) {
+      throw new Error("strength-auto-confirm is bounded to --start 2026-09-23 --end 2026-09-23.");
+    }
     if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
       throw new Error("apply mode requires --authorization-ref and --expected.");
     }

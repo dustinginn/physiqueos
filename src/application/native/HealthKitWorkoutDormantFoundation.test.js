@@ -8,7 +8,10 @@ import {
   selectStrategicallyEligibleRecords,
 } from "../../domain/services/HealthKitEvidenceEligibilityPolicy.js";
 import { resolveHealthKitWorkoutActivationPolicy } from "../../domain/services/HealthKitObservationService.js";
-import { confirmHealthKitWorkoutRelationship } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
+import {
+  confirmHealthKitWorkoutRelationship,
+  getHealthKitWorkoutLinkClaimId,
+} from "../../domain/services/HealthKitWorkoutRelationshipService.js";
 
 const OWNER = "user_founder_001";
 const WORKOUT_POLICY_ID = "healthkit_workout_canonical_activation_policy";
@@ -405,6 +408,39 @@ describe("controlled Workout window (policy enabled)", () => {
     expect(after.evidenceReviews[0].status).toBe("pending");
     expect(after.healthKitWorkoutLinks[0].status).toBe("confirmed");
     expect(after.healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
+  });
+
+  it.each(["orphan_workout", "mismatched_session"])("rejects No match when a relevant %s held claim is corrupt", async (kind) => {
+    const records = store({ evidence: [logger("session-a", "10:04", "11:20", 4560)] });
+    await ingest(records, [workout()], `no-match-claim-${kind}`);
+    const before = records.snapshot();
+    const [review] = before.evidenceReviews;
+    const [candidate] = before.healthKitWorkoutLinks;
+    const claimKind = kind === "orphan_workout" ? "workout" : "session";
+    const subject = claimKind === "workout" ? candidate.canonicalWorkoutId : candidate.loggerSessionCanonicalId;
+    const claimId = getHealthKitWorkoutLinkClaimId(claimKind, subject);
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "healthKitWorkoutLinkClaims",
+      recordId: claimId,
+      payload: {
+        id: claimId,
+        userId: OWNER,
+        kind: claimKind,
+        status: "held",
+        holderLinkId: kind === "orphan_workout" ? "missing-link" : candidate.id,
+        history: [],
+      },
+    });
+    await expect(createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-23T23:31:00.000Z") })
+      .resolveWorkoutReconciliation({
+        ownerUserId: OWNER,
+        principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+        metadata: { commandId: `resolve-no-match-${kind}`, expectedVersion: String(review.version), idempotencyKey: `resolve-no-match-${kind}` },
+        payload: { reviewId: review.id, action: "no_match" },
+      })).rejects.toMatchObject({ status: 409, code: "WORKOUT_RECONCILIATION_RELATIONSHIP_DRIFT" });
+    expect(records.snapshot().evidenceReviews[0].status).toBe("pending");
+    expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("candidate");
   });
 
   it("reopens a superseded review when a plausible relationship returns", async () => {

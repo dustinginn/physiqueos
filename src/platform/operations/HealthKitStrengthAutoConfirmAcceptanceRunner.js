@@ -14,7 +14,14 @@ import {
   isHealthKitWorkoutReconciliationReview,
   resolveHealthKitWorkoutReconciliationRecord,
 } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
+import {
+  HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
+  findHealthKitWorkoutRelationshipViolations,
+  getHealthKitWorkoutLinkClaimId,
+} from "../../domain/services/HealthKitWorkoutRelationshipService.js";
 import { runHealthKitWorkoutLinkConfirmation } from "./HealthKitWorkoutLinkConfirmationRunner.js";
+
+export const HEALTHKIT_STRENGTH_AUTO_CONFIRM_ACCEPTANCE_DATE = "2026-09-23";
 
 /**
  * Bounded acceptance operation for one existing deterministic Strength
@@ -31,9 +38,14 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
   now = () => new Date(),
 } = {}) {
   const { ownerUserId, startLocalDate, endLocalDate } = authorization ?? {};
-  const [workouts, links, evidence, metadata] = await Promise.all([
+  if (startLocalDate !== HEALTHKIT_STRENGTH_AUTO_CONFIRM_ACCEPTANCE_DATE ||
+      endLocalDate !== HEALTHKIT_STRENGTH_AUTO_CONFIRM_ACCEPTANCE_DATE) {
+    return Object.freeze({ outcome: "refused", reasons: ["acceptance_window_not_september_23"] });
+  }
+  const [workouts, links, claims, evidence, metadata] = await Promise.all([
     records.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION }),
     records.list({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION }),
+    records.list({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION }),
     records.list({ ownerUserId, collection: "canonicalEvidenceObjects" }),
     records.listStorageMetadata({ ownerUserId, collection: "canonicalEvidenceObjects" }),
   ]);
@@ -46,6 +58,10 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
   }
   const [workout] = inWindow;
   const [link] = relationships;
+  const relationshipViolations = findHealthKitWorkoutRelationshipViolations({ links, claims });
+  if (Object.values(relationshipViolations).some((count) => count !== 0)) {
+    return Object.freeze({ outcome: "refused", reasons: ["stored_relationship_violations"], violations: relationshipViolations });
+  }
   const reviewId = getHealthKitWorkoutReconciliationId(workout.id);
   const existingHistory = await records.get({
     ownerUserId,
@@ -55,9 +71,14 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
   if (link.status === HealthKitWorkoutLinkStatus.CONFIRMED) {
     const sameHistory = isHealthKitWorkoutReconciliationReview(existingHistory) &&
       existingHistory.status === "resolved_confirmed" && existingHistory.resolution?.linkId === link.id;
+    const exactClaims = claimsHeldByLink(claims, link);
     return Object.freeze({
-      outcome: sameHistory ? "already_confirmed" : "refused",
-      reasons: sameHistory ? [] : ["confirmed_link_missing_reconciliation_history"],
+      outcome: sameHistory && exactClaims ? "already_confirmed" : "refused",
+      reasons: sameHistory && exactClaims
+        ? []
+        : !sameHistory
+          ? ["confirmed_link_missing_reconciliation_history"]
+          : ["confirmed_link_without_exact_held_claims"],
       linkId: link.id,
       reviewId,
     });
@@ -185,6 +206,13 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
 
 function digest(value) {
   return createHash("sha256").update(stable(value)).digest("hex");
+}
+
+function claimsHeldByLink(claims, link) {
+  return [["workout", link.canonicalWorkoutId], ["session", link.loggerSessionCanonicalId]].every(([kind, subject]) => {
+    const claim = claims.find((item) => item.id === getHealthKitWorkoutLinkClaimId(kind, subject));
+    return claim?.status === "held" && claim.holderLinkId === link.id;
+  });
 }
 
 function stable(value) {

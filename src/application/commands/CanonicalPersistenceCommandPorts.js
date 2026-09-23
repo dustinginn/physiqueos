@@ -72,6 +72,7 @@ import {
 import {
   HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
   confirmHealthKitWorkoutRelationship,
+  getHealthKitWorkoutLinkClaimId,
   unlinkHealthKitWorkoutRelationship,
 } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
 import {
@@ -2190,9 +2191,23 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       const relationshipLinks = workoutLinks.filter((link) => link.canonicalWorkoutId === review.canonicalWorkoutId);
       const relationshipLinkIds = new Set(relationshipLinks.map((link) => link.id));
       const confirmed = relationshipLinks.filter((link) => link.status === HealthKitWorkoutLinkStatus.CONFIRMED);
-      const heldClaims = workoutLinkClaims.filter((claim) =>
-        claim.status === "held" && relationshipLinkIds.has(claim.holderLinkId));
-      if (confirmed.length > 0 || heldClaims.length > 0) {
+      const relevantSessionIds = new Set([
+        ...relationshipLinks.map((link) => link.loggerSessionCanonicalId),
+        ...assessment.candidates.map((candidate) => candidate.loggerSessionCanonicalId),
+      ]);
+      const workoutClaimId = getHealthKitWorkoutLinkClaimId("workout", review.canonicalWorkoutId);
+      const relevantSessionClaimIds = new Set([...relevantSessionIds].map((id) => getHealthKitWorkoutLinkClaimId("session", id)));
+      const relevantHeldClaims = workoutLinkClaims.filter((claim) => claim.status === "held" &&
+        (claim.id === workoutClaimId || relevantSessionClaimIds.has(claim.id)));
+      const linkById = new Map(workoutLinks.map((link) => [link.id, link]));
+      const invalidRelevantHeldClaim = relevantHeldClaims.some((claim) => {
+        if (claim.id === workoutClaimId) return true;
+        const holder = linkById.get(claim.holderLinkId);
+        return !holder || holder.status !== HealthKitWorkoutLinkStatus.CONFIRMED ||
+          claim.id !== getHealthKitWorkoutLinkClaimId("session", holder.loggerSessionCanonicalId);
+      });
+      if (confirmed.length > 0 || invalidRelevantHeldClaim ||
+        relevantHeldClaims.some((claim) => relationshipLinkIds.has(claim.holderLinkId))) {
         throw problem(409, "WORKOUT_RECONCILIATION_RELATIONSHIP_DRIFT", "The workout relationship changed before No match could be recorded.");
       }
       const releasedCandidateLinkIds = [];
