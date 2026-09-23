@@ -106,13 +106,35 @@ export async function runHealthKitWorkoutLinkReassessment({
     })),
   };
   const existingCandidate = relatedLinks.find((link) => link.id === candidate.id && link.status === HealthKitWorkoutLinkStatus.CANDIDATE);
+  const auditRecordId = `${HEALTHKIT_WORKOUT_LINK_REASSESSMENT_AUDIT_RECORD_PREFIX}${digest(authorizationReference ?? "").slice(0, 12)}`;
   if (existingCandidate && stable(workout.linkAssessment) === stable(assessmentPatch) &&
     existingCandidate.matcherVersion === assessment.matcherVersion && existingCandidate.confidence === candidate.confidence) {
-    return Object.freeze({ outcome: "already_reassessed", ...summary(workout, candidate, assessment), facts });
+    if (!apply) return Object.freeze({ outcome: "already_reassessed", ...summary(workout, candidate, assessment), facts });
+    if (!String(authorizationReference ?? "").trim()) {
+      throw operationError("AUTHORIZATION_REFERENCE_REQUIRED", "Apply requires an authorization reference.");
+    }
+    const existingAudit = await records.get({
+      ownerUserId,
+      collection: CONFIGURATION_COLLECTION,
+      recordId: auditRecordId,
+    });
+    if (existingAudit?.authorizationReference === String(authorizationReference) &&
+      existingAudit?.canonicalWorkoutId === workout.id &&
+      existingAudit?.loggerSessionCanonicalId === candidate.loggerSessionCanonicalId &&
+      existingAudit?.matcherVersion === assessment.matcherVersion &&
+      existingAudit?.autoConfirm === false &&
+      existingAudit?.strategicEvidenceEligibility === "quarantined") {
+      return Object.freeze({ outcome: "already_reassessed", ...summary(workout, candidate, assessment), auditRecordId, facts });
+    }
+    const replayDrift = compareFacts(expected, facts);
+    if (replayDrift.length > 0) return Object.freeze({ outcome: "drifted", drift: replayDrift, facts });
+    return refused("existing_reassessment_without_matching_authorization_audit", facts, {
+      canonicalWorkoutId: workout.id,
+      linkId: candidate.id,
+    });
   }
   if (relatedLinks.length > 0) return refused("existing_link_requires_separate_review", facts, { linkCount: relatedLinks.length });
 
-  const auditRecordId = `${HEALTHKIT_WORKOUT_LINK_REASSESSMENT_AUDIT_RECORD_PREFIX}${digest(authorizationReference ?? "").slice(0, 12)}`;
   const resultSummary = {
     ...summary(workout, candidate, assessment),
     auditRecordId,

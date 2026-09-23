@@ -90,10 +90,45 @@ describe("guarded Workout link reassessment operation", () => {
     const mutations = records.getMutationCount();
 
     const replay = await runHealthKitWorkoutLinkReassessment({ records, authorization: AUTH, now });
+    const applyReplay = await runHealthKitWorkoutLinkReassessment({
+      records,
+      authorization: AUTH,
+      apply: true,
+      expected: dry.facts,
+      now,
+    });
 
     expect(replay).toMatchObject({ outcome: "already_reassessed", linkStatus: "candidate" });
+    expect(applyReplay).toMatchObject({
+      outcome: "already_reassessed",
+      linkStatus: "candidate",
+      auditRecordId: expect.stringContaining("healthkit_workout_link_reassessment_audit_"),
+    });
     expect(records.getMutationCount()).toBe(mutations);
     expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("candidate");
+  });
+
+  it("does not treat an existing candidate as an authorized apply success without the matching audit", async () => {
+    const records = await world();
+    const dry = await runHealthKitWorkoutLinkReassessment({ records, authorization: AUTH, now });
+    await runHealthKitWorkoutLinkReassessment({ records, authorization: AUTH, apply: true, expected: dry.facts, now });
+    const mutations = records.getMutationCount();
+    const differentAuthorization = { ...AUTH, authorizationReference: "a-different-founder-authorization" };
+    const current = await runHealthKitWorkoutLinkReassessment({ records, authorization: differentAuthorization, now });
+
+    const result = await runHealthKitWorkoutLinkReassessment({
+      records,
+      authorization: differentAuthorization,
+      apply: true,
+      expected: current.facts,
+      now,
+    });
+
+    expect(result).toMatchObject({
+      outcome: "refused",
+      reasons: ["existing_reassessment_without_matching_authorization_audit"],
+    });
+    expect(records.getMutationCount()).toBe(mutations);
   });
 
   it("refuses if the Strength policy safety flags move, or date/workout/session uniqueness is absent", async () => {
