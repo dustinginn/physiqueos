@@ -18,7 +18,7 @@
     "expected_production_deployment": "0bdc1748-d918-452f-a84a-52a9bfdc5373",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260923T034500Z-healthkit-evidence-summary-formatting-cleanup.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260923T034500Z-healthkit-evidence-summary-formatting-cleanup-20260923.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
