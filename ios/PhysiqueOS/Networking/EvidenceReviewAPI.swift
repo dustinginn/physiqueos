@@ -160,6 +160,7 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
         var summary: Summary
         var workout: ReconciliationWorkout?
         var candidates: [ReconciliationCandidate]
+        var resolution: ReconciliationResolution?
 
         struct Summary: Decodable {
             var text: String?
@@ -229,12 +230,25 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
                         startedAt: $0.loggerSession?.startedAt,
                         endedAt: $0.loggerSession?.endedAt
                     )
+                },
+                resolution: resolution.map {
+                    .init(
+                        action: $0.action,
+                        selectedLoggerSessionCanonicalId: $0.selectedLoggerSessionCanonicalId,
+                        linkId: $0.linkId
+                    )
                 }
             )
         }
 
+        struct ReconciliationResolution: Decodable {
+            var action: String
+            var selectedLoggerSessionCanonicalId: String?
+            var linkId: String?
+        }
+
         private enum CodingKeys: String, CodingKey {
-            case kind, localDate, title, items, summary, workout, candidates
+            case kind, localDate, title, items, summary, workout, candidates, resolution
         }
 
         init(from decoder: Decoder) throws {
@@ -246,6 +260,7 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
             summary = try container.decodeIfPresent(Summary.self, forKey: .summary) ?? Summary(text: nil, excludedText: nil)
             workout = try container.decodeIfPresent(ReconciliationWorkout.self, forKey: .workout)
             candidates = try container.decodeIfPresent([ReconciliationCandidate].self, forKey: .candidates) ?? []
+            resolution = try container.decodeIfPresent(ReconciliationResolution.self, forKey: .resolution)
         }
     }
 

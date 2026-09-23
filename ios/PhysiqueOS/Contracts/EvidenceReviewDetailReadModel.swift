@@ -29,6 +29,13 @@ struct WorkoutReconciliationDetail: Equatable {
     var summary: String
     var workout: WorkoutReconciliationWorkout
     var candidates: [WorkoutReconciliationCandidate]
+    var resolution: WorkoutReconciliationResolution? = nil
+}
+
+struct WorkoutReconciliationResolution: Equatable {
+    var action: String
+    var selectedLoggerSessionCanonicalId: String?
+    var linkId: String?
 }
 
 struct WorkoutReconciliationWorkout: Equatable {

@@ -34,6 +34,7 @@ struct EvidenceReviewDetailView: View {
         case dismissed
         case accepted
         case confirmed
+        case workoutReconciliationResolved(String)
         case stillProcessing
         case refreshRequired(String)
         case failed(String)
@@ -453,6 +454,18 @@ struct EvidenceReviewDetailView: View {
             completionActions(label: "Confirmation accepted")
         case .confirmed:
             completionActions(label: "Confirmed")
+        case .workoutReconciliationResolved(let action):
+            if action == "no_match" {
+                completionActions(
+                    label: "No match recorded",
+                    detail: "The Apple Health workout remains unlinked. Logger detail and strategic eligibility were not changed."
+                )
+            } else {
+                completionActions(
+                    label: "Match confirmed",
+                    detail: "The Apple Health workout is linked to the selected Logger session. Logger detail and strategic eligibility were not changed."
+                )
+            }
         case .stillProcessing:
             CardContainer { VStack(alignment: .leading, spacing: 6) {
                 Text("Still confirming").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
@@ -476,11 +489,14 @@ struct EvidenceReviewDetailView: View {
         }
     }
 
-    private func completionActions(label: String) -> some View {
+    private func completionActions(
+        label: String,
+        detail: String = "PhysiqueOS owns this confirmation. Remaining analysis and briefing updates continue in the background."
+    ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(label, systemImage: "checkmark.circle.fill")
                 .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-            Text("PhysiqueOS owns this confirmation. Remaining analysis and briefing updates continue in the background.")
+            Text(detail)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
             PrimaryActionButton(title: "Back to Log", tone: .accent) {
@@ -588,6 +604,7 @@ struct EvidenceReviewDetailView: View {
         loggerSessionCanonicalId: String?
     ) async {
         guard let version = review.version else { return }
+        let requestedAction = loggerSessionCanonicalId == nil ? "no_match" : "confirm"
         actionState = .confirming(loggerSessionCanonicalId == nil ? "Recording no match…" : "Confirming workout match…")
         do {
             try await environment.evidenceReviewAPI.resolveWorkoutReconciliation(
@@ -598,17 +615,41 @@ struct EvidenceReviewDetailView: View {
             await environment.productionNativeAPI.invalidateReadResources([
                 "evidence-review", "evidence-review-queue", "training-landing", "training-day",
             ])
-            actionState = .confirmed
+            actionState = .workoutReconciliationResolved(requestedAction)
         } catch {
-            if ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error),
-               let refreshed = try? await environment.evidenceReviewAPI.fetchReview(reviewId: review.id),
-               refreshed.status.hasPrefix("resolved_") {
-                state = .loaded(refreshed)
-                actionState = .confirmed
+            if ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) {
+                if let refreshed = try? await environment.evidenceReviewAPI.fetchReview(reviewId: review.id) {
+                    state = .loaded(refreshed)
+                    actionState = Self.reconciliationResolutionMatches(
+                        refreshed,
+                        requestedAction: requestedAction,
+                        loggerSessionCanonicalId: loggerSessionCanonicalId
+                    )
+                        ? .workoutReconciliationResolved(requestedAction)
+                        : .refreshRequired("The reconciliation outcome could not be verified as the action you requested. Review the current result before trying again.")
+                } else {
+                    actionState = .refreshRequired("The reconciliation may have been accepted, but its exact outcome could not be verified. Refresh before making another change.")
+                }
             } else {
                 actionState = .failed(Self.errorMessage(for: error))
             }
         }
+    }
+
+    static func reconciliationResolutionMatches(
+        _ review: EvidenceReviewDetailReadModel,
+        requestedAction: String,
+        loggerSessionCanonicalId: String?
+    ) -> Bool {
+        guard let resolution = review.workoutReconciliation?.resolution else { return false }
+        if requestedAction == "no_match" {
+            return review.status == "resolved_no_match" &&
+                resolution.action == "no_match" &&
+                resolution.selectedLoggerSessionCanonicalId == nil
+        }
+        return review.status == "resolved_confirmed" &&
+            resolution.action == "confirm" &&
+            resolution.selectedLoggerSessionCanonicalId == loggerSessionCanonicalId
     }
 
     private func confirm(review: EvidenceReviewDetailReadModel) async {

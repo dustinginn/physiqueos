@@ -2140,7 +2140,7 @@ final class FounderServerAPITests: XCTestCase {
     func testProductionEvidenceReviewDecodesTypedWorkoutReconciliation() async throws {
         let detail = productionEnvelope(
             resource: "evidence-review",
-            data: #"{"review":{"id":"healthkit_workout_reconciliation_one","status":"pending","version":2,"localDate":"2026-09-23"},"presentation":{"kind":"healthkit_workout_reconciliation","id":"healthkit_workout_reconciliation_one","status":"pending","version":"2","localDate":"2026-09-23","title":"Match Apple Health workout","summary":"Choose the matching Logger session, or choose No match.","workout":{"family":"strength","canonicalType":"traditional_strength_training","startedAt":"2026-09-23T17:00:00.000Z","endedAt":"2026-09-23T18:00:00.000Z"},"candidates":[{"loggerSessionCanonicalId":"logger-a","confidence":95,"basis":"logger_session_window","loggerSession":{"activityType":"Traditional Strength Training","startedAt":"2026-09-23T17:01:00.000Z","endedAt":"2026-09-23T17:59:00.000Z"}},{"loggerSessionCanonicalId":"logger-b","confidence":94,"basis":"temporal_and_telemetry","loggerSession":{"activityType":"Functional Strength Training","startedAt":"2026-09-23T17:02:00.000Z","endedAt":"2026-09-23T18:01:00.000Z"}}]}}"#
+            data: #"{"review":{"id":"healthkit_workout_reconciliation_one","status":"resolved_confirmed","version":2,"localDate":"2026-09-23"},"presentation":{"kind":"healthkit_workout_reconciliation","id":"healthkit_workout_reconciliation_one","status":"resolved_confirmed","version":"2","localDate":"2026-09-23","title":"Match Apple Health workout","summary":"Choose the matching Logger session, or choose No match.","workout":{"family":"strength","canonicalType":"traditional_strength_training","startedAt":"2026-09-23T17:00:00.000Z","endedAt":"2026-09-23T18:00:00.000Z"},"candidates":[{"loggerSessionCanonicalId":"logger-a","confidence":95,"basis":"logger_session_window","loggerSession":{"activityType":"Traditional Strength Training","startedAt":"2026-09-23T17:01:00.000Z","endedAt":"2026-09-23T17:59:00.000Z"}},{"loggerSessionCanonicalId":"logger-b","confidence":94,"basis":"temporal_and_telemetry","loggerSession":{"activityType":"Functional Strength Training","startedAt":"2026-09-23T17:02:00.000Z","endedAt":"2026-09-23T18:01:00.000Z"}}],"resolution":{"action":"confirm","selectedLoggerSessionCanonicalId":"logger-a","linkId":"link-a"}}}"#
         )
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),
@@ -2158,7 +2158,24 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(review?.workoutReconciliation?.workout.canonicalType, "traditional_strength_training")
         XCTAssertEqual(review?.workoutReconciliation?.candidates.map(\.loggerSessionCanonicalId), ["logger-a", "logger-b"])
         XCTAssertEqual(review?.workoutReconciliation?.candidates.first?.confidence, 95)
-        XCTAssertEqual(EvidenceReviewDetailView.occurrenceDateLabel(for: try XCTUnwrap(review)), "Sep 23")
+        let decoded = try XCTUnwrap(review)
+        XCTAssertEqual(decoded.workoutReconciliation?.resolution?.selectedLoggerSessionCanonicalId, "logger-a")
+        XCTAssertTrue(EvidenceReviewDetailView.reconciliationResolutionMatches(
+            decoded,
+            requestedAction: "confirm",
+            loggerSessionCanonicalId: "logger-a"
+        ))
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationResolutionMatches(
+            decoded,
+            requestedAction: "confirm",
+            loggerSessionCanonicalId: "logger-b"
+        ))
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationResolutionMatches(
+            decoded,
+            requestedAction: "no_match",
+            loggerSessionCanonicalId: nil
+        ))
+        XCTAssertEqual(EvidenceReviewDetailView.occurrenceDateLabel(for: decoded), "Sep 23")
     }
 
     func testWorkoutReconciliationResolutionUsesRegisteredVersionedCommandAndStableIdempotency() async throws {
@@ -2210,6 +2227,41 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(payload["action"] as? String, "no_match")
         XCTAssertNil(payload["loggerSessionCanonicalId"])
         XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"2\"")
+    }
+
+    @MainActor
+    func testWorkoutReconciliationNoMatchReadbackRequiresTheExactResolution() {
+        let review = EvidenceReviewDetailReadModel(
+            id: "review-one",
+            status: "resolved_no_match",
+            createdAt: nil,
+            version: 3,
+            items: [],
+            workoutReconciliation: .init(
+                localDate: "2026-09-23",
+                title: "Match Apple Health workout",
+                summary: "No match",
+                workout: .init(
+                    family: "strength",
+                    canonicalType: "traditional_strength_training",
+                    startedAt: "2026-09-23T17:00:00Z",
+                    endedAt: "2026-09-23T18:00:00Z"
+                ),
+                candidates: [],
+                resolution: .init(action: "no_match", selectedLoggerSessionCanonicalId: nil, linkId: nil)
+            )
+        )
+
+        XCTAssertTrue(EvidenceReviewDetailView.reconciliationResolutionMatches(
+            review,
+            requestedAction: "no_match",
+            loggerSessionCanonicalId: nil
+        ))
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationResolutionMatches(
+            review,
+            requestedAction: "confirm",
+            loggerSessionCanonicalId: "logger-a"
+        ))
     }
 
     /// The Server's corrected provenance owns the label: a Training review whose
