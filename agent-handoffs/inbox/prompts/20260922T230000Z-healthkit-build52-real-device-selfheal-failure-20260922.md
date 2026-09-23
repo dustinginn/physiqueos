@@ -289,3 +289,25 @@ Final report must distinguish:
 - canonical/read-model/UI refresh latency after upload.
 
 Add tests for pull-to-refresh HealthKit catch-up, stale-vs-fresh foreground behavior, rapid foreground deduplication, and unchanged-data idempotency.
+
+
+FOUNDER UI CORRECTION — Activity numeric formatting
+
+The same raw floating-point precision leak is present on the live Activity Evidence Report. Current examples include:
+- 734.6809999999961 active cal
+- 193.68099999999606 non-workout active cal
+and the same values repeat in metric cards / Activity Areas.
+
+Extend the previously requested Nutrition formatting correction to HealthKit-backed Activity surfaces as well.
+
+Desired presentation:
+- active calories: whole-number calories, e.g. 735 active cal using the established product rounding convention;
+- non-workout active calories: whole-number calories, e.g. 194 cal;
+- workout calories: whole-number calories (already appears compact in this example);
+- exercise minutes and stand hours remain whole units as currently displayed;
+- use one centralized/reused formatter across Activity headline, metric cards, Activity Areas, Log and any other Native Activity surface;
+- do not round/mutate canonical stored values; presentation only unless audit proves a serialization defect;
+- headline and cards must agree;
+- add regression tests using binary floating-point tails such as 734.6809999999961 and 193.68099999999606.
+
+Audit for raw-double leakage across BOTH Activity and Nutrition Evidence surfaces before closing the formatting fix. The acceptance criterion is that no user-facing calorie/macro field displays machine floating-point tails.
