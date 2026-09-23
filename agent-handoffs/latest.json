@@ -1,61 +1,61 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-22T22:52:02Z",
+  "generated_at_utc": "2026-09-23T02:52:56Z",
   "task": {
-    "id": "healthkit-automatic-partition-recovery-build52-20260922",
-    "title": "Fix HealthKit automatic identity and rejection recovery for Build 52",
+    "id": "healthkit-build52-real-device-selfheal-failure-20260922",
+    "title": "Diagnose Build 52 real-device HealthKit self-heal failure",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "c638124317e27717c234976e6ac61e22f00f30d",
-    "final_sha": "4894e162b42f018745a12506ceacfe243a5fbb50",
-    "production_server_sha": "924d5e556ba418ceb64de828d4c6a7c06d99f769",
-    "production_deployment": "c2442650-a9a0-499e-bc42-59b81c0c8bae",
-    "native_sha": "4894e162b42f018745a12506ceacfe243a5fbb50",
-    "native_build": 52
+    "base_sha": "924d5e556ba418ceb64de828d4c6a7c06d99f769",
+    "final_sha": "1c57556f",
+    "production_server_sha": "ccff693b61c98737b670be620f7916c375cb37ce",
+    "production_deployment": "0bdc1748-d918-452f-a84a-52a9bfdc5373",
+    "native_sha": "1c57556f",
+    "native_build": 53
   },
   "result": {
-    "summary": "Follow-up to the earlier 'blocked' handoff for this same task: the Founder explicitly authorized the App Store Connect upload in chat, naming Build 52, the exact reviewed SHA (4894e162), and the guarded tool. Reverified the archive was unchanged before executing. Upload succeeded: xcodebuild -exportArchive reported EXPORT SUCCEEDED, App Store Connect accepted delivery 6b7d449f-ca94-49fa-957d-1534d20ec52d, and Apple's processing state polled and independently reconfirmed VALID (import status also VALID). Build 52 -- the fixed candidate with the namespace + permanent-rejection-recovery corrections, 1287 unit tests, 12 UI tests, independent review APPROVE -- is now live in TestFlight, ready for the Founder to install and retest.",
+    "summary": "Neither Activity nor Nutrition was permanently stuck on Build 52 -- both self-healed, confirmed by the Founder's own live updates. Root cause: a Server-side idempotency-key insert race producing spurious 500s on app relaunch, plus a normal usage-cadence gap. Fixed server-side, independently reviewed (2 gaps found and hardened), tested and mutation-tested. Also fixed the raw-floating-point display bug on both Evidence Reports and added Log pull-to-refresh, per the Founder's follow-up reports. Founder explicitly authorized both production actions; Server fix deployed and verified, Build 53 uploaded and Apple-confirmed VALID.",
     "success": true,
-    "production_mutated": false,
-    "deployed": false,
+    "production_mutated": true,
+    "deployed": true,
     "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Unchanged from the immediately-prior handoff for this task: 1287 unit tests and 12 UI tests, 0 failures. No code changed between that handoff and this upload; only the upload step itself was performed."
+      "summary": "Server: foundation 38/38, phase2 97/97, phase4 137/137, phase3 273/274 (1 pre-existing unrelated fixture failure, confirmed present before any change in this task). Native: 1289/1289 PhysiqueOSTests. All new tests (8 Server, 2 Native) mutation-tested -- reverted production code only, confirmed each new test fails with exactly the error it exists to catch, restored, confirmed byte-identical to before revert."
     },
     "review": {
       "status": "approved",
-      "summary": "Unchanged from the immediately-prior handoff: independent fresh-context review APPROVE, no blocking issues, five findings incorporated before the archive was built."
+      "summary": "Two independent adversarial reviews (Server fix, Native fixes), both fresh-context with no shared state. Server review found two real gaps (non-arbiter-constraint 23505 edge case; identical unguarded pattern on outbox.insert in the same file) -- both fixed in a follow-up commit, re-verified, no further findings. Native review confirmed the float-display fix and pull-to-refresh cache-key set are correct, and surfaced one genuine-but-out-of-scope completeness gap (3 other non-HealthKit raw-double leak sites) spun off as a separate follow-up task rather than expanding this one, plus one non-defect nuance (bootstrap()'s outcome can say 'caught up' when nothing new actually landed; harmless here since this pull-to-refresh discards that outcome and just reloads canonical state either way)."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "The only new production/external contact since the prior handoff was the authorized upload itself (App Store Connect, explicitly approved) and two read-only status polls confirming VALID. No Server code or data touched. No credential material read, printed, or logged; the API key's contents were never accessed, only its file path passed to xcodebuild."
+      "summary": "Server deploy: fast-forward merge only (no conflicts -- combined-app-platform-cutover's HEAD was exactly this fix's base commit), no schema/migration change, build logs show a clean Next.js restart with no migration executed, health endpoints both 200 immediately after. Verified the deployment's own spec JSON reports source_commit_hash matching the exact reviewed commit, not a stale one (the known 'env-only update reuses old commit' gotcha). Native upload: archive re-verified unchanged before --execute, no credential material read/printed/logged (API key referenced only by path)."
     }
   },
   "decisions_required": [
-    "Founder: install Build 52 from TestFlight and run the real-device retest. Remember the previously-poisoned Activity day needs two ordinary foregrounds to heal, not one (see the report's Step 6): the first foreground after installing retires the old stuck state and still reports that attempt as failed; the second one queries HealthKit fresh and actually delivers. Do not conclude anything from the very first reopen alone.",
-    "Build 53 backlog, in priority order per independent review (unchanged from the prior handoff): (1) wire abandonedBatchCount into a circuit breaker/backoff for the generic (non-identity) permanent-rejection case; (2) namespace daily-aggregate deletions before deletion delivery ever ships; (3) surface the new diagnostics fields in the Founder diagnostic screen.",
-    "Disposition of the old inbox task healthkit-build51-foreground-catchup-regression-20260922, left stale/claimed since the first recovery task."
+    "Founder: install Build 53 from TestFlight normally (no canary, no manual Sync) and confirm the real-device retest: Activity and Nutrition should now catch up without the occasional spurious 500 (fixed at the root), the raw-float display should be gone from both Evidence Reports, and Log's new pull-to-refresh should force an immediate catch-up on demand.",
+    "Two follow-up tasks were spawned as separate session suggestions (chips), not started: (1) fix the same raw-double-leak pattern at 3 other non-HealthKit sites (Training exercise history, Training Logger's editable reps/load field, photo-scanned nutrition prefill); (2) investigate whether the idempotency fix's new lock-wait behavior under a retry burst is a real connection-pool risk given actual traffic patterns, or a non-issue.",
+    "Process gap: this task's own prompt file was directly git-committed to five times after being claimed, bypassing the handoff tool's immutability gate (confirmed benign -- all from the Founder's own git identity, matching in-chat 'review this' instructions -- but the immutability guarantee is currently only enforced by the publish tool, not the repository itself)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "None new since the prior handoff for this task; see that report for the process-gap and review findings already surfaced and fixed before this upload."
+    "The prompt-file immutability violation described above.",
+    "Two additional hardening gaps found by independent review of the Server fix, both closed before deployment (see validation.review)."
   ],
   "backlog": [
-    "Wire abandonedBatchCount into a circuit breaker/backoff for generic permanent rejections (Build 53 priority).",
-    "Namespace daily-aggregate deletions before deletion delivery ships.",
-    "Surface the new diagnostics fields in the Founder diagnostic screen.",
-    "Build 53: previously-planned performance optimization and Training performance-record work, still deliberately kept out of this hotfix.",
-    "Push codex/build47-native-closure so that Native SHA is resolvable on GitHub (outstanding from an earlier handoff).",
-    "Run the Step 6 real-device retest (including both foregrounds) and report result -- this is now the only remaining step."
+    "Fix the same raw-double-leak pattern at TrainingReadModel.formatNumber, TrainingLoggerView's editable reps/load field, and EvidenceLocalInterpretation.formatNutritionNumber (spawned as a separate task).",
+    "Investigate command_receipts lock-wait cost under a retry burst against real pool size/traffic (spawned as a separate task).",
+    "Auto-foreground 'stale after N minutes' threshold policy -- deliberately deferred; the Founder asked this be derived from measured query/upload cost, and no such telemetry exists yet.",
+    "Close the prompt-file immutability gap in the handoff protocol itself (currently enforced only by the publish tool, not the repository).",
+    "Carried from the prior handoff: wire abandonedBatchCount into a circuit breaker/backoff for generic permanent rejections; namespace daily-aggregate deletions before deletion delivery ships; surface diagnostics fields in the Founder diagnostic screen."
   ],
-  "recommended_next_step": "Founder: install Build 52 from TestFlight, do not enable canary or press manual Sync, open the app normally twice (two ordinary foregrounds), and compare Apple Health Activity/Nutrition against PhysiqueOS's Log/Evidence -- report whether both catch up, including the previously-stuck Activity day.",
-  "full_report_path": "agent-handoffs/reports/20260922T225202Z-healthkit-automatic-partition-recovery-build52-uploaded.md",
+  "recommended_next_step": "Founder: install Build 53 from TestFlight, do not enable canary or press manual Sync, open the app normally, and confirm Activity/Nutrition catch up cleanly (optionally using the new Log pull-to-refresh to force an immediate check) with no raw floating-point numbers on either Evidence Report.",
+  "full_report_path": "agent-handoffs/reports/20260923T025256Z-healthkit-build52-real-device-selfheal-failure-fixed-deployed.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
