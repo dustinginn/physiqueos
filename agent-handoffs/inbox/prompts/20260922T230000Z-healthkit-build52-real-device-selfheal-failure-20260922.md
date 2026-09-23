@@ -249,3 +249,43 @@ Desired presentation:
 - Add regression tests using long binary floating-point values so raw precision cannot reappear.
 
 This UI correction is in scope for the next HealthKit acceptance build because the defect became visible only after the real HealthKit daily-total projection was exercised. Do not defer it to the general design/performance backlog.
+
+
+LIVE FOUNDER UPDATE — approximately 17:00 Founder-local
+
+Without canary/manual Sync, Activity eventually advanced automatically as well. Normal Log now shows:
+- Activity 734 active calories, Apple Health
+- Nutrition 2,406 calories / 178P / 174C / 109F, Apple Health
+
+So Build 52 ultimately self-healed both domains, but the latency remains a product issue and must be explained/optimized. Do not classify Activity as a permanent failure anymore; classify this acceptance as eventual success with unacceptable/unexplained freshness latency until timing is understood.
+
+FOUNDER PRODUCT REQUIREMENT — refresh semantics
+
+Founder wants the normal Log page to support pull-to-refresh. Investigate and implement this in the next HealthKit acceptance candidate if it can be done cleanly without broad design churn.
+
+Desired pull-to-refresh behavior on Log:
+- user pulls down on Log;
+- trigger an explicit foreground-style HealthKit Activity + Nutrition catch-up using the normal automatic ingestion path, NOT the diagnostic canary/manual test-day path;
+- await/bound the catch-up sufficiently to refresh canonical/read-model data;
+- then refresh Log data and show the newest available canonical values;
+- idempotent when HealthKit is unchanged;
+- no duplicate evidence/canonical days;
+- no Workout activation;
+- normal pull-to-refresh should remain useful for other Log data even if HealthKit permission/data is unavailable;
+- do not expose test-day/canary concepts in normal UI.
+
+Also define stale/reopen policy. Founder does not require constant polling. Investigate an efficient freshness policy such as:
+- HealthKit background delivery when iOS provides it;
+- ordinary app foreground/reopen triggers catch-up when last successful HealthKit reconciliation is older than a justified staleness threshold or when observer state indicates changes;
+- pull-to-refresh always offers a user-initiated immediate catch-up;
+- avoid redundant HealthKit queries/network calls on rapid repeated foregrounds.
+
+Do not choose an arbitrary threshold without measuring current query/upload cost and existing lifecycle behavior. Recommend a concrete staleness threshold and rationale based on measured evidence. Consider whether a short interval such as several minutes is appropriate, but derive the final value from architecture/cost/UX.
+
+Final report must distinguish:
+- background delivery timing: opportunistic, iOS-controlled;
+- foreground/reopen catch-up timing: PhysiqueOS-controlled and should be prompt when stale;
+- pull-to-refresh: explicit immediate user-controlled refresh path;
+- canonical/read-model/UI refresh latency after upload.
+
+Add tests for pull-to-refresh HealthKit catch-up, stale-vs-fresh foreground behavior, rapid foreground deduplication, and unchanged-data idempotency.
