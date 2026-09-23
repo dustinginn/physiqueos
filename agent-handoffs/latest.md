@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Correct Sep 23 Strength reassessment timestamp source (`healthkit-strength-sep23-server-commit-timestamp-correction-20260923`)
+- Task: Deploy Strength timestamp correction and dry-run Sep 23 reassessment (`healthkit-strength-sep23-commit-timestamp-deploy-dryrun-20260923`)
 - Agent: codex
 - Status: completed
-- Generated (UTC): 2026-09-23T19:10:33Z
+- Generated (UTC): 2026-09-23T19:36:01Z
 - Success: true
 
-Summary: Prepared and independently reviewed Server candidate 31c88481 for the existing Sep 23 Strength reassessment. The matcher now replaces only the known synthetic-noon Logger captured_at fallback with the immutable owner-scoped canonical row created_at, never edits Logger content, and fails closed when the timestamp is missing, invalid, before the Logger start, or not aligned to the HealthKit end. The same durable input is used by guarded reassessment, ordinary HealthKit relationship reassessment, and canary recomputation so a confident candidate cannot later be downgraded by a metadata-blind recomputation. Auto-confirm remains false and strategic eligibility remains quarantined. Nothing was deployed or applied, Build 55 was not uploaded, and Cardio was not started.
+Summary: Deployed exact reviewed Server candidate 31c88481 with runtime SHA/build stamping and a force rebuild. Deployment 42035d0d is ACTIVE 9/9; branch, web/worker source, runtime SHA, build ID, and public health all match. Pre/post deployment and post-dry-run read-only audits are identical except runtime identity. The Sep 23 reassessment dry-run returned confident_match at confidence 95 on logger_session_window and predicted exactly three bounded mutations: create one quarantined candidate link, update only the canonical workout link assessment, and create one reassessment authorization audit row. The dry-run used REPEATABLE READ READ ONLY and rolled back. No reassessment mutation was applied, Build 55 was not uploaded, and Cardio was not started.
 
-Detailed report: `agent-handoffs/reports/20260923T191033Z-healthkit-strength-sep23-server-commit-timestamp-correction.md`
+Detailed report: `agent-handoffs/reports/20260923T193601Z-strength-deployed-dryrun-green.md`
 
 Protocol: `agent-handoffs/README.md`
