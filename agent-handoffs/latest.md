@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Deploy reviewed Strength reassessment Server candidate (`healthkit-strength-build55-reassessment-deploy-checkpoint-20260923`)
+- Task: Dry-run the existing Sep 23 Strength reassessment (`healthkit-strength-sep23-reassessment-dryrun-20260923`)
 - Agent: codex
 - Status: completed
-- Generated (UTC): 2026-09-23T18:18:26Z
-- Success: true
+- Generated (UTC): 2026-09-23T18:26:58Z
+- Success: false
 
-Summary: Founder-authorized Server candidate 98f8ccec was deployed through the established production procedure. The production branch was fast-forwarded without force; web and worker PHYSIQUEOS_GIT_SHA and PHYSIQUEOS_BUILD_ID were changed to the exact candidate and physiqueos-98f8ccec-20260923; the known stale-source app-spec deployment was detected at cc3c6e44 and canceled at 1/9; force-rebuild deployment aef7251a reached ACTIVE 9/9 with both web and worker source_commit_hash at 98f8ccec. Live and ready are HTTP 200 with all nine readiness checks green and migration 000014 unchanged. Pre/post Sep 23 read-only audits are identical across policy, observations, canonical workout, links/claims, Logger count, strategic digests, HealthKit digests, and migrations. No reassessment was applied and Build 55 was not uploaded. The separately authorized read-only reassessment dry-run is the next chunk.
+Summary: The Founder-authorized Sep 23 reassessment dry-run ran under production runtime 98f8ccec in REPEATABLE READ READ ONLY and safely refused. Exact outcome: refused / single_session_below_confident_threshold; matcher v4 found exactly one candidate with outcome possible_match, confidence 50, basis logger_session_window, startAligned false, endAligned false, overlapSeconds 3826. It proved exactly one same-day canonical Strength workout and exactly one same-day native live Logger Strength session. Root cause: the existing canonical Logger object's captured_at is the server's synthetic noon fallback, not the 14:56 commit instant; its inferred end is therefore 10,632 seconds before the HealthKit end. The stored Native Build 54 record has no finishedAt. Exact predicted mutation: none, because the confident-match gate did not pass. No reassessment, link, assessment update, audit row, policy change, or TestFlight upload occurred.
 
-Detailed report: `agent-handoffs/reports/20260923T181826Z-healthkit-strength-server-deployed-checkpoint.md`
+Detailed report: `agent-handoffs/reports/20260923T182658Z-healthkit-strength-sep23-reassessment-dryrun-refused.md`
 
 Protocol: `agent-handoffs/README.md`

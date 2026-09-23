@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T18:18:26Z",
+  "generated_at_utc": "2026-09-23T18:26:58Z",
   "task": {
-    "id": "healthkit-strength-build55-reassessment-deploy-checkpoint-20260923",
-    "title": "Deploy reviewed Strength reassessment Server candidate",
+    "id": "healthkit-strength-sep23-reassessment-dryrun-20260923",
+    "title": "Dry-run the existing Sep 23 Strength reassessment",
     "agent": "codex",
     "status": "completed"
   },
@@ -17,8 +17,8 @@
     "native_build": 55
   },
   "result": {
-    "summary": "Founder-authorized Server candidate 98f8ccec was deployed through the established production procedure. The production branch was fast-forwarded without force; web and worker PHYSIQUEOS_GIT_SHA and PHYSIQUEOS_BUILD_ID were changed to the exact candidate and physiqueos-98f8ccec-20260923; the known stale-source app-spec deployment was detected at cc3c6e44 and canceled at 1/9; force-rebuild deployment aef7251a reached ACTIVE 9/9 with both web and worker source_commit_hash at 98f8ccec. Live and ready are HTTP 200 with all nine readiness checks green and migration 000014 unchanged. Pre/post Sep 23 read-only audits are identical across policy, observations, canonical workout, links/claims, Logger count, strategic digests, HealthKit digests, and migrations. No reassessment was applied and Build 55 was not uploaded. The separately authorized read-only reassessment dry-run is the next chunk.",
-    "success": true,
+    "summary": "The Founder-authorized Sep 23 reassessment dry-run ran under production runtime 98f8ccec in REPEATABLE READ READ ONLY and safely refused. Exact outcome: refused / single_session_below_confident_threshold; matcher v4 found exactly one candidate with outcome possible_match, confidence 50, basis logger_session_window, startAligned false, endAligned false, overlapSeconds 3826. It proved exactly one same-day canonical Strength workout and exactly one same-day native live Logger Strength session. Root cause: the existing canonical Logger object's captured_at is the server's synthetic noon fallback, not the 14:56 commit instant; its inferred end is therefore 10,632 seconds before the HealthKit end. The stored Native Build 54 record has no finishedAt. Exact predicted mutation: none, because the confident-match gate did not pass. No reassessment, link, assessment update, audit row, policy change, or TestFlight upload occurred.",
+    "success": false,
     "production_mutated": true,
     "deployed": true,
     "testflight_uploaded": false
@@ -26,34 +26,37 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Deployment candidate retained its reviewed validation: Server changed-slice 142 tests passed with clean eslint and mutation proofs; no code changed after review."
+      "summary": "The deployed candidate retained its reviewed local validation. The production dry-run exposed a missing real-data fixture: tests supplied capturedAt as the actual commit instant, while the existing Native command omitted capturedAt and the Server stored its noon fallback."
     },
     "review": {
-      "status": "approved",
-      "summary": "Previously published fresh review reported no blocker, major, or moderate findings for Server head 98f8ccec and Native Build 55 head 621dbef3."
+      "status": "changes_requested",
+      "summary": "The earlier source review is still valid for the implemented contracts, but the production dry-run found that the assumed legacy commit-time fallback is not present in the canonical payload. A corrected legacy timestamp source requires a new implementation, mutation proof, and fresh review before any new deploy request."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Predeploy runtime cc3c6e44 and postdeploy runtime 98f8ccec each ran the bounded Sep 23 workout audit in REPEATABLE READ READ ONLY with explicit transaction_read_only verification and ROLLBACK. The Strength-only policy remains open-ended from Sep 23, quarantined, no backfill, linkAutoConfirm false. One canonical Strength workout, two deferred cardio observations, one Logger Strength session, no Sep 23 link, no duplicate/ambiguity integrity violation, no strategic leakage, 14 migrations, and every reported collection digest were identical before and after deployment."
+      "summary": "The reassessment entry verified runtime SHA, owner scope, BEGIN REPEATABLE READ READ ONLY, transaction_read_only=on, and rolled back. It used mode=dry-run with no authorization reference. The operation returned refused before constructing or executing mutations. Pre/post deployment audits had already proven all policy, HealthKit, Logger-count, link/claim, strategic, and migration digests unchanged."
     }
   },
   "decisions_required": [
-    "After the authorized read-only reassessment dry-run is reported, separately authorize or refuse the exact reassessment apply. No apply has occurred.",
-    "Separately authorize or refuse Build 55 TestFlight upload. No upload has occurred."
+    "Do not authorize reassessment apply: the current production dry-run predicts no mutation and refuses safely.",
+    "A new reviewed Server correction must source the legacy Sep 23 Logger commit time from durable storage metadata rather than the synthetic payload captured_at fallback; deploying that future SHA will require separate Founder authorization.",
+    "Build 55 TestFlight upload remains a separate approval gate and has not occurred."
   ],
-  "blockers": [],
+  "blockers": [
+    "The existing Sep 23 Logger canonical payload has no finishedAt and its captured_at is the Server's noon fallback, so the reviewed matcher cannot prove Logger-end alignment and cannot produce a confident reassessment candidate."
+  ],
   "unexpected_findings": [
-    "The app-spec update deployment f29f15d1 used stale source cc3c6e44, matching the known provider behavior; force-rebuild canceled it at 1/9 and built the reviewed SHA exactly.",
-    "The generic postdeploy workout audit continues to show the stored no-match and its generic live possible-match score 50. The dedicated reassessment operation is intentionally the authoritative path for the new unique-window rule and will be exercised next in read-only dry-run mode."
+    "The dedicated matcher rule did activate: unique same-day workout/session and basis logger_session_window are proven. The failure is specifically end-time evidence, not ambiguity, wrong session selection, or old code running.",
+    "The test fixture modeled capturedAt as the real 14:56 commit instant, but the Native command did not send capturedAt and the Server fell back to local-date noon. That assumption gap escaped the source tests and fresh review."
   ],
   "backlog": [
-    "Run only the dedicated Sep 23 reassessment dry-run in the read-only production transaction and publish its exact predicted mutation, match result, confidence/basis, and invariants.",
-    "Do not apply the reassessment without separate Founder authorization.",
-    "Do not upload Build 55 without separate Founder authorization.",
-    "Do not begin Cardio until Strength receives its final verdict."
+    "Implement the smallest fail-closed legacy reassessment correction using a durable Server-owned commit timestamp, without mutating Logger detail or changing normal future Build 55 finishedAt behavior.",
+    "Add a production-shaped regression fixture where payload captured_at is noon fallback and durable record metadata contains the true commit instant; mutation-test and fresh-review the correction.",
+    "Request separate authorization for any new Server deploy, then rerun only the Sep 23 read-only dry-run before requesting reassessment apply.",
+    "Do not upload Build 55 without separate authorization and do not begin Cardio before Strength reaches its final verdict."
   ],
-  "recommended_next_step": "Codex should now run the already-authorized read-only Sep 23 reassessment dry-run against deployment aef7251a and publish the result; no additional approval is needed for that read-only step.",
-  "full_report_path": "agent-handoffs/reports/20260923T181826Z-healthkit-strength-server-deployed-checkpoint.md",
+  "recommended_next_step": "Prepare and fresh-review a narrow Server correction that exposes the durable commit timestamp to this one legacy reassessment path. Do not apply the current reassessment; it correctly refused and predicted no writes.",
+  "full_report_path": "agent-handoffs/reports/20260923T182658Z-healthkit-strength-sep23-reassessment-dryrun-refused.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
