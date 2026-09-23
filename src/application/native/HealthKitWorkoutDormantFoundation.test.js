@@ -566,6 +566,9 @@ describe("prospective (open-ended, Strength-only) Workout policy", () => {
     const replay = await ingest(records, [walk], "b2");
     expect(replay.result.workoutCanonicalizedCount).toBe(0);
     expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
+    // The stored reason is sticky across replays so an audit keeps counting it.
+    expect(replay.result.observations[0]).toMatchObject({ outcome: "matched", reconciliation: { state: "workout_canonicalization_deferred", reason: "family_not_in_activation_scope" } });
+    expect(records.snapshot().healthKitObservations[0]).toEqual(stored);
   });
 
   it("still refuses a workout whose own day is before the effective date (no backfill through an open window)", async () => {
@@ -598,7 +601,7 @@ describe("same-identity workout content drift (immutable HealthKit workout re-de
     });
     expect(result.result.observations[1]).toMatchObject({ outcome: "created", reconciliation: { state: "workout_canonicalized" } });
     // Like a matched replay, the ignored copy reports the stored canonicalized state.
-    expect(result.result.workoutCanonicalizedCount).toBe(2);
+    expect(result.result).toMatchObject({ workoutCanonicalizedCount: 2, ignoredCount: 1, createdCount: 1, acceptedCount: 2 });
     const after = records.snapshot();
     expect(after.healthKitObservations.find((record) => record.id === before.healthKitObservations[0].id)).toEqual(before.healthKitObservations[0]);
     expect(after.healthKitCanonicalWorkouts.find((record) => record.id === before.healthKitCanonicalWorkouts[0].id)).toEqual(before.healthKitCanonicalWorkouts[0]);

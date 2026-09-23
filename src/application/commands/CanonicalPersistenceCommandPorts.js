@@ -460,17 +460,19 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         const workoutAssessment = assessHealthKitWorkoutCanonicalization({
           observation, effectiveLocalDate, family: classification.family, activationPolicy: workoutPolicyRecord,
         });
-        if (existing && WORKOUT_TERMINAL_STATES.has(existing.reconciliation?.state)) {
-          // A canonicalized (or superseded) workout is never reconsidered on replay.
+        if (existing && (WORKOUT_TERMINAL_STATES.has(existing.reconciliation?.state) ||
+          existing.reconciliation?.reason === WORKOUT_FAMILY_OUT_OF_SCOPE_REASON)) {
+          // A canonicalized (or superseded) workout is never reconsidered on
+          // replay, and a workout a family scope kept raw keeps saying so.
           reconciliation = structuredClone(existing.reconciliation);
         } else if (!existing && workoutAssessment.eligible && classification.family === HealthKitWorkoutFamily.UNSUPPORTED) {
           reconciliation = { state: HealthKitReconciliationState.SOURCE_ONLY, reason: "unsupported_workout_type" };
-        } else if (!existing && workoutAssessment.reason === "family_not_in_activation_scope") {
+        } else if (!existing && workoutAssessment.reason === WORKOUT_FAMILY_OUT_OF_SCOPE_REASON) {
           // Stored with its real reason so an audit can count what a family
           // scope kept raw. Like every raw workout stored under a policy, it is
           // not reconsidered later: a later policy for this family covers
           // workouts first uploaded after it.
-          reconciliation = { state: HealthKitReconciliationState.WORKOUT_CANONICALIZATION_DEFERRED, reason: "family_not_in_activation_scope" };
+          reconciliation = { state: HealthKitReconciliationState.WORKOUT_CANONICALIZATION_DEFERRED, reason: WORKOUT_FAMILY_OUT_OF_SCOPE_REASON };
         } else if (!existing && workoutAssessment.eligible) {
           const preview = reconcileHealthKitCanonicalWorkout({
             observation,
@@ -730,6 +732,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         createdCount: results.filter((item) => item.outcome === "created").length,
         reconciledCount: results.filter((item) => item.outcome === "reconciled").length,
         matchedCount: results.filter((item) => item.outcome === "matched").length,
+        ignoredCount: results.filter((item) => item.outcome === "ignored").length,
         activityDayCanonicalizedCount: canonicalizedBy(HealthKitCanonicalDomain.ACTIVITY),
         nutritionDayCanonicalizedCount: canonicalizedBy(HealthKitCanonicalDomain.NUTRITION),
         workoutCanonicalizedCount: results.filter((item) =>
@@ -2515,6 +2518,7 @@ const WORKOUT_TERMINAL_STATES = new Set([
   HealthKitReconciliationState.WORKOUT_CANONICALIZED,
   HealthKitReconciliationState.WORKOUT_SUMMARY_SUPERSEDED,
 ]);
+const WORKOUT_FAMILY_OUT_OF_SCOPE_REASON = "family_not_in_activation_scope";
 
 // A HealthKit workout is immutable: the same UUID re-delivered with different
 // content is not a different workout but drifted associated statistics (heart
