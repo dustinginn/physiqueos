@@ -142,17 +142,38 @@ describe("Native HealthKit V1 ingestion contract", () => {
     expect(snapshot.canonicalEvidenceObjects).toEqual([first, second]);
   });
 
-  it("rejects immutable HealthKit identity collisions", async () => {
+  it("acknowledges and ignores a same-identity workout re-delivered with drifted content; the first delivery stays authoritative", async () => {
     const records = recordStore();
     const ports = createCanonicalPersistenceCommandPorts({ records });
     await ports.ingestHealthKitObservations(context("delivery-one", {
       batchId: "healthkit-workout-one",
       observations: [workout({ activeCalories: 400 })],
     }));
-    await expect(ports.ingestHealthKitObservations(context("delivery-two", {
+    const before = records.snapshot();
+    const drifted = await ports.ingestHealthKitObservations(context("delivery-two", {
       batchId: "healthkit-workout-two",
       observations: [workout({ activeCalories: 450 })],
+    }));
+    expect(drifted.status).toBe("committed");
+    expect(drifted.result.observations[0]).toMatchObject({ outcome: "ignored", replay: { ignored: true, reason: "workout_content_drift_same_identity" } });
+    expect(records.snapshot()).toEqual(before);
+  });
+
+  it("rejects immutable HealthKit identity collisions inside one batch and for a changed ingestion purpose", async () => {
+    const records = recordStore();
+    const ports = createCanonicalPersistenceCommandPorts({ records });
+    await expect(ports.ingestHealthKitObservations(context("delivery-dup", {
+      batchId: "healthkit-workout-dup",
+      observations: [workout({ activeCalories: 400 }), workout({ activeCalories: 450 })],
     }))).rejects.toMatchObject({ status: 409, code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION" });
+    await ports.ingestHealthKitObservations(context("delivery-one", {
+      batchId: "healthkit-workout-one",
+      observations: [workout({ activeCalories: 400 })],
+    }));
+    await expect(ports.ingestHealthKitObservations(context("delivery-purpose", {
+      batchId: "healthkit-workout-purpose",
+      observations: [{ ...workout({ activeCalories: 450 }), ingestionPurpose: "validation_only" }],
+    }))).rejects.toMatchObject({ status: 409, code: "HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE" });
     expect(records.snapshot().healthKitObservations).toHaveLength(1);
   });
 
