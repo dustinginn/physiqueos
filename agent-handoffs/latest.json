@@ -1,62 +1,59 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T16:04:19Z",
+  "generated_at_utc": "2026-09-23T17:51:10Z",
   "task": {
-    "id": "healthkit-strength-prospective-graduation-20260923",
-    "title": "Graduate Strength Workout prospectively from Sep 23",
-    "agent": "claude",
+    "id": "healthkit-strength-build55-reassessment-readiness-20260923",
+    "title": "Prepare Build 55 and safe Sep 23 Strength reassessment",
+    "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "7c5710f2111e822caaf0d8992ce555f004d3c79b",
-    "final_sha": "cc3c6e441273859731004b7fe670e48a48fcec3c",
+    "base_sha": "cc3c6e441273859731004b7fe670e48a48fcec3c",
+    "final_sha": "98f8ccec5ab8eaebc25631139e574b69267f9c74",
     "production_server_sha": "cc3c6e441273859731004b7fe670e48a48fcec3c",
     "production_deployment": "460f07c9-64f3-4f7b-9915-d4c482910b7d",
-    "native_sha": "e249a0f3",
-    "native_build": 54
+    "native_sha": "621dbef3cdcf17009e346111e4a86d14b70ed896",
+    "native_build": 55
   },
   "result": {
-    "summary": "STRENGTH_GRADUATION_VERDICT=YELLOW; Strength ingestion stays live. Build 53 uploaded no workouts automatically, so Native Build 54 (e249a0f3) adds workouts to the automatic coordinator with a 2026-09-23 activation floor; Server cc3c6e44 adds an open-ended, family-scoped Workout policy (Strength only, no backfill, quarantined, auto-confirm off), fixes the open-window candidate bug, and acknowledges same-identity workout content drift instead of a self-poisoning 409. Deployed, policy applied (13/13 invariants), Build 54 uploaded VALID (delivery 7a7035a0-55cd-4fc0-a504-d25479550fab) -- each on separate Founder authorization. Live Sep 23: the Watch strength workout was ingested by ordinary foreground catch-up with no canary/manual sync/screenshot, canonicalized exactly once, quarantined; both walks kept raw by the family scope; Logger session byte-identical; no duplicate session; strategic 0. Two bounded issues: the Logger session carried start_time only (Native did not stamp finishedAt), so the matcher found no plausible candidate (35 < 50) -- with screenshots gone, Logger-vs-HealthKit matching needs Logger end time plus its own rule and a Founder decision on confirmation semantics; and Build 54 stalled all device->Server traffic from 14:56Z until a force-quit at 15:50Z (app open and Log pull-to-refresh did not recover it).",
+    "summary": "Codex completed the reviewed pre-production Strength graduation slice after Claude's YELLOW handoff. Native Build 55 now bounds HealthKit query and per-stream waits, serializes same-scope recovery, queues one rerun after overlapping bootstrap, completes every HealthKit observer wake exactly once, and stamps/persists Logger finishedAt for stable retry payloads. Server matching now uses the unique same-day active Logger Strength session plus the unique same-day canonical Strength workout, accepts Logger start inside the HealthKit window (or up to five minutes before), uses finishedAt or the live commit/captured instant for end alignment, and remains candidate-only. A separate guarded production operation can reassess only Sep 23 with advisory locking, expected-facts drift fencing, exact audit authorization, and post-write invariants. Strategic eligibility remains quarantined and linkAutoConfirm remains false. No deploy, production reassessment, policy mutation, TestFlight upload, manual canary, repeated workout, or Cardio work occurred. Strength has not reached its final verdict; the candidates are awaiting the Founder's deployment and later mutation approvals.",
     "success": true,
-    "production_mutated": true,
-    "deployed": true,
-    "testflight_uploaded": true
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server: targeted HealthKit suites 152/152 + contract 59; eslint clean; full unit suite failure set identical to the untouched base (one worktree-local missing-dependency file excluded). Mutation-proven: family guard, null-end reassess fix, open-ended-with-end refusal, empty-families refusal, runner families write, sticky out-of-scope reason, drift ignore (loop + raw), daily-snapshot 409 protection, replay reason. Native: full PhysiqueOSTests 1303/1303 twice (12 new + 2 review pins)."
+      "summary": "Native final gate: PhysiqueOSTests 1308/1308 passed, zero failures/skips; release verifier confirmed version 1.0 (55), AppIcon, HealthKit declarations, and exempt encryption. Server changed-slice gate: 7 files / 142 tests passed and eslint was clean. Mutation checks proved queued rerun, Logger finishedAt, same-scope serialization, observer completion, same-day workout uniqueness, captured_at fallback, policy safety, and authorization-bound replay. The broad Server suite was not claimed green because this sparse checkout lacks an untracked Founder runtime fixture and sandboxed listener tests fail with EPERM; the relevant command-port and changed-slice gates are green."
     },
     "review": {
       "status": "approved",
-      "summary": "Server 6fc80bff review: BLOCKER (families never reached the runner) + MAJOR (out-of-scope reason dropped) fixed in 1f94a431; final review of a0a29a41: DEPLOY, one MAJOR (reason overwritten on exact replay) fixed in cc3c6e44. Native 842635f3 review: requirements 1-7 confirmed; MAJOR (409 self-poisons the workout scope) fixed on the Server with Founder authorization; MINOR test pins added (2f65cdcc). Founder-authorized narrow scope respected."
+      "summary": "A separate fresh Codex review found two moderate issues: a timed-out native sync could overlap its retry, and a Server already-reassessed path could bypass exact audit authorization. Both were fixed and re-reviewed. The follow-up review then found one native observer-completion issue on overlap; commit 621dbef3 added an atomic one-shot completion gate and regression test. Final review reported no blocker, major, or moderate findings across the completed slice."
     },
-    "zero_write_audit": {
-      "status": "passed",
-      "summary": "Pre/post deploy audits identical for the Sep 22 state, both policies and all strategic sections (only Build 53 Activity auto-sync moved). Policy apply: 13/13 in-transaction invariants (observations, canonical days/workouts, links, claims, Evidence, daily policy unchanged); independent live resolve matches the authorized record exactly. Post-workout: one new canonical strength workout, two raw walks, Logger v1 identical, Sep 22 link intact, one-to-one 0/0/0/0, strategic 0."
-    }
+    "zero_write_audit": null
   },
   "decisions_required": [
-    "Confirmation semantics for Logger-vs-HealthKit strength matches once the Logger carries an end time: keep explicit Founder confirmation (today's rule) or adopt a reviewed deterministic confident-candidate rule (single same-day Logger strength session whose start lies inside the workout window and whose end/commit aligns) -- and whether such a confident candidate may auto-confirm.",
-    "Cardio reconciliation semantics (coexist vs one logical event) before any cardio canary; cardio workouts uploaded under the Strength-only scope stay raw forever (a later cardio policy covers only workouts first uploaded after it), so this should not wait long.",
-    "Workout strategic eligibility stays OFF; a later slice should gate it on confirmed links only via the graduation runner pattern."
+    "Authorize deployment of Server candidate 98f8ccec5ab8eaebc25631139e574b69267f9c74. After deployment, Codex will run only the read-only Sep 23 reassessment dry-run and report the predicted mutation and invariants.",
+    "After the production dry-run, separately authorize or refuse the exact Sep 23 reassessment apply. The apply is designed to create at most one quarantined candidate and never a confirmed link or claim.",
+    "Separately authorize or refuse a Build 55 TestFlight upload when requested. No upload has occurred.",
+    "No policy mutation is currently required or proposed; any future policy mutation still requires separate explicit authorization."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Build 54 in-process sync stall: no device->Server traffic of any kind 14:56:36Z-15:50Z despite an app open and a Log pull-to-refresh; a force-quit/relaunch recovered it immediately. Diagnosis: pre-existing unbounded in-flight coalescing in the automatic coordinator (no timeouts on HealthKit awaits; overlapping bootstraps return the stuck task's result); Build 54 lengthened the tail by appending the workouts stream. Fix planned for Build 55 (per-stream timeouts + rerun-after-in-flight).",
-    "Logger-only sessions carry start_time only: the Native Logger does not stamp finishedAt on completion even though the Server maps it to end_time/duration_seconds; Sep 22's confident 99 depended on the screenshot merge.",
-    "Independent review found the console entry parsed --families but never passed it to the runner (a Strength-only apply would have scoped every family); fixed and pinned before any production use.",
-    "A Server 409 on a same-UUID workout re-delivery would have poisoned the automatic workout scope forever (anchor never advances); fixed as an authorized narrow Server change."
+    "Fresh review identified that the first timeout implementation could leave the timed-out operation alive while its retry began; exact-scope synchronization and delivery fences plus cancellation checkpoints now prevent overlap.",
+    "Fresh review identified that an already-reassessed production replay needed to be bound to the exact authorization audit row; replay now refuses any foreign or missing authorization audit.",
+    "Fresh review identified that an overlapping HealthKit observer wake could return without invoking Apple's completion callback; a one-shot completion gate now covers success, early staging, overlap, cancellation, feature-disabled, store-error, and upload-error paths."
   ],
   "backlog": [
-    "Native Build 55: fix the automatic-sync stall; stamp Logger draft finishedAt on completion.",
-    "Server: Logger-vs-HealthKit strength matching rule (start inside window, end/commit aligned) with reviewed confirmation semantics; fallback end_time from the commit instant for live drafts.",
-    "Workout revision support (workout.sourceRevision) so drifted statistics can supersede instead of being ignored.",
-    "Cardio canary after the reconciliation decision; HealthKitTrainingReconciliationAudit evidencePackagesOnDay mapping returns nulls (audit-only)."
+    "With Founder authorization: deploy Server candidate 98f8ccec, verify production authority/health, then run the Sep 23 reassessment in read-only dry-run mode.",
+    "With separate Founder authorization after the dry-run: apply the exact drift-fenced Sep 23 reassessment and run the post-mutation fresh zero-write audit.",
+    "With separate Founder authorization: upload Native Build 55 from candidate 621dbef3 to TestFlight and verify delivery before any live automatic-sync acceptance observation.",
+    "Reach and publish the final Strength verdict before beginning any Cardio work. Workout strategic eligibility and auto-confirm remain off throughout."
   ],
-  "recommended_next_step": "Founder: decide the confirmation semantics for Logger-vs-HealthKit strength matches and the cardio reconciliation model; no device action is needed -- Strength ingestion stays live and safe (quarantined, unlinked) until the Build 55 + matching slice ships.",
-  "full_report_path": "agent-handoffs/reports/20260923T160419Z-healthkit-strength-prospective-graduation-yellow.md",
+  "recommended_next_step": "Founder: authorize deployment of Server candidate 98f8ccec. Codex will then perform the bounded read-only Sep 23 reassessment dry-run and return for a separate apply decision; TestFlight remains untouched until separately authorized.",
+  "full_report_path": "agent-handoffs/reports/20260923T175110Z-healthkit-strength-build55-reassessment-readiness.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

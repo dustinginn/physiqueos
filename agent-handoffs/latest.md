@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Graduate Strength Workout prospectively from Sep 23 (`healthkit-strength-prospective-graduation-20260923`)
-- Agent: claude
+- Task: Prepare Build 55 and safe Sep 23 Strength reassessment (`healthkit-strength-build55-reassessment-readiness-20260923`)
+- Agent: codex
 - Status: completed
-- Generated (UTC): 2026-09-23T16:04:19Z
+- Generated (UTC): 2026-09-23T17:51:10Z
 - Success: true
 
-Summary: STRENGTH_GRADUATION_VERDICT=YELLOW; Strength ingestion stays live. Build 53 uploaded no workouts automatically, so Native Build 54 (e249a0f3) adds workouts to the automatic coordinator with a 2026-09-23 activation floor; Server cc3c6e44 adds an open-ended, family-scoped Workout policy (Strength only, no backfill, quarantined, auto-confirm off), fixes the open-window candidate bug, and acknowledges same-identity workout content drift instead of a self-poisoning 409. Deployed, policy applied (13/13 invariants), Build 54 uploaded VALID (delivery 7a7035a0-55cd-4fc0-a504-d25479550fab) -- each on separate Founder authorization. Live Sep 23: the Watch strength workout was ingested by ordinary foreground catch-up with no canary/manual sync/screenshot, canonicalized exactly once, quarantined; both walks kept raw by the family scope; Logger session byte-identical; no duplicate session; strategic 0. Two bounded issues: the Logger session carried start_time only (Native did not stamp finishedAt), so the matcher found no plausible candidate (35 < 50) -- with screenshots gone, Logger-vs-HealthKit matching needs Logger end time plus its own rule and a Founder decision on confirmation semantics; and Build 54 stalled all device->Server traffic from 14:56Z until a force-quit at 15:50Z (app open and Log pull-to-refresh did not recover it).
+Summary: Codex completed the reviewed pre-production Strength graduation slice after Claude's YELLOW handoff. Native Build 55 now bounds HealthKit query and per-stream waits, serializes same-scope recovery, queues one rerun after overlapping bootstrap, completes every HealthKit observer wake exactly once, and stamps/persists Logger finishedAt for stable retry payloads. Server matching now uses the unique same-day active Logger Strength session plus the unique same-day canonical Strength workout, accepts Logger start inside the HealthKit window (or up to five minutes before), uses finishedAt or the live commit/captured instant for end alignment, and remains candidate-only. A separate guarded production operation can reassess only Sep 23 with advisory locking, expected-facts drift fencing, exact audit authorization, and post-write invariants. Strategic eligibility remains quarantined and linkAutoConfirm remains false. No deploy, production reassessment, policy mutation, TestFlight upload, manual canary, repeated workout, or Cardio work occurred. Strength has not reached its final verdict; the candidates are awaiting the Founder's deployment and later mutation approvals.
 
-Detailed report: `agent-handoffs/reports/20260923T160419Z-healthkit-strength-prospective-graduation-yellow.md`
+Detailed report: `agent-handoffs/reports/20260923T175110Z-healthkit-strength-build55-reassessment-readiness.md`
 
 Protocol: `agent-handoffs/README.md`
