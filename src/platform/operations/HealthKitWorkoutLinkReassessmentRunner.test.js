@@ -30,7 +30,7 @@ describe("guarded Workout link reassessment operation", () => {
       matchOutcome: "confident_match",
       confidence: 95,
       matchBasis: "logger_session_window",
-      matcherVersion: "healthkit-strength-matcher-v4",
+      matcherVersion: "healthkit-strength-matcher-v5",
       predictedMutations: [
         { collection: "healthKitWorkoutLinks", operation: "create", to: "candidate" },
         { collection: "healthKitCanonicalWorkouts", operation: "update_assessment" },
@@ -39,6 +39,33 @@ describe("guarded Workout link reassessment operation", () => {
     });
     expect(records.snapshot()).toEqual(before);
     expect(records.getMutationCount()).toBe(0);
+    expect(result.facts).toMatchObject({
+      evidenceStorageMetadataCount: 1,
+      evidenceStorageMetadataDigest: expect.any(String),
+    });
+  });
+
+  it("fails closed for the production-shaped Sep 23 record without a usable durable Server commit timestamp", async () => {
+    const absent = await world({ loggerCommitTimestamp: null });
+    const absentBefore = absent.snapshot();
+    const absentResult = await runHealthKitWorkoutLinkReassessment({ records: absent, authorization: AUTH, now });
+    expect(absentResult).toMatchObject({
+      outcome: "refused",
+      reasons: ["single_session_below_confident_threshold"],
+      matchOutcome: "possible_match",
+      candidateCount: 1,
+    });
+    expect(absent.snapshot()).toEqual(absentBefore);
+    expect(absent.getMutationCount()).toBe(0);
+
+    const misaligned = await world({ loggerCommitTimestamp: "2026-09-23T16:56:31Z" });
+    const misalignedResult = await runHealthKitWorkoutLinkReassessment({ records: misaligned, authorization: AUTH, now });
+    expect(misalignedResult).toMatchObject({
+      outcome: "refused",
+      reasons: ["single_session_below_confident_threshold"],
+      matchOutcome: "possible_match",
+      candidateCount: 1,
+    });
   });
 
   it("apply is drift-fenced and writes one quarantined candidate without confirmation, claims, Logger mutation, or policy changes", async () => {
@@ -172,10 +199,12 @@ async function world({
   strategicEvidenceEligibility = "quarantined",
   secondWorkout = false,
   secondSession = false,
+  loggerCommitTimestamp = "2026-09-23T14:56:31Z",
 } = {}) {
+  const evidence = [loggerSession("sep23"), ...(secondSession ? [loggerSession("other", "2026-09-23T13:54:00Z")] : [])];
   const records = createInMemoryCanonicalRecordStore({
     user: [{ id: OWNER, timeZone: "America/Los_Angeles", version: 1 }],
-    canonicalEvidenceObjects: [loggerSession("sep23"), ...(secondSession ? [loggerSession("other", "2026-09-23T13:54:00Z")] : [])],
+    canonicalEvidenceObjects: evidence,
     healthKitCanonicalWorkouts: [],
     healthKitWorkoutLinks: [],
     healthKitWorkoutLinkClaims: [],
@@ -198,6 +227,14 @@ async function world({
         linkAutoConfirm,
       },
     ],
+  }, {
+    storageMetadata: {
+      canonicalEvidenceObjects: loggerCommitTimestamp === null ? [] : evidence.map((record, index) => ({
+        recordId: record.canonicalId,
+        createdAt: index === 0 ? loggerCommitTimestamp : "2026-09-23T14:57:00Z",
+        updatedAt: index === 0 ? loggerCommitTimestamp : "2026-09-23T14:57:00Z",
+      })),
+    },
   });
   for (const workout of [canonicalWorkout("sep23-strength", "2026-09-23T13:47:54Z", "2026-09-23T14:57:12Z"),
     ...(secondWorkout ? [canonicalWorkout("sep23-strength-two", "2026-09-23T18:00:00Z", "2026-09-23T19:00:00Z")] : [])]) {
@@ -241,7 +278,7 @@ function loggerSession(suffix, startedAt = "2026-09-23T13:53:26Z") {
       id: `training_logger_draft_${suffix}`,
       evidence_type: "training",
       observed_at: DAY,
-      captured_at: "2026-09-23T14:56:31Z",
+      captured_at: "2026-09-23T12:00:00.000Z",
       source: { application: "Training Logger", modality: "manual" },
       metadata: {
         activity_type: "Traditional Strength Training",

@@ -49,6 +49,15 @@ export function createPhase4CanonicalRecordStore({ query }) {
       );
       return result.rows.map(mapRecord);
     },
+    async listStorageMetadata({ ownerUserId, collection }) {
+      const table = assertKnownPhase4Collection(collection);
+      const result = await query(
+        `SELECT record_id,created_at,updated_at FROM physiqueos.${table}
+         WHERE owner_user_id=$1 AND collection_name=$2 ORDER BY record_id`,
+        [ownerUserId, collection]
+      );
+      return result.rows.map(mapStorageMetadata);
+    },
     async putIfAbsent({ ownerUserId, collection, recordId, payload, sourceIdentity = null }) {
       const table = assertKnownPhase4Collection(collection);
       const version = normalizeVersion(payload.version);
@@ -125,12 +134,17 @@ export function createPhase4CanonicalRecordStore({ query }) {
 
 export function createInMemoryCanonicalRecordStore(collections, {
   runtimeMetadata = { revision: 1, version: 1, lastCommandId: null, updatedAt: null },
+  storageMetadata = {},
 } = {}) {
   const maps = new Map();
   for (const [collection, source] of Object.entries(collections)) {
     const values = source == null ? [] : Array.isArray(source) ? source : [source];
     maps.set(collection, new Map(values.map((record, position) => [resolveRecordId(record, position), structuredClone(record)])));
   }
+  const storageMetadataByCollection = new Map(Object.entries(storageMetadata).map(([collection, rows]) => [
+    collection,
+    (rows == null ? [] : Array.isArray(rows) ? rows : [rows]).map((row) => Object.freeze(structuredClone(row))),
+  ]));
   let metadata = structuredClone(runtimeMetadata);
   let mutationCount = 0;
   return Object.freeze({
@@ -150,6 +164,9 @@ export function createInMemoryCanonicalRecordStore(collections, {
     },
     async get({ collection, recordId }) { return clone(maps.get(collection)?.get(recordId)); },
     async list({ collection }) { return [...(maps.get(collection)?.values() ?? [])].map(clone); },
+    async listStorageMetadata({ collection }) {
+      return (storageMetadataByCollection.get(collection) ?? []).map(clone);
+    },
     async putIfAbsent({ collection, recordId, payload }) {
       const collectionMap = maps.get(collection) ?? new Map();
       maps.set(collection, collectionMap);
@@ -190,6 +207,13 @@ function mapRuntimeMetadata(row) {
     lastCommandId: row.last_command_id ?? null,
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
   }) : null;
+}
+function mapStorageMetadata(row) {
+  return Object.freeze({
+    recordId: String(row.record_id),
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+  });
 }
 function clone(value) { return value == null ? null : structuredClone(value); }
 function resolveRecordId(record, position) { return String(record?.id ?? record?.canonicalId ?? record?.package_id ?? record?.review_id ?? `@index:${position}`); }

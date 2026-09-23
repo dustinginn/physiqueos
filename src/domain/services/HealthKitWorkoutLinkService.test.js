@@ -41,15 +41,15 @@ describe("strength link matcher", () => {
     expect(result.candidates[0].confidence).toBeLessThan(80);
   });
 
-  it("matches the real Logger-only shape by its unique session window and commit-time end fallback", () => {
+  it("matches the production-shaped Logger-only record using its durable Server commit timestamp", () => {
     const hk = canonical({
       startedAt: "2026-09-23T13:47:54Z",
       endedAt: "2026-09-23T14:57:12Z",
       durationSeconds: 4158,
     });
-    const session = liveLogger("sep23-logger", "2026-09-23T13:53:26Z", "2026-09-23T14:56:31Z");
+    const session = liveLogger("sep23-logger", "2026-09-23T13:53:26Z", "2026-09-23T12:00:00.000Z");
 
-    const result = assess(hk, [session]);
+    const result = assess(hk, [session], new Map([["sep23-logger", "2026-09-23T14:56:31Z"]]));
 
     expect(result).toMatchObject({
       outcome: Outcome.CONFIDENT,
@@ -63,6 +63,21 @@ describe("strength link matcher", () => {
     });
     expect(session.payload.metadata.end_time).toBeUndefined();
     expect(session.payload.metadata.duration_seconds).toBeUndefined();
+  });
+
+  it("does not replace synthetic noon without a valid aligned Server commit timestamp", () => {
+    const hk = canonical({
+      startedAt: "2026-09-23T13:47:54Z",
+      endedAt: "2026-09-23T14:57:12Z",
+      durationSeconds: 4158,
+    });
+    const session = liveLogger("sep23-logger", "2026-09-23T13:53:26Z", "2026-09-23T12:00:00.000Z");
+
+    expect(assess(hk, [session])).toMatchObject({ outcome: Outcome.POSSIBLE });
+    expect(assess(hk, [session], new Map([["sep23-logger", "not-an-instant"]])))
+      .toMatchObject({ outcome: Outcome.POSSIBLE });
+    expect(assess(hk, [session], new Map([["sep23-logger", "2026-09-23T13:00:00Z"]])))
+      .toMatchObject({ outcome: Outcome.POSSIBLE });
   });
 
   it("does not call the Logger-window rule confident when same-day uniqueness is absent", () => {
@@ -238,12 +253,13 @@ describe("cardio coexistence (no double counting against existing Evidence worko
   });
 });
 
-function assess(canonicalWorkout, canonicalObjects) {
+function assess(canonicalWorkout, canonicalObjects, loggerSessionServerCommitTimestamps = new Map()) {
   return assessHealthKitStrengthLinkCandidates({
     canonicalWorkout,
     canonicalObjects,
     existingLinks: [],
     canonicalWorkouts: [canonicalWorkout],
+    loggerSessionServerCommitTimestamps,
   });
 }
 

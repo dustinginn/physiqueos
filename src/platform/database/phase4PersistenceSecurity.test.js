@@ -19,6 +19,25 @@ describe("Phase 4 persistence ownership boundary", () => {
     expect(() => records.get({ ownerUserId: "owner", collection: "futureUnknown", recordId: "id" })).rejects.toThrow("Unsupported required canonical collection");
   });
 
+  it("reads immutable Server-owned storage timestamps with owner and collection scope", async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{
+      record_id: "training|authoritative|training_logger_draft_sep23",
+      created_at: "2026-09-23T14:56:31Z",
+      updated_at: "2026-09-23T14:56:31Z",
+    }] });
+    const records = createPhase4CanonicalRecordStore({ query });
+
+    await expect(records.listStorageMetadata({ ownerUserId: "owner-a", collection: "canonicalEvidenceObjects" }))
+      .resolves.toEqual([{
+        recordId: "training|authoritative|training_logger_draft_sep23",
+        createdAt: "2026-09-23T14:56:31.000Z",
+        updatedAt: "2026-09-23T14:56:31.000Z",
+      }]);
+    expect(query.mock.calls[0][0]).toContain("SELECT record_id,created_at,updated_at");
+    expect(query.mock.calls[0][0]).toContain("owner_user_id=$1 AND collection_name=$2");
+    expect(query.mock.calls[0][1]).toEqual(["owner-a", "canonicalEvidenceObjects"]);
+  });
+
   it("creates source observations without overwriting a concurrent immutable identity", async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [] })

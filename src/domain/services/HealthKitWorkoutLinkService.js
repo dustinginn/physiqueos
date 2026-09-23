@@ -23,7 +23,7 @@ import { isActiveDetailedStrengthSession } from "./HealthKitObservationService.j
 export const HEALTHKIT_WORKOUT_LINK_COLLECTION = "healthKitWorkoutLinks";
 export const HEALTHKIT_WORKOUT_LINK_ID_PREFIX = "healthkit_workout_link_";
 export const HEALTHKIT_WORKOUT_LINK_SCHEMA_VERSION = "healthkit-workout-link-v1";
-export const HEALTHKIT_WORKOUT_MATCHER_VERSION = "healthkit-strength-matcher-v4";
+export const HEALTHKIT_WORKOUT_MATCHER_VERSION = "healthkit-strength-matcher-v5";
 // A confident match is only a CANDIDATE. Turning any candidate into a
 // confirmed link is a separate, explicit act that must go through the guarded
 // relationship service (claims + one-to-one + duplicate-group checks). Link
@@ -89,6 +89,9 @@ export function assessHealthKitStrengthLinkCandidates({
   // Required for the deterministic Logger rule: without the complete
   // same-day workout universe, uniqueness is unproven and the rule stays off.
   canonicalWorkouts = [],
+  // Optional immutable Server storage facts, supplied only by guarded
+  // reassessment. A missing or invalid commit timestamp never becomes an end.
+  loggerSessionServerCommitTimestamps = new Map(),
 } = {}) {
   const base = { matcherVersion: HEALTHKIT_WORKOUT_MATCHER_VERSION, thresholds: HEALTHKIT_STRENGTH_MATCH_THRESHOLDS };
   const current = canonicalWorkout?.current;
@@ -117,7 +120,10 @@ export function assessHealthKitStrengthLinkCandidates({
         bundleIdentifier: current.source.bundleIdentifier,
         externalId: sourceId,
       }) === canonicalWorkout.id);
-    const normalized = normalizeSessionTimes(payload, current.timeZone);
+    const canonicalId = record.canonicalId ?? payload.id;
+    const normalized = normalizeSessionTimes(payload, current.timeZone, {
+      serverCommitTimestamp: lookupCommitTimestamp(loggerSessionServerCommitTimestamps, canonicalId),
+    });
     if (!explicit && !normalized.usable) {
       unverifiable += 1;
       continue;
@@ -125,7 +131,7 @@ export function assessHealthKitStrengthLinkCandidates({
     const assessment = assessWorkoutDuplicatePair(hkCandidate, normalized.payload);
     const facts = explicit ? null : boundaryFacts(current, normalized.payload.metadata);
     const deterministicLoggerWindow = !explicit && deterministicLoggerRuleAvailable &&
-      (record.canonicalId ?? payload.id) === (sameDayNativeLoggerSessions[0].canonicalId ?? sameDayNativeLoggerSessions[0].payload?.id) &&
+      canonicalId === (sameDayNativeLoggerSessions[0].canonicalId ?? sameDayNativeLoggerSessions[0].payload?.id) &&
       facts.startInsideWorkoutWindow;
     // Adjacent is not the same workout: a session whose window merely touches or
     // sits beside the Apple workout has no real overlap and is not a candidate,
@@ -136,7 +142,7 @@ export function assessHealthKitStrengthLinkCandidates({
     // workout. The canonical record never stores the private HealthKit id, so
     // the session's source ids are hashed the same way the record id is.
     assessed.push({
-      canonicalId: record.canonicalId ?? payload.id,
+      canonicalId,
       outcome: explicit ? "duplicate" : deterministicLoggerWindow
         ? (facts.endAligned ? "duplicate" : "possible_duplicate") : assessment.outcome,
       confidence: explicit ? 100 : deterministicLoggerWindow
@@ -485,16 +491,25 @@ function dateOf(payload) {
 // Logger and Evidence workouts, re-expressed with absolute-instant start and
 // end so the shared duplicate service compares like with like. Nothing is
 // mutated. `usable` is false when no start can be established.
-function normalizeSessionTimes(payload, timeZone) {
+function normalizeSessionTimes(payload, timeZone, { serverCommitTimestamp = null } = {}) {
   const metadata = payload.metadata ?? {};
   const dateKey = dateOf(payload);
   const rawStart = metadata.start_time ?? metadata.started_at ?? metadata.start ?? null;
-  const rawEnd = metadata.end_time ?? metadata.ended_at ?? metadata.end ??
-    (isNativeLiveLoggerSession(payload) ? payload.captured_at ?? null : null);
+  const explicitEnd = metadata.end_time ?? metadata.ended_at ?? metadata.end ?? null;
   const start = normalizeWorkoutTimeToInstant(rawStart, { dateKey, timeZone });
+  const serverCommitEnd = explicitEnd === null && isNativeLiveLoggerSession(payload) &&
+    isSyntheticNoonCapture(payload.captured_at, dateKey) && validInstant(serverCommitTimestamp)
+    ? new Date(serverCommitTimestamp).toISOString()
+    : null;
+  const rawEnd = explicitEnd ?? serverCommitEnd ??
+    (isNativeLiveLoggerSession(payload) ? payload.captured_at ?? null : null);
   let end = normalizeWorkoutTimeToInstant(rawEnd, { dateKey, timeZone });
+  // A Server commit is an absolute instant, not a wall-clock value. If it
+  // predates the session start, reject it instead of manufacturing a next-day
+  // end through the general midnight normalization below.
+  if (serverCommitEnd && start && end && Date.parse(end) < Date.parse(start)) end = null;
   // A bare or naive wall-clock end before its start crossed midnight.
-  if (start && end && Date.parse(end) < Date.parse(start)) end = new Date(Date.parse(end) + 86400000).toISOString();
+  if (!serverCommitEnd && start && end && Date.parse(end) < Date.parse(start)) end = new Date(Date.parse(end) + 86400000).toISOString();
   const durationSeconds = metadata.duration_seconds ??
     (start && end ? Math.round((Date.parse(end) - Date.parse(start)) / 1000) : null);
   return {
@@ -509,6 +524,21 @@ function normalizeSessionTimes(payload, timeZone) {
       },
     },
   };
+}
+
+function lookupCommitTimestamp(timestamps, canonicalId) {
+  if (!canonicalId) return null;
+  if (timestamps instanceof Map) return timestamps.get(canonicalId) ?? null;
+  return timestamps?.[canonicalId] ?? null;
+}
+
+function isSyntheticNoonCapture(value, dateKey) {
+  if (!validInstant(value) || !dateKey) return false;
+  return new Date(value).toISOString() === `${dateKey}T12:00:00.000Z`;
+}
+
+function validInstant(value) {
+  return value != null && !Number.isNaN(Date.parse(value));
 }
 
 function isNativeLiveLoggerSession(payload) {

@@ -44,17 +44,18 @@ export async function runHealthKitWorkoutLinkReassessment({
   }
 
   const list = (collection) => records.list({ ownerUserId, collection });
-  const [links, claims, workouts, evidence, canonicalDays, observations, dailyPolicy, workoutPolicy] = await Promise.all([
+  const [links, claims, workouts, evidence, evidenceStorageMetadata, canonicalDays, observations, dailyPolicy, workoutPolicy] = await Promise.all([
     list(HEALTHKIT_WORKOUT_LINK_COLLECTION),
     list(HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION),
     list(HEALTHKIT_CANONICAL_WORKOUT_COLLECTION),
     list(EVIDENCE_COLLECTION),
+    records.listStorageMetadata({ ownerUserId, collection: EVIDENCE_COLLECTION }),
     list(HEALTHKIT_CANONICAL_DAY_COLLECTION),
     list(OBSERVATION_COLLECTION),
     records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID }),
     records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID }),
   ]);
-  const facts = collectFacts({ links, claims, workouts, evidence, canonicalDays, observations, dailyPolicy, workoutPolicy });
+  const facts = collectFacts({ links, claims, workouts, evidence, evidenceStorageMetadata, canonicalDays, observations, dailyPolicy, workoutPolicy });
   if (workoutPolicy?.linkAutoConfirm !== false || workoutPolicy?.strategicEvidenceEligibility !== "quarantined") {
     return refused("policy_safety_flags_not_preserved", facts);
   }
@@ -78,6 +79,7 @@ export async function runHealthKitWorkoutLinkReassessment({
     canonicalObjects: evidence,
     existingLinks: links,
     canonicalWorkouts: workouts,
+    loggerSessionServerCommitTimestamps: new Map(evidenceStorageMetadata.map((row) => [row.recordId, row.createdAt])),
   });
   const [match] = assessment.candidates;
   if (assessment.outcome !== HealthKitStrengthMatchOutcome.CONFIDENT || assessment.candidates.length !== 1 ||
@@ -198,11 +200,12 @@ export async function runHealthKitWorkoutLinkReassessment({
     payload: { ...workout, linkAssessment: assessmentPatch, updatedAt: at },
   });
 
-  const [afterLinks, afterClaims, afterWorkouts, afterEvidence, afterDays, afterObservations, afterDaily, afterWorkoutPolicy] = await Promise.all([
+  const [afterLinks, afterClaims, afterWorkouts, afterEvidence, afterEvidenceStorageMetadata, afterDays, afterObservations, afterDaily, afterWorkoutPolicy] = await Promise.all([
     list(HEALTHKIT_WORKOUT_LINK_COLLECTION),
     list(HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION),
     list(HEALTHKIT_CANONICAL_WORKOUT_COLLECTION),
     list(EVIDENCE_COLLECTION),
+    records.listStorageMetadata({ ownerUserId, collection: EVIDENCE_COLLECTION }),
     list(HEALTHKIT_CANONICAL_DAY_COLLECTION),
     list(OBSERVATION_COLLECTION),
     records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID }),
@@ -217,6 +220,8 @@ export async function runHealthKitWorkoutLinkReassessment({
     loggerAuthorityPreserved: afterLink?.contentAuthority?.trainingContent === "workout_logger" && afterLink?.contentAuthority?.telemetry === "healthkit",
     claimsUnchanged: afterClaims.length === facts.claimCount && listDigest(afterClaims) === facts.claimsDigest,
     loggerEvidenceUnchanged: afterEvidence.length === facts.evidenceCount && listDigest(afterEvidence) === facts.evidenceDigest,
+    loggerEvidenceStorageMetadataUnchanged: afterEvidenceStorageMetadata.length === facts.evidenceStorageMetadataCount &&
+      storageMetadataDigest(afterEvidenceStorageMetadata) === facts.evidenceStorageMetadataDigest,
     workoutCurrentUnchanged: stable(afterWorkout?.current) === stable(workout.current),
     workoutStillQuarantined: afterWorkout?.evidenceEligibility?.state === "quarantined" && afterWorkout?.evidenceEligibility?.strategic === false,
     otherWorkoutsUnchanged: listDigest(afterWorkouts.filter((item) => item.id !== workout.id)) === listDigest(workouts.filter((item) => item.id !== workout.id)),
@@ -252,7 +257,7 @@ function summary(workout, candidate, assessment) {
   };
 }
 
-function collectFacts({ links, claims, workouts, evidence, canonicalDays, observations, dailyPolicy, workoutPolicy }) {
+function collectFacts({ links, claims, workouts, evidence, evidenceStorageMetadata, canonicalDays, observations, dailyPolicy, workoutPolicy }) {
   return {
     linkCount: links.length,
     linksDigest: listDigest(links),
@@ -262,6 +267,8 @@ function collectFacts({ links, claims, workouts, evidence, canonicalDays, observ
     canonicalWorkoutsDigest: listDigest(workouts),
     evidenceCount: evidence.length,
     evidenceDigest: listDigest(evidence),
+    evidenceStorageMetadataCount: evidenceStorageMetadata.length,
+    evidenceStorageMetadataDigest: storageMetadataDigest(evidenceStorageMetadata),
     canonicalDayCount: canonicalDays.length,
     canonicalDaysDigest: listDigest(canonicalDays),
     observationCount: observations.length,
@@ -292,6 +299,14 @@ function operationError(code, message, extra = {}) {
 
 function listDigest(list) {
   return digest(list.map((record) => `${record.id ?? record.canonicalId}:${record.version ?? 1}:${digest(stable(record))}`).sort().join(","));
+}
+
+function storageMetadataDigest(list) {
+  return digest(list.map((row) => stable({
+    recordId: row.recordId,
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
+  })).sort().join(","));
 }
 
 function stable(value) {
