@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createInMemoryCanonicalRecordStore } from "../database/Phase4CanonicalRecordStore.js";
 import { normalizeHealthKitObservationBatch } from "../../domain/services/HealthKitObservationService.js";
@@ -11,7 +12,10 @@ import {
   findHealthKitWorkoutRelationshipViolations,
   getHealthKitWorkoutLinkClaimId,
 } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
-import { runHealthKitWorkoutLinkConfirmation } from "./HealthKitWorkoutLinkConfirmationRunner.js";
+import {
+  HEALTHKIT_WORKOUT_LINK_CONFIRMATION_AUDIT_RECORD_PREFIX,
+  runHealthKitWorkoutLinkConfirmation,
+} from "./HealthKitWorkoutLinkConfirmationRunner.js";
 
 const OWNER = "user_founder_001";
 const DAY = "2026-09-22";
@@ -104,14 +108,45 @@ describe("guarded Workout link confirmation operation", () => {
     expect(again).toMatchObject({ outcome: "already_confirmed", linkStatus: "confirmed" });
     expect(await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH })).toMatchObject({ outcome: "already_confirmed" });
     expect(records.getMutationCount()).toBe(mutations);
+  });
 
-    // A fresh candidate on another workout with the same authorization reference must not reuse the audit row.
-    const other = await world({ workouts: [["u9", "14:00", "15:00"]], sessions: ["S9"], candidates: [["u9", "S9"]], sessionTimes: { S9: ["14:01", "14:59"] } });
-    const dry2 = await runHealthKitWorkoutLinkConfirmation({ records: other.records, authorization: AUTH });
-    await other.records.putIfAbsent({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: "healthkit_workout_link_confirmation_audit_" + "x".repeat(12), payload: { id: "x" } });
-    await runHealthKitWorkoutLinkConfirmation({ records: other.records, authorization: AUTH, apply: true, expected: dry2.facts });
-    const dry3 = await runHealthKitWorkoutLinkConfirmation({ records: other.records, authorization: AUTH });
-    expect(dry3.outcome).toBe("already_confirmed");
+  it("refuses to reuse an authorization reference whose audit row already exists (AUDIT_ROW_EXISTS), writing nothing", async () => {
+    // Reviewer-noted gap: the prior version of this case seeded a made-up audit
+    // id, so the guard was never reached. The real id is prefix + first 12 hex
+    // of sha256(reference), exactly as the runner derives it.
+    const { records } = await world();
+    const auditId = HEALTHKIT_WORKOUT_LINK_CONFIRMATION_AUDIT_RECORD_PREFIX +
+      createHash("sha256").update(AUTH.authorizationReference).digest("hex").slice(0, 32).slice(0, 12);
+    await records.putIfAbsent({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: auditId, payload: { id: auditId, kind: "healthkit_workout_link_confirmation_audit" } });
+    const dry = await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH });
+    expect(dry.outcome).toBe("dry_run");
+    const before = records.snapshot();
+    await expect(runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH, apply: true, expected: dry.facts })).rejects.toMatchObject({ code: "AUDIT_ROW_EXISTS" });
+    expect(records.snapshot()).toEqual(before);
+    expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("candidate");
+    expect(records.snapshot().healthKitWorkoutLinkClaims).toHaveLength(0);
+  });
+
+  it("refuses by name when stored relationship state is already violated, instead of failing a post-write invariant", async () => {
+    const { records } = await world();
+    // An orphaned held claim (its holder link does not exist) is a stored violation.
+    await records.putIfAbsent({ ownerUserId: OWNER, collection: "healthKitWorkoutLinkClaims", recordId: "healthkit_link_claim_w_orphan",
+      payload: { id: "healthkit_link_claim_w_orphan", kind: "workout", status: "held", holderLinkId: "healthkit_workout_link_missing", history: [] } });
+    const before = records.snapshot();
+    const dry = await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH });
+    expect(dry).toMatchObject({ outcome: "refused", reasons: ["stored_relationship_violations"], violations: { heldClaimsWithoutConfirmedLink: 1 } });
+    expect(await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH, apply: true, expected: dry.facts })).toMatchObject({ outcome: "refused", reasons: ["stored_relationship_violations"] });
+    expect(records.snapshot()).toEqual(before);
+  });
+
+  it("names a confirmed link whose claims are not held instead of reporting no candidate", async () => {
+    const { records, link } = await world();
+    const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: link });
+    await records.put({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: link, expectedVersion: stored.version, payload: { ...stored, status: "confirmed" } });
+    // No claims exist for it: the violation checker reports confirmedLinksWithoutHeldClaims, so this refuses as a stored violation first ...
+    const dry = await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH });
+    expect(dry).toMatchObject({ outcome: "refused", reasons: ["stored_relationship_violations"], violations: { confirmedLinksWithoutHeldClaims: 1 } });
+    expect(records.getMutationCount()).toBe(1);
   });
 
   it("two concurrent applies for the same window can never both win, and never produce two active links", async () => {
@@ -141,19 +176,37 @@ describe("guarded Workout link confirmation operation", () => {
         ownerUserId: OWNER, collection: "healthKitWorkoutLinkClaims", recordId: claimId(kind, subject),
         payload: { id: claimId(kind, subject), kind, status: "held", holderLinkId: "healthkit_workout_link_someone_else", history: [] },
       });
+      // A held claim whose holder is not a confirmed link is, by definition, a
+      // stored violation, so the pre-state check names it first (the runner's
+      // own per-side heldBy refusal stays behind it as defense-in-depth). Either
+      // way: refused, typed, and nothing written -- the write is never reached.
       const dry = await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH });
-      expect(dry).toMatchObject({ outcome: "refused", reasons: ["LINK_ONE_TO_ONE_VIOLATION"], heldBy: kind, linkId: link });
+      expect(dry).toMatchObject({ outcome: "refused", reasons: ["stored_relationship_violations"], violations: { heldClaimsWithoutConfirmedLink: 1 } });
       const before = records.snapshot();
       const applied = await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH, apply: true, expected: dry.facts });
-      expect(applied).toMatchObject({ outcome: "refused", reasons: ["LINK_ONE_TO_ONE_VIOLATION"], heldBy: kind });
+      expect(applied).toMatchObject({ outcome: "refused", reasons: ["stored_relationship_violations"] });
       expect(records.snapshot()).toEqual(before);
       expect(records.snapshot().healthKitWorkoutLinks.find((record) => record.id === link).status).toBe("candidate");
+      expect(records.snapshot().healthKitWorkoutLinkClaims.filter((claim) => claim.holderLinkId === link)).toHaveLength(0);
     }
+  });
+
+  it("fails the post-write quarantine invariant (rolled back by the entry) if a candidate is not quarantined, so confirmation can never graduate a link", async () => {
+    const { records, link } = await world();
+    const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: link });
+    await records.put({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: link, expectedVersion: stored.version,
+      payload: { ...stored, evidenceEligibility: { ...stored.evidenceEligibility, state: "eligible" } } });
+    const dry = await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH });
+    expect(dry.outcome).toBe("dry_run");
+    await expect(runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH, apply: true, expected: dry.facts }))
+      .rejects.toMatchObject({ code: "POST_WRITE_INVARIANT_FAILED", invariants: { linkQuarantined: false } });
   });
 
   it("rejects an invalid or too-wide window before reading anything", async () => {
     const { records } = await world();
     await expect(runHealthKitWorkoutLinkConfirmation({ records, authorization: { ...AUTH, startLocalDate: "2026-09-23", endLocalDate: "2026-09-22" } })).rejects.toMatchObject({ code: "WINDOW_INVALID" });
+    await expect(runHealthKitWorkoutLinkConfirmation({ records, authorization: { ...AUTH, startLocalDate: "2026-13-45", endLocalDate: "2026-13-45" } })).rejects.toMatchObject({ code: "WINDOW_INVALID" });
+    await expect(runHealthKitWorkoutLinkConfirmation({ records, authorization: { ...AUTH, startLocalDate: "2026-02-30", endLocalDate: "2026-02-30" } })).rejects.toMatchObject({ code: "WINDOW_INVALID" });
     await expect(runHealthKitWorkoutLinkConfirmation({ records, authorization: { ...AUTH, startLocalDate: "2026-09-20", endLocalDate: "2026-09-24" } })).rejects.toMatchObject({ code: "WINDOW_TOO_WIDE" });
     await expect(runHealthKitWorkoutLinkConfirmation({ records, authorization: { ...AUTH, ownerUserId: "" } })).rejects.toMatchObject({ code: "OWNER_REQUIRED" });
   });

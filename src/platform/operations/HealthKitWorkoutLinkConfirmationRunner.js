@@ -61,8 +61,13 @@ export async function runHealthKitWorkoutLinkConfirmation({
 } = {}) {
   const { ownerUserId, startLocalDate, endLocalDate, authorizationReference } = authorization ?? {};
   if (!ownerUserId) throw operationError("OWNER_REQUIRED", "An owner is required.");
-  if (!DATE.test(String(startLocalDate)) || !DATE.test(String(endLocalDate)) || startLocalDate > endLocalDate) {
-    throw operationError("WINDOW_INVALID", "startLocalDate and endLocalDate must be an ordered YYYY-MM-DD window.");
+  const calendarValid = (value) => {
+    if (!DATE.test(String(value))) return false;
+    const parsed = Date.parse(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed) && new Date(parsed).toISOString().slice(0, 10) === value;
+  };
+  if (!calendarValid(startLocalDate) || !calendarValid(endLocalDate) || startLocalDate > endLocalDate) {
+    throw operationError("WINDOW_INVALID", "startLocalDate and endLocalDate must be an ordered, calendar-valid YYYY-MM-DD window.");
   }
   if (daysInclusive(startLocalDate, endLocalDate) > HEALTHKIT_WORKOUT_LINK_CONFIRMATION_MAX_DAYS) {
     throw operationError("WINDOW_TOO_WIDE", `The window may span at most ${HEALTHKIT_WORKOUT_LINK_CONFIRMATION_MAX_DAYS} local days.`);
@@ -87,10 +92,22 @@ export async function runHealthKitWorkoutLinkConfirmation({
   const candidates = strengthLinks.filter((link) => link.status === HealthKitWorkoutLinkStatus.CANDIDATE);
   const confirmed = strengthLinks.filter((link) => link.status === HealthKitWorkoutLinkStatus.CONFIRMED);
 
+  // Stored relationship state must already be clean before anything is
+  // predicted or written: a pre-existing violation (e.g. an orphaned held
+  // claim) would otherwise pass dry-run and only surface as a post-write
+  // invariant failure in apply. Refuse it here, by name, with no write.
+  const priorViolations = findHealthKitWorkoutRelationshipViolations({ links, claims });
+  if (Object.values(priorViolations).some((count) => count !== 0)) {
+    return refused("stored_relationship_violations", facts, { violations: priorViolations });
+  }
+
   // Idempotent replay: the window's single strength relationship is already
   // confirmed and durably claimed; there is nothing left to do and nothing is written.
   if (candidates.length === 0 && confirmed.length === 1 && claimsHeldBy(claims, confirmed[0])) {
     return Object.freeze({ outcome: "already_confirmed", ...describe(confirmed[0], workoutById), facts });
+  }
+  if (candidates.length === 0 && confirmed.length === 1) {
+    return refused("confirmed_link_without_held_claims", facts, describe(confirmed[0], workoutById));
   }
   if (candidates.length === 0) return refused("no_candidate_in_window", facts);
   if (candidates.length > 1) return refused("multiple_candidates_in_window", facts, { candidateCount: candidates.length });
@@ -162,7 +179,9 @@ export async function runHealthKitWorkoutLinkConfirmation({
   const violations = findHealthKitWorkoutRelationshipViolations({ links: afterLinks, claims: afterClaims });
   const invariants = {
     linkConfirmed: afterLink?.status === HealthKitWorkoutLinkStatus.CONFIRMED && Number(afterLink?.version) === Number(link.version) + 1,
-    linkQuarantined: afterLink?.evidenceEligibility?.state === link.evidenceEligibility?.state && afterLink?.contentAuthority?.trainingContent === "workout_logger",
+    // Absolute, not before==after: confirmation is not graduation, so the
+    // link must still be quarantined from strategic evidence afterwards.
+    linkQuarantined: afterLink?.evidenceEligibility?.state === "quarantined" && afterLink?.contentAuthority?.trainingContent === "workout_logger",
     exactlyOneConfirmedLinkForWorkout: confirmedForWorkout.length === 1 && confirmedForWorkout[0].id === link.id,
     exactlyOneConfirmedLinkForSession: confirmedForSession.length === 1 && confirmedForSession[0].id === link.id,
     bothClaimsHeldByThisLink: claimsHeldBy(afterClaims, link),
