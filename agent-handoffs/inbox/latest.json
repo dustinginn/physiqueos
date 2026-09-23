@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-22T23:00:00Z",
+  "generated_at_utc": "2026-09-23T03:45:00Z",
   "task": {
-    "id": "healthkit-build52-real-device-selfheal-failure-20260922",
-    "title": "Diagnose Build 52 real-device HealthKit self-heal failure",
-    "status": "completed"
+    "id": "healthkit-evidence-summary-formatting-cleanup-20260923",
+    "title": "Finish HealthKit Evidence summary formatting",
+    "status": "ready"
   },
   "target": {
     "agent": "claude",
@@ -13,12 +13,12 @@
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "expected_server_sha": "924d5e556ba418ceb64de828d4c6a7c06d99f769",
-    "expected_native_sha": "4894e162b42f018745a12506ceacfe243a5fbb50",
-    "expected_production_deployment": "c2442650-a9a0-499e-bc42-59b81c0c8bae",
+    "expected_server_sha": "ccff693b61c98737b670be620f7916c375cb37ce",
+    "expected_native_sha": "1c57556f",
+    "expected_production_deployment": "0bdc1748-d918-452f-a84a-52a9bfdc5373",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260922T230000Z-healthkit-build52-real-device-selfheal-failure-20260922.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260923T034500Z-healthkit-evidence-summary-formatting-cleanup.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
@@ -29,12 +29,5 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
-  },
-  "lifecycle": {
-    "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-22T22:58:08Z",
-    "completed_at_utc": "2026-09-23T02:54:18Z",
-    "completion_status": "completed",
-    "completion_handoff_path": "agent-handoffs/reports/20260923T025256Z-healthkit-build52-real-device-selfheal-failure-fixed-deployed.md"
   }
 }
