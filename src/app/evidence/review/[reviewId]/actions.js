@@ -90,9 +90,47 @@ import { resolveCanonicalEvidenceLocalDate } from
   "../../../../domain/services/CanonicalEvidenceDateService";
 import { assertEvidenceCanonicalCommitReady, assertPhotoSessionsCommitReady } from
   "../../../../domain/services/EvidenceCanonicalCommitReadinessService";
+import { Phase3Command } from "../../../../application/commands/Phase3CommandService.js";
+import { createInactiveLegacyWebContext } from "../../../../application/auth/legacyWebContext.js";
+import { getProductionApplicationComposition } from "../../../../application/composition/productionApplicationComposition.js";
+import { isHealthKitWorkoutReconciliationReview } from "../../../../domain/services/HealthKitWorkoutReconciliationService.js";
 
 function uniqueStrings(values = []) {
   return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
+}
+
+export async function resolveWorkoutReconciliation(formData) {
+  const reviewId = String(formData.get("reviewId") ?? "");
+  const expectedVersion = String(formData.get("expectedVersion") ?? "");
+  const action = String(formData.get("action") ?? "");
+  const loggerSessionCanonicalId = String(formData.get("loggerSessionCanonicalId") ?? "").trim() || null;
+  const idempotencyKey = String(formData.get("idempotencyKey") ?? "");
+  const composition = await getProductionApplicationComposition();
+  const context = await createInactiveLegacyWebContext({ repositories: composition.repositories });
+  try {
+    await composition.commands.execute({
+      commandType: Phase3Command.RESOLVE_WORKOUT_RECONCILIATION,
+      principal: context.principal,
+      metadata: {
+        idempotencyKey,
+        expectedVersion,
+        canonicalStoreEpoch: composition.canonicalStoreEpoch,
+      },
+      payload: {
+        reviewId,
+        action,
+        ...(loggerSessionCanonicalId ? { loggerSessionCanonicalId } : {}),
+      },
+    });
+  } catch (error) {
+    if (["AGGREGATE_VERSION_CONFLICT", "WORKOUT_RECONCILIATION_STALE", "WORKOUT_RECONCILIATION_SELECTION_STALE"].includes(error?.code)) {
+      revalidatePath(`/evidence/review/${reviewId}`);
+      redirect(`/evidence/review/${reviewId}?reconciliation=stale`);
+    }
+    throw error;
+  }
+  revalidatePath(`/evidence/review/${reviewId}`);
+  redirect(`/evidence/review/${reviewId}?reconciliation=resolved`);
 }
 
 export async function reprocessEvidenceReview(formData) {
@@ -101,6 +139,9 @@ export async function reprocessEvidenceReview(formData) {
   const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   const user = await FounderRepositories.users.getCurrentUser();
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  if (isHealthKitWorkoutReconciliationReview(review)) {
+    throw new Error("Workout reconciliation must use its guarded resolution action.");
+  }
   const recoveryContext = resolveRecoveryContext(review, formData);
   let outcome = "failed";
   try {
@@ -204,6 +245,9 @@ async function executeEvidenceReviewConfirmation(formData, {
     };
   }, { readModel: "action.evidence-review-confirmation-start" });
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  if (isHealthKitWorkoutReconciliationReview(review)) {
+    throw new Error("Workout reconciliation must use its guarded resolution action.");
+  }
   if (nativeStart && confirmedBy !== user.id) throw new Error("Evidence review is unavailable.");
   // `committing` means a commit is genuinely in flight — report progress and
   // leave it alone. `partially_committed` does NOT: it is the terminal state
@@ -1417,6 +1461,9 @@ export async function discardEvidenceReview(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
   const user = await FounderRepositories.users.getCurrentUser();
   const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  if (isHealthKitWorkoutReconciliationReview(review)) {
+    throw new Error("Workout reconciliation must use its guarded resolution action.");
+  }
   const recoveryContext = resolveRecoveryContext(review, formData);
   await createEvidenceReviewService({ repositories: FounderRepositories }).discard(reviewId, { confirmedBy: user?.id });
   if (recoveryContext) {

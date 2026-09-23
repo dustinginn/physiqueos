@@ -20,6 +20,7 @@ describe("deterministic Strength auto-confirm gate", () => {
         loggerSessionCanonicalId: "logger-sep23",
         confidence: 95,
         basis: "logger_session_window",
+        substantiveOverlap: null,
         overlapSeconds: 3480,
         startAligned: true,
         endAligned: true,
@@ -68,6 +69,45 @@ describe("deterministic Strength auto-confirm gate", () => {
       eligible: false,
       reasons: expect.arrayContaining(["deterministic_basis_not_allowlisted"]),
     });
+  });
+
+  it("requires verified temporal compatibility even for explicit source identity", () => {
+    const world = fixture();
+    const explicit = (temporal = {}) => ({
+      ...world.assessment.candidates[0],
+      confidence: 100,
+      basis: "explicit_source_identity",
+      substantiveOverlap: false,
+      overlapSeconds: null,
+      startAligned: null,
+      endAligned: null,
+      ...temporal,
+    });
+    for (const candidate of [
+      explicit(),
+      explicit({ overlapSeconds: 0, startAligned: false, endAligned: false }),
+      explicit({ overlapSeconds: 3000, substantiveOverlap: true, startAligned: false, endAligned: false }),
+    ]) {
+      expect(assessDeterministicStrengthAutoConfirm({
+        ...world,
+        assessment: { ...world.assessment, candidates: [candidate] },
+      })).toMatchObject({
+        eligible: false,
+        reasons: expect.arrayContaining(["deterministic_basis_not_allowlisted"]),
+      });
+    }
+    expect(assessDeterministicStrengthAutoConfirm({
+      ...world,
+      assessment: {
+        ...world.assessment,
+        candidates: [explicit({
+          substantiveOverlap: true,
+          overlapSeconds: 3480,
+          startAligned: true,
+          endAligned: false,
+        })],
+      },
+    })).toMatchObject({ eligible: true, reasons: [] });
   });
 
   it("refuses active relationship competition and ignores history as an eligibility input", () => {

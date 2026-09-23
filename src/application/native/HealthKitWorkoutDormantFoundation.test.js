@@ -699,6 +699,40 @@ describe("link hardening through the real ingest path", () => {
     expect(snapshot.healthKitWorkoutLinkClaims ?? []).toEqual([]);
   });
 
+  it("routes a temporally incompatible explicit identity to review even when auto-confirm is enabled", async () => {
+    const explicit = logger("session-x", "18:00", "19:00");
+    explicit.payload.metadata.source_workout_id = HK_UUID;
+    const records = storeWithClaims({
+      evidence: [explicit],
+      workoutPolicyOverrides: {
+        linkAutoConfirm: true,
+        linkAutoConfirmEffectiveAt: "2026-09-23T23:00:00.000Z",
+      },
+    });
+    const result = await ingest(records, [workout()], "explicit-temporal-refusal");
+    const snapshot = records.snapshot();
+    expect(result.result.workoutRelationships.automaticallyConfirmed ?? 0).toBe(0);
+    expect(result.result.workoutRelationships.automaticConfirmationRefusals).toEqual([
+      expect.objectContaining({ reasons: expect.arrayContaining(["deterministic_basis_not_allowlisted"]) }),
+    ]);
+    expect(snapshot.healthKitWorkoutLinks).toEqual([
+      expect.objectContaining({ status: "candidate", matchBasis: "explicit_source_identity" }),
+    ]);
+    expect(snapshot.healthKitWorkoutLinkClaims ?? []).toEqual([]);
+    expect(snapshot.evidenceReviews).toEqual([
+      expect.objectContaining({
+        reviewKind: "healthkit_workout_reconciliation",
+        status: "pending",
+        candidates: [expect.objectContaining({
+          loggerSessionCanonicalId: "session-x",
+          substantiveOverlap: false,
+          startAligned: false,
+          endAligned: false,
+        })],
+      }),
+    ]);
+  });
+
   it("does not treat a sequential session that only touches the Apple workout as a match", async () => {
     const records = store({ evidence: [logger("session-a", "09:00", "10:00", 3600)] });
     const result = await ingest(records, [workout()], "b1");

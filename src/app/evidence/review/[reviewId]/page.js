@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import EvidenceReviewScreen from "../../../../screens/EvidenceReviewScreen";
+import WorkoutReconciliationReviewScreen from "../../../../screens/WorkoutReconciliationReviewScreen";
 import { createMobileEvidenceReviewFixture } from "../../../../fixtures/evidenceReviewFixtures";
 import { repairPendingReviewExerciseIdentities } from "../../../../domain/services/EvidenceReviewPresentationService";
-import { confirmEvidenceReview, discardEvidenceReview, reprocessEvidenceReview, resolveEvidenceReviewExercise, updateEvidenceReviewDexaMeasurements, updateEvidenceReviewExerciseRelationship, updateEvidenceReviewExerciseVariant, updateEvidenceReviewPhotoPose, updateEvidenceReviewPhotoSessionMetadata } from "./actions";
+import { confirmEvidenceReview, discardEvidenceReview, reprocessEvidenceReview, resolveEvidenceReviewExercise, resolveWorkoutReconciliation, updateEvidenceReviewDexaMeasurements, updateEvidenceReviewExerciseRelationship, updateEvidenceReviewExerciseVariant, updateEvidenceReviewPhotoPose, updateEvidenceReviewPhotoSessionMetadata } from "./actions";
 import {
   createEvidenceRecoveryContext,
   evidenceReviewMatchesRecoveryContext,
@@ -36,6 +37,10 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
     : await getProductionEvidenceReviewReadService().getReview(reviewId);
   const review = read?.review;
   if (!review) notFound();
+  if (read.presentation?.kind === "healthkit_workout_reconciliation") {
+    const outcome = query?.reconciliation === "stale" ? "stale" : null;
+    return <WorkoutReconciliationReviewScreen outcome={outcome} presentation={read.presentation} resolveAction={resolveWorkoutReconciliation} />;
+  }
   // Map existing must offer Founder-created canonical exercises (e.g. bicep_curl_machine)
   // on the very first request after a fresh deploy, not only once some unrelated canonical
   // write has incidentally hydrated the shared registry in this process.

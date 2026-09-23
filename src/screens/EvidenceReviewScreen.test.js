@@ -10,8 +10,26 @@ const actions = fs.readFileSync(
   new URL("../app/evidence/review/[reviewId]/actions.js", import.meta.url),
   "utf8"
 );
+const reconciliationScreen = fs.readFileSync(
+  new URL("./WorkoutReconciliationReviewScreen.jsx", import.meta.url),
+  "utf8"
+);
 
 describe("EvidenceReviewScreen selection interaction", () => {
+  it("routes typed workout reconciliation to guarded confirm/no-match UX instead of generic discard", () => {
+    expect(page).toContain('read.presentation?.kind === "healthkit_workout_reconciliation"');
+    expect(page).toContain("<WorkoutReconciliationReviewScreen");
+    expect(page.indexOf('read.presentation?.kind === "healthkit_workout_reconciliation"')).toBeLessThan(page.indexOf("  const canonicalExercises = await readProductionTrainingExerciseRegistry"));
+    expect(reconciliationScreen).toContain("Use Logger session");
+    expect(reconciliationScreen).toContain(">No match</");
+    expect(reconciliationScreen).toContain('name="expectedVersion"');
+    expect(reconciliationScreen).toContain('name="idempotencyKey"');
+    expect(reconciliationScreen).not.toContain("Discard review");
+    expect(actions).toContain("Phase3Command.RESOLVE_WORKOUT_RECONCILIATION");
+    expect(actions).toContain("composition.commands.execute");
+    expect(actions.match(/Workout reconciliation must use its guarded resolution action\./g)).toHaveLength(3);
+  });
+
   it("uses viewer-facing save terminology throughout the review controls", () => {
     expect(screen).toContain("Exclude from log");
     expect(screen).toContain("Include in log");

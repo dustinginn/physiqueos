@@ -129,7 +129,11 @@ export function assessHealthKitStrengthLinkCandidates({
       continue;
     }
     const assessment = assessWorkoutDuplicatePair(hkCandidate, normalized.payload);
-    const facts = explicit ? null : boundaryFacts(current, normalized.payload.metadata);
+    // Identity may establish which records are being compared, but it never
+    // establishes that they describe the same physical workout. Preserve an
+    // explicit identity as a review candidate when timing is unusable while
+    // carrying independently verified temporal facts whenever they exist.
+    const facts = normalized.usable ? boundaryFacts(current, normalized.payload.metadata) : null;
     const deterministicLoggerWindow = !explicit && deterministicLoggerRuleAvailable &&
       canonicalId === (sameDayNativeLoggerSessions[0].canonicalId ?? sameDayNativeLoggerSessions[0].payload?.id) &&
       facts.startInsideWorkoutWindow;
@@ -162,9 +166,10 @@ export function assessHealthKitStrengthLinkCandidates({
       qualified: explicit || (deterministicLoggerWindow
         ? facts.endAligned
         : assessment.outcome === "duplicate" && facts.substantiveOverlap && (facts.startAligned || facts.endAligned)),
-      overlapSeconds: explicit ? null : Math.round(facts.overlapMs / 1000),
-      startAligned: explicit ? null : facts.startAligned,
-      endAligned: explicit ? null : facts.endAligned,
+      substantiveOverlap: facts?.substantiveOverlap ?? false,
+      overlapSeconds: facts ? Math.round(facts.overlapMs / 1000) : null,
+      startAligned: facts?.startAligned ?? null,
+      endAligned: facts?.endAligned ?? null,
       explicit,
       basis: explicit ? "explicit_source_identity"
         : deterministicLoggerWindow ? "logger_session_window" : "temporal_and_telemetry",
@@ -180,6 +185,7 @@ export function assessHealthKitStrengthLinkCandidates({
     confidence: candidate.confidence,
     reasons: Object.freeze([...candidate.reasons]),
     basis: candidate.basis,
+    substantiveOverlap: candidate.substantiveOverlap,
     overlapSeconds: candidate.overlapSeconds,
     startAligned: candidate.startAligned,
     endAligned: candidate.endAligned,
@@ -328,10 +334,9 @@ export function getHealthKitWorkoutLinkRecordId(canonicalWorkoutId, loggerSessio
 
 /**
  * A link candidate record for a confident or possible single match. An
- * ambiguous or absent match never produces a record. An explicit source
- * identity shared by both sides is the only thing that creates a link already
- * confirmed, and only when it would not break the one-to-one rule; everything
- * else needs a separate explicit confirmation.
+ * ambiguous or absent match never produces a record. Every relationship,
+ * including one supported by explicit source identity, remains a candidate
+ * until it passes the separate guarded confirmation path.
  */
 export function createHealthKitWorkoutLinkCandidate({ canonicalWorkout, assessment, ownerUserId, now } = {}) {
   const outcome = assessment?.outcome;

@@ -52,7 +52,12 @@ export function assessDeterministicStrengthAutoConfirm({
   if (!session || !isActiveDetailedStrengthSession(session)) reasons.push("logger_session_not_active_detailed_strength");
 
   if (candidate) {
-    const explicit = candidate.basis === "explicit_source_identity" && candidate.confidence === 100;
+    // An authoritative source id proves identity provenance, not temporal
+    // compatibility. Every automatic-confirm basis must independently prove
+    // substantive overlap and at least one aligned boundary.
+    const explicit = candidate.basis === "explicit_source_identity" && candidate.confidence === 100 &&
+      candidate.substantiveOverlap === true && Number(candidate.overlapSeconds) > 0 &&
+      (candidate.startAligned === true || candidate.endAligned === true);
     const loggerWindow = candidate.basis === "logger_session_window" && candidate.confidence === 95 &&
       candidate.endAligned === true && Number(candidate.overlapSeconds) > 0;
     if (!explicit && !loggerWindow) reasons.push("deterministic_basis_not_allowlisted");
@@ -86,6 +91,7 @@ export function assessDeterministicStrengthAutoConfirm({
       loggerSessionCanonicalId: candidate.loggerSessionCanonicalId,
       confidence: candidate.confidence,
       basis: candidate.basis,
+      substantiveOverlap: candidate.substantiveOverlap ?? null,
       overlapSeconds: candidate.overlapSeconds ?? null,
       startAligned: candidate.startAligned ?? null,
       endAligned: candidate.endAligned ?? null,
@@ -226,6 +232,7 @@ function projectCandidate(candidate, session = null) {
     confidence: candidate.confidence,
     basis: candidate.basis,
     reasons: Object.freeze([...(candidate.reasons ?? [])]),
+    substantiveOverlap: candidate.substantiveOverlap ?? false,
     overlapSeconds: candidate.overlapSeconds ?? null,
     startAligned: candidate.startAligned ?? null,
     endAligned: candidate.endAligned ?? null,

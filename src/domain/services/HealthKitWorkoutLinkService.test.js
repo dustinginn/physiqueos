@@ -148,12 +148,36 @@ describe("strength link matcher", () => {
       .toThrowError(HealthKitWorkoutLinkError);
   });
 
-  it("treats an explicit source identity as a confident match without any timing", () => {
+  it("keeps an explicit source identity as a review candidate while exposing failed temporal facts", () => {
     const explicit = logger("session-x", "18:00", "19:00");
     explicit.payload.metadata.source_workout_id = HK_UUID;
     const result = assess(hkStrength(), [explicit]);
     expect(result.outcome).toBe(Outcome.CONFIDENT);
-    expect(result.candidates[0]).toMatchObject({ confidence: 100, basis: "explicit_source_identity" });
+    expect(result.candidates[0]).toMatchObject({
+      confidence: 100,
+      basis: "explicit_source_identity",
+      substantiveOverlap: false,
+      overlapSeconds: 0,
+      startAligned: false,
+      endAligned: false,
+    });
+  });
+
+  it("never invents temporal facts for an explicit source identity with unusable timing", () => {
+    const explicit = logger("session-x", "10:00", "11:00");
+    explicit.payload.metadata.source_workout_id = HK_UUID;
+    delete explicit.payload.metadata.start_time;
+    delete explicit.payload.metadata.end_time;
+    const result = assess(hkStrength(), [explicit]);
+    expect(result.outcome).toBe(Outcome.CONFIDENT);
+    expect(result.candidates[0]).toMatchObject({
+      confidence: 100,
+      basis: "explicit_source_identity",
+      substantiveOverlap: false,
+      overlapSeconds: null,
+      startAligned: null,
+      endAligned: null,
+    });
   });
 
   it("does not use a bare display filename to identify a workout", () => {
