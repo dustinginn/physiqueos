@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T03:45:00Z",
+  "generated_at_utc": "2026-09-23T04:00:00Z",
   "task": {
-    "id": "healthkit-evidence-summary-formatting-cleanup-20260923",
-    "title": "Finish HealthKit Evidence summary formatting",
-    "status": "completed"
+    "id": "healthkit-formatting-deploy-workout-readiness-20260923",
+    "title": "Deploy HealthKit formatting fix and audit Workout canary readiness",
+    "status": "ready"
   },
   "target": {
     "agent": "claude",
@@ -18,7 +18,7 @@
     "expected_production_deployment": "0bdc1748-d918-452f-a84a-52a9bfdc5373",
     "expected_base_sha": null
   },
-  "prompt_path": "agent-handoffs/inbox/prompts/20260923T034500Z-healthkit-evidence-summary-formatting-cleanup-20260923.md",
+  "prompt_path": "agent-handoffs/inbox/prompts/20260923T040000Z-healthkit-formatting-deploy-workout-readiness-20260923.md",
   "instructions": {
     "reverify_authority": true,
     "publish_completion_handoff": true
@@ -29,12 +29,5 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
-  },
-  "lifecycle": {
-    "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-23T03:10:49Z",
-    "completed_at_utc": "2026-09-23T03:42:26Z",
-    "completion_status": "completed",
-    "completion_handoff_path": "agent-handoffs/reports/20260923T034214Z-healthkit-evidence-summary-formatting-cleanup-fixed.md"
   }
 }
