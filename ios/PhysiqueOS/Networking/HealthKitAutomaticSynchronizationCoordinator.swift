@@ -62,11 +62,11 @@ extension HealthKitSynchronizationEngine: HealthKitAutomaticSynchronizing {}
 /// Reentrancy: `bootstrap()` is called on every `scenePhase == .active`
 /// transition, so an overlapping call (a quick app-switcher-and-back before
 /// the first call finishes) is expected, not exceptional. A second call
-/// while one is already running awaits and returns the SAME in-flight
-/// result rather than starting a concurrent second execution -- without
-/// this, two overlapping `synchronize()` calls for the identical scope
-/// could each read the same not-yet-advanced cursor and each stage/upload a
-/// redundant duplicate batch.
+/// while one is already running never starts concurrently. One request that
+/// arrives during the initial pass queues a single sequential rerun; further
+/// overlap coalesces into the active pass. This both avoids losing a fresh
+/// foreground request behind a stale/stalled pass and prevents two identical
+/// scopes from reading the same not-yet-advanced cursor concurrently.
 /// `@unchecked Sendable`: every mutable stored property (`lastBootstrapOutcome`,
 /// `cachedOwnerIdentity`, `inFlightTask`) is written only from inside
 /// `bootstrap()`/`runBootstrap()`, both `@MainActor`-isolated, matching this
@@ -104,6 +104,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     private let synchronizer: any HealthKitAutomaticSynchronizing
     private let server: any HealthKitFounderCanaryServer
     private let deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore
+    private let stepTimeout: Duration
 
     private(set) var lastBootstrapOutcome: HealthKitAutomaticBootstrapOutcome?
     /// The Founder's owner identity almost never changes within one signed-in
@@ -118,32 +119,53 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     /// the identical scope that both read the same not-yet-advanced cursor
     /// and each stage/upload a redundant duplicate batch.
     private var inFlightTask: Task<HealthKitAutomaticBootstrapOutcome, Never>?
+    /// A foreground/pull-to-refresh request that arrives during the initial
+    /// pass is not satisfied by that potentially stale pass. It queues one
+    /// fresh pass after the current one finishes. Calls arriving during that
+    /// queued rerun coalesce into it rather than creating an unbounded loop.
+    private var rerunRequested = false
+    private var rerunInProgress = false
 
     init(
         authorization: any HealthKitCanaryAuthorizationCoordinating,
         synchronizer: any HealthKitAutomaticSynchronizing,
         server: any HealthKitFounderCanaryServer,
-        deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore = KeychainHealthKitCanaryDeviceIdentityStore()
+        deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore = KeychainHealthKitCanaryDeviceIdentityStore(),
+        stepTimeout: Duration = .seconds(30)
     ) {
         self.authorization = authorization
         self.synchronizer = synchronizer
         self.server = server
         self.deviceIdentityStore = deviceIdentityStore
+        self.stepTimeout = stepTimeout
     }
 
     @MainActor
     @discardableResult
     func bootstrap() async -> HealthKitAutomaticBootstrapOutcome {
         if let inFlightTask {
+            if !rerunInProgress { rerunRequested = true }
             return await inFlightTask.value
         }
         let task = Task { @MainActor in
-            await self.runBootstrap()
+            var outcome = await self.runBootstrap()
+            if self.rerunRequested {
+                self.rerunRequested = false
+                self.rerunInProgress = true
+                outcome = await self.runBootstrap()
+                self.rerunInProgress = false
+            }
+            // Clear before completing the task. This closes the narrow actor-
+            // reentrancy window where a caller could otherwise observe an
+            // already-completed task and have its rerun request discarded by
+            // an older waiter doing cleanup after `await task.value`.
+            self.inFlightTask = nil
+            self.rerunRequested = false
+            self.rerunInProgress = false
+            return outcome
         }
         inFlightTask = task
-        let outcome = await task.value
-        inFlightTask = nil
-        return outcome
+        return await task.value
     }
 
     @MainActor
@@ -189,21 +211,82 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
                 stream: stream,
                 predicateVersion: Self.predicateVersion
             )
-            do { try await synchronizer.startObserving(scope: scope) } catch {
+            switch await boundedStep({ try await self.synchronizer.startObserving(scope: scope) }) {
+            case .succeeded: break
+            case .failed:
                 outcome.streamErrors[stream, default: []].append("observer_registration_failed")
+            case .timedOut:
+                outcome.streamErrors[stream, default: []].append("observer_registration_timed_out")
             }
-            do { try await synchronizer.enableBackgroundDelivery(scope: scope) } catch {
+            switch await boundedStep({ try await self.synchronizer.enableBackgroundDelivery(scope: scope) }) {
+            case .succeeded: break
+            case .failed:
                 outcome.streamErrors[stream, default: []].append("background_delivery_registration_failed")
+            case .timedOut:
+                outcome.streamErrors[stream, default: []].append("background_delivery_registration_timed_out")
             }
-            do {
-                try await synchronizer.synchronize(scope: scope, stagingCompletion: nil)
+            switch await boundedStep({ try await self.synchronizer.synchronize(scope: scope, stagingCompletion: nil) }) {
+            case .succeeded:
                 outcome.caughtUpStreams.insert(stream)
-            } catch {
-                outcome.streamErrors[stream, default: []].append("catch_up_sync_failed")
+            case let .failed(code):
+                outcome.streamErrors[stream, default: []].append(
+                    code == "healthkit_query_timed_out" ? "catch_up_sync_timed_out" : "catch_up_sync_failed"
+                )
+            case .timedOut:
+                outcome.streamErrors[stream, default: []].append("catch_up_sync_timed_out")
             }
         }
         lastBootstrapOutcome = outcome
         return outcome
+    }
+
+    private func boundedStep(
+        _ operation: @escaping @Sendable () async throws -> Void
+    ) async -> HealthKitAutomaticStepOutcome {
+        await withCheckedContinuation { continuation in
+            let gate = HealthKitAutomaticStepGate(continuation: continuation)
+            Task {
+                do {
+                    try await operation()
+                    gate.resolve(.succeeded)
+                } catch let error as HealthKitSyncError {
+                    gate.resolve(.failed(code: error.diagnosticCode))
+                } catch {
+                    gate.resolve(.failed(code: nil))
+                }
+            }
+            Task {
+                do { try await Task.sleep(for: stepTimeout) }
+                catch { return }
+                gate.resolve(.timedOut)
+            }
+        }
+    }
+}
+
+private enum HealthKitAutomaticStepOutcome: Sendable {
+    case succeeded
+    case failed(code: String?)
+    case timedOut
+}
+
+/// Checked continuations are single-resume. HealthKit callbacks and the
+/// timeout task race from different executors, so the winner is serialized
+/// by this tiny lock and late results are deliberately ignored.
+private final class HealthKitAutomaticStepGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<HealthKitAutomaticStepOutcome, Never>?
+
+    init(continuation: CheckedContinuation<HealthKitAutomaticStepOutcome, Never>) {
+        self.continuation = continuation
+    }
+
+    func resolve(_ outcome: HealthKitAutomaticStepOutcome) {
+        lock.lock()
+        let current = continuation
+        continuation = nil
+        lock.unlock()
+        current?.resume(returning: outcome)
     }
 }
 

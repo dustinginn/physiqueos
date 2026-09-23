@@ -15,6 +15,7 @@ final class TrainingLoggerViewModel {
     private let draftStore: TrainingLoggerDraftStore
     private let attachmentStore: TrainingLoggerAttachmentStore
     let authority: NativeAPIEnvironment
+    private let now: @Sendable () -> Date
 
     var loadState: LoadState = .loading
     var configuration: TrainingLoggerConfiguration?
@@ -56,7 +57,8 @@ final class TrainingLoggerViewModel {
         attachmentStore: TrainingLoggerAttachmentStore = FileTrainingLoggerAttachmentStore(),
         authority: NativeAPIEnvironment = .sandbox,
         durabilityRecoveryMaxAttempts: Int = 30,
-        durabilityRecoveryDelay: Duration = .seconds(2)
+        durabilityRecoveryDelay: Duration = .seconds(2),
+        now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.api = api
         self.writeAPI = writeAPI
@@ -66,6 +68,7 @@ final class TrainingLoggerViewModel {
         self.authority = authority
         self.durabilityRecoveryMaxAttempts = durabilityRecoveryMaxAttempts
         self.durabilityRecoveryDelay = durabilityRecoveryDelay
+        self.now = now
     }
 
     func load() async {
@@ -223,7 +226,12 @@ final class TrainingLoggerViewModel {
     }
 
     func submit() async {
-        guard canWrite, let draft, !isSubmitting else { return }
+        guard canWrite, draft != nil, !isSubmitting else { return }
+        if draft?.mode == .live, draft?.finishedAt == nil {
+            let finishedAt = ISO8601DateFormatter().string(from: now())
+            update { $0.finishedAt = finishedAt }
+        }
+        guard let submittedDraft = draft else { return }
         guard authority == .founderProduction else {
             completeLocalCapture()
             return
@@ -233,7 +241,7 @@ final class TrainingLoggerViewModel {
         refreshWarning = nil
         defer { isSubmitting = false }
         do {
-            let result = try await writeAPI.commit(draft)
+            let result = try await writeAPI.commit(submittedDraft)
             guard result.isDurable else {
                 let state: TrainingLoggerSubmissionState = result.status == "accepted_processing"
                     ? .acceptedProcessing : .resultUnknown
@@ -265,7 +273,7 @@ final class TrainingLoggerViewModel {
         let pendingPrewarm = evidencePrewarmTask
         Task { [writeAPI] in
             _ = await pendingPrewarm?.value
-            await writeAPI.reconcileSupportingEvidenceAfterCommit(for: draft)
+            await writeAPI.reconcileSupportingEvidenceAfterCommit(for: submittedDraft)
         }
         do {
             configuration = try await api.fetchConfiguration()

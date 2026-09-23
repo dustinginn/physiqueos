@@ -190,13 +190,11 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         XCTAssertEqual(outcome.caughtUpStreams, [.activitySummary, .nutritionDailyTotal])
     }
 
-    /// The exact race the review flagged: two `bootstrap()` calls launched
-    /// before the first one's async work (an authenticated server round
-    /// trip, standing in for a real network delay) completes. Without
-    /// coalescing, both would race past the `authorizationWasRequested`
-    /// check and both would drive a full, concurrent synchronize pass.
+    /// An overlapping foreground request must not race the current pass, but
+    /// it also must not inherit that pass's stale result. It queues exactly
+    /// one sequential rerun after the first pass.
     @MainActor
-    func testOverlappingBootstrapCallsCoalesceIntoOneExecution() async {
+    func testOverlappingBootstrapCallsQueueOneSequentialRerun() async {
         let server = AutomaticServerMock(ownerIdentityDelayNanoseconds: 20_000_000)
         let synchronizer = AutomaticSynchronizerMock()
         let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer, server: server)
@@ -210,10 +208,37 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let observeCount = await synchronizer.observeCallCount()
         let syncCount = await synchronizer.syncCallCount()
         let ownerIdentityCalls = await server.ownerIdentityCallCount()
-        // Three streams, ONE execution -- not two.
-        XCTAssertEqual(observeCount, 3)
-        XCTAssertEqual(syncCount, 3)
+        // Three streams x initial pass + one queued rerun. Never concurrent.
+        XCTAssertEqual(observeCount, 6)
+        XCTAssertEqual(syncCount, 6)
         XCTAssertEqual(ownerIdentityCalls, 1)
+    }
+
+    /// The Build 54 failure mode: one HealthKit await never completed, so
+    /// every later foreground and pull-to-refresh awaited the same task.
+    /// A timeout must release the bootstrap, preserve per-stream isolation,
+    /// and allow a later foreground to retry all streams normally.
+    @MainActor
+    func testTimedOutCatchUpDoesNotHoldFutureBootstrapsHostage() async {
+        let synchronizer = AutomaticSynchronizerMock()
+        synchronizer.syncDelayNanoseconds[.nutritionDailyTotal] = 80_000_000
+        let harness = AutomaticCoordinatorHarness(
+            synchronizer: synchronizer,
+            stepTimeout: .milliseconds(10)
+        )
+
+        let first = await harness.coordinator.bootstrap()
+
+        XCTAssertEqual(first.streamErrors[.nutritionDailyTotal], ["catch_up_sync_timed_out"])
+        XCTAssertTrue(first.caughtUpStreams.contains(.activitySummary))
+        XCTAssertTrue(first.caughtUpStreams.contains(.workouts))
+
+        try? await Task.sleep(for: .milliseconds(100))
+        synchronizer.syncDelayNanoseconds[.nutritionDailyTotal] = 0
+        let second = await harness.coordinator.bootstrap()
+
+        XCTAssertEqual(second.caughtUpStreams, Self.allStreams)
+        XCTAssertTrue(second.streamErrors.isEmpty)
     }
 
     /// A THIRD, non-overlapping call after the first fully completes must
@@ -293,6 +318,7 @@ private actor AutomaticSynchronizerMock: HealthKitAutomaticSynchronizing {
     nonisolated(unsafe) var streamsToFailObserving: Set<HealthKitSynchronizationStream> = []
     nonisolated(unsafe) var streamsToFailBackgroundDelivery: Set<HealthKitSynchronizationStream> = []
     nonisolated(unsafe) var streamsToFailSync: Set<HealthKitSynchronizationStream> = []
+    nonisolated(unsafe) var syncDelayNanoseconds: [HealthKitSynchronizationStream: UInt64] = [:]
 
     func startObserving(scope: HealthKitCursorScope) async throws {
         observeCalls += 1
@@ -309,6 +335,9 @@ private actor AutomaticSynchronizerMock: HealthKitAutomaticSynchronizing {
     func synchronize(scope: HealthKitCursorScope, stagingCompletion: (@Sendable () -> Void)?) async throws {
         syncCalls += 1
         syncScopes.append(scope)
+        if let delay = syncDelayNanoseconds[scope.stream], delay > 0 {
+            try? await Task.sleep(nanoseconds: delay)
+        }
         if streamsToFailSync.contains(scope.stream) { throw AutomaticCoordinatorTestError.serverUnreachable }
     }
 
@@ -521,6 +550,31 @@ final class HealthKitAutomaticWorkoutFloorEngineTests: XCTestCase {
         XCTAssertEqual(partitions.first?.additions.count, 1)
     }
 
+    func testQueryTimeoutReleasesEngineAndLateResultCannotStage() async throws {
+        let workout = Self.workout(start: (23, 10, 0), end: (23, 11, 0))
+        let harness = AutomaticWorkoutEngineHarness(
+            floor: HealthKitWorkoutActivationFloor(calendar: Self.calendar),
+            additions: [workout],
+            queryTimeout: .milliseconds(10)
+        )
+        await harness.query.setDelayNanoseconds(80_000_000)
+
+        do {
+            try await harness.engine.synchronize(scope: harness.scope)
+            XCTFail("A query beyond the bounded wait must time out.")
+        } catch let error as HealthKitSyncError {
+            XCTAssertEqual(error, .operational(code: "healthkit_query_timed_out"))
+        }
+
+        await harness.query.setDelayNanoseconds(0)
+        try await harness.engine.synchronize(scope: harness.scope)
+        let uploadedAfterRetry = await harness.uploader.partitions().count
+        XCTAssertEqual(uploadedAfterRetry, 1)
+        try? await Task.sleep(for: .milliseconds(100))
+        let uploadedAfterLateCallback = await harness.uploader.partitions().count
+        XCTAssertEqual(uploadedAfterLateCallback, 1, "The late first query must never stage or upload.")
+    }
+
     // MARK: fixtures
 
     private static func workout(start: (day: Int, hour: Int, minute: Int), end: (day: Int, hour: Int, minute: Int)) -> HealthKitQueryAddition {
@@ -574,6 +628,7 @@ private actor AutomaticWorkoutQueryMock: HealthKitAnchoredQueryClient {
     struct Request: Equatable { let stream: HealthKitSynchronizationStream; let bounds: HealthKitQueryBounds? }
     private let result: HealthKitAnchoredQueryResult
     private var captured: [Request] = []
+    private var delayNanoseconds: UInt64 = 0
 
     init(result: HealthKitAnchoredQueryResult) { self.result = result }
 
@@ -583,10 +638,12 @@ private actor AutomaticWorkoutQueryMock: HealthKitAnchoredQueryClient {
         bounds: HealthKitQueryBounds?
     ) async throws -> HealthKitAnchoredQueryResult {
         captured.append(Request(stream: stream, bounds: bounds))
+        if delayNanoseconds > 0 { try? await Task.sleep(nanoseconds: delayNanoseconds) }
         return result
     }
 
     func requests() -> [Request] { captured }
+    func setDelayNanoseconds(_ value: UInt64) { delayNanoseconds = value }
 }
 
 private final class AutomaticWorkoutObserverMock: HealthKitObserverClient, @unchecked Sendable {
@@ -623,7 +680,8 @@ private final class AutomaticWorkoutEngineHarness {
         floor: HealthKitWorkoutActivationFloor?,
         stream: HealthKitSynchronizationStream = .workouts,
         additions: [HealthKitQueryAddition],
-        deletions: [HealthKitQueryDeletion] = []
+        deletions: [HealthKitQueryDeletion] = [],
+        queryTimeout: Duration = .seconds(25)
     ) {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent("PhysiqueOSAutomaticWorkoutFloorTests-\(UUID().uuidString)", isDirectory: true)
@@ -648,6 +706,7 @@ private final class AutomaticWorkoutEngineHarness {
             uploader: uploader,
             featureGate: .n1Automatic,
             workoutActivationFloor: floor,
+            queryTimeout: queryTimeout,
             now: { HealthKitAutomaticWorkoutFloorEngineTests.now }
         )
     }
@@ -666,7 +725,8 @@ private struct AutomaticCoordinatorHarness {
         authorization: AutomaticAuthorizationMock = AutomaticAuthorizationMock(),
         synchronizer: AutomaticSynchronizerMock = AutomaticSynchronizerMock(),
         server: AutomaticServerMock = AutomaticServerMock(),
-        deviceIdentityStore: AutomaticDeviceIdentityStore = AutomaticDeviceIdentityStore()
+        deviceIdentityStore: AutomaticDeviceIdentityStore = AutomaticDeviceIdentityStore(),
+        stepTimeout: Duration = .seconds(30)
     ) {
         self.authorization = authorization
         self.synchronizer = synchronizer
@@ -675,7 +735,8 @@ private struct AutomaticCoordinatorHarness {
             authorization: authorization,
             synchronizer: synchronizer,
             server: server,
-            deviceIdentityStore: deviceIdentityStore
+            deviceIdentityStore: deviceIdentityStore,
+            stepTimeout: stepTimeout
         )
     }
 }

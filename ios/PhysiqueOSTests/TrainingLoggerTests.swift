@@ -848,6 +848,19 @@ final class TrainingLoggerTests: XCTestCase {
         func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult { throw Failure() }
     }
 
+    private actor DraftCapturingTrainingWriteAPI: TrainingWriteAPI {
+        private(set) var committedDraft: TrainingLoggerDraft?
+
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
+            committedDraft = draft
+            return TrainingCommitResult(
+                status: "durable", reviewId: nil, reviewRevision: nil,
+                sessionId: draft.id, intendedDate: draft.workoutDate,
+                exerciseIds: draft.exercises.map(\.id)
+            )
+        }
+    }
+
     private struct DurableDraftProbeTrainingWriteAPI: TrainingWriteAPI {
         let isDurable: Bool
         func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
@@ -1016,16 +1029,41 @@ final class TrainingLoggerTests: XCTestCase {
     @MainActor
     func testFailedSubmissionPreservesThePersistedDraft() async throws {
         let store = MemoryTrainingLoggerDraftStore()
-        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: StubFailingTrainingWriteAPI(), draftStore: store, authority: .founderProduction)
+        let finish = try XCTUnwrap(Self.testDate("2026-09-23T14:56:31Z"))
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: StubFailingTrainingWriteAPI(), draftStore: store,
+            authority: .founderProduction, now: { finish }
+        )
         await viewModel.load()
         viewModel.start(mode: .live)
-        let beforeSubmit = viewModel.draft
 
         await viewModel.submit()
 
-        XCTAssertEqual(store.load(), beforeSubmit, "A failed submission must preserve the exact draft, not just some draft.")
-        XCTAssertEqual(viewModel.draft, beforeSubmit)
+        XCTAssertEqual(store.load()?.finishedAt, "2026-09-23T14:56:31Z")
+        XCTAssertEqual(viewModel.draft?.finishedAt, "2026-09-23T14:56:31Z")
         XCTAssertNotNil(viewModel.validationMessage)
+    }
+
+    @MainActor
+    func testLiveSubmissionPersistsAndSendsOneStableFinishedAtBeforeCommit() async throws {
+        let start = try XCTUnwrap(Self.testDate("2026-09-23T13:53:26Z"))
+        let finish = try XCTUnwrap(Self.testDate("2026-09-23T14:56:31Z"))
+        let writeAPI = DraftCapturingTrainingWriteAPI()
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, draftStore: store,
+            authority: .founderProduction, now: { finish }
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live, date: start)
+
+        await viewModel.submit()
+
+        let committed = await writeAPI.committedDraft
+        XCTAssertEqual(committed?.startedAt, "2026-09-23T13:53:26Z")
+        XCTAssertEqual(committed?.finishedAt, "2026-09-23T14:56:31Z")
+        XCTAssertEqual(viewModel.draft?.finishedAt, committed?.finishedAt)
+        XCTAssertEqual(viewModel.draft?.step, .complete)
     }
 
     @MainActor
@@ -1220,16 +1258,19 @@ final class TrainingLoggerTests: XCTestCase {
         struct ConflictWriteAPI: TrainingWriteAPI {
             func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult { throw ConflictFailure() }
         }
+        let finish = try XCTUnwrap(Self.testDate("2026-09-23T14:56:31Z"))
         let store = MemoryTrainingLoggerDraftStore()
-        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: ConflictWriteAPI(), draftStore: store, authority: .founderProduction)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: ConflictWriteAPI(), draftStore: store,
+            authority: .founderProduction, now: { finish }
+        )
         await viewModel.load()
         viewModel.start(mode: .live)
-        let beforeSubmit = viewModel.draft
 
         await viewModel.submit()
 
-        XCTAssertEqual(store.load(), beforeSubmit)
-        XCTAssertEqual(viewModel.draft, beforeSubmit)
+        XCTAssertEqual(store.load()?.finishedAt, "2026-09-23T14:56:31Z")
+        XCTAssertEqual(viewModel.draft?.finishedAt, "2026-09-23T14:56:31Z")
         XCTAssertEqual(viewModel.validationMessage, "The resource changed after it was loaded.")
         XCTAssertNil(viewModel.refreshWarning)
     }
@@ -1241,13 +1282,13 @@ final class TrainingLoggerTests: XCTestCase {
 
     /// `CFBundleVersion` must be bumped in lockstep with
     /// `ios/Scripts/generate_project.py`'s `APP_BUILD_NUMBER` on every
-    /// release; this assertion was last updated for Build 54 and needs the
+    /// release; this assertion was last updated for Build 55 and needs the
     /// same one-line bump on the next release, exactly like that constant.
     func testAppDeclaresExemptEncryptionAndCurrentBuildInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "54")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "55")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }

@@ -3101,7 +3101,7 @@ final class FounderServerAPITests: XCTestCase {
             idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()),
             durabilityRetryDelay: .zero
         )
-        let draft = TrainingLoggerDraft(
+        var draft = TrainingLoggerDraft(
             id: "native-session-1", mode: .live, workoutDate: "2026-09-11", selectedAreaIds: ["chest"],
             exercises: [TrainingLoggerDraftExercise(
                 id: "occurrence-1", canonicalExerciseId: "barbell_bench_press", name: "Barbell Bench Press",
@@ -3125,6 +3125,8 @@ final class FounderServerAPITests: XCTestCase {
             exercisePickerExistingExerciseIds: nil, supportingEvidence: nil, supportingWorkouts: nil,
             supportingWorkoutFailureAssetIds: nil
         )
+        draft.startedAt = "2026-09-11T14:00:00Z"
+        draft.finishedAt = "2026-09-11T15:05:00Z"
 
         let committed = try await writeAPI.commit(draft)
 
@@ -3139,6 +3141,8 @@ final class FounderServerAPITests: XCTestCase {
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
         XCTAssertEqual(json["commandType"] as? String, "training-session.commit.v1")
         let payload = try XCTUnwrap(json["payload"] as? [String: Any])
+        XCTAssertEqual(payload["startedAt"] as? String, "2026-09-11T14:00:00Z")
+        XCTAssertEqual(payload["finishedAt"] as? String, "2026-09-11T15:05:00Z")
         let exercises = try XCTUnwrap(payload["exercises"] as? [[String: Any]])
         XCTAssertEqual(exercises.first?["canonicalExerciseId"] as? String, "barbell_bench_press")
         XCTAssertEqual((exercises.first?["sets"] as? [[String: Any]])?.first?["unit"] as? String, "lb")

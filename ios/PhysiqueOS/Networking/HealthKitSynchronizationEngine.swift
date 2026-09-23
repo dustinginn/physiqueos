@@ -9,6 +9,7 @@ actor HealthKitSynchronizationEngine {
     private let batchBuilder: HealthKitBatchBuilder
     private let availability: @Sendable () -> HealthKitAvailability
     private let now: @Sendable () -> Date
+    private let queryTimeout: Duration
     /// Defense-in-depth for the automatic (`synchronize`) Workout path only:
     /// `nil` (no filtering, the pre-Build-54 behavior) unless the owner opts
     /// in, which `AppEnvironment` does for the automatic engine and not for
@@ -24,6 +25,7 @@ actor HealthKitSynchronizationEngine {
         featureGate: HealthKitFeatureGate = .n0Disabled,
         batchBuilder: HealthKitBatchBuilder = HealthKitBatchBuilder(),
         workoutActivationFloor: HealthKitWorkoutActivationFloor? = nil,
+        queryTimeout: Duration = .seconds(25),
         availability: @escaping @Sendable () -> HealthKitAvailability = { .availableAuthorizationNotRequested },
         now: @escaping @Sendable () -> Date = Date.init
     ) {
@@ -34,6 +36,7 @@ actor HealthKitSynchronizationEngine {
         self.featureGate = featureGate
         self.batchBuilder = batchBuilder
         self.workoutActivationFloor = workoutActivationFloor
+        self.queryTimeout = queryTimeout
         self.availability = availability
         self.now = now
     }
@@ -109,7 +112,7 @@ actor HealthKitSynchronizationEngine {
         var cursor = try await store.authoritativeCursor(for: scope)
         let raw: HealthKitAnchoredQueryResult
         do {
-            raw = try await queryClient.execute(
+            raw = try await executeBoundedQuery(
                 stream: scope.stream,
                 after: cursor?.opaqueAnchorData,
                 bounds: nil
@@ -117,7 +120,7 @@ actor HealthKitSynchronizationEngine {
         } catch HealthKitSyncError.corruptCursor {
             try await store.resetCursorForBoundedRecovery(for: scope)
             cursor = nil
-            raw = try await queryClient.execute(stream: scope.stream, after: nil, bounds: nil)
+            raw = try await executeBoundedQuery(stream: scope.stream, after: nil, bounds: nil)
         }
         let result = applyWorkoutActivationFloor(to: raw, scope: scope)
         try await store.recordSuccessfulQuery(for: scope, at: result.completedAt)
@@ -130,6 +133,38 @@ actor HealthKitSynchronizationEngine {
         try await store.stage(batch)
         stagingCompletion?()
         if featureGate.allows(.serverUpload) { try await deliverPending(scope: scope) }
+    }
+
+    /// HealthKit query callbacks are not guaranteed to resume while the app
+    /// remains alive. Running the client call in an unstructured task lets
+    /// this actor release the scope after a bounded wait. A late callback is
+    /// ignored by the one-shot gate and therefore can never stage or advance
+    /// a cursor after the timeout.
+    private func executeBoundedQuery(
+        stream: HealthKitSynchronizationStream,
+        after anchorData: Data?,
+        bounds: HealthKitQueryBounds?
+    ) async throws -> HealthKitAnchoredQueryResult {
+        try await withCheckedContinuation { continuation in
+            let gate = HealthKitQueryResultGate(continuation: continuation)
+            Task {
+                do {
+                    let result = try await self.queryClient.execute(
+                        stream: stream,
+                        after: anchorData,
+                        bounds: bounds
+                    )
+                    gate.resolve(.success(result))
+                } catch {
+                    gate.resolve(.failure(error))
+                }
+            }
+            Task {
+                do { try await Task.sleep(for: self.queryTimeout) }
+                catch { return }
+                gate.resolve(.failure(HealthKitSyncError.operational(code: "healthkit_query_timed_out")))
+            }
+        }.get()
     }
 
     /// Drops Workout additions that ENDED before the activation floor. Only
@@ -454,5 +489,22 @@ actor HealthKitSynchronizationEngine {
         case .restrictedOrUnavailable: "restricted_or_unavailable"
         case .operationalError: "operational_error"
         }
+    }
+}
+
+private final class HealthKitQueryResultGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Result<HealthKitAnchoredQueryResult, Error>, Never>?
+
+    init(continuation: CheckedContinuation<Result<HealthKitAnchoredQueryResult, Error>, Never>) {
+        self.continuation = continuation
+    }
+
+    func resolve(_ result: Result<HealthKitAnchoredQueryResult, Error>) {
+        lock.lock()
+        let current = continuation
+        continuation = nil
+        lock.unlock()
+        current?.resume(returning: result)
     }
 }

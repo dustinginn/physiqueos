@@ -135,6 +135,10 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// Exact live-workout start instant when Native observed one. Legacy
     /// drafts and date-only past workouts intentionally remain nil.
     var startedAt: String? = nil
+    /// Exact instant the Founder first pressed Finish for a live workout.
+    /// It is persisted before the network commit so retries preserve one
+    /// stable session window instead of moving the end boundary.
+    var finishedAt: String? = nil
     /// Persisted exact-draft command lifecycle. Missing on legacy drafts.
     /// This is presentation/recovery state only; the draft id and the
     /// persisted idempotency key remain the mutation identity.

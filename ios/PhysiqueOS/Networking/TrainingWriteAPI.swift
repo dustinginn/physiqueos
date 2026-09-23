@@ -141,6 +141,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             localDate: draft.workoutDate,
             mode: draft.mode == .live ? "live" : "retrospective",
             startedAt: draft.startedAt,
+            finishedAt: draft.finishedAt,
             exercises: exercises,
             supersets: supersets,
             supportingEvidenceReviewId: nil,
@@ -150,6 +151,8 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             ProductionCommandType.commitTrainingSession,
             draft.id,
             draft.workoutDate,
+            draft.startedAt ?? "-",
+            draft.finishedAt ?? "-",
             exercises.map { exercise in
                 let sets = exercise.sets.map { set in
                     "\(set.setId):\(set.reps.map { String($0) } ?? "-"):\(set.durationSeconds.map { String($0) } ?? "-"):\(set.load.map { String($0) } ?? "-"):\(set.loadType):\(set.unit)"
@@ -403,6 +406,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         var localDate: String
         var mode: String
         var startedAt: String?
+        var finishedAt: String?
         var exercises: [Exercise]
         var supersets: [Superset]
         var supportingEvidenceReviewId: String?
