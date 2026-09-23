@@ -144,6 +144,29 @@ final class ActivityReadModelTests: XCTestCase {
         XCTAssertFalse(tilesByLabel.keys.contains("Steps"))
     }
 
+    /// Regression for the live-production defect where real HealthKit-summed
+    /// Activity totals (binary floating-point sums) rendered their raw
+    /// `Double` description to the user, e.g. "734.6809999999961 cal" on the
+    /// Activity Evidence Report. Every calorie tile must round to a whole
+    /// number and never leak a fractional tail.
+    func testMetricTilesRoundBinaryFloatingPointTailsToWholeCaloriesNeverLeakingRawPrecision() {
+        let day = ActivityDayRecord(
+            id: "test", label: "Daily Activity", value: "", detail: "", date: "2026-09-22", isToday: false,
+            activeCalories: 734.6809999999961, totalCalories: 928.0000000000001, exerciseMinutes: 42, standHours: 10,
+            moveGoal: 650, exerciseGoal: nil, standGoal: nil, ringCompletion: nil,
+            workoutActiveCalories: 541.0000000000002, nonWorkoutActiveCalories: 193.68099999999606,
+            linkedTrainingSessionCount: 1, protocolStatus: ""
+        )
+        let tilesByLabel = Dictionary(uniqueKeysWithValues: day.metricTiles.map { ($0.label, $0.value) })
+        XCTAssertEqual(tilesByLabel["Active Calories"], "735 cal")
+        XCTAssertEqual(tilesByLabel["Total Calories"], "928 cal")
+        XCTAssertEqual(tilesByLabel["Workout Calories"], "541 cal")
+        XCTAssertEqual(tilesByLabel["Non-Workout Calories"], "194 cal")
+        for tile in day.metricTiles {
+            XCTAssertFalse(tile.value.contains("."), "Tile \"\(tile.label)\" leaked a fractional value: \(tile.value)")
+        }
+    }
+
     // MARK: - Server-owned intelligence remains presentation data, never recomputed
 
     /// `protocolStatus` must decode as an opaque, already-formatted server

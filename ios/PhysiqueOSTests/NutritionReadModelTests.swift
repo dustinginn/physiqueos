@@ -208,4 +208,21 @@ final class NutritionReadModelTests: XCTestCase {
         XCTAssertEqual(NutritionDayView.emptyMealsCopy(totals: day.totals), "Daily totals only. No meal detail for this day.")
         XCTAssertEqual(day.destination, .nutritionDay(dayId: "healthkit_canonical_day_nutrition_2026-09-21"))
     }
+
+    /// Regression for the live-production defect where a real HealthKit
+    /// daily-total projection (binary floating-point sums) rendered its raw
+    /// `Double` description on the Nutrition Evidence Report, e.g.
+    /// "2405.5120239257812 calories". Every macro tile must round to a
+    /// whole number/gram and never leak a fractional tail.
+    func testMacroGridRoundsBinaryFloatingPointTailsToWholeUnitsNeverLeakingRawPrecision() {
+        let totals = NutritionMacroTotals(
+            calories: 2405.5120239257812, proteinG: 178.25211668014526,
+            carbsG: 173.8842658996582, fatG: 109.46525192260742, fiberG: 31.5
+        )
+        XCTAssertEqual(NutritionMacroGridView.formatWhole(totals.calories, unit: nil), "2406")
+        XCTAssertEqual(NutritionMacroGridView.formatWhole(totals.proteinG, unit: "g"), "178g")
+        XCTAssertEqual(NutritionMacroGridView.formatWhole(totals.carbsG, unit: "g"), "174g")
+        XCTAssertEqual(NutritionMacroGridView.formatWhole(totals.fatG, unit: "g"), "109g")
+        XCTAssertEqual(NutritionMacroGridView.formatWhole(totals.fiberG, unit: "g"), "32g")
+    }
 }

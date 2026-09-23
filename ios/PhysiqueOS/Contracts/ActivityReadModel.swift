@@ -254,7 +254,12 @@ extension ActivityDayRecord {
         return "\(formatNumber(value)) hr"
     }
 
+    /// Always renders a whole number. HealthKit-derived Activity metrics
+    /// (active/total/workout/non-workout calories in particular) frequently
+    /// carry binary floating-point tails (e.g. `734.6809999999961`) that must
+    /// never reach the user; round rather than truncate so e.g. `734.68`
+    /// displays as `735`, not `734`.
     private static func formatNumber(_ value: Double) -> String {
-        value.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(value)) : String(value)
+        String(Int(value.rounded()))
     }
 }

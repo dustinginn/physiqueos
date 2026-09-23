@@ -357,9 +357,16 @@ struct NutritionMacroGridView: View {
         }
     }
 
-    private static func formatWhole(_ value: Double?, unit: String?) -> String {
+    /// Always renders a whole number. HealthKit-derived Nutrition totals
+    /// frequently carry binary floating-point tails (e.g.
+    /// `2405.5120239257812`) that must never reach the user; round rather
+    /// than truncate so e.g. `2405.51` displays as `2406`, not `2405`.
+    /// Internal (not `private`) so `NutritionReadModelTests` can regression-test
+    /// it directly via `@testable import`, matching this app's convention
+    /// of testing formatting logic through the actual production entry point.
+    static func formatWhole(_ value: Double?, unit: String?) -> String {
         guard let value, value.isFinite else { return "Pending" }
-        let number = value.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(value)) : String(value)
+        let number = String(Int(value.rounded()))
         return unit.map { "\(number)\($0)" } ?? number
     }
 }
