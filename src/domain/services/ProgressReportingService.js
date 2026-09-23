@@ -46,6 +46,7 @@ import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayService
 import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers";
 import { selectValidDexaScans } from "./DEXAReadModelAdapter";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
+import { formatWholeNumber } from "./HealthKitEvidenceNumberFormatting";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
@@ -2058,8 +2059,8 @@ export function getValidNutritionCalorieRange(nutritionContext) {
 function formatNutritionDayValue(nutritionDay) {
   const totals = nutritionDay.daily_totals ?? {};
 
-  if (Number.isFinite(totals.calories)) return `${totals.calories} calories`;
-  if (Number.isFinite(totals.protein_g)) return `${totals.protein_g}g protein`;
+  if (Number.isFinite(totals.calories)) return `${formatWholeNumber(totals.calories)} calories`;
+  if (Number.isFinite(totals.protein_g)) return `${formatWholeNumber(totals.protein_g)}g protein`;
 
   return "Logged intake";
 }
@@ -2068,9 +2069,9 @@ function formatNutritionDayDetail(nutritionDay) {
   const totals = nutritionDay.daily_totals ?? {};
   const meals = nutritionDay.meals ?? [];
   const parts = [
-    Number.isFinite(totals.protein_g) ? `${totals.protein_g}g protein` : null,
-    Number.isFinite(totals.carbs_g) ? `${totals.carbs_g}g carbs` : null,
-    Number.isFinite(totals.fat_g) ? `${totals.fat_g}g fat` : null,
+    Number.isFinite(totals.protein_g) ? `${formatWholeNumber(totals.protein_g)}g protein` : null,
+    Number.isFinite(totals.carbs_g) ? `${formatWholeNumber(totals.carbs_g)}g carbs` : null,
+    Number.isFinite(totals.fat_g) ? `${formatWholeNumber(totals.fat_g)}g fat` : null,
     meals.length > 0 ? `${meals.length} meals` : null,
   ].filter(Boolean);
 
@@ -2208,7 +2209,7 @@ function getActivityAreas(understanding = {}) {
       id: "active-calories",
       label: "Active Calories",
       value: Number.isFinite(understanding.activeCalories)
-        ? `${understanding.activeCalories} cal`
+        ? `${formatWholeNumber(understanding.activeCalories)} cal`
         : "Pending",
     },
     {
@@ -2217,7 +2218,7 @@ function getActivityAreas(understanding = {}) {
       id: "exercise-minutes",
       label: "Exercise Minutes",
       value: Number.isFinite(understanding.exerciseMinutes)
-        ? `${understanding.exerciseMinutes} min`
+        ? `${formatWholeNumber(understanding.exerciseMinutes)} min`
         : "Pending",
     },
     {
@@ -2226,7 +2227,7 @@ function getActivityAreas(understanding = {}) {
       id: "workout-activity",
       label: "Workout Activity",
       value: Number.isFinite(understanding.workoutActiveCalories)
-        ? `${understanding.workoutActiveCalories} cal`
+        ? `${formatWholeNumber(understanding.workoutActiveCalories)} cal`
         : "Pending",
     },
     {
@@ -2235,7 +2236,7 @@ function getActivityAreas(understanding = {}) {
       id: "non-workout-activity",
       label: "Non-Workout Activity",
       value: Number.isFinite(understanding.nonWorkoutActiveCalories)
-        ? `${understanding.nonWorkoutActiveCalories} cal`
+        ? `${formatWholeNumber(understanding.nonWorkoutActiveCalories)} cal`
         : "Pending",
     },
   ];
@@ -2601,11 +2602,11 @@ function formatActivityDayValue(activityDay) {
   const exercise = dailyActivity.exercise_minutes;
 
   if (Number.isFinite(move) && Number.isFinite(exercise)) {
-    return `${move} active cal / ${exercise} min`;
+    return `${formatWholeNumber(move)} active cal / ${formatWholeNumber(exercise)} min`;
   }
 
-  if (Number.isFinite(move)) return `${move} active cal`;
-  if (Number.isFinite(exercise)) return `${exercise} exercise min`;
+  if (Number.isFinite(move)) return `${formatWholeNumber(move)} active cal`;
+  if (Number.isFinite(exercise)) return `${formatWholeNumber(exercise)} exercise min`;
 
   return formatDate(activityDay.observed_at);
 }
@@ -2615,13 +2616,13 @@ function formatActivityDayDetail(activityDay) {
   const derived = activityDay.derived_metrics ?? {};
   const parts = [
     Number.isFinite(dailyActivity.total_calories_burned)
-      ? `${dailyActivity.total_calories_burned} total calories`
+      ? `${formatWholeNumber(dailyActivity.total_calories_burned)} total calories`
       : null,
     Number.isFinite(derived.training_sessions_referenced)
       ? `${derived.training_sessions_referenced} workouts linked`
       : null,
     Number.isFinite(derived.non_workout_active_calories)
-      ? `${derived.non_workout_active_calories} non-workout active cal`
+      ? `${formatWholeNumber(derived.non_workout_active_calories)} non-workout active cal`
       : null,
   ].filter(Boolean);
 

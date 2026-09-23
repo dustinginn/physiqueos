@@ -2,6 +2,7 @@ import { getProgressPhotoCategoryLabel } from "../models/progressPhotoPoseVocabu
 import { isActiveCanonicalEvidenceObject } from "./CanonicalReadModel";
 import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayService";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
+import { formatWholeNumber } from "./HealthKitEvidenceNumberFormatting";
 
 export function createEvidenceTimelineService({ repositories }) {
   return scopeRepositoryReadService({ repositories, namespace: "timeline", service: {
@@ -289,11 +290,11 @@ function formatActivityDayTitle(dailyActivity = {}) {
   const exercise = dailyActivity.exercise_minutes;
 
   if (Number.isFinite(move) && Number.isFinite(exercise)) {
-    return `${move} active cal / ${exercise} exercise min`;
+    return `${formatWholeNumber(move)} active cal / ${formatWholeNumber(exercise)} exercise min`;
   }
 
-  if (Number.isFinite(move)) return `${move} active calories`;
-  if (Number.isFinite(exercise)) return `${exercise} exercise minutes`;
+  if (Number.isFinite(move)) return `${formatWholeNumber(move)} active calories`;
+  if (Number.isFinite(exercise)) return `${formatWholeNumber(exercise)} exercise minutes`;
 
   return "Daily activity summary";
 }
@@ -303,13 +304,13 @@ function formatActivityDayDetail(evidenceObject) {
   const derived = evidenceObject.derived_metrics ?? {};
   const parts = [
     Number.isFinite(dailyActivity.total_calories_burned)
-      ? `${dailyActivity.total_calories_burned} total calories`
+      ? `${formatWholeNumber(dailyActivity.total_calories_burned)} total calories`
       : null,
     Number.isFinite(derived.training_sessions_referenced)
       ? `${derived.training_sessions_referenced} workouts linked`
       : null,
     Number.isFinite(derived.non_workout_active_calories)
-      ? `${derived.non_workout_active_calories} non-workout active cal`
+      ? `${formatWholeNumber(derived.non_workout_active_calories)} non-workout active cal`
       : null,
   ].filter(Boolean);
 
