@@ -9,7 +9,7 @@ export async function executeIdempotentCommand({ transactionRunner, principal, m
     const existing = await transaction.commandReceipts.find(actor.userId, metadata.idempotencyKey);
     if (existing) return replayReceipt(existing, payloadHash);
 
-    await transaction.commandReceipts.insert({
+    const inserted = await transaction.commandReceipts.insert({
       id: metadata.commandId,
       userId: actor.userId,
       deviceId: actor.deviceId,
@@ -20,6 +20,14 @@ export async function executeIdempotentCommand({ transactionRunner, principal, m
       payloadHash,
       status: "processing",
     });
+    if (!inserted) {
+      // Lost the race: a concurrent request with the same idempotency key
+      // landed first between our find() and our insert(). This is not an
+      // error -- treat it exactly like the early-found case above.
+      const racedReceipt = await transaction.commandReceipts.find(actor.userId, metadata.idempotencyKey);
+      if (!racedReceipt) throw new Error("Command receipt insert conflicted but no receipt could be found.");
+      return replayReceipt(racedReceipt, payloadHash);
+    }
 
     const outcome = await handler({ transaction, principal: actor, metadata, payload, canonicalStoreEpoch });
     for (const message of outcome?.outbox ?? []) await transaction.outbox.insert(message);

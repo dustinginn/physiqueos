@@ -21,8 +21,12 @@ function createTransaction(staged) {
       },
       async insert(receipt) {
         const key = receiptKey(receipt.userId, receipt.idempotencyKey);
-        if (staged.commandReceipts.has(key)) throw new Error("Duplicate command receipt.");
-        staged.commandReceipts.set(key, clone(receipt));
+        // Mirrors the real store's ON CONFLICT DO NOTHING: lose the race by
+        // returning null (the caller re-fetches via find()), never by throwing.
+        if (staged.commandReceipts.has(key)) return null;
+        const stored = clone(receipt);
+        staged.commandReceipts.set(key, stored);
+        return clone(stored);
       },
       async complete(userId, idempotencyKey, completion) {
         const key = receiptKey(userId, idempotencyKey);

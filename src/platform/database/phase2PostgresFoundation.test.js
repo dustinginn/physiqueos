@@ -51,6 +51,26 @@ describe("Phase 2 PostgreSQL foundation", () => {
     expect(receipt).toMatchObject({ userId: "user", commandId: "command", idempotencyKey: "key", payloadHash: "a".repeat(64), status: "committed" });
   });
 
+  it("inserts a command receipt atomically, without throwing, when a concurrent request already won the idempotency-key race", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const receipt = await createPostgresCommandStore({ query }).commandReceipts.insert({
+      id: "command", userId: "user", deviceId: "device", sessionId: "session",
+      commandId: "command", idempotencyKey: "key", commandType: "synthetic", payloadHash: "a".repeat(64), status: "processing",
+    });
+    expect(receipt).toBeNull();
+    expect(query.mock.calls[0][0]).toContain("ON CONFLICT (user_id, idempotency_key) DO NOTHING");
+    expect(query.mock.calls[0][0]).toContain("RETURNING *");
+  });
+
+  it("returns the inserted command receipt when the insert wins the race", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ user_id: "user", device_id: "device", session_id: "session", command_id: "command", idempotency_key: "key", command_type: "synthetic", payload_hash: "a".repeat(64), operation_id: null, status: "processing" }] });
+    const receipt = await createPostgresCommandStore({ query }).commandReceipts.insert({
+      id: "command", userId: "user", deviceId: "device", sessionId: "session",
+      commandId: "command", idempotencyKey: "key", commandType: "synthetic", payloadHash: "a".repeat(64), status: "processing",
+    });
+    expect(receipt).toMatchObject({ userId: "user", idempotencyKey: "key", status: "processing" });
+  });
+
   it("casts terminal outbox failure parameters for PostgreSQL", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ id: "message", status: "dead" }] });
     const adapters = createFoundationPostgresAdapters({ query });

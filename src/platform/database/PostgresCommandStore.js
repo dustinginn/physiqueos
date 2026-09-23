@@ -6,13 +6,22 @@ export function createPostgresCommandStore({ query }) {
       async find(userId, idempotencyKey) {
         return mapCommandReceipt(firstRow(await query("SELECT * FROM physiqueos.command_receipts WHERE user_id = $1 AND idempotency_key = $2", [userId, idempotencyKey])));
       },
+      // Two requests carrying the same idempotency key can race this far apart
+      // in wall-clock time (e.g. a still-in-flight request from the app's
+      // previous process lifetime overlapping a fresh request after relaunch).
+      // ON CONFLICT DO NOTHING makes the insert itself race-safe instead of
+      // throwing a raw unique-violation; the caller must re-fetch via find()
+      // when this returns null (the race was lost, not an error).
       async insert(record) {
-        return mapCommandReceipt(requiredRow(await query(
+        const inserted = await query(
           `INSERT INTO physiqueos.command_receipts
             (id, user_id, device_id, session_id, command_id, idempotency_key, command_type, payload_hash, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (user_id, idempotency_key) DO NOTHING
+           RETURNING *`,
           [record.id, record.userId, record.deviceId, record.sessionId, record.commandId, record.idempotencyKey, record.commandType, record.payloadHash, record.status],
-        )));
+        );
+        return mapCommandReceipt(firstRow(inserted));
       },
       async complete(userId, idempotencyKey, completion) {
         return mapCommandReceipt(requiredRow(await query(

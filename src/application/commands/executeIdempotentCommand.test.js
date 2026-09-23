@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createCommandMetadata } from "../../contracts/v1/command";
+import { createPayloadHash } from "../../contracts/v1/canonicalJson";
 import { createUuidV7 } from "../../contracts/v1/identifiers";
 import { createAuthenticationPrincipal } from "../auth/principal";
 import { executeIdempotentCommand } from "./executeIdempotentCommand";
@@ -29,6 +30,41 @@ describe("idempotent command foundation", () => {
     const base = { transactionRunner: store, principal, metadata, commandType: "synthetic.update", handler: async () => ({ result: { ok: true } }) };
     await executeIdempotentCommand({ ...base, payload: { value: 1 } });
     await expect(executeIdempotentCommand({ ...base, payload: { value: 2 } })).rejects.toMatchObject({ status: 409, code: "IDEMPOTENCY_KEY_REUSED" });
+  });
+
+  it("replays the winning receipt instead of throwing when a concurrent request wins the idempotency-key insert race", async () => {
+    const metadata = createCommandMetadata({ idempotencyKey: "synthetic-command-race" });
+    const commandType = "synthetic.update";
+    const payload = { value: 1 };
+    const payloadHash = createPayloadHash({ commandType, payloadVersion: metadata.payloadVersion, canonicalStoreEpoch: null, payload });
+    const winningReceipt = { userId: principal.userId, idempotencyKey: metadata.idempotencyKey, payloadHash, status: "committed", result: { resourceId: "raced-resource" } };
+    // Simulate two requests racing: find() sees nothing (neither has committed
+    // yet), our insert() then loses the race (another request's insert already
+    // landed), so we must re-find() and replay -- never throw the raw conflict.
+    const find = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(winningReceipt);
+    const insert = vi.fn().mockResolvedValueOnce(null);
+    const transaction = { commandReceipts: { find, insert, complete: vi.fn() }, outbox: { insert: vi.fn() } };
+    const transactionRunner = { run: (work) => work(transaction) };
+    const handler = vi.fn();
+
+    const outcome = await executeIdempotentCommand({ transactionRunner, principal, metadata, commandType, payload, handler });
+
+    expect(outcome.outcome).toBe("replayed");
+    expect(outcome.receipt.result).toEqual({ resourceId: "raced-resource" });
+    expect(handler).not.toHaveBeenCalled();
+    expect(find).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws if the insert conflicts but the receipt cannot be found on re-fetch (an impossible-but-guarded state)", async () => {
+    const metadata = createCommandMetadata({ idempotencyKey: "synthetic-command-race-2" });
+    const find = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    const insert = vi.fn().mockResolvedValueOnce(null);
+    const transaction = { commandReceipts: { find, insert, complete: vi.fn() }, outbox: { insert: vi.fn() } };
+    const transactionRunner = { run: (work) => work(transaction) };
+
+    await expect(executeIdempotentCommand({
+      transactionRunner, principal, metadata, commandType: "synthetic.update", payload: {}, handler: vi.fn(),
+    })).rejects.toThrow("Command receipt insert conflicted but no receipt could be found.");
   });
 
   it("rolls back the receipt when outbox insertion fails", async () => {
