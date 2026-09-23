@@ -40,6 +40,22 @@ struct LogView: View {
             guard scenePhase == .active, let viewModel, viewModel.processingKey != nil else { return }
             await ProcessingRefresh.run { await viewModel.refreshWhileProcessing() }
         }
+        // A pull explicitly runs the same automatic HealthKit catch-up
+        // foreground already triggers -- never the diagnostic canary/manual
+        // test-day path -- so a Founder who doesn't want to wait for the
+        // next ordinary foreground can force one. `bootstrap()` is itself
+        // idempotent (in-flight-coalesced, and a day with nothing new to
+        // ingest is a no-op against the existing cursor/partition state, so
+        // this can never create a duplicate canonical day or touch Workout
+        // activation). HealthKit unavailability/denial is swallowed here --
+        // Log's other data (reviews, weight) must still refresh either way.
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                _ = await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap()
+                await environment.productionNativeAPI.invalidateReadResources(["evidence-review-queue", "weight"])
+            }
+            await viewModel?.load()
+        }
     }
 
     @ViewBuilder
