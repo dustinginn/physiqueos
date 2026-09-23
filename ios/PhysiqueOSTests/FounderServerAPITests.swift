@@ -2136,6 +2136,82 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(review?.items[5].dexaMeasurements?.leanMassLb, 148.3)
     }
 
+    @MainActor
+    func testProductionEvidenceReviewDecodesTypedWorkoutReconciliation() async throws {
+        let detail = productionEnvelope(
+            resource: "evidence-review",
+            data: #"{"review":{"id":"healthkit_workout_reconciliation_one","status":"pending","version":2,"localDate":"2026-09-23"},"presentation":{"kind":"healthkit_workout_reconciliation","id":"healthkit_workout_reconciliation_one","status":"pending","version":"2","localDate":"2026-09-23","title":"Match Apple Health workout","summary":"Choose the matching Logger session, or choose No match.","workout":{"family":"strength","canonicalType":"traditional_strength_training","startedAt":"2026-09-23T17:00:00.000Z","endedAt":"2026-09-23T18:00:00.000Z"},"candidates":[{"loggerSessionCanonicalId":"logger-a","confidence":95,"basis":"logger_session_window","loggerSession":{"activityType":"Traditional Strength Training","startedAt":"2026-09-23T17:01:00.000Z","endedAt":"2026-09-23T17:59:00.000Z"}},{"loggerSessionCanonicalId":"logger-b","confidence":94,"basis":"temporal_and_telemetry","loggerSession":{"activityType":"Functional Strength Training","startedAt":"2026-09-23T17:02:00.000Z","endedAt":"2026-09-23T18:01:00.000Z"}}]}}"#
+        )
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["evidence-review": detail]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let review = try await ProductionEvidenceReviewAPI(api: native).fetchReview(reviewId: "healthkit_workout_reconciliation_one")
+
+        XCTAssertEqual(review?.id, "healthkit_workout_reconciliation_one")
+        XCTAssertEqual(review?.items, [])
+        XCTAssertEqual(review?.summary, "Choose the matching Logger session, or choose No match.")
+        XCTAssertEqual(review?.workoutReconciliation?.localDate, "2026-09-23")
+        XCTAssertEqual(review?.workoutReconciliation?.workout.canonicalType, "traditional_strength_training")
+        XCTAssertEqual(review?.workoutReconciliation?.candidates.map(\.loggerSessionCanonicalId), ["logger-a", "logger-b"])
+        XCTAssertEqual(review?.workoutReconciliation?.candidates.first?.confidence, 95)
+        XCTAssertEqual(EvidenceReviewDetailView.occurrenceDateLabel(for: try XCTUnwrap(review)), "Sep 23")
+    }
+
+    func testWorkoutReconciliationResolutionUsesRegisteredVersionedCommandAndStableIdempotency() async throws {
+        let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_confirmed","reviewId":"review-one","revision":3,"linkId":"link-one","loggerSessionCanonicalId":"logger-a","strategicEvidenceEligibility":"quarantined"}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, response),
+            .json(200, response),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionEvidenceReviewAPI(api: native)
+
+        try await api.resolveWorkoutReconciliation(reviewId: "review-one", expectedVersion: "2", loggerSessionCanonicalId: "logger-a")
+        try await api.resolveWorkoutReconciliation(reviewId: "review-one", expectedVersion: "2", loggerSessionCanonicalId: "logger-a")
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"2\"")
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        XCTAssertEqual(json["commandType"] as? String, ProductionCommandType.resolveWorkoutReconciliation)
+        let payload = try XCTUnwrap(json["payload"] as? [String: Any])
+        XCTAssertEqual(payload["action"] as? String, "confirm")
+        XCTAssertEqual(payload["loggerSessionCanonicalId"] as? String, "logger-a")
+        let affected = await native.resourcesAffected(by: ProductionCommandType.resolveWorkoutReconciliation)
+        XCTAssertTrue(affected.contains("evidence-review"))
+        XCTAssertTrue(affected.contains("evidence-review-queue"))
+        XCTAssertTrue(affected.contains("training-day"))
+    }
+
+    func testWorkoutReconciliationNoMatchOmitsLoggerIdentity() async throws {
+        let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_no_match","reviewId":"review-one","revision":3}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, response),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        try await ProductionEvidenceReviewAPI(api: native).resolveWorkoutReconciliation(
+            reviewId: "review-one",
+            expectedVersion: "2",
+            loggerSessionCanonicalId: nil
+        )
+
+        let requests = await transport.requests
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        let payload = try XCTUnwrap(json["payload"] as? [String: Any])
+        XCTAssertEqual(payload["action"] as? String, "no_match")
+        XCTAssertNil(payload["loggerSessionCanonicalId"])
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"2\"")
+    }
+
     /// The Server's corrected provenance owns the label: a Training review whose
     /// screenshots are large images reads "Screenshot", never "Progress photos", and
     /// Native renders exactly what the Server sent, for every evidence type.

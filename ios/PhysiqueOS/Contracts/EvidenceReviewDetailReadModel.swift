@@ -18,6 +18,34 @@ struct EvidenceReviewDetailReadModel: Equatable {
     var items: [EvidenceReviewDetailItem]
     var summary: String? = nil
     var excludedSummary: String? = nil
+    /// Present only for a typed HealthKit ↔ Workout Logger identity review.
+    /// It is reconciliation evidence, never strategic/coaching evidence.
+    var workoutReconciliation: WorkoutReconciliationDetail? = nil
+}
+
+struct WorkoutReconciliationDetail: Equatable {
+    var localDate: String
+    var title: String
+    var summary: String
+    var workout: WorkoutReconciliationWorkout
+    var candidates: [WorkoutReconciliationCandidate]
+}
+
+struct WorkoutReconciliationWorkout: Equatable {
+    var family: String
+    var canonicalType: String
+    var startedAt: String
+    var endedAt: String?
+}
+
+struct WorkoutReconciliationCandidate: Equatable, Identifiable {
+    var id: String { loggerSessionCanonicalId }
+    var loggerSessionCanonicalId: String
+    var confidence: Int
+    var basis: String
+    var activityType: String
+    var startedAt: String?
+    var endedAt: String?
 }
 
 struct EvidenceReviewDetailItem: Equatable, Identifiable {

@@ -1037,7 +1037,7 @@ actor ProductionNativeAPI {
         if commandType.contains("training") || commandType.contains("workout") {
             return [
                 "home", "training-landing", "training-reporting", "training-library",
-                "training-logger", "training-day", "training-session", "evidence-review-queue",
+                "training-logger", "training-day", "training-session", "evidence-review", "evidence-review-queue",
             ]
         }
         if commandType.contains("evidence") || commandType.contains("review") {

@@ -128,7 +128,7 @@ struct EvidenceReviewDetailView: View {
 
     private func header(for review: EvidenceReviewDetailReadModel) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Evidence Review")
+            Text(review.workoutReconciliation == nil ? "Evidence Review" : "Workout Match")
                 .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
                 .foregroundStyle(PhysiqueOSTheme.accent)
             Text(Self.statusLabel(review.status))
@@ -162,6 +162,9 @@ struct EvidenceReviewDetailView: View {
     /// screen correctly listed as Sep 12, 2026. A review's creation instant is
     /// not the evidence's date under any time zone, so it is not shown at all.
     static func occurrenceDateLabel(for review: EvidenceReviewDetailReadModel) -> String? {
+        if let localDate = review.workoutReconciliation?.localDate {
+            return evidenceDateLabel(localDate)
+        }
         let included = review.items.filter(\.included)
         let sourceItems = included.isEmpty ? review.items : included
         var unique: [String] = []
@@ -182,9 +185,13 @@ struct EvidenceReviewDetailView: View {
         value.contains(",") ? value : TrainingDateFormatting.short(value)
     }
 
+    @ViewBuilder
     private func itemsCard(_ review: EvidenceReviewDetailReadModel) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 10) {
+        if let reconciliation = review.workoutReconciliation {
+            workoutReconciliationCard(reconciliation)
+        } else {
+            CardContainer {
+                VStack(alignment: .leading, spacing: 10) {
                 TrainingSectionHeaderView(title: "Captured Evidence")
                 if let summary = review.summary {
                     Text(summary)
@@ -298,7 +305,53 @@ struct EvidenceReviewDetailView: View {
                         }
                     }
                 }
+                }
             }
+        }
+    }
+
+    private func workoutReconciliationCard(_ reconciliation: WorkoutReconciliationDetail) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 12) {
+                TrainingSectionHeaderView(title: reconciliation.title)
+                Text(reconciliation.summary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("APPLE HEALTH WORKOUT")
+                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                    Text(Self.workoutTypeLabel(reconciliation.workout.canonicalType))
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(Self.timeRange(start: reconciliation.workout.startedAt, end: reconciliation.workout.endedAt))
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
+                Divider().overlay(PhysiqueOSTheme.divider)
+                Text("POSSIBLE LOGGER SESSIONS")
+                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                ForEach(Array(reconciliation.candidates.enumerated()), id: \.element.id) { index, candidate in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Logger session \(index + 1)")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        Text(Self.workoutTypeLabel(candidate.activityType))
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        Text(Self.timeRange(start: candidate.startedAt, end: candidate.endedAt))
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        Text("\(candidate.confidence)% match · \(Self.matchBasisLabel(candidate.basis))")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 5)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -343,6 +396,20 @@ struct EvidenceReviewDetailView: View {
         case .idle:
             if review.status == "confirmed" {
                 completionActions(label: "Confirmed")
+            } else if let reconciliation = review.workoutReconciliation, review.status == "pending" {
+                VStack(spacing: 10) {
+                    ForEach(Array(reconciliation.candidates.enumerated()), id: \.element.id) { index, candidate in
+                        PrimaryActionButton(title: "Use Logger session \(index + 1)", tone: .accent) {
+                            Task { await resolveWorkoutReconciliation(review: review, loggerSessionCanonicalId: candidate.loggerSessionCanonicalId) }
+                        }
+                        .accessibilityIdentifier("evidenceReview.workoutReconciliation.confirm.\(index + 1)")
+                    }
+                    Button("No match", role: .destructive) {
+                        Task { await resolveWorkoutReconciliation(review: review, loggerSessionCanonicalId: nil) }
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("evidenceReview.workoutReconciliation.noMatch")
+                }
             } else if Self.isActionable(review.status) {
                 VStack(spacing: 10) {
                     if review.items.contains(where: { $0.dexaMeasurements != nil }) {
@@ -515,6 +582,34 @@ struct EvidenceReviewDetailView: View {
     }
 
     // MARK: - Confirm
+
+    private func resolveWorkoutReconciliation(
+        review: EvidenceReviewDetailReadModel,
+        loggerSessionCanonicalId: String?
+    ) async {
+        guard let version = review.version else { return }
+        actionState = .confirming(loggerSessionCanonicalId == nil ? "Recording no match…" : "Confirming workout match…")
+        do {
+            try await environment.evidenceReviewAPI.resolveWorkoutReconciliation(
+                reviewId: review.id,
+                expectedVersion: String(version),
+                loggerSessionCanonicalId: loggerSessionCanonicalId
+            )
+            await environment.productionNativeAPI.invalidateReadResources([
+                "evidence-review", "evidence-review-queue", "training-landing", "training-day",
+            ])
+            actionState = .confirmed
+        } catch {
+            if ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error),
+               let refreshed = try? await environment.evidenceReviewAPI.fetchReview(reviewId: review.id),
+               refreshed.status.hasPrefix("resolved_") {
+                state = .loaded(refreshed)
+                actionState = .confirmed
+            } else {
+                actionState = .failed(Self.errorMessage(for: error))
+            }
+        }
+    }
 
     private func confirm(review: EvidenceReviewDetailReadModel) async {
         guard let version = review.version else { return }
@@ -801,6 +896,8 @@ struct EvidenceReviewDetailView: View {
         case "partially_committed": "Partially Confirmed"
         case "committing": "Confirming"
         case "confirmed": "Confirmed"
+        case "resolved_confirmed": "Match Confirmed"
+        case "resolved_no_match": "No Match"
         default: "Review unavailable"
         }
     }
@@ -817,5 +914,37 @@ struct EvidenceReviewDetailView: View {
         case "labs", "lab_result": "Labs"
         default: "Evidence"
         }
+    }
+
+    private static func workoutTypeLabel(_ value: String) -> String {
+        value.replacingOccurrences(of: "_", with: " ")
+            .split(separator: " ")
+            .map { $0.capitalized }
+            .joined(separator: " ")
+    }
+
+    private static func matchBasisLabel(_ value: String) -> String {
+        switch value {
+        case "explicit_source_identity": "Exact source identity"
+        case "logger_session_window": "Logger time window"
+        case "temporal_and_telemetry": "Time and telemetry"
+        default: workoutTypeLabel(value)
+        }
+    }
+
+    private static func timeRange(start: String?, end: String?) -> String {
+        guard let start else { return "Time unavailable" }
+        let startLabel = displayTime(start)
+        guard let end else { return startLabel }
+        return "\(startLabel) – \(displayTime(end))"
+    }
+
+    private static func displayTime(_ value: String) -> String {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let ordinary = ISO8601DateFormatter()
+        ordinary.formatOptions = [.withInternetDateTime]
+        guard let date = fractional.date(from: value) ?? ordinary.date(from: value) else { return value }
+        return date.formatted(date: .omitted, time: .shortened)
     }
 }

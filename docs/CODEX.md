@@ -244,6 +244,12 @@ Founder Alpha is used continuously throughout development.
 
 Assume the founder is actively testing the app on a physical device unless explicitly told otherwise.
 
+## Native Simulator and Disk Safety
+
+The Founder uses an iPhone 17 Pro. Retain only the iPhone 17 Pro simulator device needed for PhysiqueOS Native work. Do not create, download, or retain other simulator devices for convenience. If tooling creates another simulator, shut it down and remove it when it is no longer required. Do not delete the iOS runtime required by the retained iPhone 17 Pro simulator.
+
+Before Native archive or build operations, check available disk space. Reclaim space only with targeted cleanup of unnecessary simulator devices and completed PhysiqueOS build artifacts. Never blindly delete unrelated archives, DerivedData, runtimes, or user data; material cleanup outside those narrow targets requires explicit authorization.
+
 ## Development Server
 
 When completing work:

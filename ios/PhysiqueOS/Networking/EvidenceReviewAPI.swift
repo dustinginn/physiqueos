@@ -2,7 +2,24 @@ import Foundation
 
 protocol EvidenceReviewAPI: Sendable {
     func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel?
+    func resolveWorkoutReconciliation(
+        reviewId: String,
+        expectedVersion: String,
+        loggerSessionCanonicalId: String?
+    ) async throws
 }
+
+extension EvidenceReviewAPI {
+    func resolveWorkoutReconciliation(
+        reviewId: String,
+        expectedVersion: String,
+        loggerSessionCanonicalId: String?
+    ) async throws {
+        throw WorkoutReconciliationWriteUnavailable()
+    }
+}
+
+private struct WorkoutReconciliationWriteUnavailable: Error {}
 
 /// This detail screen is only ever reached via the `.evidenceReview`
 /// destination, which only `ProductionLogAPI` ever constructs — Sandbox's
@@ -17,6 +34,14 @@ struct NotAvailableEvidenceReviewAPI: EvidenceReviewAPI {
     func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel? {
         throw NotAvailable()
     }
+
+    func resolveWorkoutReconciliation(
+        reviewId: String,
+        expectedVersion: String,
+        loggerSessionCanonicalId: String?
+    ) async throws {
+        throw NotAvailable()
+    }
 }
 
 /// Volatile production review state and concurrency identity. Confirmation
@@ -27,6 +52,7 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
     func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel? {
         let envelope = try await api.readResource("evidence-review", query: ["reviewId": reviewId], policy: .reload, as: Payload.self)
         guard let review = envelope.data.review else { return nil }
+        let reconciliation = envelope.data.presentation?.workoutReconciliation
         return EvidenceReviewDetailReadModel(
             id: review.id,
             status: review.status,
@@ -89,8 +115,36 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
                 }
             },
             summary: envelope.data.presentation?.summary.text,
-            excludedSummary: envelope.data.presentation?.summary.excludedText
+            excludedSummary: envelope.data.presentation?.summary.excludedText,
+            workoutReconciliation: reconciliation
         )
+    }
+
+    func resolveWorkoutReconciliation(
+        reviewId: String,
+        expectedVersion: String,
+        loggerSessionCanonicalId: String?
+    ) async throws {
+        let action = loggerSessionCanonicalId == nil ? "no_match" : "confirm"
+        let signature = ProductionIdempotentSubmission.signature([
+            ProductionCommandType.resolveWorkoutReconciliation,
+            reviewId,
+            expectedVersion,
+            action,
+            loggerSessionCanonicalId ?? "-",
+        ])
+        let payload = WorkoutReconciliationResolutionPayload(
+            reviewId: reviewId,
+            action: action,
+            loggerSessionCanonicalId: loggerSessionCanonicalId
+        )
+        let outcome: ProductionCommandOutcome<ProductionJSONValue> = try await api.submitCommand(
+            ProductionCommandType.resolveWorkoutReconciliation,
+            idempotencyKey: signature,
+            expectedVersion: expectedVersion,
+            payload: payload
+        )
+        guard outcome.outcome != .pending else { throw ProductionNativeError.networkFailure }
     }
 
     private struct Payload: Decodable, @unchecked Sendable {
@@ -99,10 +153,106 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
     }
 
     private struct Presentation: Decodable {
+        var kind: String?
+        var localDate: String?
+        var title: String?
         var items: [PresentedItem]
         var summary: Summary
+        var workout: ReconciliationWorkout?
+        var candidates: [ReconciliationCandidate]
 
-        struct Summary: Decodable { var text: String?; var excludedText: String? }
+        struct Summary: Decodable {
+            var text: String?
+            var excludedText: String?
+
+            init(text: String?, excludedText: String?) {
+                self.text = text
+                self.excludedText = excludedText
+            }
+
+            init(from decoder: Decoder) throws {
+                if let value = try? decoder.singleValueContainer().decode(String.self) {
+                    text = value
+                    excludedText = nil
+                    return
+                }
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                text = try container.decodeIfPresent(String.self, forKey: .text)
+                excludedText = try container.decodeIfPresent(String.self, forKey: .excludedText)
+            }
+
+            private enum CodingKeys: String, CodingKey { case text, excludedText }
+        }
+
+        struct ReconciliationWorkout: Decodable {
+            var family: String
+            var canonicalType: String
+            var startedAt: String
+            var endedAt: String?
+        }
+
+        struct ReconciliationCandidate: Decodable {
+            var loggerSessionCanonicalId: String
+            var confidence: Int
+            var basis: String
+            var loggerSession: LoggerSession?
+
+            struct LoggerSession: Decodable {
+                var activityType: String?
+                var startedAt: String?
+                var endedAt: String?
+            }
+        }
+
+        var workoutReconciliation: WorkoutReconciliationDetail? {
+            guard kind == "healthkit_workout_reconciliation",
+                  let localDate,
+                  let title,
+                  let workout
+            else { return nil }
+            return .init(
+                localDate: localDate,
+                title: title,
+                summary: summary.text ?? "Choose the matching Workout Logger session, or choose No match.",
+                workout: .init(
+                    family: workout.family,
+                    canonicalType: workout.canonicalType,
+                    startedAt: workout.startedAt,
+                    endedAt: workout.endedAt
+                ),
+                candidates: candidates.map {
+                    .init(
+                        loggerSessionCanonicalId: $0.loggerSessionCanonicalId,
+                        confidence: $0.confidence,
+                        basis: $0.basis,
+                        activityType: $0.loggerSession?.activityType ?? "Strength Training",
+                        startedAt: $0.loggerSession?.startedAt,
+                        endedAt: $0.loggerSession?.endedAt
+                    )
+                }
+            )
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case kind, localDate, title, items, summary, workout, candidates
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try container.decodeIfPresent(String.self, forKey: .kind)
+            localDate = try container.decodeIfPresent(String.self, forKey: .localDate)
+            title = try container.decodeIfPresent(String.self, forKey: .title)
+            items = try container.decodeIfPresent([PresentedItem].self, forKey: .items) ?? []
+            summary = try container.decodeIfPresent(Summary.self, forKey: .summary) ?? Summary(text: nil, excludedText: nil)
+            workout = try container.decodeIfPresent(ReconciliationWorkout.self, forKey: .workout)
+            candidates = try container.decodeIfPresent([ReconciliationCandidate].self, forKey: .candidates) ?? []
+        }
+    }
+
+    private struct WorkoutReconciliationResolutionPayload: Encodable {
+        var reviewId: String
+        var action: String
+        var loggerSessionCanonicalId: String?
     }
 
     private struct PresentedItem: Decodable {
