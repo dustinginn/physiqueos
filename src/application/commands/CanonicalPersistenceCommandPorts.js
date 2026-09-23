@@ -335,9 +335,10 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         error.field ? [{ field: error.field, code: "invalid", detail: error.message }] : []
       );
     }
-    const [existingObservations, canonicalObjects, activationPolicyRecord, existingCanonicalDays] = await Promise.all([
+    const [existingObservations, canonicalObjects, canonicalObjectStorageMetadata, activationPolicyRecord, existingCanonicalDays] = await Promise.all([
       records.list({ ownerUserId: context.ownerUserId, collection: "healthKitObservations" }),
       records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
+      records.listStorageMetadata({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
       records.get({
         ownerUserId: context.ownerUserId,
         collection: "healthKitConfiguration",
@@ -718,6 +719,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         canonicalWorkoutById,
         workoutLinks,
         canonicalObjects,
+        canonicalObjectStorageMetadata,
       });
     }
     const canonicalizedBy = (domain) => results.filter((item) =>
@@ -750,7 +752,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     };
   }
 
-  async function reassessWorkoutRelationships({ context, workoutPolicy, canonicalWorkoutById, workoutLinks, canonicalObjects }) {
+  async function reassessWorkoutRelationships({ context, workoutPolicy, canonicalWorkoutById, workoutLinks, canonicalObjects, canonicalObjectStorageMetadata }) {
     const summary = { assessed: 0, updated: 0, candidateLinksCreated: 0, candidateLinksReleased: 0, candidateLinksRefreshed: 0 };
     const at = now().toISOString();
     // An open-ended policy (null endLocalDate) has no upper bound.
@@ -781,6 +783,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           canonicalObjects,
           existingLinks: workoutLinks,
           canonicalWorkouts: inWindow,
+          loggerSessionServerCommitTimestamps: new Map(canonicalObjectStorageMetadata.map((row) => [row.recordId, row.createdAt])),
         });
         const single = [HealthKitStrengthMatchOutcome.CONFIDENT, HealthKitStrengthMatchOutcome.POSSIBLE].includes(assessment.outcome);
         const session = single ? assessment.candidates[0].loggerSessionCanonicalId : null;

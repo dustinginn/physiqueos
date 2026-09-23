@@ -69,16 +69,17 @@ try {
   const readOnly = (await client.query("SHOW transaction_read_only")).rows[0]?.transaction_read_only;
   if (readOnly !== "on") throw Object.assign(new Error("read-only fence"), { code: "TRANSACTION_NOT_READ_ONLY" });
   const records = createPhase4CanonicalRecordStore({ query: (text, values) => client.query(text, values) });
-  const [policyRecord, observations, canonicalWorkouts, links, claims, canonicalEvidenceObjects] = await Promise.all([
+  const [policyRecord, observations, canonicalWorkouts, links, claims, canonicalEvidenceObjects, canonicalEvidenceStorageMetadata] = await Promise.all([
     records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: "healthkit_workout_canonical_activation_policy" }),
     records.list({ ownerUserId: OWNER, collection: "healthKitObservations" }),
     records.list({ ownerUserId: OWNER, collection: "healthKitCanonicalWorkouts" }),
     records.list({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks" }),
     records.list({ ownerUserId: OWNER, collection: "healthKitWorkoutLinkClaims" }),
     records.list({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects" }),
+    records.listStorageMetadata({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects" }),
   ]);
   const summary = summarizeHealthKitWorkoutCanary({
-    policyRecord, observations, canonicalWorkouts, links, claims, canonicalEvidenceObjects,
+    policyRecord, observations, canonicalWorkouts, links, claims, canonicalEvidenceObjects, canonicalEvidenceStorageMetadata,
     startLocalDate: START, endLocalDate: END, includeValues: INCLUDE_VALUES,
   });
   const digests = {};

@@ -4,6 +4,7 @@ import { normalizeHealthKitObservationBatch } from "../../domain/services/Health
 import { reconcileHealthKitCanonicalWorkout } from "../../domain/services/HealthKitWorkoutService.js";
 import { runHealthKitWorkoutLinkReassessment } from "./HealthKitWorkoutLinkReassessmentRunner.js";
 import { buildHealthKitPayload } from "../../../scripts/operations/buildHealthKitPayload.mjs";
+import { createCanonicalPersistenceCommandPorts } from "../../application/commands/CanonicalPersistenceCommandPorts.js";
 
 const OWNER = "user_founder_001";
 const DAY = "2026-09-23";
@@ -133,6 +134,41 @@ describe("guarded Workout link reassessment operation", () => {
     });
     expect(records.getMutationCount()).toBe(mutations);
     expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("candidate");
+  });
+
+  it("keeps the guarded confident candidate durable through ordinary HealthKit reassessment", async () => {
+    const records = await world();
+    const dry = await runHealthKitWorkoutLinkReassessment({ records, authorization: AUTH, now });
+    await runHealthKitWorkoutLinkReassessment({ records, authorization: AUTH, apply: true, expected: dry.facts, now });
+
+    await createCanonicalPersistenceCommandPorts({ records, now }).ingestHealthKitObservations({
+      ownerUserId: OWNER,
+      principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "session" },
+      metadata: { clientOccurredAt: NOW },
+      payload: {
+        batchId: "post-guarded-reassessment",
+        observations: [{
+          observationType: "workout",
+          externalId: "sep23-strength",
+          source: { bundleIdentifier: "com.apple.health.watch" },
+          occurrence: {
+            localDate: DAY,
+            timeZone: "America/Los_Angeles",
+            startedAt: "2026-09-23T13:47:54Z",
+            endedAt: "2026-09-23T14:57:12Z",
+          },
+          workout: { activityType: "50", durationSeconds: 4158, activeCalories: 400 },
+        }],
+      },
+    });
+
+    expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(1);
+    expect(records.snapshot().healthKitWorkoutLinks[0]).toMatchObject({
+      status: "candidate",
+      matchOutcome: "confident_match",
+      confidence: 95,
+      matcherVersion: "healthkit-strength-matcher-v5",
+    });
   });
 
   it("does not treat an existing candidate as an authorized apply success without the matching audit", async () => {

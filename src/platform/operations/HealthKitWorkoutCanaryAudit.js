@@ -29,6 +29,7 @@ export function summarizeHealthKitWorkoutCanary({
   links = [],
   claims = [],
   canonicalEvidenceObjects = [],
+  canonicalEvidenceStorageMetadata = [],
   startLocalDate,
   endLocalDate,
   includeValues = true,
@@ -46,6 +47,7 @@ export function summarizeHealthKitWorkoutCanary({
       canonicalObjects: canonicalEvidenceObjects,
       existingLinks: links,
       canonicalWorkouts: workouts,
+      loggerSessionServerCommitTimestamps: new Map(canonicalEvidenceStorageMetadata.map((row) => [row.recordId, row.createdAt])),
     });
     const own = links.filter((link) => link.canonicalWorkoutId === workout.id);
     return {
