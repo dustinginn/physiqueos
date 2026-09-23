@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Activate and audit Sep 22 Workout canary (`healthkit-sep22-workout-canary-activation-20260923`)
+- Task: Harden and confirm Sep 22 Strength Workout link (`healthkit-strength-link-confirmation-hardening-20260923`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-23T04:30:23Z
+- Generated (UTC): 2026-09-23T12:43:16Z
 - Success: true
 
-Summary: Sep 22 Workout canary executed end to end and the Strength canary is ACCEPTED. Pre-activation audits showed no drift from GREEN; the established dry-run predicted the exact-date policy with 0 raw workouts in window; the Founder authorized in chat; the guarded apply wrote exactly the policy record + one audit row with all 12 invariants true. The Founder's Build 53 control was disabled at first: diagnosed from source as the screen's master 'Enable this canary' toggle plus a per-visit canary-only authorization request (in-memory, uploads nothing) -- the task's 'do not touch that toggle' instruction was based on a mistaken model of the UI; corrected instruction given, single tap performed: 3 workouts uploaded, 0 pending, 3 canonicalized. Post-sync audit: 1 strength (traditional_strength_training) matched the existing Logger session as a confident_match candidate (99), never auto-confirmed; 2 walks canonical cardio, no_match, no links; 0 ambiguous auto-links; Logger evidence digest/rows identical (no mutation, no duplicate session); briefings/analyses digests identical; all quarantined, strategic leakage 0; 0 x 409, 0 x INTERNAL_ERROR (replays graceful). Activity/Nutrition policy and Nutrition day identical; the Activity day advanced only via its own automatic sync (only activity_summary states changed). No code fix, no second sync, no Native build needed.
+Summary: Edge case audited: the restore/one-to-one throw is real but was already guarded at the deployed SHA and merely untested; the material gap was that no registered guarded confirmation path existed. Built it (dry-run/apply runner + console entry + payload kind, drift-fenced, advisory-locked, in-transaction one-to-one invariants, typed refusals, idempotent replay), hardened the confirm service to fail closed without an actor/time, added 16 tests incl. restore-collides, put-conflict compensation, claim-only collision, concurrency; seven guards mutation-proven; two adversarial review passes, findings fixed. Deployed 7c5710f2 with Founder approval (spec stamp + force-rebuild; one refspec mislabel caught and superseded before going live; zero-write proven). Per the Founder's same-day screenshot clarification, built a zero-write same-event reconciliation audit and proved one_logical_event in production before asking. Confirmed the Sep 22 Strength link with separate approval: applied, 14/14 invariants, replay idempotent, Logger byte-identical, walks separate, strategic 0. Deactivated the Sep 22 Workout policy with separate approval: 12/12 invariants, canonical workouts + confirmed link intact.
 
-Detailed report: `agent-handoffs/reports/20260923T043023Z-healthkit-sep22-workout-canary-accepted.md`
+Detailed report: `agent-handoffs/reports/20260923T124316Z-healthkit-sep22-strength-link-confirmed-policy-closed.md`
 
 Protocol: `agent-handoffs/README.md`
