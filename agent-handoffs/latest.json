@@ -1,62 +1,59 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T18:26:58Z",
+  "generated_at_utc": "2026-09-23T19:10:33Z",
   "task": {
-    "id": "healthkit-strength-sep23-reassessment-dryrun-20260923",
-    "title": "Dry-run the existing Sep 23 Strength reassessment",
+    "id": "healthkit-strength-sep23-server-commit-timestamp-correction-20260923",
+    "title": "Correct Sep 23 Strength reassessment timestamp source",
     "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "cc3c6e441273859731004b7fe670e48a48fcec3c",
-    "final_sha": "98f8ccec5ab8eaebc25631139e574b69267f9c74",
+    "base_sha": "98f8ccec5ab8eaebc25631139e574b69267f9c74",
+    "final_sha": "31c88481d80703de3355c51f6695b760b0671020",
     "production_server_sha": "98f8ccec5ab8eaebc25631139e574b69267f9c74",
     "production_deployment": "aef7251a-6390-4dd8-b845-f4f27c5f4337",
     "native_sha": "621dbef3cdcf17009e346111e4a86d14b70ed896",
     "native_build": 55
   },
   "result": {
-    "summary": "The Founder-authorized Sep 23 reassessment dry-run ran under production runtime 98f8ccec in REPEATABLE READ READ ONLY and safely refused. Exact outcome: refused / single_session_below_confident_threshold; matcher v4 found exactly one candidate with outcome possible_match, confidence 50, basis logger_session_window, startAligned false, endAligned false, overlapSeconds 3826. It proved exactly one same-day canonical Strength workout and exactly one same-day native live Logger Strength session. Root cause: the existing canonical Logger object's captured_at is the server's synthetic noon fallback, not the 14:56 commit instant; its inferred end is therefore 10,632 seconds before the HealthKit end. The stored Native Build 54 record has no finishedAt. Exact predicted mutation: none, because the confident-match gate did not pass. No reassessment, link, assessment update, audit row, policy change, or TestFlight upload occurred.",
-    "success": false,
-    "production_mutated": true,
-    "deployed": true,
+    "summary": "Prepared and independently reviewed Server candidate 31c88481 for the existing Sep 23 Strength reassessment. The matcher now replaces only the known synthetic-noon Logger captured_at fallback with the immutable owner-scoped canonical row created_at, never edits Logger content, and fails closed when the timestamp is missing, invalid, before the Logger start, or not aligned to the HealthKit end. The same durable input is used by guarded reassessment, ordinary HealthKit relationship reassessment, and canary recomputation so a confident candidate cannot later be downgraded by a metadata-blind recomputation. Auto-confirm remains false and strategic eligibility remains quarantined. Nothing was deployed or applied, Build 55 was not uploaded, and Cardio was not started.",
+    "success": true,
+    "production_mutated": false,
+    "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "The deployed candidate retained its reviewed local validation. The production dry-run exposed a missing real-data fixture: tests supplied capturedAt as the actual commit instant, while the existing Native command omitted capturedAt and the Server stored its noon fallback."
+      "summary": "Codex release slice: 8 files and 150 tests passed; changed-file lint and git diff checks passed. Independent reviewer: 10 impacted files and 196 tests passed. Production-shaped fixture uses synthetic noon captured_at plus the actual durable Server commit instant and predicts one quarantined confidence-95 logger_session_window candidate."
     },
     "review": {
-      "status": "changes_requested",
-      "summary": "The earlier source review is still valid for the implemented contracts, but the production dry-run found that the assumed legacy commit-time fallback is not present in the canonical payload. A corrected legacy timestamp source requires a new implementation, mutation proof, and fresh review before any new deploy request."
+      "status": "approved",
+      "summary": "Fresh-context independent review of 98f8ccec..31c88481 ended with no findings. Earlier review rounds found and verified fixes for synthetic-noon fallback without metadata, metadata-blind ordinary/canary recomputation, and generic qualification fallthrough; each fix was re-reviewed."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "The reassessment entry verified runtime SHA, owner scope, BEGIN REPEATABLE READ READ ONLY, transaction_read_only=on, and rolled back. It used mode=dry-run with no authorization reference. The operation returned refused before constructing or executing mutations. Pre/post deployment audits had already proven all policy, HealthKit, Logger-count, link/claim, strategic, and migration digests unchanged."
+      "summary": "The production-shaped reassessment dry-run fixture remained byte-identical with mutation count zero. No production operation ran in this chunk; no reassessment, policy, Logger, link, claim, workout, audit, Native, TestFlight, or Cardio mutation occurred."
     }
   },
   "decisions_required": [
-    "Do not authorize reassessment apply: the current production dry-run predicts no mutation and refuses safely.",
-    "A new reviewed Server correction must source the legacy Sep 23 Logger commit time from durable storage metadata rather than the synthetic payload captured_at fallback; deploying that future SHA will require separate Founder authorization.",
-    "Build 55 TestFlight upload remains a separate approval gate and has not occurred."
+    "Founder approval is required before deploying Server candidate 31c88481d80703de3355c51f6695b760b0671020.",
+    "After any approved deployment, run only the read-only Sep 23 reassessment dry-run; applying its predicted mutations remains a separate Founder authorization.",
+    "Build 55 TestFlight upload remains a separate approval gate, and Cardio remains blocked until Strength reaches its final verdict."
   ],
-  "blockers": [
-    "The existing Sep 23 Logger canonical payload has no finishedAt and its captured_at is the Server's noon fallback, so the reviewed matcher cannot prove Logger-end alignment and cannot produce a confident reassessment candidate."
-  ],
+  "blockers": [],
   "unexpected_findings": [
-    "The dedicated matcher rule did activate: unique same-day workout/session and basis logger_session_window are proven. The failure is specifically end-time evidence, not ambiguity, wrong session selection, or old code running.",
-    "The test fixture modeled capturedAt as the real 14:56 commit instant, but the Native command did not send capturedAt and the Server fell back to local-date noon. That assumption gap escaped the source tests and fresh review."
+    "Fresh review exposed two broader fail-closed gaps before publication: synthetic noon could fall through when metadata was absent, and ordinary relationship/canary recomputation lacked the durable timestamp input. Both are fixed and mutation-tested.",
+    "A final review found a qualification fallthrough where start alignment plus stored duration could yield confidence despite an untrusted end. The dedicated Logger-window branch now qualifies only when the trusted end aligns."
   ],
   "backlog": [
-    "Implement the smallest fail-closed legacy reassessment correction using a durable Server-owned commit timestamp, without mutating Logger detail or changing normal future Build 55 finishedAt behavior.",
-    "Add a production-shaped regression fixture where payload captured_at is noon fallback and durable record metadata contains the true commit instant; mutation-test and fresh-review the correction.",
-    "Request separate authorization for any new Server deploy, then rerun only the Sep 23 read-only dry-run before requesting reassessment apply.",
-    "Do not upload Build 55 without separate authorization and do not begin Cardio before Strength reaches its final verdict."
+    "With separate Founder approval, deploy exact Server candidate 31c88481 using runtime SHA/build stamping, force rebuild, authority/health verification, and zero-write verification.",
+    "After deployment, run only the read-only reassessment dry-run for the existing Sep 23 Strength workout and Logger session and report the exact predicted mutations, match basis/confidence, and invariants.",
+    "Do not apply the reassessment without separate authorization; do not upload Build 55 without separate authorization; do not start Cardio before the Strength final verdict."
   ],
-  "recommended_next_step": "Prepare and fresh-review a narrow Server correction that exposes the durable commit timestamp to this one legacy reassessment path. Do not apply the current reassessment; it correctly refused and predicted no writes.",
-  "full_report_path": "agent-handoffs/reports/20260923T182658Z-healthkit-strength-sep23-reassessment-dryrun-refused.md",
+  "recommended_next_step": "Ask the Founder whether to deploy exact reviewed Server candidate 31c88481d80703de3355c51f6695b760b0671020. Stop before deployment until approval is explicit.",
+  "full_report_path": "agent-handoffs/reports/20260923T191033Z-healthkit-strength-sep23-server-commit-timestamp-correction.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
