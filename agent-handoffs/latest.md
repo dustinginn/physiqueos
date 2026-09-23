@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Close canonical mutation boundaries in Strength reconciliation (`codex-strength-reconciliation-boundary-corrections-20260923`)
+- Task: Enforce exact claims and September 23 acceptance scope (`codex-strength-reconciliation-exact-acceptance-guards-20260923`)
 - Agent: codex
 - Status: completed
-- Generated (UTC): 2026-09-23T23:17:46Z
+- Generated (UTC): 2026-09-23T23:36:47Z
 - Success: true
 
-Summary: Closed four independent-review mutation-boundary gaps: universal trusted Logger provenance, fresh guarded no-match with candidate release, superseded review revival/terminal history, and canonical rejection of generic Evidence Review mutations. Each guard was independently mutation-tested and all relevant suites and the production build pass. No production, policy, relationship, strategic-eligibility, Apple, or Cardio state changed.
+Summary: Closed the final operational-boundary findings with exact claim-identity drift checks, a hard September 23-only acceptance scope in runner and payload builder, and exact claim integrity on already-confirmed replay. All relevant suites, mutations, and the production build pass. No production, policy, relationship, strategic-eligibility, Apple, or Cardio state changed.
 
-Detailed report: `agent-handoffs/reports/20260923T231746Z-strength-reconciliation-boundary-corrections.md`
+Detailed report: `agent-handoffs/reports/20260923T233647Z-strength-reconciliation-exact-acceptance-guards.md`
 
 Protocol: `agent-handoffs/README.md`

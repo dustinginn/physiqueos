@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T23:17:46Z",
+  "generated_at_utc": "2026-09-23T23:36:47Z",
   "task": {
-    "id": "codex-strength-reconciliation-boundary-corrections-20260923",
-    "title": "Close canonical mutation boundaries in Strength reconciliation",
+    "id": "codex-strength-reconciliation-exact-acceptance-guards-20260923",
+    "title": "Enforce exact claims and September 23 acceptance scope",
     "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "31c88481d80703de3355c51f6695b760b0671020",
-    "final_sha": "d433f87105df5a8348556df504aa276b2cdd176f",
+    "final_sha": "9f0e0544ed1dd788d13c815ee897d8045fd3cb12",
     "production_server_sha": "31c88481d80703de3355c51f6695b760b0671020",
     "production_deployment": "42035d0d-9368-4ada-a4c1-392e659f3366",
     "native_sha": "7812937c95202f4b6765587df56dc61a7a748984",
     "native_build": 56
   },
   "result": {
-    "summary": "Closed four independent-review mutation-boundary gaps: universal trusted Logger provenance, fresh guarded no-match with candidate release, superseded review revival/terminal history, and canonical rejection of generic Evidence Review mutations. Each guard was independently mutation-tested and all relevant suites and the production build pass. No production, policy, relationship, strategic-eligibility, Apple, or Cardio state changed.",
+    "summary": "Closed the final operational-boundary findings with exact claim-identity drift checks, a hard September 23-only acceptance scope in runner and payload builder, and exact claim integrity on already-confirmed replay. All relevant suites, mutations, and the production build pass. No production, policy, relationship, strategic-eligibility, Apple, or Cardio state changed.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,11 +26,11 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server relevant gate 298/298, Phase 4 139/139, Phase 5 65/65, six new independent mutation checks killed, lint/diff clean, and production Next webpack build successful."
+      "summary": "Server relevant gate 305/305, Phase 4 139/139, Phase 5 65/65, final claim/date/replay mutations killed, lint/diff clean, and production Next webpack build successful."
     },
     "review": {
       "status": "changes_requested",
-      "summary": "The third independent review found four canonical-boundary gaps. All are corrected in Server d433f871; a fourth fresh-context review is pending."
+      "summary": "The fourth independent review found three operational-boundary gaps. All are corrected in Server 9f0e0544; a fifth fresh-context review is pending."
     },
     "zero_write_audit": {
       "status": "passed",
@@ -40,17 +40,17 @@
   "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "The third fresh-context review exposed mutation paths below the already guarded Native and Web adapters; enforcement is now also canonical.",
+    "The fourth review found that holder-based claim matching was insufficient without deterministic claim identities.",
     "The repository inbox pointer remains stale, so this checkpoint does not mutate inbox lifecycle state."
   ],
   "backlog": [
-    "Obtain a fourth fresh-context independent adversarial review of exact Server d433f871 and Native 7812937c candidates.",
+    "Obtain a fifth fresh-context independent adversarial review of exact Server 9f0e0544 and Native 7812937c candidates.",
     "If approved, ask separately before deploying the exact Server candidate; after deployment run only the bounded read-only September 23 auto-confirm dry-run.",
     "Continue to require separate authorization for TestFlight upload, policy activation, and production relationship mutation.",
     "Keep strategic Strength eligibility off and do not begin Cardio until the final Strength verdict."
   ],
-  "recommended_next_step": "Run fresh-context review of Server d433f87105df5a8348556df504aa276b2cdd176f and Native 7812937c95202f4b6765587df56dc61a7a748984, then publish the reviewed readiness handoff.",
-  "full_report_path": "agent-handoffs/reports/20260923T231746Z-strength-reconciliation-boundary-corrections.md",
+  "recommended_next_step": "Run fresh-context review of Server 9f0e0544ed1dd788d13c815ee897d8045fd3cb12 and Native 7812937c95202f4b6765587df56dc61a7a748984, then publish the reviewed readiness handoff.",
+  "full_report_path": "agent-handoffs/reports/20260923T233647Z-strength-reconciliation-exact-acceptance-guards.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
