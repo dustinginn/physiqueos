@@ -78,6 +78,16 @@ describe("strength link matcher", () => {
       .toMatchObject({ outcome: Outcome.POSSIBLE });
     expect(assess(hk, [session], new Map([["sep23-logger", "2026-09-23T13:00:00Z"]])))
       .toMatchObject({ outcome: Outcome.POSSIBLE });
+
+    const morningWorkout = canonical({
+      startedAt: "2026-09-23T10:00:00Z",
+      endedAt: "2026-09-23T12:00:20Z",
+      durationSeconds: 7220,
+    });
+    const morningSession = liveLogger("morning-logger", "2026-09-23T10:10:00Z", "2026-09-23T12:00:00.000Z");
+    expect(assess(morningWorkout, [morningSession])).toMatchObject({ outcome: Outcome.POSSIBLE });
+    expect(assess(morningWorkout, [morningSession], new Map([["morning-logger", "not-an-instant"]])))
+      .toMatchObject({ outcome: Outcome.POSSIBLE });
   });
 
   it("does not call the Logger-window rule confident when same-day uniqueness is absent", () => {

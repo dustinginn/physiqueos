@@ -497,12 +497,16 @@ function normalizeSessionTimes(payload, timeZone, { serverCommitTimestamp = null
   const rawStart = metadata.start_time ?? metadata.started_at ?? metadata.start ?? null;
   const explicitEnd = metadata.end_time ?? metadata.ended_at ?? metadata.end ?? null;
   const start = normalizeWorkoutTimeToInstant(rawStart, { dateKey, timeZone });
+  const syntheticNoonCapture = isSyntheticNoonCapture(payload.captured_at, dateKey);
   const serverCommitEnd = explicitEnd === null && isNativeLiveLoggerSession(payload) &&
-    isSyntheticNoonCapture(payload.captured_at, dateKey) && validInstant(serverCommitTimestamp)
+    syntheticNoonCapture && validInstant(serverCommitTimestamp)
     ? new Date(serverCommitTimestamp).toISOString()
     : null;
+  const capturedEnd = isNativeLiveLoggerSession(payload) && !syntheticNoonCapture
+    ? payload.captured_at ?? null
+    : null;
   const rawEnd = explicitEnd ?? serverCommitEnd ??
-    (isNativeLiveLoggerSession(payload) ? payload.captured_at ?? null : null);
+    capturedEnd;
   let end = normalizeWorkoutTimeToInstant(rawEnd, { dateKey, timeZone });
   // A Server commit is an absolute instant, not a wall-clock value. If it
   // predates the session start, reject it instead of manufacturing a next-day
