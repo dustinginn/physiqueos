@@ -392,6 +392,10 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         );
       }
       if (existing && !isCompatibleHealthKitReplay(existing, observation)) {
+        if (isIgnorableWorkoutContentDrift(existing, observation)) {
+          results.push(ignoredWorkoutReplayResult(existing));
+          continue;
+        }
         throw problem(
           409,
           "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
@@ -507,6 +511,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       });
       let stored = existing ?? insertion.record;
       if (!stored || !isCompatibleHealthKitReplay(stored, observation)) {
+        // Same rule at the write boundary: a concurrent first delivery of the
+        // same workout wins and this drifted copy is acknowledged, not fought.
+        if (stored && isIgnorableWorkoutContentDrift(stored, observation)) {
+          results.push(ignoredWorkoutReplayResult(stored));
+          continue;
+        }
         const purposeChanged = stored &&
           (stored.ingestionPurpose ?? "operational") !== observation.ingestionPurpose;
         throw problem(
@@ -2505,6 +2515,34 @@ const WORKOUT_TERMINAL_STATES = new Set([
   HealthKitReconciliationState.WORKOUT_CANONICALIZED,
   HealthKitReconciliationState.WORKOUT_SUMMARY_SUPERSEDED,
 ]);
+
+// A HealthKit workout is immutable: the same UUID re-delivered with different
+// content is not a different workout but drifted associated statistics (heart
+// rate / energy samples that landed after the first delivery) or a second
+// transport of a workout already stored. Refusing it with 409 would make the
+// device re-query and re-upload the same sample forever (its anchor never
+// advances past a rejected batch) and starve every later workout in that
+// partition. The first stored observation stays authoritative and untouched;
+// the redelivery is acknowledged and reported per observation, never merged.
+// A purpose change is still refused, and a revision-aware update arrives as a
+// distinct identity (workout.sourceRevision > 1), not through this path.
+function isIgnorableWorkoutContentDrift(existing, observation) {
+  return existing?.observationType === HealthKitObservationType.WORKOUT &&
+    observation?.observationType === HealthKitObservationType.WORKOUT &&
+    (existing.ingestionPurpose ?? "operational") === observation.ingestionPurpose;
+}
+
+function ignoredWorkoutReplayResult(existing) {
+  return {
+    sourceObservationId: existing.id,
+    ingestionPurpose: existing.ingestionPurpose,
+    outcome: "ignored",
+    observationType: existing.observationType,
+    occurredAt: existing.occurredAt,
+    reconciliation: existing.reconciliation,
+    replay: { ignored: true, reason: "workout_content_drift_same_identity" },
+  };
+}
 
 const DAILY_SNAPSHOT_STATES = Object.freeze({
   [HealthKitCanonicalDomain.ACTIVITY]: Object.freeze({

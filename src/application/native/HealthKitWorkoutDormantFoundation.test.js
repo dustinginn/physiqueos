@@ -582,3 +582,56 @@ describe("prospective (open-ended, Strength-only) Workout policy", () => {
     expect(records.snapshot().healthKitCanonicalWorkouts[0].current.family).toBe("cardio");
   });
 });
+
+describe("same-identity workout content drift (immutable HealthKit workout re-delivered with changed statistics)", () => {
+  it("acknowledges and ignores the drifted copy: stored observation, canonical workout and link byte-identical; later observations in the batch still ingest", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "b1");
+    const before = records.snapshot();
+    const drifted = workout({ averageHeartRate: 131, activeCalories: 412 });
+    const second = workout({ externalId: "second-uuid", startedAt: `${DAY}T16:00:00-07:00`, endedAt: `${DAY}T17:00:00-07:00` });
+    const result = await ingest(records, [drifted, second], "b2");
+    expect(result.status).toBe("committed");
+    expect(result.result.observations[0]).toMatchObject({
+      sourceObservationId: before.healthKitObservations[0].id, outcome: "ignored", observationType: "workout",
+      reconciliation: { state: "workout_canonicalized" }, replay: { ignored: true, reason: "workout_content_drift_same_identity" },
+    });
+    expect(result.result.observations[1]).toMatchObject({ outcome: "created", reconciliation: { state: "workout_canonicalized" } });
+    // Like a matched replay, the ignored copy reports the stored canonicalized state.
+    expect(result.result.workoutCanonicalizedCount).toBe(2);
+    const after = records.snapshot();
+    expect(after.healthKitObservations.find((record) => record.id === before.healthKitObservations[0].id)).toEqual(before.healthKitObservations[0]);
+    expect(after.healthKitCanonicalWorkouts.find((record) => record.id === before.healthKitCanonicalWorkouts[0].id)).toEqual(before.healthKitCanonicalWorkouts[0]);
+    expect(after.healthKitWorkoutLinks.find((record) => record.id === before.healthKitWorkoutLinks[0].id)).toEqual(before.healthKitWorkoutLinks[0]);
+    expect(after.healthKitObservations).toHaveLength(2);
+    expect(after.healthKitCanonicalWorkouts).toHaveLength(2);
+    expect(after.healthKitWorkoutLinks).toHaveLength(1);
+    for (const name of [...SENTINELS, "canonicalEvidenceObjects", "evidencePackages"]) expect(after[name]).toEqual(before[name]);
+    // Ignoring is stable: the same drifted copy alone is ignored again, with nothing written.
+    const again = await ingest(records, [drifted], "b3");
+    expect(again.result.observations[0].outcome).toBe("ignored");
+    expect(records.snapshot()).toEqual(after);
+  });
+
+  it("ignores drift for a workout that stayed raw (no policy) without ever canonicalizing it", async () => {
+    const records = store({ workoutPolicy: false });
+    await ingest(records, [workout()], "b1");
+    const before = records.snapshot();
+    const result = await ingest(records, [workout({ averageHeartRate: 131 })], "b2");
+    expect(result.result.observations[0]).toMatchObject({ outcome: "ignored", replay: { reason: "workout_content_drift_same_identity" } });
+    expect(records.snapshot()).toEqual(before);
+  });
+
+  it("still refuses a purpose change, a batch-internal duplicate with different content, and a drifted daily snapshot", async () => {
+    const records = store({ dailyPolicy: true });
+    await ingest(records, [workout(), activity()], "b1");
+    const before = records.snapshot();
+    await expect(ingest(records, [{ ...workout({ averageHeartRate: 131 }), ingestionPurpose: "validation_only" }], "b2"))
+      .rejects.toMatchObject({ status: 409, code: "HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE" });
+    await expect(ingest(records, [workout(), workout({ averageHeartRate: 131 })], "b3"))
+      .rejects.toMatchObject({ status: 409, code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION" });
+    await expect(ingest(records, [activity({ moveCalories: 801 })], "b4"))
+      .rejects.toMatchObject({ status: 409, code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION" });
+    expect(records.snapshot()).toEqual(before);
+  });
+});
