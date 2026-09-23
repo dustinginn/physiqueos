@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Diagnose Build 52 real-device HealthKit self-heal failure (`healthkit-build52-real-device-selfheal-failure-20260922`)
+- Task: Finish HealthKit Evidence summary formatting (`healthkit-evidence-summary-formatting-cleanup-20260923`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-23T02:52:56Z
+- Generated (UTC): 2026-09-23T03:42:14Z
 - Success: true
 
-Summary: Neither Activity nor Nutrition was permanently stuck on Build 52 -- both self-healed, confirmed by the Founder's own live updates. Root cause: a Server-side idempotency-key insert race producing spurious 500s on app relaunch, plus a normal usage-cadence gap. Fixed server-side, independently reviewed (2 gaps found and hardened), tested and mutation-tested. Also fixed the raw-floating-point display bug on both Evidence Reports and added Log pull-to-refresh, per the Founder's follow-up reports. Founder explicitly authorized both production actions; Server fix deployed and verified, Build 53 uploaded and Apple-confirmed VALID.
+Summary: The residual raw-double leak on the Activity/Nutrition Evidence headline, subheadline, Activity Areas, protocol-support/trend, Web hub metric, and Evidence-timeline strings is fixed -- but it was never a Native defect: those strings are built server-side and decoded verbatim, so the fix is Server code (3 commits, final 4b362591, one shared whole-number helper mirroring the Native cards). Two adversarial review passes; all three findings fixed and re-verified; final re-audit clean in scope. No Native change, so no Build 54 is needed for this. Not deployed (code/test/review only): it takes effect on the next Server deploy, which needs the Founder's go-ahead.
 
-Detailed report: `agent-handoffs/reports/20260923T025256Z-healthkit-build52-real-device-selfheal-failure-fixed-deployed.md`
+Detailed report: `agent-handoffs/reports/20260923T034214Z-healthkit-evidence-summary-formatting-cleanup-fixed.md`
 
 Protocol: `agent-handoffs/README.md`

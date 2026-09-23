@@ -1,61 +1,61 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T02:52:56Z",
+  "generated_at_utc": "2026-09-23T03:42:14Z",
   "task": {
-    "id": "healthkit-build52-real-device-selfheal-failure-20260922",
-    "title": "Diagnose Build 52 real-device HealthKit self-heal failure",
+    "id": "healthkit-evidence-summary-formatting-cleanup-20260923",
+    "title": "Finish HealthKit Evidence summary formatting",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "924d5e556ba418ceb64de828d4c6a7c06d99f769",
-    "final_sha": "1c57556f",
+    "base_sha": "ccff693b61c98737b670be620f7916c375cb37ce",
+    "final_sha": "4b362591cb5f80c599f8f45eb7f392de7c44a36f",
     "production_server_sha": "ccff693b61c98737b670be620f7916c375cb37ce",
     "production_deployment": "0bdc1748-d918-452f-a84a-52a9bfdc5373",
     "native_sha": "1c57556f",
     "native_build": 53
   },
   "result": {
-    "summary": "Neither Activity nor Nutrition was permanently stuck on Build 52 -- both self-healed, confirmed by the Founder's own live updates. Root cause: a Server-side idempotency-key insert race producing spurious 500s on app relaunch, plus a normal usage-cadence gap. Fixed server-side, independently reviewed (2 gaps found and hardened), tested and mutation-tested. Also fixed the raw-floating-point display bug on both Evidence Reports and added Log pull-to-refresh, per the Founder's follow-up reports. Founder explicitly authorized both production actions; Server fix deployed and verified, Build 53 uploaded and Apple-confirmed VALID.",
+    "summary": "The residual raw-double leak on the Activity/Nutrition Evidence headline, subheadline, Activity Areas, protocol-support/trend, Web hub metric, and Evidence-timeline strings is fixed -- but it was never a Native defect: those strings are built server-side and decoded verbatim, so the fix is Server code (3 commits, final 4b362591, one shared whole-number helper mirroring the Native cards). Two adversarial review passes; all three findings fixed and re-verified; final re-audit clean in scope. No Native change, so no Build 54 is needed for this. Not deployed (code/test/review only): it takes effect on the next Server deploy, which needs the Founder's go-ahead.",
     "success": true,
-    "production_mutated": true,
-    "deployed": true,
-    "testflight_uploaded": true
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server: foundation 38/38, phase2 97/97, phase4 137/137, phase3 273/274 (1 pre-existing unrelated fixture failure, confirmed present before any change in this task). Native: 1289/1289 PhysiqueOSTests. All new tests (8 Server, 2 Native) mutation-tested -- reverted production code only, confirmed each new test fails with exactly the error it exists to catch, restored, confirmed byte-identical to before revert."
+      "summary": "Server: new HealthKitEvidenceSummaryFormatting.test.js 9/9 driving the real exported builders with the Founder's exact reported values plus the reviewer's .5-tie vectors; phase3 282/283 (the one failure is the pre-existing gitignored private/founder/runtime-store.json fixture, present before any change), foundation 38/38, phase2 97/97, phase4 137/137; eslint clean. Mutation-tested three times (each hunk reverted in isolation fails exactly its own tests, reproducing the reported strings; restores byte-identical). Native untouched at 1c57556f: unit 1289/1289; UI target 12/12 across two runs -- one environmental flake on an untouched Training journey (testReportingJourneys, 809 s full run) passed in 44.5 s re-run in isolation, disclosed in the report."
     },
     "review": {
       "status": "approved",
-      "summary": "Two independent adversarial reviews (Server fix, Native fixes), both fresh-context with no shared state. Server review found two real gaps (non-arbiter-constraint 23505 edge case; identical unguarded pattern on outbox.insert in the same file) -- both fixed in a follow-up commit, re-verified, no further findings. Native review confirmed the float-display fix and pull-to-refresh cache-key set are correct, and surfaced one genuine-but-out-of-scope completeness gap (3 other non-HealthKit raw-double leak sites) spun off as a separate follow-up task rather than expanding this one, plus one non-defect nuance (bootstrap()'s outcome can say 'caught up' when nothing new actually landed; harmless here since this pull-to-refresh discards that outcome and just reloads canonical state either way)."
+      "summary": "Fresh-context adversarial review (isolated worktree) of 44edddb7 verified guarding, rounding parity with Swift, behavior preservation, real test path, hygiene, and found two in-scope misses (formatActivityProtocolSupport feeding the headline card's protocolStatus/report trend/hub trend; formatActivityHubMetric feeding the Web hub) -- fixed in d2aa86e0 with tests. Delta verification confirmed both and caught one last real 1-off (difference-rounding not tie-safe vs the cards) -- fixed in 4b362591 exactly as prescribed, with the reviewer's tie vectors as tests. Final re-audit: no remaining raw HealthKit-double interpolation on any Activity/Nutrition Evidence surface, Native or Web; only the task-excluded Training sites remain."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Server deploy: fast-forward merge only (no conflicts -- combined-app-platform-cutover's HEAD was exactly this fix's base commit), no schema/migration change, build logs show a clean Next.js restart with no migration executed, health endpoints both 200 immediately after. Verified the deployment's own spec JSON reports source_commit_hash matching the exact reviewed commit, not a stale one (the known 'env-only update reuses old commit' gotcha). Native upload: archive re-verified unchanged before --execute, no credential material read/printed/logged (API key referenced only by path)."
+      "summary": "No production mutation: nothing deployed, no archive/upload, no canary, no manual Sync, Workout activation untouched. Authority reverified before acting (deployment 0bdc1748 ACTIVE on ccff693b via its own source_commit_hash; Native 1c57556f clean). All work on a fresh branch from the deployed commit; only the branch and the handoff files were pushed."
     }
   },
   "decisions_required": [
-    "Founder: install Build 53 from TestFlight normally (no canary, no manual Sync) and confirm the real-device retest: Activity and Nutrition should now catch up without the occasional spurious 500 (fixed at the root), the raw-float display should be gone from both Evidence Reports, and Log's new pull-to-refresh should force an immediate catch-up on demand.",
-    "Two follow-up tasks were spawned as separate session suggestions (chips), not started: (1) fix the same raw-double-leak pattern at 3 other non-HealthKit sites (Training exercise history, Training Logger's editable reps/load field, photo-scanned nutrition prefill); (2) investigate whether the idempotency fix's new lock-wait behavior under a retry burst is a real connection-pool risk given actual traffic patterns, or a non-issue.",
-    "Process gap: this task's own prompt file was directly git-committed to five times after being claimed, bypassing the handoff tool's immutability gate (confirmed benign -- all from the Founder's own git identity, matching in-chat 'review this' instructions -- but the immutability guarantee is currently only enforced by the publish tool, not the repository itself)."
+    "Founder: authorize the Server deploy of claude/healthkit-evidence-summary-formatting-cleanup (final SHA 4b362591) -- the fix is code/test/review complete but takes effect only when deployed; until then the device keeps showing the raw strings on those surfaces. No Native build is needed for it.",
+    "Task framing correction to carry forward: this class of defect (Evidence summary strings) is Server read-model formatting, not Native; the Native cards were already correct.",
+    "Backlog annotation: the task-excluded Training sites (formatTrainingRecordValue, EvidenceTimelineService.formatTrainingDetail, trainingOverview Active Calories) interpolate HealthKit HKWorkout doubles too, not just manual Training data."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "The prompt-file immutability violation described above.",
-    "Two additional hardening gaps found by independent review of the Server fix, both closed before deployment (see validation.review)."
+    "Root cause location contradicted the task framing: server-side, not Native. No Build 54 needed.",
+    "Independent review found three real gaps in my first pass (two missed in-scope builders, one tie-rounding 1-off); all fixed before completion.",
+    "One environmental UI-test flake on an untouched Training journey during the long full-target run; green in isolation."
   ],
   "backlog": [
-    "Fix the same raw-double-leak pattern at TrainingReadModel.formatNumber, TrainingLoggerView's editable reps/load field, and EvidenceLocalInterpretation.formatNutritionNumber (spawned as a separate task).",
-    "Investigate command_receipts lock-wait cost under a retry burst against real pool size/traffic (spawned as a separate task).",
-    "Auto-foreground 'stale after N minutes' threshold policy -- deliberately deferred; the Founder asked this be derived from measured query/upload cost, and no such telemetry exists yet.",
-    "Close the prompt-file immutability gap in the handoff protocol itself (currently enforced only by the publish tool, not the repository).",
-    "Carried from the prior handoff: wire abandonedBatchCount into a circuit breaker/backoff for generic permanent rejections; namespace daily-aggregate deletions before deletion delivery ships; surface diagnostics fields in the Founder diagnostic screen."
+    "Deploy 4b362591 (Founder go-ahead), then Founder real-device check of Activity/Nutrition Evidence headlines vs cards.",
+    "Training raw-double sites (HealthKit HKWorkout doubles): formatTrainingRecordValue, formatTrainingDetail, trainingOverview Active Calories -- excluded here by task scope.",
+    "Native non-HealthKit raw-double sites from the prior handoff (Training exercise history, Training Logger reps/load field, photo-scanned nutrition prefill) -- separate spawned task.",
+    "Consider a shared Web/Server formatting note so future Evidence strings use HealthKitEvidenceNumberFormatting rather than raw interpolation."
   ],
-  "recommended_next_step": "Founder: install Build 53 from TestFlight, do not enable canary or press manual Sync, open the app normally, and confirm Activity/Nutrition catch up cleanly (optionally using the new Log pull-to-refresh to force an immediate check) with no raw floating-point numbers on either Evidence Report.",
-  "full_report_path": "agent-handoffs/reports/20260923T025256Z-healthkit-build52-real-device-selfheal-failure-fixed-deployed.md",
+  "recommended_next_step": "Founder: approve deploying claude/healthkit-evidence-summary-formatting-cleanup (4b362591); after deploy, open the Activity and Nutrition Evidence Reports and confirm the headline/subheadline/Areas strings now match the cards (e.g. '2406 calories', '782 active cal / 42 min').",
+  "full_report_path": "agent-handoffs/reports/20260923T034214Z-healthkit-evidence-summary-formatting-cleanup-fixed.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
