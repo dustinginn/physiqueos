@@ -29,6 +29,9 @@ const OPEN_ENDED = typeof __OPEN_ENDED__ === "undefined" ? false : __OPEN_ENDED_
 // Workout policy only: comma-separated family scope (e.g. "strength"). Empty
 // means the runner's default (every canonicalizable family).
 const FAMILIES = typeof __FAMILIES__ === "undefined" ? "" : __FAMILIES__;
+// The family restriction the authorization carries into the runner; absent
+// means the runner's default (every canonicalizable family).
+const AUTHORIZED_FAMILIES = FAMILIES ? FAMILIES.split(",").filter(Boolean) : undefined;
 const AUTHORIZATION_REFERENCE = typeof __AUTHORIZATION_REFERENCE__ === "undefined" ? "" : __AUTHORIZATION_REFERENCE__;
 const EXPECTED_JSON = typeof __EXPECTED_JSON__ === "undefined" ? "" : __EXPECTED_JSON__;
 const MARKER = typeof __MARKER__ === "undefined" ? "PHYSIQUEOS_HEALTHKIT_ACTIVATION_SUCCESS" : __MARKER__;
@@ -102,6 +105,7 @@ try {
       domains: DOMAINS.split(",").filter(Boolean),
       effectiveLocalDate: EFFECTIVE,
       ...(OPEN_ENDED ? { openEnded: true } : { endLocalDate: END }),
+      ...(AUTHORIZED_FAMILIES ? { families: AUTHORIZED_FAMILIES } : {}),
       authorizationReference: AUTHORIZATION_REFERENCE,
     },
     action: ACTION,

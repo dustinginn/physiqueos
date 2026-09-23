@@ -550,16 +550,22 @@ describe("prospective (open-ended, Strength-only) Workout policy", () => {
     for (const name of [...SENTINELS, "canonicalEvidenceObjects", "evidencePackages"]) expect(records.snapshot()[name]).toEqual(before[name]);
   });
 
-  it("keeps a cardio workout raw under a Strength-only scope, not permanently, with no canonical record or coexistence", async () => {
+  it("keeps a cardio workout raw under a Strength-only scope with its real reason stored, no canonical record or coexistence", async () => {
     const records = store({ workoutPolicyOverrides: prospective });
     const walk = workout({ externalId: "walk-uuid", activityType: "52", startedAt: `${LATER}T07:00:00-07:00`, endedAt: `${LATER}T07:40:00-07:00`, clientLocalDate: LATER });
     const result = await ingest(records, [walk]);
     expect(result.result.workoutCanonicalizedCount).toBe(0);
-    expect(result.result.observations[0].reconciliation.state).not.toBe("workout_canonicalized");
+    expect(result.result.observations[0].reconciliation).toEqual({ state: "workout_canonicalization_deferred", reason: "family_not_in_activation_scope" });
     const [stored] = records.snapshot().healthKitObservations;
-    expect(stored.reconciliation.state).not.toBe("workout_canonicalized");
+    expect(stored.reconciliation).toEqual({ state: "workout_canonicalization_deferred", reason: "family_not_in_activation_scope" });
     expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
     expect(records.snapshot().healthKitWorkoutLinks).toEqual([]);
+    // Same rule as every raw workout stored under a policy: not reconsidered later.
+    const current = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID });
+    await records.put({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID, expectedVersion: current.version, payload: { ...current, families: ["cardio", "strength"] } });
+    const replay = await ingest(records, [walk], "b2");
+    expect(replay.result.workoutCanonicalizedCount).toBe(0);
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
   });
 
   it("still refuses a workout whose own day is before the effective date (no backfill through an open window)", async () => {

@@ -461,6 +461,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           reconciliation = structuredClone(existing.reconciliation);
         } else if (!existing && workoutAssessment.eligible && classification.family === HealthKitWorkoutFamily.UNSUPPORTED) {
           reconciliation = { state: HealthKitReconciliationState.SOURCE_ONLY, reason: "unsupported_workout_type" };
+        } else if (!existing && workoutAssessment.reason === "family_not_in_activation_scope") {
+          // Stored with its real reason so an audit can count what a family
+          // scope kept raw. Like every raw workout stored under a policy, it is
+          // not reconsidered later: a later policy for this family covers
+          // workouts first uploaded after it.
+          reconciliation = { state: HealthKitReconciliationState.WORKOUT_CANONICALIZATION_DEFERRED, reason: "family_not_in_activation_scope" };
         } else if (!existing && workoutAssessment.eligible) {
           const preview = reconcileHealthKitCanonicalWorkout({
             observation,

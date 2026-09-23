@@ -211,8 +211,8 @@ export async function runHealthKitActivationPolicy({
         // The stored and resolved family scope is exactly what was authorized
         // (an activation without an explicit list means every family).
         familiesAreExactlyAuthorized: action === "activate"
-          ? sameSet(afterPolicy?.families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES, planned.families) &&
-            sameSet(resolved.families, planned.families)
+          ? sameSet(afterPolicy?.families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES, authorization.families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES) &&
+            sameSet(resolved.families, authorization.families ?? HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES)
           : true,
       }
       : {}),
@@ -238,6 +238,9 @@ function planActivation({ kind, policyKind, authorization, policyRecord, current
   }
   if (families !== undefined && !kind.supportsFamilies) {
     return { refusal: `The ${policyKind} policy has no family scope; families apply to the workout policy only.` };
+  }
+  if (families !== undefined && !Array.isArray(families)) {
+    return { refusal: "families must be a list of workout families when provided." };
   }
   // The family scope is always written explicitly so the stored record says
   // what it covers; an authorization without one means every family.

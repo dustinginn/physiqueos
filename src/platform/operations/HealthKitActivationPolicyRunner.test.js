@@ -244,6 +244,11 @@ describe("open-ended (permanent, forward-only) canonicalization", () => {
     });
     expect(invalid.outcome).toBe("refused");
     expect(invalid.reasons[0]).toMatch(/families_invalid/);
+    const nullScope = await runHealthKitActivationPolicy({
+      records, authorization: { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-25", openEnded: true, families: null }, action: "activate", policyKind: "workout",
+    });
+    expect(nullScope.outcome).toBe("refused");
+    expect(nullScope.reasons[0]).toMatch(/families must be a list/);
     expect(records.getMutationCount()).toBe(0);
   });
 

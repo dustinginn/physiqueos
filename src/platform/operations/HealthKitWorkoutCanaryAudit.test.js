@@ -65,6 +65,12 @@ describe("Workout canary audit", () => {
     const prospective = await buildHealthKitPayload({ kind: "policy", policyKind: "workout", sha: SHA, action: "activate", domains: "workout", effective: DAY, openEnded: true, families: "strength" });
     expect(prospective.code).toContain(SHA);
     expect(prospective.marker).toContain("WORKOUT_ACTIVATION_ACTIVATE_DRYRUN");
+    // The family restriction must travel from the build-time define into the
+    // runner's authorization, or a "Strength-only" apply would scope every family.
+    const activationEntry = fs.readFileSync(new URL("../../../scripts/operations/healthKitActivationPolicy.entry.mjs", import.meta.url), "utf8");
+    expect(activationEntry).toMatch(/const AUTHORIZED_FAMILIES = FAMILIES \? FAMILIES\.split\(","\)\.filter\(Boolean\) : undefined;/);
+    expect(activationEntry).toMatch(/\.\.\.\(AUTHORIZED_FAMILIES \? \{ families: AUTHORIZED_FAMILIES \} : \{\}\),\n\s+authorizationReference: AUTHORIZATION_REFERENCE,/);
+    expect(activationEntry).not.toMatch(/OPEN_ENDED_NOT_SUPPORTED_FOR_POLICY_KIND/);
     await expect(buildHealthKitPayload({ kind: "policy", policyKind: "daily", sha: SHA, action: "activate", domains: "activity", effective: DAY, openEnded: true, families: "strength" }))
       .rejects.toThrow(/families/);
     await expect(buildHealthKitPayload({ kind: "policy", policyKind: "workout", sha: SHA, action: "activate", domains: "workout", effective: DAY, openEnded: true, families: "swimming" }))
