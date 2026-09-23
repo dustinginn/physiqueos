@@ -483,6 +483,13 @@ final class HealthKitAutomaticWorkoutFloorEngineTests: XCTestCase {
         // partition above ever reached the uploader.
         let uploadedCount = await harness.uploader.partitions().count
         XCTAssertEqual(uploadedCount, 1)
+
+        // The anchor still advances to exactly what the query returned, even
+        // though one addition was filtered out: a dropped pre-floor workout
+        // is behind the cursor and can never be re-delivered on a later run.
+        let cursor = try await harness.store.authoritativeCursor(for: harness.scope)
+        XCTAssertEqual(cursor?.opaqueAnchorData, AutomaticWorkoutEngineHarness.proposedAnchor)
+        XCTAssertEqual(cursor?.generation, 1)
     }
 
     /// An engine constructed without a floor is byte-for-byte the pre-Build-54
@@ -603,8 +610,11 @@ private actor AutomaticWorkoutUploaderMock: HealthKitObservationUploader {
 }
 
 private final class AutomaticWorkoutEngineHarness {
+    static let proposedAnchor = Data("private-device-anchor".utf8)
+
     let root: URL
     let scope: HealthKitCursorScope
+    let store: FileHealthKitSynchronizationStore
     let query: AutomaticWorkoutQueryMock
     let uploader: AutomaticWorkoutUploaderMock
     let engine: HealthKitSynchronizationEngine
@@ -623,17 +633,18 @@ private final class AutomaticWorkoutEngineHarness {
             stream: stream,
             predicateVersion: HealthKitAutomaticSynchronizationCoordinator.predicateVersion
         )
+        store = FileHealthKitSynchronizationStore(root: root)
         query = AutomaticWorkoutQueryMock(result: .init(
             additions: additions,
             deletions: deletions,
-            proposedAnchorData: Data("private-device-anchor".utf8),
+            proposedAnchorData: Self.proposedAnchor,
             completedAt: HealthKitAutomaticWorkoutFloorEngineTests.now
         ))
         uploader = AutomaticWorkoutUploaderMock()
         engine = HealthKitSynchronizationEngine(
             queryClient: query,
             observerClient: AutomaticWorkoutObserverMock(),
-            store: FileHealthKitSynchronizationStore(root: root),
+            store: store,
             uploader: uploader,
             featureGate: .n1Automatic,
             workoutActivationFloor: floor,

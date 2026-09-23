@@ -165,4 +165,34 @@ final class HealthKitQueryClientDefaultBoundsTests: XCTestCase {
         XCTAssertNotNil(SystemHealthKitQueryClient.samplePredicate(for: .workoutFloor(floor)))
         XCTAssertNotNil(SystemHealthKitQueryClient.samplePredicate(for: .explicit(explicitBounds())))
     }
+
+    /// The floor predicate is END-date semantics on purpose (`.strictEndDate`
+    /// with no upper bound): a session that started before the floor and
+    /// ended after it must still be delivered, and the Server decides its
+    /// local day. A regression to `.strictStartDate` (or to the overlap
+    /// default, which also mentions `startDate` once an upper bound exists)
+    /// changes the `predicateFormat` and fails here.
+    func testWorkoutFloorPredicateBoundsByEndDateOnlyNeverStartDate() throws {
+        let floor = ISO8601DateFormatter().date(from: "2026-09-23T07:00:00Z")!
+        let predicate = try XCTUnwrap(SystemHealthKitQueryClient.samplePredicate(for: .workoutFloor(floor)))
+        let format = predicate.predicateFormat
+        XCTAssertTrue(format.contains("endDate"), format)
+        XCTAssertFalse(format.contains("startDate"), format)
+        XCTAssertTrue(format.contains(">="), format)
+        XCTAssertTrue(format.contains(String(format: "%.6f", floor.timeIntervalSinceReferenceDate)), format)
+    }
+
+    /// The canary's explicit bounds keep their pre-Build-54 shape exactly:
+    /// `.strictStartDate` over `[startDateInclusive, endDateExclusive)`,
+    /// i.e. both operands are on `startDate`.
+    func testExplicitBoundsPredicateKeepsStartDateSemantics() throws {
+        let bounds = explicitBounds()
+        let predicate = try XCTUnwrap(SystemHealthKitQueryClient.samplePredicate(for: .explicit(bounds)))
+        let format = predicate.predicateFormat
+        XCTAssertTrue(format.contains("startDate >="), format)
+        XCTAssertTrue(format.contains("startDate <"), format)
+        XCTAssertFalse(format.contains("endDate"), format)
+        XCTAssertTrue(format.contains(String(format: "%.6f", bounds.startDateInclusive.timeIntervalSinceReferenceDate)), format)
+        XCTAssertTrue(format.contains(String(format: "%.6f", bounds.endDateExclusive.timeIntervalSinceReferenceDate)), format)
+    }
 }
