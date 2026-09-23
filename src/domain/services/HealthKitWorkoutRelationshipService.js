@@ -37,9 +37,20 @@ export function getHealthKitWorkoutLinkClaimId(kind, subjectId) {
   return `${HEALTHKIT_WORKOUT_LINK_CLAIM_ID_PREFIX}${kind === "workout" ? "w" : "s"}_${digest}`;
 }
 
-/** Confirm a candidate (or relink an unlinked link). Idempotent for an already confirmed link. */
+/**
+ * Confirm a candidate (or relink an unlinked link). Idempotent for an already
+ * confirmed link. Fails closed before any read: a confirmation is an explicit,
+ * attributable act, so it requires a named actor and a valid time.
+ */
 export async function confirmHealthKitWorkoutRelationship({ records, ownerUserId, linkId, by, now } = {}) {
-  const at = new Date(now).toISOString();
+  if (!by || typeof by !== "object" || !String(by.kind ?? "").trim() || !String(by.ref ?? "").trim()) {
+    throw new HealthKitWorkoutLinkError("LINK_ACTOR_REQUIRED", "A confirmation requires an attributable actor ({ kind, ref }).");
+  }
+  const parsed = new Date(now);
+  if (now == null || Number.isNaN(parsed.getTime())) {
+    throw new HealthKitWorkoutLinkError("LINK_TIME_INVALID", "A confirmation requires a valid time.");
+  }
+  const at = parsed.toISOString();
   const link = await records.get({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION, recordId: linkId });
   if (!link) throw new HealthKitWorkoutLinkError("LINK_NOT_FOUND", "The workout link does not exist.");
   if (link.status === HealthKitWorkoutLinkStatus.CONFIRMED) return Object.freeze({ outcome: "already_confirmed", link });

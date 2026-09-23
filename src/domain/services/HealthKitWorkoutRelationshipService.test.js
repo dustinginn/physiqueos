@@ -183,6 +183,55 @@ describe("guarded relationship confirmation", () => {
     expect(corrupt).toMatchObject({ workoutsWithMultipleConfirmedLinks: 1, confirmedLinksWithoutHeldClaims: 2, heldClaimsWithoutConfirmedLink: 1 });
     expect(isHealthKitDerivedRecord({ id: getHealthKitWorkoutLinkClaimId("workout", "healthkit_canonical_workout_x") })).toBe(true);
   });
+
+  it("fails closed before any read without an attributable actor or a valid time", async () => {
+    const { records, link } = await world({ sessions: [session("S1", "10:01", "10:59")], workouts: [["u1", "10:00", "11:00"]] });
+    const before = records.snapshot();
+    for (const by of [undefined, null, {}, { kind: "founder" }, { kind: "", ref: "x" }, "founder"]) {
+      await expect(confirmHealthKitWorkoutRelationship({ records, ownerUserId: OWNER, linkId: link("u1", "S1"), by, now: T0 }))
+        .rejects.toMatchObject({ code: "LINK_ACTOR_REQUIRED" });
+    }
+    for (const now of [undefined, null, "not-a-date", Number.NaN]) {
+      await expect(confirmHealthKitWorkoutRelationship({ records, ownerUserId: OWNER, linkId: link("u1", "S1"), by: FOUNDER, now }))
+        .rejects.toMatchObject({ code: "LINK_TIME_INVALID" });
+    }
+    expect(records.snapshot()).toEqual(before);
+    expect(records.getMutationCount()).toBe(0);
+  });
+
+  it("releases both freshly held claims when the link write itself conflicts, surfacing a typed conflict, never a half-held state", async () => {
+    // Reviewer-noted gap: the compensation branch for a link-record version
+    // conflict (e.g. the ingest matcher refreshed the candidate between our read
+    // and our write) had no coverage. It must leave NO held claim behind.
+    const { records, link } = await world({ sessions: [session("S1", "10:01", "10:59")], workouts: [["u1", "10:00", "11:00"]] });
+    const linkId = link("u1", "S1");
+    let armed = true;
+    const racing = {
+      ...records,
+      async put(input) {
+        if (armed && input.collection === "healthKitWorkoutLinks" && input.recordId === linkId) {
+          armed = false;
+          // Simulate the concurrent refresh: bump the stored version first, then
+          // let the real store reject the stale expectedVersion.
+          const current = await records.get({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: linkId });
+          await records.put({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: linkId, expectedVersion: current.version, payload: { ...current, confidence: 91 } });
+        }
+        return records.put(input);
+      },
+    };
+    await expect(confirmWith(racing, linkId)).rejects.toMatchObject({ status: 409, code: "EXPECTED_VERSION_CONFLICT" });
+    const after = records.snapshot();
+    expect(after.healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(0);
+    expect(after.healthKitWorkoutLinkClaims.every((claim) => claim.status === "released" && claim.holderLinkId === linkId)).toBe(true);
+    const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: linkId });
+    expect(stored.status).toBe("candidate");
+    expect(findHealthKitWorkoutRelationshipViolations({ links: after.healthKitWorkoutLinks, claims: after.healthKitWorkoutLinkClaims }))
+      .toEqual({ workoutsWithMultipleConfirmedLinks: 0, sessionsWithMultipleConfirmedLinks: 0, confirmedLinksWithoutHeldClaims: 0, heldClaimsWithoutConfirmedLink: 0 });
+    // The released claims are reusable: a retry against the refreshed record confirms cleanly.
+    const retry = await confirm(records, linkId);
+    expect(retry.outcome).toBe("confirmed");
+    expect(records.snapshot().healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
+  });
 });
 
 async function confirm(records, linkId) {

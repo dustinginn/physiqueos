@@ -318,6 +318,30 @@ describe("link safety refinements", () => {
     expect(refreshHealthKitWorkoutLinkCandidate(founderUnlinked, { assessment: better, now: NOW }).status).toBe("unlinked");
   });
 
+  it("never restores a system-released link over an established confirmed link on either side, and never throws (reviewer-noted restore-collides branch)", () => {
+    const hk = hkStrength();
+    const assessment = assess(hk, [logger("session-a", "10:01", "10:59")]);
+    const link = createHealthKitWorkoutLinkCandidate({ canonicalWorkout: hk, assessment, ownerUserId: OWNER, now: NOW });
+    const released = unlinkHealthKitWorkoutLink(link, { by: { kind: "system_matcher" }, now: NOW, reason: "assessment_changed" });
+    expect(released.status).toBe("unlinked");
+
+    // The same Apple workout is now confirmed to a different Logger session:
+    // the released link must stay released. An ingest batch must never fail here.
+    const workoutTaken = { id: "other-link-1", status: "confirmed", canonicalWorkoutId: link.canonicalWorkoutId, loggerSessionCanonicalId: "session-z" };
+    expect(refreshHealthKitWorkoutLinkCandidate(released, { assessment, now: NOW, existingLinks: [released, workoutTaken] })).toBe(released);
+
+    // The same Logger session is now confirmed to a different Apple workout: same rule.
+    const sessionTaken = { id: "other-link-2", status: "confirmed", canonicalWorkoutId: "healthkit_canonical_workout_other", loggerSessionCanonicalId: link.loggerSessionCanonicalId };
+    expect(refreshHealthKitWorkoutLinkCandidate(released, { assessment, now: NOW, existingLinks: [released, sessionTaken] })).toBe(released);
+
+    // An unrelated confirmed link, or a merely-candidate link on the same side, does not block the restore.
+    const unrelated = { id: "other-link-3", status: "confirmed", canonicalWorkoutId: "healthkit_canonical_workout_unrelated", loggerSessionCanonicalId: "session-unrelated" };
+    const candidateOnly = { ...workoutTaken, id: "other-link-4", status: "candidate" };
+    const restored = refreshHealthKitWorkoutLinkCandidate(released, { assessment, now: NOW, existingLinks: [released, unrelated, candidateOnly] });
+    expect(restored.status).toBe("candidate");
+    expect(restored.statusHistory.at(-1)).toMatchObject({ reason: "assessment_restored" });
+  });
+
   it("finds a re-created or second-source workout as a possible duplicate, and nothing unrelated", () => {
     const original = canonical();
     const recreated = canonical({ externalId: "recreated-uuid" });

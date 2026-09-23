@@ -27,6 +27,8 @@ const ALLOWED = new Set([
   "platform/operations/HealthKitCanonicalAcceptanceAudit.js",
   "platform/operations/HealthKitGraduationPolicyRunner.js",
   "platform/operations/HealthKitWorkoutCanaryAudit.js",
+  // Guarded, explicitly authorized link confirmation: the only production caller of the relationship service.
+  "platform/operations/HealthKitWorkoutLinkConfirmationRunner.js",
 ]);
 const NEEDLES = [
   "healthKitCanonicalDays", "healthKitObservations", "HEALTHKIT_CANONICAL_DAY_COLLECTION",
