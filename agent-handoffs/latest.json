@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T04:05:37Z",
+  "generated_at_utc": "2026-09-23T04:30:23Z",
   "task": {
-    "id": "healthkit-formatting-deploy-workout-readiness-20260923",
-    "title": "Deploy HealthKit formatting fix and audit Workout canary readiness",
+    "id": "healthkit-sep22-workout-canary-activation-20260923",
+    "title": "Activate and audit Sep 22 Workout canary",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "ccff693b61c98737b670be620f7916c375cb37ce",
+    "base_sha": "4b362591cb5f80c599f8f45eb7f392de7c44a36f",
     "final_sha": "4b362591cb5f80c599f8f45eb7f392de7c44a36f",
     "production_server_sha": "4b362591cb5f80c599f8f45eb7f392de7c44a36f",
     "production_deployment": "d4754b09-ff14-4c1f-ab9b-8d4ea5814d85",
@@ -17,45 +17,45 @@
     "native_build": 53
   },
   "result": {
-    "summary": "Part 1: the reviewed Evidence formatting fix (4b362591) is deployed with the Founder's chat authorization -- fast-forward push, apps update --spec (only PHYSIQUEOS_GIT_SHA/BUILD_ID changed), force-rebuild after the update reused the old commit. Deployment d4754b09 ACTIVE, source_commit_hash 4b362591, health 200/200, runtime label corrected on web+worker (it had been stale at 924d5e55 since the previous deploy -- found and fixed here). Zero-write proven: Sep 22 canonical acceptance audit before/after shows identical policy, canonical-day revisions, observation states, strategic counts, all 26 strategic digests and migration count. Part 2: read-only Workout canary readiness for Sep 22 is GREEN -- code audit passes every flag with file:line evidence, and the production Workout audit shows policy OFF, 0 workout observations, 0 canonical workouts/links/claims, 1 Logger strength session, 0 ambiguous auto-links, 0 strategic leakage. Nothing activated; Founder not asked to sync. Exact bounded policy values, dry-run/zero-write checks, Founder action and post-sync audit are specified, not executed.",
+    "summary": "Sep 22 Workout canary executed end to end and the Strength canary is ACCEPTED. Pre-activation audits showed no drift from GREEN; the established dry-run predicted the exact-date policy with 0 raw workouts in window; the Founder authorized in chat; the guarded apply wrote exactly the policy record + one audit row with all 12 invariants true. The Founder's Build 53 control was disabled at first: diagnosed from source as the screen's master 'Enable this canary' toggle plus a per-visit canary-only authorization request (in-memory, uploads nothing) -- the task's 'do not touch that toggle' instruction was based on a mistaken model of the UI; corrected instruction given, single tap performed: 3 workouts uploaded, 0 pending, 3 canonicalized. Post-sync audit: 1 strength (traditional_strength_training) matched the existing Logger session as a confident_match candidate (99), never auto-confirmed; 2 walks canonical cardio, no_match, no links; 0 ambiguous auto-links; Logger evidence digest/rows identical (no mutation, no duplicate session); briefings/analyses digests identical; all quarantined, strategic leakage 0; 0 x 409, 0 x INTERNAL_ERROR (replays graceful). Activity/Nutrition policy and Nutrition day identical; the Activity day advanced only via its own automatic sync (only activity_summary states changed). No code fix, no second sync, no Native build needed.",
     "success": true,
     "production_mutated": true,
-    "deployed": true,
+    "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Minimal deploy revalidation at 4b362591 before acting: formatting regression tests 9/9, phase3 282/283 (the one failure is the pre-existing gitignored private/founder/runtime-store.json fixture), worktree clean; candidate confirmed to be exactly the three independently reviewed commits with no drift and no db/migration files. No Native change; Native untouched at 1c57556f."
+      "summary": "No code changed. Runtime proofs instead: dry-run (READ ONLY + ROLLBACK) predicted the exact policy; apply's in-transaction invariants 12/12 true (policyIsExactlyTheAuthorizedRecord, strategicEligibilityQuarantined, noBackfillRequested, linkAutoConfirmOff, auditRowPresent, otherPolicyUntouched, observations/canonicalDays/canonicalWorkouts/links/claims/evidence unchanged); post-activation and post-sync Workout + canonical acceptance audits under the live SHA 4b362591 with --no-values and hashed identifiers."
     },
     "review": {
       "status": "approved",
-      "summary": "Deployed candidate carries the two adversarial review passes from the prior task (all findings fixed, final re-audit clean). Part 2 used a fresh-context read-only code audit in an isolated worktree (Server at ccff693b, Native at 1c57556f), every claim cited file:line; overall GREEN with one operational precondition: activate the Sep 22 workout policy BEFORE the Founder taps the control, or the day's workouts are stored raw and never reconsidered."
+      "summary": "Executed exactly the GREEN readiness specification from the prior independently audited report. The one deviation (enabling the Founder Canary master toggle) was diagnosed from Build 53 source before instructing the Founder: it is a pure feature gate with no automatic behavior; the forbidden Activity/Nutrition validation buttons were not tapped. Outcome matches the designed matching semantics in every audited dimension."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Before/after Sep 22 canonical acceptance audits (REPEATABLE READ READ ONLY, explicit ROLLBACK, --no-values): policy, canonical-day revisions (activity 16, nutrition 2), observation-state histogram, strategic counts (all 0), all 26 strategic digests and migrations (14) identical. Workout audit under the true SHA: policy OFF, 0 observations, 0 canonical workouts, 0 links, 0 claims, oneToOneIntegrity all zero, ambiguousAutoLinked 0, 1 Logger strength session. No HealthKit data mutated to test formatting. No schema change. Workout policy not activated. Spec secrets are DigitalOcean-encrypted values and were never written into any handoff."
+      "summary": "Writes were exactly the authorized set: one workout policy record + one activation audit row (apply), then the Founder's single sync creating 3 raw workout observations, 3 canonical workouts, 1 candidate link. Everything else proven unchanged before/after: daily A/N policy, Nutrition Sep 22 day, all 26 strategic-collection digests (goals, Confidence, briefings, plans, protocols, all Evidence incl. Training/DEXA/Photo), migrations 14. Activity day revisions 18->21 attributed to the ordinary automatic Activity sync on a live day (only activity_summary observation states changed; provenance/coexistence unchanged; Workout path never writes canonical days). No canary/manual A/N sync used; Workout activation remains bounded to 2026-09-22; no auto-confirm; no V3/Confidence/briefing eligibility."
     }
   },
   "decisions_required": [
-    "Founder: when convenient, open the Activity and Nutrition Evidence Reports on Build 53 and confirm the headline/subheadline/Activity Areas strings now match the cards (e.g. '2406 calories', '782 active cal / 42 min'). No reinstall needed; it is a Server change.",
-    "Founder/agent: authorize the next slice -- exact-date Sep 22 Workout canary activation (policy-kind workout, effective 2026-09-22, end 2026-09-22, quarantined, no backfill, no auto-confirm) with the dry-run/zero-write sequence in the report, followed by the single 'Sync workouts for this day' tap. Activation must precede the tap.",
-    "Process: future Server deploys must include the apps update --spec step that bumps PHYSIQUEOS_GIT_SHA/BUILD_ID; a force-rebuild alone leaves the runtime label stale and the audit identity gate refusing."
+    "Next slice: explicit Founder confirmation of the strength candidate link through the guarded service (registered canonical port + claim row), addressing the reviewer's pre-canary note (restore of a system-released link can throw a one-to-one violation) first. Not executed here.",
+    "Whether to leave the Sep 22 Workout policy active (bounded, harmless: window is closed to other dates) or deactivate it via the same guarded path now that the canary is complete.",
+    "Task-authoring correction: future canary device instructions must include enabling the Founder Canary master toggle and tapping 'Request Apple Health authorization' in the same visit; the prohibition should be on the Activity/Nutrition validation BUTTONS, not the toggle."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "The previous deploy (0bdc1748, ccff693b) had left PHYSIQUEOS_GIT_SHA/BUILD_ID at 924d5e55, so production self-identified as the wrong commit and the zero-write audits' RUNTIME_SHA_MISMATCH gate refused under the true SHA. Corrected by this deploy; the gate was not bypassed.",
-    "The 'env-only spec update reuses the old commit' gotcha reproduced exactly (deployment 6c997fe9 built ccff693b); force-rebuild d4754b09 superseded it with 4b362591.",
-    "Build 53 emits no sourceRevision for workouts, so a re-query producing different aggregates for the same HKWorkout UUID is refused (409) rather than applied -- fail-closed, not blocking the canary."
+    "Build 53 Workout Sync control is gated behind the section's 'Enable this canary' toggle and a canary-only authorization instance; both in-memory, reset on relaunch; enabling uploads nothing. UX gap, not a code defect.",
+    "3 workouts on Sep 22, not 2: one strength session and two walks; both walks correctly separate.",
+    "Server log around the tap: 4 committed + 4 replayed ingest receipts with no 409/500 -- the idempotency-race fix deployed earlier prevented the previously observed spurious 500s."
   ],
   "backlog": [
-    "Sep 22 Workout canary activation + single tap + post-sync audit (next authorized slice; fully specified in the report).",
-    "Add the spec env bump to the documented deploy checklist so the runtime label cannot drift again.",
-    "Workout sourceRevision on Native so revised HKWorkout aggregates can be applied rather than refused (post-canary).",
-    "Training raw-double sites (HealthKit HKWorkout doubles) and Native non-HealthKit raw-double sites -- unchanged, on the existing backlog."
+    "Strength link confirmation slice (guarded confirm command; fix restore/one-to-one violation path first).",
+    "Bounded single-date cardio canary, then Workout graduation decisions (not executed).",
+    "Native: emit sourceRevision for workouts (revised HKWorkout aggregates currently 409 fail-closed); move the Workout control out from behind the 'Activity validation' gate.",
+    "Decide on deactivating the Sep 22 workout policy record now that the canary is done."
   ],
-  "recommended_next_step": "Founder: visually confirm the Evidence headlines on Build 53, then authorize the Sep 22 Workout canary activation slice (activate policy for exactly 2026-09-22 via dry-run then apply, re-audit, then tap 'Sync workouts for this day' once).",
-  "full_report_path": "agent-handoffs/reports/20260923T040537Z-healthkit-formatting-deployed-workout-readiness-green.md",
+  "recommended_next_step": "Founder: authorize the strength link-confirmation slice (after the restore/one-to-one fix), or leave the candidate as-is; no further device action is needed for this canary.",
+  "full_report_path": "agent-handoffs/reports/20260923T043023Z-healthkit-sep22-workout-canary-accepted.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

@@ -4,7 +4,7 @@
   "task": {
     "id": "healthkit-sep22-workout-canary-activation-20260923",
     "title": "Activate and audit Sep 22 Workout canary",
-    "status": "claimed"
+    "status": "completed"
   },
   "target": {
     "agent": "claude",
@@ -32,6 +32,9 @@
   },
   "lifecycle": {
     "claimed_by": "claude",
-    "claimed_at_utc": "2026-09-23T04:12:59Z"
+    "claimed_at_utc": "2026-09-23T04:12:59Z",
+    "completed_at_utc": "2026-09-23T04:30:40Z",
+    "completion_status": "completed",
+    "completion_handoff_path": "agent-handoffs/reports/20260923T043023Z-healthkit-sep22-workout-canary-accepted.md"
   }
 }
