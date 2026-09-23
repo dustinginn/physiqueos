@@ -35,16 +35,23 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
     private let calendar: Calendar
     private let now: @Sendable () -> Date
     private let activityLookbackDays: Int
+    /// `HealthKitWorkoutActivationFloor.startOfDay` in production; `nil`
+    /// (no floor, the pre-Build-54 behavior) for tests and any caller that
+    /// does not opt in. Consulted only by the per-sample branch of `execute`,
+    /// only for `.workouts`, and only when the caller passed no bounds.
+    private let workoutFloor: Date?
 
     init(
         store: HKHealthStore = HKHealthStore(),
         calendar: Calendar = .autoupdatingCurrent,
         activityLookbackDays: Int = 30,
+        workoutFloor: Date? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.store = store
         self.calendar = calendar
         self.activityLookbackDays = activityLookbackDays
+        self.workoutFloor = workoutFloor
         self.now = now
     }
 
@@ -75,16 +82,13 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
             throw HealthKitSyncError.corruptCursor
         }
 
+        let predicate = Self.samplePredicate(
+            for: Self.samplePredicateDecision(stream: stream, requested: bounds, workoutFloor: workoutFloor)
+        )
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKAnchoredObjectQuery(
                 type: sampleType,
-                predicate: bounds.map {
-                    HKQuery.predicateForSamples(
-                        withStart: $0.startDateInclusive,
-                        end: $0.endDateExclusive,
-                        options: [.strictStartDate]
-                    )
-                },
+                predicate: predicate,
                 anchor: anchor,
                 limit: HKObjectQueryNoLimit
             ) { _, samples, deletedObjects, proposedAnchor, error in
@@ -120,6 +124,51 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                 }
             }
             store.execute(query)
+        }
+    }
+
+    /// How the per-sample (`HKAnchoredObjectQuery`) branch of `execute`
+    /// bounds a query. Pure and HealthKit-independent so it is directly
+    /// unit-testable without an `HKHealthStore`.
+    enum SamplePredicateDecision: Equatable, Sendable {
+        /// No predicate: anchor-only, the pre-Build-54 behavior for every
+        /// per-sample stream and still the behavior for every non-Workout
+        /// stream and for a client constructed without a floor.
+        case unbounded
+        /// Caller-supplied bounds (the Founder canary paths) always win,
+        /// exactly as before: `[startDateInclusive, endDateExclusive)` with
+        /// `.strictStartDate`.
+        case explicit(HealthKitQueryBounds)
+        /// `.workouts` with no caller bounds and a configured floor: the
+        /// automatic path's anchor-less first run. `[floor, +inf)` by END
+        /// date (`.strictEndDate`) so a session that started before the
+        /// floor and ended after it is still delivered; the Server decides
+        /// its local day.
+        case workoutFloor(Date)
+    }
+
+    static func samplePredicateDecision(
+        stream: HealthKitSynchronizationStream,
+        requested: HealthKitQueryBounds?,
+        workoutFloor: Date?
+    ) -> SamplePredicateDecision {
+        if let requested { return .explicit(requested) }
+        if stream == .workouts, let workoutFloor { return .workoutFloor(workoutFloor) }
+        return .unbounded
+    }
+
+    static func samplePredicate(for decision: SamplePredicateDecision) -> NSPredicate? {
+        switch decision {
+        case .unbounded:
+            nil
+        case let .explicit(bounds):
+            HKQuery.predicateForSamples(
+                withStart: bounds.startDateInclusive,
+                end: bounds.endDateExclusive,
+                options: [.strictStartDate]
+            )
+        case let .workoutFloor(floor):
+            HKQuery.predicateForSamples(withStart: floor, end: nil, options: [.strictEndDate])
         }
     }
 

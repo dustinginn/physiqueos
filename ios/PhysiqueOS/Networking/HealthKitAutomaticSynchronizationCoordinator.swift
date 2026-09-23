@@ -12,7 +12,13 @@ protocol HealthKitAutomaticSynchronizing: Sendable {
 
 extension HealthKitSynchronizationEngine: HealthKitAutomaticSynchronizing {}
 
-/// The permanent, background-eligible Activity + Nutrition ingestion path.
+/// The permanent, background-eligible Activity + Nutrition + Workouts
+/// ingestion path. Workouts (`HKWorkout` samples) are floor-bounded: the
+/// automatic path never sweeps a workout that ended before the Founder-local
+/// activation date in `HealthKitWorkoutActivationFloor` (enforced twice --
+/// in `SystemHealthKitQueryClient`'s anchor-less predicate and again in
+/// `HealthKitSynchronizationEngine.synchronize`), so the first anchor-less
+/// catch-up can never upload pre-activation history.
 ///
 /// Independent of the Founder Production diagnostic screen and its local
 /// `canaryEnabled` toggle -- neither is consulted here, and this coordinator
@@ -31,7 +37,7 @@ extension HealthKitSynchronizationEngine: HealthKitAutomaticSynchronizing {}
 ///      `authorizationWasRequested` flag is not, since it is fresh in-memory
 ///      state on every launch).
 ///   2. Once available, register the local observer and iOS background
-///      delivery for Activity and Nutrition (both idempotent; a duplicate
+///      delivery for Activity, Nutrition, and Workouts (both idempotent; a duplicate
 ///      registration is a no-op, confirmed by reading
 ///      `HealthKitSynchronizationEngine.startObserving` and
 ///      `SystemHealthKitObserverClient.enableBackgroundDelivery`).
@@ -87,7 +93,12 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     /// stuck: see `HealthKitSynchronizationEngine.deliverPending`'s
     /// abandon-on-rejection recovery, the other half of this fix.
     static let externalIDNamespace = "automatic"
-    static let streams: [HealthKitSynchronizationStream] = [.activitySummary, .nutritionDailyTotal]
+    /// The two daily-aggregate streams first, then per-sample Workouts. The
+    /// Workout stream is the only one here with a native HealthKit anchor,
+    /// and therefore the only one whose first anchor-less run would
+    /// otherwise return ALL history -- which is exactly what
+    /// `HealthKitWorkoutActivationFloor` prevents.
+    static let streams: [HealthKitSynchronizationStream] = [.activitySummary, .nutritionDailyTotal, .workouts]
 
     private let authorization: any HealthKitCanaryAuthorizationCoordinating
     private let synchronizer: any HealthKitAutomaticSynchronizing
@@ -193,6 +204,59 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         }
         lastBootstrapOutcome = outcome
         return outcome
+    }
+}
+
+/// The device-side floor under which the automatic path never uploads an
+/// `HKWorkout`: the Founder-local calendar date 2026-09-23.
+///
+/// This mirrors the Server's prospective Strength-workout activation policy
+/// (its `effectiveLocalDate`): the Server remains the authority and
+/// independently refuses to canonicalize anything earlier, so this floor
+/// is not what makes pre-activation history safe -- it is what keeps the
+/// device from ever *sending* it. Without it, the very first anchor-less
+/// `HKAnchoredObjectQuery` for the Workout stream (a fresh install, or any
+/// cursor reset via `resetCursorForBoundedRecovery`) would sweep every
+/// workout HealthKit has ever stored and upload years of history.
+///
+/// "Founder-local" is the device's current time zone (the same zone the
+/// canary's `HealthKitActivityValidationWindow.queryBounds` resolves its
+/// local-day bounds through): the floor instant is the start of that day in
+/// that zone. Day arithmetic is pinned to the Gregorian calendar so a
+/// non-Gregorian device calendar setting can never reinterpret the fixed
+/// year/month/day.
+///
+/// Comparison is by END instant, on purpose: a session that started late on
+/// 2026-09-22 and ended after local midnight is still delivered, and the
+/// Server decides which local day it belongs to. Never compare
+/// `occurrence.localDate`, which is start-based.
+struct HealthKitWorkoutActivationFloor: Equatable, Sendable {
+    static let localDate = "2026-09-23"
+    private static let dateComponents = DateComponents(year: 2026, month: 9, day: 23)
+
+    /// Start of the activation day in the floor's time zone.
+    let startOfDay: Date
+    let timeZoneIdentifier: String
+
+    /// The production floor, resolved in the device's current time zone.
+    static var current: HealthKitWorkoutActivationFloor { HealthKitWorkoutActivationFloor() }
+
+    init(calendar: Calendar = .autoupdatingCurrent) {
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        // A fixed, valid Gregorian date always resolves; the fallback fails
+        // CLOSED (nothing ever passes a `.distantFuture` floor) rather than
+        // open, so an impossible calendar failure can never widen the sweep.
+        self.startOfDay = gregorian.date(from: Self.dateComponents) ?? .distantFuture
+        self.timeZoneIdentifier = gregorian.timeZone.identifier
+    }
+
+    /// Whether a workout that ended at `endedAt` is on or after the floor.
+    /// An unknown end instant cannot be proven post-activation and is
+    /// refused (fail closed); every real `HKWorkout` carries an `endDate`.
+    func admits(endedAt: Date?) -> Bool {
+        guard let endedAt else { return false }
+        return endedAt >= startOfDay
     }
 }
 

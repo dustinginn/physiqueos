@@ -9,6 +9,11 @@ actor HealthKitSynchronizationEngine {
     private let batchBuilder: HealthKitBatchBuilder
     private let availability: @Sendable () -> HealthKitAvailability
     private let now: @Sendable () -> Date
+    /// Defense-in-depth for the automatic (`synchronize`) Workout path only:
+    /// `nil` (no filtering, the pre-Build-54 behavior) unless the owner opts
+    /// in, which `AppEnvironment` does for the automatic engine and not for
+    /// the canary's. The explicit canary paths below never consult it.
+    private let workoutActivationFloor: HealthKitWorkoutActivationFloor?
     private var registrations: [HealthKitCursorScope: HealthKitObserverRegistration] = [:]
 
     init(
@@ -18,6 +23,7 @@ actor HealthKitSynchronizationEngine {
         uploader: any HealthKitObservationUploader,
         featureGate: HealthKitFeatureGate = .n0Disabled,
         batchBuilder: HealthKitBatchBuilder = HealthKitBatchBuilder(),
+        workoutActivationFloor: HealthKitWorkoutActivationFloor? = nil,
         availability: @escaping @Sendable () -> HealthKitAvailability = { .availableAuthorizationNotRequested },
         now: @escaping @Sendable () -> Date = Date.init
     ) {
@@ -27,6 +33,7 @@ actor HealthKitSynchronizationEngine {
         self.uploader = uploader
         self.featureGate = featureGate
         self.batchBuilder = batchBuilder
+        self.workoutActivationFloor = workoutActivationFloor
         self.availability = availability
         self.now = now
     }
@@ -80,6 +87,14 @@ actor HealthKitSynchronizationEngine {
 
     /// Runs one incremental query. The completion is invoked immediately
     /// after atomic local staging and before any network upload begins.
+    ///
+    /// For `.workouts`, additions are re-filtered against
+    /// `workoutActivationFloor` (when configured) AFTER the query client
+    /// returns: the client's own floor predicate is the first line, this is
+    /// the second, so a client constructed without the floor, or a future
+    /// predicate change, still cannot stage pre-activation history. The
+    /// proposed anchor is kept as returned so filtered-out samples are never
+    /// re-delivered on the next run.
     func synchronize(
         scope: HealthKitCursorScope,
         stagingCompletion: (@Sendable () -> Void)? = nil
@@ -92,9 +107,9 @@ actor HealthKitSynchronizationEngine {
             return
         }
         var cursor = try await store.authoritativeCursor(for: scope)
-        let result: HealthKitAnchoredQueryResult
+        let raw: HealthKitAnchoredQueryResult
         do {
-            result = try await queryClient.execute(
+            raw = try await queryClient.execute(
                 stream: scope.stream,
                 after: cursor?.opaqueAnchorData,
                 bounds: nil
@@ -102,8 +117,9 @@ actor HealthKitSynchronizationEngine {
         } catch HealthKitSyncError.corruptCursor {
             try await store.resetCursorForBoundedRecovery(for: scope)
             cursor = nil
-            result = try await queryClient.execute(stream: scope.stream, after: nil, bounds: nil)
+            raw = try await queryClient.execute(stream: scope.stream, after: nil, bounds: nil)
         }
+        let result = applyWorkoutActivationFloor(to: raw, scope: scope)
         try await store.recordSuccessfulQuery(for: scope, at: result.completedAt)
         let batch = try batchBuilder.build(
             scope: scope,
@@ -114,6 +130,26 @@ actor HealthKitSynchronizationEngine {
         try await store.stage(batch)
         stagingCompletion?()
         if featureGate.allows(.serverUpload) { try await deliverPending(scope: scope) }
+    }
+
+    /// Drops Workout additions that ENDED before the activation floor. Only
+    /// the automatic incremental path calls this; the canary paths bind
+    /// their own exact-day windows. Deletions are passed through untouched:
+    /// `HealthKitBatchBuilder` already defers every Workout deletion locally
+    /// (`server_deletion_contract_deferred`), so none is ever sent.
+    private func applyWorkoutActivationFloor(
+        to result: HealthKitAnchoredQueryResult,
+        scope: HealthKitCursorScope
+    ) -> HealthKitAnchoredQueryResult {
+        guard scope.stream == .workouts, let floor = workoutActivationFloor else { return result }
+        let admitted = result.additions.filter { floor.admits(endedAt: $0.occurrence.endedAt) }
+        guard admitted.count != result.additions.count else { return result }
+        return HealthKitAnchoredQueryResult(
+            additions: admitted,
+            deletions: result.deletions,
+            proposedAnchorData: result.proposedAnchorData,
+            completedAt: result.completedAt
+        )
     }
 
     /// Explicit foreground-only Founder canary path. The cursor scope binds

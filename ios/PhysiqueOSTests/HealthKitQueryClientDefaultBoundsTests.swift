@@ -100,4 +100,69 @@ final class HealthKitQueryClientDefaultBoundsTests: XCTestCase {
 
         XCTAssertEqual(bounds, explicit)
     }
+
+    // MARK: - samplePredicateDecision: the Workout activation floor seam
+
+    private func explicitBounds() -> HealthKitQueryBounds {
+        HealthKitQueryBounds(
+            startDateInclusive: ISO8601DateFormatter().date(from: "2026-09-11T07:00:00Z")!,
+            endDateExclusive: ISO8601DateFormatter().date(from: "2026-09-12T07:00:00Z")!,
+            startLocalDate: "2026-09-11",
+            endLocalDate: "2026-09-11",
+            timeZoneIdentifier: "America/Los_Angeles"
+        )
+    }
+
+    /// The automatic path (`bounds: nil`) on the Workout stream with a
+    /// configured floor is the ONE case that gets the floor predicate --
+    /// the first anchor-less run would otherwise sweep all workout history.
+    func testFloorAppliesOnlyToWorkoutsWithNilBounds() {
+        let floor = ISO8601DateFormatter().date(from: "2026-09-23T07:00:00Z")!
+        XCTAssertEqual(
+            SystemHealthKitQueryClient.samplePredicateDecision(stream: .workouts, requested: nil, workoutFloor: floor),
+            .workoutFloor(floor)
+        )
+        for other in [HealthKitSynchronizationStream.heartRate, .activeEnergy, .sleepAnalysis, .stepCount] {
+            XCTAssertEqual(
+                SystemHealthKitQueryClient.samplePredicateDecision(stream: other, requested: nil, workoutFloor: floor),
+                .unbounded,
+                "\(other)"
+            )
+        }
+    }
+
+    /// The Founder's exact-day Workout canary always passes explicit bounds,
+    /// and those must win over the floor exactly as before Build 54.
+    func testExplicitBoundsWinOverTheFloor() {
+        let floor = ISO8601DateFormatter().date(from: "2026-09-23T07:00:00Z")!
+        let explicit = explicitBounds()
+        XCTAssertEqual(
+            SystemHealthKitQueryClient.samplePredicateDecision(stream: .workouts, requested: explicit, workoutFloor: floor),
+            .explicit(explicit)
+        )
+        XCTAssertEqual(
+            SystemHealthKitQueryClient.samplePredicateDecision(stream: .heartRate, requested: explicit, workoutFloor: nil),
+            .explicit(explicit)
+        )
+    }
+
+    /// A client constructed without a floor (every test, and any caller that
+    /// does not opt in) is byte-for-byte the pre-Build-54 anchor-only query.
+    func testNilFloorLeavesTheWorkoutStreamUnbounded() {
+        XCTAssertEqual(
+            SystemHealthKitQueryClient.samplePredicateDecision(stream: .workouts, requested: nil, workoutFloor: nil),
+            .unbounded
+        )
+    }
+
+    /// The decision-to-predicate mapping: no predicate for the unbounded
+    /// case (anchor only), a real `NSPredicate` for both bounded cases.
+    /// `HKQuery.predicateForSamples` is a pure class method (no
+    /// `HKHealthStore`), so this is safe to exercise directly.
+    func testUnboundedDecisionYieldsNoPredicateAndBoundedDecisionsYieldOne() {
+        let floor = ISO8601DateFormatter().date(from: "2026-09-23T07:00:00Z")!
+        XCTAssertNil(SystemHealthKitQueryClient.samplePredicate(for: .unbounded))
+        XCTAssertNotNil(SystemHealthKitQueryClient.samplePredicate(for: .workoutFloor(floor)))
+        XCTAssertNotNil(SystemHealthKitQueryClient.samplePredicate(for: .explicit(explicitBounds())))
+    }
 }

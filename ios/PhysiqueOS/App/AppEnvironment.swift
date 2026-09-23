@@ -246,15 +246,17 @@ final class AppEnvironment {
     /// that survives navigation, suspension, termination, and reboot.
     let stagedPhotoIntakeStore: any StagedPhotoIntakeStore
     /// N1's permanent capability shell (`.n1Automatic`): read, upload, and
-    /// background delivery for Activity + Nutrition, never HealthKit writes.
-    /// `healthKitAutomaticSynchronizationCoordinator` is what actually
-    /// invokes it, from the root scene's `scenePhase` transitions.
+    /// background delivery for Activity + Nutrition + Workouts, never
+    /// HealthKit writes. `healthKitAutomaticSynchronizationCoordinator` is
+    /// what actually invokes it, from the root scene's `scenePhase` transitions.
     let healthKitFeatureGate: HealthKitFeatureGate
     let healthKitAuthorizationCoordinator: HealthKitAuthorizationCoordinator
     let healthKitSynchronizationEngine: HealthKitSynchronizationEngine
-    /// The permanent, background-eligible Activity + Nutrition path. Bound to
-    /// the main `healthKitSynchronizationEngine`/`healthKitAuthorizationCoordinator`
-    /// above (this gate), independent of the diagnostic canary below.
+    /// The permanent, background-eligible Activity + Nutrition + Workouts
+    /// path (Workouts floor-bounded by `HealthKitWorkoutActivationFloor`).
+    /// Bound to the main `healthKitSynchronizationEngine`/
+    /// `healthKitAuthorizationCoordinator` above (this gate), independent of
+    /// the diagnostic canary below.
     let healthKitAutomaticSynchronizationCoordinator: HealthKitAutomaticSynchronizationCoordinator
     /// Founder Production diagnostic screen: manual foreground sync and
     /// acceptance-audit tooling. Its own narrower capability shell
@@ -561,7 +563,9 @@ final class AppEnvironment {
         founderPhotoMediaStore: FounderPhotoMediaStore? = nil,
         healthKitFeatureGate: HealthKitFeatureGate = .n0Disabled,
         healthKitService: any HealthKitService = SystemHealthKitService(),
-        healthKitQueryClient: any HealthKitAnchoredQueryClient = SystemHealthKitQueryClient(),
+        healthKitQueryClient: any HealthKitAnchoredQueryClient = SystemHealthKitQueryClient(
+            workoutFloor: HealthKitWorkoutActivationFloor.current.startOfDay
+        ),
         healthKitObserverClient: any HealthKitObserverClient = SystemHealthKitObserverClient(),
         healthKitSynchronizationStore: any HealthKitSynchronizationStore = FileHealthKitSynchronizationStore(),
         healthKitObservationUploader: (any HealthKitObservationUploader)? = nil,
@@ -605,12 +609,17 @@ final class AppEnvironment {
         let canonicalizationLedger = HealthKitCanonicalizationLedger()
         let uploader = healthKitObservationUploader
             ?? ProductionHealthKitObservationUploader(api: productionNativeAPI, ledger: canonicalizationLedger)
+        // The automatic engine alone carries the Workout activation floor
+        // (second line of defense behind the query client's predicate); the
+        // canary engine below is deliberately constructed without it, so the
+        // Founder's explicit exact-day Workout canary is unchanged.
         self.healthKitSynchronizationEngine = HealthKitSynchronizationEngine(
             queryClient: healthKitQueryClient,
             observerClient: healthKitObserverClient,
             store: healthKitSynchronizationStore,
             uploader: uploader,
-            featureGate: healthKitFeatureGate
+            featureGate: healthKitFeatureGate,
+            workoutActivationFloor: .current
         )
         self.healthKitAutomaticSynchronizationCoordinator = HealthKitAutomaticSynchronizationCoordinator(
             authorization: self.healthKitAuthorizationCoordinator,
