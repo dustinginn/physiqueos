@@ -71,6 +71,47 @@ describe("Phase 2 PostgreSQL foundation", () => {
     expect(receipt).toMatchObject({ userId: "user", idempotencyKey: "key", status: "processing" });
   });
 
+  it("treats a raw unique-violation on a non-arbiter constraint as a lost race too, not a raw error", async () => {
+    // Defense-in-depth: ON CONFLICT (user_id, idempotency_key) only suppresses
+    // a violation of THAT constraint. This proves a 23505 from any other
+    // unique constraint on the same insert (e.g. a hypothetical caller that
+    // reuses commandId across a retry, colliding on the PRIMARY KEY or
+    // UNIQUE (user_id, command_id) instead) still resolves to null, never throws.
+    const query = vi.fn().mockRejectedValue(Object.assign(new Error("duplicate key value"), { code: "23505" }));
+    const receipt = await createPostgresCommandStore({ query }).commandReceipts.insert({
+      id: "command", userId: "user", deviceId: "device", sessionId: "session",
+      commandId: "command", idempotencyKey: "key", commandType: "synthetic", payloadHash: "a".repeat(64), status: "processing",
+    });
+    expect(receipt).toBeNull();
+  });
+
+  it("re-throws a non-unique-violation database error from the command receipt insert", async () => {
+    const query = vi.fn().mockRejectedValue(Object.assign(new Error("connection terminated"), { code: "57P01" }));
+    await expect(createPostgresCommandStore({ query }).commandReceipts.insert({
+      id: "command", userId: "user", deviceId: "device", sessionId: "session",
+      commandId: "command", idempotencyKey: "key", commandType: "synthetic", payloadHash: "a".repeat(64), status: "processing",
+    })).rejects.toThrow("connection terminated");
+  });
+
+  it("inserts an outbox message atomically, throwing a controlled error (not a raw unique-violation) on a duplicate dedupe key", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const adapters = createFoundationPostgresAdapters({ query });
+    await expect(adapters.commands.outbox.insert({
+      id: "message", userId: "user", operationId: null, topic: "synthetic.changed", dedupeKey: "same", payloadVersion: "1", payload: {},
+    })).rejects.toThrow("Duplicate outbox dedupe key.");
+    expect(query.mock.calls[0][0]).toContain("ON CONFLICT (topic, dedupe_key) DO NOTHING");
+    expect(query.mock.calls[0][0]).toContain("RETURNING *");
+  });
+
+  it("returns the inserted outbox message when the dedupe key is new", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ id: "message", topic: "synthetic.changed", dedupe_key: "unique" }] });
+    const adapters = createFoundationPostgresAdapters({ query });
+    const row = await adapters.commands.outbox.insert({
+      id: "message", userId: "user", operationId: null, topic: "synthetic.changed", dedupeKey: "unique", payloadVersion: "1", payload: {},
+    });
+    expect(row).toMatchObject({ id: "message", topic: "synthetic.changed" });
+  });
+
   it("casts terminal outbox failure parameters for PostgreSQL", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ id: "message", status: "dead" }] });
     const adapters = createFoundationPostgresAdapters({ query });

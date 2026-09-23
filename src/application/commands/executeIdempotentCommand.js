@@ -25,7 +25,13 @@ export async function executeIdempotentCommand({ transactionRunner, principal, m
       // landed first between our find() and our insert(). This is not an
       // error -- treat it exactly like the early-found case above.
       const racedReceipt = await transaction.commandReceipts.find(actor.userId, metadata.idempotencyKey);
-      if (!racedReceipt) throw new Error("Command receipt insert conflicted but no receipt could be found.");
+      if (!racedReceipt) {
+        throw new ApplicationProblem({
+          status: 500,
+          code: "COMMAND_RECEIPT_RACE_UNRESOLVED",
+          title: "The command receipt insert conflicted but no receipt could be found afterward.",
+        });
+      }
       return replayReceipt(racedReceipt, payloadHash);
     }
 

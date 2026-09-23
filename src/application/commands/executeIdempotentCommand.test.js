@@ -64,7 +64,7 @@ describe("idempotent command foundation", () => {
 
     await expect(executeIdempotentCommand({
       transactionRunner, principal, metadata, commandType: "synthetic.update", payload: {}, handler: vi.fn(),
-    })).rejects.toThrow("Command receipt insert conflicted but no receipt could be found.");
+    })).rejects.toMatchObject({ status: 500, code: "COMMAND_RECEIPT_RACE_UNRESOLVED" });
   });
 
   it("rolls back the receipt when outbox insertion fails", async () => {
