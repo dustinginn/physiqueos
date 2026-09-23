@@ -2184,15 +2184,18 @@ export function formatActivityProtocolSupport(activityDay = {}) {
     return "Activity context available.";
   }
 
-  // Round the difference (not the operands) so it stays consistent with the
-  // whole-number calories the cards show for the same day.
-  const difference = moveCalories - effectiveTarget;
+  // Round the operands BEFORE subtracting, so this is exact integer
+  // arithmetic on the same whole numbers the cards display (782 vs 1000 ->
+  // "218 below"). Rounding the difference instead is not tie-safe: an exact
+  // .5 move (782.5 -> card "783") would round |-217.5| up to "218" while the
+  // card rounded up to 783, a 1-off against the card.
+  const difference = Math.round(moveCalories) - Math.round(effectiveTarget);
 
   if (difference >= 0) {
-    return `${formatWholeNumber(difference)} active calories above the recorded daily target.`;
+    return `${difference} active calories above the recorded daily target.`;
   }
 
-  return `${formatWholeNumber(Math.abs(difference))} active calories below the recorded daily target.`;
+  return `${Math.abs(difference)} active calories below the recorded daily target.`;
 }
 
 export function getEffectiveTargetForActivityDay(activityDay = {}) {

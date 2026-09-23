@@ -185,4 +185,20 @@ describe("HealthKit Evidence summary formatting", () => {
       daily_activity: { move_calories: 782.1669999999962 },
     })).toBe("Activity context available.");
   });
+
+  // Found by independent review: rounding the difference is not tie-safe.
+  // The card rounds 782.5 UP to 783, so the string must say 1000 - 783 = 217,
+  // not round(|782.5 - 1000|) = round(217.5) = 218. Operands are rounded
+  // before subtracting so the string is arithmetic on what the card shows.
+  it("agrees with the cards on exact .5 ties by rounding operands before subtracting", () => {
+    expect(formatActivityProtocolSupport({
+      daily_activity: { move_calories: 782.5, move_goal: 1000 },
+    })).toBe("217 active calories below the recorded daily target.");
+    expect(formatActivityProtocolSupport({
+      daily_activity: { move_calories: 999.5, move_goal: 1000 },
+    })).toBe("0 active calories above the recorded daily target.");
+    expect(formatActivityProtocolSupport({
+      daily_activity: { move_calories: 1000, move_goal: 1000 },
+    })).toBe("0 active calories above the recorded daily target.");
+  });
 });
