@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T19:36:01Z",
+  "generated_at_utc": "2026-09-23T19:47:42Z",
   "task": {
-    "id": "healthkit-strength-sep23-commit-timestamp-deploy-dryrun-20260923",
-    "title": "Deploy Strength timestamp correction and dry-run Sep 23 reassessment",
+    "id": "healthkit-strength-sep23-reassessment-apply-20260923",
+    "title": "Apply guarded Sep 23 Strength reassessment",
     "agent": "codex",
     "status": "completed"
   },
@@ -17,7 +17,7 @@
     "native_build": 55
   },
   "result": {
-    "summary": "Deployed exact reviewed Server candidate 31c88481 with runtime SHA/build stamping and a force rebuild. Deployment 42035d0d is ACTIVE 9/9; branch, web/worker source, runtime SHA, build ID, and public health all match. Pre/post deployment and post-dry-run read-only audits are identical except runtime identity. The Sep 23 reassessment dry-run returned confident_match at confidence 95 on logger_session_window and predicted exactly three bounded mutations: create one quarantined candidate link, update only the canonical workout link assessment, and create one reassessment authorization audit row. The dry-run used REPEATABLE READ READ ONLY and rolled back. No reassessment mutation was applied, Build 55 was not uploaded, and Cardio was not started.",
+    "summary": "Applied the Founder-authorized guarded Sep 23 Strength reassessment using fresh back-to-back dry-run facts, the owner advisory lock, drift fence, and post-write invariants. Exactly one confidence-95 logger_session_window candidate link was created in quarantined status, only that workout's link assessment was updated, and one authorization audit row was created. All 18 in-transaction invariants passed. Independent pre/post audits prove Logger detail and storage metadata, claims, one-to-one integrity, strategic eligibility, Activity/Nutrition, policies, observations, canonical days, other workouts, and all unrelated data remained unchanged. The candidate was not confirmed and Build 55 was not uploaded.",
     "success": true,
     "production_mutated": true,
     "deployed": true,
@@ -26,34 +26,31 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "The deployed candidate retained its accepted validation: Codex release slice 8 files/150 tests, independent review 10 impacted files/196 tests, changed-file lint and diff checks clean, and four mutation proofs."
+      "summary": "The deployed candidate retained its accepted validation: Codex release slice 8 files/150 tests, independent review 10 impacted files/196 tests, changed-file lint/diff checks clean, and four mutation proofs."
     },
     "review": {
       "status": "approved",
-      "summary": "Fresh-context independent final review of 98f8ccec..31c88481 reported no findings."
+      "summary": "Fresh-context independent final review of the deployed correction reported no findings."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "The bounded Sep 23 audit ran before deployment, after deployment, and after the reassessment dry-run under REPEATABLE READ READ ONLY with transaction_read_only=on and explicit rollback. Policy, workout/session/link/claim counts, integrity counters, strategic quarantine counts, migration 14, and every reported collection digest were identical."
+      "summary": "Fresh pre/post read-only audits proved only the three authorized reassessment mutations. Activity/Nutrition audit output was byte-identical. Unrelated Workout and strategic data was byte-identical after excluding the intentionally changed workout assessment, new candidate link, and new audit row. All apply invariants passed 18/18."
     }
   },
   "decisions_required": [
-    "Reassessment apply is not authorized. Founder approval is required before creating the predicted candidate link, updating the workout assessment, or creating the authorization audit row.",
+    "The new Sep 23 link remains an unconfirmed quarantined candidate. Confirmation requires separate Founder authorization and was not performed.",
     "Build 55 TestFlight upload remains a separate approval gate and has not occurred.",
-    "Cardio remains out of scope until Strength receives its final verdict."
+    "Cardio remains out of scope until Strength reaches its final verdict."
   ],
   "blockers": [],
-  "unexpected_findings": [
-    "The initial app-spec deployment again selected stale source 98f8ccec. The required force rebuild canceled that deployment at 1/9 and built exact 31c88481 for both web and worker.",
-    "The production dry-run confirmed the durable Server row creation timestamp closes the Sep 23 end-alignment gap without editing the Logger record."
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Await a separate Founder decision on whether to apply the exact reassessment plan using fresh dry-run facts and a nonempty authorization reference.",
+    "Await a separate Founder decision on whether to confirm the single Sep 23 candidate link through the guarded one-to-one claim path.",
     "Do not upload Native Build 55 without separate authorization.",
     "Do not begin Cardio until Strength reaches its final verdict."
   ],
-  "recommended_next_step": "Review the successful read-only dry-run and ask the Founder whether to authorize the guarded reassessment apply. Do not mutate reassessment state until that approval is explicit.",
-  "full_report_path": "agent-handoffs/reports/20260923T193601Z-strength-deployed-dryrun-green.md",
+  "recommended_next_step": "Review the successful candidate-only reassessment and independently decide whether to authorize guarded candidate confirmation. Keep Build 55 and Cardio gated separately.",
+  "full_report_path": "agent-handoffs/reports/20260923T194742Z-strength-reassessment-applied.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
