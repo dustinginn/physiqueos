@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T17:51:10Z",
+  "generated_at_utc": "2026-09-23T18:18:26Z",
   "task": {
-    "id": "healthkit-strength-build55-reassessment-readiness-20260923",
-    "title": "Prepare Build 55 and safe Sep 23 Strength reassessment",
+    "id": "healthkit-strength-build55-reassessment-deploy-checkpoint-20260923",
+    "title": "Deploy reviewed Strength reassessment Server candidate",
     "agent": "codex",
     "status": "completed"
   },
@@ -11,49 +11,49 @@
   "authority": {
     "base_sha": "cc3c6e441273859731004b7fe670e48a48fcec3c",
     "final_sha": "98f8ccec5ab8eaebc25631139e574b69267f9c74",
-    "production_server_sha": "cc3c6e441273859731004b7fe670e48a48fcec3c",
-    "production_deployment": "460f07c9-64f3-4f7b-9915-d4c482910b7d",
+    "production_server_sha": "98f8ccec5ab8eaebc25631139e574b69267f9c74",
+    "production_deployment": "aef7251a-6390-4dd8-b845-f4f27c5f4337",
     "native_sha": "621dbef3cdcf17009e346111e4a86d14b70ed896",
     "native_build": 55
   },
   "result": {
-    "summary": "Codex completed the reviewed pre-production Strength graduation slice after Claude's YELLOW handoff. Native Build 55 now bounds HealthKit query and per-stream waits, serializes same-scope recovery, queues one rerun after overlapping bootstrap, completes every HealthKit observer wake exactly once, and stamps/persists Logger finishedAt for stable retry payloads. Server matching now uses the unique same-day active Logger Strength session plus the unique same-day canonical Strength workout, accepts Logger start inside the HealthKit window (or up to five minutes before), uses finishedAt or the live commit/captured instant for end alignment, and remains candidate-only. A separate guarded production operation can reassess only Sep 23 with advisory locking, expected-facts drift fencing, exact audit authorization, and post-write invariants. Strategic eligibility remains quarantined and linkAutoConfirm remains false. No deploy, production reassessment, policy mutation, TestFlight upload, manual canary, repeated workout, or Cardio work occurred. Strength has not reached its final verdict; the candidates are awaiting the Founder's deployment and later mutation approvals.",
+    "summary": "Founder-authorized Server candidate 98f8ccec was deployed through the established production procedure. The production branch was fast-forwarded without force; web and worker PHYSIQUEOS_GIT_SHA and PHYSIQUEOS_BUILD_ID were changed to the exact candidate and physiqueos-98f8ccec-20260923; the known stale-source app-spec deployment was detected at cc3c6e44 and canceled at 1/9; force-rebuild deployment aef7251a reached ACTIVE 9/9 with both web and worker source_commit_hash at 98f8ccec. Live and ready are HTTP 200 with all nine readiness checks green and migration 000014 unchanged. Pre/post Sep 23 read-only audits are identical across policy, observations, canonical workout, links/claims, Logger count, strategic digests, HealthKit digests, and migrations. No reassessment was applied and Build 55 was not uploaded. The separately authorized read-only reassessment dry-run is the next chunk.",
     "success": true,
-    "production_mutated": false,
-    "deployed": false,
+    "production_mutated": true,
+    "deployed": true,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Native final gate: PhysiqueOSTests 1308/1308 passed, zero failures/skips; release verifier confirmed version 1.0 (55), AppIcon, HealthKit declarations, and exempt encryption. Server changed-slice gate: 7 files / 142 tests passed and eslint was clean. Mutation checks proved queued rerun, Logger finishedAt, same-scope serialization, observer completion, same-day workout uniqueness, captured_at fallback, policy safety, and authorization-bound replay. The broad Server suite was not claimed green because this sparse checkout lacks an untracked Founder runtime fixture and sandboxed listener tests fail with EPERM; the relevant command-port and changed-slice gates are green."
+      "summary": "Deployment candidate retained its reviewed validation: Server changed-slice 142 tests passed with clean eslint and mutation proofs; no code changed after review."
     },
     "review": {
       "status": "approved",
-      "summary": "A separate fresh Codex review found two moderate issues: a timed-out native sync could overlap its retry, and a Server already-reassessed path could bypass exact audit authorization. Both were fixed and re-reviewed. The follow-up review then found one native observer-completion issue on overlap; commit 621dbef3 added an atomic one-shot completion gate and regression test. Final review reported no blocker, major, or moderate findings across the completed slice."
+      "summary": "Previously published fresh review reported no blocker, major, or moderate findings for Server head 98f8ccec and Native Build 55 head 621dbef3."
     },
-    "zero_write_audit": null
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "Predeploy runtime cc3c6e44 and postdeploy runtime 98f8ccec each ran the bounded Sep 23 workout audit in REPEATABLE READ READ ONLY with explicit transaction_read_only verification and ROLLBACK. The Strength-only policy remains open-ended from Sep 23, quarantined, no backfill, linkAutoConfirm false. One canonical Strength workout, two deferred cardio observations, one Logger Strength session, no Sep 23 link, no duplicate/ambiguity integrity violation, no strategic leakage, 14 migrations, and every reported collection digest were identical before and after deployment."
+    }
   },
   "decisions_required": [
-    "Authorize deployment of Server candidate 98f8ccec5ab8eaebc25631139e574b69267f9c74. After deployment, Codex will run only the read-only Sep 23 reassessment dry-run and report the predicted mutation and invariants.",
-    "After the production dry-run, separately authorize or refuse the exact Sep 23 reassessment apply. The apply is designed to create at most one quarantined candidate and never a confirmed link or claim.",
-    "Separately authorize or refuse a Build 55 TestFlight upload when requested. No upload has occurred.",
-    "No policy mutation is currently required or proposed; any future policy mutation still requires separate explicit authorization."
+    "After the authorized read-only reassessment dry-run is reported, separately authorize or refuse the exact reassessment apply. No apply has occurred.",
+    "Separately authorize or refuse Build 55 TestFlight upload. No upload has occurred."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Fresh review identified that the first timeout implementation could leave the timed-out operation alive while its retry began; exact-scope synchronization and delivery fences plus cancellation checkpoints now prevent overlap.",
-    "Fresh review identified that an already-reassessed production replay needed to be bound to the exact authorization audit row; replay now refuses any foreign or missing authorization audit.",
-    "Fresh review identified that an overlapping HealthKit observer wake could return without invoking Apple's completion callback; a one-shot completion gate now covers success, early staging, overlap, cancellation, feature-disabled, store-error, and upload-error paths."
+    "The app-spec update deployment f29f15d1 used stale source cc3c6e44, matching the known provider behavior; force-rebuild canceled it at 1/9 and built the reviewed SHA exactly.",
+    "The generic postdeploy workout audit continues to show the stored no-match and its generic live possible-match score 50. The dedicated reassessment operation is intentionally the authoritative path for the new unique-window rule and will be exercised next in read-only dry-run mode."
   ],
   "backlog": [
-    "With Founder authorization: deploy Server candidate 98f8ccec, verify production authority/health, then run the Sep 23 reassessment in read-only dry-run mode.",
-    "With separate Founder authorization after the dry-run: apply the exact drift-fenced Sep 23 reassessment and run the post-mutation fresh zero-write audit.",
-    "With separate Founder authorization: upload Native Build 55 from candidate 621dbef3 to TestFlight and verify delivery before any live automatic-sync acceptance observation.",
-    "Reach and publish the final Strength verdict before beginning any Cardio work. Workout strategic eligibility and auto-confirm remain off throughout."
+    "Run only the dedicated Sep 23 reassessment dry-run in the read-only production transaction and publish its exact predicted mutation, match result, confidence/basis, and invariants.",
+    "Do not apply the reassessment without separate Founder authorization.",
+    "Do not upload Build 55 without separate Founder authorization.",
+    "Do not begin Cardio until Strength receives its final verdict."
   ],
-  "recommended_next_step": "Founder: authorize deployment of Server candidate 98f8ccec. Codex will then perform the bounded read-only Sep 23 reassessment dry-run and return for a separate apply decision; TestFlight remains untouched until separately authorized.",
-  "full_report_path": "agent-handoffs/reports/20260923T175110Z-healthkit-strength-build55-reassessment-readiness.md",
+  "recommended_next_step": "Codex should now run the already-authorized read-only Sep 23 reassessment dry-run against deployment aef7251a and publish the result; no additional approval is needed for that read-only step.",
+  "full_report_path": "agent-handoffs/reports/20260923T181826Z-healthkit-strength-server-deployed-checkpoint.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

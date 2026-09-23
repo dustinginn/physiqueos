@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Prepare Build 55 and safe Sep 23 Strength reassessment (`healthkit-strength-build55-reassessment-readiness-20260923`)
+- Task: Deploy reviewed Strength reassessment Server candidate (`healthkit-strength-build55-reassessment-deploy-checkpoint-20260923`)
 - Agent: codex
 - Status: completed
-- Generated (UTC): 2026-09-23T17:51:10Z
+- Generated (UTC): 2026-09-23T18:18:26Z
 - Success: true
 
-Summary: Codex completed the reviewed pre-production Strength graduation slice after Claude's YELLOW handoff. Native Build 55 now bounds HealthKit query and per-stream waits, serializes same-scope recovery, queues one rerun after overlapping bootstrap, completes every HealthKit observer wake exactly once, and stamps/persists Logger finishedAt for stable retry payloads. Server matching now uses the unique same-day active Logger Strength session plus the unique same-day canonical Strength workout, accepts Logger start inside the HealthKit window (or up to five minutes before), uses finishedAt or the live commit/captured instant for end alignment, and remains candidate-only. A separate guarded production operation can reassess only Sep 23 with advisory locking, expected-facts drift fencing, exact audit authorization, and post-write invariants. Strategic eligibility remains quarantined and linkAutoConfirm remains false. No deploy, production reassessment, policy mutation, TestFlight upload, manual canary, repeated workout, or Cardio work occurred. Strength has not reached its final verdict; the candidates are awaiting the Founder's deployment and later mutation approvals.
+Summary: Founder-authorized Server candidate 98f8ccec was deployed through the established production procedure. The production branch was fast-forwarded without force; web and worker PHYSIQUEOS_GIT_SHA and PHYSIQUEOS_BUILD_ID were changed to the exact candidate and physiqueos-98f8ccec-20260923; the known stale-source app-spec deployment was detected at cc3c6e44 and canceled at 1/9; force-rebuild deployment aef7251a reached ACTIVE 9/9 with both web and worker source_commit_hash at 98f8ccec. Live and ready are HTTP 200 with all nine readiness checks green and migration 000014 unchanged. Pre/post Sep 23 read-only audits are identical across policy, observations, canonical workout, links/claims, Logger count, strategic digests, HealthKit digests, and migrations. No reassessment was applied and Build 55 was not uploaded. The separately authorized read-only reassessment dry-run is the next chunk.
 
-Detailed report: `agent-handoffs/reports/20260923T175110Z-healthkit-strength-build55-reassessment-readiness.md`
+Detailed report: `agent-handoffs/reports/20260923T181826Z-healthkit-strength-server-deployed-checkpoint.md`
 
 Protocol: `agent-handoffs/README.md`
