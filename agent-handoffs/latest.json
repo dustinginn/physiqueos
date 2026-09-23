@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T21:49:26Z",
+  "generated_at_utc": "2026-09-23T22:22:40Z",
   "task": {
-    "id": "codex-strength-reconciliation-semantics-implementation-20260923",
-    "title": "Implement and verify Strength reconciliation semantics",
+    "id": "codex-strength-reconciliation-semantics-review-corrections-20260923",
+    "title": "Correct independent-review findings in Strength reconciliation semantics",
     "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "31c88481d80703de3355c51f6695b760b0671020",
-    "final_sha": "58a90beecf7d78764f9328851edf6b8f47990180",
+    "final_sha": "201b424960166cbdb2fb9ed3cce28c0702c86685",
     "production_server_sha": "31c88481d80703de3355c51f6695b760b0671020",
     "production_deployment": "42035d0d-9368-4ada-a4c1-392e659f3366",
-    "native_sha": "2d79f0b0f540a466d62f9a660726cd60a3e4f0ac",
+    "native_sha": "7812937c95202f4b6765587df56dc61a7a748984",
     "native_build": 56
   },
   "result": {
-    "summary": "Implemented and froze exact Server and Native Build 56 candidates for deterministic Strength auto-confirm gating, typed ambiguity review, guarded confirm/no-match resolution, durable strategically inert reconciliation history, a bounded September 23 acceptance runner, and the iPhone 17 Pro-only simulator rule. Focused and full relevant suites plus six mutation tests passed; broader pre-existing Server failures were reproduced unchanged on the exact production base. No production, policy, relationship, strategic-eligibility, Apple, or Cardio state changed.",
+    "summary": "Corrected all seven findings from the first fresh-context review and froze revised exact Server and Native Build 56 candidates. The corrections close production composition, stranded-review, terminal-decision, retroactive-activation, exact-readback, no-match-copy, and contract-manifest gaps. Relevant Server and Native suites pass. No production, policy, relationship, strategic-eligibility, Apple, or Cardio state changed.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,31 +26,31 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server focused 146/146, Phase 4 138/138, Phase 5 65/65, six critical mutations killed; all broader failures reproduced on pristine base. Native focused 190/190 and complete unit suite 1311/1311; one existing UI navigation failure in the 12-test complete UI run passed on immediate isolated rerun."
+      "summary": "Final Server focused gate 182/182, Phase 4 139/139, Phase 5 65/65, and review-specific regressions pass; broader residual failures are absent private fixtures or reproduced base failures. Native focused 191/191 and complete unit suite 1312/1312 on the sole iPhone 17 Pro simulator."
     },
     "review": {
-      "status": "not_run",
-      "summary": "Fresh-context independent adversarial review of exact Server 58a90bee and Native 2d79f0b0 candidates is the next gate."
+      "status": "changes_requested",
+      "summary": "The first independent review rejected the initial candidates; all seven findings are corrected in exact revised SHAs. A second fresh-context review of those revised SHAs is pending."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "This implementation/test chunk made no production writes, no policy changes, no relationship changes, and no Apple upload. September 23 remains one unconfirmed quarantined candidate with strategic eligibility off."
+      "summary": "This correction and test chunk made no production writes, policy changes, relationship changes, Apple uploads, strategic-eligibility changes, or Cardio changes."
     }
   },
   "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "The complete Native UI suite had one transient existing reporting-navigation scroll failure; the same test passed on immediate isolated rerun.",
+    "The first fresh-context review identified seven gaps in the initial candidates; each has a committed regression-covered correction.",
     "The repository inbox pointer remains stale, so this checkpoint does not mutate inbox lifecycle state."
   ],
   "backlog": [
-    "Obtain fresh-context independent adversarial review of both exact candidate SHAs and address any findings.",
-    "After review passes, ask separately before Server deployment, TestFlight upload, production policy mutation, or production relationship mutation.",
-    "After a separately authorized Server deployment, run the bounded read-only September 23 auto-confirm dry-run before considering activation.",
+    "Obtain a second fresh-context independent adversarial review of exact Server 201b4249 and Native 7812937c candidates.",
+    "If approved, ask separately before deploying the exact Server candidate; follow deployment only with the bounded read-only September 23 auto-confirm dry-run.",
+    "Continue to require separate authorization for TestFlight upload, policy activation, and any production relationship mutation.",
     "Keep strategic Strength eligibility off and do not begin Cardio until the final Strength verdict."
   ],
-  "recommended_next_step": "Run fresh-context adversarial review of Server 58a90beecf7d78764f9328851edf6b8f47990180 and Native 2d79f0b0f540a466d62f9a660726cd60a3e4f0ac, then publish the final reviewed readiness handoff.",
-  "full_report_path": "agent-handoffs/reports/20260923T214926Z-strength-reconciliation-implementation.md",
+  "recommended_next_step": "Run fresh-context adversarial re-review of Server 201b424960166cbdb2fb9ed3cce28c0702c86685 and Native 7812937c95202f4b6765587df56dc61a7a748984, then publish the reviewed readiness handoff.",
+  "full_report_path": "agent-handoffs/reports/20260923T222240Z-strength-reconciliation-review-corrections.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
