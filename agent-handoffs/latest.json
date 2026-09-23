@@ -1,62 +1,62 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-23T12:43:16Z",
+  "generated_at_utc": "2026-09-23T16:04:19Z",
   "task": {
-    "id": "healthkit-strength-link-confirmation-hardening-20260923",
-    "title": "Harden and confirm Sep 22 Strength Workout link",
+    "id": "healthkit-strength-prospective-graduation-20260923",
+    "title": "Graduate Strength Workout prospectively from Sep 23",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "4b362591cb5f80c599f8f45eb7f392de7c44a36f",
-    "final_sha": "3a47b7fd960b",
-    "production_server_sha": "7c5710f2111e822caaf0d8992ce555f004d3c79b",
-    "production_deployment": "289c571c-e61b-4fab-bb59-acf3e63549dd",
-    "native_sha": "1c57556f",
-    "native_build": 53
+    "base_sha": "7c5710f2111e822caaf0d8992ce555f004d3c79b",
+    "final_sha": "cc3c6e441273859731004b7fe670e48a48fcec3c",
+    "production_server_sha": "cc3c6e441273859731004b7fe670e48a48fcec3c",
+    "production_deployment": "460f07c9-64f3-4f7b-9915-d4c482910b7d",
+    "native_sha": "e249a0f3",
+    "native_build": 54
   },
   "result": {
-    "summary": "Edge case audited: the restore/one-to-one throw is real but was already guarded at the deployed SHA and merely untested; the material gap was that no registered guarded confirmation path existed. Built it (dry-run/apply runner + console entry + payload kind, drift-fenced, advisory-locked, in-transaction one-to-one invariants, typed refusals, idempotent replay), hardened the confirm service to fail closed without an actor/time, added 16 tests incl. restore-collides, put-conflict compensation, claim-only collision, concurrency; seven guards mutation-proven; two adversarial review passes, findings fixed. Deployed 7c5710f2 with Founder approval (spec stamp + force-rebuild; one refspec mislabel caught and superseded before going live; zero-write proven). Per the Founder's same-day screenshot clarification, built a zero-write same-event reconciliation audit and proved one_logical_event in production before asking. Confirmed the Sep 22 Strength link with separate approval: applied, 14/14 invariants, replay idempotent, Logger byte-identical, walks separate, strategic 0. Deactivated the Sep 22 Workout policy with separate approval: 12/12 invariants, canonical workouts + confirmed link intact.",
+    "summary": "STRENGTH_GRADUATION_VERDICT=YELLOW; Strength ingestion stays live. Build 53 uploaded no workouts automatically, so Native Build 54 (e249a0f3) adds workouts to the automatic coordinator with a 2026-09-23 activation floor; Server cc3c6e44 adds an open-ended, family-scoped Workout policy (Strength only, no backfill, quarantined, auto-confirm off), fixes the open-window candidate bug, and acknowledges same-identity workout content drift instead of a self-poisoning 409. Deployed, policy applied (13/13 invariants), Build 54 uploaded VALID (delivery 7a7035a0-55cd-4fc0-a504-d25479550fab) -- each on separate Founder authorization. Live Sep 23: the Watch strength workout was ingested by ordinary foreground catch-up with no canary/manual sync/screenshot, canonicalized exactly once, quarantined; both walks kept raw by the family scope; Logger session byte-identical; no duplicate session; strategic 0. Two bounded issues: the Logger session carried start_time only (Native did not stamp finishedAt), so the matcher found no plausible candidate (35 < 50) -- with screenshots gone, Logger-vs-HealthKit matching needs Logger end time plus its own rule and a Founder decision on confirmation semantics; and Build 54 stalled all device->Server traffic from 14:56Z until a force-quit at 15:50Z (app open and Log pull-to-refresh did not recover it).",
     "success": true,
     "production_mutated": true,
     "deployed": true,
-    "testflight_uploaded": false
+    "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Targeted 61/61 (relationship, link, activation runner, confirmation runner) + 4 reconciliation-audit tests + read-boundary; full unit suite vs untouched base identical failure set (pre-existing gitignored private/founder fixture class; 8253 passing) once the allowlist gained the runner. Mutation-tested: actor/time guard, restore-collides guard, audit-row reuse, absolute quarantine, pre-state violations, multiple-candidate refusal, drift fence each fail exactly their own tests; restores byte-verified. eslint clean; esbuild bundles both new kinds."
+      "summary": "Server: targeted HealthKit suites 152/152 + contract 59; eslint clean; full unit suite failure set identical to the untouched base (one worktree-local missing-dependency file excluded). Mutation-proven: family guard, null-end reassess fix, open-ended-with-end refusal, empty-families refusal, runner families write, sticky out-of-scope reason, drift ignore (loop + raw), daily-snapshot 409 protection, replay reason. Native: full PhysiqueOSTests 1303/1303 twice (12 new + 2 review pins)."
     },
     "review": {
       "status": "approved",
-      "summary": "Fresh-context adversarial review of 1a95272a: no blockers, one MAJOR (test never reached AUDIT_ROW_EXISTS) + MINORs, all fixed in 7c5710f2; delta verification: all points confirmed, verdict deploy and use once. A second fresh-context read-only audit of the screenshot/Logger/HealthKit reconciliation model (file:line) established the one-logical-event proof design and confirmed confirmation writes only HealthKit-side records; two harmless MINORs left as-is."
+      "summary": "Server 6fc80bff review: BLOCKER (families never reached the runner) + MAJOR (out-of-scope reason dropped) fixed in 1f94a431; final review of a0a29a41: DEPLOY, one MAJOR (reason overwritten on exact replay) fixed in cc3c6e44. Native 842635f3 review: requirements 1-7 confirmed; MAJOR (409 self-poisons the workout scope) fixed on the Server with Founder authorization; MINOR test pins added (2f65cdcc). Founder-authorized narrow scope respected."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Writes were exactly the authorized set: deploy (spec envs + rebuild), one confirmation (link record + 2 claims + audit row), one deactivation (policy record + audit row). Deploy before/after digests identical (26 sections, migrations 14). Confirmation and deactivation each verified in-transaction: Evidence, canonical workouts, canonical days, observations, both policies, other links unchanged. Post-confirm digests for canonicalEvidenceObjects/evidencePackages/evidenceReviews/dailyBriefings/analyses identical. Later digest movement (briefing +1, analysis +1, confidence history +1, one check-in evidence object, A/N day revisions) attributed by logs to the overnight cadence and Native auto-syncs, with the Sep 22 strength object byte-identical throughout."
+      "summary": "Pre/post deploy audits identical for the Sep 22 state, both policies and all strategic sections (only Build 53 Activity auto-sync moved). Policy apply: 13/13 in-transaction invariants (observations, canonical days/workouts, links, claims, Evidence, daily policy unchanged); independent live resolve matches the authorized record exactly. Post-workout: one new canonical strength workout, two raw walks, Logger v1 identical, Sep 22 link intact, one-to-one 0/0/0/0, strategic 0."
     }
   },
   "decisions_required": [
-    "Product decision before any cardio canary: should a HealthKit cardio workout with a matching screenshot walk remain two coexisting representations (current coexistence-only design) or be reconciled into one logical event like strength?",
-    "Next Server deploy: fast-forward the read-only training-audit tooling (3a47b7fd) into production so audit source and runtime stay in lockstep, and fix its evidencePackagesOnDay mapping.",
-    "Workout graduation stays OFF; a later slice would gate strategic eligibility on confirmed relationships via the graduation runner pattern."
+    "Confirmation semantics for Logger-vs-HealthKit strength matches once the Logger carries an end time: keep explicit Founder confirmation (today's rule) or adopt a reviewed deterministic confident-candidate rule (single same-day Logger strength session whose start lies inside the workout window and whose end/commit aligns) -- and whether such a confident candidate may auto-confirm.",
+    "Cardio reconciliation semantics (coexist vs one logical event) before any cardio canary; cardio workouts uploaded under the Strength-only scope stay raw forever (a later cardio policy covers only workouts first uploaded after it), so this should not wait long.",
+    "Workout strategic eligibility stays OFF; a later slice should gate it on confirmed links only via the graduation runner pattern."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "No registered guarded confirmation path existed (the domain confirm function had zero non-test callers).",
-    "Founder's same-morning screenshot evidence for the same workout: production shows it was target-bound Logger support merged into the Logger object itself (one active object, both packages in provenance) -- exactly the designed one-logical-event outcome.",
-    "First confirmation apply refused as drifted (Native auto-sync between dry-run and apply) -- the intended fail-safe; back-to-back dry-run/apply succeeded.",
-    "A mangled refspec (zsh ':r' modifier) briefly produced a mislabeled build; caught by the source-commit check and superseded before it went live; lesson saved to memory."
+    "Build 54 in-process sync stall: no device->Server traffic of any kind 14:56:36Z-15:50Z despite an app open and a Log pull-to-refresh; a force-quit/relaunch recovered it immediately. Diagnosis: pre-existing unbounded in-flight coalescing in the automatic coordinator (no timeouts on HealthKit awaits; overlapping bootstraps return the stuck task's result); Build 54 lengthened the tail by appending the workouts stream. Fix planned for Build 55 (per-stream timeouts + rerun-after-in-flight).",
+    "Logger-only sessions carry start_time only: the Native Logger does not stamp finishedAt on completion even though the Server maps it to end_time/duration_seconds; Sep 22's confident 99 depended on the screenshot merge.",
+    "Independent review found the console entry parsed --families but never passed it to the runner (a Strength-only apply would have scoped every family); fixed and pinned before any production use.",
+    "A Server 409 on a same-UUID workout re-delivery would have poisoned the automatic workout scope forever (anchor never advances); fixed as an authorized narrow Server change."
   ],
   "backlog": [
-    "Cardio canary (one date) after the product decision on cardio reconciliation semantics.",
-    "Native: emit sourceRevision for workouts; move the Workout Sync control out from behind the Founder Canary master toggle.",
-    "Deploy 3a47b7fd audit tooling; fix evidencePackagesOnDay mapping; tidy the two MINORs in the confirmation runner.",
-    "Workout graduation slice (confirmed-link gate) -- not started."
+    "Native Build 55: fix the automatic-sync stall; stamp Logger draft finishedAt on completion.",
+    "Server: Logger-vs-HealthKit strength matching rule (start inside window, end/commit aligned) with reviewed confirmation semantics; fallback end_time from the commit instant for live drafts.",
+    "Workout revision support (workout.sourceRevision) so drifted statistics can supersede instead of being ignored.",
+    "Cardio canary after the reconciliation decision; HealthKitTrainingReconciliationAudit evidencePackagesOnDay mapping returns nulls (audit-only)."
   ],
-  "recommended_next_step": "Founder: decide the cardio reconciliation semantics (coexist vs. one logical event); no device action is needed; the Sep 22 Strength relationship is confirmed and the canary policy is closed.",
-  "full_report_path": "agent-handoffs/reports/20260923T124316Z-healthkit-sep22-strength-link-confirmed-policy-closed.md",
+  "recommended_next_step": "Founder: decide the confirmation semantics for Logger-vs-HealthKit strength matches and the cardio reconciliation model; no device action is needed -- Strength ingestion stays live and safe (quarantined, unlinked) until the Build 55 + matching slice ships.",
+  "full_report_path": "agent-handoffs/reports/20260923T160419Z-healthkit-strength-prospective-graduation-yellow.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
