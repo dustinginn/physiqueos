@@ -5,6 +5,7 @@ import {
   HealthKitStrengthMatchOutcome,
   HealthKitWorkoutLinkStatus,
   findPossibleDuplicateCanonicalWorkouts,
+  isTrustedNativeLiveLoggerSession,
 } from "./HealthKitWorkoutLinkService.js";
 import { createHealthKitQuarantinedEligibility } from "./HealthKitEvidenceEligibilityPolicy.js";
 
@@ -50,6 +51,7 @@ export function assessDeterministicStrengthAutoConfirm({
   if (candidates.length !== 1) reasons.push("candidate_not_unique");
   if (Number(assessment?.unverifiableSessionCount ?? 0) !== 0) reasons.push("unverifiable_competitor_present");
   if (!session || !isActiveDetailedStrengthSession(session)) reasons.push("logger_session_not_active_detailed_strength");
+  if (session && !isTrustedNativeLiveLoggerSession(session.payload ?? session)) reasons.push("logger_session_provenance_untrusted");
 
   if (candidate) {
     // An authoritative source id proves identity provenance, not temporal
@@ -92,6 +94,7 @@ export function assessDeterministicStrengthAutoConfirm({
       confidence: candidate.confidence,
       basis: candidate.basis,
       substantiveOverlap: candidate.substantiveOverlap ?? null,
+      trustedLoggerProvenance: candidate.trustedLoggerProvenance ?? null,
       overlapSeconds: candidate.overlapSeconds ?? null,
       startAligned: candidate.startAligned ?? null,
       endAligned: candidate.endAligned ?? null,
@@ -131,6 +134,7 @@ export function createHealthKitWorkoutReconciliationReview({
     ))),
     resolution: null,
     resolutionHistory: Object.freeze([]),
+    lifecycleHistory: Object.freeze([{ status: "pending", at, by: { kind: "system_matcher" } }]),
     evidenceEligibility: createHealthKitQuarantinedEligibility(),
     strategicEvidenceEligibility: "quarantined",
     createdAt: at,
@@ -161,6 +165,49 @@ export function refreshHealthKitWorkoutReconciliationReview(review, { canonicalW
   return Object.freeze({ ...review, ...nextFacts, updatedAt: new Date(now).toISOString() });
 }
 
+export function reopenHealthKitWorkoutReconciliationReview(review, { canonicalWorkout, assessment, canonicalObjects = [], now } = {}) {
+  if (review.status !== "superseded") return review;
+  const desired = createHealthKitWorkoutReconciliationReview({
+    ownerUserId: review.userId,
+    canonicalWorkout,
+    assessment,
+    canonicalObjects,
+    now,
+  });
+  const at = new Date(now).toISOString();
+  return Object.freeze({
+    ...review,
+    localDate: desired.localDate,
+    workout: desired.workout,
+    matcherVersion: desired.matcherVersion,
+    assessmentOutcome: desired.assessmentOutcome,
+    assessmentReason: desired.assessmentReason,
+    candidates: desired.candidates,
+    status: "pending",
+    resolution: null,
+    resolutionHistory: Object.freeze([...(review.resolutionHistory ?? [])]),
+    lifecycleHistory: Object.freeze([...(review.lifecycleHistory ?? []), { status: "pending", at, by: { kind: "system_matcher" }, reason: "plausible_match_returned" }]),
+    updatedAt: at,
+  });
+}
+
+export function supersedeHealthKitWorkoutReconciliationReview(review, { now, reason = "no_current_founder_resolution_needed" } = {}) {
+  if (review.status !== "pending") return review;
+  const at = new Date(now).toISOString();
+  return Object.freeze({
+    ...review,
+    status: "superseded",
+    lifecycleHistory: Object.freeze([...(review.lifecycleHistory ?? []), { status: "superseded", at, by: { kind: "system_matcher" }, reason }]),
+    updatedAt: at,
+  });
+}
+
+export function refreshSupersededHealthKitWorkoutReconciliationFacts(review, args = {}) {
+  if (review.status !== "superseded") return review;
+  const refreshed = refreshHealthKitWorkoutReconciliationReview({ ...review, status: "pending" }, args);
+  return Object.freeze({ ...refreshed, status: "superseded" });
+}
+
 export function resolveHealthKitWorkoutReconciliationRecord(review, {
   action,
   selectedLoggerSessionCanonicalId = null,
@@ -168,8 +215,9 @@ export function resolveHealthKitWorkoutReconciliationRecord(review, {
   by,
   now,
   basis,
+  allowSuperseded = false,
 } = {}) {
-  if (review.status !== "pending") return review;
+  if (review.status !== "pending" && !(allowSuperseded && review.status === "superseded")) return review;
   const at = new Date(now).toISOString();
   const resolution = Object.freeze({
     action,
@@ -186,6 +234,11 @@ export function resolveHealthKitWorkoutReconciliationRecord(review, {
     status: action === HealthKitWorkoutReconciliationAction.CONFIRM ? "resolved_confirmed" : "resolved_no_match",
     resolution,
     resolutionHistory: Object.freeze([...(review.resolutionHistory ?? []), resolution]),
+    lifecycleHistory: Object.freeze([...(review.lifecycleHistory ?? []), {
+      status: action === HealthKitWorkoutReconciliationAction.CONFIRM ? "resolved_confirmed" : "resolved_no_match",
+      at,
+      by,
+    }]),
     updatedAt: at,
   });
 }
@@ -233,6 +286,7 @@ function projectCandidate(candidate, session = null) {
     basis: candidate.basis,
     reasons: Object.freeze([...(candidate.reasons ?? [])]),
     substantiveOverlap: candidate.substantiveOverlap ?? false,
+    trustedLoggerProvenance: candidate.trustedLoggerProvenance ?? false,
     overlapSeconds: candidate.overlapSeconds ?? null,
     startAligned: candidate.startAligned ?? null,
     endAligned: candidate.endAligned ?? null,

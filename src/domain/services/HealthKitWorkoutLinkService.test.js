@@ -156,6 +156,7 @@ describe("strength link matcher", () => {
     expect(result.candidates[0]).toMatchObject({
       confidence: 100,
       basis: "explicit_source_identity",
+      trustedLoggerProvenance: false,
       substantiveOverlap: false,
       overlapSeconds: 0,
       startAligned: false,
@@ -173,6 +174,7 @@ describe("strength link matcher", () => {
     expect(result.candidates[0]).toMatchObject({
       confidence: 100,
       basis: "explicit_source_identity",
+      trustedLoggerProvenance: false,
       substantiveOverlap: false,
       overlapSeconds: null,
       startAligned: null,

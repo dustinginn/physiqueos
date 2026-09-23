@@ -104,7 +104,7 @@ export function assessHealthKitStrengthLinkCandidates({
     .map((link) => link.loggerSessionCanonicalId));
   const sameDayNativeLoggerSessions = canonicalObjects.filter((record) => {
     const payload = record.payload ?? record;
-    return isActiveDetailedStrengthSession(record) && dateOf(payload) === current.localDate && isNativeLiveLoggerSession(payload);
+    return isActiveDetailedStrengthSession(record) && dateOf(payload) === current.localDate && isTrustedNativeLiveLoggerSession(payload);
   });
   const sameDayStrengthWorkouts = canonicalWorkouts.filter((workout) =>
     workout?.current?.family === HealthKitWorkoutFamily.STRENGTH && workout.localDate === current.localDate);
@@ -121,6 +121,7 @@ export function assessHealthKitStrengthLinkCandidates({
         externalId: sourceId,
       }) === canonicalWorkout.id);
     const canonicalId = record.canonicalId ?? payload.id;
+    const trustedLoggerProvenance = isTrustedNativeLiveLoggerSession(payload);
     const normalized = normalizeSessionTimes(payload, current.timeZone, {
       serverCommitTimestamp: lookupCommitTimestamp(loggerSessionServerCommitTimestamps, canonicalId),
     });
@@ -167,6 +168,7 @@ export function assessHealthKitStrengthLinkCandidates({
         ? facts.endAligned
         : assessment.outcome === "duplicate" && facts.substantiveOverlap && (facts.startAligned || facts.endAligned)),
       substantiveOverlap: facts?.substantiveOverlap ?? false,
+      trustedLoggerProvenance,
       overlapSeconds: facts ? Math.round(facts.overlapMs / 1000) : null,
       startAligned: facts?.startAligned ?? null,
       endAligned: facts?.endAligned ?? null,
@@ -186,6 +188,7 @@ export function assessHealthKitStrengthLinkCandidates({
     reasons: Object.freeze([...candidate.reasons]),
     basis: candidate.basis,
     substantiveOverlap: candidate.substantiveOverlap,
+    trustedLoggerProvenance: candidate.trustedLoggerProvenance,
     overlapSeconds: candidate.overlapSeconds,
     startAligned: candidate.startAligned,
     endAligned: candidate.endAligned,
@@ -504,11 +507,11 @@ function normalizeSessionTimes(payload, timeZone, { serverCommitTimestamp = null
   const explicitEnd = metadata.end_time ?? metadata.ended_at ?? metadata.end ?? null;
   const start = normalizeWorkoutTimeToInstant(rawStart, { dateKey, timeZone });
   const syntheticNoonCapture = isSyntheticNoonCapture(payload.captured_at, dateKey);
-  const serverCommitEnd = explicitEnd === null && isNativeLiveLoggerSession(payload) &&
+  const serverCommitEnd = explicitEnd === null && isTrustedNativeLiveLoggerSession(payload) &&
     syntheticNoonCapture && validInstant(serverCommitTimestamp)
     ? new Date(serverCommitTimestamp).toISOString()
     : null;
-  const capturedEnd = isNativeLiveLoggerSession(payload) && !syntheticNoonCapture
+  const capturedEnd = isTrustedNativeLiveLoggerSession(payload) && !syntheticNoonCapture
     ? payload.captured_at ?? null
     : null;
   const rawEnd = explicitEnd ?? serverCommitEnd ??
@@ -551,7 +554,7 @@ function validInstant(value) {
   return value != null && !Number.isNaN(Date.parse(value));
 }
 
-function isNativeLiveLoggerSession(payload) {
+export function isTrustedNativeLiveLoggerSession(payload) {
   return payload?.metadata?.logger_origin === "training_logger" && payload?.metadata?.logger_mode === "live";
 }
 

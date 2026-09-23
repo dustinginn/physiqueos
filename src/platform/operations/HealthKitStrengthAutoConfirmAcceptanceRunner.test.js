@@ -71,7 +71,10 @@ describe("bounded Strength deterministic auto-confirm acceptance", () => {
     const records = await productionShapedWorld({ liveLogger: false });
     const before = records.snapshot();
     const result = await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, now: () => new Date(NOW) });
-    expect(result).toMatchObject({ outcome: "refused", reasons: ["deterministic_basis_not_allowlisted"] });
+    expect(result).toMatchObject({
+      outcome: "refused",
+      reasons: ["logger_session_provenance_untrusted", "deterministic_basis_not_allowlisted"],
+    });
     expect(records.snapshot()).toEqual(before);
   });
 

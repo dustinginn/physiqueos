@@ -8,6 +8,7 @@ import {
   selectStrategicallyEligibleRecords,
 } from "../../domain/services/HealthKitEvidenceEligibilityPolicy.js";
 import { resolveHealthKitWorkoutActivationPolicy } from "../../domain/services/HealthKitObservationService.js";
+import { confirmHealthKitWorkoutRelationship } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
 
 const OWNER = "user_founder_001";
 const WORKOUT_POLICY_ID = "healthkit_workout_canonical_activation_policy";
@@ -352,6 +353,149 @@ describe("controlled Workout window (policy enabled)", () => {
     expect(after.canonicalEvidenceObjects).toEqual(before.canonicalEvidenceObjects);
   });
 
+  it("freshly reassesses No match and atomically releases every current candidate link", async () => {
+    const records = store({ evidence: [logger("session-a", "10:04", "11:20", 4560)] });
+    await ingest(records, [workout()], "no-match-release");
+    const before = records.snapshot();
+    const [review] = before.evidenceReviews;
+    expect(before.healthKitWorkoutLinks).toEqual([expect.objectContaining({ status: "candidate" })]);
+    const result = await createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-23T23:31:00.000Z") })
+      .resolveWorkoutReconciliation({
+        ownerUserId: OWNER,
+        principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+        metadata: { commandId: "resolve-no-match-release", expectedVersion: String(review.version), idempotencyKey: "resolve-no-match-release" },
+        payload: { reviewId: review.id, action: "no_match" },
+      });
+    expect(result.result.status).toBe("resolved_no_match");
+    const after = records.snapshot();
+    expect(after.healthKitWorkoutLinks).toEqual([
+      expect.objectContaining({
+        status: "unlinked",
+        statusHistory: expect.arrayContaining([expect.objectContaining({ reason: "founder_explicit_no_match" })]),
+      }),
+    ]);
+    expect(after.healthKitWorkoutLinkClaims).toEqual([]);
+    expect(after.evidenceReviews[0]).toMatchObject({
+      status: "resolved_no_match",
+      resolution: { basis: { freshAssessmentOutcome: "possible_match", releasedCandidateLinkIds: [before.healthKitWorkoutLinks[0].id] } },
+    });
+  });
+
+  it("rejects a stale No match when the pending review's relationship was independently confirmed", async () => {
+    const records = store({ evidence: [logger("session-a", "10:04", "11:20", 4560)] });
+    await ingest(records, [workout()], "no-match-confirmed-race");
+    const before = records.snapshot();
+    const [review] = before.evidenceReviews;
+    const [candidate] = before.healthKitWorkoutLinks;
+    await confirmHealthKitWorkoutRelationship({
+      records,
+      ownerUserId: OWNER,
+      linkId: candidate.id,
+      by: { kind: "operator", ref: "independent-confirmation" },
+      now: "2026-09-23T23:30:30.000Z",
+    });
+    await expect(createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-23T23:31:00.000Z") })
+      .resolveWorkoutReconciliation({
+        ownerUserId: OWNER,
+        principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+        metadata: { commandId: "resolve-no-match-stale", expectedVersion: String(review.version), idempotencyKey: "resolve-no-match-stale" },
+        payload: { reviewId: review.id, action: "no_match" },
+      })).rejects.toMatchObject({ status: 409, code: "WORKOUT_RECONCILIATION_RELATIONSHIP_DRIFT" });
+    const after = records.snapshot();
+    expect(after.evidenceReviews[0].status).toBe("pending");
+    expect(after.healthKitWorkoutLinks[0].status).toBe("confirmed");
+    expect(after.healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
+  });
+
+  it("reopens a superseded review when a plausible relationship returns", async () => {
+    const records = store({ evidence: [logger("session-a", "10:04", "11:20", 4560)] });
+    await ingest(records, [workout()], "reopen-1");
+    const active = await records.get({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-a" });
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "canonicalEvidenceObjects",
+      recordId: "session-a",
+      expectedVersion: active.version,
+      payload: { ...active, quality: { status: "superseded" } },
+    });
+    await ingest(records, [workout()], "reopen-2");
+    expect(records.snapshot().evidenceReviews[0].status).toBe("superseded");
+    const superseded = await records.get({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-a" });
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "canonicalEvidenceObjects",
+      recordId: "session-a",
+      expectedVersion: superseded.version,
+      payload: { ...superseded, quality: { status: "active" } },
+    });
+    const replay = await ingest(records, [workout()], "reopen-3");
+    expect(replay.result.workoutRelationships.reconciliationReviewsReopened).toBe(1);
+    const review = records.snapshot().evidenceReviews[0];
+    expect(review).toMatchObject({ status: "pending", candidates: [{ loggerSessionCanonicalId: "session-a" }] });
+    expect(review.resolutionHistory).toEqual([]);
+    expect(review.lifecycleHistory.map((entry) => entry.status)).toEqual(["pending", "superseded", "pending"]);
+  });
+
+  it("transitions a superseded review to one durable auto-confirm resolution when deterministic facts return", async () => {
+    const sessionA = liveLogger("session-a", "10:01", "10:59");
+    const sessionB = liveLogger("session-b", "10:02", "11:01");
+    const records = store({ evidence: [sessionA, sessionB] });
+    await ingest(records, [workout()], "superseded-auto-1");
+    for (const id of ["session-a", "session-b"]) {
+      const active = await records.get({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: id });
+      await records.put({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: id, expectedVersion: active.version, payload: { ...active, quality: { status: "superseded" } } });
+    }
+    await ingest(records, [workout()], "superseded-auto-2");
+    expect(records.snapshot().evidenceReviews[0].status).toBe("superseded");
+    const a = await records.get({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-a" });
+    await records.put({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-a", expectedVersion: a.version, payload: { ...a, quality: { status: "active" } } });
+    const currentPolicy = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID });
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "healthKitConfiguration",
+      recordId: WORKOUT_POLICY_ID,
+      expectedVersion: currentPolicy.version,
+      payload: { ...currentPolicy, linkAutoConfirm: true, linkAutoConfirmEffectiveAt: "2026-09-23T23:00:00.000Z" },
+    });
+    const replay = await ingest(records, [workout()], "superseded-auto-3", { receivedAt: "2026-09-23T23:32:00.000Z" });
+    expect(replay.result.workoutRelationships.automaticallyConfirmed).toBe(1);
+    const review = records.snapshot().evidenceReviews[0];
+    expect(review).toMatchObject({ status: "resolved_confirmed", resolution: { action: "confirm" } });
+    expect(review.resolutionHistory).toHaveLength(1);
+    expect(review.lifecycleHistory.map((entry) => entry.status)).toEqual(["pending", "superseded", "resolved_confirmed"]);
+    await ingest(records, [workout()], "superseded-auto-4", { receivedAt: "2026-09-23T23:33:00.000Z" });
+    expect(records.snapshot().evidenceReviews[0].resolutionHistory).toHaveLength(1);
+  });
+
+  it("rejects reconciliation records at every generic canonical Evidence Review mutation port", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59"), logger("session-b", "10:02", "11:01")] });
+    await ingest(records, [workout()], "generic-port-guards");
+    const [review] = records.snapshot().evidenceReviews;
+    const ports = createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-23T23:31:00.000Z") });
+    const context = {
+      ownerUserId: OWNER,
+      principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+      metadata: { commandId: "generic-port-refusal", expectedVersion: String(review.version), idempotencyKey: "generic-port-refusal" },
+      payload: { reviewId: review.id, changes: { status: "confirmed" }, evidenceObjectId: "anything", measurements: {} },
+    };
+    for (const name of [
+      "editEvidenceReview",
+      "confirmEvidenceReview",
+      "confirmNutritionEvidence",
+      "confirmPhotoEvidence",
+      "confirmDexaEvidence",
+      "editDexaReview",
+      "requestEvidenceReviewConfirmation",
+      "disposeEvidenceReview",
+    ]) {
+      await expect(ports[name](context)).rejects.toMatchObject({
+        status: 409,
+        code: "WORKOUT_RECONCILIATION_ACTION_REQUIRED",
+      });
+    }
+    expect(records.snapshot().evidenceReviews[0]).toEqual(review);
+  });
+
   it("never overrides a terminal Founder no-match when later facts become uniquely auto-confirmable", async () => {
     const records = store({ evidence: [logger("session-a", "10:01", "10:59"), logger("session-b", "10:02", "11:01")] });
     await ingest(records, [workout()], "terminal-no-match-1");
@@ -583,6 +727,13 @@ function logger(id, start, end, duration = 3540) {
   };
 }
 
+function liveLogger(id, start, end, duration = 3540) {
+  const session = logger(id, start, end, duration);
+  session.payload.metadata.logger_origin = "training_logger";
+  session.payload.metadata.logger_mode = "live";
+  return session;
+}
+
 describe("review hardening: real storage, duplicates, and shapes", () => {
   // A jsonb column returns object keys shorter-first then bytewise, not in insertion order.
   const jsonbOrder = (value) => {
@@ -730,6 +881,32 @@ describe("link hardening through the real ingest path", () => {
           endAligned: false,
         })],
       }),
+    ]);
+  });
+
+  it("routes an aligned explicit identity from non-Logger evidence to review", async () => {
+    const explicit = logger("session-x", "10:00", "11:00");
+    explicit.payload.source = { application: "Evidence import", modality: "screenshot" };
+    explicit.payload.metadata.source_workout_id = HK_UUID;
+    const records = storeWithClaims({
+      evidence: [explicit],
+      workoutPolicyOverrides: {
+        linkAutoConfirm: true,
+        linkAutoConfirmEffectiveAt: "2026-09-23T23:00:00.000Z",
+      },
+    });
+    const result = await ingest(records, [workout()], "explicit-untrusted-provenance");
+    const snapshot = records.snapshot();
+    expect(result.result.workoutRelationships.automaticallyConfirmed ?? 0).toBe(0);
+    expect(result.result.workoutRelationships.automaticConfirmationRefusals).toEqual([
+      expect.objectContaining({ reasons: expect.arrayContaining(["logger_session_provenance_untrusted"]) }),
+    ]);
+    expect(snapshot.healthKitWorkoutLinks).toEqual([
+      expect.objectContaining({ status: "candidate", matchBasis: "explicit_source_identity" }),
+    ]);
+    expect(snapshot.healthKitWorkoutLinkClaims ?? []).toEqual([]);
+    expect(snapshot.evidenceReviews).toEqual([
+      expect.objectContaining({ status: "pending", candidates: [expect.objectContaining({ trustedLoggerProvenance: false })] }),
     ]);
   });
 

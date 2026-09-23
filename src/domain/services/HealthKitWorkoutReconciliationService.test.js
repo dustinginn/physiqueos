@@ -21,6 +21,7 @@ describe("deterministic Strength auto-confirm gate", () => {
         confidence: 95,
         basis: "logger_session_window",
         substantiveOverlap: null,
+        trustedLoggerProvenance: null,
         overlapSeconds: 3480,
         startAligned: true,
         endAligned: true,
@@ -146,6 +147,36 @@ describe("deterministic Strength auto-confirm gate", () => {
     expect(assessDeterministicStrengthAutoConfirm(world)).toMatchObject({
       eligible: false,
       reasons: ["logger_session_not_active_detailed_strength"],
+    });
+  });
+
+  it.each(["screenshot", "voice", "import", "manual"])("refuses aligned %s evidence without trusted live Logger provenance", (modality) => {
+    const world = fixture();
+    world.canonicalObjects[0] = {
+      ...world.canonicalObjects[0],
+      payload: {
+        ...world.canonicalObjects[0].payload,
+        source: { application: "Untrusted evidence", modality },
+        metadata: {
+          ...world.canonicalObjects[0].payload.metadata,
+          logger_origin: undefined,
+          logger_mode: undefined,
+        },
+      },
+    };
+    world.assessment = {
+      ...world.assessment,
+      candidates: [{
+        ...world.assessment.candidates[0],
+        confidence: 100,
+        basis: "explicit_source_identity",
+        substantiveOverlap: true,
+        trustedLoggerProvenance: false,
+      }],
+    };
+    expect(assessDeterministicStrengthAutoConfirm(world)).toMatchObject({
+      eligible: false,
+      reasons: expect.arrayContaining(["logger_session_provenance_untrusted"]),
     });
   });
 });

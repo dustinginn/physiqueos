@@ -69,7 +69,11 @@ import {
   refreshHealthKitWorkoutLinkCandidate,
   unlinkHealthKitWorkoutLink,
 } from "../../domain/services/HealthKitWorkoutLinkService.js";
-import { confirmHealthKitWorkoutRelationship } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
+import {
+  HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
+  confirmHealthKitWorkoutRelationship,
+  unlinkHealthKitWorkoutRelationship,
+} from "../../domain/services/HealthKitWorkoutRelationshipService.js";
 import {
   HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
   HealthKitWorkoutReconciliationAction,
@@ -77,8 +81,11 @@ import {
   createHealthKitWorkoutReconciliationReview,
   getHealthKitWorkoutReconciliationId,
   isHealthKitWorkoutReconciliationReview,
+  reopenHealthKitWorkoutReconciliationReview,
   refreshHealthKitWorkoutReconciliationReview,
+  refreshSupersededHealthKitWorkoutReconciliationFacts,
   resolveHealthKitWorkoutReconciliationRecord,
+  supersedeHealthKitWorkoutReconciliationReview,
 } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 import {
   HEALTHKIT_CANONICAL_DAY_COLLECTION,
@@ -223,8 +230,8 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       id: context.payload.submissionId, userId: context.ownerUserId, status: "pending_review",
       ...context.payload, provenance: commandProvenance(context),
     }, context.payload.sourceIdentity ?? context.payload.submissionId),
-    editEvidenceReview: edit("evidenceReviews", "reviewId"),
-    confirmEvidenceReview: review("confirmed"),
+    editEvidenceReview: guardedGenericEvidenceReviewMutation(edit("evidenceReviews", "reviewId")),
+    confirmEvidenceReview: guardedGenericEvidenceReviewMutation(review("confirmed")),
     disposeEvidenceReview,
     resolveWorkoutReconciliation,
     completePriority: completeCanonicalPriority,
@@ -244,9 +251,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     }, context.payload.sourceIdentity ?? context.payload.sessionId),
     correctTrainingSession: edit("trainingPerformanceEvents", "sessionId"),
     completeTrainingLogger: completeOccurrence("trainingPerformanceEvents", "draftId", "reconciliations", "localDate"),
-    confirmNutritionEvidence: review("confirmed_nutrition"),
-    confirmPhotoEvidence: review("confirmed_photo"),
-    confirmDexaEvidence: review("confirmed_dexa"),
+    confirmNutritionEvidence: guardedGenericEvidenceReviewMutation(review("confirmed_nutrition")),
+    confirmPhotoEvidence: guardedGenericEvidenceReviewMutation(review("confirmed_photo")),
+    confirmDexaEvidence: guardedGenericEvidenceReviewMutation(review("confirmed_dexa")),
     upsertNutritionDay: (context) => commitDailyEvidence(context, {
       evidenceType: "nutrition",
       payload: {
@@ -327,6 +334,20 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     changeSupplementLifecycle,
     saveCoachingUpdates,
   });
+
+  function guardedGenericEvidenceReviewMutation(mutation) {
+    return async (context) => {
+      const candidate = await ownedRecord(context, "evidenceReviews", context.payload.reviewId);
+      assertNotWorkoutReconciliationGenericMutation(candidate);
+      return mutation(context);
+    };
+  }
+
+  function assertNotWorkoutReconciliationGenericMutation(candidate) {
+    if (isHealthKitWorkoutReconciliationReview(candidate)) {
+      throw problem(409, "WORKOUT_RECONCILIATION_ACTION_REQUIRED", "Workout reconciliation must use its guarded resolution command.");
+    }
+  }
 
   async function ingestHealthKitObservations(context) {
     if (typeof records.putIfAbsent !== "function") {
@@ -777,6 +798,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       automaticConfirmationRefusals: [],
       reconciliationReviewsCreated: 0,
       reconciliationReviewsRefreshed: 0,
+      reconciliationReviewsReopened: 0,
       reconciliationReviewsSuperseded: 0,
     };
     const at = now().toISOString();
@@ -913,13 +935,20 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
               payload: desired,
             });
             if (created.created) summary.reconciliationReviewsCreated += 1;
-          } else if (isHealthKitWorkoutReconciliationReview(existingReview) && existingReview.status === "pending") {
-            const refreshed = refreshHealthKitWorkoutReconciliationReview(existingReview, {
-              canonicalWorkout: workout,
-              assessment,
-              canonicalObjects,
-              now: at,
-            });
+          } else if (isHealthKitWorkoutReconciliationReview(existingReview) && ["pending", "superseded"].includes(existingReview.status)) {
+            const refreshed = existingReview.status === "superseded"
+              ? reopenHealthKitWorkoutReconciliationReview(existingReview, {
+                  canonicalWorkout: workout,
+                  assessment,
+                  canonicalObjects,
+                  now: at,
+                })
+              : refreshHealthKitWorkoutReconciliationReview(existingReview, {
+                  canonicalWorkout: workout,
+                  assessment,
+                  canonicalObjects,
+                  now: at,
+                });
             if (refreshed !== existingReview) {
               await records.put({
                 ownerUserId: context.ownerUserId,
@@ -929,7 +958,8 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
                 sourceIdentity: reviewId,
                 payload: refreshed,
               });
-              summary.reconciliationReviewsRefreshed += 1;
+              if (existingReview.status === "superseded") summary.reconciliationReviewsReopened += 1;
+              else summary.reconciliationReviewsRefreshed += 1;
             }
           }
         } else if (isHealthKitWorkoutReconciliationReview(existingReview) && existingReview.status === "pending" &&
@@ -940,7 +970,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
             recordId: reviewId,
             expectedVersion: existingReview.version,
             sourceIdentity: reviewId,
-            payload: { ...existingReview, status: "superseded", updatedAt: at },
+            payload: supersedeHealthKitWorkoutReconciliationReview(existingReview, { now: at }),
           });
           summary.reconciliationReviewsSuperseded += 1;
         }
@@ -972,7 +1002,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
             summary.automaticallyConfirmed += confirmed.outcome === "confirmed" ? 1 : 0;
 
             const historyBase = existingReview && isHealthKitWorkoutReconciliationReview(existingReview)
-              ? existingReview
+              ? refreshSupersededHealthKitWorkoutReconciliationFacts(existingReview, {
+                  canonicalWorkout: workout,
+                  assessment,
+                  canonicalObjects,
+                  now: at,
+                })
               : createHealthKitWorkoutReconciliationReview({
                   ownerUserId: context.ownerUserId,
                   canonicalWorkout: workout,
@@ -987,6 +1022,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
               by: { kind: "system_matcher", ref: gate.ruleVersion },
               now: at,
               basis: { mode: "deterministic_auto_confirm", ruleVersion: gate.ruleVersion },
+              allowSuperseded: true,
             });
             if (!existingReview) {
               await records.putIfAbsent({
@@ -996,7 +1032,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
                 sourceIdentity: reviewId,
                 payload: resolved,
               });
-            } else if (existingReview.status === "pending") {
+            } else if (["pending", "superseded"].includes(existingReview.status)) {
               await records.put({
                 ownerUserId: context.ownerUserId,
                 collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
@@ -2007,6 +2043,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
 
   async function editDexaReview(context) {
     const review = await ownedRecord(context, "evidenceReviews", context.payload.reviewId);
+    assertNotWorkoutReconciliationGenericMutation(review);
     requireExpectedVersion(context, review, `evidence-review:${review.id}`);
     if (!["pending", "commit_failed"].includes(review.status)) {
       throw problem(409, "DEXA_REVIEW_NOT_EDITABLE", "This DEXA review cannot be edited.");
@@ -2044,6 +2081,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
 
   async function requestEvidenceReviewConfirmation(context) {
     const review = await ownedRecord(context, "evidenceReviews", context.payload.reviewId);
+    assertNotWorkoutReconciliationGenericMutation(review);
     if (review.status === "confirmed") {
       return { status: "committed", result: { status: "confirmed", reviewId: review.id, revision: review.version }, outbox: [] };
     }
@@ -2125,12 +2163,66 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     const action = context.payload.action;
     const at = now().toISOString();
     const by = { kind: "founder", ref: context.metadata.commandId };
+    const selectedSessionId = context.payload.loggerSessionCanonicalId;
+    const [canonicalWorkout, canonicalObjects, canonicalObjectStorageMetadata, canonicalWorkouts, workoutLinks, workoutLinkClaims] = await Promise.all([
+      records.get({
+        ownerUserId: context.ownerUserId,
+        collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
+        recordId: review.canonicalWorkoutId,
+      }),
+      records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
+      records.listStorageMetadata({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
+      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION }),
+      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION }),
+      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION }),
+    ]);
+    if (!canonicalWorkout || canonicalWorkout.current?.family !== HealthKitWorkoutFamily.STRENGTH) {
+      throw problem(409, "WORKOUT_RECONCILIATION_STALE", "The Apple Health Strength workout is no longer available.");
+    }
+    const assessment = assessHealthKitStrengthLinkCandidates({
+      canonicalWorkout,
+      canonicalObjects,
+      existingLinks: workoutLinks,
+      canonicalWorkouts,
+      loggerSessionServerCommitTimestamps: new Map(canonicalObjectStorageMetadata.map((row) => [row.recordId, row.createdAt])),
+    });
     if (action === HealthKitWorkoutReconciliationAction.NO_MATCH) {
-      const resolved = resolveHealthKitWorkoutReconciliationRecord(review, {
+      const relationshipLinks = workoutLinks.filter((link) => link.canonicalWorkoutId === review.canonicalWorkoutId);
+      const relationshipLinkIds = new Set(relationshipLinks.map((link) => link.id));
+      const confirmed = relationshipLinks.filter((link) => link.status === HealthKitWorkoutLinkStatus.CONFIRMED);
+      const heldClaims = workoutLinkClaims.filter((claim) =>
+        claim.status === "held" && relationshipLinkIds.has(claim.holderLinkId));
+      if (confirmed.length > 0 || heldClaims.length > 0) {
+        throw problem(409, "WORKOUT_RECONCILIATION_RELATIONSHIP_DRIFT", "The workout relationship changed before No match could be recorded.");
+      }
+      const releasedCandidateLinkIds = [];
+      for (const link of relationshipLinks.filter((item) => item.status === HealthKitWorkoutLinkStatus.CANDIDATE)) {
+        const released = await unlinkHealthKitWorkoutRelationship({
+          records,
+          ownerUserId: context.ownerUserId,
+          linkId: link.id,
+          by,
+          now: at,
+          reason: "founder_explicit_no_match",
+        });
+        if (released.outcome === "unlinked") releasedCandidateLinkIds.push(link.id);
+      }
+      const freshReview = refreshHealthKitWorkoutReconciliationReview(review, {
+        canonicalWorkout,
+        assessment,
+        canonicalObjects,
+        now: at,
+      });
+      const resolved = resolveHealthKitWorkoutReconciliationRecord(freshReview, {
         action,
         by,
         now: at,
-        basis: { mode: "founder_explicit_no_match", matcherVersion: review.matcherVersion },
+        basis: {
+          mode: "founder_explicit_no_match",
+          matcherVersion: assessment.matcherVersion,
+          freshAssessmentOutcome: assessment.outcome,
+          releasedCandidateLinkIds,
+        },
       });
       const saved = await records.put({
         ownerUserId: context.ownerUserId,
@@ -2146,29 +2238,6 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         outbox: [],
       };
     }
-
-    const selectedSessionId = context.payload.loggerSessionCanonicalId;
-    const [canonicalWorkout, canonicalObjects, canonicalObjectStorageMetadata, canonicalWorkouts, workoutLinks] = await Promise.all([
-      records.get({
-        ownerUserId: context.ownerUserId,
-        collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
-        recordId: review.canonicalWorkoutId,
-      }),
-      records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
-      records.listStorageMetadata({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
-      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION }),
-      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION }),
-    ]);
-    if (!canonicalWorkout || canonicalWorkout.current?.family !== HealthKitWorkoutFamily.STRENGTH) {
-      throw problem(409, "WORKOUT_RECONCILIATION_STALE", "The Apple Health Strength workout is no longer available.");
-    }
-    const assessment = assessHealthKitStrengthLinkCandidates({
-      canonicalWorkout,
-      canonicalObjects,
-      existingLinks: workoutLinks,
-      canonicalWorkouts,
-      loggerSessionServerCommitTimestamps: new Map(canonicalObjectStorageMetadata.map((row) => [row.recordId, row.createdAt])),
-    });
     const selected = assessment.candidates.find((candidate) =>
       candidate.loggerSessionCanonicalId === selectedSessionId);
     if (!selected) {
@@ -2226,7 +2295,13 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       if (error?.code) throw problem(409, error.code, error.message);
       throw error;
     }
-    const resolved = resolveHealthKitWorkoutReconciliationRecord(review, {
+    const freshReview = refreshHealthKitWorkoutReconciliationReview(review, {
+      canonicalWorkout,
+      assessment,
+      canonicalObjects,
+      now: at,
+    });
+    const resolved = resolveHealthKitWorkoutReconciliationRecord(freshReview, {
       action: HealthKitWorkoutReconciliationAction.CONFIRM,
       selectedLoggerSessionCanonicalId: selectedSessionId,
       linkId: confirmed.link.id,
@@ -2264,6 +2339,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
 
   async function disposeEvidenceReview(context) {
     const review = await ownedRecord(context, "evidenceReviews", context.payload.reviewId);
+    assertNotWorkoutReconciliationGenericMutation(review);
     requireExpectedVersion(context, review, `evidence-review:${review.id}`);
     if (!["pending", "commit_failed"].includes(review.status)) {
       throw problem(409, "EVIDENCE_REVIEW_NOT_DISMISSIBLE", "This evidence review cannot be dismissed.");
