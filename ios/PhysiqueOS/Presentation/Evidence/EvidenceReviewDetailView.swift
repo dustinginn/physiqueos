@@ -617,6 +617,7 @@ struct EvidenceReviewDetailView: View {
             ])
             if Self.reconciliationCommandResultMatches(
                 result,
+                requestedReviewId: review.id,
                 requestedAction: requestedAction,
                 loggerSessionCanonicalId: loggerSessionCanonicalId
             ) {
@@ -625,6 +626,7 @@ struct EvidenceReviewDetailView: View {
                 state = .loaded(refreshed)
                 actionState = Self.reconciliationResolutionMatches(
                     refreshed,
+                    requestedReviewId: review.id,
                     requestedAction: requestedAction,
                     loggerSessionCanonicalId: loggerSessionCanonicalId
                 )
@@ -639,6 +641,7 @@ struct EvidenceReviewDetailView: View {
                     state = .loaded(refreshed)
                     actionState = Self.reconciliationResolutionMatches(
                         refreshed,
+                        requestedReviewId: review.id,
                         requestedAction: requestedAction,
                         loggerSessionCanonicalId: loggerSessionCanonicalId
                     )
@@ -655,9 +658,11 @@ struct EvidenceReviewDetailView: View {
 
     static func reconciliationResolutionMatches(
         _ review: EvidenceReviewDetailReadModel,
+        requestedReviewId: String,
         requestedAction: String,
         loggerSessionCanonicalId: String?
     ) -> Bool {
+        guard review.id == requestedReviewId, let version = review.version, version > 0 else { return false }
         guard let resolution = review.workoutReconciliation?.resolution else { return false }
         if requestedAction == "no_match" {
             return review.status == "resolved_no_match" &&
@@ -673,10 +678,13 @@ struct EvidenceReviewDetailView: View {
 
     static func reconciliationCommandResultMatches(
         _ result: WorkoutReconciliationCommandResult,
+        requestedReviewId: String,
         requestedAction: String,
         loggerSessionCanonicalId: String?
     ) -> Bool {
-        guard result.status == (requestedAction == "no_match" ? "resolved_no_match" : "resolved_confirmed"),
+        guard result.reviewId == requestedReviewId,
+              let revision = result.revision, revision > 0,
+              result.status == (requestedAction == "no_match" ? "resolved_no_match" : "resolved_confirmed"),
               let resolution = result.resolution,
               resolution.action == requestedAction
         else { return false }

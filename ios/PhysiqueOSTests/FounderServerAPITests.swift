@@ -2162,16 +2162,19 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(decoded.workoutReconciliation?.resolution?.selectedLoggerSessionCanonicalId, "logger-a")
         XCTAssertTrue(EvidenceReviewDetailView.reconciliationResolutionMatches(
             decoded,
+            requestedReviewId: decoded.id,
             requestedAction: "confirm",
             loggerSessionCanonicalId: "logger-a"
         ))
         XCTAssertFalse(EvidenceReviewDetailView.reconciliationResolutionMatches(
             decoded,
+            requestedReviewId: decoded.id,
             requestedAction: "confirm",
             loggerSessionCanonicalId: "logger-b"
         ))
         XCTAssertFalse(EvidenceReviewDetailView.reconciliationResolutionMatches(
             decoded,
+            requestedReviewId: decoded.id,
             requestedAction: "no_match",
             loggerSessionCanonicalId: nil
         ))
@@ -2254,13 +2257,29 @@ final class FounderServerAPITests: XCTestCase {
 
         XCTAssertTrue(EvidenceReviewDetailView.reconciliationResolutionMatches(
             review,
+            requestedReviewId: review.id,
             requestedAction: "no_match",
             loggerSessionCanonicalId: nil
         ))
         XCTAssertFalse(EvidenceReviewDetailView.reconciliationResolutionMatches(
             review,
+            requestedReviewId: review.id,
             requestedAction: "confirm",
             loggerSessionCanonicalId: "logger-a"
+        ))
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationResolutionMatches(
+            review,
+            requestedReviewId: "review-other",
+            requestedAction: "no_match",
+            loggerSessionCanonicalId: nil
+        ))
+        var missingRevision = review
+        missingRevision.version = nil
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationResolutionMatches(
+            missingRevision,
+            requestedReviewId: review.id,
+            requestedAction: "no_match",
+            loggerSessionCanonicalId: nil
         ))
     }
 
@@ -2274,22 +2293,38 @@ final class FounderServerAPITests: XCTestCase {
         )
         XCTAssertTrue(EvidenceReviewDetailView.reconciliationCommandResultMatches(
             confirmed,
+            requestedReviewId: "review-one",
             requestedAction: "confirm",
             loggerSessionCanonicalId: "logger-a"
         ))
         XCTAssertFalse(EvidenceReviewDetailView.reconciliationCommandResultMatches(
             confirmed,
+            requestedReviewId: "review-one",
             requestedAction: "confirm",
             loggerSessionCanonicalId: "logger-b"
         ))
         XCTAssertFalse(EvidenceReviewDetailView.reconciliationCommandResultMatches(
             .init(status: "already_resolved", reviewId: "review-one", revision: 3, resolution: confirmed.resolution),
+            requestedReviewId: "review-one",
             requestedAction: "confirm",
             loggerSessionCanonicalId: "logger-a"
         ))
         XCTAssertFalse(EvidenceReviewDetailView.reconciliationCommandResultMatches(
             .init(status: "resolved_confirmed", reviewId: "review-one", revision: 3,
                   resolution: .init(action: "confirm", selectedLoggerSessionCanonicalId: "logger-a", linkId: nil)),
+            requestedReviewId: "review-one",
+            requestedAction: "confirm",
+            loggerSessionCanonicalId: "logger-a"
+        ))
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationCommandResultMatches(
+            .init(status: "resolved_confirmed", reviewId: "review-other", revision: 3, resolution: confirmed.resolution),
+            requestedReviewId: "review-one",
+            requestedAction: "confirm",
+            loggerSessionCanonicalId: "logger-a"
+        ))
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationCommandResultMatches(
+            .init(status: "resolved_confirmed", reviewId: "review-one", revision: nil, resolution: confirmed.resolution),
+            requestedReviewId: "review-one",
             requestedAction: "confirm",
             loggerSessionCanonicalId: "logger-a"
         ))

@@ -66,11 +66,12 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
         let envelope = try await api.readResource("evidence-review", query: ["reviewId": reviewId], policy: .reload, as: Payload.self)
         guard let review = envelope.data.review else { return nil }
         let reconciliation = envelope.data.presentation?.workoutReconciliation
+        let isReconciliation = reconciliation != nil
         return EvidenceReviewDetailReadModel(
-            id: review.id,
-            status: review.status,
+            id: isReconciliation ? (envelope.data.presentation?.id ?? "") : review.id,
+            status: isReconciliation ? (envelope.data.presentation?.status ?? "invalid_terminal_history") : review.status,
             createdAt: review.createdAt,
-            version: review.version,
+            version: isReconciliation ? Int(envelope.data.presentation?.version ?? "") : review.version,
             items: (envelope.data.presentation?.items ?? []).map { item in
                 let raw = (review.interpretedEvidence?.evidenceObjects ?? []).first { $0.id == item.object?.id }
                 return EvidenceReviewDetailItem(
@@ -170,6 +171,9 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
 
     private struct Presentation: Decodable {
         var kind: String?
+        var id: String?
+        var status: String?
+        var version: String?
         var localDate: String?
         var title: String?
         var items: [PresentedItem]
@@ -264,12 +268,15 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
         }
 
         private enum CodingKeys: String, CodingKey {
-            case kind, localDate, title, items, summary, workout, candidates, resolution
+            case kind, id, status, version, localDate, title, items, summary, workout, candidates, resolution
         }
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             kind = try container.decodeIfPresent(String.self, forKey: .kind)
+            id = try container.decodeIfPresent(String.self, forKey: .id)
+            status = try container.decodeIfPresent(String.self, forKey: .status)
+            version = try container.decodeIfPresent(String.self, forKey: .version)
             localDate = try container.decodeIfPresent(String.self, forKey: .localDate)
             title = try container.decodeIfPresent(String.self, forKey: .title)
             items = try container.decodeIfPresent([PresentedItem].self, forKey: .items) ?? []
