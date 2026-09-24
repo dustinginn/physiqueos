@@ -1,52 +1,56 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T02:04:46Z",
+  "generated_at_utc": "2026-09-24T02:20:53Z",
   "task": {
-    "id": "codex-strength-reconciliation-server-deployed-20260923",
-    "title": "Strength reconciliation Server deployment",
+    "id": "codex-strength-reconciliation-build56-testflight-valid-20260923",
+    "title": "Upload reviewed Native Build 56 to TestFlight",
     "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "31c88481d80703de3355c51f6695b760b0671020",
-    "final_sha": "cb9d14f90ac6851bd7f3cb884b76cba98a3774ce",
+    "base_sha": "621dbef3cdcf17009e346111e4a86d14b70ed896",
+    "final_sha": "de0d3829836dd2e84327d268d4682c97260260e6",
     "production_server_sha": "cb9d14f90ac6851bd7f3cb884b76cba98a3774ce",
     "production_deployment": "6c82ac17-00cd-41c0-ad06-5cdbf605ff1c",
     "native_sha": "de0d3829836dd2e84327d268d4682c97260260e6",
     "native_build": 56
   },
   "result": {
-    "summary": "Exact reviewed Server cb9d14f9 is ACTIVE in deployment 6c82ac17 with exact web/worker source and runtime stamps, green live/ready health, and identical pre/post zero-write audits. Build 56, the September 23 candidate, strategic eligibility, and Cardio remain untouched.",
+    "summary": "Archived and uploaded exact reviewed Native candidate de0d3829836dd2e84327d268d4682c97260260e6 as PhysiqueOS 1.0 (56) through the guarded App Store Connect release path. The dry run passed all gates; delivery e70327a2-7501-402b-ab9c-712ae61cafbb reached Apple build/import VALID and was independently verified on App Store Connect. Production Server and data, the September 23 relationship, Workout policy and strategic eligibility, Cardio, and the Activity/Nutrition revision-loop backlog were untouched.",
     "success": true,
-    "production_mutated": true,
-    "deployed": true,
-    "testflight_uploaded": false
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Deployment authority verified at the remote branch, immutable deployment source/spec, web audit runtime, worker log runtime, and public live/ready endpoints."
+      "summary": "The exact reviewed candidate retained its 1,311-test full Native unit pass, focused reconciliation coverage, and final 243-test independent Founder Server API/Training Logger pass on the sole iPhone 17 Pro simulator. Fresh release metadata verification passed; the signed arm64 archive completed successfully with matching app/dSYM UUID 38D00663-7A26-38CA-8193-CB9B2EC50332."
     },
     "review": {
       "status": "approved",
-      "summary": "Deployed exact candidate was previously approved with no findings by the tenth fresh-context independent review."
+      "summary": "The tenth fresh-context review approved exact Server cb9d14f9 and Native de0d3829 with no findings. The Native source was clean at the exact reviewed SHA before and after archive/upload."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Identical bounded pre/post September 23 audits under REPEATABLE READ READ ONLY and explicit ROLLBACK; all policy, relationship, claim, strategic, Activity/Nutrition-adjacent, and migration counts/digests unchanged."
+      "summary": "This chunk invoked only Native archive, release upload/status, targeted local build-product cleanup, and handoff publication. No Server endpoint, production database command, relationship command, policy command, strategic-eligibility command, Cardio action, or Activity/Nutrition implementation action was invoked."
     }
   },
-  "decisions_required": [],
+  "decisions_required": [
+    "The existing September 23 candidate remains unconfirmed. Its bounded deterministic acceptance apply requires separate Founder authorization.",
+    "Workout linkAutoConfirm and strategic eligibility remain off; neither may change without separate Founder authorization.",
+    "Cardio and the Activity/Nutrition revision-loop implementation remain not started."
+  ],
   "blockers": [],
-  "unexpected_findings": [
-    "The stamp-only deployment again selected stale source 31c88481; the required force rebuild canceled it before activation and deployed exact cb9d14f9."
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Keep Build 56 upload, September 23 relationship confirmation, strategic eligibility, and Cardio separately gated."
+    "Perform real-device Build 56 read-only UX acceptance without repeating the workout or using manual canary sync.",
+    "Separately authorize and audit the bounded September 23 deterministic acceptance only if desired; keep strategic eligibility quarantined.",
+    "Publish the final Strength verdict before Cardio."
   ],
-  "recommended_next_step": "Stop and await separate Founder authorization for any Build 56 upload, September 23 relationship confirmation, strategic eligibility change, or Cardio work.",
-  "full_report_path": "agent-handoffs/reports/20260924T020446Z-strength-reconciliation-server-deployed.md",
+  "recommended_next_step": "Install Build 56 on the iPhone 17 Pro and perform the documented read-only Strength reconciliation UX acceptance. Installing or reading Build 56 cannot by itself confirm the existing candidate while linkAutoConfirm remains off; any bounded September 23 acceptance apply remains a separate authorization gate.",
+  "full_report_path": "agent-handoffs/reports/20260924T022053Z-strength-reconciliation-build56-testflight-valid.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
