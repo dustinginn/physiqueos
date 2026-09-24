@@ -1,73 +1,80 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T15:20:00Z",
+  "generated_at_utc": "2026-09-24T18:15:00Z",
   "task": {
-    "id": "codex-to-claude-healthkit-transition-20260924",
-    "title": "Codex-to-Claude HealthKit transition",
-    "agent": "codex",
-    "status": "handed_off"
+    "id": "claude-healthkit-activity-workout-cardio-reconciliation-20260924",
+    "title": "HealthKit Activity/Workout/Cardio bounded forensic reconciliation",
+    "agent": "claude",
+    "status": "awaiting_founder_direction"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
-    "final_sha": "19cbfa10740c0ff5d10e638b57883027349c4b31",
+    "native_final_sha": "19cbfa10740c0ff5d10e638b57883027349c4b31",
+    "native_release_sha": "fd7eed02add35bb9016dcd873018cd0c4ef43265",
     "native_branch": "codex/healthkit-revision-recovery-native",
     "native_worktree": "/private/tmp/physiqueos-healthkit-revision-recovery-native",
-    "server_candidate_sha": "07ed8230be28c2bc4989e2167b028d0bf425c6fa",
-    "server_candidate_branch": "codex/healthkit-current-day-review-server",
-    "production_server_sha": "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d",
-    "production_deployment": "e8c3bed3-20f6-4f5c-b34a-d27ab0881480",
-    "installed_native_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
-    "installed_native_build": 57
+    "installed_native_build": 58,
+    "native_testflight_delivery_id": "d9e5461e-6e4e-4ad4-bd19-07fd530d8a71",
+    "native_apple_build_status": "VALID",
+    "server_corrected_sha": "f8c28700ae32c3a01b1859a988df5f8177a3dd0b",
+    "server_branch": "codex/healthkit-current-day-review-server",
+    "server_worktree": "/private/tmp/physiqueos-healthkit-current-day-review-server",
+    "production_server_sha": "f8c28700ae32c3a01b1859a988df5f8177a3dd0b",
+    "production_deployment": "b3e48c28-b002-4b5e-a48b-22acccba8093"
   },
   "result": {
-    "summary": "Codex completed a clean fresh-context review of exact Native 19cbfa10740c0ff5d10e638b57883027349c4b31 and Server companion 07ed8230be28c2bc4989e2167b028d0bf425c6fa, then published comprehensive authority for Claude Remote Control takeover from the exact existing Native worktree. Production remains 28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d and the Founder phone remains on Build 57.",
+    "summary": "Claude corrected a build-breaking defect in the reviewed Server candidate, deployed it to production, archived/uploaded Native Build 58 (Apple VALID), and completed a bounded read-only forensic reconciliation of Sep23 Activity history/detail divergence, Sep24 workout attribution, the 94-minute Strength presentation defect, and a Cardio graduation design. September 23 Activity self-healed automatically (canonical revision 51/51, complete_day) and its previously-planned device repair is NOT required. September 24 current-day Activity/Nutrition acceptance is healthy. No production mutation, policy change, Cardio activation, September 23 repair, or Founder-device operation occurred.",
     "success": true,
     "production_mutated": false,
-    "deployed": false,
-    "testflight_uploaded": false,
+    "deployed": true,
+    "testflight_uploaded": true,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Native focused 277/277 and expanded 349/349 passed on the sole iPhone 17 Pro simulator. Server critical 89/89 and reviewer rerun 83/83 passed."
+      "summary": "Corrected Server candidate: directly-affected suites 95/95, full package7 555/561 and native-sandbox 272/274 (8 pre-existing unrelated failures, confirmed identical to baseline). Real production-shaped webpack build passed twice against successive corrected SHAs."
     },
     "review": {
       "status": "approved",
-      "summary": "Second fresh-context adversarial review approved both exact frozen candidates with no remaining findings."
+      "summary": "Two independent fresh-context reviews of the Server correction: first APPROVE WITH CONCERNS (one real regression-test coverage gap), gap closed, second APPROVE with no concerns."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "No deployment, archive, upload, Founder-device operation, September 23 repair, production data mutation, policy/strategic change, Strength mutation, or Cardio work occurred."
+      "summary": "Pre/post zero-write HealthKit/Strength/policy audits byte-identical across both the Server deploy attempt and the successful deploy. This forensic reconciliation task performed only bounded read-only production reads (including two one-off, narrowly-scoped, non-committed diagnostic scripts run once each under the same safety contract) and zero writes."
     }
   },
   "decisions_required": [
-    "Explicit Founder authorization is required before deploying Server 07ed8230be28c2bc4989e2167b028d0bf425c6fa.",
-    "Native archive/TestFlight upload requires a separate authorization after the Server contract is live.",
-    "Founder-device operation, September 23 dry-run, and September 23 apply each remain separately gated."
+    "Whether to authorize the Native presentation fix for Sep23 Activity History/Detail cache-key consistency (own build/TestFlight cycle).",
+    "Whether to authorize the Server presentation-layer fix for the Sep24 94-minute Strength duration defect, and separately whether to authorize a bounded correction of the one already-frozen Sep24 Logger evidence package's synthetic timing.",
+    "Cardio graduation: four separate, sequential authorization gates (deactivate workout policy; reactivate with families:[cardio,strength]; bounded reconciliation of the two specific already-deferred Sep24 Indoor Walk observations; and, as a separate later decision, wiring Cardio into Activity-total derivation/presentation, which is currently dead/unwired code).",
+    "Founder-device gate: verify Build 58's real-device current-day acceptance continues to hold under ordinary use.",
+    "September 23 Activity repair: NOT required per this audit's findings (canonical day already self-healed to revision 51/complete_day) -- no dry-run/apply authorization needed unless new evidence contradicts this."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "The last bounded production audit found September 24 Activity and Nutrition absent; those are last-observed facts, not a claim about unseen current device state.",
-    "The Strength relationship is fully confirmed and green, while its Log-row Apple Health provenance label remained pending explicit Founder observation in the last acceptance checkpoint."
+    "The reviewed-and-approved Server candidate 07ed8230be28c2bc4989e2167b028d0bf425c6fa failed a real production webpack build (duplicate readBuildIdentity import) that node --check and the prior review method did not catch; corrected as f8c28700ae32c3a01b1859a988df5f8177a3dd0b with a new regression test for this exact failure class.",
+    "September 23 Activity's canonical day self-healed to revision 51/complete_day via ordinary automatic sync with no repair applied, while the Activity Day Detail screen kept showing a stale revision-50 snapshot due to a Native client-side cache-key collision/asymmetry -- a presentation bug, not a database problem.",
+    "The Sep24 Strength Logger session's frozen 94-minute duration is a known, code-acknowledged fallback mechanism (server-side commit-instant substituted for a missing Native finishedAt) that 'cannot move on reconciliation replay' even after the real, correct HealthKit workout later arrives.",
+    "Both Sep24 Indoor Walk observations reached the Server successfully and are correctly deferred (family_not_in_activation_scope, not lost/errored) under the current Strength-only workout policy; once deferred, an observation identity is never automatically reconsidered even after policy widens -- a new bounded reconciliation runner would need to be built.",
+    "The Cardio Activity-total derivation model (composeDailyActiveEnergyWithWorkouts) already exists and is correct but is unwired dead code -- canonicalizing Cardio workouts today would not change any number or add any visible surface in the shipped app without additional, separately-authorized engineering."
   ],
   "backlog": [
-    "Guarded Server deployment of exact 07ed8230be28c2bc4989e2167b028d0bf425c6fa after authorization.",
-    "Guarded release of exact Native 19cbfa10740c0ff5d10e638b57883027349c4b31 after separate authorization and Server activation.",
-    "Real-device current-day acceptance, then bounded September 23 read-only dry-run and separately authorized apply/post-write audit.",
-    "Begin Cardio only after HealthKit Activity reaches its final accepted verdict."
+    "Native fix: Sep23 Activity History/Detail cache-key consistency (ActivityDayView.swift / ProductionDailyDriverAPI.swift).",
+    "Server fix: stop presenting the Sep24 Logger session's synthetic 94-minute duration as if HK-sourced; optional bounded correction of that one frozen evidence package.",
+    "Cardio graduation: deactivate -> reactivate workout policy with families:[cardio,strength] (two separate authorizations, executed back-to-back with no gap, per the identified legacy-matcher transitional risk) -> bounded reconciliation of the two named Sep24 deferred Indoor Walk observations -> (separate decision) wire Activity-total derivation and a presentation surface for Cardio.",
+    "Founder-device real-use verification that Build 58's current-day acceptance holds over time (no 409 loop, continued revision advancement)."
   ],
-  "recommended_next_step": "Claude should await Founder direction through Remote Control from /private/tmp/physiqueos-healthkit-revision-recovery-native. Do not deploy, archive/upload, operate the phone, repair September 23, change policy/strategic eligibility, or begin Cardio without the matching authorization.",
-  "full_report_path": "agent-handoffs/reports/20260924T152000Z-codex-to-claude-healthkit-transition.md",
+  "recommended_next_step": "Claude should await Founder direction through Remote Control from /private/tmp/physiqueos-healthkit-revision-recovery-native (Native, exact fd7eed02add35bb9016dcd873018cd0c4ef43265) and /private/tmp/physiqueos-healthkit-current-day-review-server (Server, exact f8c28700ae32c3a01b1859a988df5f8177a3dd0b, matching live production). Do not operate the phone, repair September 23 (not required per this audit), change policy/strategic eligibility, or begin Cardio without the specific matching authorization for each of the five gates listed above.",
+  "full_report_path": "agent-handoffs/reports/20260924T181500Z-healthkit-activity-workout-cardio-reconciliation.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260924T151500Z-healthkit-current-day-priority-final-reviewed.md",
-    "agent-handoffs/reports/20260924T144325Z-healthkit-current-day-priority-fresh-review-rejected.md",
-    "agent-handoffs/reports/20260924T131323Z-healthkit-sep23-activity-repair-dryrun-refused.md",
-    "agent-handoffs/reports/20260924T130511Z-healthkit-build57-sep24-baseline-strength-acceptance.md",
-    "agent-handoffs/reports/20260924T130954Z-midweek-server-deployment-complete.md",
-    "agent-handoffs/reports/20260924T124636Z-healthkit-native57-testflight-valid.md",
-    "agent-handoffs/reports/20260924T030200Z-strength-sep23-deterministic-confirmed-final-green.md"
+    "agent-handoffs/reports/20260924T174500Z-healthkit-native58-testflight-valid.md",
+    "agent-handoffs/reports/20260924T173000Z-healthkit-native58-archive-wouldupload.md",
+    "agent-handoffs/reports/20260924T170000Z-healthkit-server-deployed.md",
+    "agent-handoffs/reports/20260924T164500Z-healthkit-server-candidate-corrected-reviewed.md",
+    "agent-handoffs/reports/20260924T160500Z-healthkit-server-deploy-attempt-buildfailure.md",
+    "agent-handoffs/reports/20260924T152000Z-codex-to-claude-healthkit-transition.md",
+    "agent-handoffs/reports/20260924T151500Z-healthkit-current-day-priority-final-reviewed.md"
   ],
   "safety": {
     "contains_secrets": false,
