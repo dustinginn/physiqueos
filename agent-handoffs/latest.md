@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: September 23 Strength deterministic auto-confirm read-only evaluation (`codex-strength-sep23-auto-confirm-readonly-evaluation-20260923`)
+- Task: September 23 Strength deterministic confirmation and final graduation (`codex-strength-sep23-deterministic-confirmed-final-green-20260923`)
 - Agent: codex
 - Status: completed
-- Generated (UTC): 2026-09-24T02:32:27Z
+- Generated (UTC): 2026-09-24T03:02:00Z
 - Success: true
 
-Summary: Two identical September 23-only production rollback evaluations proved the existing confidence-95 logger_session_window candidate is eligible under healthkit-strength-auto-confirm-v1 with no refusal reasons. The bounded dry-run predicts confirmation of the one existing link, two held one-to-one claims, one authorization audit row, and one terminal strategically inert reconciliation-history row. Every drift digest remained identical and the link remained candidate version 1. Build 56 correctly has no ambiguous action because no pending reconciliation review exists and this case qualifies for the deterministic path.
+Summary: The fresh authorization-bound dry-run reproduced the exact accepted September 23 confidence-95 `logger_session_window` facts. The immediately following advisory-locked, drift-fenced apply confirmed only that link, established its two one-to-one claims, created the exact authorization audit and one strategically inert resolved reconciliation-history record, and passed every in-transaction and independent post-write invariant. Strength graduation is GREEN. Strategic eligibility and global `linkAutoConfirm` remain off; Cardio and the Activity/Nutrition revision-loop were not started.
 
-Detailed report: `agent-handoffs/reports/20260924T023227Z-strength-sep23-auto-confirm-readonly-evaluation.md`
+Detailed report: `agent-handoffs/reports/20260924T030200Z-strength-sep23-deterministic-confirmed-final-green.md`
 
 Protocol: `agent-handoffs/README.md`

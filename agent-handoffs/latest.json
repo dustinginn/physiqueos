@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T02:32:27Z",
+  "generated_at_utc": "2026-09-24T03:02:00Z",
   "task": {
-    "id": "codex-strength-sep23-auto-confirm-readonly-evaluation-20260923",
-    "title": "September 23 Strength deterministic auto-confirm read-only evaluation",
+    "id": "codex-strength-sep23-deterministic-confirmed-final-green-20260923",
+    "title": "September 23 Strength deterministic confirmation and final graduation",
     "agent": "codex",
     "status": "completed"
   },
@@ -17,39 +17,45 @@
     "native_build": 56
   },
   "result": {
-    "summary": "Two identical September 23-only production rollback evaluations proved the existing confidence-95 logger_session_window candidate is eligible under healthkit-strength-auto-confirm-v1 with no refusal reasons. The bounded dry-run predicts confirmation of the one existing link, two held one-to-one claims, one authorization audit row, and one terminal strategically inert reconciliation-history row. Every drift digest remained identical and the link remained candidate version 1. Build 56 correctly has no ambiguous action because no pending reconciliation review exists and this case qualifies for the deterministic path.",
+    "summary": "The authorization-bound fresh dry-run reproduced the exact accepted September 23 confidence-95 logger_session_window facts. The immediately following advisory-locked, drift-fenced apply confirmed only that existing link, established its two one-to-one claims, created the exact authorization audit and one strategically inert resolved reconciliation-history record, and passed every in-transaction and independent post-write invariant. Strength graduation is GREEN. Strategic eligibility and global linkAutoConfirm remain off; Cardio and the Activity/Nutrition revision-loop were not started.",
     "success": true,
-    "production_mutated": false,
+    "production_mutated": true,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": false,
+    "strength_graduation_verdict": "green"
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Focused exact-source verification passed 34/34 tests across the deterministic rule, bounded acceptance runner, and Log pending-review projection."
+      "summary": "No source changed in this mutation chunk. The previously reviewed exact-source focused suite remains 34/34 passed."
     },
     "review": {
       "status": "approved",
-      "summary": "No source changed. The exact deployed Server and Build 56 candidates retain the tenth fresh-context review approval with no findings."
+      "summary": "The exact deployed Server and Build 56 candidates retain the tenth fresh-context approval. The production write used only the reviewed bounded acceptance path."
     },
-    "zero_write_audit": {
+    "pre_apply_dry_run": {
       "status": "passed",
-      "summary": "Both production evaluations asserted exact runtime/owner identity, used REPEATABLE READ READ ONLY, verified transaction_read_only=on, and rolled back. Candidate identity/version and every link, claim, workout, Evidence, metadata, day, observation, and policy digest were identical across runs."
+      "summary": "Fresh authorization-bound REPEATABLE READ READ ONLY dry-run reproduced the exact candidate, confidence, basis, rule eligibility, assessment digest, and all drift-fence facts, then rolled back."
+    },
+    "apply": {
+      "status": "passed",
+      "summary": "One READ COMMITTED advisory-locked transaction confirmed link 10d4b9fb..., advanced it from version 1 to 2, held exactly two claims, and created exactly one authorization audit and one terminal inert reconciliation history row."
+    },
+    "post_write_audit": {
+      "status": "passed",
+      "summary": "Independent read-only workout, Training, and exact ledger/drift audits proved the confirmed one-to-one relationship, untouched Logger detail and missing end time, no duplicate Training session, exact durable authorization/history, zero integrity violations, unchanged protected facts, and unchanged strategic policy."
     }
   },
-  "decisions_required": [
-    "Founder authorization is required before applying the bounded September 23 deterministic confirmation.",
-    "A fresh immediately preceding dry-run with the chosen authorization reference and exact expected facts is required before any apply."
-  ],
+  "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [],
   "backlog": [
-    "Keep Workout strategic eligibility off and confirmation history strategically inert.",
-    "Publish the final Strength verdict before Cardio.",
+    "Keep Workout strategic eligibility and global linkAutoConfirm off unless separately authorized.",
+    "Cardio is the next eligible domain but must not begin without a separate instruction.",
     "Do not begin the Activity/Nutrition revision-loop implementation until separately authorized."
   ],
-  "recommended_next_step": "If the Founder authorizes the exact bounded apply, run a fresh September 23 dry-run and then an immediate drift-fenced advisory-lock apply using the same authorization reference and facts, followed by the independent post-write invariant audit.",
-  "full_report_path": "agent-handoffs/reports/20260924T023227Z-strength-sep23-auto-confirm-readonly-evaluation.md",
+  "recommended_next_step": "Treat Strength as graduated GREEN. Await a separate Founder instruction before beginning Cardio or changing any Workout policy or strategic-eligibility control.",
+  "full_report_path": "agent-handoffs/reports/20260924T030200Z-strength-sep23-deterministic-confirmed-final-green.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
