@@ -1674,12 +1674,30 @@ struct ProductionActivityAPI: ActivityAPI {
         )
     }
 
+    /// Day Detail is a "day truth" screen — staleness here is unacceptable
+    /// (the Build 58 defect this fixes: History showed a fresh revision
+    /// while Detail, reading the exact same shared `activity?context=all`
+    /// bucket through the read cache, kept serving whatever an earlier,
+    /// unrelated caller — e.g. the combined-driver prefetch — had left
+    /// there, for as long as that entry's TTL hadn't lapsed). Rather than
+    /// inventing a new date-scoped server resource (Training's own
+    /// `training-day` route gets this isolation for free, but that's a
+    /// Server change out of scope here), Detail always bypasses the cache
+    /// with `.reload` and performs a live read — matching the server's own
+    /// uncached, always-fresh `/read/activity` route (`cache-control:
+    /// no-store`), so it can never resolve to a revision older than
+    /// whatever History's own most recent live read already observed. The
+    /// live response still repopulates the shared `context=all` cache entry
+    /// afterward (`ProductionNativeAPI.readResource`'s normal
+    /// generation-gated store), so any other reader of that bucket benefits
+    /// too — Detail just never itself settles for a passively-sitting stale
+    /// value.
     func fetchActivityDay(date: String) async throws -> ActivityDayRecord? {
-        try await read(scope: .all).report.activityHistory.first { $0.date == date }
+        try await read(scope: .all, policy: .reload).report.activityHistory.first { $0.date == date }
     }
 
-    private func read(scope: EvidenceScopeSelection) async throws -> Payload {
-        try await api.readResource("activity", query: ["context": try ProductionContext.value(for: scope)], as: Payload.self).data
+    private func read(scope: EvidenceScopeSelection, policy: ProductionNativeAPI.ReadPolicy = .cacheFirst) async throws -> Payload {
+        try await api.readResource("activity", query: ["context": try ProductionContext.value(for: scope)], policy: policy, as: Payload.self).data
     }
     private struct Payload: Decodable, @unchecked Sendable { var timeline: ProductionTimeline; var report: Report }
     private struct Report: Decodable {
