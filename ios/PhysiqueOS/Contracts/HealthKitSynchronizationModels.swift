@@ -283,6 +283,14 @@ struct HealthKitStreamDiagnostics: Equatable, Codable, Sendable {
     var lastAbandonedBatchCode: String?
     var lastAbandonedAt: Date?
     var abandonedBatchCount: Int?
+    /// Daily-snapshot recovery state is optional for backwards-compatible
+    /// decoding of Build 56 envelopes. It contains no HealthKit values or
+    /// device identifiers, only the affected local day and revision floor.
+    var dailyRevisionFloorCount: Int? = nil
+    var lastDailyRevisionRecoveryAt: Date? = nil
+    var lastDailyRevisionRecoveryCode: String? = nil
+    var lastDailyRevisionRecoveryLocalDate: String? = nil
+    var lastDailyRevisionNextExpected: UInt64? = nil
 }
 
 enum HealthKitSyncError: Error, Equatable, Sendable {

@@ -315,7 +315,10 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                         bounds.contains(localDate: $0)
                     })
                     let deletedDates = queriedPriorDates.subtracting(returnedDates)
-                    deletedDates.forEach { nextEntries.removeValue(forKey: $0) }
+                    // Keep the last issued revision even while the day is
+                    // absent. Removing it regresses the device-owned floor;
+                    // if HealthKit later returns the day again, revision 1
+                    // could collide with an already durable Server identity.
                     let deletions = deletedDates.compactMap { localDate -> HealthKitQueryDeletion? in
                         guard let uuid = Self.deterministicUUID("activity-summary:\(localDate)") else { return nil }
                         return HealthKitQueryDeletion(

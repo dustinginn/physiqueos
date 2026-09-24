@@ -214,6 +214,28 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         XCTAssertEqual(ownerIdentityCalls, 1)
     }
 
+    /// A pull that arrives during the queued rerun is newer than both the
+    /// original pass and that rerun. It must schedule one further pass;
+    /// clearing a single boolean at rerun completion used to lose this call.
+    @MainActor
+    func testBootstrapArrivingDuringQueuedRerunSchedulesOneNewerPass() async {
+        let synchronizer = AutomaticSynchronizerMock()
+        synchronizer.syncDelayNanoseconds = Dictionary(
+            uniqueKeysWithValues: Self.allStreams.map { ($0, 20_000_000) }
+        )
+        let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer)
+
+        let first = Task { await harness.coordinator.bootstrap() }
+        await eventuallyAutomatic { await synchronizer.syncCallCount() >= 1 }
+        let second = Task { await harness.coordinator.bootstrap() }
+        await eventuallyAutomatic { await synchronizer.syncCallCount() >= 4 }
+        let third = Task { await harness.coordinator.bootstrap() }
+        _ = await (first.value, second.value, third.value)
+
+        let syncCount = await synchronizer.syncCallCount()
+        XCTAssertEqual(syncCount, 9)
+    }
+
     /// The Build 54 failure mode: one HealthKit await never completed, so
     /// every later foreground and pull-to-refresh awaited the same task.
     /// A timeout must release the bootstrap, preserve per-stream isolation,
@@ -389,6 +411,17 @@ private struct AutomaticDeviceIdentityStore: HealthKitCanaryDeviceIdentityStore 
     func stableIdentity() throws -> String {
         if shouldThrow { throw AutomaticCoordinatorTestError.serverUnreachable }
         return "founder-device-stable"
+    }
+}
+
+private func eventuallyAutomatic(
+    timeout: TimeInterval = 2,
+    condition: @escaping @Sendable () async -> Bool
+) async {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if await condition() { return }
+        try? await Task.sleep(for: .milliseconds(5))
     }
 }
 

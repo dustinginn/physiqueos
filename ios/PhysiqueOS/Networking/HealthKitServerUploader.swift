@@ -1,9 +1,66 @@
 import Foundation
 
+struct HealthKitDailyRevisionRecovery: Equatable, Sendable {
+    static let schemaVersion = "healthkit-daily-revision-recovery-v1"
+
+    let observationType: HealthKitS1ObservationType
+    let localDate: String
+    let receivedSourceRevision: UInt64
+    let nextExpectedRevision: UInt64
+    let identityDigest: String
+
+    init(
+        observationType: HealthKitS1ObservationType,
+        localDate: String,
+        receivedSourceRevision: UInt64,
+        nextExpectedRevision: UInt64,
+        identityDigest: String
+    ) {
+        self.observationType = observationType
+        self.localDate = localDate
+        self.receivedSourceRevision = receivedSourceRevision
+        self.nextExpectedRevision = nextExpectedRevision
+        self.identityDigest = identityDigest
+    }
+
+    init?(problem: ProductionProblemDetails) {
+        guard problem.code == "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+              case let .object(value) = problem.recovery,
+              value["kind"]?.stringValue == "healthkit_daily_revision_collision",
+              value["schemaVersion"]?.stringValue == Self.schemaVersion,
+              let typeRaw = value["observationType"]?.stringValue,
+              let observationType = HealthKitS1ObservationType(rawValue: typeRaw),
+              observationType == .activitySummary || observationType == .nutritionDailyTotal,
+              let localDate = value["localDate"]?.stringValue,
+              Self.isLocalDate(localDate),
+              let receivedSourceRevision = value["receivedSourceRevision"]?.uint64Value,
+              let nextExpectedRevision = value["nextExpectedRevision"]?.uint64Value,
+              nextExpectedRevision > receivedSourceRevision,
+              let identityDigest = value["identityDigest"]?.stringValue,
+              identityDigest.count == 64,
+              identityDigest.allSatisfy({ $0.isHexDigit })
+        else { return nil }
+        self.observationType = observationType
+        self.localDate = localDate
+        self.receivedSourceRevision = receivedSourceRevision
+        self.nextExpectedRevision = nextExpectedRevision
+        self.identityDigest = identityDigest
+    }
+
+    private static func isLocalDate(_ value: String) -> Bool {
+        guard value.count == 10 else { return false }
+        let characters = Array(value)
+        return characters[4] == "-" && characters[7] == "-" &&
+            characters.enumerated().allSatisfy { index, character in
+                index == 4 || index == 7 ? character == "-" : character.isNumber
+            }
+    }
+}
+
 enum HealthKitUploadResult: Equatable, Sendable {
     case durablyAccepted(batchID: String, receiptIdentity: String)
     case transientFailure(code: String)
-    case rejected(code: String)
+    case rejected(code: String, recovery: HealthKitDailyRevisionRecovery? = nil)
 }
 
 /// What the Server reported for one accepted observation. The Server alone
@@ -91,7 +148,7 @@ struct ProductionHealthKitObservationUploader: HealthKitObservationUploader {
             switch error {
             case let .validation(problem), let .failedPrecondition(problem),
                  let .preconditionRequired(problem), let .conflict(problem):
-                return .rejected(code: problem.code)
+                return .rejected(code: problem.code, recovery: HealthKitDailyRevisionRecovery(problem: problem))
             case .incompatibleContractVersion:
                 return .rejected(code: "healthkit_server_contract_incompatible")
             case .authorityMismatch, .resourceMismatch:
@@ -104,5 +161,22 @@ struct ProductionHealthKitObservationUploader: HealthKitObservationUploader {
         } catch {
             return .transientFailure(code: "healthkit_server_upload_failed")
         }
+    }
+}
+
+private extension ProductionJSONValue {
+    var stringValue: String? {
+        guard case let .string(value) = self else { return nil }
+        return value
+    }
+
+    var uint64Value: UInt64? {
+        guard case let .number(value) = self,
+              value.isFinite,
+              value.rounded(.towardZero) == value,
+              value >= 0,
+              value <= Double(UInt64.max)
+        else { return nil }
+        return UInt64(value)
     }
 }

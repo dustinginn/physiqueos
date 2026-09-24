@@ -3,6 +3,49 @@ import XCTest
 @testable import PhysiqueOS
 
 final class HealthKitSynchronizationTests: XCTestCase {
+    func testDailyRevisionRecoveryDecodesOnlyTypedMonotonicServerFacts() {
+        let recovery: ProductionJSONValue = .object([
+            "kind": .string("healthkit_daily_revision_collision"),
+            "schemaVersion": .string("healthkit-daily-revision-recovery-v1"),
+            "observationType": .string("activity_summary"),
+            "localDate": .string("2026-09-23"),
+            "receivedSourceRevision": .number(5),
+            "nextExpectedRevision": .number(6),
+            "identityDigest": .string(String(repeating: "a", count: 64)),
+        ])
+        let problem = ProductionProblemDetails(
+            problemVersion: "1", type: nil, title: "collision", status: 409,
+            code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION", detail: nil,
+            instance: nil, requestId: nil, fieldErrors: [], recovery: recovery
+        )
+        XCTAssertEqual(
+            HealthKitDailyRevisionRecovery(problem: problem),
+            HealthKitDailyRevisionRecovery(
+                observationType: .activitySummary,
+                localDate: "2026-09-23",
+                receivedSourceRevision: 5,
+                nextExpectedRevision: 6,
+                identityDigest: String(repeating: "a", count: 64)
+            )
+        )
+
+        let nonMonotonic = ProductionProblemDetails(
+            problemVersion: "1", type: nil, title: "collision", status: 409,
+            code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION", detail: nil,
+            instance: nil, requestId: nil, fieldErrors: [],
+            recovery: .object([
+                "kind": .string("healthkit_daily_revision_collision"),
+                "schemaVersion": .string("healthkit-daily-revision-recovery-v1"),
+                "observationType": .string("activity_summary"),
+                "localDate": .string("2026-09-23"),
+                "receivedSourceRevision": .number(5),
+                "nextExpectedRevision": .number(5),
+                "identityDigest": .string(String(repeating: "a", count: 64)),
+            ])
+        )
+        XCTAssertNil(HealthKitDailyRevisionRecovery(problem: nonMonotonic))
+    }
+
     func testObserverWakeRunsAnchoredQueryAndCompletesAfterStagingBeforeUpload() async throws {
         let harness = try Harness(stream: .activeEnergy, gate: .enabled)
         let completion = CompletionProbe()
@@ -52,6 +95,18 @@ final class HealthKitSynchronizationTests: XCTestCase {
         XCTAssertEqual(cursor.opaqueAnchorData, Data("anchor-1".utf8))
         XCTAssertEqual(cursor.generation, 1)
         let pending = try await harness.store.pendingBatches(for: harness.scope)
+        XCTAssertTrue(pending.isEmpty)
+    }
+
+    func testCancellationAfterDurableAcceptanceStillAcknowledgesAndAdvancesCursor() async throws {
+        let harness = try Harness(stream: .activeEnergy, gate: .enabled, uploadModes: [.acceptAndCancel])
+        let operation = Task { try await harness.engine.synchronize(scope: harness.scope) }
+        try await operation.value
+
+        XCTAssertTrue(operation.isCancelled)
+        let cursor = try await harness.store.authoritativeCursor(for: harness.scope)
+        let pending = try await harness.store.pendingBatches(for: harness.scope)
+        XCTAssertNotNil(cursor)
         XCTAssertTrue(pending.isEmpty)
     }
 
@@ -204,6 +259,72 @@ final class HealthKitSynchronizationTests: XCTestCase {
         let pending = try await harness.store.pendingBatches(for: harness.scope)
         XCTAssertEqual(uploadAttempts, 1, "a rejected upload must not be retried within the same call")
         XCTAssertTrue(pending.isEmpty, "must not remain permanently blocking after being surfaced")
+    }
+
+    func testDailyIdentityCollisionPersistsServerFloorAcrossRelaunchAndFreshRevisionSucceeds() async throws {
+        let first = Self.activitySummaryResult(revision: 1, moveCalories: 606, cursorFingerprint: "stale-local")
+        let second = Self.activitySummaryResult(revision: 6, moveCalories: 700, cursorFingerprint: "current-healthkit")
+        let harness = try Harness(
+            stream: .activitySummary,
+            gate: .enabled,
+            queryResults: [first],
+            uploadModes: [.dailyCollision(received: 1, nextExpected: 6)]
+        )
+
+        await XCTAssertThrowsErrorAsync { try await harness.engine.synchronize(scope: harness.scope) }
+        let pendingAfterCollision = try await harness.store.pendingBatches(for: harness.scope)
+        let floorsAfterCollision = try await harness.store.dailyRevisionFloors(for: harness.scope)
+        XCTAssertTrue(pendingAfterCollision.isEmpty)
+        XCTAssertEqual(floorsAfterCollision, ["2026-09-23": 6])
+
+        let reopened = FileHealthKitSynchronizationStore(root: harness.root)
+        let query = MockQueryClient(results: [second])
+        let uploader = MockUploader(modes: [.accept])
+        let restarted = HealthKitSynchronizationEngine(
+            queryClient: query,
+            observerClient: MockObserverClient(),
+            store: reopened,
+            uploader: uploader,
+            featureGate: .enabled,
+            now: { Self.now }
+        )
+        try await restarted.synchronize(scope: harness.scope)
+
+        let captured = await query.receivedAnchors()
+        let queryAnchor = try XCTUnwrap(captured.first ?? nil)
+        let overlay = try XCTUnwrap(JSONSerialization.jsonObject(with: queryAnchor) as? [String: Any])
+        let entries = try XCTUnwrap(overlay["entries"] as? [String: [String: Any]])
+        XCTAssertEqual((entries["2026-09-23"]?["revision"] as? NSNumber)?.uint64Value, 5)
+        XCTAssertTrue((entries["2026-09-23"]?["fingerprint"] as? String)?.hasPrefix("server-revision-recovery-v1:") == true)
+        let uploadedRevisions = await uploader.receivedDailyRevisions()
+        let finalFloors = try await reopened.dailyRevisionFloors(for: harness.scope)
+        let finalCursor = try await reopened.authoritativeCursor(for: harness.scope)
+        XCTAssertEqual(uploadedRevisions, [6])
+        XCTAssertEqual(finalFloors, [:])
+        XCTAssertNotNil(finalCursor)
+    }
+
+    func testProtectedDataReadFailureDoesNotQuarantineOrResetDurableState() async throws {
+        let harness = try Harness(stream: .activeEnergy, gate: .queryOnly)
+        try await harness.engine.synchronize(scope: harness.scope)
+        let stateURL = await harness.store.stateFileURL(for: harness.scope)
+        let original = try Data(contentsOf: stateURL)
+        let locked = FileHealthKitSynchronizationStore(root: harness.root) { _ in
+            throw CocoaError(.fileReadNoPermission)
+        }
+
+        do {
+            _ = try await locked.authoritativeCursor(for: harness.scope)
+            XCTFail("Expected protected-data unavailability")
+        } catch let error as HealthKitSyncError {
+            XCTAssertEqual(error, .operational(code: "healthkit_state_protected_data_unavailable"))
+        }
+
+        XCTAssertEqual(try Data(contentsOf: stateURL), original)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stateURL.appendingPathExtension("corrupt").path))
+        let reopened = FileHealthKitSynchronizationStore(root: harness.root)
+        let reopenedPending = try await reopened.pendingBatches(for: harness.scope)
+        XCTAssertEqual(reopenedPending.count, 1)
     }
 
     func testCrashAfterStagingRecoversPendingBatchFromProtectedFile() async throws {
@@ -680,6 +801,24 @@ final class HealthKitSynchronizationTests: XCTestCase {
         )
     }
 
+    fileprivate static func activitySummaryResult(
+        revision: UInt64,
+        moveCalories: Double,
+        cursorFingerprint: String
+    ) -> HealthKitAnchoredQueryResult {
+        let cursor = try! JSONSerialization.data(withJSONObject: [
+            "entries": ["2026-09-23": ["fingerprint": cursorFingerprint, "revision": revision]],
+        ], options: [.sortedKeys])
+        return HealthKitAnchoredQueryResult(
+            additions: [activitySummaryAddition(
+                moveCalories: moveCalories,
+                revision: revision,
+                localDate: "2026-09-23"
+            )],
+            deletions: [], proposedAnchorData: cursor, completedAt: now
+        )
+    }
+
     private static func quantityAddition(
         _ uuid: UUID,
         bundle: String = "com.apple.Health",
@@ -702,18 +841,30 @@ final class HealthKitSynchronizationTests: XCTestCase {
         )
     }
 
-    private static func activitySummaryAddition(moveCalories: Double) -> HealthKitQueryAddition {
-        HealthKitQueryAddition(
+    private static func activitySummaryAddition(
+        moveCalories: Double,
+        revision: UInt64 = 1,
+        localDate: String = "2027-01-15"
+    ) -> HealthKitQueryAddition {
+        let start = localDate == "2026-09-23"
+            ? ISO8601DateFormatter().date(from: "2026-09-23T07:00:00Z")!
+            : now
+        return HealthKitQueryAddition(
             healthKitUUID: nil,
             objectTypeIdentifier: HealthKitSynchronizationStream.activitySummary.objectTypeIdentifier,
             source: HealthKitQuerySource(
                 bundleIdentifier: "com.apple.Health", sourceName: "Apple Health", sourceRevision: nil,
                 productType: nil, privacySafeDeviceProvenance: nil
             ),
-            occurrence: occurrence(),
+            occurrence: HealthKitQueryOccurrence(
+                startedAt: nil, endedAt: nil, localDate: localDate,
+                calendarIdentifier: "gregorian", timeZoneIdentifier: "America/Los_Angeles",
+                utcOffsetSeconds: -25_200, localDayStartedAt: start,
+                localDayEndedAt: start.addingTimeInterval(86_400)
+            ),
             payload: .activitySummary(HealthKitQueryActivitySummary(
                 dailyActivity: ["move_calories": moveCalories, "exercise_minutes": 30, "stand_hours": 10],
-                aggregationScope: "daily_total_including_workouts", coverage: .completeDay, sourceRevision: 1
+                aggregationScope: "daily_total_including_workouts", coverage: .completeDay, sourceRevision: revision
             )),
             allowlistedMetadata: [:]
         )
@@ -818,6 +969,7 @@ private actor MockQueryClient: HealthKitAnchoredQueryClient {
     }
 
     func callCount() -> Int { anchors.count }
+    func receivedAnchors() -> [Data?] { anchors }
 }
 
 private final class MockObserverClient: HealthKitObserverClient, @unchecked Sendable {
@@ -850,7 +1002,13 @@ private final class MockObserverClient: HealthKitObserverClient, @unchecked Send
 }
 
 private actor MockUploader: HealthKitObservationUploader {
-    enum Mode { case accept, transient, reject }
+    enum Mode {
+        case accept
+        case acceptAndCancel
+        case transient
+        case reject
+        case dailyCollision(received: UInt64, nextExpected: UInt64)
+    }
     private var modes: [Mode]
     private var received: [HealthKitStagedPartition] = []
     private var completionProbe: CompletionProbe?
@@ -867,16 +1025,39 @@ private actor MockUploader: HealthKitObservationUploader {
         switch mode {
         case .accept:
             return .durablyAccepted(batchID: partition.identity, receiptIdentity: "receipt-\(partition.identity)")
+        case .acceptAndCancel:
+            withUnsafeCurrentTask { $0?.cancel() }
+            return .durablyAccepted(batchID: partition.identity, receiptIdentity: "receipt-\(partition.identity)")
         case .transient:
             return .transientFailure(code: "synthetic_lost_ack")
         case .reject:
             return .rejected(code: "synthetic_rejection")
+        case let .dailyCollision(received, nextExpected):
+            return .rejected(
+                code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+                recovery: HealthKitDailyRevisionRecovery(
+                    observationType: .activitySummary,
+                    localDate: "2026-09-23",
+                    receivedSourceRevision: received,
+                    nextExpectedRevision: nextExpected,
+                    identityDigest: String(repeating: "a", count: 64)
+                )
+            )
         }
     }
 
     func receivedCount() -> Int { received.count }
     func receivedIdentities() -> [String] { received.map(\.identity) }
     func receivedSizes() -> [Int] { received.map(\.additions.count) }
+    func receivedDailyRevisions() -> [UInt64] {
+        received.flatMap(\.additions).compactMap {
+            switch $0.payload {
+            case let .activitySummary(summary): summary.sourceRevision
+            case let .nutritionDailyTotal(summary): summary.sourceRevision
+            default: nil
+            }
+        }
+    }
     func observedCompletionBeforeUpload() -> Bool { sawCompletedBeforeUpload }
 }
 

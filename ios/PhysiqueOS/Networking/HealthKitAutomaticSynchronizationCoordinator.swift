@@ -119,12 +119,12 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     /// the identical scope that both read the same not-yet-advanced cursor
     /// and each stage/upload a redundant duplicate batch.
     private var inFlightTask: Task<HealthKitAutomaticBootstrapOutcome, Never>?
-    /// A foreground/pull-to-refresh request that arrives during the initial
-    /// pass is not satisfied by that potentially stale pass. It queues one
-    /// fresh pass after the current one finishes. Calls arriving during that
-    /// queued rerun coalesce into it rather than creating an unbounded loop.
-    private var rerunRequested = false
-    private var rerunInProgress = false
+    /// Monotonic request generations make every burst that arrives during an
+    /// active pass demand one strictly newer pass. Calls within the same pass
+    /// coalesce, while a pull during an already-queued rerun cannot be lost.
+    private var requestedGeneration: UInt64 = 0
+    private var activeGeneration: UInt64 = 0
+    private var completedGeneration: UInt64 = 0
 
     init(
         authorization: any HealthKitCanaryAuthorizationCoordinating,
@@ -144,24 +144,26 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     @discardableResult
     func bootstrap() async -> HealthKitAutomaticBootstrapOutcome {
         if let inFlightTask {
-            if !rerunInProgress { rerunRequested = true }
+            let currentOrScheduledGeneration = max(activeGeneration, completedGeneration + 1)
+            if requestedGeneration <= currentOrScheduledGeneration {
+                requestedGeneration = currentOrScheduledGeneration + 1
+            }
             return await inFlightTask.value
         }
+        requestedGeneration = max(requestedGeneration, completedGeneration) + 1
         let task = Task { @MainActor in
-            var outcome = await self.runBootstrap()
-            if self.rerunRequested {
-                self.rerunRequested = false
-                self.rerunInProgress = true
+            var outcome = HealthKitAutomaticBootstrapOutcome()
+            while self.completedGeneration < self.requestedGeneration {
+                self.activeGeneration = self.completedGeneration + 1
                 outcome = await self.runBootstrap()
-                self.rerunInProgress = false
+                self.completedGeneration = self.activeGeneration
             }
             // Clear before completing the task. This closes the narrow actor-
             // reentrancy window where a caller could otherwise observe an
             // already-completed task and have its rerun request discarded by
             // an older waiter doing cleanup after `await task.value`.
             self.inFlightTask = nil
-            self.rerunRequested = false
-            self.rerunInProgress = false
+            self.activeGeneration = 0
             return outcome
         }
         inFlightTask = task

@@ -127,13 +127,17 @@ actor HealthKitSynchronizationEngine {
         do {
             raw = try await executeBoundedQuery(
                 stream: scope.stream,
-                after: cursor?.opaqueAnchorData,
+                after: try await queryCursorData(cursor: cursor, scope: scope),
                 bounds: nil
             )
         } catch HealthKitSyncError.corruptCursor {
             try await store.resetCursorForBoundedRecovery(for: scope)
             cursor = nil
-            raw = try await executeBoundedQuery(stream: scope.stream, after: nil, bounds: nil)
+            raw = try await executeBoundedQuery(
+                stream: scope.stream,
+                after: try await queryCursorData(cursor: nil, scope: scope),
+                bounds: nil
+            )
         }
         try Task.checkCancellation()
         let result = applyWorkoutActivationFloor(to: raw, scope: scope)
@@ -240,13 +244,17 @@ actor HealthKitSynchronizationEngine {
         do {
             raw = try await queryClient.execute(
                 stream: .activitySummary,
-                after: cursor?.opaqueAnchorData,
+                after: try await queryCursorData(cursor: cursor, scope: scope),
                 bounds: bounds
             )
         } catch HealthKitSyncError.corruptCursor {
             try await store.resetCursorForBoundedRecovery(for: scope)
             cursor = nil
-            raw = try await queryClient.execute(stream: .activitySummary, after: nil, bounds: bounds)
+            raw = try await queryClient.execute(
+                stream: .activitySummary,
+                after: try await queryCursorData(cursor: nil, scope: scope),
+                bounds: bounds
+            )
         }
 
         let additions = raw.additions.filter { window.contains(localDate: $0.occurrence.localDate) }
@@ -321,11 +329,19 @@ actor HealthKitSynchronizationEngine {
         var cursor = try await store.authoritativeCursor(for: scope)
         let raw: HealthKitAnchoredQueryResult
         do {
-            raw = try await queryClient.execute(stream: scope.stream, after: cursor?.opaqueAnchorData, bounds: bounds)
+            raw = try await queryClient.execute(
+                stream: scope.stream,
+                after: try await queryCursorData(cursor: cursor, scope: scope),
+                bounds: bounds
+            )
         } catch HealthKitSyncError.corruptCursor {
             try await store.resetCursorForBoundedRecovery(for: scope)
             cursor = nil
-            raw = try await queryClient.execute(stream: scope.stream, after: nil, bounds: bounds)
+            raw = try await queryClient.execute(
+                stream: scope.stream,
+                after: try await queryCursorData(cursor: nil, scope: scope),
+                bounds: bounds
+            )
         }
         // Exact day only, whatever the query client returned.
         let additions = raw.additions.filter { testDay.window.contains(localDate: $0.occurrence.localDate) }
@@ -479,7 +495,6 @@ actor HealthKitSynchronizationEngine {
                     at: attemptAt
                 )
                 let uploadResult = await uploader.upload(partition)
-                try Task.checkCancellation()
                 switch uploadResult {
                 case let .durablyAccepted(acknowledgedBatchID, receiptIdentity):
                     try await store.acknowledge(
@@ -496,12 +511,46 @@ actor HealthKitSynchronizationEngine {
                         code: code
                     )
                     return
-                case let .rejected(code):
-                    try await store.abandonPendingBatch(batchID: batch.identity, code: code, at: now())
+                case let .rejected(code, recovery):
+                    if let recovery {
+                        do {
+                            try await store.rebaseDailyRevisionAndAbandonPendingBatch(
+                                batchID: batch.identity,
+                                partitionID: partition.identity,
+                                observationType: recovery.observationType,
+                                localDate: recovery.localDate,
+                                receivedSourceRevision: recovery.receivedSourceRevision,
+                                nextExpectedRevision: recovery.nextExpectedRevision,
+                                code: code,
+                                at: now()
+                            )
+                        } catch {
+                            // Never trust mismatched recovery facts. Preserve
+                            // the prior fail-closed behavior by retiring this
+                            // permanently rejected request without advancing
+                            // either the cursor or a revision floor.
+                            try await store.abandonPendingBatch(batchID: batch.identity, code: code, at: now())
+                            throw error
+                        }
+                    } else {
+                        try await store.abandonPendingBatch(batchID: batch.identity, code: code, at: now())
+                    }
                     throw HealthKitSyncError.serverRejected(code: code)
                 }
             }
         }
+    }
+
+    private func queryCursorData(
+        cursor: HealthKitAuthoritativeCursor?,
+        scope: HealthKitCursorScope
+    ) async throws -> Data? {
+        let floors = try await store.dailyRevisionFloors(for: scope)
+        return try HealthKitDailyRevisionCursorOverlay.applying(
+            floors: floors,
+            to: cursor?.opaqueAnchorData,
+            stream: scope.stream
+        )
     }
 
     private func authorizationState(for availability: HealthKitAvailability) -> String {
