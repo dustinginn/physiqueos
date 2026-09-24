@@ -4,7 +4,7 @@ Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
 - Task: HealthKit daily-revision recovery and Strength presentation (`codex-healthkit-revision-recovery-strength-presentation-20260923`)
 - Agent: codex
-- Status: in progress
+- Status: awaiting Server deployment authorization
 - Generated (UTC): 2026-09-24T04:40:00Z
 - Success: true
 
