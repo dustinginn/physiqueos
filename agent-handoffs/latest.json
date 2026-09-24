@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T05:38:11Z",
+  "generated_at_utc": "2026-09-24T12:46:36Z",
   "task": {
     "id": "codex-healthkit-native57-sep23-repair-20260924",
-    "title": "Prepare Native Build 57 and preserve September 23 repair gates",
+    "title": "Upload exact Native Build 57 and preserve September 23 repair gates",
     "agent": "codex",
     "status": "completed"
   },
@@ -13,46 +13,43 @@
     "final_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
     "production_server_sha": "63395579ed70611be8a57f032133a43a3bc67800",
     "production_deployment": "117d8a2f-8cc1-4ef1-9247-1029c875e401",
-    "native_sha": "de0d3829836dd2e84327d268d4682c97260260e6",
-    "native_build": 56
+    "native_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
+    "native_build": 57
   },
   "result": {
-    "summary": "With explicit Founder authorization, only the retained superseded PhysiqueOS archives for existing Builds 16, 17, 18, and 28 through 49 were deleted; Builds 50 through 56 and unrelated data were retained. The mandatory pre-archive disk floor passed at 10.274 GiB. Exact Build 57 source 6cca0581 was archived and its bundle, version, build, team, arm64 signature, and matching app/dSYM UUID were verified. The guarded uploader passed every preflight and returned WOULD UPLOAD in dry-run mode. Nothing was uploaded, and no Server, September 23, policy, strategic-eligibility, confirmed Strength, or Cardio state changed.",
+    "summary": "Exact archived Native Build 57 source 6cca0581 was uploaded through the guarded uploader under explicit Founder authorization. Delivery 82ebe97c-2c38-482f-8a9c-d0e0d7490e1e is present on App Store Connect with build status VALID and import status VALID. The immediately preceding dry-run, archive identity/signature/dSYM gates, and independent post-upload status check all passed. No Server/data operation, September 23 Activity repair, policy or strategic-eligibility change, confirmed Strength mutation, or Cardio work occurred.",
     "success": true,
     "production_mutated": false,
     "deployed": true,
-    "testflight_uploaded": false
+    "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Release configuration verified version 1.0 (57), AppIcon, HealthKit declarations, and exempt encryption. The source worktree remained clean at exact SHA 6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9."
+      "summary": "Immediately before upload, source remained exact and clean at 6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9; release configuration, bundle/version/build/team, strict signature, arm64 executable, and matching app/dSYM UUID CFDB3C87-B36F-349D-AD4F-39BD3DAB9584 passed."
     },
     "review": {
       "status": "approved",
-      "summary": "The reviewed Native ancestor remains e0ed02be57fef76b237be3fe4621f946a02ab40c; Build 57 adds only the verified build-number metadata delta. Archive identity, host-context strict code signature, team 33GMTRM6G9, arm64 binary, and app/dSYM UUID CFDB3C87-B36F-349D-AD4F-39BD3DAB9584 all passed."
+      "summary": "Fresh guarded dry-run returned WOULD UPLOAD with last uploaded Build 56 and no prior successful Build 57 upload. The execution used the exact confirmation UPLOAD com.physiqueos.native.dev 1.0 (57)."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "The guarded uploader ran without --execute and reported dry-run mode / WOULD UPLOAD. Build 57 was not uploaded; production Server/data, September 23 Activity/Nutrition, reconciliation policy, Workout strategic eligibility, confirmed Strength, and Cardio were untouched."
+      "summary": "Only the explicitly authorized App Store Connect upload occurred. Independent read-only status returned build VALID, import VALID, and is-on-app-store-connect true. Production Server/data, September 23 Activity/Nutrition, reconciliation policy, Workout strategic eligibility, confirmed Strength, and Cardio were untouched."
     }
   },
   "decisions_required": [
-    "Separate Founder authorization is required before executing the Build 57 TestFlight upload.",
+    "Install Build 57 on the real device before beginning the separately gated September 24 acceptance sequence.",
     "Founder authorization remains required separately before any September 23 Activity repair or Server mutation.",
     "Founder instruction remains required before policy, strategic eligibility, or Cardio changes."
   ],
   "blockers": [],
-  "unexpected_findings": [
-    "The archive/build working set reduced free space from 10.274 GiB pre-archive to 9.987 GiB afterward; the verified Build 57 archive and its current DerivedData are intentionally retained pending the separate upload decision."
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Wait for explicit Founder authorization before running the uploader with --execute and the exact confirmation string.",
-    "After an authorized upload, verify Apple build/import status reaches VALID before any real-device acceptance claim.",
+    "Wait for Founder confirmation that Build 57 is installed before any real-device acceptance action.",
     "Do not repair September 23, change policy/strategic eligibility, or start Cardio without separate authorization."
   ],
-  "recommended_next_step": "Authorize the guarded TestFlight upload of exact archived Build 57 only if desired; otherwise preserve the archive and stop.",
-  "full_report_path": "agent-handoffs/reports/20260924T053811Z-healthkit-native57-archive-upload-dryrun.md",
+  "recommended_next_step": "Install Apple-VALID Build 57 on the iPhone 17 Pro, then provide the next explicitly bounded acceptance authorization; keep September 23 repair and Cardio stopped.",
+  "full_report_path": "agent-handoffs/reports/20260924T124636Z-healthkit-native57-testflight-valid.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
