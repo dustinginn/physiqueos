@@ -126,16 +126,16 @@ export function assessHealthKitStrengthLinkCandidates({
     const normalized = normalizeSessionTimes(payload, current.timeZone, {
       serverCommitTimestamp: lookupCommitTimestamp(loggerSessionServerCommitTimestamps, canonicalId),
     });
-    if (!explicit && !normalized.usable) {
+    if (!normalized.usable) {
       unverifiable += 1;
       continue;
     }
     const assessment = assessWorkoutDuplicatePair(hkCandidate, normalized.payload);
-    // Identity may establish which records are being compared, but it never
-    // establishes that they describe the same physical workout. Preserve an
-    // explicit identity as a review candidate when timing is unusable while
-    // carrying independently verified temporal facts whenever they exist.
-    const facts = normalized.usable ? boundaryFacts(current, normalized.payload.metadata) : null;
+    // Identity establishes which records are being compared, but never that
+    // they describe the same physical workout. Every candidate, including an
+    // explicit source identity, must have a usable and substantively
+    // overlapping window before Founder review can select it.
+    const facts = boundaryFacts(current, normalized.payload.metadata);
     const deterministicLoggerWindow = !explicit && deterministicLoggerRuleAvailable &&
       canonicalId === (sameDayNativeLoggerSessions[0].canonicalId ?? sameDayNativeLoggerSessions[0].payload?.id) &&
       facts.startInsideWorkoutWindow;
@@ -143,7 +143,7 @@ export function assessHealthKitStrengthLinkCandidates({
     // sits beside the Apple workout has no real overlap and is not a candidate,
     // whatever its duration or calories say. (The shared duplicate service counts
     // a touching boundary as overlap; that stays untouched for its other callers.)
-    if (!explicit && !facts.substantiveOverlap && !deterministicLoggerWindow) continue;
+    if (!facts.substantiveOverlap && !deterministicLoggerWindow) continue;
     // An explicit binding: the Logger session already names this exact Apple
     // workout. The canonical record never stores the private HealthKit id, so
     // the session's source ids are hashed the same way the record id is.
@@ -165,7 +165,7 @@ export function assessHealthKitStrengthLinkCandidates({
           : assessment.reasons,
       // Confident needs a real overlap AND at least one boundary that agrees
       // within the existing tolerance (start with start, or end with end).
-      qualified: explicit || (deterministicLoggerWindow
+      qualified: explicit ? facts.substantiveOverlap : (deterministicLoggerWindow
         ? facts.endAligned
         : assessment.outcome === "duplicate" && facts.substantiveOverlap && (facts.startAligned || facts.endAligned)),
       substantiveOverlap: facts?.substantiveOverlap ?? false,

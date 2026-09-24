@@ -29,6 +29,8 @@ const ALLOWED = new Set([
   "platform/operations/HealthKitWorkoutCanaryAudit.js",
   // Guarded, explicitly authorized link confirmation: the only production caller of the relationship service.
   "platform/operations/HealthKitWorkoutLinkConfirmationRunner.js",
+  // One-date, transaction-guarded acceptance operation; it preserves quarantine.
+  "platform/operations/HealthKitStrengthAutoConfirmAcceptanceRunner.js",
   // Guarded, candidate-only reassessment of one already-canonical workout.
   "platform/operations/HealthKitWorkoutLinkReassessmentRunner.js",
 ]);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assessDeterministicStrengthAutoConfirm,
   createHealthKitWorkoutReconciliationReview,
+  hasExactHealthKitWorkoutReconciliationResolution,
   projectHealthKitWorkoutReconciliationPresentation,
   resolveHealthKitWorkoutReconciliationRecord,
 } from "./HealthKitWorkoutReconciliationService.js";
@@ -216,7 +217,7 @@ describe("structured reconciliation history", () => {
       linkId: "link-sep23",
       by: { kind: "founder", ref: "command" },
       now: NOW,
-      basis: { mode: "founder_explicit_selection" },
+      basis: { mode: "founder_explicit_selection", matcherVersion: "healthkit-strength-matcher-v5" },
     });
     expect(resolved).toMatchObject({
       status: "resolved_confirmed",
@@ -236,6 +237,25 @@ describe("structured reconciliation history", () => {
       },
     });
     expect(resolved.resolutionHistory).toHaveLength(1);
+    expect(hasExactHealthKitWorkoutReconciliationResolution(resolved, {
+      action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: "link-sep23",
+    })).toBe(true);
+    for (const corrupt of [
+      { ...resolved, resolutionHistory: [{ ...resolved.resolutionHistory[0], at: "2026-09-23T23:31:00.000Z" }] },
+      { ...resolved, resolutionHistory: [{ ...resolved.resolutionHistory[0], by: { kind: "founder", ref: "other" } }] },
+      { ...resolved, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { mode: "invented" } }] },
+      { ...resolved, resolution: { ...resolved.resolution, by: { kind: "system_matcher", ref: "wrong-actor" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], by: { kind: "system_matcher", ref: "wrong-actor" } }] },
+      { ...resolved, resolution: { ...resolved.resolution, basis: { mode: "founder_explicit_selection" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { mode: "founder_explicit_selection" } }] },
+      { ...resolved, lifecycleHistory: resolved.lifecycleHistory.map((entry) => entry.status === "resolved_confirmed" ? { ...entry, at: "2026-09-23T23:31:00.000Z" } : entry) },
+      { ...resolved, updatedAt: "2026-09-23T23:31:00.000Z" },
+      { ...resolved, strategicEvidenceEligibility: "eligible" },
+    ]) {
+      expect(hasExactHealthKitWorkoutReconciliationResolution(corrupt, {
+        action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: "link-sep23",
+      })).toBe(false);
+      expect(projectHealthKitWorkoutReconciliationPresentation({ ...corrupt, version: 2 }))
+        .toMatchObject({ status: "invalid_terminal_history", resolution: null, actions: [] });
+    }
     expect(resolveHealthKitWorkoutReconciliationRecord(resolved, {
       action: "confirm",
       selectedLoggerSessionCanonicalId: "logger-other",

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { HEALTHKIT_CANONICAL_WORKOUT_COLLECTION, HealthKitWorkoutFamily } from "../../domain/services/HealthKitWorkoutService.js";
 import {
   HEALTHKIT_WORKOUT_LINK_COLLECTION,
+  HealthKitWorkoutLinkError,
   HealthKitWorkoutLinkStatus,
   assessHealthKitStrengthLinkCandidates,
 } from "../../domain/services/HealthKitWorkoutLinkService.js";
@@ -12,11 +13,13 @@ import {
   createHealthKitWorkoutReconciliationReview,
   getHealthKitWorkoutReconciliationId,
   hasExactHealthKitWorkoutReconciliationResolution,
+  hasExactStoredHealthKitWorkoutReconciliationTerminal,
   isHealthKitWorkoutReconciliationReview,
   resolveHealthKitWorkoutReconciliationRecord,
 } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 import {
   HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
+  assertHealthKitWorkoutRelationshipConfirmationAllowed,
   findHealthKitWorkoutRelationshipViolations,
   getHealthKitWorkoutLinkClaimId,
 } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
@@ -62,6 +65,21 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
   const relationshipViolations = findHealthKitWorkoutRelationshipViolations({ links, claims });
   if (Object.values(relationshipViolations).some((count) => count !== 0)) {
     return Object.freeze({ outcome: "refused", reasons: ["stored_relationship_violations"], violations: relationshipViolations });
+  }
+  try {
+    assertHealthKitWorkoutRelationshipConfirmationAllowed({
+      link,
+      links,
+      workouts,
+      evidence,
+      claims,
+      loggerSessionServerCommitTimestamps: new Map(metadata.map((row) => [row.recordId, row.createdAt])),
+    });
+  } catch (error) {
+    if (error instanceof HealthKitWorkoutLinkError) {
+      return Object.freeze({ outcome: "refused", reasons: [error.code], linkId: link.id });
+    }
+    throw error;
   }
   const reviewId = getHealthKitWorkoutReconciliationId(workout.id);
   const existingHistory = await records.get({
@@ -172,26 +190,33 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
     now: at,
     basis: { mode: "deterministic_auto_confirm_acceptance", ruleVersion: gate.ruleVersion },
   });
-  const saved = existingHistory
-    ? await records.put({
+  let saved;
+  if (existingHistory) {
+    saved = await records.put({
         ownerUserId,
         collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
         recordId: reviewId,
         expectedVersion: existingHistory.version,
         sourceIdentity: reviewId,
         payload: resolved,
-      })
-    : (await records.putIfAbsent({
+      });
+  } else {
+    const created = await records.putIfAbsent({
         ownerUserId,
         collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
         recordId: reviewId,
         sourceIdentity: reviewId,
         payload: resolved,
-      })).record;
+      });
+    if (!created.created) {
+      throw Object.assign(new Error("Strength auto-confirm history identity was occupied before commit."), { code: "RECONCILIATION_HISTORY_COLLISION" });
+    }
+    saved = created.record;
+  }
   const invariants = Object.freeze({
     ...confirmation.invariants,
-    reconciliationHistoryResolvedExactlyOnce: saved.status === "resolved_confirmed" &&
-      saved.resolution?.linkId === link.id && saved.resolutionHistory?.length === 1,
+    reconciliationHistoryResolvedExactlyOnce: hasExactStoredHealthKitWorkoutReconciliationTerminal(saved) &&
+      saved.resolution?.linkId === link.id,
     historyStrategicallyInert: saved.strategicEvidenceEligibility === "quarantined" &&
       saved.evidenceEligibility?.strategic === false,
   });

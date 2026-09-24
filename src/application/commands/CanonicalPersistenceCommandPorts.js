@@ -74,6 +74,7 @@ import {
 import {
   HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
   confirmHealthKitWorkoutRelationship,
+  assertHealthKitWorkoutRelationshipConfirmationAllowed,
   assertHealthKitWorkoutRelationshipIntegrity,
   getHealthKitWorkoutLinkClaimId,
   unlinkHealthKitWorkoutRelationship,
@@ -86,6 +87,7 @@ import {
   getHealthKitWorkoutReconciliationId,
   isHealthKitWorkoutReconciliationReview,
   hasExactHealthKitWorkoutReconciliationResolution,
+  hasExactStoredHealthKitWorkoutReconciliationTerminal,
   reopenHealthKitWorkoutReconciliationReview,
   refreshHealthKitWorkoutReconciliationReview,
   refreshSupersededHealthKitWorkoutReconciliationFacts,
@@ -385,7 +387,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       }),
       records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }),
     ]);
-    const [workoutPolicyRecord, existingCanonicalWorkouts, existingWorkoutLinks] = await Promise.all([
+    const [workoutPolicyRecord, existingCanonicalWorkouts, existingWorkoutLinks, existingWorkoutLinkClaims] = await Promise.all([
       records.get({
         ownerUserId: context.ownerUserId,
         collection: "healthKitConfiguration",
@@ -393,6 +395,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       }),
       records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION }),
       records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION }),
+      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION }),
     ]);
     const workoutPolicy = resolveHealthKitWorkoutActivationPolicy(workoutPolicyRecord);
     const workoutActivationSnapshot = workoutPolicy.enabled
@@ -760,6 +763,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         workoutLinks,
         canonicalObjects,
         canonicalObjectStorageMetadata,
+        workoutLinkClaims: existingWorkoutLinkClaims,
       });
     }
     const canonicalizedBy = (domain) => results.filter((item) =>
@@ -792,7 +796,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     };
   }
 
-  async function reassessWorkoutRelationships({ context, workoutPolicy, canonicalWorkoutById, workoutLinks, canonicalObjects, canonicalObjectStorageMetadata }) {
+  async function reassessWorkoutRelationships({ context, workoutPolicy, canonicalWorkoutById, workoutLinks, canonicalObjects, canonicalObjectStorageMetadata, workoutLinkClaims }) {
     const summary = {
       assessed: 0,
       updated: 0,
@@ -807,6 +811,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       reconciliationReviewsSuperseded: 0,
     };
     const at = now().toISOString();
+    assertHealthKitWorkoutRelationshipIntegrity({ links: workoutLinks, claims: workoutLinkClaims });
     // An open-ended policy (null endLocalDate) has no upper bound.
     const inWindow = [...canonicalWorkoutById.values()].filter((workout) =>
       workout.localDate >= workoutPolicy.effectiveLocalDate &&
@@ -912,8 +917,39 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
           recordId: reviewId,
         });
-        const hasTerminalFounderResolution = isHealthKitWorkoutReconciliationReview(existingReview) &&
+        const terminalStatusPresent = isHealthKitWorkoutReconciliationReview(existingReview) &&
           ["resolved_confirmed", "resolved_no_match"].includes(existingReview.status);
+        let terminalGraphExact = true;
+        if (terminalStatusPresent && existingReview.status === "resolved_confirmed") {
+          const resolvedLink = workoutLinks.find((item) => item.id === existingReview.resolution?.linkId);
+          try {
+            terminalGraphExact = resolvedLink?.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
+              resolvedLink.canonicalWorkoutId === workout.id &&
+              resolvedLink.loggerSessionCanonicalId === existingReview.resolution?.selectedLoggerSessionCanonicalId;
+            if (terminalGraphExact) {
+              assertHealthKitWorkoutRelationshipConfirmationAllowed({
+                link: resolvedLink,
+                links: workoutLinks,
+                workouts: inWindow,
+                evidence: canonicalObjects,
+                claims: workoutLinkClaims,
+                loggerSessionServerCommitTimestamps: new Map(canonicalObjectStorageMetadata.map((row) => [row.recordId, row.createdAt])),
+              });
+            }
+          } catch {
+            terminalGraphExact = false;
+          }
+        } else if (terminalStatusPresent && existingReview.status === "resolved_no_match") {
+          terminalGraphExact = !workoutLinks.some((item) => item.canonicalWorkoutId === workout.id &&
+            item.status === HealthKitWorkoutLinkStatus.CONFIRMED);
+        }
+        const hasTerminalFounderResolution = terminalStatusPresent && terminalGraphExact &&
+          hasExactStoredHealthKitWorkoutReconciliationTerminal(existingReview);
+        const reconciliationHistoryConflict = Boolean(existingReview) && (
+          !isHealthKitWorkoutReconciliationReview(existingReview) ||
+          (terminalStatusPresent && !hasTerminalFounderResolution) ||
+          !["pending", "superseded", "resolved_confirmed", "resolved_no_match"].includes(existingReview.status)
+        );
         const plausibleButNotDeterministic = assessment.outcome === HealthKitStrengthMatchOutcome.AMBIGUOUS ||
           assessment.outcome === HealthKitStrengthMatchOutcome.POSSIBLE ||
           (assessment.outcome === HealthKitStrengthMatchOutcome.CONFIDENT && autoGate?.eligible !== true);
@@ -922,7 +958,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         const prospectiveAutoConfirm = workoutPolicy.linkAutoConfirm === true &&
           instantAtOrAfter(workout.createdAt, workoutPolicy.linkAutoConfirmEffectiveAt);
         const willAutomaticallyConfirm = prospectiveAutoConfirm && currentLink &&
-          autoGate?.eligible === true && !hasTerminalFounderResolution;
+          autoGate?.eligible === true && !hasTerminalFounderResolution && !reconciliationHistoryConflict;
         if (needsFounderResolution) {
           const desired = createHealthKitWorkoutReconciliationReview({
             ownerUserId: context.ownerUserId,
@@ -984,6 +1020,8 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           const gate = autoGate;
           const refusalReasons = !prospectiveAutoConfirm
             ? ["workout_predates_auto_confirm_activation"]
+            : reconciliationHistoryConflict
+              ? ["reconciliation_history_conflict"]
             : hasTerminalFounderResolution
               ? ["founder_reconciliation_already_resolved"]
               : [...(gate?.reasons ?? (gate?.eligible ? [] : ["gate_unavailable"]))];
@@ -994,7 +1032,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
               candidate: gate?.candidate ?? null,
             });
           }
-          if (prospectiveAutoConfirm && !hasTerminalFounderResolution && gate?.eligible) {
+          if (prospectiveAutoConfirm && !hasTerminalFounderResolution && !reconciliationHistoryConflict && gate?.eligible) {
             const confirmed = await confirmHealthKitWorkoutRelationship({
               records,
               ownerUserId: context.ownerUserId,
@@ -1004,6 +1042,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
             });
             const index = workoutLinks.findIndex((item) => item.id === currentLink.id);
             if (index >= 0) workoutLinks.splice(index, 1, confirmed.link);
+            const refreshedClaims = await records.list({
+              ownerUserId: context.ownerUserId,
+              collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
+            });
+            workoutLinkClaims.splice(0, workoutLinkClaims.length, ...refreshedClaims);
             summary.automaticallyConfirmed += confirmed.outcome === "confirmed" ? 1 : 0;
 
             const historyBase = existingReview && isHealthKitWorkoutReconciliationReview(existingReview)
@@ -1030,15 +1073,18 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
               allowSuperseded: true,
             });
             if (!existingReview) {
-              await records.putIfAbsent({
+              const created = await records.putIfAbsent({
                 ownerUserId: context.ownerUserId,
                 collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
                 recordId: reviewId,
                 sourceIdentity: reviewId,
                 payload: resolved,
               });
+              if (!created.created || !hasExactStoredHealthKitWorkoutReconciliationTerminal(created.record)) {
+                throw problem(409, "WORKOUT_RECONCILIATION_HISTORY_COLLISION", "Automatic confirmation could not persist its exact reconciliation history.");
+              }
             } else if (["pending", "superseded"].includes(existingReview.status)) {
-              await records.put({
+              const savedHistory = await records.put({
                 ownerUserId: context.ownerUserId,
                 collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
                 recordId: reviewId,
@@ -1046,6 +1092,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
                 sourceIdentity: reviewId,
                 payload: resolved,
               });
+              if (!hasExactStoredHealthKitWorkoutReconciliationTerminal(savedHistory)) {
+                throw problem(409, "WORKOUT_RECONCILIATION_HISTORY_INVALID", "Automatic confirmation did not persist exact reconciliation history.");
+              }
             }
           }
         }

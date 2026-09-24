@@ -3,17 +3,16 @@ import { HEALTHKIT_CANONICAL_DAY_COLLECTION } from "../../domain/services/Health
 import {
   HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
   HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
-  isActiveDetailedStrengthSession,
 } from "../../domain/services/HealthKitObservationService.js";
 import { HEALTHKIT_CANONICAL_WORKOUT_COLLECTION, HealthKitWorkoutFamily } from "../../domain/services/HealthKitWorkoutService.js";
 import {
   HEALTHKIT_WORKOUT_LINK_COLLECTION,
   HealthKitWorkoutLinkError,
   HealthKitWorkoutLinkStatus,
-  assertHealthKitWorkoutLinkAllowed,
 } from "../../domain/services/HealthKitWorkoutLinkService.js";
 import {
   HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
+  assertHealthKitWorkoutRelationshipConfirmationAllowed,
   confirmHealthKitWorkoutRelationship,
   findHealthKitWorkoutRelationshipViolations,
   getHealthKitWorkoutLinkClaimId,
@@ -74,17 +73,18 @@ export async function runHealthKitWorkoutLinkConfirmation({
   }
 
   const list = (collection) => records.list({ ownerUserId, collection });
-  const [links, claims, workouts, evidence, canonicalDays, observations, dailyPolicy, workoutPolicy] = await Promise.all([
+  const [links, claims, workouts, evidence, evidenceMetadata, canonicalDays, observations, dailyPolicy, workoutPolicy] = await Promise.all([
     list(HEALTHKIT_WORKOUT_LINK_COLLECTION),
     list(HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION),
     list(HEALTHKIT_CANONICAL_WORKOUT_COLLECTION),
     list(EVIDENCE_COLLECTION),
+    records.listStorageMetadata({ ownerUserId, collection: EVIDENCE_COLLECTION }),
     list(HEALTHKIT_CANONICAL_DAY_COLLECTION),
     list(OBSERVATION_COLLECTION),
     records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID }),
     records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID }),
   ]);
-  const facts = collectFacts({ links, claims, workouts, evidence, canonicalDays, observations, dailyPolicy, workoutPolicy });
+  const facts = collectFacts({ links, claims, workouts, evidence, evidenceMetadata, canonicalDays, observations, dailyPolicy, workoutPolicy });
   const inWindow = (link) => link.localDate >= startLocalDate && link.localDate <= endLocalDate;
   const workoutById = new Map(workouts.map((workout) => [workout.id, workout]));
   const isStrength = (link) => workoutById.get(link.canonicalWorkoutId)?.current?.family === HealthKitWorkoutFamily.STRENGTH;
@@ -104,6 +104,15 @@ export async function runHealthKitWorkoutLinkConfirmation({
   // Idempotent replay: the window's single strength relationship is already
   // confirmed and durably claimed; there is nothing left to do and nothing is written.
   if (candidates.length === 0 && confirmed.length === 1 && claimsHeldBy(claims, confirmed[0])) {
+    try {
+      assertHealthKitWorkoutRelationshipConfirmationAllowed({
+        link: confirmed[0], links, workouts, evidence, claims,
+        loggerSessionServerCommitTimestamps: new Map(evidenceMetadata.map((row) => [row.recordId, row.createdAt])),
+      });
+    } catch (error) {
+      if (error instanceof HealthKitWorkoutLinkError) return refused(error.code, facts, describe(confirmed[0], workoutById));
+      throw error;
+    }
     return Object.freeze({ outcome: "already_confirmed", ...describe(confirmed[0], workoutById), facts });
   }
   if (candidates.length === 0 && confirmed.length === 1) {
@@ -115,10 +124,11 @@ export async function runHealthKitWorkoutLinkConfirmation({
   const summary = describe(link, workoutById);
 
   // Prove the confirmation is allowed before predicting or writing anything.
-  const session = evidence.find((record) => (record.canonicalId ?? record.payload?.id) === link.loggerSessionCanonicalId);
-  if (!session || !isActiveDetailedStrengthSession(session)) return refused("LINK_SESSION_UNAVAILABLE", facts, summary);
   try {
-    assertHealthKitWorkoutLinkAllowed(link, { existingLinks: links, canonicalWorkouts: workouts });
+    assertHealthKitWorkoutRelationshipConfirmationAllowed({
+      link, links, workouts, evidence, claims,
+      loggerSessionServerCommitTimestamps: new Map(evidenceMetadata.map((row) => [row.recordId, row.createdAt])),
+    });
   } catch (error) {
     if (error instanceof HealthKitWorkoutLinkError) return refused(error.code, facts, summary);
     throw error;
@@ -236,7 +246,7 @@ function refused(reason, facts, detail = {}) {
   return Object.freeze({ outcome: "refused", reasons: [reason], ...detail, facts });
 }
 
-function collectFacts({ links, claims, workouts, evidence, canonicalDays, observations, dailyPolicy, workoutPolicy }) {
+function collectFacts({ links, claims, workouts, evidence, evidenceMetadata, canonicalDays, observations, dailyPolicy, workoutPolicy }) {
   return {
     linkCount: links.length,
     linksDigest: listDigest(links),
@@ -246,6 +256,7 @@ function collectFacts({ links, claims, workouts, evidence, canonicalDays, observ
     canonicalWorkoutsDigest: listDigest(workouts),
     evidenceCount: evidence.length,
     evidenceDigest: listDigest(evidence),
+    evidenceStorageMetadataDigest: listDigest(evidenceMetadata),
     canonicalDayCount: canonicalDays.length,
     canonicalDaysDigest: listDigest(canonicalDays),
     observationCount: observations.length,

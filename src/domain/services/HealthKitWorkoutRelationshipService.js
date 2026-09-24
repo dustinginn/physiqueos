@@ -4,6 +4,7 @@ import {
   HEALTHKIT_WORKOUT_LINK_COLLECTION,
   HealthKitWorkoutLinkError,
   HealthKitWorkoutLinkStatus,
+  assessHealthKitStrengthLinkCandidates,
   assertHealthKitWorkoutLinkAllowed,
   unlinkHealthKitWorkoutLink,
 } from "./HealthKitWorkoutLinkService.js";
@@ -55,20 +56,21 @@ export async function confirmHealthKitWorkoutRelationship({ records, ownerUserId
   const link = await records.get({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION, recordId: linkId });
   if (!link) throw new HealthKitWorkoutLinkError("LINK_NOT_FOUND", "The workout link does not exist.");
 
-  const [links, workouts, evidence, claims] = await Promise.all([
+  const [links, workouts, evidence, claims, metadata] = await Promise.all([
     records.list({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION }),
     records.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION }),
     records.list({ ownerUserId, collection: "canonicalEvidenceObjects" }),
     records.list({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION }),
+    records.listStorageMetadata({ ownerUserId, collection: "canonicalEvidenceObjects" }),
   ]);
-  // The Logger session must still be an active detailed strength session: a
-  // stale candidate never confirms against a superseded or removed session.
-  const session = evidence.find((record) => (record.canonicalId ?? record.payload?.id) === link.loggerSessionCanonicalId);
-  if (!session || !isActiveDetailedStrengthSession(session) || !isTrustedNativeLiveLoggerSession(session.payload ?? session)) {
-    throw new HealthKitWorkoutLinkError("LINK_SESSION_UNAVAILABLE", "The Workout Logger session for this link is no longer an active strength session.");
-  }
-  assertHealthKitWorkoutRelationshipIntegrity({ links, claims });
-  assertHealthKitWorkoutLinkAllowed(link, { existingLinks: links, canonicalWorkouts: workouts });
+  assertHealthKitWorkoutRelationshipConfirmationAllowed({
+    link,
+    links,
+    workouts,
+    evidence,
+    claims,
+    loggerSessionServerCommitTimestamps: new Map(metadata.map((row) => [row.recordId, row.createdAt])),
+  });
   if (link.status === HealthKitWorkoutLinkStatus.CONFIRMED) return Object.freeze({ outcome: "already_confirmed", link });
 
   const acquired = [];
@@ -99,6 +101,43 @@ export async function confirmHealthKitWorkoutRelationship({ records, ownerUserId
     throw error;
   }
   return Object.freeze({ outcome: "confirmed", link: saved });
+}
+
+/**
+ * One pure, reusable confirmation boundary. Dry-runs, idempotent replays and
+ * writes all use the same current-state proof: canonical claim graph, active
+ * trusted live Logger provenance, one-to-one/duplicate-family rules, and a
+ * temporally plausible current matcher candidate.
+ */
+export function assertHealthKitWorkoutRelationshipConfirmationAllowed({
+  link,
+  links = [],
+  workouts = [],
+  evidence = [],
+  claims = [],
+  loggerSessionServerCommitTimestamps = new Map(),
+} = {}) {
+  assertHealthKitWorkoutRelationshipIntegrity({ links, claims });
+  const session = evidence.find((record) => (record.canonicalId ?? record.payload?.id) === link?.loggerSessionCanonicalId);
+  if (!session || !isActiveDetailedStrengthSession(session) || !isTrustedNativeLiveLoggerSession(session.payload ?? session)) {
+    throw new HealthKitWorkoutLinkError("LINK_SESSION_UNAVAILABLE", "The Workout Logger session for this link is no longer an active trusted live Logger strength session.");
+  }
+  assertHealthKitWorkoutLinkAllowed(link, { existingLinks: links, canonicalWorkouts: workouts });
+  const workout = workouts.find((candidate) => candidate.id === link.canonicalWorkoutId);
+  const assessment = assessHealthKitStrengthLinkCandidates({
+    canonicalWorkout: workout,
+    canonicalObjects: evidence,
+    existingLinks: links,
+    canonicalWorkouts: workouts,
+    loggerSessionServerCommitTimestamps,
+  });
+  if (!assessment.candidates.some((candidate) => candidate.loggerSessionCanonicalId === link.loggerSessionCanonicalId)) {
+    throw new HealthKitWorkoutLinkError(
+      "LINK_TEMPORAL_GUARD_FAILED",
+      "The selected Logger session is not a temporally plausible current match for this Apple workout.",
+    );
+  }
+  return Object.freeze({ session, workout, assessment });
 }
 
 /** Unlink keeps the link, the Apple workout, and the Logger session; only the claims are released. */
@@ -133,9 +172,15 @@ export function findHealthKitWorkoutRelationshipViolations({ links = [], claims 
   const confirmedById = new Map(confirmed.map((link) => [link.id, link]));
   const validClaimFor = (claim, link, kind, subject) => claim?.id === getHealthKitWorkoutLinkClaimId(kind, subject) &&
     claim.kind === kind && claim.schemaVersion === HEALTHKIT_WORKOUT_LINK_CLAIM_SCHEMA_VERSION &&
-    claim.status === ClaimStatus.HELD && claim.holderLinkId === link.id &&
+    claim.userId === link.userId && claim.status === ClaimStatus.HELD && claim.holderLinkId === link.id &&
+    claim.evidenceEligibility?.state === "quarantined" && claim.evidenceEligibility?.strategic === false &&
+    claim.evidenceEligibility?.decidedBy === createHealthKitQuarantinedEligibility().decidedBy &&
     Array.isArray(claim.history) && claim.history.length > 0 &&
-    claim.history.at(-1)?.status === ClaimStatus.HELD && claim.history.at(-1)?.holderLinkId === link.id;
+    claim.history.at(-1)?.status === ClaimStatus.HELD && claim.history.at(-1)?.holderLinkId === link.id &&
+    claim.history.every((entry) => [ClaimStatus.HELD, ClaimStatus.RELEASED].includes(entry?.status) &&
+      String(entry?.holderLinkId ?? "").length > 0 && validInstant(entry?.at)) &&
+    claim.createdAt === claim.history[0].at && claim.updatedAt === claim.history.at(-1).at &&
+    validInstant(claim.createdAt) && validInstant(claim.updatedAt);
   const validHeldClaim = (claim) => {
     const link = confirmedById.get(claim.holderLinkId);
     if (!link) return false;
@@ -153,6 +198,10 @@ export function findHealthKitWorkoutRelationshipViolations({ links = [], claims 
     }).length,
     heldClaimsWithoutConfirmedLink: heldClaims.filter((claim) => !validHeldClaim(claim)).length,
   });
+}
+
+function validInstant(value) {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
 export function assertHealthKitWorkoutRelationshipIntegrity({ links = [], claims = [] } = {}) {

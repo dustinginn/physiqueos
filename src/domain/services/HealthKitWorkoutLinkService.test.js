@@ -148,20 +148,11 @@ describe("strength link matcher", () => {
       .toThrowError(HealthKitWorkoutLinkError);
   });
 
-  it("keeps an explicit source identity as a review candidate while exposing failed temporal facts", () => {
+  it("rejects an explicit source identity when the windows do not overlap", () => {
     const explicit = logger("session-x", "18:00", "19:00");
     explicit.payload.metadata.source_workout_id = HK_UUID;
     const result = assess(hkStrength(), [explicit]);
-    expect(result.outcome).toBe(Outcome.CONFIDENT);
-    expect(result.candidates[0]).toMatchObject({
-      confidence: 100,
-      basis: "explicit_source_identity",
-      trustedLoggerProvenance: true,
-      substantiveOverlap: false,
-      overlapSeconds: 0,
-      startAligned: false,
-      endAligned: false,
-    });
+    expect(result).toMatchObject({ outcome: Outcome.NONE, reason: "no_plausible_logger_session", candidates: [] });
   });
 
   it("never invents temporal facts for an explicit source identity with unusable timing", () => {
@@ -170,16 +161,7 @@ describe("strength link matcher", () => {
     delete explicit.payload.metadata.start_time;
     delete explicit.payload.metadata.end_time;
     const result = assess(hkStrength(), [explicit]);
-    expect(result.outcome).toBe(Outcome.CONFIDENT);
-    expect(result.candidates[0]).toMatchObject({
-      confidence: 100,
-      basis: "explicit_source_identity",
-      trustedLoggerProvenance: true,
-      substantiveOverlap: false,
-      overlapSeconds: null,
-      startAligned: null,
-      endAligned: null,
-    });
+    expect(result).toMatchObject({ outcome: Outcome.NONE, reason: "logger_session_times_unverifiable", unverifiableSessionCount: 1, candidates: [] });
   });
 
   it("does not use a bare display filename to identify a workout", () => {
@@ -241,7 +223,7 @@ describe("link record lifecycle", () => {
   });
 
   it("never confirms at creation, not even for an explicit source identity", () => {
-    const explicit = logger("session-x", "18:00", "19:00");
+    const explicit = logger("session-x", "10:01", "10:59");
     explicit.payload.metadata.source_workout_id = HK_UUID;
     const { link } = candidateFor([explicit]);
     expect(link).toMatchObject({ status: "candidate", matchBasis: "explicit_source_identity", confidence: 100, createdBy: { kind: "system_matcher" } });

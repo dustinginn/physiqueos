@@ -39,7 +39,7 @@ describe("guarded Workout link confirmation operation", () => {
     });
     expect(Object.keys(result.facts).sort()).toEqual([
       "canonicalDayCount", "canonicalDaysDigest", "canonicalWorkoutCount", "canonicalWorkoutsDigest", "claimCount", "claimsDigest",
-      "dailyPolicyDigest", "evidenceCount", "evidenceDigest", "linkCount", "linksDigest", "observationCount", "observationsDigest", "workoutPolicyDigest",
+      "dailyPolicyDigest", "evidenceCount", "evidenceDigest", "evidenceStorageMetadataDigest", "linkCount", "linksDigest", "observationCount", "observationsDigest", "workoutPolicyDigest",
     ]);
     expect(records.snapshot()).toEqual(before);
     expect(records.getMutationCount()).toBe(0);
@@ -108,6 +108,20 @@ describe("guarded Workout link confirmation operation", () => {
     expect(again).toMatchObject({ outcome: "already_confirmed", linkStatus: "confirmed" });
     expect(await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH })).toMatchObject({ outcome: "already_confirmed" });
     expect(records.getMutationCount()).toBe(mutations);
+  });
+
+  it("refuses already-confirmed replay after trusted live Logger provenance is removed", async () => {
+    const { records } = await world();
+    const dry = await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH });
+    await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH, apply: true, expected: dry.facts });
+    const snapshot = records.snapshot();
+    const session = snapshot.canonicalEvidenceObjects[0];
+    delete session.payload.metadata.logger_origin;
+    delete session.payload.metadata.logger_mode;
+    const corrupt = createInMemoryCanonicalRecordStore(snapshot);
+    expect(await runHealthKitWorkoutLinkConfirmation({ records: corrupt, authorization: AUTH }))
+      .toMatchObject({ outcome: "refused", reasons: ["LINK_SESSION_UNAVAILABLE"] });
+    expect(corrupt.getMutationCount()).toBe(0);
   });
 
   it("refuses to reuse an authorization reference whose audit row already exists (AUDIT_ROW_EXISTS), writing nothing", async () => {

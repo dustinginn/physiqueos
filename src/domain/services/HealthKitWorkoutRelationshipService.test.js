@@ -123,6 +123,13 @@ describe("guarded relationship confirmation", () => {
     expect(records.snapshot().healthKitWorkoutLinkClaims).toEqual([]);
   });
 
+  it("refuses a manually persisted explicit-identity candidate whose current windows are temporally impossible", async () => {
+    const { records, link } = await world({ sessions: [session("S1", "18:00", "19:00")], workouts: [["u1", "10:00", "11:00"]] });
+    await expect(confirm(records, link("u1", "S1"))).rejects.toMatchObject({ code: "LINK_TEMPORAL_GUARD_FAILED" });
+    expect(records.snapshot().healthKitWorkoutLinkClaims).toEqual([]);
+    expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("candidate");
+  });
+
   it("unlink releases the claims without deleting anything, and a relink or another link can then take them", async () => {
     const { records, link } = await world({
       sessions: [session("S1", "10:01", "10:59"), session("S2", "10:02", "11:00")],
@@ -202,6 +209,19 @@ describe("guarded relationship confirmation", () => {
     });
     expect(corrupt).toMatchObject({ workoutsWithMultipleConfirmedLinks: 1, confirmedLinksWithoutHeldClaims: 2, heldClaimsWithoutConfirmedLink: 1 });
     expect(isHealthKitDerivedRecord({ id: getHealthKitWorkoutLinkClaimId("workout", "healthkit_canonical_workout_x") })).toBe(true);
+  });
+
+  it.each([
+    ["foreign owner", (claim) => ({ ...claim, userId: "user_other" })],
+    ["missing terminal time", (claim) => ({ ...claim, history: claim.history.map((entry, index) => index === claim.history.length - 1 ? { ...entry, at: null } : entry) })],
+    ["strategically eligible", (claim) => ({ ...claim, evidenceEligibility: { state: "eligible", strategic: true } })],
+  ])("rejects a held claim with %s", async (_label, mutate) => {
+    const { records, link } = await world({ sessions: [session("S1", "10:01", "10:59")], workouts: [["u1", "10:00", "11:00"]] });
+    await confirm(records, link("u1", "S1"));
+    const snapshot = records.snapshot();
+    snapshot.healthKitWorkoutLinkClaims[0] = mutate(snapshot.healthKitWorkoutLinkClaims[0]);
+    expect(findHealthKitWorkoutRelationshipViolations({ links: snapshot.healthKitWorkoutLinks, claims: snapshot.healthKitWorkoutLinkClaims }))
+      .toMatchObject({ confirmedLinksWithoutHeldClaims: 1, heldClaimsWithoutConfirmedLink: 1 });
   });
 
   it("fails closed before any read without an attributable actor or a valid time", async () => {

@@ -12,6 +12,7 @@ import {
   confirmHealthKitWorkoutRelationship,
   getHealthKitWorkoutLinkClaimId,
 } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
+import { getHealthKitWorkoutReconciliationId } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 
 const OWNER = "user_founder_001";
 const WORKOUT_POLICY_ID = "healthkit_workout_canonical_activation_policy";
@@ -265,6 +266,31 @@ describe("controlled Workout window (policy enabled)", () => {
     await ingest(records, [workout()], "auto-2");
     expect(records.snapshot().evidenceReviews[0].resolutionHistory).toHaveLength(1);
     expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(1);
+  });
+
+  it("refuses automatic confirmation when an unexpected record occupies the deterministic history identity", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "history-collision-1");
+    const canonicalWorkout = records.snapshot().healthKitCanonicalWorkouts[0];
+    const reviewId = getHealthKitWorkoutReconciliationId(canonicalWorkout.id);
+    await records.putIfAbsent({
+      ownerUserId: OWNER, collection: "evidenceReviews", recordId: reviewId,
+      payload: { id: reviewId, userId: OWNER, status: "pending", reviewKind: "generic_evidence_review", version: 1 },
+    });
+    const currentPolicy = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID });
+    await records.put({
+      ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID,
+      expectedVersion: currentPolicy.version,
+      payload: { ...currentPolicy, linkAutoConfirm: true, linkAutoConfirmEffectiveAt: "2026-09-23T23:00:00.000Z" },
+    });
+    const result = await ingest(records, [workout()], "history-collision-2", { receivedAt: "2026-09-23T23:32:00.000Z" });
+    expect(result.result.workoutRelationships.automaticConfirmationRefusals).toEqual([
+      expect.objectContaining({ reasons: ["reconciliation_history_conflict"] }),
+    ]);
+    const after = records.snapshot();
+    expect(after.healthKitWorkoutLinks[0].status).toBe("candidate");
+    expect(after.healthKitWorkoutLinkClaims).toEqual([]);
+    expect(after.evidenceReviews).toEqual([expect.objectContaining({ reviewKind: "generic_evidence_review", status: "pending" })]);
   });
 
   it("never retroactively auto-confirms a workout created before the separately authorized cutoff", async () => {
@@ -939,7 +965,7 @@ describe("link hardening through the real ingest path", () => {
   };
 
   it("never creates a confirmed link or a claim from ingestion, even for an explicit source identity", async () => {
-    const explicit = logger("session-x", "18:00", "19:00");
+    const explicit = logger("session-x", "10:01", "10:59");
     explicit.payload.metadata.source_workout_id = HK_UUID;
     const records = storeWithClaims({ evidence: [explicit] });
     await ingest(records, [workout()], "b1");
@@ -949,7 +975,7 @@ describe("link hardening through the real ingest path", () => {
     expect(snapshot.healthKitWorkoutLinkClaims ?? []).toEqual([]);
   });
 
-  it("routes a temporally incompatible explicit identity to review even when auto-confirm is enabled", async () => {
+  it("rejects a temporally incompatible explicit identity before candidate or review creation", async () => {
     const explicit = logger("session-x", "18:00", "19:00");
     explicit.payload.metadata.source_workout_id = HK_UUID;
     const records = storeWithClaims({
@@ -962,25 +988,11 @@ describe("link hardening through the real ingest path", () => {
     const result = await ingest(records, [workout()], "explicit-temporal-refusal");
     const snapshot = records.snapshot();
     expect(result.result.workoutRelationships.automaticallyConfirmed ?? 0).toBe(0);
-    expect(result.result.workoutRelationships.automaticConfirmationRefusals).toEqual([
-      expect.objectContaining({ reasons: expect.arrayContaining(["deterministic_basis_not_allowlisted"]) }),
-    ]);
-    expect(snapshot.healthKitWorkoutLinks).toEqual([
-      expect.objectContaining({ status: "candidate", matchBasis: "explicit_source_identity" }),
-    ]);
+    expect(result.result.workoutRelationships.automaticConfirmationRefusals).toEqual([]);
+    expect(snapshot.healthKitWorkoutLinks).toEqual([]);
     expect(snapshot.healthKitWorkoutLinkClaims ?? []).toEqual([]);
-    expect(snapshot.evidenceReviews).toEqual([
-      expect.objectContaining({
-        reviewKind: "healthkit_workout_reconciliation",
-        status: "pending",
-        candidates: [expect.objectContaining({
-          loggerSessionCanonicalId: "session-x",
-          substantiveOverlap: false,
-          startAligned: false,
-          endAligned: false,
-        })],
-      }),
-    ]);
+    expect(snapshot.evidenceReviews ?? []).toEqual([]);
+    expect(snapshot.healthKitCanonicalWorkouts[0].linkAssessment).toMatchObject({ outcome: "no_match", reason: "no_plausible_logger_session" });
   });
 
   it("excludes an aligned explicit identity from non-Logger evidence", async () => {

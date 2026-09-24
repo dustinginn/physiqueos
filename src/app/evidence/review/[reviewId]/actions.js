@@ -132,14 +132,16 @@ export async function resolveWorkoutReconciliation(formData) {
   }
   const direct = commandOutcome?.result;
   const directStatus = action === "confirm" ? "resolved_confirmed" : "resolved_no_match";
-  let exact = direct?.status === directStatus && exactWorkoutReconciliationResolution(
+  let exact = direct?.reviewId === reviewId && Number.isSafeInteger(Number(direct?.revision)) && Number(direct.revision) > 0 &&
+    direct?.status === directStatus && exactWorkoutReconciliationResolution(
     direct.resolution,
     action,
     loggerSessionCanonicalId,
   );
   if (!exact) {
     const readback = await getProductionEvidenceReviewReadService().getReview(reviewId);
-    exact = readback?.review?.status === directStatus && exactWorkoutReconciliationResolution(
+    exact = readback?.presentation?.id === reviewId && readback?.presentation?.status === directStatus &&
+      Number.isSafeInteger(Number(readback?.presentation?.version)) && Number(readback.presentation.version) > 0 && exactWorkoutReconciliationResolution(
       readback?.presentation?.resolution,
       action,
       loggerSessionCanonicalId,

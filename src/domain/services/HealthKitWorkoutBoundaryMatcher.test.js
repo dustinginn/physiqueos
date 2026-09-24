@@ -172,6 +172,7 @@ function session(id, start, end, { calories = 400, hr = 120 } = {}) {
       source: { application: "Training Logger + Apple Fitness", modality: "mixed" },
       metadata: {
         activity_type: "Traditional Strength Training",
+        logger_origin: "training_logger", logger_mode: "live",
         start_time: `${DAY}T${time(start)}-07:00`, end_time: `${DAY}T${time(end)}-07:00`,
         duration_seconds: seconds, active_calories: calories, average_heart_rate: hr,
       },

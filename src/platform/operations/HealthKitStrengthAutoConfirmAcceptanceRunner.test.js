@@ -131,6 +131,18 @@ describe("bounded Strength deterministic auto-confirm acceptance", () => {
     expect(result).toMatchObject({ outcome: "refused", reasons: ["stored_relationship_violations"] });
   });
 
+  it("refuses an already-confirmed acceptance replay after live Logger provenance is removed", async () => {
+    const records = await productionShapedWorld();
+    const dry = await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, now: () => new Date(NOW) });
+    await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, apply: true, expected: dry.facts, now: () => new Date(NOW) });
+    const snapshot = records.snapshot();
+    delete snapshot.canonicalEvidenceObjects[0].payload.metadata.logger_origin;
+    delete snapshot.canonicalEvidenceObjects[0].payload.metadata.logger_mode;
+    const corrupt = createInMemoryCanonicalRecordStore(snapshot);
+    expect(await runHealthKitStrengthAutoConfirmAcceptance({ records: corrupt, authorization: AUTHORIZATION, now: () => new Date(NOW) }))
+      .toMatchObject({ outcome: "refused", reasons: ["LINK_SESSION_UNAVAILABLE"] });
+  });
+
   it.each([
     ["wrong action", (review) => { review.resolution.action = "no_match"; }],
     ["wrong selected session", (review) => { review.resolution.selectedLoggerSessionCanonicalId = "other-session"; }],

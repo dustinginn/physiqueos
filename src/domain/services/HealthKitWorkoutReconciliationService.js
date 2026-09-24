@@ -266,29 +266,68 @@ export function hasExactHealthKitWorkoutReconciliationResolution(review, {
     (resolution.linkId ?? null) === (action === HealthKitWorkoutReconciliationAction.CONFIRM ? linkId : null);
   if (!exactResolution(review.resolution)) return false;
   if (!Array.isArray(review.resolutionHistory) || review.resolutionHistory.length !== 1 ||
-    !exactResolution(review.resolutionHistory[0])) return false;
+    !exactResolution(review.resolutionHistory[0]) ||
+    stable(review.resolutionHistory[0]) !== stable(review.resolution)) return false;
+  const resolution = review.resolution;
+  const allowedBasisModes = new Set([
+    "founder_explicit_selection",
+    "founder_explicit_no_match",
+    "deterministic_auto_confirm",
+    "deterministic_auto_confirm_acceptance",
+  ]);
+  if (!validInstant(resolution.at) || !String(resolution.by?.kind ?? "").trim() ||
+    !String(resolution.by?.ref ?? "").trim() || !allowedBasisModes.has(resolution.basis?.mode) ||
+    ((resolution.basis.mode.startsWith("founder_")) && resolution.by.kind !== "founder") ||
+    ((resolution.basis.mode.startsWith("deterministic_")) && resolution.by.kind !== "system_matcher") ||
+    (resolution.basis.mode.startsWith("founder_") && !String(resolution.basis?.matcherVersion ?? "").trim()) ||
+    (resolution.basis.mode.startsWith("deterministic_") && !String(resolution.basis?.ruleVersion ?? "").trim()) ||
+    review.updatedAt !== resolution.at ||
+    resolution.strategicEvidenceEligibility !== "quarantined" ||
+    review.strategicEvidenceEligibility !== "quarantined" || review.evidenceEligibility?.strategic !== false) return false;
   const lifecycle = Array.isArray(review.lifecycleHistory) ? review.lifecycleHistory : [];
   const terminal = lifecycle.filter((entry) => ["resolved_confirmed", "resolved_no_match"].includes(entry?.status));
-  return terminal.length === 1 && terminal[0]?.status === expectedStatus && lifecycle.at(-1)?.status === expectedStatus;
+  return terminal.length === 1 && terminal[0]?.status === expectedStatus &&
+    terminal[0]?.at === resolution.at && stable(terminal[0]?.by) === stable(resolution.by) &&
+    stable(lifecycle.at(-1)) === stable(terminal[0]);
+}
+
+export function hasExactStoredHealthKitWorkoutReconciliationTerminal(review) {
+  if (!isHealthKitWorkoutReconciliationReview(review)) return false;
+  if (review.status === "resolved_confirmed") {
+    return hasExactHealthKitWorkoutReconciliationResolution(review, {
+      action: HealthKitWorkoutReconciliationAction.CONFIRM,
+      selectedLoggerSessionCanonicalId: review.resolution?.selectedLoggerSessionCanonicalId ?? null,
+      linkId: review.resolution?.linkId ?? null,
+    });
+  }
+  if (review.status === "resolved_no_match") {
+    return hasExactHealthKitWorkoutReconciliationResolution(review, {
+      action: HealthKitWorkoutReconciliationAction.NO_MATCH,
+    });
+  }
+  return false;
 }
 
 export function projectHealthKitWorkoutReconciliationPresentation(review) {
+  const terminal = ["resolved_confirmed", "resolved_no_match"].includes(review.status);
+  const validTerminal = !terminal || hasExactStoredHealthKitWorkoutReconciliationTerminal(review);
+  const projectedStatus = validTerminal ? review.status : "invalid_terminal_history";
   return Object.freeze({
     kind: "healthkit_workout_reconciliation",
     id: review.id,
-    status: review.status,
+    status: projectedStatus,
     version: String(review.version ?? "1"),
     localDate: review.localDate,
     title: "Match Apple Health workout",
     summary: "Choose the Workout Logger session that belongs to this Apple Health workout, or choose No match.",
     workout: review.workout,
     candidates: Object.freeze((review.candidates ?? []).map((candidate) => Object.freeze({ ...candidate }))),
-    resolution: review.resolution ? Object.freeze({
+    resolution: validTerminal && review.resolution ? Object.freeze({
       action: review.resolution.action,
       selectedLoggerSessionCanonicalId: review.resolution.selectedLoggerSessionCanonicalId ?? null,
       linkId: review.resolution.linkId ?? null,
     }) : null,
-    actions: Object.freeze([
+    actions: Object.freeze(projectedStatus === "pending" ? [
       ...((review.candidates ?? []).map((candidate) => Object.freeze({
         id: `confirm:${candidate.loggerSessionCanonicalId}`,
         action: HealthKitWorkoutReconciliationAction.CONFIRM,
@@ -296,9 +335,13 @@ export function projectHealthKitWorkoutReconciliationPresentation(review) {
         label: "Use this Logger session",
       }))),
       Object.freeze({ id: "no_match", action: HealthKitWorkoutReconciliationAction.NO_MATCH, label: "No match" }),
-    ]),
+    ] : []),
     strategicEvidenceEligibility: "quarantined",
   });
+}
+
+function validInstant(value) {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
 function projectCandidate(candidate, session = null) {
