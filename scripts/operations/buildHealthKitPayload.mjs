@@ -26,6 +26,12 @@
 //   (strength-auto-confirm) additionally proves the deterministic gate and records inert reconciliation history
 //   node scripts/operations/buildHealthKitPayload.mjs --kind link-reassess --sha <40-hex> \
 //     --start YYYY-MM-DD --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
+//   node scripts/operations/buildHealthKitPayload.mjs --kind deferred-workout-reconcile --sha <40-hex> \
+//     --observation-id <exact stored HealthKit observation id> --mode dry-run|apply \
+//     [--authorization-ref <text>] [--expected <json file>] --out <file>
+//   (deferred-workout-reconcile) reconciles exactly ONE already-stored observation that ingestion
+//   deferred solely for family_not_in_activation_scope, against the CURRENT Workout policy. No
+//   date range, no bulk list — --observation-id is the exact identity, and only that one.
 import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
@@ -40,6 +46,7 @@ export async function buildHealthKitPayload({
   authorizationReference = "", expected = "", includeValues = true, marker, desired = "", simulateComplete = false,
   openEnded = false, families = "", linkAutoConfirm = null,
   expectedCurrentFamilies = "", expectedCurrentPolicyDigest = "", acknowledgeNarrowing = false,
+  observationId = "",
 } = {}) {
   if (!/^[0-9a-f]{40}$/.test(String(sha ?? ""))) throw new Error("--sha must be the 40-hex production commit the payload is authorized for.");
   const suffix = randomBytes(4).toString("hex");
@@ -188,6 +195,25 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
+  if (kind === "deferred-workout-reconcile") {
+    if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
+    if (!String(observationId ?? "").trim()) throw new Error("--observation-id must be the exact stored HealthKit observation identity to reconcile.");
+    if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
+      throw new Error("apply mode requires --authorization-ref and --expected.");
+    }
+    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_DEFERRED_WORKOUT_RECONCILIATION_${mode === "apply" ? "APPLY" : "DRYRUN"}_SUCCESS_${suffix}`;
+    const result = await build({
+      entryPoints: [path.join(root, "scripts/operations/healthKitDeferredWorkoutReconciliation.entry.mjs")],
+      bundle: true, write: false, format: "esm", platform: "node", target: "node22", legalComments: "none", minify: true,
+      external: ["pg"],
+      define: {
+        __EXPECTED_GIT_SHA__: JSON.stringify(sha), __MODE__: JSON.stringify(mode), __OBSERVATION_ID__: JSON.stringify(String(observationId ?? "")),
+        __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference)), __EXPECTED_JSON__: JSON.stringify(String(expected)),
+        __MARKER__: JSON.stringify(successMarker),
+      },
+    });
+    return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
+  }
   if (kind === "training-audit") {
     if (!DATE.test(start)) throw new Error("--start must be the YYYY-MM-DD local date to audit.");
     const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_TRAINING_AUDIT_SUCCESS_${suffix}`;
@@ -199,7 +225,7 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
-  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, or training-audit.");
+  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, deferred-workout-reconcile, or training-audit.");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -216,7 +242,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     start: args.start, mode: args.mode, authorizationReference: args["authorization-ref"], expected, desired: args.desired, simulateComplete: Boolean(args["simulate-complete"]),
     includeValues: !args["no-values"], openEnded: Boolean(args["open-ended"]), families: args.families ?? "", linkAutoConfirm,
     expectedCurrentFamilies: args["expected-current-families"] ?? "", expectedCurrentPolicyDigest: args["expected-current-policy-digest"] ?? "",
-    acknowledgeNarrowing: Boolean(args["acknowledge-narrowing"]),
+    acknowledgeNarrowing: Boolean(args["acknowledge-narrowing"]), observationId: args["observation-id"] ?? "",
   });
   if (!args.out) throw new Error("--out is required.");
   fs.writeFileSync(args.out, code, { mode: 0o600 });

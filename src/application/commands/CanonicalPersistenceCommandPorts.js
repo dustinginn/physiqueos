@@ -3088,7 +3088,10 @@ const WORKOUT_TERMINAL_STATES = new Set([
   HealthKitReconciliationState.WORKOUT_CANONICALIZED,
   HealthKitReconciliationState.WORKOUT_SUMMARY_SUPERSEDED,
 ]);
-const WORKOUT_FAMILY_OUT_OF_SCOPE_REASON = "family_not_in_activation_scope";
+// Exported (pure addition, no behavior change) so a bounded reconciliation
+// runner can refuse against the exact same reason string ingestion stores,
+// without duplicating this literal and risking drift if it ever changes.
+export const WORKOUT_FAMILY_OUT_OF_SCOPE_REASON = "family_not_in_activation_scope";
 
 // A HealthKit workout is immutable: the same UUID re-delivered with different
 // content is not a different workout but drifted associated statistics (heart
