@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T03:02:00Z",
+  "generated_at_utc": "2026-09-24T03:14:46Z",
   "task": {
-    "id": "codex-strength-sep23-deterministic-confirmed-final-green-20260923",
-    "title": "September 23 Strength deterministic confirmation and final graduation",
+    "id": "codex-healthkit-revision-recovery-strength-presentation-20260923",
+    "title": "HealthKit daily-revision recovery and Strength presentation authority audit",
     "agent": "codex",
-    "status": "completed"
+    "status": "in_progress"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -17,12 +17,13 @@
     "native_build": 56
   },
   "result": {
-    "summary": "The authorization-bound fresh dry-run reproduced the exact accepted September 23 confidence-95 logger_session_window facts. The immediately following advisory-locked, drift-fenced apply confirmed only that existing link, established its two one-to-one claims, created the exact authorization audit and one strategically inert resolved reconciliation-history record, and passed every in-transaction and independent post-write invariant. Strength graduation is GREEN. Strategic eligibility and global linkAutoConfirm remain off; Cardio and the Activity/Nutrition revision-loop were not started.",
+    "summary": "Production Server cb9d14f9/deployment 6c82ac17 and Native Build 56 de0d3829 were reverified. Exact-source audit confirms the Activity/Nutrition 409 loop: the accepted cursor can lag a consumed Server revision, abandonment preserves the poisoned floor, cancellation can interrupt accepted-to-acknowledged durability, protected-file access failures can be misclassified as corruption, and a pull during the queued rerun can be discarded. No mutation occurred; implementation is starting under separate deployment/upload/repair gates.",
     "success": true,
-    "production_mutated": true,
+    "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
-    "strength_graduation_verdict": "green"
+    "strength_graduation_verdict": "green",
+    "implementation_status": "authority_and_root_cause_audited"
   },
   "validation": {
     "tests": {
@@ -33,29 +34,30 @@
       "status": "approved",
       "summary": "The exact deployed Server and Build 56 candidates retain the tenth fresh-context approval. The production write used only the reviewed bounded acceptance path."
     },
-    "pre_apply_dry_run": {
+    "authority_audit": {
       "status": "passed",
-      "summary": "Fresh authorization-bound REPEATABLE READ READ ONLY dry-run reproduced the exact candidate, confidence, basis, rule eligibility, assessment digest, and all drift-fence facts, then rolled back."
+      "summary": "Deployment identity, immutable component hashes, runtime build, public liveness/readiness, Native SHA, confirmed Strength relationship, and unchanged policy boundaries were reverified."
     },
-    "apply": {
+    "root_cause_audit": {
       "status": "passed",
-      "summary": "One READ COMMITTED advisory-locked transaction confirmed link 10d4b9fb..., advanced it from version 1 to 2, held exactly two claims, and created exactly one authorization audit and one terminal inert reconciliation history row."
-    },
-    "post_write_audit": {
-      "status": "passed",
-      "summary": "Independent read-only workout, Training, and exact ledger/drift audits proved the confirmed one-to-one relationship, untouched Logger detail and missing end time, no duplicate Training session, exact durable authorization/history, zero integrity violations, unchanged protected facts, and unchanged strategic policy."
+      "summary": "Exact Build 56 and Server source confirm the daily-revision poison loop, acknowledgement cancellation gap, protected-file misclassification, queued-rerun hazard, and missing structured 409 recovery metadata."
     }
   },
-  "decisions_required": [],
+  "decisions_required": [
+    "Founder authorization remains required before any Server deployment.",
+    "Founder authorization remains required before any Native/TestFlight upload.",
+    "Founder authorization remains required before the bounded September 23 Activity repair apply."
+  ],
   "blockers": [],
   "unexpected_findings": [],
   "backlog": [
+    "Implement and independently review the Server/Native reliability correction and Strength presentation slice.",
     "Keep Workout strategic eligibility and global linkAutoConfirm off unless separately authorized.",
     "Cardio is the next eligible domain but must not begin without a separate instruction.",
     "Do not begin the Activity/Nutrition revision-loop implementation until separately authorized."
   ],
-  "recommended_next_step": "Treat Strength as graduated GREEN. Await a separate Founder instruction before beginning Cardio or changing any Workout policy or strategic-eligibility control.",
-  "full_report_path": "agent-handoffs/reports/20260924T030200Z-strength-sep23-deterministic-confirmed-final-green.md",
+  "recommended_next_step": "Implement the smallest fail-closed Server and Native corrections with production-shaped tests, run relevant suites and fresh-context review, publish exact candidates, and stop for Server deployment authorization.",
+  "full_report_path": "agent-handoffs/reports/20260924T031446Z-healthkit-revision-recovery-authority-audit.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
