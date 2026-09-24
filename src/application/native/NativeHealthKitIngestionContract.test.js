@@ -177,6 +177,52 @@ describe("Native HealthKit V1 ingestion contract", () => {
     expect(records.snapshot().healthKitObservations).toHaveLength(1);
   });
 
+  it("returns a typed next-revision floor for a changed daily snapshot without weakening replay or purpose identity", async () => {
+    const records = recordStore();
+    const ports = createCanonicalPersistenceCommandPorts({ records });
+    await ports.ingestHealthKitObservations(context("delivery-activity-one", {
+      batchId: "healthkit-activity-one",
+      observations: [activitySummary({ moveCalories: 650, sourceRevision: 1 })],
+    }));
+    await ports.ingestHealthKitObservations(context("delivery-activity-five", {
+      batchId: "healthkit-activity-five",
+      observations: [activitySummary({ moveCalories: 700, sourceRevision: 5 })],
+    }));
+
+    let collision;
+    try {
+      await ports.ingestHealthKitObservations(context("delivery-activity-five-drift", {
+        batchId: "healthkit-activity-five-drift",
+        observations: [activitySummary({ moveCalories: 701, sourceRevision: 5 })],
+      }));
+    } catch (error) {
+      collision = error;
+    }
+
+    expect(collision).toMatchObject({
+      status: 409,
+      code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+      recovery: {
+        kind: "healthkit_daily_revision_collision",
+        schemaVersion: "healthkit-daily-revision-recovery-v1",
+        observationType: "activity_summary",
+        localDate: "2026-09-12",
+        receivedSourceRevision: 5,
+        nextExpectedRevision: 6,
+      },
+    });
+    expect(collision.recovery.identityDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(collision.recovery)).not.toContain("founder-iphone");
+    expect(JSON.stringify(collision.recovery)).not.toContain("activity-summary-2026-09-12");
+    expect(records.snapshot().healthKitObservations).toHaveLength(2);
+
+    const replay = await ports.ingestHealthKitObservations(context("delivery-activity-five-replay", {
+      batchId: "healthkit-activity-five-replay",
+      observations: [activitySummary({ moveCalories: 700, sourceRevision: 5 })],
+    }));
+    expect(replay.result).toMatchObject({ createdCount: 0, matchedCount: 1 });
+  });
+
   it("reconciles a previously unmatched strength observation when exact canonical ownership later appears", async () => {
     const records = recordStore();
     const ports = createCanonicalPersistenceCommandPorts({ records });

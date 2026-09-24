@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   bindTrainingSupportingEvidencePackage,
   reconcileConfirmedEvidencePackage,
@@ -439,11 +440,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           results.push(ignoredWorkoutReplayResult(existing));
           continue;
         }
-        throw problem(
-          409,
-          "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
-          "The HealthKit source identity already exists with different observation content."
-        );
+        throw healthKitObservationIdentityCollisionProblem(observation, existingObservations);
       }
       const dailySnapshotDomain = healthKitDailySnapshotDomain(observation.observationType);
       let reconciliation;
@@ -564,13 +561,17 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         }
         const purposeChanged = stored &&
           (stored.ingestionPurpose ?? "operational") !== observation.ingestionPurpose;
-        throw problem(
-          409,
-          purposeChanged ? "HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE" : "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
-          purposeChanged
-            ? "The HealthKit source identity is permanently bound to its original ingestion purpose."
-            : "The HealthKit source identity already exists with different observation content."
-        );
+        if (purposeChanged) {
+          throw problem(
+            409,
+            "HEALTHKIT_INGESTION_PURPOSE_IMMUTABLE",
+            "The HealthKit source identity is permanently bound to its original ingestion purpose."
+          );
+        }
+        throw healthKitObservationIdentityCollisionProblem(observation, [
+          ...existingObservations,
+          ...(stored ? [stored] : []),
+        ]);
       }
       const ownsCreation = !existing && insertion.created;
       let canonicalDayOutcome = null;
@@ -3138,6 +3139,57 @@ function healthKitDailySnapshotDomain(observationType) {
   if (observationType === HealthKitObservationType.ACTIVITY_SUMMARY) return HealthKitCanonicalDomain.ACTIVITY;
   if (observationType === HealthKitObservationType.NUTRITION_DAILY_TOTAL) return HealthKitCanonicalDomain.NUTRITION;
   return null;
+}
+
+function healthKitObservationIdentityCollisionProblem(observation, storedObservations) {
+  if (!healthKitDailySnapshotDomain(observation.observationType)) {
+    return problem(
+      409,
+      "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+      "The HealthKit source identity already exists with different observation content."
+    );
+  }
+  const identity = {
+    observationType: observation.observationType,
+    externalId: observation.externalId,
+    bundleIdentifier: observation.source.bundleIdentifier,
+    deliveryDeviceId: observation.ingestion.deliveryDeviceId,
+    ingestionPurpose: observation.ingestionPurpose,
+  };
+  const revisions = storedObservations
+    .filter((record) => record.observationType === identity.observationType)
+    .filter((record) => record.externalId === identity.externalId)
+    .filter((record) => record.source?.bundleIdentifier === identity.bundleIdentifier)
+    .filter((record) => record.ingestion?.deliveryDeviceId === identity.deliveryDeviceId)
+    .filter((record) => (record.ingestionPurpose ?? "operational") === identity.ingestionPurpose)
+    .map((record) => Number(record.measurement?.sourceRevision))
+    .filter((revision) => Number.isSafeInteger(revision) && revision > 0);
+  const receivedSourceRevision = Number(observation.measurement.sourceRevision);
+  const nextExpectedRevision = Math.max(receivedSourceRevision, ...revisions) + 1;
+  const identityDigest = createHash("sha256")
+    .update([
+      "healthkit-daily-revision-identity-v1",
+      identity.observationType,
+      identity.externalId,
+      identity.bundleIdentifier,
+      identity.deliveryDeviceId,
+      identity.ingestionPurpose,
+    ].join("\0"))
+    .digest("hex");
+  return new ApplicationProblem({
+    status: 409,
+    code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+    title: "The HealthKit source identity already exists with different observation content.",
+    recovery: {
+      kind: "healthkit_daily_revision_collision",
+      schemaVersion: "healthkit-daily-revision-recovery-v1",
+      observationType: identity.observationType,
+      localDate: observation.occurrence.localDate,
+      receivedSourceRevision,
+      nextExpectedRevision,
+      identityDigest,
+    },
+  });
 }
 
 function comparableRecord(record) {

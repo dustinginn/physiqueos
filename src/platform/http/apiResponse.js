@@ -9,6 +9,16 @@ export async function executeApiRequest(request, handler, { buildIdentity, logge
     return json(value, successStatus, requestId, buildIdentity);
   } catch (error) {
     const problem = toProblemDetails(error, { requestId, instance: new URL(request.url).pathname });
+    if (problem.recovery?.kind === "healthkit_daily_revision_collision") {
+      logger?.warn("healthkit.daily_revision_collision", {
+        requestId,
+        observationType: problem.recovery.observationType,
+        localDate: problem.recovery.localDate,
+        receivedSourceRevision: problem.recovery.receivedSourceRevision,
+        nextExpectedRevision: problem.recovery.nextExpectedRevision,
+        identityDigest: problem.recovery.identityDigest,
+      });
+    }
     logger?.warn("api.request.failed", { requestId, code: problem.code, status: problem.status, error });
     return json(problem, problem.status, requestId, buildIdentity, "application/problem+json");
   }
