@@ -13,7 +13,7 @@ import {
 
 export function createLogReadService({ repositories, now = () => new Date() } = {}) {
   return scopeRepositoryReadService({ repositories, namespace: "log", service: Object.freeze({
-    async getLog({ principal, timeZone } = {}) {
+    async getLog({ principal, timeZone, healthKitRelationshipState = null } = {}) {
       const actor = requireAuthenticationPrincipal(principal);
       const user = await repositories.users.getUserById(actor.userId);
       if (!user) return null;
@@ -25,6 +25,7 @@ export function createLogReadService({ repositories, now = () => new Date() } = 
         createLoggedTodayService({ repositories, now }).getSummary({
           userId: actor.userId,
           timeZone: resolvedTimeZone,
+          healthKitRelationshipState,
         }),
       ]);
       const localDate = getLocalDateKey(now(), resolvedTimeZone);

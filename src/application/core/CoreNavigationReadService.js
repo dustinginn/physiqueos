@@ -113,6 +113,11 @@ export function createCoreNavigationReadService({
         const log = await createLogReadService({ repositories, now }).getLog({
           principal,
           timeZone: user?.timeZone ?? user?.timezone,
+          healthKitRelationshipState: {
+            canonicalWorkouts: runtime.healthKitCanonicalWorkouts ?? [],
+            workoutLinks: runtime.healthKitWorkoutLinks ?? [],
+            workoutLinkClaims: runtime.healthKitWorkoutLinkClaims ?? [],
+          },
         });
         return projectConfirmedHealthKitLogProvenance(log, runtime);
       });

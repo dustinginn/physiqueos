@@ -6,6 +6,7 @@ import {
   selectActiveCanonicalNutritionDays,
 } from "./CanonicalNutritionDayService";
 import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayService";
+import { projectHealthKitStrengthWorkoutPresentationBySession } from "./HealthKitWorkoutPresentationService.js";
 
 const EMPTY_SUMMARY = "Nothing logged yet";
 
@@ -14,7 +15,14 @@ export function createLoggedTodayService({
   now = () => new Date(),
 } = {}) {
   return {
-    async getSummary({ userId, timeZone } = {}) {
+    // `healthKitRelationshipState` (canonicalWorkouts/workoutLinks/
+    // workoutLinkClaims) is optional and additive: omitting it reproduces the
+    // exact prior behavior (the Training row's own duration, confirmed or
+    // not). When supplied, the row never keeps showing a Logger session's
+    // frozen/synthetic duration once a canonical HK Strength workout has been
+    // resolved for it -- confirmed, or an unconfirmed but deterministically
+    // picked candidate.
+    async getSummary({ userId, timeZone, healthKitRelationshipState = null } = {}) {
       const user = userId
         ? await repositories.users.getUserById(userId)
         : await repositories.users.getCurrentUser();
@@ -29,10 +37,19 @@ export function createLoggedTodayService({
             resolvedUserId
           )
         : [];
+      const healthKitStrengthPresentationBySession = healthKitRelationshipState
+        ? projectHealthKitStrengthWorkoutPresentationBySession({
+            canonicalEvidenceObjects: canonicalObjects,
+            canonicalWorkouts: healthKitRelationshipState.canonicalWorkouts ?? [],
+            workoutLinks: healthKitRelationshipState.workoutLinks ?? [],
+            workoutLinkClaims: healthKitRelationshipState.workoutLinkClaims ?? [],
+          })
+        : new Map();
 
       return composeLoggedTodaySummary({
         canonicalObjects,
         dateKey: getLocalDateKey(now(), resolvedTimeZone),
+        healthKitStrengthPresentationBySession,
       });
     },
   };
@@ -41,6 +58,7 @@ export function createLoggedTodayService({
 export function composeLoggedTodaySummary({
   canonicalObjects = [],
   dateKey,
+  healthKitStrengthPresentationBySession = new Map(),
 } = {}) {
   const activeNonNutrition = canonicalObjects
     .filter((object) => object?.quality?.status !== "superseded")
@@ -71,19 +89,32 @@ export function composeLoggedTodaySummary({
   return Object.freeze({
     dateKey,
     rows: Object.freeze([
-      composeTrainingRow(activeNonNutrition.filter((record) => record.evidence_type === "training")),
+      composeTrainingRow(
+        activeNonNutrition.filter((record) => record.evidence_type === "training"),
+        healthKitStrengthPresentationBySession,
+      ),
       composeNutritionRow(nutrition),
       composeActivityRow(activity),
     ]),
   });
 }
 
-function composeTrainingRow(sessions) {
+function composeTrainingRow(sessions, healthKitStrengthPresentationBySession = new Map()) {
   if (!sessions.length) return emptyRow("training", "Training");
 
   const labels = unique(sessions.map((session) => formatTrainingType(session)));
   const single = sessions.length === 1 ? sessions[0] : null;
-  const duration = single ? formatDuration(single.metadata?.duration_seconds) : null;
+  const singleId = single ? String(single._canonicalId ?? single.canonicalId ?? single.id ?? "") : null;
+  // Real Apple Health telemetry -- confirmed, or an unconfirmed but
+  // deterministically resolved candidate -- always wins over the Logger
+  // session's own frozen/synthetic duration. Absent any resolution, the
+  // Logger's own duration is used unchanged (never invented).
+  const presentedDurationSeconds = singleId
+    ? healthKitStrengthPresentationBySession.get(singleId)?.session?.durationSeconds
+    : null;
+  const duration = single
+    ? formatDuration(presentedDurationSeconds ?? single.metadata?.duration_seconds)
+    : null;
   const noMovements = single && (single.exercises?.length ?? 0) === 0;
   const summary =
     single && duration

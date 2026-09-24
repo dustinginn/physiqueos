@@ -47,7 +47,10 @@ import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers"
 import { selectValidDexaScans } from "./DEXAReadModelAdapter";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
 import { formatWholeNumber } from "./HealthKitEvidenceNumberFormatting";
-import { indexConfirmedHealthKitWorkoutAttachments } from "./HealthKitWorkoutPresentationService.js";
+import {
+  indexConfirmedHealthKitWorkoutAttachments,
+  projectHealthKitStrengthWorkoutPresentationBySession,
+} from "./HealthKitWorkoutPresentationService.js";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
@@ -965,6 +968,9 @@ export function createProviderActivityEvidenceReport({
     canonicalPayloads.filter(isTrainingSession),
     "observed_at"
   );
+  // Whole-day energy attribution (accounting) reads ONLY the confirmed map:
+  // it must never count, or stop counting, energy because of an unconfirmed
+  // candidate. That derivation is untouched by this function.
   const confirmedHealthKitWorkoutsBySession = indexConfirmedHealthKitWorkoutAttachments({
     canonicalEvidenceObjects,
     canonicalWorkouts,
@@ -982,8 +988,23 @@ export function createProviderActivityEvidenceReport({
   const activityDays = dateWindow
     ? allActivityDays.filter((day) => isInsideDateWindow(day.observed_at, dateWindow))
     : allActivityDays;
+  // The Activity-Linked-Training-Context DISPLAY, by contrast, may present an
+  // unconfirmed-but-deterministically-resolved candidate's HK telemetry
+  // (never its own invented one) instead of a Logger session's frozen or
+  // synthetic timing. This never feeds accounting above.
+  const presentableHealthKitWorkoutsBySession = projectHealthKitStrengthWorkoutPresentationBySession({
+    canonicalEvidenceObjects,
+    canonicalWorkouts,
+    workoutLinks,
+    workoutLinkClaims,
+  });
   return Object.freeze({
-    ...buildActivityReport({ activityDays, goals, trainingSessions, confirmedHealthKitWorkoutsBySession }),
+    ...buildActivityReport({
+      activityDays,
+      goals,
+      trainingSessions,
+      confirmedHealthKitWorkoutsBySession: presentableHealthKitWorkoutsBySession,
+    }),
     evidenceWindow: dateWindow,
   });
 }
@@ -2338,14 +2359,19 @@ function getLinkedActivityTrainingContext({
     .map((session) => {
       const id = trainingSessionIdentity(session);
       const attachment = confirmedHealthKitWorkoutsBySession.get(id);
-      const activeCalories = finiteNumberOrNull(attachment?.session?.activeCalories);
-      return {
-      id,
-      label: session.metadata?.activity_type ?? "Workout",
-      value: activeCalories !== null ? `${formatWholeNumber(activeCalories)} active cal` : formatTrainingRecordValue(session),
-      detail: formatTrainingRecordDetail(session),
-      sourceEvidence: attachment ? ["Workout Logger", "Apple Health"] : getSessionSourceLabels(session),
-    };
+      const base = {
+        id,
+        label: session.metadata?.activity_type ?? "Workout",
+        value: formatTrainingRecordValue(session),
+        detail: formatTrainingRecordDetail(session),
+        sourceEvidence: getSessionSourceLabels(session),
+      };
+      // `confirmedHealthKitWorkoutsBySession` here is the broader
+      // confirmed-or-candidate presentation map (see
+      // `createProviderActivityEvidenceReport`), never the confirmed-only map
+      // used for whole-day energy attribution -- this only decides what this
+      // list DISPLAYS, never what a day's totals count.
+      return attachment ? applyHealthKitStrengthPresentationToTrainingRecord(base, attachment) : base;
     });
 }
 
@@ -2755,6 +2781,52 @@ function buildTrainingSessionTelemetry(session) {
     return null;
   }
   return { startTime, endTime, durationSeconds, activeCalories, averageHeartRate };
+}
+
+// Presentation-only override: when a canonical HK Strength workout has been
+// resolved for this Logger session -- confirmed OR an unconfirmed but
+// deterministically-picked candidate, see
+// `projectHealthKitStrengthWorkoutPresentationBySession` -- its telemetry is
+// what Training / Workout-Detail / Activity-Linked-Training-Context present,
+// never the Logger session's own frozen/synthetic start/end/duration. The
+// underlying evidence payload is never mutated; this only reshapes an
+// already-built display record. Exercises, sets, and every other Logger
+// field pass through unchanged. `healthKitPresentation` exposes the actual
+// relationship state (confirmed vs. an unconfirmed candidate, with its
+// confidence) so a caller never has to guess or infer certainty itself.
+export function applyHealthKitStrengthPresentationToTrainingRecord(record, presentation) {
+  if (!record || !presentation) return record;
+  const telemetrySource = presentation.session ?? {};
+  const durationSeconds = Number.isFinite(telemetrySource.durationSeconds) ? telemetrySource.durationSeconds : null;
+  const activeCalories = Number.isFinite(telemetrySource.activeCalories) ? telemetrySource.activeCalories : null;
+  const averageHeartRate = Number.isFinite(telemetrySource.averageHeartRate) ? telemetrySource.averageHeartRate : null;
+  const startTime = telemetrySource.startedAt ?? null;
+  const endTime = telemetrySource.endedAt ?? null;
+  const telemetry = (startTime || endTime || durationSeconds !== null || activeCalories !== null || averageHeartRate !== null)
+    ? { startTime, endTime, durationSeconds, activeCalories, averageHeartRate }
+    : null;
+  const detailParts = [
+    startTime && endTime ? `${startTime}-${endTime}` : startTime,
+    formatDuration(durationSeconds),
+    Number.isFinite(telemetrySource.distance)
+      ? `${telemetrySource.distance} ${telemetrySource.distanceUnit ?? "mi"}`
+      : null,
+    Number.isFinite(averageHeartRate) ? `${averageHeartRate} bpm avg HR` : null,
+    formatExerciseSummary(record.exercises),
+  ].filter(Boolean);
+  return {
+    ...record,
+    value: activeCalories !== null ? `${formatWholeNumber(activeCalories)} active cal` : record.value,
+    detail: detailParts.join(" · ") || record.detail,
+    telemetry: telemetry ?? record.telemetry ?? null,
+    sourceEvidence: [...new Set([...(record.sourceEvidence ?? []), "Workout Logger", "Apple Health"])],
+    healthKitPresentation: Object.freeze({
+      status: presentation.relationship?.status ?? "confirmed",
+      matchOutcome: presentation.relationship?.matchOutcome ?? null,
+      confidence: presentation.relationship?.confidence ?? null,
+      canonicalWorkoutId: presentation.canonicalWorkoutId ?? null,
+    }),
+  };
 }
 
 function formatTrainingRecordDetail(session) {

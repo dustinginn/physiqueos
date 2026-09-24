@@ -17,7 +17,8 @@ import {
   readCurrentCanonicalTrainingExerciseRegistry,
 } from "./CanonicalExerciseRegistryReadService.js";
 import { createTrainingReportingPresentation } from "../../domain/services/TrainingReportingPresentationService.js";
-import { indexConfirmedHealthKitWorkoutAttachments } from "../../domain/services/HealthKitWorkoutPresentationService.js";
+import { projectHealthKitStrengthWorkoutPresentationBySession } from "../../domain/services/HealthKitWorkoutPresentationService.js";
+import { applyHealthKitStrengthPresentationToTrainingRecord } from "../../domain/services/ProgressReportingService.js";
 
 export function createTrainingNavigationReadService({
   store,
@@ -207,7 +208,7 @@ export function createTrainingNavigationReadService({
       return store.run("training.navigation.session", async () => {
         await ensureCanonicalExerciseRegistry();
         const exact = await store.getCanonicalEvidenceObject(sessionId);
-        if (exact) return withConfirmedHealthKitAttachment(
+        if (exact) return withHealthKitPresentation(
           withSupportingMedia(
             findSession(createTrainingNavigationReport({ canonicalEvidenceObjects: [exact] }), sessionId),
             exact,
@@ -222,7 +223,7 @@ export function createTrainingNavigationReadService({
             item.canonicalId, item.id, item.payload?.id,
             ...(item.provenance?.contributing_evidence_object_ids ?? []),
           ].some((candidate) => String(candidate) === String(sessionId)));
-          return withConfirmedHealthKitAttachment(
+          return withHealthKitPresentation(
             withSupportingMedia(session, record),
             record,
             await loadHealthKitRelationshipState(store),
@@ -283,9 +284,18 @@ async function loadHealthKitRelationshipState(store) {
   return { canonicalWorkouts, workoutLinks, workoutLinkClaims };
 }
 
-function withConfirmedHealthKitAttachment(session, record, relationshipState) {
+// Workout-Detail's Apple-Health-provenance block: a CONFIRMED relationship
+// always wins, but absent one this still resolves an unconfirmed, single,
+// deterministically-picked candidate (see
+// `projectHealthKitStrengthWorkoutPresentationBySession`) so the screen never
+// falls back to the Logger session's own frozen/synthetic timing just
+// because nobody has confirmed the link yet. `healthKitAttachment.relationship
+// .status` tells the caller honestly which one it got ("confirmed" or
+// "candidate", with the candidate's confidence) -- it never invents a
+// confirmed relationship.
+function withHealthKitPresentation(session, record, relationshipState) {
   if (!session || !record || !relationshipState) return session;
-  const index = indexConfirmedHealthKitWorkoutAttachments({
+  const index = projectHealthKitStrengthWorkoutPresentationBySession({
     canonicalEvidenceObjects: [record],
     ...relationshipState,
   });
@@ -293,8 +303,7 @@ function withConfirmedHealthKitAttachment(session, record, relationshipState) {
   const healthKitAttachment = index.get(id);
   if (!healthKitAttachment) return session;
   return Object.freeze({
-    ...session,
-    sourceEvidence: Object.freeze([...new Set([...(session.sourceEvidence ?? []), "Workout Logger", "Apple Health"])]),
+    ...applyHealthKitStrengthPresentationToTrainingRecord(session, healthKitAttachment),
     healthKitAttachment,
   });
 }

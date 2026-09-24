@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { projectConfirmedHealthKitLogProvenance } from "../../application/core/CoreNavigationReadService.js";
 import { createProviderActivityEvidenceReport } from "./ProgressReportingService.js";
-import { projectConfirmedHealthKitWorkoutAttachments } from "./HealthKitWorkoutPresentationService.js";
+import {
+  indexConfirmedHealthKitWorkoutAttachments,
+  projectConfirmedHealthKitWorkoutAttachments,
+  projectHealthKitStrengthWorkoutPresentationBySession,
+} from "./HealthKitWorkoutPresentationService.js";
 import { createSep23StrengthPresentationFixture } from "../../fixtures/healthKitSep23StrengthPresentationFixture.js";
+import { createSep24StrengthPresentationFixture } from "../../fixtures/healthKitSep24StrengthPresentationFixture.js";
 import { createTrainingNavigationReadService } from "../../application/training/TrainingNavigationReadService.js";
-import { getHealthKitWorkoutLinkRecordId } from "./HealthKitWorkoutLinkService.js";
+import {
+  HealthKitStrengthMatchOutcome,
+  assessHealthKitStrengthLinkCandidates,
+  getHealthKitWorkoutLinkRecordId,
+} from "./HealthKitWorkoutLinkService.js";
 import { getHealthKitWorkoutLinkClaimId } from "./HealthKitWorkoutRelationshipService.js";
 
 describe("confirmed HealthKit workout presentation", () => {
@@ -320,5 +329,142 @@ describe("confirmed HealthKit workout presentation", () => {
     });
     expect(session.sourceEvidence).toEqual(["Workout Logger", "Apple Health"]);
     expect(logger.payload.exercises).toEqual(exercisesBefore);
+  });
+});
+
+describe("HK telemetry presentation for an unconfirmed Logger session (September 24)", () => {
+  it("resolves the sole same-day Strength workout as an unconfirmed candidate, with real HK telemetry -- never the Logger's frozen 94-minute duration", () => {
+    const fixture = createSep24StrengthPresentationFixture();
+    const strengthWorkout = fixture.canonicalWorkouts.find((workout) => workout.id === fixture.ids.strengthWorkout);
+
+    // The audited stored state: no confirmed (or even candidate) link record
+    // exists yet for this pair.
+    expect(fixture.workoutLinks).toEqual([]);
+    expect(indexConfirmedHealthKitWorkoutAttachments(fixture).size).toBe(0);
+
+    // The deterministic matcher, called directly, reproduces the audited
+    // "live re-assessment": possible_match at 60% confidence.
+    const assessment = assessHealthKitStrengthLinkCandidates({
+      canonicalWorkout: strengthWorkout,
+      canonicalObjects: fixture.canonicalEvidenceObjects,
+      existingLinks: fixture.workoutLinks,
+      canonicalWorkouts: fixture.canonicalWorkouts,
+    });
+    expect(assessment.outcome).toBe(HealthKitStrengthMatchOutcome.POSSIBLE);
+    expect(assessment.candidates[0]).toMatchObject({ confidence: 60, loggerSessionCanonicalId: fixture.ids.session });
+
+    const presentation = projectHealthKitStrengthWorkoutPresentationBySession(fixture);
+    expect(presentation.get(fixture.ids.session)).toMatchObject({
+      canonicalWorkoutId: fixture.ids.strengthWorkout,
+      family: "strength",
+      relationship: { status: "candidate", matchOutcome: "possible_match", confidence: 60 },
+      session: {
+        startedAt: "2026-09-24T18:22:10.000Z",
+        endedAt: "2026-09-24T18:50:09.000Z",
+        durationSeconds: 1679,
+        activeCalories: 206.205,
+        averageHeartRate: 120.14,
+      },
+    });
+
+    // This is presentation-only: it never created, confirmed, or altered any
+    // healthKitWorkoutLinks row, and the Logger session's own frozen evidence
+    // is untouched.
+    expect(fixture.workoutLinks).toEqual([]);
+    const logger = fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session);
+    expect(logger.payload.metadata.duration_seconds).toBe(5647);
+    expect(logger.payload.metadata.end_time).toBeUndefined();
+  });
+
+  it("leaves the confirmed September 23 case byte-identical to the confirmed-only projection", () => {
+    const fixture = createSep23StrengthPresentationFixture();
+    const confirmedOnly = projectConfirmedHealthKitWorkoutAttachments(fixture);
+    const presentation = projectHealthKitStrengthWorkoutPresentationBySession(fixture);
+    expect(presentation.get(fixture.ids.session)).toEqual(confirmedOnly[0]);
+    expect(presentation.get(fixture.ids.session).relationship.status).toBe("confirmed");
+  });
+
+  it("falls back to the Logger's own timing when no plausible HK candidate exists at all", () => {
+    const fixture = createSep24StrengthPresentationFixture();
+    fixture.canonicalWorkouts = [];
+    const presentation = projectHealthKitStrengthWorkoutPresentationBySession(fixture);
+    expect(presentation.has(fixture.ids.session)).toBe(false);
+  });
+
+  it("never selects a non-Strength workout (Indoor Walk) as the Strength Logger session's presentation candidate", () => {
+    const fixture = createSep24StrengthPresentationFixture();
+    // Remove the real Strength workout; keep only the two Indoor Walk
+    // workouts, one of which (`walkAfter`) sits entirely inside the Logger
+    // session's own synthetic window and would otherwise look temporally
+    // plausible.
+    const walkAfter = fixture.canonicalWorkouts.find((workout) => workout.id === fixture.ids.walkAfter);
+    fixture.canonicalWorkouts = fixture.canonicalWorkouts.filter((workout) => workout.id !== fixture.ids.strengthWorkout);
+
+    const assessment = assessHealthKitStrengthLinkCandidates({
+      canonicalWorkout: walkAfter,
+      canonicalObjects: fixture.canonicalEvidenceObjects,
+      existingLinks: fixture.workoutLinks,
+      canonicalWorkouts: fixture.canonicalWorkouts,
+    });
+    expect(assessment.outcome).toBe(HealthKitStrengthMatchOutcome.NONE);
+    expect(assessment.reason).toBe("not_a_strength_workout");
+
+    const presentation = projectHealthKitStrengthWorkoutPresentationBySession(fixture);
+    expect(presentation.has(fixture.ids.session)).toBe(false);
+  });
+
+  it("presents the corrected HK telemetry on the Activity-Linked-Training-Context list without changing energy attribution", () => {
+    const fixture = createSep24StrengthPresentationFixture();
+    const report = createProviderActivityEvidenceReport(fixture);
+    const day = report.latestActivityDay;
+
+    // Unconfirmed: accounting must not count this workout's energy, and the
+    // confidence/eligibility machinery is untouched by this presentation fix.
+    expect(day.workoutEnergyAttribution.confirmedHealthKitWorkoutCount).toBe(0);
+    expect(day.linkedTrainingSessionCount).toBe(1);
+
+    const entry = report.linkedTrainingContext.find((item) => item.id === fixture.ids.session);
+    expect(entry).toMatchObject({
+      value: "206 active cal",
+      sourceEvidence: ["Workout Logger", "Apple Health"],
+      healthKitPresentation: { status: "candidate", matchOutcome: "possible_match", confidence: 60 },
+    });
+    expect(entry.detail).toContain("28 min");
+    expect(entry.detail).not.toContain("94 min");
+  });
+
+  it("attaches the unconfirmed candidate's real Apple telemetry to Workout Detail, keeping the two Logger exercises attached and correct", async () => {
+    const fixture = createSep24StrengthPresentationFixture();
+    const logger = fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session);
+    const exercisesBefore = structuredClone(logger.payload.exercises);
+    const service = createTrainingNavigationReadService({
+      readCanonicalExerciseRegistry: async () => [],
+      store: {
+        run: (_name, callback) => callback(),
+        getCanonicalEvidenceObject: async (id) => id === fixture.ids.session ? logger : null,
+        listHealthKitCanonicalWorkouts: async () => fixture.canonicalWorkouts,
+        listHealthKitWorkoutLinks: async () => fixture.workoutLinks,
+        listHealthKitWorkoutLinkClaims: async () => fixture.workoutLinkClaims,
+      },
+    });
+    const session = await service.getSession({ sessionId: fixture.ids.session });
+
+    expect(session.id).toBe(fixture.ids.session);
+    expect(session.exercises).toEqual(exercisesBefore);
+    expect(session.exercises).toHaveLength(2);
+    expect(session.healthKitAttachment).toMatchObject({
+      relationship: { status: "candidate", matchOutcome: "possible_match", confidence: 60 },
+      source: { application: "Apple Health", sourceName: "Apple Watch" },
+      session: { activeCalories: 206.205, durationSeconds: 1679, averageHeartRate: 120.14 },
+    });
+    // The Workout-Detail telemetry block itself must show the real ~28-minute
+    // HK window, never the Logger's own frozen 94-minute synthetic one.
+    expect(session.telemetry).toMatchObject({
+      startTime: "2026-09-24T18:22:10.000Z",
+      endTime: "2026-09-24T18:50:09.000Z",
+      durationSeconds: 1679,
+    });
+    expect(logger.payload.exercises).toEqual(exercisesBefore);
+    expect(logger.payload.metadata.duration_seconds).toBe(5647);
   });
 });

@@ -3,6 +3,7 @@ import {
   composeLoggedTodaySummary,
   createLoggedTodayService,
 } from "./LoggedTodayService";
+import { createSep24StrengthPresentationFixture } from "../../fixtures/healthKitSep24StrengthPresentationFixture.js";
 
 const dateKey = "2026-07-25";
 
@@ -113,6 +114,72 @@ describe("LoggedTodayService", () => {
       context: "Movements not added",
       href: "/progress/training/session/apple-strength-1",
       recordId: "apple-strength-1",
+    });
+  });
+
+  it("uses a resolved HK candidate's real duration over the Logger session's own frozen/synthetic one", () => {
+    const row = composeLoggedTodaySummary({
+      canonicalObjects: [
+        training("logger-1", "Traditional Strength Training", { duration_seconds: 5647 }),
+      ],
+      dateKey,
+      healthKitStrengthPresentationBySession: new Map([
+        ["logger-1", { session: { durationSeconds: 1679 } }],
+      ]),
+    }).rows[0];
+
+    expect(row).toMatchObject({
+      summary: "Strength Training · 28 min",
+      href: "/progress/training/session/logger-1",
+      recordId: "logger-1",
+    });
+  });
+
+  it("falls back to the Logger session's own duration when no presentation map is supplied at all (backward compatible)", () => {
+    const row = composeLoggedTodaySummary({
+      canonicalObjects: [
+        training("logger-1", "Traditional Strength Training", { duration_seconds: 5647 }),
+      ],
+      dateKey,
+    }).rows[0];
+
+    expect(row.summary).toBe("Strength Training · 94 min");
+  });
+
+  it("falls back to the Logger session's own duration when the map has no entry for this session (no plausible HK candidate)", () => {
+    const row = composeLoggedTodaySummary({
+      canonicalObjects: [
+        training("logger-1", "Traditional Strength Training", { duration_seconds: 5647 }),
+      ],
+      dateKey,
+      healthKitStrengthPresentationBySession: new Map(),
+    }).rows[0];
+
+    expect(row.summary).toBe("Strength Training · 94 min");
+  });
+
+  it("end to end: getSummary corrects the audited September 24 Log row from the real resolver, not a stub", async () => {
+    const fixture = createSep24StrengthPresentationFixture();
+    const list = vi.fn(async () => fixture.canonicalEvidenceObjects);
+    const repositories = {
+      users: { getUserById: vi.fn(async () => ({ id: fixture.ownerUserId, timeZone: "America/Los_Angeles" })) },
+      canonicalEvidence: { listCanonicalEvidenceObjects: list },
+    };
+    const result = await createLoggedTodayService({
+      repositories,
+      now: () => new Date("2026-09-24T20:30:00.000Z"),
+    }).getSummary({
+      userId: fixture.ownerUserId,
+      healthKitRelationshipState: {
+        canonicalWorkouts: fixture.canonicalWorkouts,
+        workoutLinks: fixture.workoutLinks,
+        workoutLinkClaims: fixture.workoutLinkClaims,
+      },
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      summary: "Strength Training · 28 min",
+      recordId: fixture.ids.session,
     });
   });
 
