@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Strength reconciliation semantics (`codex-strength-reconciliation-semantics-20260923`)
+- Task: Strength reconciliation seventh fresh-context review (`codex-strength-reconciliation-seventh-review-20260923`)
 - Agent: codex
 - Status: partial
-- Generated (UTC): 2026-09-24T00:35:11Z
+- Generated (UTC): 2026-09-24T00:43:24Z
 - Success: false
 
-Summary: All six sixth-review findings are corrected in exact clean Server and Native Build 56 candidates, and the relevant Server, Phase, production build, and sole-iPhone-17-Pro Native gates passed. Seventh fresh-context review is pending; production remains unchanged.
+Summary: Seventh fresh-context review rejected the exact candidates for five remaining fail-closed gaps. Native acknowledgement changes passed review; production remains unchanged while Server corrections proceed.
 
-Detailed report: `agent-handoffs/reports/20260924T003511Z-strength-reconciliation-sixth-review-corrections.md`
+Detailed report: `agent-handoffs/reports/20260924T004324Z-strength-reconciliation-seventh-review-rejected.md`
 
 Protocol: `agent-handoffs/README.md`
