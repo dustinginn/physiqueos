@@ -88,6 +88,10 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     /// Both predicate versions map to the same Server `automatic` namespace;
     /// this string only separates protected local state and pending delivery.
     static let currentDayPredicateVersion = "healthkit-automatic-current-day-v1"
+    /// Historical daily state is isolated one local date per envelope. The
+    /// prefix is local-only; every derived scope still maps to the established
+    /// Server `automatic` identity namespace.
+    static let historicalDayPredicatePrefix = "healthkit-automatic-history-day-v1:"
     /// Source-observation identities of the permanent automatic path never
     /// share an external id with the Founder canary's validation-only
     /// uploads or the canonical-test-day's own `testday` namespace, exactly

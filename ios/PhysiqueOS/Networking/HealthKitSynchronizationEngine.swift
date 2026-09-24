@@ -10,6 +10,7 @@ actor HealthKitSynchronizationEngine {
     private let availability: @Sendable () -> HealthKitAvailability
     private let now: @Sendable () -> Date
     private let queryTimeout: Duration
+    private let historicalLookbackDays: Int
     /// Defense-in-depth for the automatic (`synchronize`) Workout path only:
     /// `nil` (no filtering, the pre-Build-54 behavior) unless the owner opts
     /// in, which `AppEnvironment` does for the automatic engine and not for
@@ -31,6 +32,7 @@ actor HealthKitSynchronizationEngine {
         featureGate: HealthKitFeatureGate = .n0Disabled,
         batchBuilder: HealthKitBatchBuilder = HealthKitBatchBuilder(),
         workoutActivationFloor: HealthKitWorkoutActivationFloor? = nil,
+        historicalLookbackDays: Int = 30,
         queryTimeout: Duration = .seconds(25),
         availability: @escaping @Sendable () -> HealthKitAvailability = { .availableAuthorizationNotRequested },
         now: @escaping @Sendable () -> Date = Date.init
@@ -42,6 +44,7 @@ actor HealthKitSynchronizationEngine {
         self.featureGate = featureGate
         self.batchBuilder = batchBuilder
         self.workoutActivationFloor = workoutActivationFloor
+        self.historicalLookbackDays = historicalLookbackDays
         self.queryTimeout = queryTimeout
         self.availability = availability
         self.now = now
@@ -169,8 +172,49 @@ actor HealthKitSynchronizationEngine {
         guard Self.isAutomaticHistoricalDailyScope(scope) else {
             throw HealthKitSyncError.ownerOrDeviceMismatch
         }
-        let bounds = try Self.historicalCatchUpBounds(at: now(), calendar: calendar)
-        try await synchronizeUnit(scope: scope, bounds: bounds, stagingCompletion: nil)
+        let dayBounds = try Self.historicalCatchUpDayBounds(
+            at: now(), lookbackDays: historicalLookbackDays, calendar: calendar
+        )
+        var firstFailure: Error?
+
+        // A Build 57 envelope may still contain a pending whole-window batch.
+        // Give it one safe replay opportunity, but never let it prevent the
+        // independent per-day units below from running.
+        if !(try await store.pendingBatches(for: scope)).isEmpty {
+            do { try await deliverPending(scope: scope) }
+            catch { firstFailure = error }
+        }
+
+        for bounds in dayBounds {
+            let dayScope = HealthKitCursorScope(
+                ownerIdentity: scope.ownerIdentity,
+                enrolledDeviceIdentity: scope.enrolledDeviceIdentity,
+                stream: scope.stream,
+                predicateVersion: HealthKitAutomaticSynchronizationCoordinator.historicalDayPredicatePrefix + bounds.startLocalDate
+            )
+            do {
+                try await synchronizeHistoricalDay(scope: dayScope, bounds: bounds)
+            } catch {
+                if firstFailure == nil { firstFailure = error }
+                // Every date has its own cursor, pending batch, and revision
+                // floors, so a failed date cannot block a later date.
+            }
+        }
+        if let firstFailure { throw firstFailure }
+    }
+
+    private func synchronizeHistoricalDay(
+        scope: HealthKitCursorScope,
+        bounds: HealthKitQueryBounds
+    ) async throws {
+        do {
+            try await synchronizeUnit(scope: scope, bounds: bounds, stagingCompletion: nil)
+        } catch let HealthKitSyncError.serverRejected(code)
+            where code == "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION" {
+            let floor = try await store.dailyRevisionFloors(for: scope)[bounds.startLocalDate]
+            guard floor != nil else { throw HealthKitSyncError.serverRejected(code: code) }
+            try await synchronizeUnit(scope: scope, bounds: bounds, stagingCompletion: nil)
+        }
     }
 
     private func synchronizeUnit(
@@ -258,6 +302,27 @@ actor HealthKitSynchronizationEngine {
             endLocalDate: HealthKitActivityValidationWindow.localDate(yesterday, calendar: calendar),
             timeZoneIdentifier: calendar.timeZone.identifier
         )
+    }
+
+    static func historicalCatchUpDayBounds(
+        at current: Date,
+        lookbackDays: Int = 30,
+        calendar: Calendar
+    ) throws -> [HealthKitQueryBounds] {
+        let range = try historicalCatchUpBounds(at: current, lookbackDays: lookbackDays, calendar: calendar)
+        return try (0..<lookbackDays).map { offset in
+            guard let start = calendar.date(byAdding: .day, value: offset, to: range.startDateInclusive),
+                  let end = calendar.date(byAdding: .day, value: 1, to: start)
+            else { throw HealthKitSyncError.operational(code: "healthkit_historical_bounds_invalid") }
+            let localDate = HealthKitActivityValidationWindow.localDate(start, calendar: calendar)
+            return HealthKitQueryBounds(
+                startDateInclusive: start,
+                endDateExclusive: end,
+                startLocalDate: localDate,
+                endLocalDate: localDate,
+                timeZoneIdentifier: calendar.timeZone.identifier
+            )
+        }
     }
 
     private static func isAutomaticHistoricalDailyScope(_ scope: HealthKitCursorScope) -> Bool {
@@ -817,12 +882,25 @@ actor HealthKitSynchronizationEngine {
                         partitionID: partition.identity,
                         code: code
                     )
-                    return
+                    throw HealthKitSyncError.operational(code: code)
                 case let .rejected(code, recovery):
                     if let recovery {
                         do {
+                            guard recovery.identityDigest == Self.dailyRevisionIdentityDigest(
+                                recovery: recovery,
+                                partition: partition,
+                                scope: scope
+                            ) else {
+                                throw HealthKitSyncError.operational(
+                                    code: "healthkit_daily_revision_recovery_identity_mismatch"
+                                )
+                            }
                             if let dailyRecoveryConstraint,
-                               !dailyRecoveryConstraint.accepts(recovery: recovery, partition: partition) {
+                               !dailyRecoveryConstraint.accepts(
+                                    recovery: recovery,
+                                    partition: partition,
+                                    scope: scope
+                               ) {
                                 throw HealthKitCanaryError.september23RepairRevisionMismatch
                             }
                             try await store.rebaseDailyRevisionAndAbandonPendingBatch(
@@ -850,6 +928,32 @@ actor HealthKitSynchronizationEngine {
                 }
             }
         }
+    }
+
+    private static func dailyRevisionIdentityDigest(
+        recovery: HealthKitDailyRevisionRecovery,
+        partition: HealthKitStagedPartition,
+        scope: HealthKitCursorScope
+    ) -> String? {
+        let matches = partition.additions.filter { addition in
+            guard addition.occurrence.localDate == recovery.localDate else { return false }
+            switch (recovery.observationType, addition.payload) {
+            case let (.activitySummary, .activitySummary(summary)):
+                return summary.sourceRevision == recovery.receivedSourceRevision
+            case let (.nutritionDailyTotal, .nutritionDailyTotal(summary)):
+                return summary.sourceRevision == recovery.receivedSourceRevision
+            default:
+                return false
+            }
+        }
+        guard matches.count == 1, let addition = matches.first else { return nil }
+        return HealthKitDailyRevisionRecovery.identityDigest(
+            observationType: recovery.observationType,
+            externalID: addition.immutableExternalID,
+            bundleIdentifier: addition.source.bundleIdentifier,
+            deliveryDeviceID: scope.enrolledDeviceIdentity,
+            ingestionPurpose: partition.ingestionPurpose
+        )
     }
 
     private func queryCursorData(
@@ -904,7 +1008,8 @@ private struct HealthKitDailyRecoveryConstraint: Sendable {
 
     func accepts(
         recovery: HealthKitDailyRevisionRecovery,
-        partition: HealthKitStagedPartition
+        partition: HealthKitStagedPartition,
+        scope: HealthKitCursorScope
     ) -> Bool {
         guard permitsRecovery,
               recovery.observationType == expectedObservationType,
@@ -913,7 +1018,14 @@ private struct HealthKitDailyRecoveryConstraint: Sendable {
               recovery.nextExpectedRevision == expectedNextRevision,
               recovery.nextExpectedRevision == HealthKitSeptember23ActivityRepairContract.expectedCurrentRevision + 1,
               partition.additions.count == 1,
-              partition.additions.first?.immutableExternalID == expectedExternalID
+              partition.additions.first?.immutableExternalID == expectedExternalID,
+              recovery.identityDigest == HealthKitDailyRevisionRecovery.identityDigest(
+                    observationType: expectedObservationType,
+                    externalID: expectedExternalID,
+                    bundleIdentifier: partition.additions[0].source.bundleIdentifier,
+                    deliveryDeviceID: scope.enrolledDeviceIdentity,
+                    ingestionPurpose: partition.ingestionPurpose
+              )
         else { return false }
         return true
     }

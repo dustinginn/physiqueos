@@ -196,11 +196,14 @@ final class HealthKitFounderCanaryTests: XCTestCase {
             additions: [Self.activity(localDate: "2026-09-06", calories: 600)],
             uploadModes: [.transient, .accept]
         )
-        _ = try await harness.engine.synchronizeActivityValidation(
-            scope: harness.scope,
-            window: Self.window(),
-            calendar: Self.calendar
-        )
+        do {
+            _ = try await harness.engine.synchronizeActivityValidation(
+                scope: harness.scope,
+                window: Self.window(),
+                calendar: Self.calendar
+            )
+            XCTFail("A transient upload must not report synchronization success")
+        } catch {}
         let pending = try await harness.store.pendingBatches(for: harness.scope)
         XCTAssertEqual(pending.first?.ingestionPurpose, .validationOnly)
         let cursorBeforeReplay = try await harness.store.authoritativeCursor(for: harness.scope)
@@ -824,7 +827,12 @@ final class HealthKitCanonicalTestDayTests: XCTestCase {
             additions: [Self.rawAddition(stream: .nutritionDailyTotal)],
             uploadModes: [.transient, .accept]
         )
-        _ = try await harness.engine.synchronizeCanonicalTestDay(scope: harness.scope, testDay: testDay, calendar: Self.calendar)
+        do {
+            _ = try await harness.engine.synchronizeCanonicalTestDay(
+                scope: harness.scope, testDay: testDay, calendar: Self.calendar
+            )
+            XCTFail("A transient upload must not report synchronization success")
+        } catch {}
         let pending = try await harness.store.pendingBatches(for: harness.scope)
         XCTAssertEqual(pending.first?.ingestionPurpose, .operational)
         let replay = try await harness.engine.synchronizeCanonicalTestDay(scope: harness.scope, testDay: testDay, calendar: Self.calendar)
@@ -1167,7 +1175,12 @@ final class HealthKitWorkoutCanaryTests: XCTestCase {
     func testLostAcknowledgementReplaysTheExactWorkoutPartitionWithoutRequery() async throws {
         let day = try Self.day()
         let harness = try WorkoutCanaryEngineHarness(day: day, additions: [Self.workout()], uploadModes: [.transient, .accept])
-        _ = try await harness.engine.synchronizeWorkoutCanary(scope: harness.scope, day: day, calendar: Self.calendar)
+        do {
+            _ = try await harness.engine.synchronizeWorkoutCanary(
+                scope: harness.scope, day: day, calendar: Self.calendar
+            )
+            XCTFail("A transient upload must not report synchronization success")
+        } catch {}
         let replay = try await harness.engine.synchronizeWorkoutCanary(scope: harness.scope, day: day, calendar: Self.calendar)
         let identities = await harness.uploader.identities()
         XCTAssertTrue(replay.resumedPendingBatch)

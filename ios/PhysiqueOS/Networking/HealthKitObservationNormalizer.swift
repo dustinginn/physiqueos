@@ -231,6 +231,7 @@ struct HealthKitBatchBuilder: Sendable {
         }
         if predicateVersion == HealthKitAutomaticSynchronizationCoordinator.predicateVersion ||
             predicateVersion == HealthKitAutomaticSynchronizationCoordinator.currentDayPredicateVersion ||
+            predicateVersion.hasPrefix(HealthKitAutomaticSynchronizationCoordinator.historicalDayPredicatePrefix) ||
             predicateVersion == HealthKitSeptember23ActivityRepairContract.predicateVersion {
             return HealthKitAutomaticSynchronizationCoordinator.externalIDNamespace
         }

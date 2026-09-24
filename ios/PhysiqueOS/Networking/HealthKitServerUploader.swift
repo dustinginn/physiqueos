@@ -47,6 +47,23 @@ struct HealthKitDailyRevisionRecovery: Equatable, Sendable {
         self.identityDigest = identityDigest
     }
 
+    static func identityDigest(
+        observationType: HealthKitS1ObservationType,
+        externalID: String,
+        bundleIdentifier: String,
+        deliveryDeviceID: String,
+        ingestionPurpose: HealthKitIngestionPurpose
+    ) -> String {
+        HealthKitStableDigest.hex([
+            "healthkit-daily-revision-identity-v1",
+            observationType.rawValue,
+            externalID,
+            bundleIdentifier,
+            deliveryDeviceID,
+            ingestionPurpose.rawValue,
+        ].joined(separator: "\0"))
+    }
+
     private static func isLocalDate(_ value: String) -> Bool {
         guard value.count == 10 else { return false }
         let characters = Array(value)
