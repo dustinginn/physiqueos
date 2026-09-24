@@ -170,17 +170,33 @@ export function findHealthKitWorkoutRelationshipViolations({ links = [], claims 
   const sessionCounts = count("loggerSessionCanonicalId");
   const heldClaims = claims.filter((claim) => claim.status === ClaimStatus.HELD);
   const confirmedById = new Map(confirmed.map((link) => [link.id, link]));
-  const validClaimFor = (claim, link, kind, subject) => claim?.id === getHealthKitWorkoutLinkClaimId(kind, subject) &&
+  const validClaimFor = (claim, link, kind, subject) => {
+    const history = Array.isArray(claim?.history) ? claim.history : [];
+    const confirmedTransition = Array.isArray(link?.statusHistory) ? link.statusHistory.at(-1) : null;
+    const linkHistoryIsCanonical = validConfirmedLinkHistory(link);
+    const historyIsCanonical = history.length > 0 && history[0]?.status === ClaimStatus.HELD &&
+      history.every((entry, index) => {
+        if (![ClaimStatus.HELD, ClaimStatus.RELEASED].includes(entry?.status) ||
+          !String(entry?.holderLinkId ?? "").length || !validInstant(entry?.at)) return false;
+        if (index === 0) return true;
+        const previous = history[index - 1];
+        return entry.status !== previous.status &&
+          Date.parse(entry.at) >= Date.parse(previous.at) &&
+          (entry.status !== ClaimStatus.RELEASED || entry.holderLinkId === previous.holderLinkId);
+      });
+    const quarantine = createHealthKitQuarantinedEligibility();
+    return linkHistoryIsCanonical && claim?.id === getHealthKitWorkoutLinkClaimId(kind, subject) &&
     claim.kind === kind && claim.schemaVersion === HEALTHKIT_WORKOUT_LINK_CLAIM_SCHEMA_VERSION &&
     claim.userId === link.userId && claim.status === ClaimStatus.HELD && claim.holderLinkId === link.id &&
-    claim.evidenceEligibility?.state === "quarantined" && claim.evidenceEligibility?.strategic === false &&
-    claim.evidenceEligibility?.decidedBy === createHealthKitQuarantinedEligibility().decidedBy &&
-    Array.isArray(claim.history) && claim.history.length > 0 &&
-    claim.history.at(-1)?.status === ClaimStatus.HELD && claim.history.at(-1)?.holderLinkId === link.id &&
-    claim.history.every((entry) => [ClaimStatus.HELD, ClaimStatus.RELEASED].includes(entry?.status) &&
-      String(entry?.holderLinkId ?? "").length > 0 && validInstant(entry?.at)) &&
-    claim.createdAt === claim.history[0].at && claim.updatedAt === claim.history.at(-1).at &&
+    exactObject(claim.evidenceEligibility, quarantine) && historyIsCanonical &&
+    history.at(-1)?.status === ClaimStatus.HELD && history.at(-1)?.holderLinkId === link.id &&
+    claim.createdAt === history[0].at && claim.updatedAt === history.at(-1).at &&
+    confirmedTransition?.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
+    validInstant(confirmedTransition.at) && String(confirmedTransition.by?.kind ?? "").length > 0 &&
+    String(confirmedTransition.by?.ref ?? "").length > 0 &&
+    history.at(-1).at === confirmedTransition.at && claim.updatedAt === link.updatedAt &&
     validInstant(claim.createdAt) && validInstant(claim.updatedAt);
+  };
   const validHeldClaim = (claim) => {
     const link = confirmedById.get(claim.holderLinkId);
     if (!link) return false;
@@ -202,6 +218,33 @@ export function findHealthKitWorkoutRelationshipViolations({ links = [], claims 
 
 function validInstant(value) {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function exactObject(value, expected) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value).sort();
+  const expectedKeys = Object.keys(expected).sort();
+  return keys.length === expectedKeys.length && keys.every((key, index) =>
+    key === expectedKeys[index] && value[key] === expected[key]);
+}
+
+function validConfirmedLinkHistory(link) {
+  const history = Array.isArray(link?.statusHistory) ? link.statusHistory : [];
+  const allowedNext = {
+    [HealthKitWorkoutLinkStatus.CANDIDATE]: new Set([HealthKitWorkoutLinkStatus.CONFIRMED, HealthKitWorkoutLinkStatus.UNLINKED]),
+    [HealthKitWorkoutLinkStatus.CONFIRMED]: new Set([HealthKitWorkoutLinkStatus.UNLINKED]),
+    [HealthKitWorkoutLinkStatus.UNLINKED]: new Set([HealthKitWorkoutLinkStatus.CANDIDATE, HealthKitWorkoutLinkStatus.CONFIRMED]),
+  };
+  return link?.status === HealthKitWorkoutLinkStatus.CONFIRMED && history.length >= 2 &&
+    history[0]?.status === HealthKitWorkoutLinkStatus.CANDIDATE &&
+    history.at(-1)?.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
+    link.createdAt === history[0].at && link.updatedAt === history.at(-1).at &&
+    history.every((entry, index) => {
+      if (!validInstant(entry?.at) || !String(entry?.by?.kind ?? "").length || !String(entry?.by?.ref ?? "").length) return false;
+      if (index === 0) return true;
+      const previous = history[index - 1];
+      return allowedNext[previous.status]?.has(entry.status) === true && Date.parse(entry.at) >= Date.parse(previous.at);
+    });
 }
 
 export function assertHealthKitWorkoutRelationshipIntegrity({ links = [], claims = [] } = {}) {

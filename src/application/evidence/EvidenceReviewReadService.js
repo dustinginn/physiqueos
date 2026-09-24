@@ -23,11 +23,25 @@ export function createEvidenceReviewReadService({ store } = {}) {
         const review = await store.getReview(reviewId);
         if (!review) return null;
         if (isHealthKitWorkoutReconciliationReview(review)) {
+          const ownerUserId = await store.getOwnerUserId();
+          if (!ownerUserId || review.userId !== ownerUserId) return null;
+          const presentation = projectHealthKitWorkoutReconciliationPresentation(review, {
+            ownerUserId,
+            canonicalWorkoutId: review.canonicalWorkoutId,
+          });
           return Object.freeze({
-            review,
+            // Reconciliation records have their own deliberately narrow read
+            // contract. Never place raw resolution/history state beside the
+            // validated projection where a consumer could bypass it.
+            review: Object.freeze({
+              id: presentation.id,
+              status: presentation.status,
+              version: Number(review.version ?? 0),
+              createdAt: review.createdAt ?? null,
+            }),
             evidencePackage: null,
             canonicalObjects: Object.freeze([]),
-            presentation: projectHealthKitWorkoutReconciliationPresentation(review),
+            presentation,
           });
         }
         const packageId = review.interpretedEvidence?.package_id ?? null;

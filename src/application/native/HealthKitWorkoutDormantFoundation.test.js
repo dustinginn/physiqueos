@@ -293,6 +293,48 @@ describe("controlled Workout window (policy enabled)", () => {
     expect(after.evidenceReviews).toEqual([expect.objectContaining({ reviewKind: "generic_evidence_review", status: "pending" })]);
   });
 
+  it.each([
+    ["another workout", { userId: OWNER, canonicalWorkoutId: "healthkit_canonical_workout_other" }],
+    ["another user", { userId: "user_other", canonicalWorkoutId: null }],
+  ])("refuses automatic confirmation when valid-looking history belongs to %s", async (_label, identity) => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    await ingest(records, [workout()], "history-identity-1");
+    const canonicalWorkout = records.snapshot().healthKitCanonicalWorkouts[0];
+    const reviewId = getHealthKitWorkoutReconciliationId(canonicalWorkout.id);
+    await records.putIfAbsent({
+      ownerUserId: OWNER, collection: "evidenceReviews", recordId: reviewId, sourceIdentity: reviewId,
+      payload: {
+        schemaVersion: "healthkit-workout-reconciliation-v1",
+        reviewKind: "healthkit_workout_reconciliation",
+        id: reviewId,
+        userId: identity.userId,
+        canonicalWorkoutId: identity.canonicalWorkoutId ?? canonicalWorkout.id,
+        status: "pending",
+        resolutionHistory: [],
+        lifecycleHistory: [{ status: "pending", at: "2026-09-23T23:30:00.000Z", by: { kind: "system_matcher" } }],
+        evidenceEligibility: { state: "quarantined", strategic: false, decidedBy: "healthkit-strategic-evidence-quarantine-v1" },
+        strategicEvidenceEligibility: "quarantined",
+        createdAt: "2026-09-23T23:30:00.000Z",
+        updatedAt: "2026-09-23T23:30:00.000Z",
+      },
+    });
+    const currentPolicy = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID });
+    await records.put({
+      ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID,
+      expectedVersion: currentPolicy.version,
+      payload: { ...currentPolicy, linkAutoConfirm: true, linkAutoConfirmEffectiveAt: "2026-09-23T23:00:00.000Z" },
+    });
+    const occupantBefore = structuredClone(records.snapshot().evidenceReviews[0]);
+    const result = await ingest(records, [workout()], `history-identity-2-${_label}`, { receivedAt: "2026-09-23T23:32:00.000Z" });
+    expect(result.result.workoutRelationships.automaticConfirmationRefusals).toEqual([
+      expect.objectContaining({ reasons: ["reconciliation_history_conflict"] }),
+    ]);
+    const after = records.snapshot();
+    expect(after.healthKitWorkoutLinks[0].status).toBe("candidate");
+    expect(after.healthKitWorkoutLinkClaims).toEqual([]);
+    expect(after.evidenceReviews[0]).toEqual(occupantBefore);
+  });
+
   it("never retroactively auto-confirms a workout created before the separately authorized cutoff", async () => {
     const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
     await ingest(records, [workout()], "before-auto", { receivedAt: "2026-09-23T23:30:00.000Z" });
@@ -406,6 +448,44 @@ describe("controlled Workout window (policy enabled)", () => {
       principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
       metadata: { commandId: "resolve-no-match-corrupt-replay", expectedVersion: String(corrupt.version), idempotencyKey: "resolve-no-match-corrupt-replay" },
       payload: { reviewId: review.id, action: "no_match" },
+    })).rejects.toMatchObject({ status: 409, code: "WORKOUT_RECONCILIATION_NOT_PENDING" });
+  });
+
+  it("refuses resolved confirmation replay when the selected Logger session is no longer a current temporal candidate", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59"), logger("session-b", "10:02", "11:01")] });
+    await ingest(records, [workout()], "resolved-temporal-replay");
+    const [review] = records.snapshot().evidenceReviews;
+    const ports = createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-23T23:31:00.000Z") });
+    await ports.resolveWorkoutReconciliation({
+      ownerUserId: OWNER,
+      principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+      metadata: { commandId: "resolve-temporal-first", expectedVersion: String(review.version), idempotencyKey: "resolve-temporal-first" },
+      payload: { reviewId: review.id, action: "confirm", loggerSessionCanonicalId: "session-b" },
+    });
+    const resolved = await records.get({ ownerUserId: OWNER, collection: "evidenceReviews", recordId: review.id });
+    const selected = await records.get({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-b" });
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "canonicalEvidenceObjects",
+      recordId: "session-b",
+      expectedVersion: selected.version,
+      payload: {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          metadata: {
+            ...selected.payload.metadata,
+            start_time: `${DAY}T18:00:00-07:00`,
+            end_time: `${DAY}T19:00:00-07:00`,
+          },
+        },
+      },
+    });
+    await expect(ports.resolveWorkoutReconciliation({
+      ownerUserId: OWNER,
+      principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+      metadata: { commandId: "resolve-temporal-replay", expectedVersion: String(resolved.version), idempotencyKey: "resolve-temporal-replay" },
+      payload: { reviewId: review.id, action: "confirm", loggerSessionCanonicalId: "session-b" },
     })).rejects.toMatchObject({ status: 409, code: "WORKOUT_RECONCILIATION_NOT_PENDING" });
   });
 
@@ -957,7 +1037,7 @@ describe("link hardening through the real ingest path", () => {
   const withClaims = (records) => records;
   const confirmLink = async (records, linkId) => {
     const { confirmHealthKitWorkoutRelationship } = await import("../../domain/services/HealthKitWorkoutRelationshipService.js");
-    return confirmHealthKitWorkoutRelationship({ records: withClaims(records), ownerUserId: OWNER, linkId, by: { kind: "founder", ref: "c" }, now: "2026-09-23T22:00:00.000Z" });
+    return confirmHealthKitWorkoutRelationship({ records: withClaims(records), ownerUserId: OWNER, linkId, by: { kind: "founder", ref: "c" }, now: "2026-09-23T23:31:00.000Z" });
   };
   const storeWithClaims = (options) => {
     const inner = store(options);

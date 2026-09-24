@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { isActiveDetailedStrengthSession } from "./HealthKitObservationService.js";
 import { HealthKitWorkoutFamily } from "./HealthKitWorkoutService.js";
 import {
+  HEALTHKIT_WORKOUT_MATCHER_VERSION,
   HealthKitStrengthMatchOutcome,
   HealthKitWorkoutLinkStatus,
   findPossibleDuplicateCanonicalWorkouts,
@@ -13,6 +14,7 @@ export const HEALTHKIT_WORKOUT_RECONCILIATION_SCHEMA_VERSION = "healthkit-workou
 export const HEALTHKIT_WORKOUT_RECONCILIATION_KIND = "healthkit_workout_reconciliation";
 export const HEALTHKIT_WORKOUT_RECONCILIATION_PREFIX = "healthkit_workout_reconciliation_";
 export const HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION = "evidenceReviews";
+export const HEALTHKIT_STRENGTH_AUTO_CONFIRM_RULE_VERSION = "healthkit-strength-auto-confirm-v1";
 
 export const HealthKitWorkoutReconciliationAction = Object.freeze({
   CONFIRM: "confirm",
@@ -87,7 +89,7 @@ export function assessDeterministicStrengthAutoConfirm({
 
   return Object.freeze({
     eligible: reasons.length === 0,
-    ruleVersion: "healthkit-strength-auto-confirm-v1",
+    ruleVersion: HEALTHKIT_STRENGTH_AUTO_CONFIRM_RULE_VERSION,
     reasons: Object.freeze(reasons),
     candidate: candidate ? Object.freeze({
       loggerSessionCanonicalId: candidate.loggerSessionCanonicalId,
@@ -226,7 +228,7 @@ export function resolveHealthKitWorkoutReconciliationRecord(review, {
     linkId: action === HealthKitWorkoutReconciliationAction.CONFIRM ? linkId : null,
     at,
     by,
-    basis,
+    basis: Object.freeze({ ...basis, actorRef: by?.ref ?? null }),
     strategicEvidenceEligibility: "quarantined",
   });
   return Object.freeze({
@@ -248,12 +250,27 @@ export function isHealthKitWorkoutReconciliationReview(review) {
     review?.schemaVersion === HEALTHKIT_WORKOUT_RECONCILIATION_SCHEMA_VERSION;
 }
 
+export function hasExactHealthKitWorkoutReconciliationIdentity(review, {
+  ownerUserId = null,
+  canonicalWorkoutId = null,
+} = {}) {
+  if (!isHealthKitWorkoutReconciliationReview(review)) return false;
+  const storedWorkoutId = String(review.canonicalWorkoutId ?? "").trim();
+  const storedUserId = String(review.userId ?? "").trim();
+  return storedWorkoutId.length > 0 && storedUserId.length > 0 &&
+    review.id === getHealthKitWorkoutReconciliationId(storedWorkoutId) &&
+    (canonicalWorkoutId == null || storedWorkoutId === canonicalWorkoutId) &&
+    (ownerUserId == null || storedUserId === ownerUserId);
+}
+
 export function hasExactHealthKitWorkoutReconciliationResolution(review, {
   action,
   selectedLoggerSessionCanonicalId = null,
   linkId = null,
+  ownerUserId = null,
+  canonicalWorkoutId = null,
 } = {}) {
-  if (!isHealthKitWorkoutReconciliationReview(review)) return false;
+  if (!hasExactHealthKitWorkoutReconciliationIdentity(review, { ownerUserId, canonicalWorkoutId })) return false;
   const expectedStatus = action === HealthKitWorkoutReconciliationAction.CONFIRM
     ? "resolved_confirmed" : action === HealthKitWorkoutReconciliationAction.NO_MATCH
       ? "resolved_no_match" : null;
@@ -269,21 +286,26 @@ export function hasExactHealthKitWorkoutReconciliationResolution(review, {
     !exactResolution(review.resolutionHistory[0]) ||
     stable(review.resolutionHistory[0]) !== stable(review.resolution)) return false;
   const resolution = review.resolution;
-  const allowedBasisModes = new Set([
-    "founder_explicit_selection",
-    "founder_explicit_no_match",
-    "deterministic_auto_confirm",
-    "deterministic_auto_confirm_acceptance",
-  ]);
+  const allowedBasisForAction = action === HealthKitWorkoutReconciliationAction.CONFIRM
+    ? new Set(["founder_explicit_selection", "deterministic_auto_confirm", "deterministic_auto_confirm_acceptance"])
+    : new Set(["founder_explicit_no_match"]);
+  const quarantine = createHealthKitQuarantinedEligibility();
+  const basis = resolution.basis ?? {};
+  const founderBasis = basis.mode?.startsWith("founder_");
+  const deterministicBasis = basis.mode?.startsWith("deterministic_");
   if (!validInstant(resolution.at) || !String(resolution.by?.kind ?? "").trim() ||
-    !String(resolution.by?.ref ?? "").trim() || !allowedBasisModes.has(resolution.basis?.mode) ||
-    ((resolution.basis.mode.startsWith("founder_")) && resolution.by.kind !== "founder") ||
-    ((resolution.basis.mode.startsWith("deterministic_")) && resolution.by.kind !== "system_matcher") ||
-    (resolution.basis.mode.startsWith("founder_") && !String(resolution.basis?.matcherVersion ?? "").trim()) ||
-    (resolution.basis.mode.startsWith("deterministic_") && !String(resolution.basis?.ruleVersion ?? "").trim()) ||
+    !String(resolution.by?.ref ?? "").trim() || !allowedBasisForAction.has(basis.mode) ||
+    basis.actorRef !== resolution.by.ref ||
+    (founderBasis && resolution.by.kind !== "founder") ||
+    (deterministicBasis && resolution.by.kind !== "system_matcher") ||
+    (founderBasis && (basis.matcherVersion !== review.matcherVersion ||
+      review.matcherVersion !== HEALTHKIT_WORKOUT_MATCHER_VERSION)) ||
+    (deterministicBasis && (basis.ruleVersion !== HEALTHKIT_STRENGTH_AUTO_CONFIRM_RULE_VERSION ||
+      resolution.by.ref !== HEALTHKIT_STRENGTH_AUTO_CONFIRM_RULE_VERSION)) ||
     review.updatedAt !== resolution.at ||
     resolution.strategicEvidenceEligibility !== "quarantined" ||
-    review.strategicEvidenceEligibility !== "quarantined" || review.evidenceEligibility?.strategic !== false) return false;
+    review.strategicEvidenceEligibility !== "quarantined" ||
+    stable(review.evidenceEligibility) !== stable(quarantine)) return false;
   const lifecycle = Array.isArray(review.lifecycleHistory) ? review.lifecycleHistory : [];
   const terminal = lifecycle.filter((entry) => ["resolved_confirmed", "resolved_no_match"].includes(entry?.status));
   return terminal.length === 1 && terminal[0]?.status === expectedStatus &&
@@ -291,27 +313,31 @@ export function hasExactHealthKitWorkoutReconciliationResolution(review, {
     stable(lifecycle.at(-1)) === stable(terminal[0]);
 }
 
-export function hasExactStoredHealthKitWorkoutReconciliationTerminal(review) {
-  if (!isHealthKitWorkoutReconciliationReview(review)) return false;
+export function hasExactStoredHealthKitWorkoutReconciliationTerminal(review, identity = {}) {
+  if (!hasExactHealthKitWorkoutReconciliationIdentity(review, identity)) return false;
   if (review.status === "resolved_confirmed") {
     return hasExactHealthKitWorkoutReconciliationResolution(review, {
       action: HealthKitWorkoutReconciliationAction.CONFIRM,
       selectedLoggerSessionCanonicalId: review.resolution?.selectedLoggerSessionCanonicalId ?? null,
       linkId: review.resolution?.linkId ?? null,
+      ...identity,
     });
   }
   if (review.status === "resolved_no_match") {
     return hasExactHealthKitWorkoutReconciliationResolution(review, {
       action: HealthKitWorkoutReconciliationAction.NO_MATCH,
+      ...identity,
     });
   }
   return false;
 }
 
-export function projectHealthKitWorkoutReconciliationPresentation(review) {
+export function projectHealthKitWorkoutReconciliationPresentation(review, identity = {}) {
+  const validIdentity = hasExactHealthKitWorkoutReconciliationIdentity(review, identity);
   const terminal = ["resolved_confirmed", "resolved_no_match"].includes(review.status);
-  const validTerminal = !terminal || hasExactStoredHealthKitWorkoutReconciliationTerminal(review);
-  const projectedStatus = validTerminal ? review.status : "invalid_terminal_history";
+  const validTerminal = validIdentity && (!terminal || hasExactStoredHealthKitWorkoutReconciliationTerminal(review, identity));
+  const projectedStatus = !validIdentity ? "invalid_reconciliation_identity"
+    : validTerminal ? review.status : "invalid_terminal_history";
   return Object.freeze({
     kind: "healthkit_workout_reconciliation",
     id: review.id,

@@ -12,9 +12,9 @@ import {
   assessDeterministicStrengthAutoConfirm,
   createHealthKitWorkoutReconciliationReview,
   getHealthKitWorkoutReconciliationId,
+  hasExactHealthKitWorkoutReconciliationIdentity,
   hasExactHealthKitWorkoutReconciliationResolution,
   hasExactStoredHealthKitWorkoutReconciliationTerminal,
-  isHealthKitWorkoutReconciliationReview,
   resolveHealthKitWorkoutReconciliationRecord,
 } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 import {
@@ -87,11 +87,20 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
     collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
     recordId: reviewId,
   });
+  const historyIdentityExact = hasExactHealthKitWorkoutReconciliationIdentity(existingHistory, {
+    ownerUserId,
+    canonicalWorkoutId: workout.id,
+  });
+  if (existingHistory && !historyIdentityExact) {
+    return Object.freeze({ outcome: "refused", reasons: ["reconciliation_history_identity_conflict"], linkId: link.id, reviewId });
+  }
   if (link.status === HealthKitWorkoutLinkStatus.CONFIRMED) {
     const sameHistory = hasExactHealthKitWorkoutReconciliationResolution(existingHistory, {
       action: HealthKitWorkoutReconciliationAction.CONFIRM,
       selectedLoggerSessionCanonicalId: link.loggerSessionCanonicalId,
       linkId: link.id,
+      ownerUserId,
+      canonicalWorkoutId: workout.id,
     });
     const exactClaims = claimsHeldByLink(claims, link);
     return Object.freeze({
@@ -139,7 +148,7 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
   if (!gate.eligible) {
     return Object.freeze({ outcome: "refused", reasons: [...gate.reasons], autoConfirmFacts });
   }
-  if (existingHistory && (!isHealthKitWorkoutReconciliationReview(existingHistory) || existingHistory.status !== "pending")) {
+  if (existingHistory && (!historyIdentityExact || existingHistory.status !== "pending")) {
     return Object.freeze({ outcome: "refused", reasons: ["reconciliation_history_conflict"], autoConfirmFacts });
   }
   if (apply && stable(expected?.autoConfirm) !== stable(autoConfirmFacts)) {
@@ -215,7 +224,11 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
   }
   const invariants = Object.freeze({
     ...confirmation.invariants,
-    reconciliationHistoryResolvedExactlyOnce: hasExactStoredHealthKitWorkoutReconciliationTerminal(saved) &&
+    reconciliationHistoryResolvedExactlyOnce: hasExactStoredHealthKitWorkoutReconciliationTerminal(saved, {
+      ownerUserId,
+      canonicalWorkoutId: workout.id,
+    }) &&
+      hasExactHealthKitWorkoutReconciliationIdentity(saved, { ownerUserId, canonicalWorkoutId: workout.id }) &&
       saved.resolution?.linkId === link.id,
     historyStrategicallyInert: saved.strategicEvidenceEligibility === "quarantined" &&
       saved.evidenceEligibility?.strategic === false,

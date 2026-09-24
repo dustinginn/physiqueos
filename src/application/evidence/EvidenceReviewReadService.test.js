@@ -1,15 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import { createEvidenceReviewReadService } from "./EvidenceReviewReadService.js";
+import { getHealthKitWorkoutReconciliationId } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 
 describe("EvidenceReviewReadService native detail", () => {
   it("returns a typed workout reconciliation presentation without loading evidence objects", async () => {
+    const canonicalWorkoutId = "healthkit_canonical_workout_one";
     const review = {
       schemaVersion: "healthkit-workout-reconciliation-v1",
       reviewKind: "healthkit_workout_reconciliation",
-      id: "healthkit_workout_reconciliation_one",
+      id: getHealthKitWorkoutReconciliationId(canonicalWorkoutId),
       userId: "founder",
+      canonicalWorkoutId,
       status: "pending",
       version: 2,
+      createdAt: "2026-09-23T20:00:00.000Z",
       localDate: "2026-09-23",
       workout: { family: "strength", canonicalType: "traditional_strength_training" },
       candidates: [{ loggerSessionCanonicalId: "session-a", confidence: 95, basis: "logger_session_window" }],
@@ -17,11 +21,18 @@ describe("EvidenceReviewReadService native detail", () => {
     const store = {
       run: vi.fn(async (_scope, operation) => operation()),
       getReview: vi.fn(async () => review),
+      getOwnerUserId: vi.fn(async () => "founder"),
       getPackage: vi.fn(),
       listRelevantCanonicalObjects: vi.fn(),
     };
     const result = await createEvidenceReviewReadService({ store }).getReview(review.id);
     expect(result).toMatchObject({
+      review: {
+        id: review.id,
+        status: "pending",
+        version: 2,
+        createdAt: "2026-09-23T20:00:00.000Z",
+      },
       evidencePackage: null,
       canonicalObjects: [],
       presentation: {
@@ -34,8 +45,46 @@ describe("EvidenceReviewReadService native detail", () => {
         strategicEvidenceEligibility: "quarantined",
       },
     });
+    expect(result.review).not.toHaveProperty("candidates");
+    expect(result.review).not.toHaveProperty("resolutionHistory");
     expect(store.getPackage).not.toHaveBeenCalled();
     expect(store.listRelevantCanonicalObjects).not.toHaveBeenCalled();
+  });
+
+  it("never exposes raw malformed reconciliation terminal state beside the sanitized projection", async () => {
+    const canonicalWorkoutId = "healthkit_canonical_workout_corrupt";
+    const review = {
+      schemaVersion: "healthkit-workout-reconciliation-v1",
+      reviewKind: "healthkit_workout_reconciliation",
+      id: getHealthKitWorkoutReconciliationId(canonicalWorkoutId),
+      userId: "founder",
+      canonicalWorkoutId,
+      status: "resolved_confirmed",
+      version: 7,
+      createdAt: "2026-09-23T20:00:00.000Z",
+      localDate: "2026-09-23",
+      workout: { family: "strength", canonicalType: "traditional_strength_training" },
+      candidates: [],
+      resolution: { action: "confirm", selectedLoggerSessionCanonicalId: "session-a", linkId: "link-a" },
+      resolutionHistory: [],
+      lifecycleHistory: [],
+    };
+    const store = {
+      run: vi.fn(async (_scope, operation) => operation()),
+      getReview: vi.fn(async () => review),
+      getOwnerUserId: vi.fn(async () => "founder"),
+    };
+    const result = await createEvidenceReviewReadService({ store }).getReview(review.id);
+    expect(result.presentation).toMatchObject({ status: "invalid_terminal_history", resolution: null, actions: [] });
+    expect(result.review).toEqual({
+      id: review.id,
+      status: "invalid_terminal_history",
+      version: 7,
+      createdAt: "2026-09-23T20:00:00.000Z",
+    });
+    expect(result.review).not.toHaveProperty("resolution");
+    expect(result.review).not.toHaveProperty("resolutionHistory");
+    expect(result.review).not.toHaveProperty("lifecycleHistory");
   });
 
   it("returns the same systemic presentation used by the web review surface", async () => {
@@ -61,6 +110,7 @@ describe("EvidenceReviewReadService native detail", () => {
     const store = {
       run: vi.fn(async (_scope, operation) => operation()),
       getReview: vi.fn(async () => review),
+      getOwnerUserId: vi.fn(async () => "founder"),
       getPackage: vi.fn(async () => null),
       listRelevantCanonicalObjects: vi.fn(async () => []),
     };

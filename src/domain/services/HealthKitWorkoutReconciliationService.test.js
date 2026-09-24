@@ -3,6 +3,7 @@ import {
   assessDeterministicStrengthAutoConfirm,
   createHealthKitWorkoutReconciliationReview,
   hasExactHealthKitWorkoutReconciliationResolution,
+  hasExactStoredHealthKitWorkoutReconciliationTerminal,
   projectHealthKitWorkoutReconciliationPresentation,
   resolveHealthKitWorkoutReconciliationRecord,
 } from "./HealthKitWorkoutReconciliationService.js";
@@ -239,22 +240,54 @@ describe("structured reconciliation history", () => {
     expect(resolved.resolutionHistory).toHaveLength(1);
     expect(hasExactHealthKitWorkoutReconciliationResolution(resolved, {
       action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: "link-sep23",
+      ownerUserId: "founder", canonicalWorkoutId: world.canonicalWorkout.id,
     })).toBe(true);
     for (const corrupt of [
+      { ...resolved, id: "healthkit_workout_reconciliation_wrong" },
+      { ...resolved, userId: "other-user" },
+      { ...resolved, canonicalWorkoutId: "other-workout" },
       { ...resolved, resolutionHistory: [{ ...resolved.resolutionHistory[0], at: "2026-09-23T23:31:00.000Z" }] },
       { ...resolved, resolutionHistory: [{ ...resolved.resolutionHistory[0], by: { kind: "founder", ref: "other" } }] },
       { ...resolved, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { mode: "invented" } }] },
       { ...resolved, resolution: { ...resolved.resolution, by: { kind: "system_matcher", ref: "wrong-actor" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], by: { kind: "system_matcher", ref: "wrong-actor" } }] },
       { ...resolved, resolution: { ...resolved.resolution, basis: { mode: "founder_explicit_selection" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { mode: "founder_explicit_selection" } }] },
+      { ...resolved, resolution: { ...resolved.resolution, basis: { ...resolved.resolution.basis, matcherVersion: "forged" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { ...resolved.resolutionHistory[0].basis, matcherVersion: "forged" } }] },
+      { ...resolved, resolution: { ...resolved.resolution, basis: { ...resolved.resolution.basis, actorRef: "other-command" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { ...resolved.resolutionHistory[0].basis, actorRef: "other-command" } }] },
       { ...resolved, lifecycleHistory: resolved.lifecycleHistory.map((entry) => entry.status === "resolved_confirmed" ? { ...entry, at: "2026-09-23T23:31:00.000Z" } : entry) },
       { ...resolved, updatedAt: "2026-09-23T23:31:00.000Z" },
       { ...resolved, strategicEvidenceEligibility: "eligible" },
+      { ...resolved, evidenceEligibility: { ...resolved.evidenceEligibility, state: "eligible" } },
     ]) {
       expect(hasExactHealthKitWorkoutReconciliationResolution(corrupt, {
         action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: "link-sep23",
+        ownerUserId: "founder", canonicalWorkoutId: world.canonicalWorkout.id,
       })).toBe(false);
-      expect(projectHealthKitWorkoutReconciliationPresentation({ ...corrupt, version: 2 }))
-        .toMatchObject({ status: "invalid_terminal_history", resolution: null, actions: [] });
+      expect(projectHealthKitWorkoutReconciliationPresentation({ ...corrupt, version: 2 }, {
+        ownerUserId: "founder", canonicalWorkoutId: world.canonicalWorkout.id,
+      }))
+        .toMatchObject({ status: expect.stringMatching(/^invalid_/), resolution: null, actions: [] });
+    }
+    const automatic = resolveHealthKitWorkoutReconciliationRecord(review, {
+      action: "confirm",
+      selectedLoggerSessionCanonicalId: "logger-sep23",
+      linkId: "link-sep23",
+      by: { kind: "system_matcher", ref: "healthkit-strength-auto-confirm-v1" },
+      now: NOW,
+      basis: { mode: "deterministic_auto_confirm", ruleVersion: "healthkit-strength-auto-confirm-v1" },
+    });
+    expect(hasExactHealthKitWorkoutReconciliationResolution(automatic, {
+      action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: "link-sep23",
+    })).toBe(true);
+    for (const forged of [
+      { ruleVersion: "healthkit-strength-auto-confirm-v999", actorRef: "healthkit-strength-auto-confirm-v1" },
+      { ruleVersion: "healthkit-strength-auto-confirm-v1", actorRef: "other-rule" },
+    ]) {
+      const corrupt = {
+        ...automatic,
+        resolution: { ...automatic.resolution, basis: { ...automatic.resolution.basis, ...forged } },
+        resolutionHistory: [{ ...automatic.resolutionHistory[0], basis: { ...automatic.resolutionHistory[0].basis, ...forged } }],
+      };
+      expect(hasExactStoredHealthKitWorkoutReconciliationTerminal(corrupt)).toBe(false);
     }
     expect(resolveHealthKitWorkoutReconciliationRecord(resolved, {
       action: "confirm",

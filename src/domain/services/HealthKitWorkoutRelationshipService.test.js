@@ -215,6 +215,21 @@ describe("guarded relationship confirmation", () => {
     ["foreign owner", (claim) => ({ ...claim, userId: "user_other" })],
     ["missing terminal time", (claim) => ({ ...claim, history: claim.history.map((entry, index) => index === claim.history.length - 1 ? { ...entry, at: null } : entry) })],
     ["strategically eligible", (claim) => ({ ...claim, evidenceEligibility: { state: "eligible", strategic: true } })],
+    ["a repeated held transition", (claim) => ({ ...claim, history: [...claim.history, { ...claim.history.at(-1) }] })],
+    ["a non-monotonic lifecycle", (claim) => ({
+      ...claim,
+      history: [
+        ...claim.history,
+        { status: "released", holderLinkId: claim.holderLinkId, at: "2026-09-25T20:01:00.000Z" },
+        { status: "held", holderLinkId: claim.holderLinkId, at: T0 },
+      ],
+    })],
+    ["a held time detached from link confirmation", (claim) => ({
+      ...claim,
+      createdAt: "2026-09-25T20:01:00.000Z",
+      updatedAt: "2026-09-25T20:01:00.000Z",
+      history: [{ status: "held", holderLinkId: claim.holderLinkId, at: "2026-09-25T20:01:00.000Z" }],
+    })],
   ])("rejects a held claim with %s", async (_label, mutate) => {
     const { records, link } = await world({ sessions: [session("S1", "10:01", "10:59")], workouts: [["u1", "10:00", "11:00"]] });
     await confirm(records, link("u1", "S1"));
@@ -222,6 +237,21 @@ describe("guarded relationship confirmation", () => {
     snapshot.healthKitWorkoutLinkClaims[0] = mutate(snapshot.healthKitWorkoutLinkClaims[0]);
     expect(findHealthKitWorkoutRelationshipViolations({ links: snapshot.healthKitWorkoutLinks, claims: snapshot.healthKitWorkoutLinkClaims }))
       .toMatchObject({ confirmedLinksWithoutHeldClaims: 1, heldClaimsWithoutConfirmedLink: 1 });
+  });
+
+  it.each([
+    ["a repeated confirmed transition", (link) => ({ ...link, statusHistory: [...link.statusHistory, { ...link.statusHistory.at(-1) }] })],
+    ["a non-monotonic transition", (link) => ({ ...link, statusHistory: [
+      link.statusHistory[0],
+      { ...link.statusHistory.at(-1), at: "2026-09-25T19:59:00.000Z" },
+    ], updatedAt: "2026-09-25T19:59:00.000Z" })],
+  ])("rejects held claims anchored to a confirmed link with %s", async (_label, mutate) => {
+    const { records, link } = await world({ sessions: [session("S1", "10:01", "10:59")], workouts: [["u1", "10:00", "11:00"]] });
+    await confirm(records, link("u1", "S1"));
+    const snapshot = records.snapshot();
+    snapshot.healthKitWorkoutLinks[0] = mutate(snapshot.healthKitWorkoutLinks[0]);
+    expect(findHealthKitWorkoutRelationshipViolations({ links: snapshot.healthKitWorkoutLinks, claims: snapshot.healthKitWorkoutLinkClaims }))
+      .toMatchObject({ confirmedLinksWithoutHeldClaims: 1, heldClaimsWithoutConfirmedLink: 2 });
   });
 
   it("fails closed before any read without an attributable actor or a valid time", async () => {

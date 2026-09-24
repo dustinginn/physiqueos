@@ -3,6 +3,7 @@ import { createCanonicalPersistenceCommandPorts } from "../../application/comman
 import { createInMemoryCanonicalRecordStore } from "../database/Phase4CanonicalRecordStore.js";
 import { runHealthKitStrengthAutoConfirmAcceptance } from "./HealthKitStrengthAutoConfirmAcceptanceRunner.js";
 import { buildHealthKitPayload } from "../../../scripts/operations/buildHealthKitPayload.mjs";
+import { getHealthKitWorkoutReconciliationId } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 
 const OWNER = "user_founder_001";
 const DAY = "2026-09-23";
@@ -78,6 +79,41 @@ describe("bounded Strength deterministic auto-confirm acceptance", () => {
       reasons: ["acceptance_case_not_unique"],
     });
     expect(records.snapshot()).toEqual(before);
+  });
+
+  it.each([
+    ["foreign workout", { userId: OWNER, canonicalWorkoutId: "healthkit_canonical_workout_other" }],
+    ["foreign user", { userId: "user_other", canonicalWorkoutId: null }],
+  ])("refuses a deterministic history occupant bound to a %s without mutation", async (_label, identity) => {
+    const records = await productionShapedWorld();
+    const workoutId = records.snapshot().healthKitCanonicalWorkouts[0].id;
+    const reviewId = getHealthKitWorkoutReconciliationId(workoutId);
+    await records.putIfAbsent({
+      ownerUserId: OWNER,
+      collection: "evidenceReviews",
+      recordId: reviewId,
+      sourceIdentity: reviewId,
+      payload: {
+        schemaVersion: "healthkit-workout-reconciliation-v1",
+        reviewKind: "healthkit_workout_reconciliation",
+        id: reviewId,
+        userId: identity.userId,
+        canonicalWorkoutId: identity.canonicalWorkoutId ?? workoutId,
+        status: "pending",
+        resolutionHistory: [],
+        lifecycleHistory: [{ status: "pending", at: NOW, by: { kind: "system_matcher" } }],
+        evidenceEligibility: { state: "quarantined", strategic: false, decidedBy: "healthkit-strategic-evidence-quarantine-v1" },
+        strategicEvidenceEligibility: "quarantined",
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    });
+    const before = records.snapshot();
+    const beforeWrites = records.getMutationCount();
+    const result = await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, now: () => new Date(NOW) });
+    expect(result).toMatchObject({ outcome: "refused", reasons: ["reconciliation_history_identity_conflict"], reviewId });
+    expect(records.snapshot()).toEqual(before);
+    expect(records.getMutationCount()).toBe(beforeWrites);
   });
 
   it("drift-fences the deterministic facts before any confirmation write", async () => {
