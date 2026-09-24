@@ -73,9 +73,20 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let observeCount = await synchronizer.observeCallCount()
         let backgroundDeliveryCount = await synchronizer.backgroundDeliveryCallCount()
         let syncCount = await synchronizer.syncCallCount()
+        let operationOrder = await synchronizer.recordedOperationOrder()
         XCTAssertEqual(observeCount, 3)
         XCTAssertEqual(backgroundDeliveryCount, 3)
-        XCTAssertEqual(syncCount, 3)
+        XCTAssertEqual(syncCount, 5)
+        XCTAssertEqual(
+            operationOrder,
+            [
+                "current:activitySummary",
+                "current:nutritionDailyTotal",
+                "standard:workouts",
+                "historical:activitySummary",
+                "historical:nutritionDailyTotal",
+            ]
+        )
     }
 
     @MainActor
@@ -191,7 +202,7 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer)
         let outcome = await harness.coordinator.bootstrap()
 
-        XCTAssertEqual(outcome.streamErrors[.activitySummary], ["catch_up_sync_failed"])
+        XCTAssertEqual(outcome.streamErrors[.activitySummary], ["current_day_sync_failed", "historical_sync_failed"])
         XCTAssertFalse(outcome.caughtUpStreams.contains(.activitySummary))
         XCTAssertTrue(outcome.caughtUpStreams.contains(.nutritionDailyTotal))
         XCTAssertTrue(outcome.caughtUpStreams.contains(.workouts))
@@ -229,9 +240,9 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let observeCount = await synchronizer.observeCallCount()
         let syncCount = await synchronizer.syncCallCount()
         let ownerIdentityCalls = await server.ownerIdentityCallCount()
-        // Three streams x initial pass + one queued rerun. Never concurrent.
+        // Five units x initial pass + one queued rerun. Never concurrent.
         XCTAssertEqual(observeCount, 6)
-        XCTAssertEqual(syncCount, 6)
+        XCTAssertEqual(syncCount, 10)
         XCTAssertEqual(ownerIdentityCalls, 1)
     }
 
@@ -249,12 +260,12 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let first = Task { await harness.coordinator.bootstrap() }
         await eventuallyAutomatic { await synchronizer.syncCallCount() >= 1 }
         let second = Task { await harness.coordinator.bootstrap() }
-        await eventuallyAutomatic { await synchronizer.syncCallCount() >= 4 }
+        await eventuallyAutomatic { await synchronizer.syncCallCount() >= 6 }
         let third = Task { await harness.coordinator.bootstrap() }
         _ = await (first.value, second.value, third.value)
 
         let syncCount = await synchronizer.syncCallCount()
-        XCTAssertEqual(syncCount, 9)
+        XCTAssertEqual(syncCount, 15)
     }
 
     /// The Build 54 failure mode: one HealthKit await never completed, so
@@ -272,7 +283,7 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
 
         let first = await harness.coordinator.bootstrap()
 
-        XCTAssertEqual(first.streamErrors[.nutritionDailyTotal], ["catch_up_sync_timed_out"])
+        XCTAssertEqual(first.streamErrors[.nutritionDailyTotal], ["current_day_sync_timed_out", "historical_sync_timed_out"])
         XCTAssertTrue(first.caughtUpStreams.contains(.activitySummary))
         XCTAssertTrue(first.caughtUpStreams.contains(.workouts))
 
@@ -301,8 +312,8 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let ownerIdentityCalls = await server.ownerIdentityCallCount()
         XCTAssertEqual(ownerIdentityCalls, 1)
         let syncCount = await synchronizer.syncCallCount()
-        // Three streams x two completed bootstraps.
-        XCTAssertEqual(syncCount, 6)
+        // Five synchronization units x two completed bootstraps.
+        XCTAssertEqual(syncCount, 10)
     }
 
     /// If more than one of the three per-stream calls fails, all of them must
@@ -317,8 +328,74 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(
             outcome.streamErrors[.activitySummary],
-            ["observer_registration_failed", "catch_up_sync_failed"]
+            ["observer_registration_failed", "current_day_sync_failed", "historical_sync_failed"]
         )
+    }
+
+    @MainActor
+    func testHistoricalActivityFailureCannotBlockEitherCurrentDayScope() async {
+        let synchronizer = AutomaticSynchronizerMock()
+        synchronizer.operationsToFail = ["historical:activitySummary"]
+        let outcome = await AutomaticCoordinatorHarness(synchronizer: synchronizer).coordinator.bootstrap()
+        let operationOrder = await synchronizer.recordedOperationOrder()
+
+        XCTAssertTrue(outcome.caughtUpStreams.contains(.activitySummary))
+        XCTAssertTrue(outcome.caughtUpStreams.contains(.nutritionDailyTotal))
+        XCTAssertEqual(outcome.streamErrors[.activitySummary], ["historical_sync_failed"])
+        XCTAssertEqual(
+            Array(operationOrder.prefix(2)),
+            ["current:activitySummary", "current:nutritionDailyTotal"]
+        )
+    }
+
+    @MainActor
+    func testCurrentActivityFailureStillAttemptsCurrentNutritionBeforeHistory() async {
+        let synchronizer = AutomaticSynchronizerMock()
+        synchronizer.operationsToFail = ["current:activitySummary"]
+        let outcome = await AutomaticCoordinatorHarness(synchronizer: synchronizer).coordinator.bootstrap()
+        let operationOrder = await synchronizer.recordedOperationOrder()
+
+        XCTAssertFalse(outcome.caughtUpStreams.contains(.activitySummary))
+        XCTAssertTrue(outcome.caughtUpStreams.contains(.nutritionDailyTotal))
+        XCTAssertEqual(outcome.streamErrors[.activitySummary], ["current_day_sync_failed"])
+        XCTAssertEqual(
+            Array(operationOrder.prefix(2)),
+            ["current:activitySummary", "current:nutritionDailyTotal"]
+        )
+    }
+
+    @MainActor
+    func testCurrentNutritionFailureCannotBlockActivityOrReorderHistoryFirst() async {
+        let synchronizer = AutomaticSynchronizerMock()
+        synchronizer.operationsToFail = ["current:nutritionDailyTotal"]
+        let outcome = await AutomaticCoordinatorHarness(synchronizer: synchronizer).coordinator.bootstrap()
+        let operationOrder = await synchronizer.recordedOperationOrder()
+
+        XCTAssertTrue(outcome.caughtUpStreams.contains(.activitySummary))
+        XCTAssertFalse(outcome.caughtUpStreams.contains(.nutritionDailyTotal))
+        XCTAssertEqual(outcome.streamErrors[.nutritionDailyTotal], ["current_day_sync_failed"])
+        XCTAssertEqual(
+            Array(operationOrder.prefix(2)),
+            ["current:activitySummary", "current:nutritionDailyTotal"]
+        )
+        XCTAssertEqual(Array(operationOrder.suffix(2)), ["historical:activitySummary", "historical:nutritionDailyTotal"])
+    }
+
+    @MainActor
+    func testRepeatedHistoricalCollisionsAcrossForegroundsNeverStarveEitherCurrentScope() async {
+        let synchronizer = AutomaticSynchronizerMock()
+        synchronizer.operationsToFail = ["historical:activitySummary", "historical:nutritionDailyTotal"]
+        let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer)
+
+        let first = await harness.coordinator.bootstrap()
+        let second = await harness.coordinator.bootstrap()
+        let operationOrder = await synchronizer.recordedOperationOrder()
+
+        XCTAssertTrue(first.caughtUpStreams.isSuperset(of: [.activitySummary, .nutritionDailyTotal]))
+        XCTAssertTrue(second.caughtUpStreams.isSuperset(of: [.activitySummary, .nutritionDailyTotal]))
+        XCTAssertEqual(operationOrder.count, 10)
+        XCTAssertEqual(Array(operationOrder[0..<2]), ["current:activitySummary", "current:nutritionDailyTotal"])
+        XCTAssertEqual(Array(operationOrder[5..<7]), ["current:activitySummary", "current:nutritionDailyTotal"])
     }
 
     @MainActor
@@ -358,9 +435,11 @@ private actor AutomaticSynchronizerMock: HealthKitAutomaticSynchronizing {
     private var observeCalls = 0
     private var backgroundDeliveryCalls = 0
     private var syncCalls = 0
+    private var operationOrder: [String] = []
     nonisolated(unsafe) var streamsToFailObserving: Set<HealthKitSynchronizationStream> = []
     nonisolated(unsafe) var streamsToFailBackgroundDelivery: Set<HealthKitSynchronizationStream> = []
     nonisolated(unsafe) var streamsToFailSync: Set<HealthKitSynchronizationStream> = []
+    nonisolated(unsafe) var operationsToFail: Set<String> = []
     nonisolated(unsafe) var syncDelayNanoseconds: [HealthKitSynchronizationStream: UInt64] = [:]
 
     func startObserving(scope: HealthKitCursorScope) async throws {
@@ -376,12 +455,28 @@ private actor AutomaticSynchronizerMock: HealthKitAutomaticSynchronizing {
     }
 
     func synchronize(scope: HealthKitCursorScope, stagingCompletion: (@Sendable () -> Void)?) async throws {
+        try await performSync(scope: scope, label: "standard")
+    }
+
+    func synchronizeCurrentDay(scope: HealthKitCursorScope, calendar: Calendar) async throws {
+        try await performSync(scope: scope, label: "current")
+    }
+
+    func synchronizeHistoricalCatchUp(scope: HealthKitCursorScope, calendar: Calendar) async throws {
+        try await performSync(scope: scope, label: "historical")
+    }
+
+    private func performSync(scope: HealthKitCursorScope, label: String) async throws {
         syncCalls += 1
         syncScopes.append(scope)
+        let operation = "\(label):\(scope.stream.rawValue)"
+        operationOrder.append(operation)
         if let delay = syncDelayNanoseconds[scope.stream], delay > 0 {
             try? await Task.sleep(nanoseconds: delay)
         }
-        if streamsToFailSync.contains(scope.stream) { throw AutomaticCoordinatorTestError.serverUnreachable }
+        if streamsToFailSync.contains(scope.stream) || operationsToFail.contains(operation) {
+            throw AutomaticCoordinatorTestError.serverUnreachable
+        }
     }
 
     func observedScopes() -> [HealthKitCursorScope] { scopes }
@@ -390,6 +485,7 @@ private actor AutomaticSynchronizerMock: HealthKitAutomaticSynchronizing {
     func observeCallCount() -> Int { observeCalls }
     func backgroundDeliveryCallCount() -> Int { backgroundDeliveryCalls }
     func syncCallCount() -> Int { syncCalls }
+    func recordedOperationOrder() -> [String] { operationOrder }
 }
 
 private actor AutomaticServerMock: HealthKitFounderCanaryServer {

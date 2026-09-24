@@ -8,6 +8,8 @@ protocol HealthKitAutomaticSynchronizing: Sendable {
     func startObserving(scope: HealthKitCursorScope) async throws
     func enableBackgroundDelivery(scope: HealthKitCursorScope) async throws
     func synchronize(scope: HealthKitCursorScope, stagingCompletion: (@Sendable () -> Void)?) async throws
+    func synchronizeCurrentDay(scope: HealthKitCursorScope, calendar: Calendar) async throws
+    func synchronizeHistoricalCatchUp(scope: HealthKitCursorScope, calendar: Calendar) async throws
 }
 
 extension HealthKitSynchronizationEngine: HealthKitAutomaticSynchronizing {}
@@ -78,7 +80,14 @@ extension HealthKitSynchronizationEngine: HealthKitAutomaticSynchronizing {}
 /// test's `async let`, or two quick `scenePhase` transitions), which the
 /// in-flight-task guard above requires being able to express.
 final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
+    /// The existing Build 57 scope is deliberately retained for historical
+    /// recovery so its durable cursor, pending batch, and per-day revision
+    /// floors survive this architecture change.
     static let predicateVersion = "healthkit-automatic-v1"
+    /// Current-day state is isolated from the legacy historical envelope.
+    /// Both predicate versions map to the same Server `automatic` namespace;
+    /// this string only separates protected local state and pending delivery.
+    static let currentDayPredicateVersion = "healthkit-automatic-current-day-v1"
     /// Source-observation identities of the permanent automatic path never
     /// share an external id with the Founder canary's validation-only
     /// uploads or the canonical-test-day's own `testday` namespace, exactly
@@ -106,6 +115,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     private let deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore
     private let synchronizationStore: (any HealthKitSynchronizationStore)?
     private let stepTimeout: Duration
+    private let calendar: Calendar
 
     private(set) var lastBootstrapOutcome: HealthKitAutomaticBootstrapOutcome?
     /// The Founder's owner identity almost never changes within one signed-in
@@ -133,7 +143,8 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         server: any HealthKitFounderCanaryServer,
         deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore = KeychainHealthKitCanaryDeviceIdentityStore(),
         synchronizationStore: (any HealthKitSynchronizationStore)? = nil,
-        stepTimeout: Duration = .seconds(30)
+        stepTimeout: Duration = .seconds(30),
+        calendar: Calendar = .autoupdatingCurrent
     ) {
         self.authorization = authorization
         self.synchronizer = synchronizer
@@ -141,6 +152,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         self.deviceIdentityStore = deviceIdentityStore
         self.synchronizationStore = synchronizationStore
         self.stepTimeout = stepTimeout
+        self.calendar = calendar
     }
 
     /// Read-only Founder diagnostics for the permanent automatic scopes.
@@ -162,13 +174,26 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         guard let deviceIdentity = try? deviceIdentityStore.stableIdentity() else { return [:] }
         var snapshot: [HealthKitSynchronizationStream: HealthKitStreamDiagnostics] = [:]
         for stream in Self.streams {
-            let scope = HealthKitCursorScope(
+            let historicalScope = HealthKitCursorScope(
                 ownerIdentity: ownerIdentity,
                 enrolledDeviceIdentity: deviceIdentity,
                 stream: stream,
                 predicateVersion: Self.predicateVersion
             )
-            snapshot[stream] = try? await synchronizationStore.diagnostics(for: scope)
+            guard stream == .activitySummary || stream == .nutritionDailyTotal else {
+                snapshot[stream] = try? await synchronizationStore.diagnostics(for: historicalScope)
+                continue
+            }
+            let currentScope = HealthKitCursorScope(
+                ownerIdentity: ownerIdentity,
+                enrolledDeviceIdentity: deviceIdentity,
+                stream: stream,
+                predicateVersion: Self.currentDayPredicateVersion
+            )
+            if let current = try? await synchronizationStore.diagnostics(for: currentScope),
+               let historical = try? await synchronizationStore.diagnostics(for: historicalScope) {
+                snapshot[stream] = Self.mergedDiagnostics(current: current, historical: historical)
+            }
         }
         return snapshot
     }
@@ -239,13 +264,31 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             lastBootstrapOutcome = outcome
             return outcome
         }
-        for stream in Self.streams {
-            let scope = HealthKitCursorScope(
+        let historicalScopes = Dictionary(uniqueKeysWithValues: Self.streams.map { stream in
+            (stream, HealthKitCursorScope(
                 ownerIdentity: ownerIdentity,
                 enrolledDeviceIdentity: deviceIdentity,
                 stream: stream,
                 predicateVersion: Self.predicateVersion
-            )
+            ))
+        })
+        let currentScopes = Dictionary(uniqueKeysWithValues: [
+            HealthKitSynchronizationStream.activitySummary,
+            .nutritionDailyTotal,
+        ].map { stream in
+            (stream, HealthKitCursorScope(
+                ownerIdentity: ownerIdentity,
+                enrolledDeviceIdentity: deviceIdentity,
+                stream: stream,
+                predicateVersion: Self.currentDayPredicateVersion
+            ))
+        })
+
+        // Registration is unchanged and remains bound to the legacy scope.
+        // Observer wakes entering the engine through that scope run the same
+        // current-first orchestration as foreground bootstrap.
+        for stream in Self.streams {
+            guard let scope = historicalScopes[stream] else { continue }
             switch await boundedStep({ try await self.synchronizer.startObserving(scope: scope) }) {
             case .succeeded: break
             case .failed:
@@ -260,19 +303,88 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             case .timedOut:
                 outcome.streamErrors[stream, default: []].append("background_delivery_registration_timed_out")
             }
-            switch await boundedStep({ try await self.synchronizer.synchronize(scope: scope, stagingCompletion: nil) }) {
+        }
+
+        // Every daily current-day attempt precedes every historical attempt.
+        // This ordering is load-bearing: Activity history must not delay
+        // Nutrition today, and neither history lane may poison today's ack.
+        for stream in [HealthKitSynchronizationStream.activitySummary, .nutritionDailyTotal] {
+            guard let scope = currentScopes[stream] else { continue }
+            switch await boundedStep({ try await self.synchronizer.synchronizeCurrentDay(scope: scope, calendar: self.calendar) }) {
             case .succeeded:
                 outcome.caughtUpStreams.insert(stream)
             case let .failed(code):
                 outcome.streamErrors[stream, default: []].append(
+                    code == "healthkit_query_timed_out" ? "current_day_sync_timed_out" : "current_day_sync_failed"
+                )
+            case .timedOut:
+                outcome.streamErrors[stream, default: []].append("current_day_sync_timed_out")
+            }
+        }
+
+        // Workout ingestion remains byte-for-byte on its prior automatic
+        // scope and activation-floor path.
+        if let workoutScope = historicalScopes[.workouts] {
+            switch await boundedStep({ try await self.synchronizer.synchronize(scope: workoutScope, stagingCompletion: nil) }) {
+            case .succeeded:
+                outcome.caughtUpStreams.insert(.workouts)
+            case let .failed(code):
+                outcome.streamErrors[.workouts, default: []].append(
                     code == "healthkit_query_timed_out" ? "catch_up_sync_timed_out" : "catch_up_sync_failed"
                 )
             case .timedOut:
-                outcome.streamErrors[stream, default: []].append("catch_up_sync_timed_out")
+                outcome.streamErrors[.workouts, default: []].append("catch_up_sync_timed_out")
+            }
+        }
+
+        // Historical recovery is best-effort after all current work. A
+        // historical failure remains visible but never revokes current-day
+        // success or prevents the other scope's current-day attempt.
+        for stream in [HealthKitSynchronizationStream.activitySummary, .nutritionDailyTotal] {
+            guard let scope = historicalScopes[stream] else { continue }
+            switch await boundedStep({ try await self.synchronizer.synchronizeHistoricalCatchUp(scope: scope, calendar: self.calendar) }) {
+            case .succeeded: break
+            case let .failed(code):
+                outcome.streamErrors[stream, default: []].append(
+                    code == "healthkit_query_timed_out" ? "historical_sync_timed_out" : "historical_sync_failed"
+                )
+            case .timedOut:
+                outcome.streamErrors[stream, default: []].append("historical_sync_timed_out")
             }
         }
         lastBootstrapOutcome = outcome
         return outcome
+    }
+
+    private static func mergedDiagnostics(
+        current: HealthKitStreamDiagnostics,
+        historical: HealthKitStreamDiagnostics
+    ) -> HealthKitStreamDiagnostics {
+        let latestRecoveryIsCurrent = (current.lastDailyRevisionRecoveryAt ?? .distantPast) >=
+            (historical.lastDailyRevisionRecoveryAt ?? .distantPast)
+        return HealthKitStreamDiagnostics(
+            enabled: current.enabled || historical.enabled,
+            availability: current.availability,
+            authorizationState: current.authorizationState,
+            lastObserverWakeup: [current.lastObserverWakeup, historical.lastObserverWakeup].compactMap { $0 }.max(),
+            lastSuccessfulAnchoredQuery: [current.lastSuccessfulAnchoredQuery, historical.lastSuccessfulAnchoredQuery].compactMap { $0 }.max(),
+            cursorGeneration: current.cursorGeneration,
+            cursorDigest: current.cursorDigest,
+            pendingBatchCount: current.pendingBatchCount + historical.pendingBatchCount,
+            lastUploadAttempt: [current.lastUploadAttempt, historical.lastUploadAttempt].compactMap { $0 }.max(),
+            lastDurableAcknowledgement: [current.lastDurableAcknowledgement, historical.lastDurableAcknowledgement].compactMap { $0 }.max(),
+            lastErrorCode: current.lastErrorCode ?? historical.lastErrorCode,
+            boundedRecoveryCount: current.boundedRecoveryCount + historical.boundedRecoveryCount,
+            lastAbandonedBatchCode: (current.lastAbandonedAt ?? .distantPast) >= (historical.lastAbandonedAt ?? .distantPast)
+                ? current.lastAbandonedBatchCode : historical.lastAbandonedBatchCode,
+            lastAbandonedAt: [current.lastAbandonedAt, historical.lastAbandonedAt].compactMap { $0 }.max(),
+            abandonedBatchCount: (current.abandonedBatchCount ?? 0) + (historical.abandonedBatchCount ?? 0),
+            dailyRevisionFloorCount: (current.dailyRevisionFloorCount ?? 0) + (historical.dailyRevisionFloorCount ?? 0),
+            lastDailyRevisionRecoveryAt: latestRecoveryIsCurrent ? current.lastDailyRevisionRecoveryAt : historical.lastDailyRevisionRecoveryAt,
+            lastDailyRevisionRecoveryCode: latestRecoveryIsCurrent ? current.lastDailyRevisionRecoveryCode : historical.lastDailyRevisionRecoveryCode,
+            lastDailyRevisionRecoveryLocalDate: latestRecoveryIsCurrent ? current.lastDailyRevisionRecoveryLocalDate : historical.lastDailyRevisionRecoveryLocalDate,
+            lastDailyRevisionNextExpected: latestRecoveryIsCurrent ? current.lastDailyRevisionNextExpected : historical.lastDailyRevisionNextExpected
+        )
     }
 
     private func boundedStep(

@@ -25,6 +25,9 @@ struct HealthKitFounderCanaryView: View {
     @State private var workoutResult: HealthKitWorkoutCanaryRunResult?
     @State private var workoutError: String?
     @State private var automaticDiagnostics: [HealthKitSynchronizationStream: HealthKitStreamDiagnostics] = [:]
+    @State private var isSeptember23RepairWorking = false
+    @State private var september23RepairDryRun: HealthKitSeptember23ActivityRepairDryRun?
+    @State private var september23RepairError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -42,7 +45,10 @@ struct HealthKitFounderCanaryView: View {
                         .tint(PhysiqueOSTheme.accent)
                         .onChange(of: canaryEnabled) { _, enabled in
                             environment.healthKitFounderCanaryCoordinator.setEnabled(enabled)
-                            if !enabled { result = nil }
+                            if !enabled {
+                                result = nil
+                                september23RepairDryRun = nil
+                            }
                         }
                     statusRow("HealthKit", availabilityText)
                     statusRow("Authorization", authorizationText)
@@ -95,6 +101,7 @@ struct HealthKitFounderCanaryView: View {
             if let result { resultView(result) }
 
             automaticDiagnosticsCard
+            september23RepairCard
             canonicalTestDayCard
             workoutCanaryCard
         }
@@ -177,6 +184,83 @@ struct HealthKitFounderCanaryView: View {
         }
         .task {
             automaticDiagnostics = await environment.healthKitAutomaticSynchronizationCoordinator.diagnosticSnapshot()
+        }
+    }
+
+    private var september23RepairCard: some View {
+        CardContainer(padding: .md) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("ONE-SHOT SEP 23 ACTIVITY REPAIR")
+                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
+                    .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                Text("Founder diagnostic only. DRY RUN reads Apple Health for September 23, 2026 and computes a privacy-safe digest. It uploads nothing. APPLY is locked until a separate authorization and fresh Server preflight are supplied.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                statusRow("Date", HealthKitSeptember23ActivityRepairContract.localDate)
+                statusRow("Scope", "Activity only · automatic identity")
+                statusRow("Expected revision", "50 → 51")
+                PrimaryActionButton(
+                    title: isSeptember23RepairWorking ? "Reading September 23…" : "DRY RUN — read September 23 Activity",
+                    isEnabled: canDryRunSeptember23Repair
+                ) {
+                    runSeptember23RepairDryRun()
+                }
+                PrimaryActionButton(
+                    title: "APPLY — not authorized",
+                    isEnabled: false
+                ) {}
+                if let september23RepairError {
+                    Text(september23RepairError)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                }
+                if let dryRun = september23RepairDryRun {
+                    statusRow("Dry-run date", dryRun.localDate)
+                    statusRow("Time zone", dryRun.timeZoneIdentifier)
+                    statusRow("Coverage", dryRun.coverage.rawValue)
+                    ForEach(dryRun.dailyActivity.keys.sorted(), id: \.self) { key in
+                        if let value = dryRun.dailyActivity[key] {
+                            statusRow(Self.metricLabel(key), value.formatted(.number.precision(.fractionLength(0...4))))
+                        }
+                    }
+                    statusRow("Aggregate digest", dryRun.aggregateDigest)
+                    statusRow(
+                        "Predicted mutation",
+                        "1 source row; canonical 50→51; history 49→50"
+                    )
+                    Text("Dry run complete. No upload occurred. Keep APPLY locked until the coordinating agent revalidates authority and receives separate authorization.")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            }
+        }
+    }
+
+    private var canDryRunSeptember23Repair: Bool {
+        canaryEnabled &&
+            environment.healthKitFounderCanaryCoordinator.authorizationWasExplicitlyRequested &&
+            !isSeptember23RepairWorking && !isWorking && !isTestDayWorking && !isWorkoutWorking
+    }
+
+    private func runSeptember23RepairDryRun() {
+        isSeptember23RepairWorking = true
+        september23RepairDryRun = nil
+        september23RepairError = nil
+        Task {
+            do {
+                let completed = try await environment.healthKitFounderCanaryCoordinator
+                    .dryRunSeptember23ActivityRepair()
+                await MainActor.run {
+                    september23RepairDryRun = completed
+                    isSeptember23RepairWorking = false
+                }
+            } catch {
+                await MainActor.run {
+                    september23RepairError = (error as? LocalizedError)?.errorDescription
+                        ?? "The September 23 Activity repair dry run did not complete."
+                    isSeptember23RepairWorking = false
+                }
+            }
         }
     }
 

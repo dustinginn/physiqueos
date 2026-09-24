@@ -44,6 +44,20 @@ protocol HealthKitWorkoutCanarySynchronizing: HealthKitActivityCanarySynchronizi
 
 extension HealthKitSynchronizationEngine: HealthKitWorkoutCanarySynchronizing {}
 
+protocol HealthKitSeptember23ActivityRepairSynchronizing: HealthKitActivityCanarySynchronizing {
+    func dryRunSeptember23ActivityRepair(
+        scope: HealthKitCursorScope,
+        calendar: Calendar
+    ) async throws -> HealthKitSeptember23ActivityRepairDryRun
+    func applySeptember23ActivityRepair(
+        scope: HealthKitCursorScope,
+        authorization: HealthKitSeptember23ActivityRepairAuthorization?,
+        calendar: Calendar
+    ) async throws -> HealthKitSeptember23ActivityRepairApplyResult
+}
+
+extension HealthKitSynchronizationEngine: HealthKitSeptember23ActivityRepairSynchronizing {}
+
 protocol HealthKitFounderCanaryServer: Sendable {
     func healthKitCanaryContract() async throws -> HealthKitCanaryServerContract
     func founderOwnerIdentity() async throws -> String
@@ -278,6 +292,58 @@ final class HealthKitFounderCanaryCoordinator {
             synchronization: summary,
             diagnostics: try await synchronizer.diagnostics(scope: scope),
             canonicalization: canonicalizationLedger?.reports() ?? []
+        )
+    }
+
+    /// Founder-only, exact-day, no-upload repair preview. Unlike the general
+    /// validation canary this uses the automatic Server identity namespace,
+    /// but the engine never stages or uploads the result.
+    @MainActor
+    func dryRunSeptember23ActivityRepair() async throws -> HealthKitSeptember23ActivityRepairDryRun {
+        guard isEnabled else { throw HealthKitCanaryError.disabled }
+        guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
+        guard let synchronizer = synchronizer as? any HealthKitSeptember23ActivityRepairSynchronizing else {
+            throw HealthKitCanaryError.september23RepairBoundaryViolation
+        }
+        let contract = try await server.healthKitCanaryContract()
+        guard contract.isCompatible, contract.supportsCanonicalTestDay else {
+            throw HealthKitCanaryError.serverContractMismatch
+        }
+        let scope = HealthKitCursorScope(
+            ownerIdentity: try await server.founderOwnerIdentity(),
+            enrolledDeviceIdentity: try deviceIdentityStore.stableIdentity(),
+            stream: .activitySummary,
+            predicateVersion: HealthKitSeptember23ActivityRepairContract.predicateVersion
+        )
+        return try await synchronizer.dryRunSeptember23ActivityRepair(scope: scope, calendar: calendar)
+    }
+
+    /// There is intentionally no production UI caller in this candidate.
+    /// A future separately authorized task must supply a freshly constructed
+    /// capability containing exact Server preflight facts and the immediately
+    /// preceding dry-run digest.
+    @MainActor
+    func applySeptember23ActivityRepair(
+        authorization repairAuthorization: HealthKitSeptember23ActivityRepairAuthorization?
+    ) async throws -> HealthKitSeptember23ActivityRepairApplyResult {
+        guard isEnabled else { throw HealthKitCanaryError.disabled }
+        guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
+        guard let synchronizer = synchronizer as? any HealthKitSeptember23ActivityRepairSynchronizing else {
+            throw HealthKitCanaryError.september23RepairBoundaryViolation
+        }
+        guard repairAuthorization != nil else {
+            throw HealthKitCanaryError.september23RepairApplyNotAuthorized
+        }
+        let scope = HealthKitCursorScope(
+            ownerIdentity: try await server.founderOwnerIdentity(),
+            enrolledDeviceIdentity: try deviceIdentityStore.stableIdentity(),
+            stream: .activitySummary,
+            predicateVersion: HealthKitSeptember23ActivityRepairContract.predicateVersion
+        )
+        return try await synchronizer.applySeptember23ActivityRepair(
+            scope: scope,
+            authorization: repairAuthorization,
+            calendar: calendar
         )
     }
 

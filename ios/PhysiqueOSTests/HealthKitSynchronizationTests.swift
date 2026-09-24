@@ -358,6 +358,531 @@ final class HealthKitSynchronizationTests: XCTestCase {
         XCTAssertNotNil(finalCursor)
     }
 
+    func testCurrentDayZeroAndNonzeroActivityAggregatesAreBothDurablyUploaded() async throws {
+        for (value, revision) in [(0.0, UInt64(1)), (725.0, UInt64(2))] {
+            let result = Self.dailyActivityResult(
+                localDate: "2027-01-15",
+                revision: revision,
+                moveCalories: value,
+                cursorFingerprint: "current-\(revision)",
+                exerciseMinutes: value == 0 ? 0 : 30,
+                standHours: value == 0 ? 0 : 10
+            )
+            let harness = try Harness(
+                stream: .activitySummary,
+                gate: .enabled,
+                queryResults: [result],
+                uploadModes: [.accept],
+                predicateVersion: HealthKitAutomaticSynchronizationCoordinator.currentDayPredicateVersion
+            )
+
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+            try await harness.engine.synchronizeCurrentDay(scope: harness.scope, calendar: calendar)
+
+            let uploadedRevisions = await harness.uploader.receivedDailyRevisions()
+            let externalIDs = await harness.uploader.receivedExternalIDs()
+            let receivedBounds = await harness.query.receivedBounds()
+            let pending = try await harness.store.pendingBatches(for: harness.scope)
+            let cursor = try await harness.store.authoritativeCursor(for: harness.scope)
+            XCTAssertEqual(uploadedRevisions, [revision])
+            XCTAssertEqual(externalIDs, ["activity-summary:automatic:2027-01-15"])
+            let bounds = try XCTUnwrap(receivedBounds.first ?? nil)
+            XCTAssertEqual(bounds.startLocalDate, "2027-01-15")
+            XCTAssertEqual(bounds.endLocalDate, "2027-01-15")
+            XCTAssertEqual(bounds.timeZoneIdentifier, "America/Los_Angeles")
+            XCTAssertTrue(pending.isEmpty)
+            XCTAssertNotNil(cursor)
+        }
+    }
+
+    func testCurrentDayZeroNutritionAggregateIsAValidPresentObservation() async throws {
+        let result = Self.dailyNutritionResult(
+            localDate: "2027-01-15", revision: 1, calories: 0,
+            protein: 0, cursorFingerprint: "zero-nutrition"
+        )
+        let harness = try Harness(
+            stream: .nutritionDailyTotal,
+            gate: .enabled,
+            queryResults: [result],
+            uploadModes: [.accept],
+            predicateVersion: HealthKitAutomaticSynchronizationCoordinator.currentDayPredicateVersion
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+
+        try await harness.engine.synchronizeCurrentDay(scope: harness.scope, calendar: calendar)
+
+        let revisions = await harness.uploader.receivedDailyRevisions()
+        let externalIDs = await harness.uploader.receivedExternalIDs()
+        let cursor = try await harness.store.authoritativeCursor(for: harness.scope)
+        XCTAssertEqual(revisions, [1])
+        XCTAssertEqual(externalIDs, ["nutrition-daily-total:automatic:2027-01-15"])
+        XCTAssertNotNil(cursor)
+    }
+
+    func testAutomaticObserverWakeAlwaysAttemptsCurrentBeforeCollidingHistory() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSObserverPriority-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let historical = Self.automaticScope(.activitySummary)
+        let current = Self.currentDayScope(.activitySummary)
+        let query = MockQueryClient(results: [
+            Self.dailyActivityResult(localDate: "2027-01-15", revision: 1, moveCalories: 0, cursorFingerprint: "today", exerciseMinutes: 0, standHours: 0),
+            Self.dailyActivityResult(localDate: "2027-01-14", revision: 1, moveCalories: 300, cursorFingerprint: "history"),
+        ])
+        let uploader = MockUploader(modes: [
+            .accept,
+            .dailyCollision(localDate: "2027-01-14", received: 1, nextExpected: 4),
+        ])
+        let store = FileHealthKitSynchronizationStore(root: root)
+        let engine = HealthKitSynchronizationEngine(
+            queryClient: query, observerClient: MockObserverClient(), store: store, uploader: uploader,
+            featureGate: .enabled, now: { Self.now }
+        )
+        let completion = CompletionProbe()
+
+        await engine.handleObserverWake(scope: historical) { completion.markCompleted() }
+
+        let bounds = (await query.receivedBounds()).compactMap { $0 }
+        let currentCursor = try await store.authoritativeCursor(for: current)
+        let historyFloors = try await store.dailyRevisionFloors(for: historical)
+        XCTAssertTrue(completion.isCompleted)
+        XCTAssertEqual(bounds.map(\.startLocalDate), ["2027-01-15", "2026-12-16"])
+        XCTAssertEqual(bounds.map(\.endLocalDate), ["2027-01-15", "2027-01-14"])
+        XCTAssertNotNil(currentCursor)
+        XCTAssertEqual(historyFloors, ["2027-01-14": 4])
+    }
+
+    func testCurrentDayCollisionRebasesAndRetriesExactlyOnce() async throws {
+        let first = Self.dailyActivityResult(
+            localDate: "2027-01-15", revision: 1, moveCalories: 100, cursorFingerprint: "stale"
+        )
+        let second = Self.dailyActivityResult(
+            localDate: "2027-01-15", revision: 6, moveCalories: 100, cursorFingerprint: "rebased"
+        )
+        let harness = try Harness(
+            stream: .activitySummary,
+            gate: .enabled,
+            queryResults: [first, second],
+            uploadModes: [.dailyCollision(localDate: "2027-01-15", received: 1, nextExpected: 6), .accept],
+            predicateVersion: HealthKitAutomaticSynchronizationCoordinator.currentDayPredicateVersion
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+
+        try await harness.engine.synchronizeCurrentDay(scope: harness.scope, calendar: calendar)
+
+        let queryCount = await harness.query.callCount()
+        let uploadedRevisions = await harness.uploader.receivedDailyRevisions()
+        let floors = try await harness.store.dailyRevisionFloors(for: harness.scope)
+        let pending = try await harness.store.pendingBatches(for: harness.scope)
+        XCTAssertEqual(queryCount, 2)
+        XCTAssertEqual(uploadedRevisions, [1, 6])
+        XCTAssertEqual(floors, [:])
+        XCTAssertTrue(pending.isEmpty)
+    }
+
+    func testHistoricalCollisionStateCannotPoisonCurrentDayScope() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSCurrentIsolation-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = FileHealthKitSynchronizationStore(root: root)
+        let query = MockQueryClient(results: [
+            Self.dailyActivityResult(localDate: "2027-01-14", revision: 1, moveCalories: 300, cursorFingerprint: "history"),
+            Self.dailyActivityResult(localDate: "2027-01-15", revision: 1, moveCalories: 0, cursorFingerprint: "today"),
+        ])
+        let uploader = MockUploader(modes: [
+            .dailyCollision(localDate: "2027-01-14", received: 1, nextExpected: 9),
+            .accept,
+        ])
+        let engine = HealthKitSynchronizationEngine(
+            queryClient: query, observerClient: MockObserverClient(), store: store,
+            uploader: uploader, featureGate: .enabled, now: { Self.now }
+        )
+        let historical = Self.automaticScope(.activitySummary)
+        let current = Self.currentDayScope(.activitySummary)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+
+        await XCTAssertThrowsErrorAsync {
+            try await engine.synchronizeHistoricalCatchUp(scope: historical, calendar: calendar)
+        }
+        try await engine.synchronizeCurrentDay(scope: current, calendar: calendar)
+
+        let historicalFloors = try await store.dailyRevisionFloors(for: historical)
+        let currentFloors = try await store.dailyRevisionFloors(for: current)
+        let currentCursor = try await store.authoritativeCursor(for: current)
+        let externalIDs = await uploader.receivedExternalIDs()
+        XCTAssertEqual(historicalFloors, ["2027-01-14": 9])
+        XCTAssertEqual(currentFloors, [:])
+        XCTAssertNotNil(currentCursor)
+        XCTAssertEqual(externalIDs.last, "activity-summary:automatic:2027-01-15")
+    }
+
+    func testPersistedHistoricalPendingBatchDoesNotBlockCurrentDayAfterRelaunch() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSCurrentRelaunch-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let historical = Self.automaticScope(.activitySummary)
+        let current = Self.currentDayScope(.activitySummary)
+        let firstStore = FileHealthKitSynchronizationStore(root: root)
+        let historyEngine = HealthKitSynchronizationEngine(
+            queryClient: MockQueryClient(results: [Self.dailyActivityResult(
+                localDate: "2027-01-14", revision: 1, moveCalories: 320, cursorFingerprint: "pending"
+            )]),
+            observerClient: MockObserverClient(), store: firstStore, uploader: MockUploader(modes: []),
+            featureGate: .queryOnly, now: { Self.now }
+        )
+        try await historyEngine.synchronize(scope: historical)
+        let originalHistoricalPending = try await firstStore.pendingBatches(for: historical)
+        XCTAssertEqual(originalHistoricalPending.count, 1)
+
+        let reopened = FileHealthKitSynchronizationStore(root: root)
+        let uploader = MockUploader(modes: [.accept])
+        let currentEngine = HealthKitSynchronizationEngine(
+            queryClient: MockQueryClient(results: [Self.dailyActivityResult(
+                localDate: "2027-01-15", revision: 1, moveCalories: 0, cursorFingerprint: "today"
+            )]),
+            observerClient: MockObserverClient(), store: reopened, uploader: uploader,
+            featureGate: .enabled, now: { Self.now }
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        try await currentEngine.synchronizeCurrentDay(scope: current, calendar: calendar)
+
+        let historicalPending = try await reopened.pendingBatches(for: historical)
+        let currentPending = try await reopened.pendingBatches(for: current)
+        let externalIDs = await uploader.receivedExternalIDs()
+        XCTAssertEqual(historicalPending.count, 1)
+        XCTAssertTrue(currentPending.isEmpty)
+        XCTAssertEqual(externalIDs, ["activity-summary:automatic:2027-01-15"])
+    }
+
+    func testCurrentDayOfflinePendingResumesWithoutASecondQuery() async throws {
+        let result = Self.dailyActivityResult(
+            localDate: "2027-01-15", revision: 1, moveCalories: 0, cursorFingerprint: "offline"
+        )
+        let harness = try Harness(
+            stream: .activitySummary,
+            gate: .enabled,
+            queryResults: [result],
+            uploadModes: [.transient, .accept],
+            predicateVersion: HealthKitAutomaticSynchronizationCoordinator.currentDayPredicateVersion
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+
+        try await harness.engine.synchronizeCurrentDay(scope: harness.scope, calendar: calendar)
+        let pendingOffline = try await harness.store.pendingBatches(for: harness.scope)
+        XCTAssertEqual(pendingOffline.count, 1)
+        try await harness.engine.synchronizeCurrentDay(scope: harness.scope, calendar: calendar)
+
+        let queryCount = await harness.query.callCount()
+        let uploadCount = await harness.uploader.receivedCount()
+        let pendingAfterReconnect = try await harness.store.pendingBatches(for: harness.scope)
+        XCTAssertEqual(queryCount, 1)
+        XCTAssertEqual(uploadCount, 2)
+        XCTAssertTrue(pendingAfterReconnect.isEmpty)
+    }
+
+    func testCurrentAndHistoricalBoundsHonorLocalTimezoneRolloverWithoutBackfillExpansion() throws {
+        let instant = ISO8601DateFormatter().date(from: "2026-09-24T04:30:00Z")!
+        var texas = Calendar(identifier: .gregorian)
+        texas.timeZone = TimeZone(identifier: "America/Chicago")!
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+
+        let texasCurrent = try HealthKitSynchronizationEngine.currentDayBounds(at: instant, calendar: texas)
+        let utcCurrent = try HealthKitSynchronizationEngine.currentDayBounds(at: instant, calendar: utc)
+        let texasHistory = try HealthKitSynchronizationEngine.historicalCatchUpBounds(at: instant, calendar: texas)
+
+        XCTAssertEqual(texasCurrent.startLocalDate, "2026-09-23")
+        XCTAssertEqual(utcCurrent.startLocalDate, "2026-09-24")
+        XCTAssertEqual(texasHistory.startLocalDate, "2026-08-24")
+        XCTAssertEqual(texasHistory.endLocalDate, "2026-09-22")
+        XCTAssertEqual(
+            texas.dateComponents([.day], from: texasHistory.startDateInclusive, to: texasHistory.endDateExclusive).day,
+            30
+        )
+    }
+
+    func testSeptember23RepairDryRunReadsOnlyExactActivityDayAcceptsZerosAndUploadsNothing() async throws {
+        let zero = Self.dailyActivityResult(
+            localDate: "2026-09-23", revision: 1, moveCalories: 0,
+            cursorFingerprint: "zero", exerciseMinutes: 0, standHours: 0
+        )
+        let query = MockQueryClient(results: [zero])
+        let uploader = MockUploader(modes: [])
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSRepairDryRun-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = HealthKitSynchronizationEngine(
+            queryClient: query, observerClient: MockObserverClient(),
+            store: FileHealthKitSynchronizationStore(root: root), uploader: uploader,
+            featureGate: .enabled, now: { Self.now }
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Chicago")!
+
+        let result = try await engine.dryRunSeptember23ActivityRepair(
+            scope: Self.september23RepairScope(), calendar: calendar
+        )
+
+        XCTAssertEqual(result.localDate, "2026-09-23")
+        XCTAssertEqual(result.dailyActivity.values.reduce(0, +), 0)
+        XCTAssertEqual(result.predictedMutation, .exact)
+        XCTAssertFalse(result.aggregateDigest.isEmpty)
+        let uploadCount = await uploader.receivedCount()
+        let streams = await query.receivedStreams()
+        let receivedBounds = await query.receivedBounds()
+        XCTAssertEqual(uploadCount, 0)
+        XCTAssertEqual(streams, [.activitySummary])
+        let bounds = try XCTUnwrap(receivedBounds.first ?? nil)
+        XCTAssertEqual(bounds.startLocalDate, "2026-09-23")
+        XCTAssertEqual(bounds.endLocalDate, "2026-09-23")
+        XCTAssertEqual(bounds.timeZoneIdentifier, "America/Chicago")
+    }
+
+    func testSeptember23RepairWrongScopeAndMissingAuthorizationRefuseBeforeQuery() async throws {
+        let query = MockQueryClient(results: [])
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSRepairRefusal-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = HealthKitSynchronizationEngine(
+            queryClient: query, observerClient: MockObserverClient(),
+            store: FileHealthKitSynchronizationStore(root: root), uploader: MockUploader(modes: []),
+            featureGate: .enabled, now: { Self.now }
+        )
+
+        let invalidScopes = [
+            Self.currentDayScope(.activitySummary),
+            HealthKitCursorScope(
+                ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a", stream: .activitySummary,
+                predicateVersion: "healthkit-automatic-sep23-activity-repair-v1:2026-09-22"
+            ),
+            HealthKitCursorScope(
+                ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a", stream: .nutritionDailyTotal,
+                predicateVersion: HealthKitSeptember23ActivityRepairContract.predicateVersion
+            ),
+        ]
+        for scope in invalidScopes {
+            do {
+                _ = try await engine.dryRunSeptember23ActivityRepair(scope: scope)
+                XCTFail("wrong date, namespace, or stream must refuse")
+            } catch let error as HealthKitCanaryError {
+                XCTAssertEqual(error, .september23RepairBoundaryViolation)
+            }
+        }
+        do {
+            _ = try await engine.applySeptember23ActivityRepair(
+                scope: Self.september23RepairScope(), authorization: nil
+            )
+            XCTFail("missing authorization must refuse")
+        } catch let error as HealthKitCanaryError {
+            XCTAssertEqual(error, .september23RepairApplyNotAuthorized)
+        }
+        let queryCount = await query.callCount()
+        XCTAssertEqual(queryCount, 0)
+    }
+
+    func testSeptember23RepairFrozenServerFactDriftRefusesBeforeQueryOrUpload() async throws {
+        let query = MockQueryClient(results: [])
+        let uploader = MockUploader(modes: [])
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSRepairAuthority-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = HealthKitSynchronizationEngine(
+            queryClient: query, observerClient: MockObserverClient(),
+            store: FileHealthKitSynchronizationStore(root: root), uploader: uploader,
+            featureGate: .enabled, now: { Self.now }
+        )
+        let driftedFacts = [
+            Self.september23ServerFacts(canonicalDayCount: 2),
+            Self.september23ServerFacts(canonicalRevision: 51),
+            Self.september23ServerFacts(runtimeSHA: "unexpected-runtime"),
+            Self.september23ServerFacts(dailyPolicyDigest: "unexpected-policy"),
+            Self.september23ServerFacts(september24ActivityCanonicalDayCount: 1),
+        ]
+        for facts in driftedFacts {
+            let authorization = HealthKitSeptember23ActivityRepairAuthorization(
+                contractVersion: HealthKitSeptember23ActivityRepairContract.contractVersion,
+                approvedAggregateDigest: "approved",
+                serverFacts: facts
+            )
+            do {
+                _ = try await engine.applySeptember23ActivityRepair(
+                    scope: Self.september23RepairScope(), authorization: authorization
+                )
+                XCTFail("duplicate, revision, authority, policy, or Sep 24 drift must refuse")
+            } catch let error as HealthKitCanaryError {
+                XCTAssertEqual(error, .september23RepairAuthorityDrift)
+            }
+        }
+        let queryCount = await query.callCount()
+        let uploadCount = await uploader.receivedCount()
+        XCTAssertEqual(queryCount, 0)
+        XCTAssertEqual(uploadCount, 0)
+    }
+
+    func testSeptember23RepairRefusesAnyExtraDateDeletionOrUnrelatedObservation() async throws {
+        let september23 = Self.dailyActivityResult(
+            localDate: "2026-09-23", revision: 1, moveCalories: 400, cursorFingerprint: "base"
+        )
+        let september24 = Self.dailyActivityResult(
+            localDate: "2026-09-24", revision: 1, moveCalories: 0, cursorFingerprint: "other",
+            exerciseMinutes: 0, standHours: 0
+        )
+        let mixed = HealthKitAnchoredQueryResult(
+            additions: september23.additions + september24.additions,
+            deletions: [], proposedAnchorData: september23.proposedAnchorData, completedAt: Self.now
+        )
+        let deleted = HealthKitAnchoredQueryResult(
+            additions: september23.additions,
+            deletions: [HealthKitQueryDeletion(
+                healthKitUUID: UUID(), immutableExternalID: "activity-summary:automatic:2026-09-23",
+                objectTypeIdentifier: HealthKitSynchronizationStream.activitySummary.objectTypeIdentifier
+            )],
+            proposedAnchorData: september23.proposedAnchorData, completedAt: Self.now
+        )
+        for result in [mixed, deleted] {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("PhysiqueOSRepairUnrelated-\(UUID().uuidString)", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let query = MockQueryClient(results: [result])
+            let uploader = MockUploader(modes: [])
+            let engine = HealthKitSynchronizationEngine(
+                queryClient: query, observerClient: MockObserverClient(),
+                store: FileHealthKitSynchronizationStore(root: root), uploader: uploader,
+                featureGate: .enabled, now: { Self.now }
+            )
+            do {
+                _ = try await engine.dryRunSeptember23ActivityRepair(scope: Self.september23RepairScope())
+                XCTFail("extra date or deletion must refuse")
+            } catch let error as HealthKitCanaryError {
+                XCTAssertEqual(error, .september23RepairAggregateMissing)
+            }
+            let uploadCount = await uploader.receivedCount()
+            XCTAssertEqual(uploadCount, 0)
+        }
+    }
+
+    func testSeptember23RepairDigestDriftRefusesBeforeAnyUpload() async throws {
+        let approvedResult = Self.dailyActivityResult(
+            localDate: "2026-09-23", revision: 1, moveCalories: 400, cursorFingerprint: "approved"
+        )
+        let changedResult = Self.dailyActivityResult(
+            localDate: "2026-09-23", revision: 1, moveCalories: 401, cursorFingerprint: "changed"
+        )
+        let approved = try await Self.repairDryRun(for: approvedResult)
+        let query = MockQueryClient(results: [changedResult])
+        let uploader = MockUploader(modes: [])
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSRepairDigest-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = HealthKitSynchronizationEngine(
+            queryClient: query, observerClient: MockObserverClient(),
+            store: FileHealthKitSynchronizationStore(root: root), uploader: uploader,
+            featureGate: .enabled, now: { Self.now }
+        )
+
+        do {
+            _ = try await engine.applySeptember23ActivityRepair(
+                scope: Self.september23RepairScope(),
+                authorization: Self.september23Authorization(digest: approved.aggregateDigest)
+            )
+            XCTFail("digest drift must refuse")
+        } catch let error as HealthKitCanaryError {
+            XCTAssertEqual(error, .september23RepairAggregateDrift)
+        }
+        let uploadCount = await uploader.receivedCount()
+        XCTAssertEqual(uploadCount, 0)
+    }
+
+    func testSeptember23RepairRejectsUnexpectedNextRevisionAfterOneRequest() async throws {
+        let first = Self.dailyActivityResult(
+            localDate: "2026-09-23", revision: 1, moveCalories: 400, cursorFingerprint: "first"
+        )
+        let approved = try await Self.repairDryRun(for: first)
+        let query = MockQueryClient(results: [first])
+        let uploader = MockUploader(modes: [
+            .dailyCollision(localDate: "2026-09-23", received: 1, nextExpected: 52),
+        ])
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSRepairRevision-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = FileHealthKitSynchronizationStore(root: root)
+        let engine = HealthKitSynchronizationEngine(
+            queryClient: query, observerClient: MockObserverClient(), store: store, uploader: uploader,
+            featureGate: .enabled, now: { Self.now }
+        )
+
+        do {
+            _ = try await engine.applySeptember23ActivityRepair(
+                scope: Self.september23RepairScope(),
+                authorization: Self.september23Authorization(digest: approved.aggregateDigest)
+            )
+            XCTFail("unexpected next revision must refuse")
+        } catch let error as HealthKitCanaryError {
+            XCTAssertEqual(error, .september23RepairRevisionMismatch)
+        }
+        let uploadCount = await uploader.receivedCount()
+        let queryCount = await query.callCount()
+        let floors = try await store.dailyRevisionFloors(for: Self.september23RepairScope())
+        XCTAssertEqual(uploadCount, 1)
+        XCTAssertEqual(queryCount, 1)
+        XCTAssertEqual(floors, [:])
+    }
+
+    func testSeptember23RepairExactFixtureUsesOnlyTwoSep23RequestsAndPredictsFiftyOne() async throws {
+        let first = Self.dailyActivityResult(
+            localDate: "2026-09-23", revision: 1, moveCalories: 400, cursorFingerprint: "first"
+        )
+        let rebased = Self.dailyActivityResult(
+            localDate: "2026-09-23", revision: 51, moveCalories: 400, cursorFingerprint: "rebased"
+        )
+        let approved = try await Self.repairDryRun(for: first)
+        let query = MockQueryClient(results: [first, rebased])
+        let uploader = MockUploader(modes: [
+            .dailyCollision(localDate: "2026-09-23", received: 1, nextExpected: 51),
+            .accept,
+        ])
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSRepairSuccess-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = FileHealthKitSynchronizationStore(root: root)
+        let engine = HealthKitSynchronizationEngine(
+            queryClient: query, observerClient: MockObserverClient(), store: store, uploader: uploader,
+            featureGate: .enabled, now: { Self.now }
+        )
+
+        let result = try await engine.applySeptember23ActivityRepair(
+            scope: Self.september23RepairScope(),
+            authorization: Self.september23Authorization(digest: approved.aggregateDigest)
+        )
+
+        XCTAssertEqual(result.requestCount, 2)
+        XCTAssertEqual(result.prediction.canonicalRevisionAfter, 51)
+        XCTAssertEqual(result.prediction.sourceObservationCountAfter, 51)
+        XCTAssertEqual(result.prediction.historyCountAfter, 50)
+        let queryCount = await query.callCount()
+        let streams = await query.receivedStreams()
+        let bounds = await query.receivedBounds()
+        let externalIDs = await uploader.receivedExternalIDs()
+        let uploadedRevisions = await uploader.receivedDailyRevisions()
+        let floors = try await store.dailyRevisionFloors(for: Self.september23RepairScope())
+        let pending = try await store.pendingBatches(for: Self.september23RepairScope())
+        XCTAssertEqual(queryCount, 2)
+        XCTAssertEqual(streams, [.activitySummary, .activitySummary])
+        XCTAssertTrue(bounds.compactMap { $0 }.allSatisfy {
+            $0.startLocalDate == "2026-09-23" && $0.endLocalDate == "2026-09-23"
+        })
+        XCTAssertEqual(externalIDs, ["activity-summary:automatic:2026-09-23", "activity-summary:automatic:2026-09-23"])
+        XCTAssertEqual(uploadedRevisions, [1, 51])
+        XCTAssertEqual(floors, [:])
+        XCTAssertTrue(pending.isEmpty)
+    }
+
     func testProtectedDataReadFailureDoesNotQuarantineOrResetDurableState() async throws {
         let harness = try Harness(stream: .activeEnergy, gate: .queryOnly)
         try await harness.engine.synchronize(scope: harness.scope)
@@ -530,22 +1055,26 @@ final class HealthKitSynchronizationTests: XCTestCase {
         )
     }
 
-    /// All four known callers -- canary (stays un-namespaced: the original
-    /// V1-compatible format every other caller must now avoid), canonical
-    /// test day, automatic, and Workout canary -- resolve to distinct,
-    /// non-colliding identity spaces. Registering a caller here is what
-    /// makes it exempt from the Build 51/52 collision class; this test
-    /// exists so adding a fifth caller without registering it here changes
-    /// this test's own list and forces the question to be asked.
-    func testAllFourKnownPredicateVersionsProduceDistinctNamespaces() {
+    /// The current-day and one-shot repair scopes deliberately share the
+    /// established automatic wire namespace while retaining separate local
+    /// cursor/pending state. Canary/test-day/workout-canary remain distinct.
+    func testKnownPredicateVersionsUseOnlyTheirIntendedIdentityNamespaces() {
         let canary = HealthKitBatchBuilder.externalIDNamespace(for: "healthkit-activity-validation-only-v1:2026-09-22:2026-09-22")
         let testDay = HealthKitBatchBuilder.externalIDNamespace(for: "healthkit-canonical-testday-v1:2026-09-22")
         let workoutCanary = HealthKitBatchBuilder.externalIDNamespace(for: "healthkit-workout-canary-v1:2026-09-22")
         let automatic = HealthKitBatchBuilder.externalIDNamespace(for: HealthKitAutomaticSynchronizationCoordinator.predicateVersion)
+        let current = HealthKitBatchBuilder.externalIDNamespace(
+            for: HealthKitAutomaticSynchronizationCoordinator.currentDayPredicateVersion
+        )
+        let repair = HealthKitBatchBuilder.externalIDNamespace(
+            for: HealthKitSeptember23ActivityRepairContract.predicateVersion
+        )
         XCTAssertEqual(canary, nil)
         XCTAssertEqual(testDay, "testday")
         XCTAssertEqual(workoutCanary, "workoutcanary")
         XCTAssertEqual(automatic, "automatic")
+        XCTAssertEqual(current, automatic)
+        XCTAssertEqual(repair, automatic)
         let registered = [testDay, workoutCanary, automatic].compactMap { $0 }
         XCTAssertEqual(registered.count, Set(registered).count, "every registered namespace must be pairwise distinct")
     }
@@ -884,6 +1413,73 @@ final class HealthKitSynchronizationTests: XCTestCase {
         )
     }
 
+    private static func automaticScope(_ stream: HealthKitSynchronizationStream) -> HealthKitCursorScope {
+        HealthKitCursorScope(
+            ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a", stream: stream,
+            predicateVersion: HealthKitAutomaticSynchronizationCoordinator.predicateVersion
+        )
+    }
+
+    private static func currentDayScope(_ stream: HealthKitSynchronizationStream) -> HealthKitCursorScope {
+        HealthKitCursorScope(
+            ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a", stream: stream,
+            predicateVersion: HealthKitAutomaticSynchronizationCoordinator.currentDayPredicateVersion
+        )
+    }
+
+    private static func september23RepairScope() -> HealthKitCursorScope {
+        HealthKitCursorScope(
+            ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a", stream: .activitySummary,
+            predicateVersion: HealthKitSeptember23ActivityRepairContract.predicateVersion
+        )
+    }
+
+    private static func september23ServerFacts(
+        runtimeSHA: String = HealthKitSeptember23ActivityRepairContract.productionServerSHA,
+        dailyPolicyDigest: String = HealthKitSeptember23ActivityRepairContract.dailyPolicyDigest,
+        canonicalDayCount: Int = HealthKitSeptember23ActivityRepairContract.expectedCanonicalDayCount,
+        canonicalRevision: UInt64 = HealthKitSeptember23ActivityRepairContract.expectedCurrentRevision,
+        canonicalSourceRevision: UInt64 = HealthKitSeptember23ActivityRepairContract.expectedCurrentSourceRevision,
+        sourceObservationCount: Int = HealthKitSeptember23ActivityRepairContract.expectedSourceObservationCount,
+        historyCount: Int = HealthKitSeptember23ActivityRepairContract.expectedHistoryCount,
+        september24ActivityCanonicalDayCount: Int = 0
+    ) -> HealthKitSeptember23ActivityRepairServerFacts {
+        HealthKitSeptember23ActivityRepairServerFacts(
+            runtimeSHA: runtimeSHA,
+            dailyPolicyDigest: dailyPolicyDigest,
+            canonicalDayCount: canonicalDayCount,
+            canonicalRevision: canonicalRevision,
+            canonicalSourceRevision: canonicalSourceRevision,
+            sourceObservationCount: sourceObservationCount,
+            historyCount: historyCount,
+            september24ActivityCanonicalDayCount: september24ActivityCanonicalDayCount
+        )
+    }
+
+    private static func september23Authorization(
+        digest: String
+    ) -> HealthKitSeptember23ActivityRepairAuthorization {
+        HealthKitSeptember23ActivityRepairAuthorization(
+            contractVersion: HealthKitSeptember23ActivityRepairContract.contractVersion,
+            approvedAggregateDigest: digest,
+            serverFacts: september23ServerFacts()
+        )
+    }
+
+    private static func repairDryRun(
+        for result: HealthKitAnchoredQueryResult
+    ) async throws -> HealthKitSeptember23ActivityRepairDryRun {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSRepairDigestSeed-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = HealthKitSynchronizationEngine(
+            queryClient: MockQueryClient(results: [result]), observerClient: MockObserverClient(),
+            store: FileHealthKitSynchronizationStore(root: root), uploader: MockUploader(modes: []),
+            featureGate: .enabled, now: { Self.now }
+        )
+        return try await engine.dryRunSeptember23ActivityRepair(scope: september23RepairScope())
+    }
+
     fileprivate static func quantityResult(anchor: String, _ uuid: UUID) -> HealthKitAnchoredQueryResult {
         HealthKitAnchoredQueryResult(
             additions: [quantityAddition(uuid)], deletions: [],
@@ -904,6 +1500,29 @@ final class HealthKitSynchronizationTests: XCTestCase {
                 moveCalories: moveCalories,
                 revision: revision,
                 localDate: "2026-09-23"
+            )],
+            deletions: [], proposedAnchorData: cursor, completedAt: now
+        )
+    }
+
+    fileprivate static func dailyActivityResult(
+        localDate: String,
+        revision: UInt64,
+        moveCalories: Double,
+        cursorFingerprint: String,
+        exerciseMinutes: Double = 30,
+        standHours: Double = 10
+    ) -> HealthKitAnchoredQueryResult {
+        let cursor = try! JSONSerialization.data(withJSONObject: [
+            "entries": [localDate: ["fingerprint": cursorFingerprint, "revision": revision]],
+        ], options: [.sortedKeys])
+        return HealthKitAnchoredQueryResult(
+            additions: [activitySummaryAddition(
+                moveCalories: moveCalories,
+                revision: revision,
+                localDate: localDate,
+                exerciseMinutes: exerciseMinutes,
+                standHours: standHours
             )],
             deletions: [], proposedAnchorData: cursor, completedAt: now
         )
@@ -945,6 +1564,43 @@ final class HealthKitSynchronizationTests: XCTestCase {
         )
     }
 
+    fileprivate static func dailyNutritionResult(
+        localDate: String,
+        revision: UInt64,
+        calories: Double,
+        protein: Double,
+        cursorFingerprint: String
+    ) -> HealthKitAnchoredQueryResult {
+        let start = ISO8601DateFormatter().date(from: "\(localDate)T08:00:00Z") ?? now
+        let cursor = try! JSONSerialization.data(withJSONObject: [
+            "entries": [localDate: ["fingerprint": cursorFingerprint, "revision": revision]],
+        ], options: [.sortedKeys])
+        let addition = HealthKitQueryAddition(
+            healthKitUUID: nil,
+            objectTypeIdentifier: HealthKitSynchronizationStream.nutritionDailyTotal.objectTypeIdentifier,
+            source: HealthKitQuerySource(
+                bundleIdentifier: "com.apple.Health", sourceName: "Apple Health", sourceRevision: nil,
+                productType: nil, privacySafeDeviceProvenance: nil
+            ),
+            occurrence: HealthKitQueryOccurrence(
+                startedAt: nil, endedAt: nil, localDate: localDate,
+                calendarIdentifier: "gregorian", timeZoneIdentifier: "America/Los_Angeles",
+                utcOffsetSeconds: -28_800, localDayStartedAt: start,
+                localDayEndedAt: start.addingTimeInterval(86_400)
+            ),
+            payload: .nutritionDailyTotal(HealthKitQueryNutritionDailyTotal(
+                dailyNutrition: ["calories": calories, "protein_g": protein],
+                aggregationScope: HealthKitQueryNutritionDailyTotal.aggregationScope,
+                coverage: .completeDay,
+                sourceRevision: revision
+            )),
+            allowlistedMetadata: [:]
+        )
+        return HealthKitAnchoredQueryResult(
+            additions: [addition], deletions: [], proposedAnchorData: cursor, completedAt: now
+        )
+    }
+
     private static func quantityAddition(
         _ uuid: UUID,
         bundle: String = "com.apple.Health",
@@ -970,11 +1626,11 @@ final class HealthKitSynchronizationTests: XCTestCase {
     private static func activitySummaryAddition(
         moveCalories: Double,
         revision: UInt64 = 1,
-        localDate: String = "2027-01-15"
+        localDate: String = "2027-01-15",
+        exerciseMinutes: Double = 30,
+        standHours: Double = 10
     ) -> HealthKitQueryAddition {
-        let start = localDate == "2026-09-23"
-            ? ISO8601DateFormatter().date(from: "2026-09-23T07:00:00Z")!
-            : now
+        let start = ISO8601DateFormatter().date(from: "\(localDate)T08:00:00Z") ?? now
         return HealthKitQueryAddition(
             healthKitUUID: nil,
             objectTypeIdentifier: HealthKitSynchronizationStream.activitySummary.objectTypeIdentifier,
@@ -989,7 +1645,11 @@ final class HealthKitSynchronizationTests: XCTestCase {
                 localDayEndedAt: start.addingTimeInterval(86_400)
             ),
             payload: .activitySummary(HealthKitQueryActivitySummary(
-                dailyActivity: ["move_calories": moveCalories, "exercise_minutes": 30, "stand_hours": 10],
+                dailyActivity: [
+                    "move_calories": moveCalories,
+                    "exercise_minutes": exerciseMinutes,
+                    "stand_hours": standHours,
+                ],
                 aggregationScope: "daily_total_including_workouts", coverage: .completeDay, sourceRevision: revision
             )),
             allowlistedMetadata: [:]
@@ -1048,13 +1708,14 @@ private final class Harness {
         stream: HealthKitSynchronizationStream,
         gate: HealthKitFeatureGate,
         queryResults: [HealthKitAnchoredQueryResult]? = nil,
-        uploadModes: [MockUploader.Mode] = []
+        uploadModes: [MockUploader.Mode] = [],
+        predicateVersion: String = "healthkit-sync-v1"
     ) throws {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent("PhysiqueOSHealthKitTests-\(UUID().uuidString)", isDirectory: true)
         scope = HealthKitCursorScope(
             ownerIdentity: "owner-a", enrolledDeviceIdentity: "device-a",
-            stream: stream, predicateVersion: "healthkit-sync-v1"
+            stream: stream, predicateVersion: predicateVersion
         )
         store = FileHealthKitSynchronizationStore(root: root)
         query = MockQueryClient(results: queryResults ?? [HealthKitSynchronizationTests.quantityResult(
@@ -1081,6 +1742,8 @@ private extension HealthKitFeatureGate {
 private actor MockQueryClient: HealthKitAnchoredQueryClient {
     private var results: [HealthKitAnchoredQueryResult]
     private var anchors: [Data?] = []
+    private var bounds: [HealthKitQueryBounds?] = []
+    private var streams: [HealthKitSynchronizationStream] = []
 
     init(results: [HealthKitAnchoredQueryResult]) { self.results = results }
 
@@ -1090,12 +1753,16 @@ private actor MockQueryClient: HealthKitAnchoredQueryClient {
         bounds: HealthKitQueryBounds?
     ) async throws -> HealthKitAnchoredQueryResult {
         anchors.append(anchorData)
+        self.bounds.append(bounds)
+        streams.append(stream)
         guard !results.isEmpty else { throw HealthKitSyncError.operational(code: "mock_query_exhausted") }
         return results.removeFirst()
     }
 
     func callCount() -> Int { anchors.count }
     func receivedAnchors() -> [Data?] { anchors }
+    func receivedBounds() -> [HealthKitQueryBounds?] { bounds }
+    func receivedStreams() -> [HealthKitSynchronizationStream] { streams }
 }
 
 private final class MockObserverClient: HealthKitObserverClient, @unchecked Sendable {
@@ -1135,6 +1802,7 @@ private actor MockUploader: HealthKitObservationUploader {
         case reject
         case dailyCollision(
             observationType: HealthKitS1ObservationType = .activitySummary,
+            localDate: String = "2026-09-23",
             received: UInt64,
             nextExpected: UInt64
         )
@@ -1162,12 +1830,12 @@ private actor MockUploader: HealthKitObservationUploader {
             return .transientFailure(code: "synthetic_lost_ack")
         case .reject:
             return .rejected(code: "synthetic_rejection")
-        case let .dailyCollision(observationType, received, nextExpected):
+        case let .dailyCollision(observationType, localDate, received, nextExpected):
             return .rejected(
                 code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
                 recovery: HealthKitDailyRevisionRecovery(
                     observationType: observationType,
-                    localDate: "2026-09-23",
+                    localDate: localDate,
                     receivedSourceRevision: received,
                     nextExpectedRevision: nextExpected,
                     identityDigest: String(repeating: "a", count: 64)
@@ -1187,6 +1855,9 @@ private actor MockUploader: HealthKitObservationUploader {
             default: nil
             }
         }
+    }
+    func receivedExternalIDs() -> [String] {
+        received.flatMap(\.additions).map(\.immutableExternalID)
     }
     func observedCompletionBeforeUpload() -> Bool { sawCompletedBeforeUpload }
 }

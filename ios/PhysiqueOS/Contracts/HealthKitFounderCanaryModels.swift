@@ -116,6 +116,112 @@ struct HealthKitCanonicalTestDay: Equatable, Sendable {
     }
 }
 
+/// Temporary, deliberately non-generic operational contract for repairing
+/// the one stale September 23 Activity canonical day. It is separate from
+/// automatic current-day synchronization and cannot be pointed at another
+/// date or stream.
+struct HealthKitSeptember23ActivityRepairContract: Equatable, Sendable {
+    static let localDate = "2026-09-23"
+    static let predicateVersion = "healthkit-automatic-sep23-activity-repair-v1:2026-09-23"
+    static let contractVersion = "healthkit-sep23-activity-repair-v1"
+    static let productionServerSHA = "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d"
+    static let dailyPolicyDigest = "d5f0b571b6c046be9710a0551a6d4d230b249eb4088f79878f2647d3b5c40586"
+    static let expectedCanonicalDayCount = 1
+    static let expectedCurrentRevision: UInt64 = 50
+    static let expectedCurrentSourceRevision: UInt64 = 50
+    static let expectedSourceObservationCount = 50
+    static let expectedHistoryCount = 49
+    static let expectedNextRevision: UInt64 = 51
+    static let predictedSourceObservationCount = 51
+    static let predictedHistoryCount = 50
+    static let maximumApplyRequests = 2
+
+    static func queryBounds(calendar: Calendar) throws -> HealthKitQueryBounds {
+        try HealthKitActivityValidationWindow(startDate: localDate, endDate: localDate)
+            .queryBounds(calendar: calendar)
+    }
+}
+
+struct HealthKitSeptember23ActivityRepairPrediction: Equatable, Sendable {
+    let canonicalLocalDate: String
+    let canonicalRevisionBefore: UInt64
+    let canonicalRevisionAfter: UInt64
+    let sourceObservationCountBefore: Int
+    let sourceObservationCountAfter: Int
+    let historyCountBefore: Int
+    let historyCountAfter: Int
+    let maximumRequests: Int
+
+    static let exact = HealthKitSeptember23ActivityRepairPrediction(
+        canonicalLocalDate: HealthKitSeptember23ActivityRepairContract.localDate,
+        canonicalRevisionBefore: HealthKitSeptember23ActivityRepairContract.expectedCurrentRevision,
+        canonicalRevisionAfter: HealthKitSeptember23ActivityRepairContract.expectedNextRevision,
+        sourceObservationCountBefore: HealthKitSeptember23ActivityRepairContract.expectedSourceObservationCount,
+        sourceObservationCountAfter: HealthKitSeptember23ActivityRepairContract.predictedSourceObservationCount,
+        historyCountBefore: HealthKitSeptember23ActivityRepairContract.expectedHistoryCount,
+        historyCountAfter: HealthKitSeptember23ActivityRepairContract.predictedHistoryCount,
+        maximumRequests: HealthKitSeptember23ActivityRepairContract.maximumApplyRequests
+    )
+}
+
+struct HealthKitSeptember23ActivityRepairDryRun: Equatable, Sendable {
+    let localDate: String
+    let timeZoneIdentifier: String
+    let coverage: HealthKitQueryActivitySummary.Coverage
+    let dailyActivity: [String: Double]
+    let aggregateDigest: String
+    let predictedMutation: HealthKitSeptember23ActivityRepairPrediction
+}
+
+/// Facts a future authorized apply must obtain from a fresh Server preflight.
+/// Build 57 has no production API for these facts, so the shipped Founder UI
+/// cannot construct this value and APPLY remains unavailable.
+struct HealthKitSeptember23ActivityRepairServerFacts: Equatable, Sendable {
+    let runtimeSHA: String
+    let dailyPolicyDigest: String
+    let canonicalDayCount: Int
+    let canonicalRevision: UInt64
+    let canonicalSourceRevision: UInt64
+    let sourceObservationCount: Int
+    let historyCount: Int
+    let september24ActivityCanonicalDayCount: Int
+
+    var matchesFrozenContract: Bool {
+        runtimeSHA == HealthKitSeptember23ActivityRepairContract.productionServerSHA &&
+            dailyPolicyDigest == HealthKitSeptember23ActivityRepairContract.dailyPolicyDigest &&
+            canonicalDayCount == HealthKitSeptember23ActivityRepairContract.expectedCanonicalDayCount &&
+            canonicalRevision == HealthKitSeptember23ActivityRepairContract.expectedCurrentRevision &&
+            canonicalSourceRevision == HealthKitSeptember23ActivityRepairContract.expectedCurrentSourceRevision &&
+            sourceObservationCount == HealthKitSeptember23ActivityRepairContract.expectedSourceObservationCount &&
+            historyCount == HealthKitSeptember23ActivityRepairContract.expectedHistoryCount &&
+            september24ActivityCanonicalDayCount == 0
+    }
+}
+
+/// Explicit capability value for the future, separately authorized apply.
+/// No production factory or UI path creates one in this candidate.
+struct HealthKitSeptember23ActivityRepairAuthorization: Equatable, Sendable {
+    let contractVersion: String
+    let approvedAggregateDigest: String
+    let serverFacts: HealthKitSeptember23ActivityRepairServerFacts
+
+    init(
+        contractVersion: String,
+        approvedAggregateDigest: String,
+        serverFacts: HealthKitSeptember23ActivityRepairServerFacts
+    ) {
+        self.contractVersion = contractVersion
+        self.approvedAggregateDigest = approvedAggregateDigest
+        self.serverFacts = serverFacts
+    }
+}
+
+struct HealthKitSeptember23ActivityRepairApplyResult: Equatable, Sendable {
+    let aggregateDigest: String
+    let requestCount: Int
+    let prediction: HealthKitSeptember23ActivityRepairPrediction
+}
+
 /// One exact Founder-local day for the dormant Workout canary. Same shape and
 /// limits as the Activity + Nutrition test day: a single date, never a range,
 /// not in the future, at most a few days old. The Server alone decides whether
@@ -309,6 +415,12 @@ enum HealthKitCanaryError: Error, Equatable, Sendable, LocalizedError {
     case invalidCanonicalTestDay
     case canonicalTestDayUnsupported
     case workoutCanaryUnsupported
+    case september23RepairBoundaryViolation
+    case september23RepairAggregateMissing
+    case september23RepairApplyNotAuthorized
+    case september23RepairAuthorityDrift
+    case september23RepairAggregateDrift
+    case september23RepairRevisionMismatch
 
     var errorDescription: String? {
         switch self {
@@ -322,6 +434,12 @@ enum HealthKitCanaryError: Error, Equatable, Sendable, LocalizedError {
         case .invalidCanonicalTestDay: "Choose today or one of the last three local days for the canonical test day."
         case .canonicalTestDayUnsupported: "Founder Production does not advertise the controlled canonical test-day contract."
         case .workoutCanaryUnsupported: "Founder Production does not advertise the Workout canary contract."
+        case .september23RepairBoundaryViolation: "The one-shot repair is bound to September 23 Activity in the automatic namespace."
+        case .september23RepairAggregateMissing: "Apple Health did not return exactly one September 23 Activity aggregate."
+        case .september23RepairApplyNotAuthorized: "September 23 Activity repair APPLY is not authorized in this build."
+        case .september23RepairAuthorityDrift: "Server authority or frozen September 23 repair facts changed; apply was refused."
+        case .september23RepairAggregateDrift: "The September 23 Apple Health aggregate changed after dry-run; apply was refused."
+        case .september23RepairRevisionMismatch: "The Server revision recovery facts did not match the exact 50-to-51 repair contract."
         }
     }
 }
