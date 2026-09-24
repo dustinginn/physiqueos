@@ -25,7 +25,6 @@ import { readDatabaseConfig } from "../../platform/database/config.js";
 import { createPostgresPool } from "../../platform/database/pool.js";
 import { createPhase4CanonicalRecordStore } from "../../platform/database/Phase4CanonicalRecordStore.js";
 import { createHealthKitCanaryDiagnosticReadService } from "../native/HealthKitCanaryDiagnosticReadService.js";
-import { readBuildIdentity } from "../../platform/observability/buildIdentity.js";
 import { createPostgresProviderReadinessProbe } from "../../platform/database/ProviderReadinessProbe.js";
 import { readSpacesConfig } from "../../platform/object-storage/spacesConfig.js";
 import { createSpacesPrivateObjectProvider } from "../../platform/object-storage/SpacesPrivateObjectProvider.js";

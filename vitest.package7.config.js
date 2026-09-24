@@ -5,6 +5,8 @@ export default defineConfig({
     environment: "node",
     include: [
       "src/application/native/**/*.test.js",
+      "src/application/composition/productionApplicationComposition.test.js",
+      "src/application/composition/productionEsmSyntaxIntegrity.test.js",
       "src/app/api/v1/native/NativeProductionRoutes.test.js",
       "src/platform/auth/nativeFounderAuthRuntime.test.js",
       "src/platform/auth/FounderAuthService.test.js",
