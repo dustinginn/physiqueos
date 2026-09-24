@@ -401,8 +401,21 @@ struct BriefingConfidenceCard: View {
 struct BriefingCoachFinale: View {
     let takeaway: String
     let recommendation: String
+    /// Server-owned "What To Watch" text. Midweek's V3 contract has no
+    /// Through-Sunday priorities list, so this replaces it in place rather
+    /// than reusing legacy priority semantics. Weekly does not pass this
+    /// and is unaffected.
+    let watch: String?
     let actionTitle: String
     let actions: [String]
+
+    init(takeaway: String, recommendation: String, watch: String? = nil, actionTitle: String = "", actions: [String] = []) {
+        self.takeaway = takeaway
+        self.recommendation = recommendation
+        self.watch = watch
+        self.actionTitle = actionTitle
+        self.actions = actions
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -412,6 +425,10 @@ struct BriefingCoachFinale: View {
             finaleSection("💡 Biggest Takeaway", takeaway)
             Divider().overlay(Color.white.opacity(0.22))
             finaleSection("🧠 My Recommendation", recommendation)
+            if let watch, !watch.isEmpty {
+                Divider().overlay(Color.white.opacity(0.22))
+                finaleSection("👀 What To Watch", watch)
+            }
             if !actions.isEmpty {
                 Divider().overlay(Color.white.opacity(0.22))
                 Text("🎯 \(actionTitle)")

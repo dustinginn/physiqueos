@@ -316,6 +316,7 @@ struct BriefingTrainingResponseCard: View {
 struct WeeklyEnergyCard: View {
     let section: WeeklyEnergySection
     var showsDailySemanticRows = false
+    var showsChart = true
     @State private var selectedDate: String?
 
     var body: some View {
@@ -367,7 +368,8 @@ struct WeeklyEnergyCard: View {
                     energyMetric("Avg Balance", "\(section.averageBalanceKcal >= 0 ? "+" : "")\(section.averageBalanceKcal) kcal", color: PhysiqueOSTheme.textMuted)
                 }
                 Divider().overlay(PhysiqueOSTheme.divider)
-                if let dailyBalances = section.dailyBalances, !dailyBalances.isEmpty {
+                if showsChart, let dailyBalances = section.dailyBalances,
+                   !dailyBalances.isEmpty {
                     Text(section.chartTitle ?? "Daily intake vs estimated expenditure")
                         .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)

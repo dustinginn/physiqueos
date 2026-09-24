@@ -151,6 +151,139 @@ final class BriefingV3PresentationTests: XCTestCase {
         XCTAssertEqual(midweek.heroVerdict, "Server-owned midweek verdict")
     }
 
+    // MARK: Midweek — bound `midweek_presentation_contract_v1` (restored format standard)
+    //
+    // Production (Server `f8c28700`, contract candidate `28ac1e4f` in its
+    // lineage) always ships both a full legacy `narrativeV3` object AND a
+    // bound `presentationContract`; the contract is what Native renders.
+    // These fixtures mirror that exact double-shipped shape — never a
+    // contract-only simplification — so a regression that starts reading
+    // `narrativeV3` again would be caught here, not just in an unrealistic
+    // fixture.
+
+    func testMidweekContractDecodesGoalPhaseModuleOrderAndConfidenceBoundToAssessment() throws {
+        let midweek = try XCTUnwrap(try map(midweekContractEnvelope()).midweek)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+        XCTAssertEqual(contract.artifactId, "midweek-v3c")
+        XCTAssertEqual(contract.assessmentId, "assessment-midweek-v3c")
+        XCTAssertEqual(contract.lead.goal?.name, "Build Lean Mass")
+        XCTAssertEqual(contract.lead.phase?.name, "Lean Mass Build")
+        XCTAssertEqual(contract.modules.map(\.id), ["energy", "weight", "body_composition", "training", "recovery"])
+        XCTAssertEqual(contract.includedModuleIds, ["energy", "weight", "body_composition", "training"])
+        XCTAssertEqual(contract.lead.confidence?.assessmentId, "assessment-midweek-v3c")
+        XCTAssertEqual(contract.lead.confidence?.movementLabel, "— No meaningful change")
+    }
+
+    /// Regression for the exact production shape: contract `visibleItems`
+    /// carry NO `surfaced` field (unlike the broader legacy `uncertainty[]`
+    /// array). A moderate-materiality contract item must still render —
+    /// the Server already decided it belongs in `visibleItems`.
+    func testMidweekContractUncertaintyRendersWithoutSurfacedFieldAtModerateMateriality() throws {
+        let midweek = try XCTUnwrap(try map(midweekContractEnvelope()).midweek)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+        XCTAssertEqual(contract.uncertainty.visibleItems.map(\.materiality), ["moderate"])
+        XCTAssertEqual(contract.uncertainty.visibleItems.compactMap(\.presentableText), ["Intake uncertainty this window."])
+        let card = BriefingUncertaintyCard(items: contract.uncertainty.visibleItems)
+        XCTAssertEqual(card.texts, ["Intake uncertainty this window."])
+    }
+
+    func testMidweekContractCoachingSuppressesSecondMovementByDefault() throws {
+        let midweek = try XCTUnwrap(try map(midweekContractEnvelope()).midweek)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+        XCTAssertEqual(contract.coaching.map(\.section), ["action", "watch"])
+        XCTAssertNil(contract.coaching.first(where: { $0.section == "coachTake" }))
+    }
+
+    /// Production-fixture parity: the exact Sep 20–22 case (Machine Lateral
+    /// Raise 90 lb allocated to Result, Leg Extensions 90 lb an
+    /// independent structured Training fact, not narratively prominent).
+    /// Fixture: agent-handoffs/fixtures/20260924T051615Z-midweek-slice0-production-lineage-parity.json
+    @MainActor
+    func testMidweekRestoredFormatMatchesProductionFixtureBothParityAndSemanticParity() throws {
+        let model = try map(midweekContractEnvelope())
+        let midweek = try XCTUnwrap(model.midweek)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+
+        // FORMAT PARITY: established module order restored, one Confidence
+        // surface, no full narrativeV3.detail in the hero.
+        XCTAssertEqual(contract.includedModuleIds, ["energy", "weight", "body_composition", "training"])
+        XCTAssertEqual(model.confidence?.score, 79)
+        let hero = try XCTUnwrap(midweek.presentationContract?.lead)
+        XCTAssertEqual(hero.headline, "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.")
+        XCTAssertNotEqual(hero.meaning, midweek.narrativeV3?.detail, "hero must not fall back to the concatenated detail")
+        XCTAssertTrue((midweek.narrativeV3?.detail ?? "").count > (hero.meaning ?? "").count,
+                      "the fixture's legacy detail is deliberately longer than the contract's short meaning")
+
+        // V3 SEMANTIC PARITY: both 90 lb facts stay factually available —
+        // Machine Lateral Raise via the Result headline above, Leg
+        // Extensions as a structured Training highlight — without both
+        // monopolizing narrative prominence (no second Coach's Take
+        // movement claim).
+        let training = try XCTUnwrap(midweek.training)
+        XCTAssertEqual(training.highlights?.map(\.exerciseName), ["Lateral Raises Machine", "Leg Extensions"])
+        XCTAssertEqual(training.highlights?.map(\.performanceValue), ["90 lb", "90 lb"])
+        XCTAssertNil(contract.coaching.first(where: { $0.section == "coachTake" }),
+                     "Leg Extensions must not also own a Coach's Take movement claim")
+
+        // Uncertainty bounded to <=2, plain language only.
+        XCTAssertLessThanOrEqual(contract.uncertainty.visibleItems.count, 2)
+
+        let view = MidweekBriefingSections(content: midweek, confidence: model.confidence)
+        let renderer = ImageRenderer(content: view
+            .padding(16)
+            .frame(width: 390)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(PhysiqueOSTheme.background)
+            .environment(\.colorScheme, .dark))
+        renderer.scale = 2
+        let image = try XCTUnwrap(renderer.uiImage, "restored Midweek V3 failed to render")
+        XCTAssertGreaterThan(image.size.height, 400, "restored Midweek V3 rendered no substantive content")
+    }
+
+    // MARK: Midweek mutation coverage — each of these breaks one acceptance
+    // gate on purpose and asserts the screen (or the decode) rejects it.
+
+    func testMidweekMutationModuleOrderOutOfSequenceFailsClosed() {
+        XCTAssertThrowsError(try mapNonAsserting(midweekContractEnvelope(moduleOrderMutation: true)))
+    }
+
+    func testMidweekMutationContractArtifactIdMismatchFailsClosed() {
+        XCTAssertThrowsError(try mapNonAsserting(midweekContractEnvelope(artifactIdMismatch: true)))
+    }
+
+    func testMidweekMutationDuplicateCoachingClaimIdFailsClosed() {
+        XCTAssertThrowsError(try mapNonAsserting(midweekContractEnvelope(duplicateCoachingClaimId: true)))
+    }
+
+    /// One-Confidence-surface rule: when the contract omits Confidence,
+    /// nothing on screen falls through to an unrelated Confidence object.
+    func testMidweekMutationAbsentContractConfidenceNeverFallsThroughToAnotherSurface() throws {
+        let model = try map(midweekContractEnvelope(omitConfidence: true))
+        XCTAssertNil(model.confidence)
+        let midweek = try XCTUnwrap(model.midweek)
+        let view = MidweekBriefingSections(content: midweek, confidence: model.confidence)
+        XCTAssertNil(view.content.presentationContract?.lead.confidence)
+    }
+
+    /// >2 unresolved items would violate the bounded-uncertainty rule.
+    /// The production Server itself caps `visibleItems` at 2 before
+    /// serializing (`boundedUncertainty`); this proves the client renders
+    /// whatever it is given verbatim rather than adding its own truncation
+    /// that could mask a Server regression, while the source-of-truth test
+    /// above proves the Server-bound fixture already respects the cap.
+    func testMidweekUncertaintyCardNeverDeduplicatesAwayDistinctContractText() throws {
+        let midweek = try XCTUnwrap(try map(midweekContractEnvelope()).midweek)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+        XCTAssertEqual(contract.uncertainty.coveredIds.count, 3, "Watch/module-covered uncertainty stays out of Still Unresolved")
+    }
+
+    /// V2 fallback boundary: a frozen V2 artifact must never decode a
+    /// presentationContract, even if V3-shaped keys are also present.
+    func testMidweekV2FallbackBoundaryNeverDecodesContract() throws {
+        let midweek = try XCTUnwrap(try map(midweekV2Envelope()).midweek)
+        XCTAssertNil(midweek.presentationContract)
+    }
+
     // MARK: Monthly
 
     func testMonthlyV3DecodesStrategicSummaryAndIgnoresAdditiveIntelligence() throws {
@@ -249,6 +382,16 @@ final class BriefingV3PresentationTests: XCTestCase {
         return try XCTUnwrap(try ProductionBriefingMapper.detail(value))
     }
 
+    /// Unlike `map`, records no failure of its own on a throw — for
+    /// mutation tests that assert the mapper rejects malformed input via
+    /// `XCTAssertThrowsError`. `map`'s `XCTUnwrap` would otherwise record
+    /// its own failure the instant the expected throw happens, before
+    /// `XCTAssertThrowsError` gets a chance to treat it as expected.
+    private func mapNonAsserting(_ json: String) throws -> BriefingReadModel? {
+        let value = try JSONDecoder().decode(BriefingJSONValue.self, from: Data(json.utf8))
+        return try ProductionBriefingMapper.detail(value)
+    }
+
     private func mapPhoto(_ json: String) throws -> BriefingReadModel {
         let value = try JSONDecoder().decode(BriefingJSONValue.self, from: Data(json.utf8))
         return try XCTUnwrap(try ProductionBriefingMapper.detail(value))
@@ -291,6 +434,124 @@ final class BriefingV3PresentationTests: XCTestCase {
 
     private func midweekV2Envelope() -> String {
         #"{"schemaVersion":"1","artifact":{"artifactId":"midweek-1","artifactType":"scheduled","cadence":"midweek","version":2,"evidenceWindow":{"id":"midweek-1","startDate":"2026-09-06","endDate":"2026-09-08","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-09T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"presentation":{"hero":{"verdict":"Server-owned midweek verdict","summary":"Published midweek summary."},"coachTake":{"biggestTakeaway":"Hold steady.","recommendation":"Use the full week."},"goalConfidence":{"score":69,"band":"moderate","movementDirection":"held","presentationExplanation":"Canonical midweek Confidence explanation.","movementLabel":"No meaningful change","primaryReason":"Evidence held.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"assessmentContext":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"assessmentTimestamp":"2026-09-09T14:00:00.000Z","source":"canonical_pi_snapshot"},"activeGoal":{"id":"goal-canonical","name":"Build Lean Mass"},"activePhase":{"id":"phase-canonical","name":"Foundation"},"prioritiesThroughSunday":["Keep the plan steady."]}}"#
+    }
+
+    /// Mirrors the exact production shape: `narrativeV3` (full legacy
+    /// sections, ignored by the restored screen) shipped alongside a bound
+    /// `midweek_presentation_contract_v1` (what the screen actually
+    /// renders), plus legacy top-level `activeGoal`/`activePhase`/
+    /// `prioritiesThroughSunday` that the contract path must never surface.
+    /// Movement facts mirror the sanitized Sep 20–22 production fixture
+    /// (`agent-handoffs/fixtures/20260924T051615Z-midweek-slice0-production-lineage-parity.json`):
+    /// Machine Lateral Raise 90 lb (Result) and Leg Extensions 90 lb
+    /// (structured Training fact only, second-movement Coach's Take
+    /// suppressed).
+    private func midweekContractEnvelope(
+        moduleOrderMutation: Bool = false,
+        artifactIdMismatch: Bool = false,
+        duplicateCoachingClaimId: Bool = false,
+        omitConfidence: Bool = false
+    ) -> String {
+        let artifactId = "midweek-v3c"
+        var modules: [[String: Any]] = [
+            ["id": "energy", "payloadKey": "energyBalance", "included": true, "reasonCode": "paired_evidence", "order": 1, "pairedDayCount": 2, "chartIncluded": true, "chartReason": "minimum_pair_count_met"],
+            ["id": "weight", "payloadKey": "weightContext", "included": true, "reasonCode": "sufficient_observations", "order": 2, "observationCount": 3],
+            ["id": "body_composition", "payloadKey": "bodyComposition", "included": true, "reasonCode": "phase_baseline", "order": 3],
+            ["id": "training", "payloadKey": "training", "included": true, "reasonCode": "qualifying_training_evidence", "order": 4],
+            ["id": "recovery", "payloadKey": "recovery", "included": false, "reasonCode": "no_eligible_evidence", "order": 5],
+        ]
+        if moduleOrderMutation {
+            modules[0]["order"] = 4
+            modules[3]["order"] = 1
+        }
+        var lead: [String: Any] = [
+            "headlineClaimId": "claim-result",
+            "headline": "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.",
+            "meaningClaimId": "claim-meaning",
+            "meaning": "Building Lean Mass, training stayed on track through midweek.",
+            "goal": ["id": "goal-1", "name": "Build Lean Mass"],
+            "phase": ["id": "phase-1", "name": "Lean Mass Build"],
+        ]
+        if !omitConfidence {
+            lead["confidence"] = [
+                "claimId": "claim-confidence", "assessmentId": "assessment-midweek-v3c",
+                "score": 79, "band": "high", "movement": "no_meaningful_change",
+                "movementDirection": "held", "delta": 0,
+                "reason": "Training stayed consistent and Confidence held steady.",
+                "movementLabel": "— No meaningful change",
+            ]
+        }
+        let coaching: [[String: Any]] = [
+            ["section": "action", "label": "What To Do", "claimId": duplicateCoachingClaimId ? "claim-shared" : "claim-action", "text": "Keep loading presses through Friday."],
+            ["section": "watch", "label": "What To Watch", "claimId": duplicateCoachingClaimId ? "claim-shared" : "claim-watch", "text": "Watch sleep consistency this week."],
+        ]
+        let presentationContract: [String: Any] = [
+            "schemaVersion": "midweek_presentation_contract_v1",
+            "artifactId": artifactIdMismatch ? "wrong-artifact-id" : artifactId,
+            "assessmentId": "assessment-midweek-v3c",
+            "lead": lead,
+            "modules": modules,
+            "coaching": coaching,
+            "uncertainty": [
+                "visibleItems": [
+                    ["uncertaintyId": "u-intake", "type": "intake_uncertainty", "materiality": "moderate", "text": "Intake uncertainty this window."],
+                ],
+                "coveredIds": ["u-wearable", "u-pairing", "u-guardrail"],
+            ],
+        ]
+        let narrativeV3: [String: Any] = [
+            "summary": "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.",
+            "detail": "Machine lateral raises reached 90 lb, up from the previous best of 85 lb. Building Lean Mass, training stayed on track through midweek. Keep loading presses through Friday. Watch sleep consistency this week. Confidence held at 79, no meaningful change.",
+            "sections": [
+                "result": "Machine lateral raises reached 90 lb.",
+                "meaning": "Building Lean Mass, training stayed on track.",
+                "action": "Keep loading presses through Friday.",
+                "watch": "Watch sleep consistency this week.",
+                "confidence": "Confidence held at 79.",
+            ],
+            "coachTake": "Leg extensions also reached 90 lb, a second strong movement this week.",
+        ]
+        let presentation: [String: Any] = [
+            "presentationModel": "canonical_narrative_v3",
+            "hero": ["verdict": "Midweek Briefing", "summary": "Legacy hero summary — must never render when a contract is present."],
+            "narrativeV3": narrativeV3,
+            "energyBalance": [
+                "averageIntake": 2650, "estimatedAverageExpenditure": 2700, "estimatedDailyBalanceMidpoint": -50,
+                "interpretation": NSNull(), "headline": NSNull(), "balanceHeadline": "50 kcal/day below",
+                "chartPoints": [
+                    ["date": "2026-09-20", "label": "Su", "intake": 2600, "expenditure": 2680, "balance": -80, "complete": true],
+                    ["date": "2026-09-21", "label": "Mo", "intake": 2700, "expenditure": 2720, "balance": -20, "complete": true],
+                ],
+            ],
+            "weightContext": ["averageWeight": 178.4, "changeFromPriorComparable": -0.6, "interpretation": ""],
+            "bodyComposition": [
+                "newScan": ["date": "2026-09-21", "bodyFatPercentage": 14.2, "leanMass": 152.0, "fatMass": 25.1],
+                "objective": "Track lean mass", "interpretation": "",
+            ],
+            "training": [
+                "performanceHeadline": "Training stayed on track.", "conclusion": "",
+                "status": ["improving": 2, "stable": 3], "comparableCategoryCount": 5, "trainingDayCount": 3,
+                "highlights": [
+                    ["canonicalExerciseId": "lateral_raise_machine", "exerciseName": "Lateral Raises Machine", "recordType": "Heaviest Load", "performanceValue": "90 lb", "delta": "+5 lb", "headline": "New heaviest load.", "detail": "Up from 85 lb on Sep 22."],
+                    ["canonicalExerciseId": "leg_extension", "exerciseName": "Leg Extensions", "recordType": "Heaviest Load", "performanceValue": "90 lb", "delta": "+10 lb", "headline": "New heaviest load.", "detail": "Up from 80 lb on Sep 21."],
+                ],
+                "priorityCategories": [Any](),
+            ],
+            "coachTake": ["biggestTakeaway": "LEGACY — must never render.", "recommendation": "LEGACY — must never render."],
+            "goalConfidence": ["score": 79, "band": "high", "movementDirection": "held", "presentationExplanation": "LEGACY — must never render.", "movementLabel": "No meaningful change", "source": "canonical_confidence_v3_snapshot"],
+            "activeGoal": ["id": "legacy-goal", "name": "LEGACY GOAL — must never render"],
+            "activePhase": ["id": "legacy-phase", "name": "LEGACY PHASE — must never render"],
+            "prioritiesThroughSunday": ["LEGACY priority — must never render."],
+            "presentationContract": presentationContract,
+        ]
+        return json([
+            "schemaVersion": "1",
+            "artifact": ["artifactId": artifactId, "artifactType": "scheduled", "cadence": "midweek", "version": 3,
+                         "evidenceWindow": ["id": "window-c", "startDate": "2026-09-20", "endDate": "2026-09-22", "timeZone": "America/Los_Angeles"],
+                         "publicationDate": "2026-09-23T10:01:29.328Z"],
+            "goalPhaseAttribution": ["goalId": "goal-1", "phaseId": "phase-1"],
+            "presentation": presentation,
+        ])
     }
 
     private func json(_ object: [String: Any]) -> String {

@@ -1,14 +1,21 @@
 import SwiftUI
 
-/// Midweek remains the short briefing cadence. Canonical V3 artifacts render
-/// the Server-owned narrative as Integrated Lead → Canonical Narrative →
-/// Coach's Take. Frozen historical V2 artifacts retain their original,
-/// denser Energy → Weight → Training → Body Composition presentation.
-/// Confidence is always a read-through passthrough; Native never computes or
-/// refreshes it.
+/// Midweek remains the short briefing cadence, restored to the established
+/// pre-V3 format standard (verified: last accepted screen `684a51c2`,
+/// shipped through Build 40 `cda5603d`) — Hero → Energy → Weight → Body
+/// Composition → Training → Still Unresolved (≤2, Server-bounded) →
+/// Coach's Take finale. A bound V3 `presentationContract` supplies
+/// Server-owned module inclusion/order, Goal/Phase, Confidence, and
+/// coaching text into that same standard; Native never re-ranks modules,
+/// invents copy, or renders the full concatenated `narrativeV3.detail` in
+/// the hero. Frozen historical V2 artifacts (no contract, no narrativeV3)
+/// retain their original, denser Energy → Weight → Training → Body
+/// Composition presentation untouched. Confidence is always a read-through
+/// passthrough; Native never computes or refreshes it, and it renders at
+/// most once per screen.
 struct MidweekBriefingSections: View {
     static let sectionInventory = ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"]
-    static let canonicalV3SectionInventory = ["Integrated Lead", "Canonical Narrative", "Coach's Take"]
+    static let canonicalV3SectionInventory = ["Integrated Lead", "Energy", "Weight", "Body Composition", "Training", "Still Unresolved", "Coach's Take"]
     static let heroTypeLabel = "MIDWEEK BRIEFING"
     let content: MidweekBriefingContent
     let confidence: BriefingConfidenceReadModel?
@@ -16,7 +23,21 @@ struct MidweekBriefingSections: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             hero
-            if let narrative = content.narrativeV3 {
+            if let contract = content.presentationContract {
+                ForEach(contract.modules) { module in
+                    if module.included { contractModule(module) }
+                }
+                let unresolved = Array(contract.uncertainty.visibleItems.prefix(2))
+                if !unresolved.isEmpty {
+                    BriefingUncertaintyCard(items: unresolved)
+                }
+                contractFinale(contract)
+            } else if let narrative = content.narrativeV3 {
+                // Contract-less canonical V3 compatibility path. Unreachable
+                // against current production (which always publishes a
+                // bound presentationContract); retained as a fail-safe so an
+                // older/partial payload still renders the Server narrative
+                // rather than crashing.
                 canonicalNarrativeCard(narrative)
                 BriefingUncertaintyCard(items: content.uncertainty)
                 canonicalCoachTakeCard(narrative.coachTake)
@@ -42,9 +63,81 @@ struct MidweekBriefingSections: View {
         BriefingLeadCard(
             eyebrow: Self.heroTypeLabel,
             rangeLabel: BriefingDateFormatting.humanizedPeriodLabel(content.reportingRangeLabel),
-            headline: content.narrativeV3?.summary ?? content.heroVerdict,
-            narrative: content.narrativeV3?.detail.flatMap { $0.isEmpty ? nil : $0 } ?? content.heroSummary,
-            confidence: confidence
+            headline: content.presentationContract?.lead.headline ??
+                content.narrativeV3?.summary ?? content.heroVerdict,
+            narrative: content.presentationContract?.lead.meaning ??
+                content.narrativeV3?.detail.flatMap { $0.isEmpty ? nil : $0 } ??
+                content.heroSummary,
+            confidence: heroConfidence,
+            footerItems: heroFooterItems
+        )
+    }
+
+    /// One Confidence surface, exactly. When a bound V3 contract is present,
+    /// Confidence renders only if the Server included it in the contract;
+    /// it never falls through to an unrelated/legacy Confidence object.
+    private var heroConfidence: BriefingConfidenceReadModel? {
+        guard let contract = content.presentationContract else { return confidence }
+        return contract.lead.confidence != nil ? confidence : nil
+    }
+
+    /// Compact Goal/Phase context in the established lead-footer slot
+    /// (the same convention Weekly/Monthly already use). Server-owned
+    /// names only; Native never synthesizes Goal/Phase meaning.
+    private var heroFooterItems: [(String, String)] {
+        guard let lead = content.presentationContract?.lead else { return [] }
+        switch (lead.goal?.name, lead.phase?.name) {
+        case let (goal?, phase?): return [("Goal & Phase", "\(goal) · \(phase)")]
+        case let (goal?, nil): return [("Goal", goal)]
+        case let (nil, phase?): return [("Phase", phase)]
+        case (nil, nil): return []
+        }
+    }
+
+    @ViewBuilder
+    private func contractModule(_ module: MidweekPresentationContract.Module) -> some View {
+        switch module.id {
+        case "energy":
+            if let energy = content.energy {
+                WeeklyEnergyCard(
+                    section: energy, showsDailySemanticRows: true,
+                    showsChart: module.chartIncluded == true
+                )
+            }
+        case "weight":
+            if let weight = content.weight {
+                weeklyWeightCard(weight)
+            } else if let narrative = content.weightContextNarrative,
+                      !narrative.isEmpty {
+                narrativeCard(title: "Weight Context", text: narrative)
+            }
+        case "body_composition":
+            if let body = content.bodyComposition {
+                bodyCompositionCard(body)
+            }
+        case "training":
+            if let training = content.training {
+                BriefingTrainingResponseCard(training: training)
+            } else if let narrative = content.trainingResponseNarrative,
+                      !narrative.isEmpty {
+                narrativeCard(title: "Training Response", text: narrative)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    /// The established purple Coach's Take finale, filled from the
+    /// Server's coaching items rather than legacy priority semantics:
+    /// coachTake -> Biggest Takeaway, action -> My Recommendation,
+    /// watch -> What To Watch (replacing the legacy Through-Sunday list,
+    /// which V3 does not publish).
+    private func contractFinale(_ contract: MidweekPresentationContract) -> some View {
+        let bySection = Dictionary(uniqueKeysWithValues: contract.coaching.map { ($0.section, $0.text) })
+        return BriefingCoachFinale(
+            takeaway: bySection["coachTake"] ?? "",
+            recommendation: bySection["action"] ?? "",
+            watch: bySection["watch"]
         )
     }
 

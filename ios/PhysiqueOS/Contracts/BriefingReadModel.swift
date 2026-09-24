@@ -449,6 +449,77 @@ struct MidweekBriefingContent: Codable, Equatable {
     var narrativeV3: CanonicalNarrativeV3ReadModel? = nil
     /// Server `uncertainty[]` for a canonical V3 Midweek; nil for frozen V2.
     var uncertainty: [BriefingUncertaintyItem]? = nil
+    /// Server-owned hierarchy and semantic-placement decisions for a bound
+    /// canonical V3 Midweek artifact. Native preserves this array order and
+    /// never re-ranks claims or modules.
+    var presentationContract: MidweekPresentationContract? = nil
+}
+
+struct MidweekPresentationContract: Codable, Equatable {
+    static let schemaVersion = "midweek_presentation_contract_v1"
+
+    struct Lead: Codable, Equatable {
+        struct Confidence: Codable, Equatable {
+            var claimId: String
+            var assessmentId: String
+            var score: Int
+            var band: String
+            var movement: String
+            var movementDirection: String
+            var delta: Int?
+            var reason: String?
+            var movementLabel: String?
+        }
+
+        struct Identity: Codable, Equatable {
+            var id: String?
+            var name: String?
+        }
+
+        var headlineClaimId: String?
+        var headline: String
+        var meaningClaimId: String?
+        var meaning: String?
+        var goal: Identity?
+        var phase: Identity?
+        var confidence: Confidence?
+    }
+
+    struct Module: Codable, Equatable, Identifiable {
+        var id: String
+        var payloadKey: String
+        var included: Bool
+        var reasonCode: String
+        var order: Int
+        var pairedDayCount: Int? = nil
+        var chartIncluded: Bool? = nil
+        var chartReason: String? = nil
+        var observationCount: Int? = nil
+    }
+
+    struct CoachingItem: Codable, Equatable, Identifiable {
+        var id: String { claimId }
+        var section: String
+        var label: String
+        var claimId: String
+        var text: String
+    }
+
+    struct Uncertainty: Codable, Equatable {
+        var visibleItems: [BriefingUncertaintyItem]
+        var coveredIds: [String]
+    }
+
+    var artifactId: String
+    var assessmentId: String?
+    var lead: Lead
+    var modules: [Module]
+    var coaching: [CoachingItem]
+    var uncertainty: Uncertainty
+
+    var includedModuleIds: [String] {
+        modules.filter(\.included).map(\.id)
+    }
 }
 
 struct CanonicalNarrativeV3ReadModel: Codable, Equatable {

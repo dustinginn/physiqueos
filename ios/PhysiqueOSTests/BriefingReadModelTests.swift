@@ -54,7 +54,12 @@ final class BriefingReadModelTests: XCTestCase {
     func testEveryBriefingKeepsItsCompleteEditorialSectionInventory() {
         XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"])
         XCTAssertEqual(MidweekBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"])
-        XCTAssertEqual(MidweekBriefingSections.canonicalV3SectionInventory, ["Integrated Lead", "Canonical Narrative", "Coach's Take"])
+        // Restored to the established Midweek format standard (verified:
+        // last accepted screen `684a51c2`, shipped through Build 40
+        // `cda5603d`): the V3 contract fills that same established module
+        // order rather than collapsing into one undifferentiated
+        // "Canonical Narrative" block.
+        XCTAssertEqual(MidweekBriefingSections.canonicalV3SectionInventory, ["Integrated Lead", "Energy", "Weight", "Body Composition", "Training", "Still Unresolved", "Coach's Take"])
         XCTAssertEqual(Array(DEXABriefingSections.sectionInventory.suffix(4)), ["What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"])
         XCTAssertEqual(PhotoBriefingSections.sectionInventory, ["Hero", "Snapshot", "Progress", "Interpretation", "Coach's Insight", "Completion Decision"])
     }
