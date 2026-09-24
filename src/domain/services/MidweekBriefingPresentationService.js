@@ -308,6 +308,8 @@ export function createMidweekPresentationContract({ artifact, assessment,
           assessment.currentPercentage - assessment.priorPercentage,
         reason: confidenceReasonDistinct ? confidenceReason : null,
         primaryReason: confidenceReasonDistinct ? confidenceReason : null,
+        movementLabel: briefing.goalConfidence?.movementLabel ??
+          confidenceMovementLabel(assessment),
       }),
     }),
     modules: moduleDecisions(briefing),
@@ -327,6 +329,17 @@ export function createMidweekPresentationContract({ artifact, assessment,
 function confidenceMovementDirection(value) {
   return ({ increase: "increased", decrease: "decreased",
     no_meaningful_change: "held" })[value] ?? value;
+}
+
+function confidenceMovementLabel(assessment) {
+  const delta = assessment.priorPercentage == null ? null :
+    assessment.currentPercentage - assessment.priorPercentage;
+  if (assessment.movement === "increase") return `▲ +${Math.abs(delta ?? 0)}`;
+  if (assessment.movement === "decrease") return `▼ −${Math.abs(delta ?? 0)}`;
+  if (assessment.movement === "no_meaningful_change") {
+    return "— No meaningful change";
+  }
+  return "Initial assessment";
 }
 
 function moduleDecisions(briefing) {
