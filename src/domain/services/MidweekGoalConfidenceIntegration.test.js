@@ -40,7 +40,8 @@ describe("Midweek canonical confidence integration", () => {
     })).toBeNull();
     const source = fs.readFileSync(
       "src/screens/MidweekBriefingScreen.jsx", "utf8");
-    expect(source).toContain("briefing.goalConfidence&&");
+    expect(source).toContain("briefing.goalConfidence;");
+    expect(source).toContain("confidence && <BriefingConfidenceAnchor");
     expect(source).not.toMatch(/44%|overall_goal_confidence_v1/);
   });
 
