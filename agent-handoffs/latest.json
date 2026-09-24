@@ -1,33 +1,37 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T15:15:00Z",
+  "generated_at_utc": "2026-09-24T15:20:00Z",
   "task": {
-    "id": "codex-healthkit-current-day-priority-sep23-repair-20260924",
-    "title": "HealthKit current-day priority and bounded September 23 Activity repair",
+    "id": "codex-to-claude-healthkit-transition-20260924",
+    "title": "Codex-to-Claude HealthKit transition",
     "agent": "codex",
-    "status": "reviewed"
+    "status": "handed_off"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
     "final_sha": "19cbfa10740c0ff5d10e638b57883027349c4b31",
+    "native_branch": "codex/healthkit-revision-recovery-native",
+    "native_worktree": "/private/tmp/physiqueos-healthkit-revision-recovery-native",
     "server_candidate_sha": "07ed8230be28c2bc4989e2167b028d0bf425c6fa",
+    "server_candidate_branch": "codex/healthkit-current-day-review-server",
     "production_server_sha": "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d",
     "production_deployment": "e8c3bed3-20f6-4f5c-b34a-d27ab0881480",
-    "native_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
-    "native_build": 57
+    "installed_native_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
+    "installed_native_build": 57
   },
   "result": {
-    "summary": "Fresh-context adversarial review approved exact Native 19cbfa10740c0ff5d10e638b57883027349c4b31 and exact Server companion 07ed8230be28c2bc4989e2167b028d0bf425c6fa. Authenticated Server device identity, fresh September 23 preflight authority, and exact-day historical diagnostics are corrected. Nothing was deployed, uploaded, repaired, or mutated in production.",
+    "summary": "Codex completed a clean fresh-context review of exact Native 19cbfa10740c0ff5d10e638b57883027349c4b31 and Server companion 07ed8230be28c2bc4989e2167b028d0bf425c6fa, then published comprehensive authority for Claude Remote Control takeover from the exact existing Native worktree. Production remains 28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d and the Founder phone remains on Build 57.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": false,
+    "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Native focused 277/277 and expanded 349/349 passed on the sole iPhone 17 Pro simulator. Server critical 89/89 and reviewer rerun 83/83 passed. Full package-7 had 543 passing tests and six documented unrelated private-fixture/date-sensitive failures."
+      "summary": "Native focused 277/277 and expanded 349/349 passed on the sole iPhone 17 Pro simulator. Server critical 89/89 and reviewer rerun 83/83 passed."
     },
     "review": {
       "status": "approved",
@@ -39,21 +43,32 @@
     }
   },
   "decisions_required": [
-    "Separate Founder authorization is required before deploying Server candidate 07ed8230be28c2bc4989e2167b028d0bf425c6fa.",
-    "Native archive/TestFlight upload and any Founder-device September 23 repair remain separately gated."
+    "Explicit Founder authorization is required before deploying Server 07ed8230be28c2bc4989e2167b028d0bf425c6fa.",
+    "Native archive/TestFlight upload requires a separate authorization after the Server contract is live.",
+    "Founder-device operation, September 23 dry-run, and September 23 apply each remain separately gated."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "The prior review exposed a real production distinction between the local cursor identity and Server-authenticated device identity; the corrected tests keep them distinct.",
-    "The isolated Server worktree's broad package suite lacks private migration-control fixtures; the directly affected suites are fully green."
+    "The last bounded production audit found September 24 Activity and Nutrition absent; those are last-observed facts, not a claim about unseen current device state.",
+    "The Strength relationship is fully confirmed and green, while its Log-row Apple Health provenance label remained pending explicit Founder observation in the last acceptance checkpoint."
   ],
   "backlog": [
-    "Deploy the exact reviewed Server candidate only after separate authorization and guarded production verification.",
-    "Archive/upload the exact reviewed Native candidate only after separate authorization and only after the Server contract is live.",
-    "Then perform read-only current-day acceptance and the bounded September 23 repair sequence under separate device/apply gates; Cardio remains last."
+    "Guarded Server deployment of exact 07ed8230be28c2bc4989e2167b028d0bf425c6fa after authorization.",
+    "Guarded release of exact Native 19cbfa10740c0ff5d10e638b57883027349c4b31 after separate authorization and Server activation.",
+    "Real-device current-day acceptance, then bounded September 23 read-only dry-run and separately authorized apply/post-write audit.",
+    "Begin Cardio only after HealthKit Activity reaches its final accepted verdict."
   ],
-  "recommended_next_step": "Stop for separate Server deployment authorization. Do not archive/upload Native, operate the Founder device, repair September 23, change policy/strategic eligibility, or begin Cardio.",
-  "full_report_path": "agent-handoffs/reports/20260924T151500Z-healthkit-current-day-priority-final-reviewed.md",
+  "recommended_next_step": "Claude should await Founder direction through Remote Control from /private/tmp/physiqueos-healthkit-revision-recovery-native. Do not deploy, archive/upload, operate the phone, repair September 23, change policy/strategic eligibility, or begin Cardio without the matching authorization.",
+  "full_report_path": "agent-handoffs/reports/20260924T152000Z-codex-to-claude-healthkit-transition.md",
+  "related_report_paths": [
+    "agent-handoffs/reports/20260924T151500Z-healthkit-current-day-priority-final-reviewed.md",
+    "agent-handoffs/reports/20260924T144325Z-healthkit-current-day-priority-fresh-review-rejected.md",
+    "agent-handoffs/reports/20260924T131323Z-healthkit-sep23-activity-repair-dryrun-refused.md",
+    "agent-handoffs/reports/20260924T130511Z-healthkit-build57-sep24-baseline-strength-acceptance.md",
+    "agent-handoffs/reports/20260924T130954Z-midweek-server-deployment-complete.md",
+    "agent-handoffs/reports/20260924T124636Z-healthkit-native57-testflight-valid.md",
+    "agent-handoffs/reports/20260924T030200Z-strength-sep23-deterministic-confirmed-final-green.md"
+  ],
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
