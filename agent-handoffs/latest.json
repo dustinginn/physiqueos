@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T04:30:00Z",
+  "generated_at_utc": "2026-09-24T04:40:00Z",
   "task": {
     "id": "codex-healthkit-revision-recovery-strength-presentation-20260923",
     "title": "HealthKit daily-revision recovery and Strength presentation",
@@ -16,23 +16,30 @@
     "native_sha": "de0d3829836dd2e84327d268d4682c97260260e6",
     "native_build": 56
   },
+  "candidates": {
+    "server_sha": "63395579ed70611be8a57f032133a43a3bc67800",
+    "server_branch": "codex/healthkit-revision-recovery-server",
+    "native_sha": "e0ed02be57fef76b237be3fe4621f946a02ab40c",
+    "native_branch": "codex/healthkit-revision-recovery-native",
+    "native_build_number": null
+  },
   "result": {
-    "summary": "The first fresh review found blocking presentation defects and bounded persistence/diagnostics gaps. They are corrected in exact amended candidates Server 74c51805 and Native e0ed02be, both pushed to GitHub. Corrected Server suites and Native iPhone 17 Pro suites pass, and a second fresh-context review is in progress. No production mutation, deployment, TestFlight upload, Activity repair, policy change, or Cardio work occurred.",
+    "summary": "Fresh-context review is CLEAN on exact candidates Server 63395579 and Native e0ed02be. Activity/Nutrition revision recovery, Founder diagnostics, and fail-closed confirmed-Strength Workout Detail, Activity, and Log presentation are reviewed GREEN. No production mutation, deployment, TestFlight upload, Activity repair, policy change, or Cardio work occurred.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
     "strength_graduation_verdict": "green",
-    "implementation_status": "amended_exact_candidates_frozen_fresh_review_in_progress"
+    "implementation_status": "reviewed_green_awaiting_server_deployment_authorization"
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Corrected Server suites 13/13, 72/72, 46/46 and 446 candidate-relevant HealthKit assertions passed; corrected Native iPhone 17 Pro suites 37/37 and 76/76 passed. One missing-energy mutation failed as required and was restored."
+      "summary": "Independent Server HealthKit regressions passed 445/445; independent Native focused suites passed 84/84 on the sole iPhone 17 Pro simulator. Changed lint and diff checks passed. One missing-energy mutation failed as required and was restored."
     },
     "review": {
-      "status": "pending",
-      "summary": "The first fresh review's findings were corrected. A second fresh-context adversarial review is running against exact amended Server 74c5180518b3470e6307cd2d414c79b792397ef5 and Native e0ed02be57fef76b237be3fe4621f946a02ab40c."
+      "status": "passed",
+      "summary": "Fresh-context adversarial review returned CLEAN on exact Server 63395579ed70611be8a57f032133a43a3bc67800 and Native e0ed02be57fef76b237be3fe4621f946a02ab40c."
     },
     "authority_audit": {
       "status": "passed",
@@ -48,19 +55,23 @@
     "Founder authorization remains required before any Native/TestFlight upload.",
     "Founder authorization remains required before the bounded September 23 Activity repair apply."
   ],
-  "blockers": [],
+  "blockers": [
+    "Server deployment requires separate Founder authorization.",
+    "Native archive/TestFlight upload requires separate later Founder authorization.",
+    "September 23 Activity repair cannot be dry-run against the fixed path until the reviewed Server and Native corrections are live."
+  ],
   "unexpected_findings": [
     "First fresh review found fail-open Strength projection and incomplete-energy attribution in the initial candidates; both are corrected in the amended candidates.",
     "First fresh review also found multi-session Log provenance, repeated deferred-tombstone growth, and stale foreground-query diagnostics gaps; all are corrected."
   ],
   "backlog": [
-    "Complete the second fresh-context independent review of the exact amended Server/Native candidates.",
+    "After explicit authorization, deploy exact Server candidate 63395579ed70611be8a57f032133a43a3bc67800 using the established guarded production procedure.",
     "Keep Workout strategic eligibility and global linkAutoConfirm off unless separately authorized.",
     "Cardio is the next eligible domain but must not begin without a separate instruction.",
     "Design and dry-run the bounded September 23 Activity repair only after the reviewed correction, then ask before mutation."
   ],
-  "recommended_next_step": "Complete fresh-context review, publish its result, and stop for separate Founder authorization before any Server deployment.",
-  "full_report_path": "agent-handoffs/reports/20260924T043000Z-healthkit-revision-strength-presentation-amended-review.md",
+  "recommended_next_step": "Obtain explicit Founder authorization, then deploy exact reviewed Server candidate 63395579ed70611be8a57f032133a43a3bc67800 with force-rebuild, runtime SHA/build stamping, authority/health verification, and zero-write verification.",
+  "full_report_path": "agent-handoffs/reports/20260924T044000Z-healthkit-revision-strength-presentation-reviewed-green.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
