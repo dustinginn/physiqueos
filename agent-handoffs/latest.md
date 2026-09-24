@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Enforce exact claims and September 23 acceptance scope (`codex-strength-reconciliation-exact-acceptance-guards-20260923`)
+- Task: Strength reconciliation canonical integrity and exact readback (`codex-strength-reconciliation-integrity-readback-20260923`)
 - Agent: codex
-- Status: completed
-- Generated (UTC): 2026-09-23T23:36:47Z
+- Status: partial
+- Generated (UTC): 2026-09-24T00:06:57Z
 - Success: true
 
-Summary: Closed the final operational-boundary findings with exact claim-identity drift checks, a hard September 23-only acceptance scope in runner and payload builder, and exact claim integrity on already-confirmed replay. All relevant suites, mutations, and the production build pass. No production, policy, relationship, strategic-eligibility, Apple, or Cardio state changed.
+Summary: Corrected the fifth-review replay, exact-claim, trusted-Logger, whole-graph, and exact client readback findings. Clean Server and Native candidates are ready for a sixth fresh-context review; nothing was deployed, uploaded, confirmed, or made strategically eligible.
 
-Detailed report: `agent-handoffs/reports/20260923T233647Z-strength-reconciliation-exact-acceptance-guards.md`
+Detailed report: `agent-handoffs/reports/20260924T000657Z-strength-reconciliation-integrity-readback.md`
 
 Protocol: `agent-handoffs/README.md`
