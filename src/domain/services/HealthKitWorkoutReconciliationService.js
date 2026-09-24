@@ -278,6 +278,8 @@ export function hasExactHealthKitWorkoutReconciliationResolution(review, {
   if (action === HealthKitWorkoutReconciliationAction.CONFIRM &&
     (!selectedLoggerSessionCanonicalId || !linkId)) return false;
   const exactResolution = (resolution) => resolution?.action === action &&
+    exactObjectKeys(resolution, ["action", "selectedLoggerSessionCanonicalId", "linkId", "at", "by", "basis", "strategicEvidenceEligibility"]) &&
+    exactObjectKeys(resolution?.by, ["kind", "ref"]) &&
     (resolution.selectedLoggerSessionCanonicalId ?? null) === (action === HealthKitWorkoutReconciliationAction.CONFIRM
       ? selectedLoggerSessionCanonicalId : null) &&
     (resolution.linkId ?? null) === (action === HealthKitWorkoutReconciliationAction.CONFIRM ? linkId : null);
@@ -286,15 +288,12 @@ export function hasExactHealthKitWorkoutReconciliationResolution(review, {
     !exactResolution(review.resolutionHistory[0]) ||
     stable(review.resolutionHistory[0]) !== stable(review.resolution)) return false;
   const resolution = review.resolution;
-  const allowedBasisForAction = action === HealthKitWorkoutReconciliationAction.CONFIRM
-    ? new Set(["founder_explicit_selection", "deterministic_auto_confirm", "deterministic_auto_confirm_acceptance"])
-    : new Set(["founder_explicit_no_match"]);
   const quarantine = createHealthKitQuarantinedEligibility();
   const basis = resolution.basis ?? {};
   const founderBasis = basis.mode?.startsWith("founder_");
   const deterministicBasis = basis.mode?.startsWith("deterministic_");
   if (!validInstant(resolution.at) || !String(resolution.by?.kind ?? "").trim() ||
-    !String(resolution.by?.ref ?? "").trim() || !allowedBasisForAction.has(basis.mode) ||
+    !String(resolution.by?.ref ?? "").trim() || !hasExactResolutionBasis({ action, basis, review, by: resolution.by }) ||
     basis.actorRef !== resolution.by.ref ||
     (founderBasis && resolution.by.kind !== "founder") ||
     (deterministicBasis && resolution.by.kind !== "system_matcher") ||
@@ -310,7 +309,8 @@ export function hasExactHealthKitWorkoutReconciliationResolution(review, {
   const terminal = lifecycle.filter((entry) => ["resolved_confirmed", "resolved_no_match"].includes(entry?.status));
   return terminal.length === 1 && terminal[0]?.status === expectedStatus &&
     terminal[0]?.at === resolution.at && stable(terminal[0]?.by) === stable(resolution.by) &&
-    stable(lifecycle.at(-1)) === stable(terminal[0]);
+    stable(lifecycle.at(-1)) === stable(terminal[0]) &&
+    validTerminalLifecycle(review, expectedStatus);
 }
 
 export function hasExactStoredHealthKitWorkoutReconciliationTerminal(review, identity = {}) {
@@ -338,6 +338,8 @@ export function projectHealthKitWorkoutReconciliationPresentation(review, identi
   const validTerminal = validIdentity && (!terminal || hasExactStoredHealthKitWorkoutReconciliationTerminal(review, identity));
   const projectedStatus = !validIdentity ? "invalid_reconciliation_identity"
     : validTerminal ? review.status : "invalid_terminal_history";
+  const candidates = Object.freeze((review.candidates ?? []).map(projectStoredCandidate)
+    .filter((candidate) => candidate.loggerSessionCanonicalId));
   return Object.freeze({
     kind: "healthkit_workout_reconciliation",
     id: review.id,
@@ -346,15 +348,20 @@ export function projectHealthKitWorkoutReconciliationPresentation(review, identi
     localDate: review.localDate,
     title: "Match Apple Health workout",
     summary: "Choose the Workout Logger session that belongs to this Apple Health workout, or choose No match.",
-    workout: review.workout,
-    candidates: Object.freeze((review.candidates ?? []).map((candidate) => Object.freeze({ ...candidate }))),
-    resolution: validTerminal && review.resolution ? Object.freeze({
+    workout: Object.freeze({
+      family: stringOrNull(review.workout?.family),
+      canonicalType: stringOrNull(review.workout?.canonicalType),
+      startedAt: stringOrNull(review.workout?.startedAt),
+      endedAt: stringOrNull(review.workout?.endedAt),
+    }),
+    candidates,
+    resolution: terminal && validTerminal && review.resolution ? Object.freeze({
       action: review.resolution.action,
       selectedLoggerSessionCanonicalId: review.resolution.selectedLoggerSessionCanonicalId ?? null,
       linkId: review.resolution.linkId ?? null,
     }) : null,
     actions: Object.freeze(projectedStatus === "pending" ? [
-      ...((review.candidates ?? []).map((candidate) => Object.freeze({
+      ...(candidates.map((candidate) => Object.freeze({
         id: `confirm:${candidate.loggerSessionCanonicalId}`,
         action: HealthKitWorkoutReconciliationAction.CONFIRM,
         loggerSessionCanonicalId: candidate.loggerSessionCanonicalId,
@@ -366,8 +373,98 @@ export function projectHealthKitWorkoutReconciliationPresentation(review, identi
   });
 }
 
+function projectStoredCandidate(candidate) {
+  return Object.freeze({
+    loggerSessionCanonicalId: stringOrNull(candidate?.loggerSessionCanonicalId),
+    confidence: finiteOrNull(candidate?.confidence),
+    basis: stringOrNull(candidate?.basis),
+    reasons: Object.freeze((Array.isArray(candidate?.reasons) ? candidate.reasons : []).map(String)),
+    substantiveOverlap: candidate?.substantiveOverlap === true,
+    trustedLoggerProvenance: candidate?.trustedLoggerProvenance === true,
+    overlapSeconds: finiteOrNull(candidate?.overlapSeconds),
+    startAligned: booleanOrNull(candidate?.startAligned),
+    endAligned: booleanOrNull(candidate?.endAligned),
+    loggerSession: Object.freeze({
+      activityType: stringOrNull(candidate?.loggerSession?.activityType),
+      startedAt: stringOrNull(candidate?.loggerSession?.startedAt),
+      endedAt: stringOrNull(candidate?.loggerSession?.endedAt),
+    }),
+  });
+}
+
+function stringOrNull(value) {
+  return typeof value === "string" ? value : null;
+}
+
+function finiteOrNull(value) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function booleanOrNull(value) {
+  return typeof value === "boolean" ? value : null;
+}
+
 function validInstant(value) {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function hasExactResolutionBasis({ action, basis, review, by }) {
+  const exactKeys = (keys) => {
+    return exactObjectKeys(basis, keys);
+  };
+  if (basis.mode === "founder_explicit_selection") {
+    return action === HealthKitWorkoutReconciliationAction.CONFIRM &&
+      exactKeys(["mode", "matcherVersion", "actorRef", "rejectedAlternativeLoggerSessionCanonicalIds"]) &&
+      basis.matcherVersion === review.matcherVersion && basis.actorRef === by.ref &&
+      Array.isArray(basis.rejectedAlternativeLoggerSessionCanonicalIds) &&
+      basis.rejectedAlternativeLoggerSessionCanonicalIds.every((id) => String(id).trim().length > 0);
+  }
+  if (basis.mode === "founder_explicit_no_match") {
+    return action === HealthKitWorkoutReconciliationAction.NO_MATCH &&
+      exactKeys(["mode", "matcherVersion", "actorRef", "freshAssessmentOutcome", "releasedCandidateLinkIds"]) &&
+      basis.matcherVersion === review.matcherVersion && basis.actorRef === by.ref &&
+      Object.values(HealthKitStrengthMatchOutcome).includes(basis.freshAssessmentOutcome) &&
+      Array.isArray(basis.releasedCandidateLinkIds) &&
+      basis.releasedCandidateLinkIds.every((id) => String(id).trim().length > 0);
+  }
+  if (["deterministic_auto_confirm", "deterministic_auto_confirm_acceptance"].includes(basis.mode)) {
+    return action === HealthKitWorkoutReconciliationAction.CONFIRM &&
+      exactKeys(["mode", "ruleVersion", "actorRef"]) &&
+      basis.ruleVersion === HEALTHKIT_STRENGTH_AUTO_CONFIRM_RULE_VERSION && basis.actorRef === by.ref;
+  }
+  return false;
+}
+
+function validTerminalLifecycle(review, expectedStatus) {
+  const history = Array.isArray(review.lifecycleHistory) ? review.lifecycleHistory : [];
+  const allowed = new Set(["pending", "superseded", "resolved_confirmed", "resolved_no_match"]);
+  const allowedNext = {
+    pending: new Set(["superseded", "resolved_confirmed", "resolved_no_match"]),
+    superseded: new Set(["pending", "resolved_confirmed", "resolved_no_match"]),
+  };
+  return history.length >= 2 && history[0]?.status === "pending" &&
+    review.createdAt === history[0].at && validInstant(review.createdAt) &&
+    history.at(-1)?.status === expectedStatus && history.every((entry, index) => {
+      if (!allowed.has(entry?.status) || !validInstant(entry?.at) || !String(entry?.by?.kind ?? "").trim()) return false;
+      const terminal = ["resolved_confirmed", "resolved_no_match"].includes(entry.status);
+      const initial = index === 0;
+      if (!exactObjectKeys(entry, initial || terminal ? ["status", "at", "by"] : ["status", "at", "by", "reason"]) ||
+        !exactObjectKeys(entry.by, terminal ? ["kind", "ref"] : ["kind"]) ||
+        (!initial && !terminal && !String(entry.reason ?? "").trim())) return false;
+      if (initial) return entry.by.kind === "system_matcher";
+      const previous = history[index - 1];
+      return allowedNext[previous.status]?.has(entry.status) === true &&
+        Date.parse(entry.at) >= Date.parse(previous.at);
+    });
+}
+
+function exactObjectKeys(value, keys) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
 function projectCandidate(candidate, session = null) {

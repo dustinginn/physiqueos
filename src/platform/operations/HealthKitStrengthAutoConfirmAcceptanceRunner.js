@@ -68,6 +68,7 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
   }
   try {
     assertHealthKitWorkoutRelationshipConfirmationAllowed({
+      ownerUserId,
       link,
       links,
       workouts,

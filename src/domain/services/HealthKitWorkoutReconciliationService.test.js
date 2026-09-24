@@ -218,7 +218,7 @@ describe("structured reconciliation history", () => {
       linkId: "link-sep23",
       by: { kind: "founder", ref: "command" },
       now: NOW,
-      basis: { mode: "founder_explicit_selection", matcherVersion: "healthkit-strength-matcher-v5" },
+      basis: { mode: "founder_explicit_selection", matcherVersion: "healthkit-strength-matcher-v5", rejectedAlternativeLoggerSessionCanonicalIds: [] },
     });
     expect(resolved).toMatchObject({
       status: "resolved_confirmed",
@@ -253,7 +253,10 @@ describe("structured reconciliation history", () => {
       { ...resolved, resolution: { ...resolved.resolution, basis: { mode: "founder_explicit_selection" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { mode: "founder_explicit_selection" } }] },
       { ...resolved, resolution: { ...resolved.resolution, basis: { ...resolved.resolution.basis, matcherVersion: "forged" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { ...resolved.resolutionHistory[0].basis, matcherVersion: "forged" } }] },
       { ...resolved, resolution: { ...resolved.resolution, basis: { ...resolved.resolution.basis, actorRef: "other-command" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { ...resolved.resolutionHistory[0].basis, actorRef: "other-command" } }] },
+      { ...resolved, resolution: { ...resolved.resolution, basis: { ...resolved.resolution.basis, ruleVersion: "healthkit-strength-auto-confirm-v1" } }, resolutionHistory: [{ ...resolved.resolutionHistory[0], basis: { ...resolved.resolutionHistory[0].basis, ruleVersion: "healthkit-strength-auto-confirm-v1" } }] },
       { ...resolved, lifecycleHistory: resolved.lifecycleHistory.map((entry) => entry.status === "resolved_confirmed" ? { ...entry, at: "2026-09-23T23:31:00.000Z" } : entry) },
+      { ...resolved, lifecycleHistory: [resolved.lifecycleHistory[0], { status: "garbage", at: "2030-01-01T00:00:00.000Z", by: { kind: "system_matcher" } }, resolved.lifecycleHistory.at(-1)] },
+      { ...resolved, lifecycleHistory: [resolved.lifecycleHistory[0], { status: "pending", at: "2030-01-01T00:00:00.000Z", by: { kind: "system_matcher" } }, resolved.lifecycleHistory.at(-1)] },
       { ...resolved, updatedAt: "2026-09-23T23:31:00.000Z" },
       { ...resolved, strategicEvidenceEligibility: "eligible" },
       { ...resolved, evidenceEligibility: { ...resolved.evidenceEligibility, state: "eligible" } },
@@ -289,6 +292,32 @@ describe("structured reconciliation history", () => {
       };
       expect(hasExactStoredHealthKitWorkoutReconciliationTerminal(corrupt)).toBe(false);
     }
+    const noMatch = resolveHealthKitWorkoutReconciliationRecord(review, {
+      action: "no_match",
+      by: { kind: "founder", ref: "no-match-command" },
+      now: NOW,
+      basis: {
+        mode: "founder_explicit_no_match",
+        matcherVersion: "healthkit-strength-matcher-v5",
+        freshAssessmentOutcome: "ambiguous_multiple",
+        releasedCandidateLinkIds: [],
+      },
+    });
+    expect(hasExactStoredHealthKitWorkoutReconciliationTerminal(noMatch)).toBe(true);
+    const noMatchWithRule = {
+      ...noMatch,
+      resolution: { ...noMatch.resolution, basis: { ...noMatch.resolution.basis, ruleVersion: "healthkit-strength-auto-confirm-v1" } },
+      resolutionHistory: [{ ...noMatch.resolutionHistory[0], basis: { ...noMatch.resolutionHistory[0].basis, ruleVersion: "healthkit-strength-auto-confirm-v1" } }],
+    };
+    expect(hasExactStoredHealthKitWorkoutReconciliationTerminal(noMatchWithRule)).toBe(false);
+    expect(hasExactStoredHealthKitWorkoutReconciliationTerminal({
+      ...noMatch,
+      lifecycleHistory: [
+        noMatch.lifecycleHistory[0],
+        { status: "garbage", at: "2030-01-01T00:00:00.000Z", by: { kind: "system_matcher" } },
+        noMatch.lifecycleHistory.at(-1),
+      ],
+    })).toBe(false);
     expect(resolveHealthKitWorkoutReconciliationRecord(resolved, {
       action: "confirm",
       selectedLoggerSessionCanonicalId: "logger-other",

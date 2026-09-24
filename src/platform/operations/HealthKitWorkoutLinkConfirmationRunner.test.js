@@ -21,7 +21,7 @@ const OWNER = "user_founder_001";
 const DAY = "2026-09-22";
 const T0 = "2026-09-22T20:00:00.000Z";
 const AUTH = { ownerUserId: OWNER, startLocalDate: DAY, endLocalDate: DAY, authorizationReference: "founder-chat-approved-sep22-strength-link" };
-const CLEAN = { workoutsWithMultipleConfirmedLinks: 0, sessionsWithMultipleConfirmedLinks: 0, confirmedLinksWithoutHeldClaims: 0, heldClaimsWithoutConfirmedLink: 0 };
+const CLEAN = { workoutsWithMultipleConfirmedLinks: 0, sessionsWithMultipleConfirmedLinks: 0, confirmedLinksWithoutHeldClaims: 0, heldClaimsWithoutConfirmedLink: 0, malformedReleasedClaims: 0 };
 
 describe("guarded Workout link confirmation operation", () => {
   it("dry-run selects the single candidate strength link in the window, proves it is allowed, predicts the exact writes, and writes nothing", async () => {
@@ -205,15 +205,17 @@ describe("guarded Workout link confirmation operation", () => {
     }
   });
 
-  it("fails the post-write quarantine invariant (rolled back by the entry) if a candidate is not quarantined, so confirmation can never graduate a link", async () => {
+  it("refuses before prediction when a candidate is not quarantined, so confirmation can never graduate a link", async () => {
     const { records, link } = await world();
     const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: link });
     await records.put({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: link, expectedVersion: stored.version,
       payload: { ...stored, evidenceEligibility: { ...stored.evidenceEligibility, state: "eligible" } } });
+    const before = records.snapshot();
+    const beforeWrites = records.getMutationCount();
     const dry = await runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH });
-    expect(dry.outcome).toBe("dry_run");
-    await expect(runHealthKitWorkoutLinkConfirmation({ records, authorization: AUTH, apply: true, expected: dry.facts }))
-      .rejects.toMatchObject({ code: "POST_WRITE_INVARIANT_FAILED", invariants: { linkQuarantined: false } });
+    expect(dry).toMatchObject({ outcome: "refused", reasons: ["LINK_RELATIONSHIP_INTEGRITY_INVALID"] });
+    expect(records.snapshot()).toEqual(before);
+    expect(records.getMutationCount()).toBe(beforeWrites);
   });
 
   it("rejects an invalid or too-wide window before reading anything", async () => {
@@ -254,7 +256,7 @@ async function world({ workouts = [["u1", "10:00", "11:00"]], sessions = ["S1"],
   for (const [uuid, sessionId] of candidates) {
     const candidate = createHealthKitWorkoutLinkCandidate({
       canonicalWorkout: byUuid.get(uuid),
-      assessment: { outcome: Outcome.CONFIDENT, matcherVersion: "healthkit-strength-matcher-v3", candidates: [{ loggerSessionCanonicalId: sessionId, confidence: 99, reasons: ["single_overlapping_session"], basis: "temporal_and_telemetry" }] },
+      assessment: { outcome: Outcome.CONFIDENT, matcherVersion: "healthkit-strength-matcher-v5", candidates: [{ loggerSessionCanonicalId: sessionId, confidence: 99, reasons: ["single_overlapping_session"], basis: "temporal_and_telemetry" }] },
       ownerUserId: OWNER, now: T0,
     });
     await records.putIfAbsent({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: candidate.id, sourceIdentity: candidate.id, payload: candidate });

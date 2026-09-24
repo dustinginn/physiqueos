@@ -65,6 +65,35 @@ describe("guarded relationship confirmation", () => {
     await expect(confirmWith(corrupt, linkId)).rejects.toMatchObject({ code: "LINK_RELATIONSHIP_INTEGRITY_INVALID" });
   });
 
+  it("never promotes a malformed released deterministic claim into a held confirmed graph", async () => {
+    const { records, link } = await world({ sessions: [session("S1", "10:01", "10:59")], workouts: [["u1", "10:00", "11:00"]] });
+    const linkId = link("u1", "S1");
+    await confirm(records, linkId);
+    await unlinkHealthKitWorkoutRelationship({ records, ownerUserId: OWNER, linkId, by: FOUNDER, now: T0 });
+    const snapshot = records.snapshot();
+    const workoutClaimId = getHealthKitWorkoutLinkClaimId("workout", snapshot.healthKitWorkoutLinks[0].canonicalWorkoutId);
+    const index = snapshot.healthKitWorkoutLinkClaims.findIndex((claim) => claim.id === workoutClaimId);
+    snapshot.healthKitWorkoutLinkClaims[index] = {
+      ...snapshot.healthKitWorkoutLinkClaims[index],
+      userId: "user_other",
+      schemaVersion: "forged-schema",
+      kind: "session",
+      evidenceEligibility: { state: "eligible", strategic: true, decidedBy: "forged" },
+      history: [
+        { status: "released", holderLinkId: "foreign-link", at: "2030-01-01T00:00:00.000Z" },
+        { status: "held", holderLinkId: "foreign-link", at: "2020-01-01T00:00:00.000Z" },
+      ],
+    };
+    const corrupt = createInMemoryCanonicalRecordStore(snapshot);
+    const before = corrupt.snapshot();
+    const beforeWrites = corrupt.getMutationCount();
+    expect(findHealthKitWorkoutRelationshipViolations({ links: before.healthKitWorkoutLinks, claims: before.healthKitWorkoutLinkClaims }))
+      .toMatchObject({ malformedReleasedClaims: 1 });
+    await expect(confirmWith(corrupt, linkId)).rejects.toMatchObject({ code: "LINK_RELATIONSHIP_INTEGRITY_INVALID" });
+    expect(corrupt.snapshot()).toEqual(before);
+    expect(corrupt.getMutationCount()).toBe(beforeWrites);
+  });
+
   it("refuses a second Apple workout for one Logger session (Logger -> HealthKit one-to-one)", async () => {
     const { records, link } = await world({
       sessions: [session("S1", "10:00", "11:00")],
@@ -152,7 +181,7 @@ describe("guarded relationship confirmation", () => {
     const relinked = await confirm(records, link("u1", "S1"));
     expect(relinked.link.statusHistory.map((entry) => entry.status)).toEqual(["candidate", "confirmed", "unlinked", "confirmed"]);
     expect(findHealthKitWorkoutRelationshipViolations({ links: records.snapshot().healthKitWorkoutLinks, claims: records.snapshot().healthKitWorkoutLinkClaims }))
-      .toEqual({ workoutsWithMultipleConfirmedLinks: 0, sessionsWithMultipleConfirmedLinks: 0, confirmedLinksWithoutHeldClaims: 0, heldClaimsWithoutConfirmedLink: 0 });
+      .toEqual({ workoutsWithMultipleConfirmedLinks: 0, sessionsWithMultipleConfirmedLinks: 0, confirmedLinksWithoutHeldClaims: 0, heldClaimsWithoutConfirmedLink: 0, malformedReleasedClaims: 0 });
   });
 
   it("is race-safe: two concurrent confirmations for one workout or one session can never both win", async () => {
@@ -202,7 +231,7 @@ describe("guarded relationship confirmation", () => {
 
   it("reports stored violations without any write and treats claims as quarantined HealthKit records", async () => {
     const clean = findHealthKitWorkoutRelationshipViolations({ links: [], claims: [] });
-    expect(clean).toEqual({ workoutsWithMultipleConfirmedLinks: 0, sessionsWithMultipleConfirmedLinks: 0, confirmedLinksWithoutHeldClaims: 0, heldClaimsWithoutConfirmedLink: 0 });
+    expect(clean).toEqual({ workoutsWithMultipleConfirmedLinks: 0, sessionsWithMultipleConfirmedLinks: 0, confirmedLinksWithoutHeldClaims: 0, heldClaimsWithoutConfirmedLink: 0, malformedReleasedClaims: 0 });
     const corrupt = findHealthKitWorkoutRelationshipViolations({
       links: [{ id: "a", status: "confirmed", canonicalWorkoutId: "w", loggerSessionCanonicalId: "s1" }, { id: "b", status: "confirmed", canonicalWorkoutId: "w", loggerSessionCanonicalId: "s2" }],
       claims: [{ id: "x", status: "held", holderLinkId: "gone" }],
@@ -296,7 +325,7 @@ describe("guarded relationship confirmation", () => {
     const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: linkId });
     expect(stored.status).toBe("candidate");
     expect(findHealthKitWorkoutRelationshipViolations({ links: after.healthKitWorkoutLinks, claims: after.healthKitWorkoutLinkClaims }))
-      .toEqual({ workoutsWithMultipleConfirmedLinks: 0, sessionsWithMultipleConfirmedLinks: 0, confirmedLinksWithoutHeldClaims: 0, heldClaimsWithoutConfirmedLink: 0 });
+      .toEqual({ workoutsWithMultipleConfirmedLinks: 0, sessionsWithMultipleConfirmedLinks: 0, confirmedLinksWithoutHeldClaims: 0, heldClaimsWithoutConfirmedLink: 0, malformedReleasedClaims: 0 });
     // The released claims are reusable: a retry against the refreshed record confirms cleanly.
     const retry = await confirm(records, linkId);
     expect(retry.outcome).toBe("confirmed");
@@ -334,7 +363,7 @@ async function world({ sessions = [], workouts = [], extraLinks = null } = {}) {
     const workout = byUuid.get(uuid);
     const candidate = createHealthKitWorkoutLinkCandidate({
       canonicalWorkout: workout,
-      assessment: { outcome: Outcome.POSSIBLE, matcherVersion: "test", candidates: [{ loggerSessionCanonicalId: sessionId, confidence: 90, reasons: ["test"], basis: "temporal_and_telemetry" }] },
+      assessment: { outcome: Outcome.POSSIBLE, matcherVersion: "healthkit-strength-matcher-v5", candidates: [{ loggerSessionCanonicalId: sessionId, confidence: 90, reasons: ["test"], basis: "temporal_and_telemetry" }] },
       ownerUserId: OWNER, now: T0,
     });
     await records.putIfAbsent({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: candidate.id, sourceIdentity: candidate.id, payload: candidate });

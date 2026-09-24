@@ -15,8 +15,9 @@ describe("EvidenceReviewReadService native detail", () => {
       version: 2,
       createdAt: "2026-09-23T20:00:00.000Z",
       localDate: "2026-09-23",
-      workout: { family: "strength", canonicalType: "traditional_strength_training" },
-      candidates: [{ loggerSessionCanonicalId: "session-a", confidence: 95, basis: "logger_session_window" }],
+      workout: { family: "strength", canonicalType: "traditional_strength_training", resolutionHistory: ["must-not-escape"] },
+      candidates: [{ loggerSessionCanonicalId: "session-a", confidence: 95, basis: "logger_session_window", resolutionHistory: ["must-not-escape"] }],
+      resolution: { action: "confirm", selectedLoggerSessionCanonicalId: "must-not-escape", linkId: "must-not-escape" },
     };
     const store = {
       run: vi.fn(async (_scope, operation) => operation()),
@@ -47,6 +48,9 @@ describe("EvidenceReviewReadService native detail", () => {
     });
     expect(result.review).not.toHaveProperty("candidates");
     expect(result.review).not.toHaveProperty("resolutionHistory");
+    expect(result.presentation.workout).not.toHaveProperty("resolutionHistory");
+    expect(result.presentation.candidates[0]).not.toHaveProperty("resolutionHistory");
+    expect(result.presentation.resolution).toBeNull();
     expect(store.getPackage).not.toHaveBeenCalled();
     expect(store.listRelevantCanonicalObjects).not.toHaveBeenCalled();
   });

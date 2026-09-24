@@ -106,6 +106,7 @@ export async function runHealthKitWorkoutLinkConfirmation({
   if (candidates.length === 0 && confirmed.length === 1 && claimsHeldBy(claims, confirmed[0])) {
     try {
       assertHealthKitWorkoutRelationshipConfirmationAllowed({
+        ownerUserId,
         link: confirmed[0], links, workouts, evidence, claims,
         loggerSessionServerCommitTimestamps: new Map(evidenceMetadata.map((row) => [row.recordId, row.createdAt])),
       });
@@ -126,6 +127,7 @@ export async function runHealthKitWorkoutLinkConfirmation({
   // Prove the confirmation is allowed before predicting or writing anything.
   try {
     assertHealthKitWorkoutRelationshipConfirmationAllowed({
+      ownerUserId,
       link, links, workouts, evidence, claims,
       loggerSessionServerCommitTimestamps: new Map(evidenceMetadata.map((row) => [row.recordId, row.createdAt])),
     });

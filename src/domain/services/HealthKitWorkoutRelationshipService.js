@@ -2,10 +2,13 @@ import { createHash } from "node:crypto";
 import { HEALTHKIT_CANONICAL_WORKOUT_COLLECTION } from "./HealthKitWorkoutService.js";
 import {
   HEALTHKIT_WORKOUT_LINK_COLLECTION,
+  HEALTHKIT_WORKOUT_LINK_SCHEMA_VERSION,
+  HEALTHKIT_WORKOUT_MATCHER_VERSION,
   HealthKitWorkoutLinkError,
   HealthKitWorkoutLinkStatus,
   assessHealthKitStrengthLinkCandidates,
   assertHealthKitWorkoutLinkAllowed,
+  getHealthKitWorkoutLinkRecordId,
   unlinkHealthKitWorkoutLink,
 } from "./HealthKitWorkoutLinkService.js";
 import { isActiveDetailedStrengthSession } from "./HealthKitObservationService.js";
@@ -64,6 +67,7 @@ export async function confirmHealthKitWorkoutRelationship({ records, ownerUserId
     records.listStorageMetadata({ ownerUserId, collection: "canonicalEvidenceObjects" }),
   ]);
   assertHealthKitWorkoutRelationshipConfirmationAllowed({
+    ownerUserId,
     link,
     links,
     workouts,
@@ -100,6 +104,11 @@ export async function confirmHealthKitWorkoutRelationship({ records, ownerUserId
     for (const claimId of acquired) await releaseClaim({ records, ownerUserId, claimId, linkId: link.id, at });
     throw error;
   }
+  const postWriteClaims = await records.list({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION });
+  assertHealthKitWorkoutRelationshipIntegrity({
+    links: [saved],
+    claims: postWriteClaims.filter((claim) => claim.status === ClaimStatus.HELD && claim.holderLinkId === saved.id),
+  });
   return Object.freeze({ outcome: "confirmed", link: saved });
 }
 
@@ -110,6 +119,7 @@ export async function confirmHealthKitWorkoutRelationship({ records, ownerUserId
  * temporally plausible current matcher candidate.
  */
 export function assertHealthKitWorkoutRelationshipConfirmationAllowed({
+  ownerUserId,
   link,
   links = [],
   workouts = [],
@@ -117,6 +127,9 @@ export function assertHealthKitWorkoutRelationshipConfirmationAllowed({
   claims = [],
   loggerSessionServerCommitTimestamps = new Map(),
 } = {}) {
+  if (!validLinkRecord(link, ownerUserId)) {
+    throw new HealthKitWorkoutLinkError("LINK_RELATIONSHIP_INTEGRITY_INVALID", "The stored workout relationship link is not canonical.");
+  }
   assertHealthKitWorkoutRelationshipIntegrity({ links, claims });
   const session = evidence.find((record) => (record.canonicalId ?? record.payload?.id) === link?.loggerSessionCanonicalId);
   if (!session || !isActiveDetailedStrengthSession(session) || !isTrustedNativeLiveLoggerSession(session.payload ?? session)) {
@@ -169,26 +182,18 @@ export function findHealthKitWorkoutRelationshipViolations({ links = [], claims 
   const workoutCounts = count("canonicalWorkoutId");
   const sessionCounts = count("loggerSessionCanonicalId");
   const heldClaims = claims.filter((claim) => claim.status === ClaimStatus.HELD);
+  const inactiveClaims = claims.filter((claim) => claim.status !== ClaimStatus.HELD);
   const confirmedById = new Map(confirmed.map((link) => [link.id, link]));
+  const linkById = new Map(links.map((link) => [link.id, link]));
   const validClaimFor = (claim, link, kind, subject) => {
     const history = Array.isArray(claim?.history) ? claim.history : [];
     const confirmedTransition = Array.isArray(link?.statusHistory) ? link.statusHistory.at(-1) : null;
     const linkHistoryIsCanonical = validConfirmedLinkHistory(link);
-    const historyIsCanonical = history.length > 0 && history[0]?.status === ClaimStatus.HELD &&
-      history.every((entry, index) => {
-        if (![ClaimStatus.HELD, ClaimStatus.RELEASED].includes(entry?.status) ||
-          !String(entry?.holderLinkId ?? "").length || !validInstant(entry?.at)) return false;
-        if (index === 0) return true;
-        const previous = history[index - 1];
-        return entry.status !== previous.status &&
-          Date.parse(entry.at) >= Date.parse(previous.at) &&
-          (entry.status !== ClaimStatus.RELEASED || entry.holderLinkId === previous.holderLinkId);
-      });
     const quarantine = createHealthKitQuarantinedEligibility();
-    return linkHistoryIsCanonical && claim?.id === getHealthKitWorkoutLinkClaimId(kind, subject) &&
+    return linkHistoryIsCanonical && claimHasExactShape(claim) && claim?.id === getHealthKitWorkoutLinkClaimId(kind, subject) &&
     claim.kind === kind && claim.schemaVersion === HEALTHKIT_WORKOUT_LINK_CLAIM_SCHEMA_VERSION &&
     claim.userId === link.userId && claim.status === ClaimStatus.HELD && claim.holderLinkId === link.id &&
-    exactObject(claim.evidenceEligibility, quarantine) && historyIsCanonical &&
+    exactObject(claim.evidenceEligibility, quarantine) && validClaimHistory(claim, ClaimStatus.HELD) &&
     history.at(-1)?.status === ClaimStatus.HELD && history.at(-1)?.holderLinkId === link.id &&
     claim.createdAt === history[0].at && claim.updatedAt === history.at(-1).at &&
     confirmedTransition?.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
@@ -213,6 +218,23 @@ export function findHealthKitWorkoutRelationshipViolations({ links = [], claims 
         heldByLink.filter((claim) => validClaimFor(claim, link, "session", link.loggerSessionCanonicalId)).length !== 1;
     }).length,
     heldClaimsWithoutConfirmedLink: heldClaims.filter((claim) => !validHeldClaim(claim)).length,
+    malformedReleasedClaims: inactiveClaims.filter((claim) => {
+      const link = linkById.get(claim.holderLinkId);
+      if (!link) return true;
+      const subject = claim.kind === "workout" ? link.canonicalWorkoutId
+        : claim.kind === "session" ? link.loggerSessionCanonicalId : null;
+      if (!subject || !isCanonicalReusableReleasedClaim(claim, {
+        ownerUserId: link.userId,
+        kind: claim.kind,
+        subject,
+      })) return true;
+      const finalLinkTransition = Array.isArray(link.statusHistory) ? link.statusHistory.at(-1) : null;
+      if (link.status === HealthKitWorkoutLinkStatus.UNLINKED) {
+        return finalLinkTransition?.status !== HealthKitWorkoutLinkStatus.UNLINKED ||
+          finalLinkTransition.at !== claim.updatedAt;
+      }
+      return link.status !== HealthKitWorkoutLinkStatus.CANDIDATE;
+    }).length,
   });
 }
 
@@ -228,17 +250,70 @@ function exactObject(value, expected) {
     key === expectedKeys[index] && value[key] === expected[key]);
 }
 
+function validClaimHistory(claim, expectedFinalStatus) {
+  const history = Array.isArray(claim?.history) ? claim.history : [];
+  return history.length > 0 && history[0]?.status === ClaimStatus.HELD &&
+    history.at(-1)?.status === expectedFinalStatus &&
+    claim.createdAt === history[0].at && claim.updatedAt === history.at(-1).at &&
+    validInstant(claim.createdAt) && validInstant(claim.updatedAt) &&
+    history.every((entry, index) => {
+      if (![ClaimStatus.HELD, ClaimStatus.RELEASED].includes(entry?.status) ||
+        !String(entry?.holderLinkId ?? "").length || !validInstant(entry?.at)) return false;
+      if (index === 0) return true;
+      const previous = history[index - 1];
+      return entry.status !== previous.status &&
+        Date.parse(entry.at) >= Date.parse(previous.at) &&
+        (entry.status !== ClaimStatus.RELEASED || entry.holderLinkId === previous.holderLinkId);
+    });
+}
+
+function isCanonicalReusableReleasedClaim(claim, { ownerUserId, kind, subject } = {}) {
+  return claimHasExactShape(claim) && claim?.id === getHealthKitWorkoutLinkClaimId(kind, subject) &&
+    claim.schemaVersion === HEALTHKIT_WORKOUT_LINK_CLAIM_SCHEMA_VERSION &&
+    claim.userId === ownerUserId && claim.kind === kind && claim.status === ClaimStatus.RELEASED &&
+    String(claim.holderLinkId ?? "").length > 0 &&
+    exactObject(claim.evidenceEligibility, createHealthKitQuarantinedEligibility()) &&
+    validClaimHistory(claim, ClaimStatus.RELEASED) &&
+    claim.history.at(-1)?.holderLinkId === claim.holderLinkId;
+}
+
+function claimHasExactShape(claim) {
+  if (!claim || typeof claim !== "object" || Array.isArray(claim)) return false;
+  const actual = Object.keys(claim).filter((key) => key !== "version").sort();
+  const expected = [
+    "createdAt", "evidenceEligibility", "history", "holderLinkId", "id",
+    "kind", "schemaVersion", "status", "updatedAt", "userId",
+  ].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]) &&
+    (claim.version == null || (Number.isSafeInteger(Number(claim.version)) && Number(claim.version) > 0));
+}
+
 function validConfirmedLinkHistory(link) {
+  return validLinkHistory(link) && link?.status === HealthKitWorkoutLinkStatus.CONFIRMED;
+}
+
+function validLinkRecord(link, ownerUserId) {
+  return link?.schemaVersion === HEALTHKIT_WORKOUT_LINK_SCHEMA_VERSION &&
+    link.id === getHealthKitWorkoutLinkRecordId(link.canonicalWorkoutId, link.loggerSessionCanonicalId) &&
+    String(link.canonicalWorkoutId ?? "").length > 0 && String(link.loggerSessionCanonicalId ?? "").length > 0 &&
+    String(ownerUserId ?? "").length > 0 && link.userId === ownerUserId &&
+    link.matcherVersion === HEALTHKIT_WORKOUT_MATCHER_VERSION &&
+    exactObject(link.contentAuthority, { trainingContent: "workout_logger", telemetry: "healthkit" }) &&
+    exactObject(link.evidenceEligibility, createHealthKitQuarantinedEligibility()) && validLinkHistory(link);
+}
+
+function validLinkHistory(link) {
   const history = Array.isArray(link?.statusHistory) ? link.statusHistory : [];
   const allowedNext = {
     [HealthKitWorkoutLinkStatus.CANDIDATE]: new Set([HealthKitWorkoutLinkStatus.CONFIRMED, HealthKitWorkoutLinkStatus.UNLINKED]),
     [HealthKitWorkoutLinkStatus.CONFIRMED]: new Set([HealthKitWorkoutLinkStatus.UNLINKED]),
     [HealthKitWorkoutLinkStatus.UNLINKED]: new Set([HealthKitWorkoutLinkStatus.CANDIDATE, HealthKitWorkoutLinkStatus.CONFIRMED]),
   };
-  return link?.status === HealthKitWorkoutLinkStatus.CONFIRMED && history.length >= 2 &&
+  return Object.values(HealthKitWorkoutLinkStatus).includes(link?.status) && history.length >= 1 &&
     history[0]?.status === HealthKitWorkoutLinkStatus.CANDIDATE &&
-    history.at(-1)?.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
-    link.createdAt === history[0].at && link.updatedAt === history.at(-1).at &&
+    history.at(-1)?.status === link.status && link.createdAt === history[0].at &&
+    validInstant(link.updatedAt) && Date.parse(link.updatedAt) >= Date.parse(history.at(-1).at) &&
+    (link.status === HealthKitWorkoutLinkStatus.CANDIDATE || link.updatedAt === history.at(-1).at) &&
     history.every((entry, index) => {
       if (!validInstant(entry?.at) || !String(entry?.by?.kind ?? "").length || !String(entry?.by?.ref ?? "").length) return false;
       if (index === 0) return true;
@@ -282,10 +357,27 @@ async function acquireClaim({ records, ownerUserId, kind, subject, linkId, at })
     throw new HealthKitWorkoutLinkError("LINK_ONE_TO_ONE_VIOLATION",
       kind === "workout" ? "This Apple workout already has a confirmed link." : "This Logger session already has a confirmed link.");
   }
+  if (!isCanonicalReusableReleasedClaim(existing, { ownerUserId, kind, subject })) {
+    throw new HealthKitWorkoutLinkError(
+      "LINK_RELATIONSHIP_INTEGRITY_INVALID",
+      "The existing released relationship claim is not canonical and cannot be reused.",
+    );
+  }
   try {
     await records.put({
       ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION, recordId: id, expectedVersion: existing.version, sourceIdentity: id,
-      payload: { ...existing, status: ClaimStatus.HELD, holderLinkId: linkId, updatedAt: at, history: [...existing.history, { status: ClaimStatus.HELD, holderLinkId: linkId, at }] },
+      payload: {
+        schemaVersion: HEALTHKIT_WORKOUT_LINK_CLAIM_SCHEMA_VERSION,
+        id,
+        userId: ownerUserId,
+        kind,
+        status: ClaimStatus.HELD,
+        holderLinkId: linkId,
+        history: [...existing.history, { status: ClaimStatus.HELD, holderLinkId: linkId, at }],
+        evidenceEligibility: createHealthKitQuarantinedEligibility(),
+        createdAt: existing.createdAt,
+        updatedAt: at,
+      },
     });
   } catch (error) {
     // Another confirmation took the claim between our read and our write.

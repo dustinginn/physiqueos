@@ -931,6 +931,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
               resolvedLink.loggerSessionCanonicalId === existingReview.resolution?.selectedLoggerSessionCanonicalId;
             if (terminalGraphExact) {
               assertHealthKitWorkoutRelationshipConfirmationAllowed({
+                ownerUserId: context.ownerUserId,
                 link: resolvedLink,
                 links: workoutLinks,
                 workouts: inWindow,
@@ -2278,6 +2279,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         resolvedLink.loggerSessionCanonicalId === selectedSessionId) {
         try {
           assertHealthKitWorkoutRelationshipConfirmationAllowed({
+            ownerUserId: context.ownerUserId,
             link: resolvedLink,
             links: workoutLinks,
             workouts: canonicalWorkouts,
