@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Upload exact Native Build 57 and preserve September 23 repair gates (`codex-healthkit-native57-sep23-repair-20260924`)
+- Task: Build 57 September 24 acceptance and September 23 Activity repair planning (`codex-healthkit-build57-sep24-acceptance-sep23-repair-20260924`)
 - Agent: codex
-- Status: Build 57 uploaded and Apple VALID; awaiting real-device installation and next authorization
-- Generated (UTC): 2026-09-24T12:46:36Z
-- Success: true
+- Status: September 24 Activity baseline absent; September 23 repair remains authorization-gated
+- Generated (UTC): 2026-09-24T13:05:11Z
+- Success: false
 
-Summary: Exact Native Build 57 source `6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9` was uploaded through the guarded release process. Delivery `82ebe97c-2c38-482f-8a9c-d0e0d7490e1e` is present on App Store Connect with build and import status `VALID`. No Server/data operation, September 23 repair, policy/strategic-eligibility change, confirmed Strength mutation, or Cardio work occurred.
+Summary: Read-only production audits found no September 24 Activity or Nutrition canonical day. Build 57 recovery is active, but Activity is walking fail-closed collisions from August 25 through August 28 one date per attempt and has not reached September 24. September 23 Nutrition independently succeeded at revision 5, proving scope independence. Founder-observed Strength detail and workout-energy presentation pass; Log provenance remains a device-observation follow-up. No mutation occurred.
 
-Detailed report: `agent-handoffs/reports/20260924T124636Z-healthkit-native57-testflight-valid.md`
+Detailed report: `agent-handoffs/reports/20260924T130511Z-healthkit-build57-sep24-baseline-strength-acceptance.md`
 
 Protocol: `agent-handoffs/README.md`
