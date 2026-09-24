@@ -1,62 +1,53 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T01:22:49Z",
+  "generated_at_utc": "2026-09-24T01:29:42Z",
   "task": {
-    "id": "claude-build55-activity-sync-stall-diagnostic-20260923",
-    "title": "Build 55 Activity freshness failure: read-only diagnostic",
-    "agent": "claude",
-    "status": "completed"
+    "id": "codex-strength-reconciliation-ninth-review-20260923",
+    "title": "Strength reconciliation ninth fresh-context review",
+    "agent": "codex",
+    "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "31c88481d80703de3355c51f6695b760b0671020",
-    "final_sha": "31c88481d80703de3355c51f6695b760b0671020",
+    "final_sha": "b3e30001d05f1cef37a98412cb5187d1bb17c4df",
     "production_server_sha": "31c88481d80703de3355c51f6695b760b0671020",
     "production_deployment": "42035d0d-9368-4ada-a4c1-392e659f3366",
-    "native_sha": "621dbef3",
-    "native_build": 55
+    "native_sha": "de0d3829836dd2e84327d268d4682c97260260e6",
+    "native_build": 56
   },
   "result": {
-    "summary": "Diagnostic only (no code, production, policy, ASC or Codex-worktree changes). Activity is stale on the SERVER, not just the UI: the last accepted Activity observation for 2026-09-23 is sourceRevision 50 at 18:35:26Z (11:35 PDT) = the canonical day rev 50 the Log shows. Since 22:02:36Z (first fresh Build 55 process) every foreground and Log pull-to-refresh produced an ingest request that the Server rejected 409 HEALTHKIT_OBSERVATION_IDENTITY_COLLISION (10 attempts through 01:07:03Z; 409s write no receipt). So the query fires, the upload is sent and reaches the Server, and the Build 55 timeout/rerun/serialization fixes are engaged -- this is a NEW failure mode, not the Build 54 wedge. Mechanism: the device re-sends an already-consumed per-day sourceRevision for activity-summary:automatic:2026-09-23 with newer content; abandon-on-rejection never advances the cursor, so the loop is permanent for the day and clears only at local midnight. Trigger not distinguishable from the Server (409 bodies not stored): an acknowledge-loss leaving the device cursor at 49 (Build 54 wedge era or Build 55's new cancellation check between upload and acknowledge) or a dropped cursor entry restarting at 1 (aged-out-day deletion path or locked-device state-file quarantine). Nutrition shares the identical mechanism and is fresh only because nothing changed after 14:35 PDT. Build 55 changed none of the revision/persistence code. No app screen surfaces the automatic scope diagnostics.",
-    "success": true,
+    "summary": "Ninth fresh-context review rejected the exact candidates for historical-claim identity, lifecycle actor/reason, Founder basis semantic-binding, and edit-context read-boundary gaps. Production remains unchanged.",
+    "success": false,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "not_applicable",
-      "summary": "Read-only diagnostic; no code changed. Evidence: doctl deployment/spec verification, production web logs 19:32Z-01:07Z, three zero-write console probes at runtime 31c88481 (observations/canonical days/receipts, acceptance audit Sep 22-24), local ASC receipt logs, and a fresh-context read-only audit of Native 621dbef3 vs e249a0f3."
+      "status": "passed",
+      "summary": "Independent reviewer passed Server focused 206/206, Phase 4 139/139, Phase 5 65/65, and Native focused 183/183 on the sole permitted iPhone 17 Pro simulator."
     },
     "review": {
-      "status": "approved",
-      "summary": "Native mechanism reviewed with file:line citations (HealthKitQueryClient.swift:26-32,261-280,314-318; HealthKitSynchronizationEngine.swift:482,499-501; HealthKitSyncPersistence.swift:114-128,206-231,240; LogView.swift:52-58). Client cache ruled out (90 s in-memory TTL invalidated by pull-to-refresh; Server holds rev 50)."
+      "status": "changes_requested",
+      "summary": "Rejected: historical claim entries lacked exact holder identity; lifecycle actors/reasons and Founder basis facts were under-bound; edit context exposed raw reconciliation state."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "All production access read-only (REPEATABLE READ READ ONLY + ROLLBACK, hashed ids, no values). Strategic eligibility 0 for every HealthKit record; canonical days Sep 23: activity rev 50 (partial_day, 18:35Z), nutrition rev 3 (21:35Z)."
+      "summary": "No production deploy, policy mutation, relationship mutation, TestFlight upload, strategic eligibility change, or Cardio work occurred."
     }
   },
-  "decisions_required": [
-    "Coordinate the Native fix with Codex (not started): advance the day's revision floor on identity-collision abandon; per-day high-water revision that never regresses; uncancellable acknowledge after a durable upload; do not quarantine the state file on locked-device I/O failure.",
-    "Server companions (safe, independent): carry nextExpectedRevision in the 409 body and log the hashed external id + sourceRevision on the 409 warn line; do not silently accept lower revisions.",
-    "Operator visibility: surface the automatic scopes' persisted diagnostics (lastErrorCode, abandonedBatchCount, cursorGeneration, lastDurableAcknowledgement) on the existing canary screen."
-  ],
+  "decisions_required": [],
   "blockers": [],
-  "unexpected_findings": [
-    "409 identity collisions write no command receipt, so the receipts table looks silent while the device is actively retrying; only the web logs show the rejections.",
-    "Nutrition carries the same latent loop (identical revision/cursor mechanism); it survived only for lack of new data.",
-    "Build 55 introduced a new acknowledge-loss window (30 s step timeout can cancel between a durably accepted upload and the local acknowledge), a plausible trigger for exactly this one-revision offset.",
-    "The 2026-09-23 Activity day will stay frozen at the 11:35 PDT value until a fixed device re-emits it with a fresh revision; Activity will appear to recover on its own after local midnight because 2026-09-24's revision numbers are unused."
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Native: revision floor on collision abandon + high-water revision + uncancellable acknowledge + state-file load hardening (Activity and Nutrition builders).",
-    "Server: nextExpectedRevision in 409 body; hashed identity + revision in the 409 log line.",
-    "Native: automatic-scope diagnostics on the canary screen.",
-    "Rerun-after-in-flight guarantees only one fresh pass; a pull during the queued rerun coalesces onto a pass that predates it (secondary staleness hazard)."
+    "Correct all four ninth-review findings with adversarial regressions.",
+    "Rerun relevant Server gates and freeze a new exact Server candidate.",
+    "Obtain another fresh-context independent review.",
+    "Keep deployment, TestFlight upload, September 23 confirmation, strategic eligibility, and Cardio separately gated."
   ],
-  "recommended_next_step": "Founder: no device action; do not force-quit (the cursor is persisted). Confirm passively after local midnight that Activity resumes for 2026-09-24. ChatGPT: route the Native fix to Codex after its Strength task; Server companions can ship independently.",
-  "full_report_path": "agent-handoffs/reports/20260924T012249Z-build55-activity-sync-409-loop-diagnostic.md",
+  "recommended_next_step": "Correct the four findings, freeze a new exact Server candidate, and run a tenth fresh-context independent review.",
+  "full_report_path": "agent-handoffs/reports/20260924T012942Z-strength-reconciliation-ninth-review-rejected.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

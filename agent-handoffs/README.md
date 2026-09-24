@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Strength reconciliation semantics (`codex-strength-reconciliation-semantics-20260923`)
+- Task: Strength reconciliation ninth fresh-context review (`codex-strength-reconciliation-ninth-review-20260923`)
 - Agent: codex
 - Status: partial
-- Generated (UTC): 2026-09-24T01:20:12Z
+- Generated (UTC): 2026-09-24T01:29:42Z
 - Success: false
 
-Summary: All three eighth-review findings are corrected in exact clean Server and unchanged Native Build 56 candidates. Relevant Server, Phase, lint, and production-build gates passed. Ninth fresh-context review is pending; production remains unchanged.
+Summary: Ninth fresh-context review rejected the exact candidates for four remaining fail-closed semantic gaps. Production remains unchanged while Server corrections proceed.
 
-Detailed report: `agent-handoffs/reports/20260924T012012Z-strength-reconciliation-eighth-review-corrections.md`
+Detailed report: `agent-handoffs/reports/20260924T012942Z-strength-reconciliation-ninth-review-rejected.md`
 
 Protocol: `agent-handoffs/README.md`
