@@ -20,7 +20,7 @@ Status: IN PROGRESS — read-only forensic audit. This is a durable interim chec
 
 This audit traces the Founder-observed Sep 20–22 Midweek failure from canonical evidence through evidence eligibility, V3 interpretation and Confidence, Midweek assembly, narrative composition, persistence, API projection, Native decoding, and web/Native presentation.
 
-No product source, production data, policy, deployment, build, historical artifact, branch, or Codex A worktree has been modified. No regeneration was performed.
+No product source, production data, policy, deployment, build, historical artifact, implementation branch, or Codex A worktree has been modified. The only repository mutation is this documentation-only report commit on `main`. No regeneration was performed.
 
 ## Pipeline layers audited so far
 
