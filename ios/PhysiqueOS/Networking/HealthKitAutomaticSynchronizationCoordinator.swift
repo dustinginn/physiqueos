@@ -104,6 +104,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     private let synchronizer: any HealthKitAutomaticSynchronizing
     private let server: any HealthKitFounderCanaryServer
     private let deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore
+    private let synchronizationStore: (any HealthKitSynchronizationStore)?
     private let stepTimeout: Duration
 
     private(set) var lastBootstrapOutcome: HealthKitAutomaticBootstrapOutcome?
@@ -131,13 +132,45 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         synchronizer: any HealthKitAutomaticSynchronizing,
         server: any HealthKitFounderCanaryServer,
         deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore = KeychainHealthKitCanaryDeviceIdentityStore(),
+        synchronizationStore: (any HealthKitSynchronizationStore)? = nil,
         stepTimeout: Duration = .seconds(30)
     ) {
         self.authorization = authorization
         self.synchronizer = synchronizer
         self.server = server
         self.deviceIdentityStore = deviceIdentityStore
+        self.synchronizationStore = synchronizationStore
         self.stepTimeout = stepTimeout
+    }
+
+    /// Read-only Founder diagnostics for the permanent automatic scopes.
+    /// This never starts a query or upload and exposes no HealthKit values or
+    /// device identity; it only projects the protected local store's health
+    /// and daily-revision recovery metadata.
+    @MainActor
+    func diagnosticSnapshot() async -> [HealthKitSynchronizationStream: HealthKitStreamDiagnostics] {
+        guard let synchronizationStore else { return [:] }
+        let ownerIdentity: String
+        if let cachedOwnerIdentity {
+            ownerIdentity = cachedOwnerIdentity
+        } else if let fetched = try? await server.founderOwnerIdentity() {
+            ownerIdentity = fetched
+            cachedOwnerIdentity = fetched
+        } else {
+            return [:]
+        }
+        guard let deviceIdentity = try? deviceIdentityStore.stableIdentity() else { return [:] }
+        var snapshot: [HealthKitSynchronizationStream: HealthKitStreamDiagnostics] = [:]
+        for stream in Self.streams {
+            let scope = HealthKitCursorScope(
+                ownerIdentity: ownerIdentity,
+                enrolledDeviceIdentity: deviceIdentity,
+                stream: stream,
+                predicateVersion: Self.predicateVersion
+            )
+            snapshot[stream] = try? await synchronizationStore.diagnostics(for: scope)
+        }
+        return snapshot
     }
 
     @MainActor

@@ -72,7 +72,9 @@ struct TrainingSessionDetailView: View {
         case .loaded(.some(let session)):
             VStack(alignment: .leading, spacing: 24) {
                 header(for: session)
-                if let telemetry = session.telemetry {
+                if let attachment = session.healthKitAttachment {
+                    appleHealthAttachmentCard(attachment)
+                } else if let telemetry = session.telemetry {
                     telemetryCard(telemetry)
                 }
                 if session.showsGeneratedSummaryInsteadOfStructuredExercises {
@@ -108,6 +110,44 @@ struct TrainingSessionDetailView: View {
                 }
                 if let heartRate = telemetry.averageHeartRate {
                     telemetryRow("\(Int(heartRate)) bpm avg HR")
+                }
+            }
+        }
+    }
+
+    private func appleHealthAttachmentCard(_ attachment: HealthKitWorkoutAttachmentReadModel) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeading("Apple Health")
+                HStack(spacing: 8) {
+                    Image(systemName: "applewatch")
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(attachment.source.sourceName)
+                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        Text("Confirmed with Workout Logger")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                }
+                if let timeRange = Self.formatTimeRange(
+                    start: attachment.session.startedAt,
+                    end: attachment.session.endedAt
+                ) { telemetryRow(timeRange) }
+                if let duration = attachment.session.durationSeconds,
+                   let label = Self.formatDuration(duration) { telemetryRow(label) }
+                if let calories = attachment.session.activeCalories {
+                    telemetryRow("\(Int(calories.rounded())) active cal")
+                }
+                if let calories = attachment.session.totalCalories {
+                    telemetryRow("\(Int(calories.rounded())) total cal")
+                }
+                if let heartRate = attachment.session.averageHeartRate {
+                    telemetryRow("\(Int(heartRate.rounded())) bpm avg HR")
+                }
+                if let distance = attachment.session.distance {
+                    telemetryRow("\(distance.formatted(.number.precision(.fractionLength(0...2)))) \(attachment.session.distanceUnit ?? "")".trimmingCharacters(in: .whitespaces))
                 }
             }
         }

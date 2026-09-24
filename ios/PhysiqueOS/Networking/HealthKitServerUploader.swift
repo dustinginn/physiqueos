@@ -171,11 +171,15 @@ private extension ProductionJSONValue {
     }
 
     var uint64Value: UInt64? {
+        // JSON numbers arrive as Double. Values above JavaScript's exact
+        // integer range cannot be trusted as an authoritative revision and
+        // converting the rounded 2^64 representation can trap.
+        let maximumExactJSONInteger = 9_007_199_254_740_991.0
         guard case let .number(value) = self,
               value.isFinite,
               value.rounded(.towardZero) == value,
               value >= 0,
-              value <= Double(UInt64.max)
+              value <= maximumExactJSONInteger
         else { return nil }
         return UInt64(value)
     }

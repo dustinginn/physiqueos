@@ -163,6 +163,11 @@ struct ActivityHistoryView: View {
                                     .foregroundStyle(PhysiqueOSTheme.accent)
                             }
                             ActivityMetricGridView(day: day)
+                            if let warning = day.energyAnomalyMessage {
+                                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                    .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                            }
                         }
                         .padding(12)
                         .background(PhysiqueOSTheme.surfaceMuted)

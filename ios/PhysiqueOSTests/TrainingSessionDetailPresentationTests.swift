@@ -15,13 +15,32 @@ final class TrainingSessionDetailPresentationTests: XCTestCase {
     }
     private func session(
         exercises: [TrainingExerciseOccurrence] = [],
-        telemetry: TrainingSessionTelemetryReadModel? = nil
+        telemetry: TrainingSessionTelemetryReadModel? = nil,
+        healthKitAttachment: HealthKitWorkoutAttachmentReadModel? = nil
     ) -> TrainingSessionDetailReadModel {
         TrainingSessionDetailReadModel(
             id: "session-1", label: "Traditional Strength Training", value: "438 active cal",
             detail: "7:45 AM-8:44 AM · 59 min · 121 bpm avg HR · Leg Press: 1 x 15 @ 225 lb",
             date: "2026-09-14", sourceEvidence: ["Apple Fitness", "Training Logger"],
-            exercises: exercises, exerciseRelationshipGroups: [], telemetry: telemetry
+            exercises: exercises, exerciseRelationshipGroups: [], telemetry: telemetry,
+            healthKitAttachment: healthKitAttachment
+        )
+    }
+
+    private func healthKitAttachment(activeCalories: Double? = 410) -> HealthKitWorkoutAttachmentReadModel {
+        HealthKitWorkoutAttachmentReadModel(
+            canonicalWorkoutId: "healthkit_canonical_workout_sep23", family: "strength",
+            canonicalType: "traditional_strength_training",
+            relationship: .init(
+                status: "confirmed", confirmedAt: "2026-09-24T02:46:00.000Z",
+                contentAuthority: .init(trainingContent: "workout_logger", telemetry: "healthkit")
+            ),
+            source: .init(application: "Apple Health", sourceName: "Apple Watch", productType: "Watch7,5"),
+            session: .init(
+                startedAt: "2026-09-23T17:00:00.000Z", endedAt: "2026-09-23T18:00:00.000Z",
+                durationSeconds: 3600, activeCalories: activeCalories, totalCalories: 515,
+                distance: nil, distanceUnit: nil, averageHeartRate: 122
+            )
         )
     }
 
@@ -65,6 +84,23 @@ final class TrainingSessionDetailPresentationTests: XCTestCase {
         XCTAssertNil(structuredOnly.telemetry)
         XCTAssertTrue(structuredOnly.showsWorkoutValueInHeader)
         XCTAssertFalse(structuredOnly.showsGeneratedSummaryInsteadOfStructuredExercises)
+    }
+
+    func testConfirmedAppleAttachmentKeepsLoggerExercisesAndOwnsTelemetryPresentation() {
+        let exercises = [exercise("bench_press", sets: 4)]
+        let confirmed = session(exercises: exercises, healthKitAttachment: healthKitAttachment())
+        XCTAssertEqual(confirmed.exercises, exercises)
+        XCTAssertEqual(confirmed.healthKitAttachment?.relationship.status, "confirmed")
+        XCTAssertEqual(confirmed.healthKitAttachment?.relationship.contentAuthority.trainingContent, "workout_logger")
+        XCTAssertEqual(confirmed.healthKitAttachment?.relationship.contentAuthority.telemetry, "healthkit")
+        XCTAssertEqual(confirmed.healthKitAttachment?.source.sourceName, "Apple Watch")
+        XCTAssertEqual(confirmed.healthKitAttachment?.session.activeCalories, 410)
+        XCTAssertFalse(confirmed.showsWorkoutValueInHeader)
+        XCTAssertFalse(confirmed.showsGeneratedSummaryInsteadOfStructuredExercises)
+    }
+
+    func testMissingAppleEnergyStaysMissing() {
+        XCTAssertNil(healthKitAttachment(activeCalories: nil).session.activeCalories)
     }
 
     func testEachExerciseAndItsSetsAppearExactlyOnceInTheStructuredBreakdown() {

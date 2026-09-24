@@ -93,6 +93,11 @@ struct ActivityDayView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Activity Metrics")
                 ActivityMetricGridView(day: day)
+                if let warning = day.energyAnomalyMessage {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                }
             }
         }
     }

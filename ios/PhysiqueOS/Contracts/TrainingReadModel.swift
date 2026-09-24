@@ -361,9 +361,13 @@ struct TrainingSessionDetailReadModel: Codable, Equatable, Identifiable {
     /// can render telemetry once and exercises once, never a duplicated
     /// backend-style summary on top of the structured breakdown.
     var telemetry: TrainingSessionTelemetryReadModel? = nil
+    /// A Server-verified, one-to-one confirmed Apple workout attachment.
+    /// Logger content remains authoritative; this carries HealthKit source
+    /// and session telemetry only. Missing/unconfirmed relationships omit it.
+    var healthKitAttachment: HealthKitWorkoutAttachmentReadModel? = nil
     /// Telemetry already carries calories/duration; the header must not
     /// repeat those values above the workout summary.
-    var showsWorkoutValueInHeader: Bool { telemetry == nil }
+    var showsWorkoutValueInHeader: Bool { telemetry == nil && healthKitAttachment == nil }
     /// Authenticated opaque screenshot descriptors canonically bound to
     /// this exact session. No storage URL/object key is exposed.
     var supportingMedia: [TrainingSessionSupportingMedia]? = nil
@@ -379,7 +383,42 @@ struct TrainingSessionDetailReadModel: Codable, Equatable, Identifiable {
     /// same session — Build 33's fix for the Founder-observed duplicate
     /// Workout Detail summary. `detail` is the fallback ONLY when there is
     /// neither a structured breakdown nor typed workout telemetry exists.
-    var showsGeneratedSummaryInsteadOfStructuredExercises: Bool { exercises.isEmpty && telemetry == nil }
+    var showsGeneratedSummaryInsteadOfStructuredExercises: Bool {
+        exercises.isEmpty && telemetry == nil && healthKitAttachment == nil
+    }
+}
+
+struct HealthKitWorkoutAttachmentReadModel: Codable, Equatable {
+    struct Relationship: Codable, Equatable {
+        struct ContentAuthority: Codable, Equatable {
+            var trainingContent: String
+            var telemetry: String
+        }
+        var status: String
+        var confirmedAt: String
+        var contentAuthority: ContentAuthority
+    }
+    struct Source: Codable, Equatable {
+        var application: String
+        var sourceName: String
+        var productType: String?
+    }
+    struct Session: Codable, Equatable {
+        var startedAt: String?
+        var endedAt: String?
+        var durationSeconds: Double?
+        var activeCalories: Double?
+        var totalCalories: Double?
+        var distance: Double?
+        var distanceUnit: String?
+        var averageHeartRate: Double?
+    }
+    var canonicalWorkoutId: String
+    var family: String
+    var canonicalType: String?
+    var relationship: Relationship
+    var source: Source
+    var session: Session
 }
 
 /// Raw values only — no server-side display formatting. A workout

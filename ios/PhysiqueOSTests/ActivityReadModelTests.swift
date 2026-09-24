@@ -167,6 +167,26 @@ final class ActivityReadModelTests: XCTestCase {
         }
     }
 
+    func testConfirmedWorkoutAttributionAndEnergyAnomalyDecodeWithoutHidingTheFloor() throws {
+        let json = Data(#"""
+        {"id":"sep23","label":"Daily Activity","value":"300 active cal","detail":"1 workout linked","date":"2026-09-23","isToday":false,
+         "activeCalories":300,"totalCalories":null,"exerciseMinutes":60,"standHours":11,
+         "moveGoal":650,"exerciseGoal":null,"standGoal":null,"ringCompletion":null,
+         "workoutActiveCalories":410,"nonWorkoutActiveCalories":0,"linkedTrainingSessionCount":1,
+         "workoutEnergyAttribution":{"policy":"workout_energy_is_descriptive_never_additive","confirmedHealthKitWorkoutCount":1},
+         "energyAnomaly":{"code":"WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY","dailyActiveCalories":300,"workoutActiveCalories":410},
+         "protocolStatus":"350 active calories below the recorded daily target."}
+        """#.utf8)
+        let day = try JSONDecoder().decode(ActivityDayRecord.self, from: json)
+        XCTAssertEqual(day.workoutEnergyAttribution?.confirmedHealthKitWorkoutCount, 1)
+        XCTAssertEqual(day.metricTiles.first { $0.label == "Workout Calories" }?.value, "410 cal")
+        XCTAssertEqual(day.metricTiles.first { $0.label == "Non-Workout Calories" }?.value, "0 cal")
+        XCTAssertEqual(
+            day.energyAnomalyMessage,
+            "Workout energy (410 cal) exceeds the recorded daily active total (300 cal). Non-workout calories are shown as 0."
+        )
+    }
+
     // MARK: - Server-owned intelligence remains presentation data, never recomputed
 
     /// `protocolStatus` must decode as an opaque, already-formatted server

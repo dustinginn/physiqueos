@@ -172,6 +172,13 @@ struct ActivityDayRecord: Codable, Equatable, Identifiable {
     var workoutActiveCalories: Double?
     var nonWorkoutActiveCalories: Double?
     var linkedTrainingSessionCount: Int
+    /// Explicit non-additive attribution from confirmed HealthKit workout
+    /// relationships. Optional for pre-integration Server payloads.
+    var workoutEnergyAttribution: ActivityWorkoutEnergyAttribution? = nil
+    /// Present when included workout energy exceeds the whole-day active
+    /// energy total. Non-workout calories remain safely floored at zero, but
+    /// the inconsistency is never hidden from the Founder.
+    var energyAnomaly: ActivityEnergyAnomaly? = nil
     /// Goal/Phase chronology adoption (see `EvidenceChronology.swift`):
     /// Activity's scope selector had the identical "inert pills, no second
     /// scoped dataset" gap Training's did (same shared
@@ -190,6 +197,17 @@ struct ActivityDayRecord: Codable, Equatable, Identifiable {
     /// `TrainingExerciseBenchmark.comparison`) — never recomputed from the
     /// numeric fields above.
     var protocolStatus: String
+}
+
+struct ActivityWorkoutEnergyAttribution: Codable, Equatable {
+    var policy: String
+    var confirmedHealthKitWorkoutCount: Int
+}
+
+struct ActivityEnergyAnomaly: Codable, Equatable {
+    var code: String
+    var dailyActiveCalories: Double
+    var workoutActiveCalories: Double
 }
 
 /// `daily_activity.ring_completion` — move/exercise/stand completion
@@ -218,6 +236,11 @@ struct ActivityMetricTile: Identifiable, Equatable {
 }
 
 extension ActivityDayRecord {
+    var energyAnomalyMessage: String? {
+        guard energyAnomaly?.code == "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY",
+              let anomaly = energyAnomaly else { return nil }
+        return "Workout energy (\(Self.formatNumber(anomaly.workoutActiveCalories)) cal) exceeds the recorded daily active total (\(Self.formatNumber(anomaly.dailyActiveCalories)) cal). Non-workout calories are shown as 0."
+    }
     /// Mirrors `formatOptionalCalories`/`formatOptionalMinutes`/
     /// `formatOptionalHours` exactly: `"{n} cal"` / `"{n} min"` / `"{n}
     /// hr"`, or `"Pending"` when the value isn't present/finite. These are

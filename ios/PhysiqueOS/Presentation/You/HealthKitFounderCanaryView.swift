@@ -24,6 +24,7 @@ struct HealthKitFounderCanaryView: View {
     @State private var isWorkoutWorking = false
     @State private var workoutResult: HealthKitWorkoutCanaryRunResult?
     @State private var workoutError: String?
+    @State private var automaticDiagnostics: [HealthKitSynchronizationStream: HealthKitStreamDiagnostics] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -93,6 +94,7 @@ struct HealthKitFounderCanaryView: View {
             }
             if let result { resultView(result) }
 
+            automaticDiagnosticsCard
             canonicalTestDayCard
             workoutCanaryCard
         }
@@ -172,6 +174,46 @@ struct HealthKitFounderCanaryView: View {
                 }
             }
             .preferredColorScheme(.dark)
+        }
+        .task {
+            automaticDiagnostics = await environment.healthKitAutomaticSynchronizationCoordinator.diagnosticSnapshot()
+        }
+    }
+
+    private var automaticDiagnosticsCard: some View {
+        CardContainer(padding: .md) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Automatic sync diagnostics")
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text("Read-only protected-device state for the permanent automatic scopes. This card does not start a sync.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                automaticDiagnosticRows("Activity", stream: .activitySummary)
+                automaticDiagnosticRows("Nutrition", stream: .nutritionDailyTotal)
+                automaticDiagnosticRows("Workouts", stream: .workouts)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func automaticDiagnosticRows(_ label: String, stream: HealthKitSynchronizationStream) -> some View {
+        if let diagnostic = automaticDiagnostics[stream] {
+            statusRow("\(label) scope", "automatic / \(stream.rawValue)")
+            statusRow("\(label) last attempt", diagnostic.lastUploadAttempt?.formatted() ?? "None")
+            statusRow("\(label) last query", diagnostic.lastSuccessfulAnchoredQuery?.formatted() ?? "None")
+            statusRow("\(label) pending", String(diagnostic.pendingBatchCount))
+            statusRow("\(label) abandoned", String(diagnostic.abandonedBatchCount ?? 0))
+            statusRow("\(label) cursor generation", diagnostic.cursorGeneration.map(String.init) ?? "None")
+            statusRow("\(label) revision floors", String(diagnostic.dailyRevisionFloorCount ?? 0))
+            if let localDate = diagnostic.lastDailyRevisionRecoveryLocalDate,
+               let nextExpected = diagnostic.lastDailyRevisionNextExpected {
+                statusRow("\(label) last rebase", "\(localDate) → \(nextExpected)")
+            }
+            statusRow("\(label) acknowledgement", diagnostic.lastDurableAcknowledgement?.formatted() ?? "None")
+            statusRow("\(label) error", diagnostic.lastErrorCode ?? "None")
+        } else {
+            statusRow("\(label)", "No local automatic state")
         }
     }
 

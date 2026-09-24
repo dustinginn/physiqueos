@@ -624,7 +624,8 @@ final class AppEnvironment {
         self.healthKitAutomaticSynchronizationCoordinator = HealthKitAutomaticSynchronizationCoordinator(
             authorization: self.healthKitAuthorizationCoordinator,
             synchronizer: self.healthKitSynchronizationEngine,
-            server: productionNativeAPI
+            server: productionNativeAPI,
+            synchronizationStore: healthKitSynchronizationStore
         )
         let canaryGate = HealthKitFeatureGate.founderActivityValidation
         let canaryAuthorization = HealthKitAuthorizationCoordinator(

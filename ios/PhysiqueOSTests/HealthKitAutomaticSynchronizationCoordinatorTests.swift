@@ -78,6 +78,27 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         XCTAssertEqual(syncCount, 3)
     }
 
+    @MainActor
+    func testFounderDiagnosticSnapshotReadsOnlyTheExactAutomaticScopes() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PhysiqueOSAutomaticDiagnostics-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = FileHealthKitSynchronizationStore(root: root)
+        let coordinator = HealthKitAutomaticSynchronizationCoordinator(
+            authorization: AutomaticAuthorizationMock(),
+            synchronizer: AutomaticSynchronizerMock(),
+            server: AutomaticServerMock(),
+            deviceIdentityStore: AutomaticDeviceIdentityStore(),
+            synchronizationStore: store
+        )
+
+        let snapshot = await coordinator.diagnosticSnapshot()
+
+        XCTAssertEqual(Set(snapshot.keys), Self.allStreams)
+        XCTAssertTrue(snapshot.values.allSatisfy { $0.pendingBatchCount == 0 })
+        XCTAssertTrue(snapshot.values.allSatisfy { ($0.dailyRevisionFloorCount ?? 0) == 0 })
+    }
+
     /// Build 54 inverts the old "never Workout" invariant: the automatic
     /// path now observes `HKWorkout` samples prospectively. Order matters
     /// only for readability (daily aggregates first), but the SET is exact:

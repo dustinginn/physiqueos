@@ -44,6 +44,25 @@ final class HealthKitSynchronizationTests: XCTestCase {
             ])
         )
         XCTAssertNil(HealthKitDailyRevisionRecovery(problem: nonMonotonic))
+
+        let roundedBeyondExactJSONInteger = ProductionProblemDetails(
+            problemVersion: "1", type: nil, title: "collision", status: 409,
+            code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION", detail: nil,
+            instance: nil, requestId: nil, fieldErrors: [],
+            recovery: .object([
+                "kind": .string("healthkit_daily_revision_collision"),
+                "schemaVersion": .string("healthkit-daily-revision-recovery-v1"),
+                "observationType": .string("activity_summary"),
+                "localDate": .string("2026-09-23"),
+                "receivedSourceRevision": .number(9_007_199_254_740_992),
+                "nextExpectedRevision": .number(9_007_199_254_740_992),
+                "identityDigest": .string(String(repeating: "a", count: 64)),
+            ])
+        )
+        XCTAssertNil(
+            HealthKitDailyRevisionRecovery(problem: roundedBeyondExactJSONInteger),
+            "A rounded JSON Double must never become a durable revision floor"
+        )
     }
 
     func testObserverWakeRunsAnchoredQueryAndCompletesAfterStagingBeforeUpload() async throws {
