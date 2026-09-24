@@ -124,7 +124,7 @@ function isPresentableConfirmedStrengthLink({ link, workout, loggerSession }) {
   const payload = loggerSession.payload ?? loggerSession;
   const loggerUserId = loggerSession.userId ?? payload.userId;
   const loggerDate = String(payload.observed_at ?? "").slice(0, 10);
-  return loggerSession.canonicalId === payload.id &&
+  return hasExactNativeLoggerIdentityPair(loggerSession.canonicalId, payload.id) &&
     link.loggerSessionCanonicalId === loggerSession.canonicalId &&
     link.schemaVersion === HEALTHKIT_WORKOUT_LINK_SCHEMA_VERSION &&
     link.matcherVersion === HEALTHKIT_WORKOUT_MATCHER_VERSION &&
@@ -135,6 +135,16 @@ function isPresentableConfirmedStrengthLink({ link, workout, loggerSession }) {
     link.localDate === loggerDate &&
     exactObject(link.contentAuthority, { trainingContent: "workout_logger", telemetry: "healthkit" }) &&
     exactObject(link.evidenceEligibility, createHealthKitQuarantinedEligibility());
+}
+
+function hasExactNativeLoggerIdentityPair(canonicalId, payloadId) {
+  const canonicalPrefix = "training|authoritative|training_logger_draft_";
+  const payloadPrefix = "training_logger_session_";
+  if (!String(canonicalId ?? "").startsWith(canonicalPrefix) ||
+      !String(payloadId ?? "").startsWith(payloadPrefix)) return false;
+  const canonicalSessionId = String(canonicalId).slice(canonicalPrefix.length);
+  const payloadSessionId = String(payloadId).slice(payloadPrefix.length);
+  return canonicalSessionId.length > 0 && canonicalSessionId === payloadSessionId;
 }
 
 function exactObject(value, expected) {

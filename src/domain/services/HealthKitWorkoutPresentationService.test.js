@@ -12,8 +12,11 @@ describe("confirmed HealthKit workout presentation", () => {
     const fixture = createSep23StrengthPresentationFixture();
     const before = structuredClone(fixture.canonicalEvidenceObjects);
     const attachments = projectConfirmedHealthKitWorkoutAttachments(fixture);
+    const logger = fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session);
 
     expect(attachments).toHaveLength(1);
+    expect(logger.payload.id).toBe("training_logger_session_E0E5F723-E306-4CC1-9D35-7F867514A406");
+    expect(logger.payload.id).not.toBe(logger.canonicalId);
     expect(attachments[0]).toMatchObject({
       canonicalWorkoutId: fixture.ids.workout,
       loggerSessionCanonicalId: fixture.ids.session,
@@ -135,7 +138,10 @@ describe("confirmed HealthKit workout presentation", () => {
     const secondLinkId = getHealthKitWorkoutLinkRecordId(secondWorkoutId, secondSessionId);
     const logger = structuredClone(fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session));
     logger.canonicalId = secondSessionId;
-    logger.payload.id = secondSessionId;
+    logger.payload.id = secondSessionId.replace(
+      "training|authoritative|training_logger_draft_",
+      "training_logger_session_",
+    );
     logger.payload.metadata.start_time = "2026-09-23T12:00:00-07:00";
     fixture.canonicalEvidenceObjects.push(logger);
     const workout = structuredClone(fixture.canonicalWorkouts[0]);
@@ -182,7 +188,10 @@ describe("confirmed HealthKit workout presentation", () => {
     const secondLinkId = getHealthKitWorkoutLinkRecordId(secondWorkoutId, secondSessionId);
     const logger = structuredClone(fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session));
     logger.canonicalId = secondSessionId;
-    logger.payload.id = secondSessionId;
+    logger.payload.id = secondSessionId.replace(
+      "training|authoritative|training_logger_draft_",
+      "training_logger_session_",
+    );
     logger.payload.metadata.start_time = "2026-09-23T12:00:00-07:00";
     fixture.canonicalEvidenceObjects.push(logger);
     const workout = structuredClone(fixture.canonicalWorkouts[0]);
@@ -258,7 +267,10 @@ describe("confirmed HealthKit workout presentation", () => {
     const second = structuredClone(fixture.canonicalEvidenceObjects
       .find((record) => record.canonicalId === fixture.ids.session));
     second.canonicalId = `${fixture.ids.session}-walk`;
-    second.payload.id = second.canonicalId;
+    second.payload.id = second.canonicalId.replace(
+      "training|authoritative|training_logger_draft_",
+      "training_logger_session_",
+    );
     second.payload.metadata.activity_type = "Walking";
     fixture.canonicalEvidenceObjects.push(second);
     const log = {

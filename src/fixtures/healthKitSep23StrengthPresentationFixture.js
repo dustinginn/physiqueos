@@ -8,6 +8,7 @@ const OWNER = "user_founder_001";
 const DAY = "2026-09-23";
 const WORKOUT_ID = "healthkit_canonical_workout_9e609fffe3d46943d0b5d5525a89c99c441f9efe";
 const SESSION_ID = "training|authoritative|training_logger_draft_E0E5F723-E306-4CC1-9D35-7F867514A406";
+const SESSION_PAYLOAD_ID = "training_logger_session_E0E5F723-E306-4CC1-9D35-7F867514A406";
 const LINK_ID = "healthkit_workout_link_10d4b9fb207974242a4277816460eb076fa4a7dd";
 const WORKOUT_CLAIM_ID = "healthkit_link_claim_w_0bf0a0e59c84c0dbd7f1638e6d967caee6356264";
 const SESSION_CLAIM_ID = "healthkit_link_claim_s_12126799d47847ac87c7b702828eafe458a21a4a";
@@ -42,7 +43,7 @@ export function createSep23StrengthPresentationFixture({
     version: 7,
     quality: { status: "active" },
     payload: {
-      id: SESSION_ID,
+      id: SESSION_PAYLOAD_ID,
       evidence_type: "training",
       observed_at: DAY,
       source: { application: "Training Logger", modality: "manual" },
