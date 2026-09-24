@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T03:37:00Z",
+  "generated_at_utc": "2026-09-24T04:07:00Z",
   "task": {
     "id": "codex-healthkit-revision-recovery-strength-presentation-20260923",
     "title": "HealthKit daily-revision recovery and Strength presentation",
@@ -17,22 +17,22 @@
     "native_build": 56
   },
   "result": {
-    "summary": "The fail-closed Server/Native daily-revision recovery is implemented at Server 61d54b47 and Native a30ad740. Server 14/14 + 41/41 and Native iPhone 17 Pro 52/52 focused tests pass; deliberate mutations prove the Server floor increment and accepted-to-ack durability guards are load-bearing. No production mutation, deployment, TestFlight upload, Activity repair, policy change, or Cardio work occurred. Strength presentation and fresh-context review remain in progress.",
+    "summary": "Complete candidates are frozen at Server 1f50421f and Native 85e07acb. Daily-revision recovery, Founder automatic-scope diagnostics, and confirmed-Strength Workout Detail / Activity / Log presentation are implemented. Server 89/89 + 3/3 + 441/441 and Native iPhone 17 Pro 81/81 + 302/302 + restored 8/8 suites pass; presentation mutations were caught and restored. Fresh-context review is in progress. No production mutation, deployment, TestFlight upload, Activity repair, policy change, or Cardio work occurred.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
     "strength_graduation_verdict": "green",
-    "implementation_status": "reliability_implemented_strength_presentation_in_progress"
+    "implementation_status": "exact_candidates_frozen_fresh_review_in_progress"
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server HealthKit contract 14/14, canonical persistence 41/41, changed-file ESLint, and Native iPhone 17 Pro targeted suites 52/52 passed."
+      "summary": "Server focused suites 89/89 + Activity 3/3 + HealthKit 441/441; Native iPhone 17 Pro suites 81/81 + 302/302 + restored presentation 8/8 passed."
     },
     "review": {
       "status": "pending",
-      "summary": "Fresh-context adversarial review will run after the Strength presentation slice is complete on the exact combined candidates."
+      "summary": "Fresh-context adversarial review is running against exact Server 1f50421f and Native 85e07acb candidate ranges."
     },
     "authority_audit": {
       "status": "passed",
@@ -51,13 +51,13 @@
   "blockers": [],
   "unexpected_findings": [],
   "backlog": [
-    "Complete and independently review the Strength presentation slice on the exact Server/Native candidates.",
+    "Complete the in-flight fresh-context independent review of the exact Server/Native candidates.",
     "Keep Workout strategic eligibility and global linkAutoConfirm off unless separately authorized.",
     "Cardio is the next eligible domain but must not begin without a separate instruction.",
     "Design and dry-run the bounded September 23 Activity repair only after the reviewed correction, then ask before mutation."
   ],
-  "recommended_next_step": "Complete confirmed-Strength Workout Detail, Activity, and Log presentation; run combined suites and fresh-context review; publish exact candidates; stop for Server deployment authorization.",
-  "full_report_path": "agent-handoffs/reports/20260924T033700Z-healthkit-revision-recovery-implemented.md",
+  "recommended_next_step": "Complete fresh-context review, publish its result, and stop for separate Founder authorization before any Server deployment.",
+  "full_report_path": "agent-handoffs/reports/20260924T040700Z-healthkit-revision-strength-presentation-candidates.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
