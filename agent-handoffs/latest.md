@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Strength reconciliation ninth fresh-context review (`codex-strength-reconciliation-ninth-review-20260923`)
+- Task: Strength reconciliation ninth-review corrections (`codex-strength-reconciliation-ninth-corrections-20260923`)
 - Agent: codex
 - Status: partial
-- Generated (UTC): 2026-09-24T01:29:42Z
+- Generated (UTC): 2026-09-24T01:39:09Z
 - Success: false
 
-Summary: Ninth fresh-context review rejected the exact candidates for historical-claim identity, lifecycle actor/reason, Founder basis semantic-binding, and edit-context read-boundary gaps. Production remains unchanged.
+Summary: All four ninth-review fail-closed gaps are corrected in exact Server candidate cb9d14f9 with adversarial regressions and green gates; fresh-context review is next. Production remains unchanged.
 
-Detailed report: `agent-handoffs/reports/20260924T012942Z-strength-reconciliation-ninth-review-rejected.md`
+Detailed report: `agent-handoffs/reports/20260924T013909Z-strength-reconciliation-ninth-corrections.md`
 
 Protocol: `agent-handoffs/README.md`

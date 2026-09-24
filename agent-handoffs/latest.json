@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T01:29:42Z",
+  "generated_at_utc": "2026-09-24T01:39:09Z",
   "task": {
-    "id": "codex-strength-reconciliation-ninth-review-20260923",
-    "title": "Strength reconciliation ninth fresh-context review",
+    "id": "codex-strength-reconciliation-ninth-corrections-20260923",
+    "title": "Strength reconciliation ninth-review corrections",
     "agent": "codex",
     "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "31c88481d80703de3355c51f6695b760b0671020",
-    "final_sha": "b3e30001d05f1cef37a98412cb5187d1bb17c4df",
+    "final_sha": "cb9d14f90ac6851bd7f3cb884b76cba98a3774ce",
     "production_server_sha": "31c88481d80703de3355c51f6695b760b0671020",
     "production_deployment": "42035d0d-9368-4ada-a4c1-392e659f3366",
     "native_sha": "de0d3829836dd2e84327d268d4682c97260260e6",
     "native_build": 56
   },
   "result": {
-    "summary": "Ninth fresh-context review rejected the exact candidates for historical-claim identity, lifecycle actor/reason, Founder basis semantic-binding, and edit-context read-boundary gaps. Production remains unchanged.",
+    "summary": "All four ninth-review fail-closed gaps are corrected in exact Server candidate cb9d14f9 with adversarial regressions and green gates; fresh-context review is next. Production remains unchanged.",
     "success": false,
     "production_mutated": false,
     "deployed": false,
@@ -26,11 +26,11 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Independent reviewer passed Server focused 206/206, Phase 4 139/139, Phase 5 65/65, and Native focused 183/183 on the sole permitted iPhone 17 Pro simulator."
+      "summary": "Focused Server 229/229, direct corrections 43/43, Phase 4 139/139, Phase 5 65/65, ESLint, diff check, and webpack production build passed."
     },
     "review": {
-      "status": "changes_requested",
-      "summary": "Rejected: historical claim entries lacked exact holder identity; lifecycle actors/reasons and Founder basis facts were under-bound; edit context exposed raw reconciliation state."
+      "status": "not_run",
+      "summary": "Exact Server cb9d14f90ac6851bd7f3cb884b76cba98a3774ce and unchanged Native de0d3829836dd2e84327d268d4682c97260260e6 require tenth fresh-context independent review."
     },
     "zero_write_audit": {
       "status": "passed",
@@ -39,15 +39,17 @@
   },
   "decisions_required": [],
   "blockers": [],
-  "unexpected_findings": [],
-  "backlog": [
-    "Correct all four ninth-review findings with adversarial regressions.",
-    "Rerun relevant Server gates and freeze a new exact Server candidate.",
-    "Obtain another fresh-context independent review.",
-    "Keep deployment, TestFlight upload, September 23 confirmation, strategic eligibility, and Cardio separately gated."
+  "unexpected_findings": [
+    "Default Turbopack cannot follow the isolated worktree node_modules symlink; the established webpack production build passed.",
+    "An expanded exploratory run found one unrelated pre-existing canary-audit source-format assertion; 322 other tests passed."
   ],
-  "recommended_next_step": "Correct the four findings, freeze a new exact Server candidate, and run a tenth fresh-context independent review.",
-  "full_report_path": "agent-handoffs/reports/20260924T012942Z-strength-reconciliation-ninth-review-rejected.md",
+  "backlog": [
+    "Obtain tenth fresh-context independent review of the exact candidates.",
+    "If approved, stop and request explicit authorization before any Server deployment.",
+    "Keep Build 56 upload, September 23 confirmation, strategic eligibility, and Cardio separately gated."
+  ],
+  "recommended_next_step": "Run a tenth fresh-context independent review of exact Server cb9d14f90ac6851bd7f3cb884b76cba98a3774ce and unchanged Native de0d3829836dd2e84327d268d4682c97260260e6.",
+  "full_report_path": "agent-handoffs/reports/20260924T013909Z-strength-reconciliation-ninth-corrections.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
