@@ -200,8 +200,8 @@ struct HealthKitFounderCanaryView: View {
     private func automaticDiagnosticRows(_ label: String, stream: HealthKitSynchronizationStream) -> some View {
         if let diagnostic = automaticDiagnostics[stream] {
             statusRow("\(label) scope", "automatic / \(stream.rawValue)")
-            statusRow("\(label) last attempt", diagnostic.lastUploadAttempt?.formatted() ?? "None")
-            statusRow("\(label) last query", diagnostic.lastSuccessfulAnchoredQuery?.formatted() ?? "None")
+            statusRow("\(label) last upload attempt", diagnostic.lastUploadAttempt?.formatted() ?? "None")
+            statusRow("\(label) last successful query", diagnostic.lastSuccessfulAnchoredQuery?.formatted() ?? "None")
             statusRow("\(label) pending", String(diagnostic.pendingBatchCount))
             statusRow("\(label) abandoned", String(diagnostic.abandonedBatchCount ?? 0))
             statusRow("\(label) cursor generation", diagnostic.cursorGeneration.map(String.init) ?? "None")

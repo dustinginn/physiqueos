@@ -400,14 +400,24 @@ actor FileHealthKitSynchronizationStore: HealthKitSynchronizationStore {
         guard batch.partitions.allSatisfy({ $0.attemptState.permitsCursorAdvance }) else { return }
         for partition in batch.partitions {
             if case let .localDeferred(reason) = partition.disposition {
-                envelope.deferredChanges.append(HealthKitDeferredChange(
+                let deferred = HealthKitDeferredChange(
                     batchIdentity: batch.identity,
                     partitionIdentity: partition.identity,
                     reason: reason,
                     additions: partition.additions,
                     deletions: partition.deletions,
                     stagedAt: batch.createdAt
-                ))
+                )
+                // A retained daily Activity revision can intentionally yield
+                // the same local-only tombstone on later foreground queries.
+                // Partition identity binds the exact content, scope, cursor,
+                // purpose, and disposition, so persisting it once is enough;
+                // repeated absence must not grow the protected state file.
+                if !envelope.deferredChanges.contains(where: {
+                    $0.partitionIdentity == deferred.partitionIdentity
+                }) {
+                    envelope.deferredChanges.append(deferred)
+                }
             }
         }
         envelope.authoritativeCursor = batch.proposedCursor

@@ -131,13 +131,24 @@ actor HealthKitSynchronizationEngine {
                 bounds: nil
             )
         } catch HealthKitSyncError.corruptCursor {
-            try await store.resetCursorForBoundedRecovery(for: scope)
-            cursor = nil
-            raw = try await executeBoundedQuery(
-                stream: scope.stream,
-                after: try await queryCursorData(cursor: nil, scope: scope),
-                bounds: nil
-            )
+            do {
+                try await store.resetCursorForBoundedRecovery(for: scope)
+                cursor = nil
+                raw = try await executeBoundedQuery(
+                    stream: scope.stream,
+                    after: try await queryCursorData(cursor: nil, scope: scope),
+                    bounds: nil
+                )
+            } catch let error as HealthKitSyncError {
+                try? await store.recordOperationalError(for: scope, code: error.diagnosticCode)
+                throw error
+            }
+        } catch let error as HealthKitSyncError {
+            try? await store.recordOperationalError(for: scope, code: error.diagnosticCode)
+            throw error
+        } catch {
+            try? await store.recordOperationalError(for: scope, code: "healthkit_query_failed")
+            throw error
         }
         try Task.checkCancellation()
         let result = applyWorkoutActivationFloor(to: raw, scope: scope)

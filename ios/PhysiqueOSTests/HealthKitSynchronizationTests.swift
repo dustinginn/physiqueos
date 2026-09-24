@@ -323,6 +323,41 @@ final class HealthKitSynchronizationTests: XCTestCase {
         XCTAssertNotNil(finalCursor)
     }
 
+    func testNutritionDailyIdentityCollisionPersistsIndependentFloorAcrossRelaunch() async throws {
+        let first = Self.nutritionDailyResult(revision: 2, calories: 2_050, cursorFingerprint: "stale-nutrition")
+        let second = Self.nutritionDailyResult(revision: 8, calories: 2_175, cursorFingerprint: "current-nutrition")
+        let harness = try Harness(
+            stream: .nutritionDailyTotal,
+            gate: .enabled,
+            queryResults: [first],
+            uploadModes: [.dailyCollision(observationType: .nutritionDailyTotal, received: 2, nextExpected: 8)]
+        )
+
+        await XCTAssertThrowsErrorAsync { try await harness.engine.synchronize(scope: harness.scope) }
+        let floorsAfterCollision = try await harness.store.dailyRevisionFloors(for: harness.scope)
+        XCTAssertEqual(floorsAfterCollision, ["2026-09-23": 8])
+
+        let reopened = FileHealthKitSynchronizationStore(root: harness.root)
+        let query = MockQueryClient(results: [second])
+        let uploader = MockUploader(modes: [.accept])
+        let restarted = HealthKitSynchronizationEngine(
+            queryClient: query,
+            observerClient: MockObserverClient(),
+            store: reopened,
+            uploader: uploader,
+            featureGate: .enabled,
+            now: { Self.now }
+        )
+        try await restarted.synchronize(scope: harness.scope)
+
+        let uploadedRevisions = await uploader.receivedDailyRevisions()
+        let finalFloors = try await reopened.dailyRevisionFloors(for: harness.scope)
+        let finalCursor = try await reopened.authoritativeCursor(for: harness.scope)
+        XCTAssertEqual(uploadedRevisions, [8])
+        XCTAssertEqual(finalFloors, [:])
+        XCTAssertNotNil(finalCursor)
+    }
+
     func testProtectedDataReadFailureDoesNotQuarantineOrResetDurableState() async throws {
         let harness = try Harness(stream: .activeEnergy, gate: .queryOnly)
         try await harness.engine.synchronize(scope: harness.scope)
@@ -696,6 +731,33 @@ final class HealthKitSynchronizationTests: XCTestCase {
         XCTAssertEqual(uploadCount, 0)
     }
 
+    func testRepeatedIdenticalDeferredDeletionDoesNotGrowDurableState() async throws {
+        let checkpoint = HealthKitAnchoredQueryResult(
+            additions: [], deletions: [], proposedAnchorData: Data("activity-anchor".utf8), completedAt: Self.now
+        )
+        let deletion = HealthKitQueryDeletion(
+            healthKitUUID: UUID(uuidString: "40000000-0000-0000-0000-000000000002")!,
+            immutableExternalID: "activity-summary:2026-09-23",
+            objectTypeIdentifier: HealthKitSynchronizationStream.activitySummary.objectTypeIdentifier
+        )
+        let absent = HealthKitAnchoredQueryResult(
+            additions: [], deletions: [deletion], proposedAnchorData: Data("activity-anchor".utf8), completedAt: Self.now
+        )
+        let harness = try Harness(
+            stream: .activitySummary,
+            gate: .enabled,
+            queryResults: [checkpoint, absent, absent]
+        )
+
+        try await harness.engine.synchronize(scope: harness.scope)
+        try await harness.engine.synchronize(scope: harness.scope)
+        try await harness.engine.synchronize(scope: harness.scope)
+
+        let deferred = try await harness.store.deferredChanges(for: harness.scope)
+        XCTAssertEqual(deferred.count, 1)
+        XCTAssertEqual(deferred.first?.deletions, [HealthKitObservationNormalizer().normalize(deletion)])
+    }
+
     func testFeatureDisabledPerformsNoQueryUploadObserverOrBackgroundRegistration() async throws {
         let harness = try Harness(stream: .activeEnergy, gate: .n0Disabled)
         await XCTAssertThrowsErrorAsync { try await harness.engine.synchronize(scope: harness.scope) }
@@ -804,6 +866,15 @@ final class HealthKitSynchronizationTests: XCTestCase {
         XCTAssertFalse(encoded.contains("500"))
     }
 
+    func testForegroundQueryFailurePersistsDiagnosticErrorCode() async throws {
+        let harness = try Harness(stream: .activeEnergy, gate: .enabled, queryResults: [])
+
+        await XCTAssertThrowsErrorAsync { try await harness.engine.synchronize(scope: harness.scope) }
+
+        let diagnostics = try await harness.store.diagnostics(for: harness.scope)
+        XCTAssertEqual(diagnostics.lastErrorCode, "mock_query_exhausted")
+    }
+
     fileprivate static let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     private static func scope(_ stream: HealthKitSynchronizationStream) -> HealthKitCursorScope {
@@ -835,6 +906,42 @@ final class HealthKitSynchronizationTests: XCTestCase {
                 localDate: "2026-09-23"
             )],
             deletions: [], proposedAnchorData: cursor, completedAt: now
+        )
+    }
+
+    fileprivate static func nutritionDailyResult(
+        revision: UInt64,
+        calories: Double,
+        cursorFingerprint: String
+    ) -> HealthKitAnchoredQueryResult {
+        let localDate = "2026-09-23"
+        let start = ISO8601DateFormatter().date(from: "2026-09-23T07:00:00Z")!
+        let cursor = try! JSONSerialization.data(withJSONObject: [
+            "entries": [localDate: ["fingerprint": cursorFingerprint, "revision": revision]],
+        ], options: [.sortedKeys])
+        let addition = HealthKitQueryAddition(
+            healthKitUUID: nil,
+            objectTypeIdentifier: HealthKitSynchronizationStream.nutritionDailyTotal.objectTypeIdentifier,
+            source: HealthKitQuerySource(
+                bundleIdentifier: "com.apple.Health", sourceName: "Apple Health", sourceRevision: nil,
+                productType: nil, privacySafeDeviceProvenance: nil
+            ),
+            occurrence: HealthKitQueryOccurrence(
+                startedAt: nil, endedAt: nil, localDate: localDate,
+                calendarIdentifier: "gregorian", timeZoneIdentifier: "America/Los_Angeles",
+                utcOffsetSeconds: -25_200, localDayStartedAt: start,
+                localDayEndedAt: start.addingTimeInterval(86_400)
+            ),
+            payload: .nutritionDailyTotal(HealthKitQueryNutritionDailyTotal(
+                dailyNutrition: ["calories": calories, "protein_g": 180],
+                aggregationScope: HealthKitQueryNutritionDailyTotal.aggregationScope,
+                coverage: .completeDay,
+                sourceRevision: revision
+            )),
+            allowlistedMetadata: [:]
+        )
+        return HealthKitAnchoredQueryResult(
+            additions: [addition], deletions: [], proposedAnchorData: cursor, completedAt: now
         )
     }
 
@@ -1026,7 +1133,11 @@ private actor MockUploader: HealthKitObservationUploader {
         case acceptAndCancel
         case transient
         case reject
-        case dailyCollision(received: UInt64, nextExpected: UInt64)
+        case dailyCollision(
+            observationType: HealthKitS1ObservationType = .activitySummary,
+            received: UInt64,
+            nextExpected: UInt64
+        )
     }
     private var modes: [Mode]
     private var received: [HealthKitStagedPartition] = []
@@ -1051,11 +1162,11 @@ private actor MockUploader: HealthKitObservationUploader {
             return .transientFailure(code: "synthetic_lost_ack")
         case .reject:
             return .rejected(code: "synthetic_rejection")
-        case let .dailyCollision(received, nextExpected):
+        case let .dailyCollision(observationType, received, nextExpected):
             return .rejected(
                 code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
                 recovery: HealthKitDailyRevisionRecovery(
-                    observationType: .activitySummary,
+                    observationType: observationType,
                     localDate: "2026-09-23",
                     receivedSourceRevision: received,
                     nextExpectedRevision: nextExpected,
