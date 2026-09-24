@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T01:07:55Z",
+  "generated_at_utc": "2026-09-24T01:20:12Z",
   "task": {
-    "id": "codex-strength-reconciliation-eighth-review-20260923",
-    "title": "Strength reconciliation eighth fresh-context review",
+    "id": "codex-strength-reconciliation-semantics-20260923",
+    "title": "Strength reconciliation semantics",
     "agent": "codex",
     "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "31c88481d80703de3355c51f6695b760b0671020",
-    "final_sha": "5e0dd8e3a5f2d3eea1013b6a3787c2f4df8d8cdc",
+    "final_sha": "b3e30001d05f1cef37a98412cb5187d1bb17c4df",
     "production_server_sha": "31c88481d80703de3355c51f6695b760b0671020",
     "production_deployment": "42035d0d-9368-4ada-a4c1-392e659f3366",
     "native_sha": "de0d3829836dd2e84327d268d4682c97260260e6",
     "native_build": 56
   },
   "result": {
-    "summary": "Eighth fresh-context review rejected the exact candidates for released-claim reuse, incomplete terminal lifecycle/basis exactness, and shallow nested presentation sanitization. Production remains unchanged.",
+    "summary": "Corrected all three eighth-review findings, froze exact clean Server and unchanged Native Build 56 candidates, and passed 201 relevant Server tests, both Phase gates, lint, and the production webpack build. Ninth fresh-context review is pending; production remains unchanged.",
     "success": false,
     "production_mutated": false,
     "deployed": false,
@@ -26,31 +26,28 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Independent reviewer passed 193/193 focused Server tests and 183/183 Native Founder Server API tests on the sole permitted iPhone 17 Pro simulator."
+      "summary": "Server relevant 201/201, Phase 4 139/139, Phase 5 65/65, production webpack build, ESLint, and diff checks passed. Native is unchanged; the eighth reviewer passed its focused 183/183 tests on the sole permitted iPhone 17 Pro simulator."
     },
     "review": {
-      "status": "changes_requested",
-      "summary": "Rejected: malformed released claims could be promoted; lifecycle/basis schemas were not fully exact; nested presentation objects still shallow-passed raw fields."
+      "status": "not_run",
+      "summary": "Ninth fresh-context independent review of the exact candidates is the next gate."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "No files were edited by the reviewer and no production deploy, policy mutation, relationship mutation, TestFlight upload, strategic eligibility change, or Cardio work occurred."
+      "summary": "No production deploy, policy mutation, relationship mutation, TestFlight upload, strategic eligibility change, or Cardio work occurred."
     }
   },
   "decisions_required": [],
   "blockers": [],
-  "unexpected_findings": [
-    "A malformed released deterministic claim could be recycled into a held claim and confirmed relationship.",
-    "Nested raw fields could cross the otherwise sanitized reconciliation presentation boundary."
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Correct all three eighth-review findings with adversarial regressions.",
-    "Rerun relevant Server gates and freeze a new exact Server candidate.",
-    "Obtain another fresh-context independent review.",
-    "Keep deployment, TestFlight upload, September 23 confirmation, strategic eligibility, and Cardio separately gated."
+    "Obtain a ninth fresh-context independent adversarial review of the exact candidates.",
+    "If approved, request separate Founder authorization before any Server deployment.",
+    "Keep Native Build 56 upload separately gated.",
+    "Keep the September 23 relationship unconfirmed and Cardio blocked until the final Strength verdict."
   ],
-  "recommended_next_step": "Correct the three findings, freeze a new exact Server candidate, and run a ninth fresh-context independent adversarial review.",
-  "full_report_path": "agent-handoffs/reports/20260924T010755Z-strength-reconciliation-eighth-review-rejected.md",
+  "recommended_next_step": "Run the ninth fresh-context independent review against the immutable Server and Native candidates, then publish its verdict.",
+  "full_report_path": "agent-handoffs/reports/20260924T012012Z-strength-reconciliation-eighth-review-corrections.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
