@@ -164,6 +164,22 @@ final class BriefingV3PresentationTests: XCTestCase {
         XCTAssertEqual(model.confidence?.score, 79)
     }
 
+    func testMidweekV3KeepsBoundConfidenceWhenDuplicateReasonIsOmitted() throws {
+        let json = midweekV3Envelope(
+            includeDetail: true, includeUncertainty: true
+        ).replacingOccurrences(
+            of: ",\"reason\":\"Canonical V3 confidence.\"",
+            with: ""
+        )
+        let model = try map(json)
+        let confidence = try XCTUnwrap(model.confidence)
+        XCTAssertEqual(confidence.score, 79)
+        XCTAssertEqual(confidence.band, "high")
+        XCTAssertEqual(confidence.movementLabel, "No meaningful change")
+        XCTAssertEqual(confidence.primaryReason, "")
+        XCTAssertNil(confidence.presentationExplanation)
+    }
+
     func testMidweekV3RejectsPresentationContractArtifactMismatch() throws {
         let data = Data(midweekV3Envelope(
             includeDetail: true, includeUncertainty: true,

@@ -551,16 +551,16 @@ enum ProductionBriefingMapper {
         case "held", "no_meaningful_change", "stable": movement = .held
         default: movement = .initial
         }
-        guard let reason = value.reason, !reason.isEmpty,
-              let movementLabel = value.movementLabel,
+        guard let movementLabel = value.movementLabel,
               !movementLabel.isEmpty else { return nil }
+        let reason = value.reason ?? ""
         return .init(
             score: value.score, band: value.band, priorScore: nil,
             delta: value.delta, movementDirection: movement,
             primaryReason: reason, supportingReasons: [], limitingReasons: [],
             unresolvedUncertainty: [], goalId: goalId, phaseId: phaseId,
             capturedAt: "", source: MidweekPresentationContract.schemaVersion,
-            presentationExplanation: reason,
+            presentationExplanation: value.reason,
             presentationMovementLabel: movementLabel
         )
     }
