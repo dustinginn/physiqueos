@@ -5,6 +5,7 @@ import Foundation
 /// projections of the app's fixture models and do not become local authority.
 struct FounderServerSession: Decodable, Sendable, Equatable {
     let sessionId: String
+    let deviceId: String
     let accessToken: String
     let accessExpiresAt: String
     let refreshCredential: String

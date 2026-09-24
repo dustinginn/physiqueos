@@ -110,7 +110,15 @@ protocol HealthKitObservationUploader: Sendable {
     func upload(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult
 }
 
-struct ProductionHealthKitObservationUploader: HealthKitObservationUploader {
+/// Server-authenticated authority required only for daily revision recovery
+/// and the bounded September 23 repair. Local cursor identities are not
+/// authentication principals and must never be substituted here.
+protocol HealthKitRevisionRecoveryAuthoritySource: Sendable {
+    func healthKitAuthenticatedDeviceIdentity() async throws -> String
+    func healthKitSeptember23ActivityRepairPreflight() async throws -> HealthKitSeptember23ActivityRepairServerFacts
+}
+
+struct ProductionHealthKitObservationUploader: HealthKitObservationUploader, HealthKitRevisionRecoveryAuthoritySource {
     private struct Result: Decodable, Sendable {
         struct Observation: Decodable, Sendable {
             struct Reconciliation: Decodable, Sendable {
@@ -130,6 +138,19 @@ struct ProductionHealthKitObservationUploader: HealthKitObservationUploader {
 
     let api: ProductionNativeAPI
     var ledger: HealthKitCanonicalizationLedger? = nil
+
+    func healthKitAuthenticatedDeviceIdentity() async throws -> String {
+        try await api.authenticatedServerDeviceIdentity()
+    }
+
+    func healthKitSeptember23ActivityRepairPreflight() async throws -> HealthKitSeptember23ActivityRepairServerFacts {
+        let envelope: ProductionResponseEnvelope<HealthKitSeptember23ActivityRepairServerFacts> = try await api.readResource(
+            "healthkit-sep23-activity-repair-preflight",
+            policy: .reload,
+            as: HealthKitSeptember23ActivityRepairServerFacts.self
+        )
+        return envelope.data
+    }
 
     func upload(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult {
         do {

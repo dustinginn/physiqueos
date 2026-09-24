@@ -384,6 +384,7 @@ actor ProductionNativeAPI {
     }()
     private let encoder = JSONEncoder()
     private var accessToken: String?
+    private var authenticatedDeviceId: String?
     private var refreshTask: Task<String, Error>?
     private struct CachedRead {
         let data: Data
@@ -442,7 +443,20 @@ actor ProductionNativeAPI {
         )
         guard response.revoked else { throw ProductionNativeError.invalidResponse }
         accessToken = nil
+        authenticatedDeviceId = nil
         try credentialStore.deleteRefreshCredential()
+    }
+
+    /// The opaque device identity assigned by Server pairing and carried by
+    /// every authenticated principal. Access tokens are memory-only, so a
+    /// relaunch necessarily refreshes first and repopulates this identity
+    /// from the authoritative Server response.
+    func authenticatedServerDeviceIdentity() async throws -> String {
+        _ = try await validAccessToken()
+        guard let authenticatedDeviceId, !authenticatedDeviceId.isEmpty else {
+            throw ProductionNativeError.invalidResponse
+        }
+        return authenticatedDeviceId
     }
 
     func readProfile() async throws -> ProductionResponseEnvelope<ProductionProfileData> {
@@ -855,6 +869,7 @@ actor ProductionNativeAPI {
         } catch {
             if case ProductionNativeError.unauthenticated = error {
                 accessToken = nil
+                authenticatedDeviceId = nil
                 try? credentialStore.deleteRefreshCredential()
             }
             throw error
@@ -862,8 +877,10 @@ actor ProductionNativeAPI {
     }
 
     private func persist(_ session: FounderServerSession) throws {
+        guard !session.deviceId.isEmpty else { throw ProductionNativeError.invalidResponse }
         try credentialStore.saveRefreshCredential(session.refreshCredential)
         accessToken = session.accessToken
+        authenticatedDeviceId = session.deviceId
     }
 
     private func authenticatedJSON<Response: Decodable>(

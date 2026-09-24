@@ -687,7 +687,7 @@ private actor StagedTransport: FounderHTTPTransport {
     private func respond(_ request: URLRequest, body: Data?) throws -> (Data, HTTPURLResponse) {
         let path = request.url?.path ?? ""
         if path.hasSuffix("/auth/pair") || path.hasSuffix("/auth/refresh") {
-            let session = #"{"sessionId":"session-1","accessToken":"\#(String(repeating: "a", count: 43))","accessExpiresAt":"2026-09-01T12:10:00.000Z","refreshCredential":"\#(String(repeating: "r", count: 43))","refreshIdleExpiresAt":"2026-10-01T12:00:00.000Z","refreshAbsoluteExpiresAt":"2026-11-30T12:00:00.000Z"}"#
+            let session = #"{"sessionId":"session-1","deviceId":"server-device-1","accessToken":"\#(String(repeating: "a", count: 43))","accessExpiresAt":"2026-09-01T12:10:00.000Z","refreshCredential":"\#(String(repeating: "r", count: 43))","refreshIdleExpiresAt":"2026-10-01T12:00:00.000Z","refreshAbsoluteExpiresAt":"2026-11-30T12:00:00.000Z"}"#
             return (Data(session.utf8), response(200, request))
         }
         let call = Call(method: request.httpMethod ?? "", path: path, contentType: request.value(forHTTPHeaderField: "Content-Type"), idempotencyKey: request.value(forHTTPHeaderField: "Idempotency-Key"), body: body)

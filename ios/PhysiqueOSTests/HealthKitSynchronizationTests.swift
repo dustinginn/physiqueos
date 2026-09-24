@@ -762,10 +762,10 @@ final class HealthKitSynchronizationTests: XCTestCase {
             Self.september23ServerFacts(september24ActivityCanonicalDayCount: 1),
         ]
         for facts in driftedFacts {
+            await uploader.setServerFacts(facts)
             let authorization = HealthKitSeptember23ActivityRepairAuthorization(
                 contractVersion: HealthKitSeptember23ActivityRepairContract.contractVersion,
-                approvedAggregateDigest: "approved",
-                serverFacts: facts
+                approvedAggregateDigest: "approved"
             )
             do {
                 _ = try await engine.applySeptember23ActivityRepair(
@@ -1543,6 +1543,7 @@ final class HealthKitSynchronizationTests: XCTestCase {
     }
 
     private static func september23ServerFacts(
+        authenticatedDeviceId: String = "server-device-a",
         runtimeSHA: String = HealthKitSeptember23ActivityRepairContract.productionServerSHA,
         dailyPolicyDigest: String = HealthKitSeptember23ActivityRepairContract.dailyPolicyDigest,
         canonicalDayCount: Int = HealthKitSeptember23ActivityRepairContract.expectedCanonicalDayCount,
@@ -1553,6 +1554,9 @@ final class HealthKitSynchronizationTests: XCTestCase {
         september24ActivityCanonicalDayCount: Int = 0
     ) -> HealthKitSeptember23ActivityRepairServerFacts {
         HealthKitSeptember23ActivityRepairServerFacts(
+            contractVersion: "healthkit-sep23-activity-repair-preflight-v1",
+            localDate: HealthKitSeptember23ActivityRepairContract.localDate,
+            authenticatedDeviceId: authenticatedDeviceId,
             runtimeSHA: runtimeSHA,
             dailyPolicyDigest: dailyPolicyDigest,
             canonicalDayCount: canonicalDayCount,
@@ -1569,8 +1573,7 @@ final class HealthKitSynchronizationTests: XCTestCase {
     ) -> HealthKitSeptember23ActivityRepairAuthorization {
         HealthKitSeptember23ActivityRepairAuthorization(
             contractVersion: HealthKitSeptember23ActivityRepairContract.contractVersion,
-            approvedAggregateDigest: digest,
-            serverFacts: september23ServerFacts()
+            approvedAggregateDigest: digest
         )
     }
 
@@ -1902,7 +1905,7 @@ private final class MockObserverClient: HealthKitObserverClient, @unchecked Send
     }
 }
 
-private actor MockUploader: HealthKitObservationUploader {
+private actor MockUploader: HealthKitObservationUploader, HealthKitRevisionRecoveryAuthoritySource {
     enum Mode {
         case accept
         case acceptAndCancel
@@ -1920,8 +1923,36 @@ private actor MockUploader: HealthKitObservationUploader {
     private var received: [HealthKitStagedPartition] = []
     private var completionProbe: CompletionProbe?
     private var sawCompletedBeforeUpload = false
+    private let serverDeviceIdentity: String
+    private var serverFacts: HealthKitSeptember23ActivityRepairServerFacts
 
-    init(modes: [Mode]) { self.modes = modes }
+    init(
+        modes: [Mode],
+        serverDeviceIdentity: String = "server-device-a",
+        serverFacts: HealthKitSeptember23ActivityRepairServerFacts? = nil
+    ) {
+        self.modes = modes
+        self.serverDeviceIdentity = serverDeviceIdentity
+        self.serverFacts = serverFacts ?? HealthKitSeptember23ActivityRepairServerFacts(
+            contractVersion: "healthkit-sep23-activity-repair-preflight-v1",
+            localDate: HealthKitSeptember23ActivityRepairContract.localDate,
+            authenticatedDeviceId: serverDeviceIdentity,
+            runtimeSHA: HealthKitSeptember23ActivityRepairContract.productionServerSHA,
+            dailyPolicyDigest: HealthKitSeptember23ActivityRepairContract.dailyPolicyDigest,
+            canonicalDayCount: HealthKitSeptember23ActivityRepairContract.expectedCanonicalDayCount,
+            canonicalRevision: HealthKitSeptember23ActivityRepairContract.expectedCurrentRevision,
+            canonicalSourceRevision: HealthKitSeptember23ActivityRepairContract.expectedCurrentSourceRevision,
+            sourceObservationCount: HealthKitSeptember23ActivityRepairContract.expectedSourceObservationCount,
+            historyCount: HealthKitSeptember23ActivityRepairContract.expectedHistoryCount,
+            september24ActivityCanonicalDayCount: 0
+        )
+    }
+
+    func healthKitAuthenticatedDeviceIdentity() async throws -> String { serverDeviceIdentity }
+    func healthKitSeptember23ActivityRepairPreflight() async throws -> HealthKitSeptember23ActivityRepairServerFacts {
+        serverFacts
+    }
+    func setServerFacts(_ facts: HealthKitSeptember23ActivityRepairServerFacts) { serverFacts = facts }
 
     func setCompletionProbe(_ probe: CompletionProbe) { completionProbe = probe }
 
@@ -1952,7 +1983,7 @@ private actor MockUploader: HealthKitObservationUploader {
                         observationType: observationType,
                         externalID: addition?.immutableExternalID ?? "missing",
                         bundleIdentifier: addition?.source.bundleIdentifier ?? "missing",
-                        deliveryDeviceID: "device-a",
+                        deliveryDeviceID: serverDeviceIdentity,
                         ingestionPurpose: partition.ingestionPurpose
                     )
                 )

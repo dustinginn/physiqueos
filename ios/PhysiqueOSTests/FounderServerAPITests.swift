@@ -417,6 +417,8 @@ final class FounderServerAPITests: XCTestCase {
         _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
 
         XCTAssertEqual(try store.loadRefreshCredential(), String(repeating: "r", count: 43))
+        let authenticatedDeviceId = try await api.authenticatedServerDeviceIdentity()
+        XCTAssertEqual(authenticatedDeviceId, "server-device-1")
         let requests = await transport.requests
         XCTAssertEqual(requests.map { $0.url?.path }, ["/api/v1/native/auth/pair"])
         XCTAssertEqual(requests.first?.httpMethod, "POST")
@@ -425,6 +427,33 @@ final class FounderServerAPITests: XCTestCase {
         let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: String])
         XCTAssertEqual(fields["platform"], "ios")
         XCTAssertEqual(fields["displayName"], "Founder iPhone")
+    }
+
+    func testHealthKitRepairAuthorityUsesServerDeviceAndReloadedReadOnlyPreflight() async throws {
+        let preflight = productionEnvelope(
+            resource: "healthkit-sep23-activity-repair-preflight",
+            data: #"{"contractVersion":"healthkit-sep23-activity-repair-preflight-v1","localDate":"2026-09-23","authenticatedDeviceId":"server-device-1","runtimeSHA":"07ed8230be28c2bc4989e2167b028d0bf425c6fa","dailyPolicyDigest":"d5f0b571b6c046be9710a0551a6d4d230b249eb4088f79878f2647d3b5c40586","canonicalDayCount":1,"canonicalRevision":50,"canonicalSourceRevision":50,"sourceObservationCount":50,"historyCount":49,"september24ActivityCanonicalDayCount":0}"#
+        )
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, preflight),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let authority = ProductionHealthKitObservationUploader(api: api)
+
+        let authenticatedDeviceId = try await authority.healthKitAuthenticatedDeviceIdentity()
+        XCTAssertEqual(authenticatedDeviceId, "server-device-1")
+        let facts = try await authority.healthKitSeptember23ActivityRepairPreflight()
+
+        XCTAssertTrue(facts.matchesFrozenContract)
+        XCTAssertEqual(facts.authenticatedDeviceId, "server-device-1")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map { $0.url?.path }, [
+            "/api/v1/native/auth/pair",
+            "/api/v1/native/read/healthkit-sep23-activity-repair-preflight",
+        ])
+        XCTAssertEqual(requests.last?.httpMethod, "GET")
     }
 
     func testProductionProfileDecodesAndValidatesFounderAuthority() async throws {
@@ -616,6 +645,8 @@ final class FounderServerAPITests: XCTestCase {
         ])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
 
+        let authenticatedDeviceId = try await api.authenticatedServerDeviceIdentity()
+        XCTAssertEqual(authenticatedDeviceId, "server-device-1")
         _ = try await api.readWeight()
 
         XCTAssertEqual(try store.loadRefreshCredential(), String(repeating: "s", count: 43))
@@ -4974,7 +5005,7 @@ private func sessionJSON(access: Character, refresh: Character) -> String {
     let accessToken = String(repeating: String(access), count: 43)
     let refreshCredential = String(repeating: String(refresh), count: 43)
     return """
-    {"sessionId":"session-1","accessToken":"\(accessToken)","accessExpiresAt":"2026-09-01T12:10:00.000Z","refreshCredential":"\(refreshCredential)","refreshIdleExpiresAt":"2026-10-01T12:00:00.000Z","refreshAbsoluteExpiresAt":"2026-11-30T12:00:00.000Z"}
+    {"sessionId":"session-1","deviceId":"server-device-1","accessToken":"\(accessToken)","accessExpiresAt":"2026-09-01T12:10:00.000Z","refreshCredential":"\(refreshCredential)","refreshIdleExpiresAt":"2026-10-01T12:00:00.000Z","refreshAbsoluteExpiresAt":"2026-11-30T12:00:00.000Z"}
     """
 }
 

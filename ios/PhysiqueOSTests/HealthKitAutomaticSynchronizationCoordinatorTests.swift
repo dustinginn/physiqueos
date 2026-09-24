@@ -95,12 +95,26 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
             .appendingPathComponent("PhysiqueOSAutomaticDiagnostics-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = FileHealthKitSynchronizationStore(root: root)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Chicago")!
+        let historicalDayScope = HealthKitCursorScope(
+            ownerIdentity: "user_founder_001",
+            enrolledDeviceIdentity: "founder-device-stable",
+            stream: .activitySummary,
+            predicateVersion: HealthKitAutomaticSynchronizationCoordinator.historicalDayPredicatePrefix + "2026-09-23"
+        )
+        try await store.recordOperationalError(
+            for: historicalDayScope,
+            code: "historical_day_retained_failure"
+        )
         let coordinator = HealthKitAutomaticSynchronizationCoordinator(
             authorization: AutomaticAuthorizationMock(),
             synchronizer: AutomaticSynchronizerMock(),
             server: AutomaticServerMock(),
             deviceIdentityStore: AutomaticDeviceIdentityStore(),
-            synchronizationStore: store
+            synchronizationStore: store,
+            calendar: calendar,
+            now: { ISO8601DateFormatter().date(from: "2026-09-24T17:00:00Z")! }
         )
 
         let snapshot = await coordinator.diagnosticSnapshot()
@@ -108,6 +122,7 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         XCTAssertEqual(Set(snapshot.keys), Self.allStreams)
         XCTAssertTrue(snapshot.values.allSatisfy { $0.pendingBatchCount == 0 })
         XCTAssertTrue(snapshot.values.allSatisfy { ($0.dailyRevisionFloorCount ?? 0) == 0 })
+        XCTAssertEqual(snapshot[.activitySummary]?.lastErrorCode, "historical_day_retained_failure")
     }
 
     /// Build 54 inverts the old "never Workout" invariant: the automatic

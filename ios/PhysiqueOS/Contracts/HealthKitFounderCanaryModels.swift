@@ -124,7 +124,7 @@ struct HealthKitSeptember23ActivityRepairContract: Equatable, Sendable {
     static let localDate = "2026-09-23"
     static let predicateVersion = "healthkit-automatic-sep23-activity-repair-v1:2026-09-23"
     static let contractVersion = "healthkit-sep23-activity-repair-v1"
-    static let productionServerSHA = "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d"
+    static let productionServerSHA = "07ed8230be28c2bc4989e2167b028d0bf425c6fa"
     static let dailyPolicyDigest = "d5f0b571b6c046be9710a0551a6d4d230b249eb4088f79878f2647d3b5c40586"
     static let expectedCanonicalDayCount = 1
     static let expectedCurrentRevision: UInt64 = 50
@@ -176,7 +176,10 @@ struct HealthKitSeptember23ActivityRepairDryRun: Equatable, Sendable {
 /// Facts a future authorized apply must obtain from a fresh Server preflight.
 /// Build 57 has no production API for these facts, so the shipped Founder UI
 /// cannot construct this value and APPLY remains unavailable.
-struct HealthKitSeptember23ActivityRepairServerFacts: Equatable, Sendable {
+struct HealthKitSeptember23ActivityRepairServerFacts: Decodable, Equatable, Sendable {
+    let contractVersion: String
+    let localDate: String
+    let authenticatedDeviceId: String
     let runtimeSHA: String
     let dailyPolicyDigest: String
     let canonicalDayCount: Int
@@ -187,7 +190,10 @@ struct HealthKitSeptember23ActivityRepairServerFacts: Equatable, Sendable {
     let september24ActivityCanonicalDayCount: Int
 
     var matchesFrozenContract: Bool {
-        runtimeSHA == HealthKitSeptember23ActivityRepairContract.productionServerSHA &&
+        contractVersion == "healthkit-sep23-activity-repair-preflight-v1" &&
+            localDate == HealthKitSeptember23ActivityRepairContract.localDate &&
+            !authenticatedDeviceId.isEmpty &&
+            runtimeSHA == HealthKitSeptember23ActivityRepairContract.productionServerSHA &&
             dailyPolicyDigest == HealthKitSeptember23ActivityRepairContract.dailyPolicyDigest &&
             canonicalDayCount == HealthKitSeptember23ActivityRepairContract.expectedCanonicalDayCount &&
             canonicalRevision == HealthKitSeptember23ActivityRepairContract.expectedCurrentRevision &&
@@ -203,16 +209,13 @@ struct HealthKitSeptember23ActivityRepairServerFacts: Equatable, Sendable {
 struct HealthKitSeptember23ActivityRepairAuthorization: Equatable, Sendable {
     let contractVersion: String
     let approvedAggregateDigest: String
-    let serverFacts: HealthKitSeptember23ActivityRepairServerFacts
 
     init(
         contractVersion: String,
-        approvedAggregateDigest: String,
-        serverFacts: HealthKitSeptember23ActivityRepairServerFacts
+        approvedAggregateDigest: String
     ) {
         self.contractVersion = contractVersion
         self.approvedAggregateDigest = approvedAggregateDigest
-        self.serverFacts = serverFacts
     }
 }
 

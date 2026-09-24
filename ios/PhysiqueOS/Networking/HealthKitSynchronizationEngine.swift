@@ -583,7 +583,14 @@ actor HealthKitSynchronizationEngine {
         guard let authorization,
               authorization.contractVersion == HealthKitSeptember23ActivityRepairContract.contractVersion
         else { throw HealthKitCanaryError.september23RepairApplyNotAuthorized }
-        guard authorization.serverFacts.matchesFrozenContract else {
+        guard let recoveryAuthority = uploader as? any HealthKitRevisionRecoveryAuthoritySource else {
+            throw HealthKitCanaryError.september23RepairAuthorityDrift
+        }
+        let serverFacts = try await recoveryAuthority.healthKitSeptember23ActivityRepairPreflight()
+        let authenticatedDeviceID = try await recoveryAuthority.healthKitAuthenticatedDeviceIdentity()
+        guard serverFacts.matchesFrozenContract,
+              serverFacts.authenticatedDeviceId == authenticatedDeviceID
+        else {
             throw HealthKitCanaryError.september23RepairAuthorityDrift
         }
         guard try await store.pendingBatches(for: scope).isEmpty,
@@ -886,10 +893,16 @@ actor HealthKitSynchronizationEngine {
                 case let .rejected(code, recovery):
                     if let recovery {
                         do {
+                            guard let recoveryAuthority = uploader as? any HealthKitRevisionRecoveryAuthoritySource else {
+                                throw HealthKitSyncError.operational(
+                                    code: "healthkit_daily_revision_recovery_authority_unavailable"
+                                )
+                            }
+                            let authenticatedDeviceID = try await recoveryAuthority.healthKitAuthenticatedDeviceIdentity()
                             guard recovery.identityDigest == Self.dailyRevisionIdentityDigest(
                                 recovery: recovery,
                                 partition: partition,
-                                scope: scope
+                                authenticatedDeviceID: authenticatedDeviceID
                             ) else {
                                 throw HealthKitSyncError.operational(
                                     code: "healthkit_daily_revision_recovery_identity_mismatch"
@@ -899,7 +912,7 @@ actor HealthKitSynchronizationEngine {
                                !dailyRecoveryConstraint.accepts(
                                     recovery: recovery,
                                     partition: partition,
-                                    scope: scope
+                                    authenticatedDeviceID: authenticatedDeviceID
                                ) {
                                 throw HealthKitCanaryError.september23RepairRevisionMismatch
                             }
@@ -933,7 +946,7 @@ actor HealthKitSynchronizationEngine {
     private static func dailyRevisionIdentityDigest(
         recovery: HealthKitDailyRevisionRecovery,
         partition: HealthKitStagedPartition,
-        scope: HealthKitCursorScope
+        authenticatedDeviceID: String
     ) -> String? {
         let matches = partition.additions.filter { addition in
             guard addition.occurrence.localDate == recovery.localDate else { return false }
@@ -951,7 +964,7 @@ actor HealthKitSynchronizationEngine {
             observationType: recovery.observationType,
             externalID: addition.immutableExternalID,
             bundleIdentifier: addition.source.bundleIdentifier,
-            deliveryDeviceID: scope.enrolledDeviceIdentity,
+            deliveryDeviceID: authenticatedDeviceID,
             ingestionPurpose: partition.ingestionPurpose
         )
     }
@@ -1009,7 +1022,7 @@ private struct HealthKitDailyRecoveryConstraint: Sendable {
     func accepts(
         recovery: HealthKitDailyRevisionRecovery,
         partition: HealthKitStagedPartition,
-        scope: HealthKitCursorScope
+        authenticatedDeviceID: String
     ) -> Bool {
         guard permitsRecovery,
               recovery.observationType == expectedObservationType,
@@ -1023,7 +1036,7 @@ private struct HealthKitDailyRecoveryConstraint: Sendable {
                     observationType: expectedObservationType,
                     externalID: expectedExternalID,
                     bundleIdentifier: partition.additions[0].source.bundleIdentifier,
-                    deliveryDeviceID: scope.enrolledDeviceIdentity,
+                    deliveryDeviceID: authenticatedDeviceID,
                     ingestionPurpose: partition.ingestionPurpose
               )
         else { return false }

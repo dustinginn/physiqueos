@@ -120,6 +120,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     private let synchronizationStore: (any HealthKitSynchronizationStore)?
     private let stepTimeout: Duration
     private let calendar: Calendar
+    private let now: @Sendable () -> Date
 
     private(set) var lastBootstrapOutcome: HealthKitAutomaticBootstrapOutcome?
     /// The Founder's owner identity almost never changes within one signed-in
@@ -148,7 +149,8 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore = KeychainHealthKitCanaryDeviceIdentityStore(),
         synchronizationStore: (any HealthKitSynchronizationStore)? = nil,
         stepTimeout: Duration = .seconds(30),
-        calendar: Calendar = .autoupdatingCurrent
+        calendar: Calendar = .autoupdatingCurrent,
+        now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.authorization = authorization
         self.synchronizer = synchronizer
@@ -157,6 +159,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         self.synchronizationStore = synchronizationStore
         self.stepTimeout = stepTimeout
         self.calendar = calendar
+        self.now = now
     }
 
     /// Read-only Founder diagnostics for the permanent automatic scopes.
@@ -196,7 +199,25 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             )
             if let current = try? await synchronizationStore.diagnostics(for: currentScope),
                let historical = try? await synchronizationStore.diagnostics(for: historicalScope) {
-                snapshot[stream] = Self.mergedDiagnostics(current: current, historical: historical)
+                var diagnostics = [current, historical]
+                if let dayBounds = try? HealthKitSynchronizationEngine.historicalCatchUpDayBounds(
+                    at: now(), calendar: calendar
+                ) {
+                    for bounds in dayBounds {
+                        let dayScope = HealthKitCursorScope(
+                            ownerIdentity: ownerIdentity,
+                            enrolledDeviceIdentity: deviceIdentity,
+                            stream: stream,
+                            predicateVersion: Self.historicalDayPredicatePrefix + bounds.startLocalDate
+                        )
+                        if let day = try? await synchronizationStore.diagnostics(for: dayScope) {
+                            diagnostics.append(day)
+                        }
+                    }
+                }
+                snapshot[stream] = diagnostics.dropFirst().reduce(diagnostics[0]) {
+                    Self.mergedDiagnostics(current: $0, historical: $1)
+                }
             }
         }
         return snapshot
