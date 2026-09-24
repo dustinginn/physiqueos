@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T13:05:11Z",
+  "generated_at_utc": "2026-09-24T13:13:23Z",
   "task": {
     "id": "codex-healthkit-build57-sep24-acceptance-sep23-repair-20260924",
     "title": "Build 57 September 24 acceptance and September 23 Activity repair planning",
     "agent": "codex",
-    "status": "partial"
+    "status": "blocked"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "63395579ed70611be8a57f032133a43a3bc67800",
-    "final_sha": "63395579ed70611be8a57f032133a43a3bc67800",
-    "production_server_sha": "63395579ed70611be8a57f032133a43a3bc67800",
-    "production_deployment": "117d8a2f-8cc1-4ef1-9247-1029c875e401",
+    "final_sha": "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d",
+    "production_server_sha": "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d",
+    "production_deployment": "e8c3bed3-20f6-4f5c-b34a-d27ab0881480",
     "native_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
     "native_build": 57
   },
   "result": {
-    "summary": "The bounded read-only September 24 baseline audit found no September 24 Activity or Nutrition canonical day. Build 57's recovery is active but Activity is advancing through fail-closed collisions from the oldest 30-day lookback dates: post-install requests moved from August 25 through August 28, each received revision 1 with Server nextExpectedRevision 2, and no September 24 Activity upload has reached the Server. Nutrition independently succeeded for September 23 at source/canonical revision 5 and complete-day coverage. Founder-observed Strength detail and Activity workout-energy presentation pass, while Log provenance remains a device-observation follow-up. Nothing was mutated by this audit; September 23 Activity remains stale and Cardio remains stopped.",
+    "summary": "The September 23 Activity repair dry-run failed closed and made no mutation. Installed Build 57 has no exact-day operational transport for the automatic Activity namespace, the actual September 23 Apple Health aggregate must still be sourced from the phone, and September 24 has no Activity baseline. The bounded design predicts exactly one source observation at revision 51 and one update of the existing September 23 canonical day from revision 50 to 51 after a new Native candidate is implemented, tested, independently reviewed, and separately authorized. September 23 Nutrition is independently healthy at revision 5 and requires no repair.",
     "success": false,
     "production_mutated": false,
     "deployed": true,
@@ -26,36 +26,39 @@
   "validation": {
     "tests": {
       "status": "failed",
-      "summary": "September 24 Activity baseline is absent. The automatic Activity scope is not 409-free: Build 57 recovery metadata is being consumed one historical collision day at a time and has not reached September 24. September 24 Nutrition is also absent; no Apple Health nutrition data for that date is proven."
+      "summary": "The read-only dry-run emitted its success marker only after rollback but returned outcome refused: Build 57 cannot target only September 23 in the automatic Activity namespace, the exact device aggregate is absent, and the September 24 baseline is not established. No repair test was or could safely be applied."
     },
     "review": {
       "status": "changes_requested",
-      "summary": "Founder real-device Strength observations pass Workout Detail provenance/telemetry, unchanged Logger content, one linked workout, 321 workout calories, and visible non-workout derivation. Server read-only facts retain one confirmed quarantined Strength relationship and one four-exercise/sixteen-set Logger session. Log-row provenance remains to be observed on device."
+      "summary": "A minimal Native exact-day operational Activity repair path must be implemented, mutation-tested, and independently reviewed. It must bind date/scope/namespace, permit at most the expected revision-51 collision recovery and retry, drift-fence the device aggregate, and refuse every unrelated mutation."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Both production audits used the exact runtime gate, one owner-scoped connection, PostgreSQL REPEATABLE READ READ ONLY, transaction_read_only=on, parameterized reads, explicit ROLLBACK, and post-rollback success markers. Log access was read-only. No application, Server, database, policy, strategic eligibility, Strength, or Cardio mutation was performed."
+      "summary": "The successful current-authority audit used exact runtime gating, one owner-scoped connection, PostgreSQL REPEATABLE READ READ ONLY, transaction_read_only=on, parameterized reads, explicit ROLLBACK, and a post-rollback marker. The retiring-deployment attempt stopped before database access. No application, device, database, policy, Strength, Logger, strategic, or Cardio mutation occurred."
     }
   },
   "decisions_required": [
-    "Do not trigger another device automatic Activity pass until the bounded September 23 repair/refusal plan is published and separately authorized; a normal foreground may continue the 30-day collision walk.",
-    "Founder device observation is still needed for the read-only automatic diagnostics card and the Log row provenance label.",
-    "Separate Founder authorization remains required before any September 23 Activity upload or Server/data mutation."
+    "Founder authorization is required to implement and independently review the smallest exact-day automatic-namespace Native Activity repair candidate; this is not authorization to upload it or perform the repair.",
+    "After implementation and review, separate authorization will be required for any TestFlight upload and a fresh separate authorization will be required for the device repair apply.",
+    "If Build 57 is already foregrounded, the Founder may perform only read-only observation of the automatic diagnostics card and expected Log row label; do not foreground or refresh the app merely for this check."
   ],
   "blockers": [
-    "September 24 Activity acceptance baseline is absent because the automatic Activity batch is walking historical identity collisions before reaching the current date."
+    "Build 57 has no exact-day operational transport that can mutate only September 23 Activity in the automatic namespace.",
+    "The exact current September 23 Apple Health aggregate and digest have not been read from the phone.",
+    "September 24 Activity has no baseline, so ordinary second-advance acceptance is not testable."
   ],
   "unexpected_findings": [
-    "Build 57 proves deterministic collision rebase but the production 30-day Activity batch encounters one older collided date per attempt; observed post-install progression was August 25, 26, 27, then 28 rather than an immediate September 24 baseline.",
-    "September 23 Nutrition independently advanced from the deployment audit's prior revision 4 to revision 5 at 2026-09-24T12:51:15.742Z, confirming Activity/Nutrition scope independence and removing any symmetry-based Nutrition repair rationale."
+    "Build 57's normal 30-day Activity batch advances through historical identity collisions one date per attempt, so normal foreground/refresh is not a safe bounded September 23 repair mechanism.",
+    "A separately authorized Midweek deployment changed current Server authority to 28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d during this task; the intervening diff has no HealthKit, Activity, database, or migration change, and the dry-run was rerun against that exact runtime.",
+    "September 23 Nutrition independently reached revision 5 and complete-day coverage, so a symmetry-based Nutrition repair is neither necessary nor authorized."
   ],
   "backlog": [
-    "Complete and publish the smallest fail-closed September 23 Activity repair design/dry-run with the new 30-day collision finding included.",
-    "Obtain a read-only Founder screenshot/check of automatic diagnostics and the Log provenance row; do not press any canary or manual sync control.",
-    "Do not start Cardio or change policy/strategic eligibility."
+    "Implement, mutation-test, and independently review the exact-day automatic Activity repair candidate after Founder authorization.",
+    "Do not upload a new Native build or perform the September 23 repair without separate subsequent authorizations.",
+    "After repair, establish an ordinary September 24/current-day baseline and prove a later revision 2 advance before starting Cardio."
   ],
-  "recommended_next_step": "Finish the read-only September 23 Activity repair dry-run/refusal design and publish it, then stop for separate Founder authorization before any device-triggered upload or data mutation.",
-  "full_report_path": "agent-handoffs/reports/20260924T130511Z-healthkit-build57-sep24-baseline-strength-acceptance.md",
+  "recommended_next_step": "Obtain Founder authorization to implement and independently review the bounded exact-day Native Activity repair transport. Keep the device closed unless it is already foregrounded, and do not upload, repair data, change policy/strategic eligibility, or begin Cardio.",
+  "full_report_path": "agent-handoffs/reports/20260924T131323Z-healthkit-sep23-activity-repair-dryrun-refused.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
