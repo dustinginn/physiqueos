@@ -69,13 +69,13 @@ describe("bounded Strength deterministic auto-confirm acceptance", () => {
     expect(records.snapshot().evidenceReviews[0].resolutionHistory).toHaveLength(1);
   });
 
-  it("refuses a high-scoring non-allowlisted temporal candidate", async () => {
+  it("excludes an untrusted session before acceptance candidate selection", async () => {
     const records = await productionShapedWorld({ liveLogger: false });
     const before = records.snapshot();
     const result = await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, now: () => new Date(NOW) });
     expect(result).toMatchObject({
       outcome: "refused",
-      reasons: ["logger_session_provenance_untrusted", "deterministic_basis_not_allowlisted"],
+      reasons: ["acceptance_case_not_unique"],
     });
     expect(records.snapshot()).toEqual(before);
   });
@@ -129,6 +129,22 @@ describe("bounded Strength deterministic auto-confirm acceptance", () => {
     const corrupt = createInMemoryCanonicalRecordStore(snapshot);
     const result = await runHealthKitStrengthAutoConfirmAcceptance({ records: corrupt, authorization: AUTHORIZATION, now: () => new Date(NOW) });
     expect(result).toMatchObject({ outcome: "refused", reasons: ["stored_relationship_violations"] });
+  });
+
+  it.each([
+    ["wrong action", (review) => { review.resolution.action = "no_match"; }],
+    ["wrong selected session", (review) => { review.resolution.selectedLoggerSessionCanonicalId = "other-session"; }],
+    ["empty resolution history", (review) => { review.resolutionHistory = []; }],
+    ["missing terminal lifecycle", (review) => { review.lifecycleHistory = review.lifecycleHistory.filter((entry) => entry.status !== "resolved_confirmed"); }],
+  ])("refuses an already-confirmed replay with %s", async (_label, corruptReview) => {
+    const records = await productionShapedWorld();
+    const dry = await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, now: () => new Date(NOW) });
+    await runHealthKitStrengthAutoConfirmAcceptance({ records, authorization: AUTHORIZATION, apply: true, expected: dry.facts, now: () => new Date(NOW) });
+    const snapshot = records.snapshot();
+    corruptReview(snapshot.evidenceReviews[0]);
+    const corrupt = createInMemoryCanonicalRecordStore(snapshot);
+    const result = await runHealthKitStrengthAutoConfirmAcceptance({ records: corrupt, authorization: AUTHORIZATION, now: () => new Date(NOW) });
+    expect(result).toMatchObject({ outcome: "refused", reasons: ["confirmed_link_missing_reconciliation_history"] });
   });
 });
 

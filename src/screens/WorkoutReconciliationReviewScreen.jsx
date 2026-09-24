@@ -4,6 +4,7 @@ import Card from "../components/ui/Card";
 export default function WorkoutReconciliationReviewScreen({ presentation, resolveAction, outcome = null }) {
   const pending = presentation.status === "pending";
   const resolvedNoMatch = presentation.status === "resolved_no_match";
+  const resolvedConfirmed = presentation.status === "resolved_confirmed";
   const selectedId = presentation.resolution?.selectedLoggerSessionCanonicalId ?? null;
   return (
     <main className="app-surface min-h-screen">
@@ -22,7 +23,9 @@ export default function WorkoutReconciliationReviewScreen({ presentation, resolv
         </Card>
 
         {outcome === "stale" && <Card className="mt-4" variant="warning"><p className="text-sm font-bold">This review changed. Check the current choices before trying again.</p></Card>}
-        {!pending && <Card className="mt-4" variant="soft"><p className="font-bold text-[var(--text-primary)]">{resolvedNoMatch ? "No match recorded" : "Match confirmed"}</p></Card>}
+        {resolvedNoMatch && <Card className="mt-4" variant="soft"><p className="font-bold text-[var(--text-primary)]">No match recorded</p></Card>}
+        {resolvedConfirmed && <Card className="mt-4" variant="soft"><p className="font-bold text-[var(--text-primary)]">Match confirmed</p></Card>}
+        {!pending && !resolvedNoMatch && !resolvedConfirmed && <Card className="mt-4" variant="warning"><p className="font-bold">This review changed without a confirmed outcome. Refresh before taking another action.</p></Card>}
 
         <div className="mt-6 space-y-4">
           {presentation.candidates.map((candidate, index) => (

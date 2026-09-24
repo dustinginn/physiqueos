@@ -48,6 +48,7 @@ import {
   resolveHealthKitCanonicalActivationPolicy,
   HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
   assessHealthKitWorkoutCanonicalization,
+  isActiveDetailedStrengthSession,
   resolveHealthKitWorkoutActivationPolicy,
 } from "../../domain/services/HealthKitObservationService.js";
 import {
@@ -67,11 +68,13 @@ import {
   createHealthKitWorkoutLinkCandidate,
   findPossibleDuplicateCanonicalWorkouts,
   refreshHealthKitWorkoutLinkCandidate,
+  isTrustedNativeLiveLoggerSession,
   unlinkHealthKitWorkoutLink,
 } from "../../domain/services/HealthKitWorkoutLinkService.js";
 import {
   HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
   confirmHealthKitWorkoutRelationship,
+  assertHealthKitWorkoutRelationshipIntegrity,
   getHealthKitWorkoutLinkClaimId,
   unlinkHealthKitWorkoutRelationship,
 } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
@@ -82,6 +85,7 @@ import {
   createHealthKitWorkoutReconciliationReview,
   getHealthKitWorkoutReconciliationId,
   isHealthKitWorkoutReconciliationReview,
+  hasExactHealthKitWorkoutReconciliationResolution,
   reopenHealthKitWorkoutReconciliationReview,
   refreshHealthKitWorkoutReconciliationReview,
   refreshSupersededHealthKitWorkoutReconciliationFacts,
@@ -2153,14 +2157,6 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       throw problem(404, "WORKOUT_RECONCILIATION_UNAVAILABLE", "This workout reconciliation item is unavailable.");
     }
     requireExpectedVersion(context, review, `workout-reconciliation:${review.id}`);
-    if (review.status !== "pending") {
-      return {
-        status: "committed",
-        result: { status: "already_resolved", reviewId: review.id, revision: review.version, resolution: review.resolution },
-        outbox: [],
-      };
-    }
-
     const action = context.payload.action;
     const at = now().toISOString();
     const by = { kind: "founder", ref: context.metadata.commandId };
@@ -2187,6 +2183,39 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       canonicalWorkouts,
       loggerSessionServerCommitTimestamps: new Map(canonicalObjectStorageMetadata.map((row) => [row.recordId, row.createdAt])),
     });
+    try {
+      assertHealthKitWorkoutRelationshipIntegrity({ links: workoutLinks, claims: workoutLinkClaims });
+    } catch (error) {
+      throw problem(409, "WORKOUT_RECONCILIATION_RELATIONSHIP_DRIFT", error.message);
+    }
+    if (review.status !== "pending") {
+      const resolution = review.resolution;
+      const exactRequestedResolution = hasExactHealthKitWorkoutReconciliationResolution(review, {
+        action,
+        selectedLoggerSessionCanonicalId: selectedSessionId ?? null,
+        linkId: action === HealthKitWorkoutReconciliationAction.CONFIRM ? resolution?.linkId ?? null : null,
+      });
+      const resolvedLink = action === HealthKitWorkoutReconciliationAction.CONFIRM
+        ? workoutLinks.find((item) => item.id === resolution?.linkId) : null;
+      const resolvedSession = resolvedLink ? canonicalObjects.find((record) =>
+        (record.canonicalId ?? record.payload?.id) === resolvedLink.loggerSessionCanonicalId) : null;
+      const relationshipStillExact = action === HealthKitWorkoutReconciliationAction.CONFIRM
+        ? resolvedLink?.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
+          resolvedLink.canonicalWorkoutId === review.canonicalWorkoutId &&
+          resolvedLink.loggerSessionCanonicalId === selectedSessionId &&
+          resolvedSession && isActiveDetailedStrengthSession(resolvedSession) &&
+          isTrustedNativeLiveLoggerSession(resolvedSession.payload ?? resolvedSession)
+        : !workoutLinks.some((item) => item.canonicalWorkoutId === review.canonicalWorkoutId &&
+          item.status === HealthKitWorkoutLinkStatus.CONFIRMED);
+      if (!exactRequestedResolution || !relationshipStillExact) {
+        throw problem(409, "WORKOUT_RECONCILIATION_NOT_PENDING", "This reconciliation no longer exactly matches the requested resolution.");
+      }
+      return {
+        status: "committed",
+        result: { status: "already_resolved", reviewId: review.id, revision: review.version, resolution },
+        outbox: [],
+      };
+    }
     if (action === HealthKitWorkoutReconciliationAction.NO_MATCH) {
       const relationshipLinks = workoutLinks.filter((link) => link.canonicalWorkoutId === review.canonicalWorkoutId);
       const relationshipLinkIds = new Set(relationshipLinks.map((link) => link.id));
@@ -2249,7 +2278,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       });
       return {
         status: "committed",
-        result: { status: "resolved_no_match", reviewId: review.id, revision: saved.version },
+        result: {
+          status: "resolved_no_match",
+          reviewId: review.id,
+          revision: saved.version,
+          resolution: { action: "no_match", selectedLoggerSessionCanonicalId: null, linkId: null },
+        },
         outbox: [],
       };
     }
@@ -2346,6 +2380,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         revision: saved.version,
         linkId: confirmed.link.id,
         loggerSessionCanonicalId: selectedSessionId,
+        resolution: {
+          action: "confirm",
+          selectedLoggerSessionCanonicalId: selectedSessionId,
+          linkId: confirmed.link.id,
+        },
         strategicEvidenceEligibility: "quarantined",
       },
       outbox: [],

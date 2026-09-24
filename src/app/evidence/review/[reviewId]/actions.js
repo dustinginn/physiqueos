@@ -107,8 +107,9 @@ export async function resolveWorkoutReconciliation(formData) {
   const idempotencyKey = String(formData.get("idempotencyKey") ?? "");
   const composition = await getProductionApplicationComposition();
   const context = await createInactiveLegacyWebContext({ repositories: composition.repositories });
+  let commandOutcome;
   try {
-    await composition.commands.execute({
+    commandOutcome = await composition.commands.execute({
       commandType: Phase3Command.RESOLVE_WORKOUT_RECONCILIATION,
       principal: context.principal,
       metadata: {
@@ -123,14 +124,37 @@ export async function resolveWorkoutReconciliation(formData) {
       },
     });
   } catch (error) {
-    if (["AGGREGATE_VERSION_CONFLICT", "WORKOUT_RECONCILIATION_STALE", "WORKOUT_RECONCILIATION_SELECTION_STALE"].includes(error?.code)) {
+    if (["AGGREGATE_VERSION_CONFLICT", "WORKOUT_RECONCILIATION_STALE", "WORKOUT_RECONCILIATION_SELECTION_STALE", "WORKOUT_RECONCILIATION_NOT_PENDING", "WORKOUT_RECONCILIATION_RELATIONSHIP_DRIFT", "LINK_RELATIONSHIP_INTEGRITY_INVALID"].includes(error?.code)) {
       revalidatePath(`/evidence/review/${reviewId}`);
       redirect(`/evidence/review/${reviewId}?reconciliation=stale`);
     }
     throw error;
   }
+  const direct = commandOutcome?.result;
+  const directStatus = action === "confirm" ? "resolved_confirmed" : "resolved_no_match";
+  let exact = direct?.status === directStatus && exactWorkoutReconciliationResolution(
+    direct.resolution,
+    action,
+    loggerSessionCanonicalId,
+  );
+  if (!exact) {
+    const readback = await getProductionEvidenceReviewReadService().getReview(reviewId);
+    exact = readback?.review?.status === directStatus && exactWorkoutReconciliationResolution(
+      readback?.presentation?.resolution,
+      action,
+      loggerSessionCanonicalId,
+    );
+  }
   revalidatePath(`/evidence/review/${reviewId}`);
-  redirect(`/evidence/review/${reviewId}?reconciliation=resolved`);
+  redirect(`/evidence/review/${reviewId}?reconciliation=${exact ? "resolved" : "stale"}`);
+}
+
+function exactWorkoutReconciliationResolution(resolution, action, loggerSessionCanonicalId) {
+  if (resolution?.action !== action) return false;
+  if (action === "no_match") {
+    return (resolution.selectedLoggerSessionCanonicalId ?? null) === null && (resolution.linkId ?? null) === null;
+  }
+  return Boolean(resolution.linkId) && resolution.selectedLoggerSessionCanonicalId === loggerSessionCanonicalId;
 }
 
 export async function reprocessEvidenceReview(formData) {

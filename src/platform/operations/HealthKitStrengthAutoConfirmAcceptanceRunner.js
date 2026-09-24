@@ -11,6 +11,7 @@ import {
   assessDeterministicStrengthAutoConfirm,
   createHealthKitWorkoutReconciliationReview,
   getHealthKitWorkoutReconciliationId,
+  hasExactHealthKitWorkoutReconciliationResolution,
   isHealthKitWorkoutReconciliationReview,
   resolveHealthKitWorkoutReconciliationRecord,
 } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
@@ -69,8 +70,11 @@ export async function runHealthKitStrengthAutoConfirmAcceptance({
     recordId: reviewId,
   });
   if (link.status === HealthKitWorkoutLinkStatus.CONFIRMED) {
-    const sameHistory = isHealthKitWorkoutReconciliationReview(existingHistory) &&
-      existingHistory.status === "resolved_confirmed" && existingHistory.resolution?.linkId === link.id;
+    const sameHistory = hasExactHealthKitWorkoutReconciliationResolution(existingHistory, {
+      action: HealthKitWorkoutReconciliationAction.CONFIRM,
+      selectedLoggerSessionCanonicalId: link.loggerSessionCanonicalId,
+      linkId: link.id,
+    });
     const exactClaims = claimsHeldByLink(claims, link);
     return Object.freeze({
       outcome: sameHistory && exactClaims ? "already_confirmed" : "refused",
@@ -209,9 +213,10 @@ function digest(value) {
 }
 
 function claimsHeldByLink(claims, link) {
-  return [["workout", link.canonicalWorkoutId], ["session", link.loggerSessionCanonicalId]].every(([kind, subject]) => {
+  const held = claims.filter((claim) => claim.status === "held" && claim.holderLinkId === link.id);
+  return held.length === 2 && [["workout", link.canonicalWorkoutId], ["session", link.loggerSessionCanonicalId]].every(([kind, subject]) => {
     const claim = claims.find((item) => item.id === getHealthKitWorkoutLinkClaimId(kind, subject));
-    return claim?.status === "held" && claim.holderLinkId === link.id;
+    return claim?.status === "held" && claim.holderLinkId === link.id && claim.kind === kind;
   });
 }
 

@@ -112,7 +112,8 @@ export function assessHealthKitStrengthLinkCandidates({
 
   let unverifiable = 0;
   const assessed = [];
-  for (const record of canonicalObjects.filter(isActiveDetailedStrengthSession)) {
+  for (const record of canonicalObjects.filter((item) =>
+    isActiveDetailedStrengthSession(item) && isTrustedNativeLiveLoggerSession(item.payload ?? item))) {
     const payload = record.payload ?? record;
     if (dateOf(payload) !== current.localDate) continue;
     const explicit = getWorkoutIdentityFacts(payload).authoritativeIds.some((sourceId) =>
@@ -121,7 +122,7 @@ export function assessHealthKitStrengthLinkCandidates({
         externalId: sourceId,
       }) === canonicalWorkout.id);
     const canonicalId = record.canonicalId ?? payload.id;
-    const trustedLoggerProvenance = isTrustedNativeLiveLoggerSession(payload);
+    const trustedLoggerProvenance = true;
     const normalized = normalizeSessionTimes(payload, current.timeZone, {
       serverCommitTimestamp: lookupCommitTimestamp(loggerSessionServerCommitTimestamps, canonicalId),
     });

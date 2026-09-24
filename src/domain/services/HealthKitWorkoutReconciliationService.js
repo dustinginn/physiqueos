@@ -248,6 +248,30 @@ export function isHealthKitWorkoutReconciliationReview(review) {
     review?.schemaVersion === HEALTHKIT_WORKOUT_RECONCILIATION_SCHEMA_VERSION;
 }
 
+export function hasExactHealthKitWorkoutReconciliationResolution(review, {
+  action,
+  selectedLoggerSessionCanonicalId = null,
+  linkId = null,
+} = {}) {
+  if (!isHealthKitWorkoutReconciliationReview(review)) return false;
+  const expectedStatus = action === HealthKitWorkoutReconciliationAction.CONFIRM
+    ? "resolved_confirmed" : action === HealthKitWorkoutReconciliationAction.NO_MATCH
+      ? "resolved_no_match" : null;
+  if (!expectedStatus || review.status !== expectedStatus) return false;
+  if (action === HealthKitWorkoutReconciliationAction.CONFIRM &&
+    (!selectedLoggerSessionCanonicalId || !linkId)) return false;
+  const exactResolution = (resolution) => resolution?.action === action &&
+    (resolution.selectedLoggerSessionCanonicalId ?? null) === (action === HealthKitWorkoutReconciliationAction.CONFIRM
+      ? selectedLoggerSessionCanonicalId : null) &&
+    (resolution.linkId ?? null) === (action === HealthKitWorkoutReconciliationAction.CONFIRM ? linkId : null);
+  if (!exactResolution(review.resolution)) return false;
+  if (!Array.isArray(review.resolutionHistory) || review.resolutionHistory.length !== 1 ||
+    !exactResolution(review.resolutionHistory[0])) return false;
+  const lifecycle = Array.isArray(review.lifecycleHistory) ? review.lifecycleHistory : [];
+  const terminal = lifecycle.filter((entry) => ["resolved_confirmed", "resolved_no_match"].includes(entry?.status));
+  return terminal.length === 1 && terminal[0]?.status === expectedStatus && lifecycle.at(-1)?.status === expectedStatus;
+}
+
 export function projectHealthKitWorkoutReconciliationPresentation(review) {
   return Object.freeze({
     kind: "healthkit_workout_reconciliation",

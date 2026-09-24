@@ -203,7 +203,7 @@ describe("controlled Workout window (policy enabled)", () => {
   });
 
   it("creates a Founder review when a high-confidence candidate lacks an allowlisted deterministic basis", async () => {
-    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59"), logger("far-away", "16:00", "17:00")] });
     await ingest(records, [workout()], "confident-but-not-deterministic");
     const snapshot = records.snapshot();
     expect(snapshot.healthKitCanonicalWorkouts[0].linkAssessment.outcome).toBe("confident_match");
@@ -356,6 +356,33 @@ describe("controlled Workout window (policy enabled)", () => {
     expect(after.canonicalEvidenceObjects).toEqual(before.canonicalEvidenceObjects);
   });
 
+  it("refuses idempotent reconciliation success when terminal history is corrupt", async () => {
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59"), logger("session-b", "10:02", "11:01")] });
+    await ingest(records, [workout()], "corrupt-terminal-history");
+    const [review] = records.snapshot().evidenceReviews;
+    const ports = createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-23T23:31:00.000Z") });
+    await ports.resolveWorkoutReconciliation({
+      ownerUserId: OWNER,
+      principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+      metadata: { commandId: "resolve-no-match-first", expectedVersion: String(review.version), idempotencyKey: "resolve-no-match-first" },
+      payload: { reviewId: review.id, action: "no_match" },
+    });
+    const resolved = await records.get({ ownerUserId: OWNER, collection: "evidenceReviews", recordId: review.id });
+    const corrupt = await records.put({
+      ownerUserId: OWNER,
+      collection: "evidenceReviews",
+      recordId: review.id,
+      expectedVersion: resolved.version,
+      payload: { ...resolved, resolutionHistory: [] },
+    });
+    await expect(ports.resolveWorkoutReconciliation({
+      ownerUserId: OWNER,
+      principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+      metadata: { commandId: "resolve-no-match-corrupt-replay", expectedVersion: String(corrupt.version), idempotencyKey: "resolve-no-match-corrupt-replay" },
+      payload: { reviewId: review.id, action: "no_match" },
+    })).rejects.toMatchObject({ status: 409, code: "WORKOUT_RECONCILIATION_NOT_PENDING" });
+  });
+
   it("freshly reassesses No match and atomically releases every current candidate link", async () => {
     const records = store({ evidence: [logger("session-a", "10:04", "11:20", 4560)] });
     await ingest(records, [workout()], "no-match-release");
@@ -441,6 +468,42 @@ describe("controlled Workout window (policy enabled)", () => {
       })).rejects.toMatchObject({ status: 409, code: "WORKOUT_RECONCILIATION_RELATIONSHIP_DRIFT" });
     expect(records.snapshot().evidenceReviews[0].status).toBe("pending");
     expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("candidate");
+  });
+
+  it("rejects No match when a foreign confirmed link holds the candidate session without its companion workout claim", async () => {
+    const records = store({ evidence: [logger("session-a", "10:04", "11:20", 4560)] });
+    await ingest(records, [workout()], "no-match-foreign-graph");
+    const snapshot = records.snapshot();
+    const [review] = snapshot.evidenceReviews;
+    const [candidate] = snapshot.healthKitWorkoutLinks;
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "healthKitWorkoutLinks",
+      recordId: "foreign-confirmed-link",
+      payload: { ...candidate, id: "foreign-confirmed-link", canonicalWorkoutId: "other-workout", status: "confirmed" },
+    });
+    const sessionClaimId = getHealthKitWorkoutLinkClaimId("session", candidate.loggerSessionCanonicalId);
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "healthKitWorkoutLinkClaims",
+      recordId: sessionClaimId,
+      payload: {
+        schemaVersion: "healthkit-workout-link-claim-v1",
+        id: sessionClaimId,
+        kind: "session",
+        status: "held",
+        holderLinkId: "foreign-confirmed-link",
+        history: [{ status: "held", holderLinkId: "foreign-confirmed-link", at: "2026-09-23T23:30:00.000Z" }],
+      },
+    });
+    await expect(createCanonicalPersistenceCommandPorts({ records, now: () => new Date("2026-09-23T23:31:00.000Z") })
+      .resolveWorkoutReconciliation({
+        ownerUserId: OWNER,
+        principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+        metadata: { commandId: "resolve-no-match-foreign-graph", expectedVersion: String(review.version), idempotencyKey: "resolve-no-match-foreign-graph" },
+        payload: { reviewId: review.id, action: "no_match" },
+      })).rejects.toMatchObject({ status: 409, code: "WORKOUT_RECONCILIATION_RELATIONSHIP_DRIFT" });
+    expect(records.snapshot().evidenceReviews[0].status).toBe("pending");
   });
 
   it("reopens a superseded review when a plausible relationship returns", async () => {
@@ -757,7 +820,7 @@ function logger(id, start, end, duration = 3540) {
     payload: {
       id, evidence_type: "training", observed_at: DAY,
       source: { application: "Training Logger + Apple Fitness", modality: "mixed" },
-      metadata: { activity_type: "Traditional Strength Training", start_time: `${DAY}T${start}:00-07:00`, end_time: `${DAY}T${end}:00-07:00`, duration_seconds: duration },
+      metadata: { activity_type: "Traditional Strength Training", start_time: `${DAY}T${start}:00-07:00`, end_time: `${DAY}T${end}:00-07:00`, duration_seconds: duration, logger_origin: "training_logger", logger_mode: "live" },
       exercises: [{ name: "Bench Press", sets: [{ reps: 8, weight: 185 }] }],
     },
   };
@@ -920,9 +983,11 @@ describe("link hardening through the real ingest path", () => {
     ]);
   });
 
-  it("routes an aligned explicit identity from non-Logger evidence to review", async () => {
+  it("excludes an aligned explicit identity from non-Logger evidence", async () => {
     const explicit = logger("session-x", "10:00", "11:00");
     explicit.payload.source = { application: "Evidence import", modality: "screenshot" };
+    delete explicit.payload.metadata.logger_origin;
+    delete explicit.payload.metadata.logger_mode;
     explicit.payload.metadata.source_workout_id = HK_UUID;
     const records = storeWithClaims({
       evidence: [explicit],
@@ -934,16 +999,11 @@ describe("link hardening through the real ingest path", () => {
     const result = await ingest(records, [workout()], "explicit-untrusted-provenance");
     const snapshot = records.snapshot();
     expect(result.result.workoutRelationships.automaticallyConfirmed ?? 0).toBe(0);
-    expect(result.result.workoutRelationships.automaticConfirmationRefusals).toEqual([
-      expect.objectContaining({ reasons: expect.arrayContaining(["logger_session_provenance_untrusted"]) }),
-    ]);
-    expect(snapshot.healthKitWorkoutLinks).toEqual([
-      expect.objectContaining({ status: "candidate", matchBasis: "explicit_source_identity" }),
-    ]);
+    expect(result.result.workoutRelationships.automaticConfirmationRefusals).toEqual([]);
+    expect(snapshot.healthKitWorkoutLinks ?? []).toEqual([]);
     expect(snapshot.healthKitWorkoutLinkClaims ?? []).toEqual([]);
-    expect(snapshot.evidenceReviews).toEqual([
-      expect.objectContaining({ status: "pending", candidates: [expect.objectContaining({ trustedLoggerProvenance: false })] }),
-    ]);
+    expect(snapshot.evidenceReviews ?? []).toEqual([]);
+    expect(snapshot.healthKitCanonicalWorkouts[0].linkAssessment).toMatchObject({ outcome: "no_match", reason: "no_plausible_logger_session" });
   });
 
   it("does not treat a sequential session that only touches the Apple workout as a match", async () => {
@@ -1070,7 +1130,7 @@ describe("prospective (open-ended, Strength-only) Workout policy", () => {
 
 describe("same-identity workout content drift (immutable HealthKit workout re-delivered with changed statistics)", () => {
   it("acknowledges and ignores the drifted copy: stored observation, canonical workout and link byte-identical; later observations in the batch still ingest", async () => {
-    const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
+    const records = store({ evidence: [logger("session-a", "10:01", "10:59"), logger("far-away", "18:00", "19:00")] });
     await ingest(records, [workout()], "b1");
     const before = records.snapshot();
     const drifted = workout({ averageHeartRate: 131, activeCalories: 412 });

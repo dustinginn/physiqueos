@@ -277,7 +277,7 @@ function session(id, start, end) {
     canonicalId: id, version: 1, quality: { status: "active" },
     payload: {
       id, evidence_type: "training", observed_at: DAY, source: { application: "Training Logger + Apple Fitness", modality: "mixed" },
-      metadata: { activity_type: "Traditional Strength Training", start_time: `${DAY}T${start}:00-07:00`, end_time: `${DAY}T${end}:00-07:00`, duration_seconds: seconds },
+      metadata: { activity_type: "Traditional Strength Training", start_time: `${DAY}T${start}:00-07:00`, end_time: `${DAY}T${end}:00-07:00`, duration_seconds: seconds, logger_origin: "training_logger", logger_mode: "live" },
       exercises: [{ name: "Squat", sets: [{ reps: 5, weight: 225 }] }],
     },
   };

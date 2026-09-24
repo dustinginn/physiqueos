@@ -30,7 +30,7 @@ describe("strength link matcher", () => {
     const result = assess(hkStrength(), [logger("session-a", "10:01", "10:59")]);
     expect(result.outcome).toBe(Outcome.CONFIDENT);
     expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0]).toMatchObject({ loggerSessionCanonicalId: "session-a", basis: "temporal_and_telemetry" });
+    expect(result.candidates[0]).toMatchObject({ loggerSessionCanonicalId: "session-a", basis: "logger_session_window" });
     expect(result.candidates[0].confidence).toBeGreaterThanOrEqual(80);
   });
 
@@ -156,7 +156,7 @@ describe("strength link matcher", () => {
     expect(result.candidates[0]).toMatchObject({
       confidence: 100,
       basis: "explicit_source_identity",
-      trustedLoggerProvenance: false,
+      trustedLoggerProvenance: true,
       substantiveOverlap: false,
       overlapSeconds: 0,
       startAligned: false,
@@ -174,7 +174,7 @@ describe("strength link matcher", () => {
     expect(result.candidates[0]).toMatchObject({
       confidence: 100,
       basis: "explicit_source_identity",
-      trustedLoggerProvenance: false,
+      trustedLoggerProvenance: true,
       substantiveOverlap: false,
       overlapSeconds: null,
       startAligned: null,
@@ -346,6 +346,8 @@ function logger(id, start, end, duration = 3540, date = "2026-09-23", exercises 
         start_time: `${date}T${start}:00-07:00`,
         end_time: `${date}T${end}:00-07:00`,
         duration_seconds: duration,
+        logger_origin: "training_logger",
+        logger_mode: "live",
       },
       exercises,
     },

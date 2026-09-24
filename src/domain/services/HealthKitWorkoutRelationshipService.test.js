@@ -45,6 +45,26 @@ describe("guarded relationship confirmation", () => {
     expect(records.snapshot().healthKitWorkoutLinkClaims).toHaveLength(2);
   });
 
+  it("refuses idempotent success when a confirmed link has an extra or malformed held claim", async () => {
+    const { records, link } = await world({ sessions: [session("S1", "10:01", "10:59")], workouts: [["u1", "10:00", "11:00"]] });
+    const linkId = link("u1", "S1");
+    await confirm(records, linkId);
+    const snapshot = records.snapshot();
+    snapshot.healthKitWorkoutLinkClaims.push({
+      id: "unexpected-held-claim",
+      kind: "session",
+      schemaVersion: "healthkit-workout-link-claim-v1",
+      status: "held",
+      holderLinkId: linkId,
+      history: [{ status: "held", holderLinkId: linkId, at: T0 }],
+      version: 1,
+    });
+    const corrupt = createInMemoryCanonicalRecordStore(snapshot);
+    expect(findHealthKitWorkoutRelationshipViolations({ links: snapshot.healthKitWorkoutLinks, claims: snapshot.healthKitWorkoutLinkClaims }))
+      .toMatchObject({ confirmedLinksWithoutHeldClaims: 1, heldClaimsWithoutConfirmedLink: 1 });
+    await expect(confirmWith(corrupt, linkId)).rejects.toMatchObject({ code: "LINK_RELATIONSHIP_INTEGRITY_INVALID" });
+  });
+
   it("refuses a second Apple workout for one Logger session (Logger -> HealthKit one-to-one)", async () => {
     const { records, link } = await world({
       sessions: [session("S1", "10:00", "11:00")],
@@ -294,7 +314,7 @@ function session(id, start, end) {
     canonicalId: id, version: 1, quality: { status: "active" },
     payload: {
       id, evidence_type: "training", observed_at: DAY, source: { application: "Training Logger + Apple Fitness", modality: "mixed" },
-      metadata: { activity_type: "Traditional Strength Training", start_time: `${DAY}T${start}:00-07:00`, end_time: `${DAY}T${end}:00-07:00`, duration_seconds: seconds },
+      metadata: { activity_type: "Traditional Strength Training", start_time: `${DAY}T${start}:00-07:00`, end_time: `${DAY}T${end}:00-07:00`, duration_seconds: seconds, logger_origin: "training_logger", logger_mode: "live" },
       exercises: [{ name: "Squat", sets: [{ reps: 5, weight: 225 }] }],
     },
   };
