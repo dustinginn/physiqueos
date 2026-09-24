@@ -71,7 +71,13 @@ function fixture(overrides = {}) {
       }),
       getDEXA: call({ report: {} }),
     },
-    healthKitCanary: { getActivityValidation: call({ boundedRange: {}, items: [] }) },
+    healthKitCanary: {
+      getActivityValidation: call({ boundedRange: {}, items: [] }),
+      getSeptember23ActivityRepairPreflight: call({
+        contractVersion: "healthkit-sep23-activity-repair-preflight-v1",
+        authenticatedDeviceId: principal.deviceId,
+      }),
+    },
     photos: { getNativePhotosTimeline: call({ sessions: [], page: { limit: 12, count: 0, hasMore: false } }) },
     briefings: { listNativeHistory: call({ items: [], page: { limit: 20, hasMore: false, nextCursor: null } }), getNativeArtifact: call({ artifact: { artifactId: "briefing-1" } }), getDexaArtifact: call({ artifact: { id: "dexa-event-1" } }) },
     photoEvents: { getPhotoEvent: call({ artifact: { id: "photo-event-1" } }) },
@@ -110,6 +116,19 @@ describe("Native production contract boundary", () => {
     expect(result.resource).toBe("healthkit-activity-canary");
     await expect(current.service.read({ request: request(), resource: "healthkit-activity-canary", input: {} }))
       .rejects.toMatchObject({ status: 400 });
+  });
+
+  it("binds the September 23 repair preflight to the authenticated principal device", async () => {
+    const current = fixture();
+    const result = await current.service.read({
+      request: request(), resource: "healthkit-sep23-activity-repair-preflight", input: {},
+    });
+    expect(current.readers.healthKitCanary.getSeptember23ActivityRepairPreflight)
+      .toHaveBeenCalledWith({ authenticatedDeviceId: principal.deviceId });
+    expect(result).toMatchObject({
+      resource: "healthkit-sep23-activity-repair-preflight",
+      data: { authenticatedDeviceId: principal.deviceId },
+    });
   });
 
   it("defaults Library to history/explicit membership and keeps All Exercises separate", async () => {

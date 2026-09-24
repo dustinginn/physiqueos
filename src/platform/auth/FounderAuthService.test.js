@@ -52,7 +52,13 @@ describe("inactive Founder authentication lifecycle", () => {
       userId: "user", eventType: "native_pairing_credential_consumed", outcome: "accepted",
       details: { pairingCredentialId: "pairing", platform: "ios" },
     }));
-    expect(result).toMatchObject({ sessionId: expect.any(String), accessToken: expect.any(String), refreshCredential: expect.any(String) });
+    expect(result).toMatchObject({
+      sessionId: expect.any(String),
+      deviceId: expect.any(String),
+      accessToken: expect.any(String),
+      refreshCredential: expect.any(String),
+    });
+    expect(result.deviceId).toBe(identity.createDevice.mock.calls[0][0].id);
     expect(result.accessToken).toHaveLength(43);
     expect(result.refreshCredential).toHaveLength(43);
   });
@@ -234,7 +240,12 @@ describe("inactive Founder authentication lifecycle", () => {
     expect(identity.replaceRefreshCredential).toHaveBeenCalledWith(expect.objectContaining({
       previousId: "refresh", next: expect.objectContaining({ familyId: "family", sessionId: "session" }),
     }));
-    expect(result).toMatchObject({ sessionId: "session", accessToken: expect.any(String), refreshCredential: expect.any(String) });
+    expect(result).toMatchObject({
+      sessionId: "session",
+      deviceId: "device",
+      accessToken: expect.any(String),
+      refreshCredential: expect.any(String),
+    });
     expect(result.accessToken).toHaveLength(43);
     expect(result.refreshCredential).toHaveLength(43);
   });

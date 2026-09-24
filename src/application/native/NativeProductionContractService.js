@@ -144,6 +144,9 @@ export function createNativeProductionContractService({
           startDate: required(input.startDate, "startDate"),
           endDate: required(input.endDate, "endDate"),
         }); break;
+        case "healthkit-sep23-activity-repair-preflight": data = await readers.healthKitCanary.getSeptember23ActivityRepairPreflight({
+          authenticatedDeviceId: principal.deviceId,
+        }); break;
         case "energy": {
           // The raw progress read returns unreconciled source collections
           // (Activity/Nutrition days, DEXA scans). Native must not derive

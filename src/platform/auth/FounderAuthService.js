@@ -164,7 +164,7 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
           platform,
         },
       });
-      return session;
+      return Object.freeze({ ...session, deviceId });
     });
   }
 
@@ -212,7 +212,14 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
       };
       await transaction.identity.createAccessCredential(accessRecord);
       await transaction.identity.replaceRefreshCredential({ previousId: current.id, next: refreshRecord });
-      return Object.freeze({ accessToken: accessCredential, accessExpiresAt: accessExpiresAt.toISOString(), refreshCredential: nextRefreshCredential, refreshIdleExpiresAt: idleExpiresAt.toISOString(), sessionId: current.session_id });
+      return Object.freeze({
+        accessToken: accessCredential,
+        accessExpiresAt: accessExpiresAt.toISOString(),
+        refreshCredential: nextRefreshCredential,
+        refreshIdleExpiresAt: idleExpiresAt.toISOString(),
+        sessionId: current.session_id,
+        deviceId: current.device_id,
+      });
     });
     if (result.refreshReuseDetected) {
       throw new ApplicationProblem({ status: 401, code: "REFRESH_REUSE_DETECTED", title: "This device session was revoked after refresh credential reuse." });

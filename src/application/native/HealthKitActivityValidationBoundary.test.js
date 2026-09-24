@@ -10,6 +10,80 @@ const OWNER = "user_founder_001";
 const POLICY_ID = "healthkit_canonical_daily_activation_policy";
 
 describe("HealthKit Activity validation-only boundary", () => {
+  it("returns a hard-bound September 23 repair preflight using the authenticated Server device", async () => {
+    const deviceId = "server-generated-device";
+    const history = Array.from({ length: 49 }, (_, index) => ({ revision: index + 1 }));
+    const observations = Array.from({ length: 50 }, (_, index) => ({
+      id: `healthkit-observation-${index + 1}`,
+      observationType: "activity_summary",
+      externalId: "activity-summary:automatic:2026-09-23",
+      occurrenceDate: "2026-09-23",
+      ingestionPurpose: "operational",
+      ingestion: { deliveryDeviceId: deviceId },
+      measurement: { sourceRevision: index + 1 },
+    }));
+    observations.push({
+      id: "wrong-local-keychain-device",
+      observationType: "activity_summary",
+      externalId: "activity-summary:automatic:2026-09-23",
+      occurrenceDate: "2026-09-23",
+      ingestionPurpose: "operational",
+      ingestion: { deliveryDeviceId: "founder-device-local-only" },
+      measurement: { sourceRevision: 51 },
+    });
+    const policy = {
+      id: POLICY_ID,
+      schemaVersion: "healthkit-canonical-activation-policy-v1",
+      status: "enabled",
+      domains: ["activity", "nutrition"],
+      effectiveLocalDate: "2026-09-22",
+      endLocalDate: null,
+      strategicEvidenceEligibility: "quarantined",
+      historicalBackfill: false,
+      version: 1,
+    };
+    const records = createInMemoryCanonicalRecordStore({
+      user: [{ id: OWNER, version: 1 }],
+      healthKitObservations: observations,
+      healthKitConfiguration: [policy],
+      healthKitCanonicalDays: [{
+        id: "healthkit_canonical_day_activity_2026-09-23",
+        domain: "activity",
+        localDate: "2026-09-23",
+        revision: 50,
+        current: { sourceRevision: 50 },
+        revisionHistory: history,
+      }],
+    });
+    const diagnostics = createHealthKitCanaryDiagnosticReadService({
+      records,
+      ownerUserId: OWNER,
+      buildIdentity: { gitSha: "a".repeat(40) },
+    });
+
+    await expect(diagnostics.getSeptember23ActivityRepairPreflight({
+      authenticatedDeviceId: deviceId,
+    })).resolves.toMatchObject({
+      contractVersion: "healthkit-sep23-activity-repair-preflight-v1",
+      localDate: "2026-09-23",
+      authenticatedDeviceId: deviceId,
+      runtimeSHA: "a".repeat(40),
+      dailyPolicyDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      canonicalDayCount: 1,
+      canonicalRevision: 50,
+      canonicalSourceRevision: 50,
+      sourceObservationCount: 50,
+      historyCount: 49,
+      september24ActivityCanonicalDayCount: 0,
+    });
+  });
+
+  it("refuses the September 23 preflight without stamped runtime and authenticated device authority", async () => {
+    const diagnostics = createHealthKitCanaryDiagnosticReadService({ records: store(), ownerUserId: OWNER });
+    await expect(diagnostics.getSeptember23ActivityRepairPreflight({ authenticatedDeviceId: "device" }))
+      .rejects.toMatchObject({ status: 503, code: "HEALTHKIT_SEP23_REPAIR_PREFLIGHT_UNAVAILABLE" });
+  });
+
   it("persists validation-only Activity permanently raw without canonical or strategic mutation", async () => {
     const records = store();
     const before = records.snapshot();

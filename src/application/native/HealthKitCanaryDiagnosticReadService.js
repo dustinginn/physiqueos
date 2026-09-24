@@ -1,8 +1,17 @@
+import { createHash } from "node:crypto";
 import { ApplicationProblem } from "../../contracts/v1/problem.js";
-import { HealthKitIngestionPurpose, HealthKitObservationType } from "../../domain/services/HealthKitObservationService.js";
+import {
+  HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
+  HealthKitIngestionPurpose,
+  HealthKitObservationType,
+} from "../../domain/services/HealthKitObservationService.js";
+import { HEALTHKIT_CANONICAL_DAY_COLLECTION } from "../../domain/services/HealthKitEvidenceEligibilityPolicy.js";
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const MAXIMUM_RANGE_DAYS = 31;
+const SEPTEMBER_23 = "2026-09-23";
+const SEPTEMBER_24 = "2026-09-24";
+const SEPTEMBER_23_AUTOMATIC_EXTERNAL_ID = "activity-summary:automatic:2026-09-23";
 const ACTIVITY_UNITS = Object.freeze({
   move_calories: "kcal",
   exercise_minutes: "min",
@@ -12,7 +21,7 @@ const ACTIVITY_UNITS = Object.freeze({
   flights_climbed: "count",
 });
 
-export function createHealthKitCanaryDiagnosticReadService({ records, ownerUserId } = {}) {
+export function createHealthKitCanaryDiagnosticReadService({ records, ownerUserId, buildIdentity = null } = {}) {
   if (!records?.list || !ownerUserId) {
     throw new Error("HealthKit canary diagnostics require record storage and owner authority.");
   }
@@ -32,6 +41,50 @@ export function createHealthKitCanaryDiagnosticReadService({ records, ownerUserI
         canonicalAuthority: "none",
         strategicAuthority: "none",
         items: Object.freeze(items),
+      });
+    },
+
+    /// Read-only, hard-bound authority fence for the one September 23
+    /// Activity repair. It deliberately accepts no caller-selected date or
+    /// collection and returns no HealthKit values.
+    async getSeptember23ActivityRepairPreflight({ authenticatedDeviceId } = {}) {
+      const runtimeSHA = String(buildIdentity?.gitSha ?? "").trim();
+      const deviceId = String(authenticatedDeviceId ?? "").trim();
+      if (!/^[0-9a-f]{40}$/.test(runtimeSHA) || !deviceId) {
+        throw unavailableRepairPreflight();
+      }
+      const [observations, canonicalDays, dailyPolicy] = await Promise.all([
+        records.list({ ownerUserId, collection: "healthKitObservations" }),
+        records.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }),
+        records.get({
+          ownerUserId,
+          collection: "healthKitConfiguration",
+          recordId: HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
+        }),
+      ]);
+      const september23Days = canonicalDays.filter((record) =>
+        record.domain === "activity" && record.localDate === SEPTEMBER_23);
+      const september24Days = canonicalDays.filter((record) =>
+        record.domain === "activity" && record.localDate === SEPTEMBER_24);
+      const sourceObservations = observations.filter((record) =>
+        record.observationType === HealthKitObservationType.ACTIVITY_SUMMARY &&
+        (record.occurrenceDate ?? record.occurrence?.localDate) === SEPTEMBER_23 &&
+        (record.ingestionPurpose ?? HealthKitIngestionPurpose.OPERATIONAL) === HealthKitIngestionPurpose.OPERATIONAL &&
+        record.externalId === SEPTEMBER_23_AUTOMATIC_EXTERNAL_ID &&
+        record.ingestion?.deliveryDeviceId === deviceId);
+      const canonical = september23Days.length === 1 ? september23Days[0] : null;
+      return Object.freeze({
+        contractVersion: "healthkit-sep23-activity-repair-preflight-v1",
+        localDate: SEPTEMBER_23,
+        authenticatedDeviceId: deviceId,
+        runtimeSHA,
+        dailyPolicyDigest: dailyPolicy ? fullDigest(stable(dailyPolicy)) : null,
+        canonicalDayCount: september23Days.length,
+        canonicalRevision: exactPositiveInteger(canonical?.revision),
+        canonicalSourceRevision: exactPositiveInteger(canonical?.current?.sourceRevision),
+        sourceObservationCount: sourceObservations.length,
+        historyCount: Array.isArray(canonical?.revisionHistory) ? canonical.revisionHistory.length : 0,
+        september24ActivityCanonicalDayCount: september24Days.length,
       });
     },
   });
@@ -103,5 +156,30 @@ function validation(field, detail) {
     code: "VALIDATION_FAILED",
     title: "The bounded HealthKit canary diagnostic request is invalid.",
     fieldErrors: [{ field, code: "invalid", detail }],
+  });
+}
+
+function exactPositiveInteger(value) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function stable(value) {
+  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function fullDigest(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
+}
+
+function unavailableRepairPreflight() {
+  return new ApplicationProblem({
+    status: 503,
+    code: "HEALTHKIT_SEP23_REPAIR_PREFLIGHT_UNAVAILABLE",
+    title: "The bounded HealthKit repair preflight is unavailable.",
   });
 }
