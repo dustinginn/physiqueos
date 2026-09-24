@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T14:08:22Z",
+  "generated_at_utc": "2026-09-24T14:30:18Z",
   "task": {
     "id": "codex-healthkit-current-day-priority-sep23-repair-20260924",
     "title": "HealthKit current-day priority and bounded September 23 Activity repair",
@@ -10,14 +10,14 @@
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
-    "final_sha": "91de99a33c80c7b5bd9180b38fb79bbec34b5448",
+    "final_sha": "d7c271fae4ed9a51e13b92f413ea9480c739f7f6",
     "production_server_sha": "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d",
     "production_deployment": "e8c3bed3-20f6-4f5c-b34a-d27ab0881480",
     "native_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
     "native_build": 57
   },
   "result": {
-    "summary": "Exact Native candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448 is implemented, pushed, mutation-tested, and green in 111 relevant HealthKit tests on the sole iPhone 17 Pro simulator. Exact-current-day Activity and Nutrition now run before isolated historical catch-up; zero-valued days remain valid. The separate exact-September-23 Activity repair tool uploads nothing in dry-run and production APPLY remains disabled and authorization-gated. Fresh-context review is pending. Nothing was deployed, uploaded, repaired, or mutated in production.",
+    "summary": "The first fresh-context review rejected candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448 with three valid findings. Amended Native candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6 isolates every historical date, authenticates Server recovery identity digests, and refuses to report transient delivery as durable success. It is pushed and green in 150/150 tests across all nine HealthKit classes. Second fresh-context review is pending. Nothing was deployed, uploaded, repaired, or mutated in production.",
     "success": false,
     "production_mutated": false,
     "deployed": true,
@@ -26,29 +26,30 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Focused synchronization/coordinator tests passed 75/75 and the final complete relevant Native HealthKit suite passed 111/111 on the sole existing iPhone 17 Pro simulator. Every injected critical-guard mutation caused the intended targeted failure and was reverted before the green run."
+      "summary": "The amended synchronization suite passed 55/55, focused Founder replay tests passed 12/12, and the expanded complete Native HealthKit suite passed 150/150 across all nine HealthKit test classes on the sole iPhone 17 Pro simulator. Historical stop-on-first-failure mutation was killed and reverted."
     },
     "review": {
-      "status": "not_run",
-      "summary": "Exact candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448 is frozen and pushed; fresh-context independent adversarial review is the remaining authorized step."
+      "status": "changes_requested",
+      "summary": "First fresh-context review rejected candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448. All three findings are corrected in exact amended candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6; a second fresh-context review is pending."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Only Native source/test changes, simulator tests, repository publication, and prior public authority/health reads occurred. No Founder-device operation, production write, Server mutation, upload, repair, policy/strategic change, Strength/Logger mutation, Midweek merge, or Cardio work occurred."
+      "summary": "Only Native source/test corrections, simulator tests, repository publication, and prior public authority/health reads occurred. No Founder-device operation, production write, Server mutation, upload, repair, policy/strategic change, Strength/Logger mutation, Midweek merge, or Cardio work occurred."
     }
   },
   "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "Sorting current day first inside the existing batch would be insufficient because Build 57 resolves a persisted pending historical batch before issuing any new query.",
-    "The existing foreground sequence completes Activity history before beginning Nutrition, so Activity historical recovery can also delay Nutrition current-day freshness unless all current-day scopes are scheduled first."
+    "The first review found that current-day isolation alone did not satisfy the separate invariant that one failed historical date cannot block later historical dates.",
+    "The first review found that the parsed Server recovery identity digest was not yet authenticated against the outgoing identity material.",
+    "The first review found that transient delivery could preserve pending state yet still return a misleading successful synchronization outcome."
   ],
   "backlog": [
-    "Obtain fresh-context independent adversarial review of exact candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448 and publish the final verdict.",
+    "Obtain a second fresh-context independent adversarial review of exact amended candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6 and publish the final verdict.",
     "If review is clean, stop for separate TestFlight authorization; September 23 repair application remains a distinct later authorization."
   ],
-  "recommended_next_step": "Run the authorized fresh-context review of exact Native candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448. Do not archive, upload, operate the Founder device, apply the repair, change policy/strategic eligibility, merge Midweek Native work, or begin Cardio.",
-  "full_report_path": "agent-handoffs/reports/20260924T140822Z-healthkit-current-day-priority-implemented-tested.md",
+  "recommended_next_step": "Run the authorized second fresh-context review of exact amended Native candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6. Do not archive, upload, operate the Founder device, apply the repair, change policy/strategic eligibility, merge Midweek Native work, or begin Cardio.",
+  "full_report_path": "agent-handoffs/reports/20260924T143018Z-healthkit-current-day-priority-review-corrections.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
