@@ -7,6 +7,7 @@ import { runConfidenceNarrativeV3 } from "./ConfidenceNarrativeV3Pipeline.js";
 import { deriveCadenceCoachingDetailsV3 } from
   "./SpecificCoachingObservationV3.js";
 import {
+  evaluateSecondMovementNarrativeAllocation,
   findNarrativeV3VoiceViolations,
   NARRATIVE_V3_SECTION_PURPOSES,
 } from "./NarrativeV3CompositionService.js";
@@ -115,31 +116,78 @@ describe("Narrative V3 briefing section intelligence", () => {
       .toBe(true);
   });
 
-  it("lets Coach's Take celebrate a second movement without changing Confidence", () => {
+  it("keeps one movement prominent when a second movement is not decision-changing", () => {
     const { event, recurring } = recurringWithDetails({ exercises: [
       exercisePi({ id: "leg_press", label: "Leg Press", category: "Lower Body",
         prs: [{ type: "session_volume", value: 13100,
           previous_best: 11000, unit: "lb" }] }),
       exercisePi({ id: "row", label: "ISO-Lateral High Rows", percent: 36.4 }),
     ] });
+    const selected = recurring.strategicInterpretation
+      .coachingObservationSelection.selected;
+    expect(recurring.narrativePlan.composition.sections.result)
+      .toMatch(/Leg Press/iu);
     expect(recurring.narrativePlan.composition.coachTake)
-      .toMatch(/ISO-lateral high rows took a nice jump.*worth recognizing/isu);
-    expect(recurring.confidence.currentPercentage).toBe(event.confidence.currentPercentage);
+      .not.toMatch(/Leg Press|ISO-Lateral High Rows/iu);
+    expect(recurring.narrativePlan.composition.sectionAllocations.result)
+      .toMatchObject({ candidateIds: [selected[0].candidateId] });
+    expect(recurring.narrativePlan.composition.sectionAllocations.coachTake)
+      .toMatchObject({
+        allocationReason: "second_movement_not_decision_changing",
+        suppressedCandidateIds: [selected[1].candidateId],
+      });
+    expect(recurring.confidence.currentPercentage)
+      .toBe(event.confidence.currentPercentage);
   });
 
-  it("grounds a single-observation Coach's Take in the selected movement", () => {
+  it("keeps the frozen 90 lb movements distinct while allocating only Machine Lateral Raise to narrative", () => {
+    const { recurring } = recurringWithDetails({ exercises: [
+      exercisePi({ id: "lateral_raise_machine",
+        label: "Lateral Raises Machine", date: "2026-09-22",
+        prs: [{ type: "heaviest_load", value: 90,
+          previous_best: 85, unit: "lb" }] }),
+      exercisePi({ id: "leg_extension", label: "Leg Extensions",
+        date: "2026-09-21", prs: [{ type: "heaviest_load", value: 90,
+          previous_best: 80, unit: "lb" }] }),
+    ] });
+    const selected = recurring.strategicInterpretation
+      .coachingObservationSelection.selected;
+    expect(selected.map((item) => [item.subjectId,
+      item.evidenceBasis.currentValue, item.evidenceBasis.previousValue]))
+      .toEqual([["lateral_raise_machine", 90, 85],
+        ["leg_extension", 90, 80]]);
+    expect(recurring.narrativePlan.composition.sections.result)
+      .toBe("Machine lateral raises reached 90 lb, up from the previous best of 85 lb.");
+    expect(recurring.narrativePlan.composition.coachTake)
+      .not.toMatch(/Leg Extensions|90 lb/iu);
+    expect(recurring.narrativePlan.composition.sectionAllocations.result)
+      .toMatchObject({
+        topicKeys: ["training|lateral_raise_machine|heaviest_load"],
+        candidateIds: [selected[0].candidateId],
+      });
+    expect(recurring.narrativePlan.composition.sectionAllocations.coachTake)
+      .toMatchObject({
+        allocationReason: "second_movement_not_decision_changing",
+        suppressedCandidateIds: [selected[1].candidateId],
+      });
+  });
+
+  it("keeps a single movement in Result and uses broad coaching for Coach's Take", () => {
     const { recurring } = recurringWithDetails({ exercises: [exercisePi({
       id: "row", label: "ISO-Lateral High Rows", percent: 20,
       prs: [{ type: "heaviest_load", value: 120,
         previous_best: 100, unit: "lb" }],
     })] });
+    expect(recurring.narrativePlan.composition.sections.result)
+      .toMatch(/ISO-Lateral High Rows.*120 lb/iu);
     expect(recurring.narrativePlan.composition.coachTake)
-      .toMatch(/ISO-Lateral High Rows reaching 120 lb.*training milestone worth recognizing/iu);
-    expect(recurring.narrativePlan.composition.coachTake)
-      .not.toMatch(/^That is useful progress/iu);
+      .not.toMatch(/ISO-Lateral High Rows|120 lb/iu);
+    expect(recurring.narrativePlan.composition.sectionAllocations.coachTake)
+      .toMatchObject({ allocationReason: "broad_synthesis",
+        suppressedCandidateIds: [] });
   });
 
-  it("lets Coach's Take raise a bounded plateau concern without changing strategy", () => {
+  it("does not promote a bounded plateau into a second movement narrative", () => {
     const { event, recurring } = recurringWithDetails({ exercises: [
       exercisePi({ id: "leg_press", label: "Leg Press", category: "Lower Body",
         prs: [{ type: "session_volume", value: 13100,
@@ -148,10 +196,34 @@ describe("Narrative V3 briefing section intelligence", () => {
         exposures: 4, latest: 1000, previous: 1000, percent: 0 }),
     ] });
     expect(recurring.narrativePlan.composition.coachTake)
-      .toMatch(/Seated cable row has been flat.*does not justify changing the whole plan/isu);
+      .not.toMatch(/Seated Cable Row|flat/iu);
+    expect(recurring.narrativePlan.composition.sectionAllocations.coachTake
+      .allocationReason).toBe("second_movement_not_decision_changing");
     expect(recurring.strategicInterpretation.recommendation.action)
       .toBe("continue_current_strategy");
-    expect(recurring.confidence.currentPercentage).toBe(event.confidence.currentPercentage);
+    expect(recurring.confidence.currentPercentage)
+      .toBe(event.confidence.currentPercentage);
+  });
+
+  it("requires every explicit gate before a second movement can be allocated", () => {
+    const candidate = { recommendationCapability: { decisionChanging: true } };
+    expect(evaluateSecondMovementNarrativeAllocation({ candidate,
+      recommendationAction: "change_strategy", goalPhaseMeaning: "Meaning.",
+      broadDomainSynthesis: true })).toEqual({ allowed: true,
+      reasonCode: "decision_changing" });
+    expect(evaluateSecondMovementNarrativeAllocation({ candidate,
+      recommendationAction: "continue_current_strategy",
+      goalPhaseMeaning: "Meaning.", broadDomainSynthesis: true }))
+      .toMatchObject({ allowed: false,
+        reasonCode: "second_movement_not_decision_changing" });
+    expect(evaluateSecondMovementNarrativeAllocation({ candidate,
+      recommendationAction: "change_strategy", goalPhaseMeaning: "Meaning.",
+      broadDomainSynthesis: false })).toMatchObject({ allowed: false,
+        reasonCode: "broad_domain_synthesis_not_satisfied" });
+    expect(evaluateSecondMovementNarrativeAllocation({ candidate,
+      recommendationAction: "change_strategy", goalPhaseMeaning: "",
+      broadDomainSynthesis: true })).toMatchObject({ allowed: false,
+        reasonCode: "goal_phase_meaning_not_satisfied" });
   });
 
   it("keeps Confidence movement independent from Narrative novelty", () => {
@@ -224,7 +296,7 @@ function recurringWithDetails({ exercises = [exercisePi()],
 
 function exercisePi({ id = "row", label = "Seated Cable Row", category = "Back",
   status = "improving", exposures = 3, latest = 1200, previous = 1000,
-  percent = 20, prs = [] } = {}) {
+  percent = 20, prs = [], date = "2026-09-16" } = {}) {
   const ids = Array.from({ length: exposures }, (_, index) =>
     `${id}_session_${index + 1}`);
   return {
@@ -235,7 +307,7 @@ function exercisePi({ id = "row", label = "Seated Cable Row", category = "Back",
     evidenceWindow: { startDate: "2026-09-13", endDate: "2026-09-16" },
     supportingEvidenceIds: ids, confidence: { level: "moderate" },
     explanationData: {
-      last_session: { date: "2026-09-16", session_id: ids.at(-1),
+      last_session: { date, session_id: ids.at(-1),
         total_volume: latest, set_count: 4 },
       previous_comparable_session: { date: "2026-09-12",
         session_id: ids.at(-2), total_volume: previous, set_count: 4 },

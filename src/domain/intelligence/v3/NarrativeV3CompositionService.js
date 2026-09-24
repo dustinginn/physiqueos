@@ -312,7 +312,7 @@ function allocateNarrativeSections(context) {
   if (!context.useRecurringSectionPlan) {
     return { mode: "event_focused", content: {}, allocations: eventAllocations() };
   }
-  const [resultObservation, coachObservation] =
+  const [resultObservation, secondObservation] =
     distinctObservationSubjects(context.specificCoachingObservations);
   const energySignal = context.operatingSignals.find((item) =>
     item.semanticClass === "DERIVED_ESTIMATE" &&
@@ -332,6 +332,16 @@ function allocateNarrativeSections(context) {
     resultObservation,
     operatingSignal,
   });
+  const secondMovementDecision = evaluateSecondMovementNarrativeAllocation({
+    candidate: secondObservation,
+    recommendationAction: context.interpretation.recommendation.action,
+    goalPhaseMeaning: meaningText,
+    broadDomainSynthesis: hasBroadDomainSynthesis({
+      context, candidate: secondObservation,
+    }),
+  });
+  const coachObservation = secondMovementDecision.allowed
+    ? secondObservation : null;
   const actionText = recurringAction(context);
   const energyText = translateEnergyForCoaching(context, energySignal);
   const ambiguityText = translateEnergyAmbiguityForCoaching(context);
@@ -345,7 +355,8 @@ function allocateNarrativeSections(context) {
       : recurringCoachTake(context, { resultObservation, operatingSignal });
   const allocations = {
     result: allocation("recent_change_worth_knowing",
-      resultObservation?.topicKey ?? operatingSignal?.signalId ?? "no_material_change"),
+      resultObservation?.topicKey ?? operatingSignal?.signalId ?? "no_material_change",
+      resultObservation ? { candidateIds: [resultObservation.candidateId] } : {}),
     meaning: allocation("goal_relative_implication", "goal_implication"),
     action: allocation("current_coaching_action", "recommendation"),
     watch: allocation("specific_bounded_attention",
@@ -354,7 +365,17 @@ function allocateNarrativeSections(context) {
     confidence: allocation("goal_outlook_movement", "confidence_movement"),
     coachTake: allocation("highest_value_remaining_coaching_point",
       coachObservation?.topicKey ?? (signalClauses[1]
-        ? `${operatingSignal?.signalId}|secondary_angle` : "coach_emphasis")),
+        ? `${operatingSignal?.signalId}|secondary_angle` : "coach_emphasis"),
+      coachObservation ? {
+        candidateIds: [coachObservation.candidateId],
+        decisionChanging: true,
+        allocationReason: "decision_changing",
+      } : {
+        allocationReason: secondObservation
+          ? secondMovementDecision.reasonCode : "broad_synthesis",
+        suppressedCandidateIds: secondObservation?.candidateId
+          ? [secondObservation.candidateId] : [],
+      }),
   };
   return {
     mode: "recurring_distinct_sections",
@@ -362,6 +383,39 @@ function allocateNarrativeSections(context) {
       watch: watchText, coachTake: coachText },
     allocations,
   };
+}
+
+export function evaluateSecondMovementNarrativeAllocation({ candidate,
+  recommendationAction, goalPhaseMeaning, broadDomainSynthesis } = {}) {
+  if (!candidate) return deepFreeze({ allowed: false,
+    reasonCode: "no_second_movement" });
+  const explicitlyDecisionChanging =
+    candidate.recommendationCapability?.decisionChanging === true;
+  if (!explicitlyDecisionChanging || !recommendationAction ||
+      recommendationAction === "continue_current_strategy") {
+    return deepFreeze({ allowed: false,
+      reasonCode: "second_movement_not_decision_changing" });
+  }
+  if (!String(goalPhaseMeaning ?? "").trim()) {
+    return deepFreeze({ allowed: false,
+      reasonCode: "goal_phase_meaning_not_satisfied" });
+  }
+  if (!broadDomainSynthesis) return deepFreeze({ allowed: false,
+    reasonCode: "broad_domain_synthesis_not_satisfied" });
+  return deepFreeze({ allowed: true, reasonCode: "decision_changing" });
+}
+
+function hasBroadDomainSynthesis({ context, candidate }) {
+  if (!candidate) return false;
+  return context.operatingSignals.some((signal) => {
+    const source = `${signal.sourceType ?? ""} ${signal.capabilityId ?? ""}`;
+    return (candidate.domain !== "energy" &&
+        /energy|nutrition|activity/iu.test(source)) ||
+      (candidate.domain !== "training" &&
+        /training|performance/iu.test(source)) ||
+      (candidate.domain !== "weight" &&
+        /weight|composition|outcome/iu.test(source));
+  });
 }
 
 function eventAllocations() {
@@ -443,7 +497,7 @@ function recurringNextCheck(context) {
 
 function recurringCoachTake(context, { resultObservation, operatingSignal }) {
   if (resultObservation) {
-    return realizeCoachingObservation(resultObservation, "coach_take");
+    return "This was a useful check-in. Keep building on the result and save adjustments for evidence that would actually change the decision.";
   }
   if (operatingSignal?.direction === "supports") {
     return "This was a useful check-in. Keep stacking work like this and save adjustments for evidence that would actually change the decision.";

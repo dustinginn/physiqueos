@@ -54,7 +54,10 @@ describe("Midweek Sep 13–15: unified V3 golden", () => {
     const artifact = prepared.artifact ?? prepared.composed?.artifact ?? prepared.candidateArtifact;
     expect(artifact).toBeDefined();
     vi.mocked(createPINarrativeAssessment).mockClear();
-    const served = prepareMidweekBriefingReviewPresentation({ artifact });
+    const served = prepareMidweekBriefingReviewPresentation({
+      artifact,
+      assessment: prepared.assessment,
+    });
     expect(served.presentationModel).toBe("canonical_narrative_v3");
     expect(served.coachTake.biggestTakeaway).toBe(artifact.briefing.narrativeV3.coachTake);
     expect(served.coachTake.recommendation).toBe(artifact.briefing.narrativeV3.sections.action);

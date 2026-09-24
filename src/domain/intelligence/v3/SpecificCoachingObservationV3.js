@@ -581,6 +581,7 @@ function resolveRecommendationCapability({ candidate, goalContract }) {
   return {
     capable: supportedPlateau,
     mode: supportedPlateau ? "bounded_reversible_suggestion" : "observation_only",
+    decisionChanging: false,
     text: supportedPlateau
       ? `Consider giving ${candidate.subjectLabel} extra attention over the next few sessions, then reassess before changing the broader plan.`
       : null,
