@@ -119,10 +119,13 @@ export function createProgressEvidenceReadService({ store } = {}) {
 
     getActivity({ context, currentDate = new Date() } = {}) {
       return store.run("progress.evidence.activity", async () => {
-        const [user, goals, canonicalEvidenceObjects] = await Promise.all([
+        const [user, goals, canonicalEvidenceObjects, canonicalWorkouts, workoutLinks, workoutLinkClaims] = await Promise.all([
           store.getUser(),
           store.listGoals(),
           store.listCanonicalActivityAndTrainingEvidenceObjects(),
+          store.listHealthKitCanonicalWorkouts?.() ?? [],
+          store.listHealthKitWorkoutLinks?.() ?? [],
+          store.listHealthKitWorkoutLinkClaims?.() ?? [],
         ]);
         const timeline = createEvidenceTimeline({
           context,
@@ -142,6 +145,9 @@ export function createProgressEvidenceReadService({ store } = {}) {
             dateWindow: getDateWindow(timeline),
             evidencePackages,
             goals,
+            canonicalWorkouts,
+            workoutLinks,
+            workoutLinkClaims,
           }),
         });
       });

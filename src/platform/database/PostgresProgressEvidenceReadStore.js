@@ -103,6 +103,9 @@ export function createPostgresProgressEvidenceReadStore({
       return contexts.at(-1) ?? null;
     },
     listEvidencePackages: () => list("evidencePackages"),
+    listHealthKitCanonicalWorkouts: () => list("healthKitCanonicalWorkouts"),
+    listHealthKitWorkoutLinks: () => list("healthKitWorkoutLinks"),
+    listHealthKitWorkoutLinkClaims: () => list("healthKitWorkoutLinkClaims"),
     listCanonicalNutritionEvidenceObjects: async () => graduation.overlay(await queryRecords(
       `SELECT payload,version FROM physiqueos.canonical_evidence_records
        WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
@@ -138,6 +141,9 @@ export function createRepositoryProgressEvidenceReadStore({ repositories } = {})
     listDEXAMediaObjects: async () => null,
     getNutritionContext: async () => repositories.nutritionContext.getNutritionContext(await userId()),
     listEvidencePackages: async () => repositories.evidencePackages?.listEvidencePackages(await userId()) ?? [],
+    listHealthKitCanonicalWorkouts: async () => repositories.healthKitCanonicalWorkouts?.list?.() ?? [],
+    listHealthKitWorkoutLinks: async () => repositories.healthKitWorkoutLinks?.list?.() ?? [],
+    listHealthKitWorkoutLinkClaims: async () => repositories.healthKitWorkoutLinkClaims?.list?.() ?? [],
     listCanonicalNutritionEvidenceObjects: async () =>
       (await canonical()).filter((record) => (record.payload ?? record).evidence_type === "nutrition"),
     listCanonicalActivityAndTrainingEvidenceObjects: async () =>

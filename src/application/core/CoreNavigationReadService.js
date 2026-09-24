@@ -50,6 +50,7 @@ import {
   isReminderOccurrenceCompleted,
   resolveScheduledTime,
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
+import { indexConfirmedHealthKitWorkoutAttachments } from "../../domain/services/HealthKitWorkoutPresentationService.js";
 
 export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   home: Object.freeze([
@@ -60,6 +61,7 @@ export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   ]),
   log: Object.freeze([
     "user", "evidenceReviews", "canonicalEvidenceObjects",
+    "healthKitCanonicalWorkouts", "healthKitWorkoutLinks", "healthKitWorkoutLinkClaims",
   ]),
   goals: Object.freeze([
     "user", "goals", "goalTransitionDrafts", "goalProtocolTransitionDrafts",
@@ -108,10 +110,11 @@ export function createCoreNavigationReadService({
     getLog() {
       return withContext("core.navigation.log", "log", async ({ ownerUserId, principal, repositories, runtime }) => {
         const user = runtime.user?.id === ownerUserId ? runtime.user : null;
-        return createLogReadService({ repositories, now }).getLog({
+        const log = await createLogReadService({ repositories, now }).getLog({
           principal,
           timeZone: user?.timeZone ?? user?.timezone,
         });
+        return projectConfirmedHealthKitLogProvenance(log, runtime);
       });
     },
     async getGoals() {
@@ -1037,6 +1040,27 @@ function domainSupportDestination(category, method) {
   return Object.freeze({
     id: "native.operating-plan.protocol.recovery",
     parameters: Object.freeze({ executionId: method.executionId }),
+  });
+}
+
+export function projectConfirmedHealthKitLogProvenance(log, runtime = {}) {
+  if (!log?.loggedToday?.rows) return log;
+  const attachments = indexConfirmedHealthKitWorkoutAttachments({
+    canonicalEvidenceObjects: runtime.canonicalEvidenceObjects ?? [],
+    canonicalWorkouts: runtime.healthKitCanonicalWorkouts ?? [],
+    workoutLinks: runtime.healthKitWorkoutLinks ?? [],
+    workoutLinkClaims: runtime.healthKitWorkoutLinkClaims ?? [],
+  });
+  return Object.freeze({
+    ...log,
+    loggedToday: Object.freeze({
+      ...log.loggedToday,
+      rows: Object.freeze(log.loggedToday.rows.map((row) => {
+        if (row.id !== "training" || !row.recordId || !attachments.has(String(row.recordId))) return row;
+        const base = String(row.summary ?? "Workout").replace(/ logged$/i, "");
+        return Object.freeze({ ...row, summary: `${base} · Apple Health` });
+      })),
+    }),
   });
 }
 

@@ -454,6 +454,7 @@ describe("provider-native core navigation reads", () => {
     expect(CORE_NAVIGATION_COLLECTIONS.home).not.toContain("trainingPerformanceEvents");
     expect(CORE_NAVIGATION_COLLECTIONS.log).toEqual([
       "user", "evidenceReviews", "canonicalEvidenceObjects",
+      "healthKitCanonicalWorkouts", "healthKitWorkoutLinks", "healthKitWorkoutLinkClaims",
     ]);
     expect(CORE_NAVIGATION_COLLECTIONS.goals).not.toContain("executionItems");
     expect(CORE_NAVIGATION_COLLECTIONS.operatingPlan).not.toContain("dailyBriefings");

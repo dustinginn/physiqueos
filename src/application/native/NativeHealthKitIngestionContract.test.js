@@ -223,6 +223,32 @@ describe("Native HealthKit V1 ingestion contract", () => {
     expect(replay.result).toMatchObject({ createdCount: 0, matchedCount: 1 });
   });
 
+  it("fails closed without publishing an overflowing daily revision recovery floor", async () => {
+    const records = recordStore();
+    const ports = createCanonicalPersistenceCommandPorts({ records });
+    await ports.ingestHealthKitObservations(context("delivery-activity-max", {
+      batchId: "healthkit-activity-max",
+      observations: [activitySummary({ moveCalories: 700, sourceRevision: Number.MAX_SAFE_INTEGER })],
+    }));
+
+    let collision;
+    try {
+      await ports.ingestHealthKitObservations(context("delivery-activity-max-drift", {
+        batchId: "healthkit-activity-max-drift",
+        observations: [activitySummary({ moveCalories: 701, sourceRevision: Number.MAX_SAFE_INTEGER })],
+      }));
+    } catch (error) {
+      collision = error;
+    }
+
+    expect(collision).toMatchObject({
+      status: 409,
+      code: "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+    });
+    expect(collision.recovery).toBeNull();
+    expect(records.snapshot().healthKitObservations).toHaveLength(1);
+  });
+
   it("reconciles a previously unmatched strength observation when exact canonical ownership later appears", async () => {
     const records = recordStore();
     const ports = createCanonicalPersistenceCommandPorts({ records });

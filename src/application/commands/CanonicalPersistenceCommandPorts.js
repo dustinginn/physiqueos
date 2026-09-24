@@ -3165,7 +3165,19 @@ function healthKitObservationIdentityCollisionProblem(observation, storedObserva
     .map((record) => Number(record.measurement?.sourceRevision))
     .filter((revision) => Number.isSafeInteger(revision) && revision > 0);
   const receivedSourceRevision = Number(observation.measurement.sourceRevision);
-  const nextExpectedRevision = Math.max(receivedSourceRevision, ...revisions) + 1;
+  const maximumObservedRevision = Math.max(receivedSourceRevision, ...revisions);
+  // Never publish a rounded or overflowing recovery floor. The collision
+  // remains refused, but an exhausted/unrepresentable sequence must recover
+  // through operator intervention instead of giving the client an unsafe
+  // integer that could collide again.
+  if (!Number.isSafeInteger(maximumObservedRevision) || maximumObservedRevision >= Number.MAX_SAFE_INTEGER) {
+    return problem(
+      409,
+      "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+      "The HealthKit source identity already exists with different observation content."
+    );
+  }
+  const nextExpectedRevision = maximumObservedRevision + 1;
   const identityDigest = createHash("sha256")
     .update([
       "healthkit-daily-revision-identity-v1",

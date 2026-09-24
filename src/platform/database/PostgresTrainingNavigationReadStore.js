@@ -86,6 +86,9 @@ export function createPostgresTrainingNavigationReadStore({
       [ownerUserId, date, timeZone]
     ),
     listEvidencePackages: () => list("evidencePackages"),
+    listHealthKitCanonicalWorkouts: () => list("healthKitCanonicalWorkouts"),
+    listHealthKitWorkoutLinks: () => list("healthKitWorkoutLinks"),
+    listHealthKitWorkoutLinkClaims: () => list("healthKitWorkoutLinkClaims"),
     listTrainingPerformanceEventsByExercise: (canonicalExerciseId) => queryRecords(
       `SELECT payload,version FROM physiqueos.canonical_training_records
        WHERE owner_user_id=$1 AND collection_name='trainingPerformanceEvents'
@@ -111,6 +114,9 @@ export function createRepositoryTrainingNavigationReadStore({ repositories } = {
         [exercise.canonicalExerciseId, exercise.exerciseId, exercise.id].includes(canonicalExerciseId))),
     listCanonicalTrainingEvidenceForDate: async () => repositories.canonicalEvidence.listCanonicalEvidenceObjects((await repositories.users.getCurrentUser())?.id),
     listEvidencePackages: async () => repositories.evidencePackages.listEvidencePackages((await repositories.users.getCurrentUser())?.id),
+    listHealthKitCanonicalWorkouts: async () => repositories.healthKitCanonicalWorkouts?.list?.() ?? [],
+    listHealthKitWorkoutLinks: async () => repositories.healthKitWorkoutLinks?.list?.() ?? [],
+    listHealthKitWorkoutLinkClaims: async () => repositories.healthKitWorkoutLinkClaims?.list?.() ?? [],
     listTrainingPerformanceEventsByExercise: async (canonicalExerciseId) => (await repositories.trainingPerformanceEvents.listTrainingPerformanceEvents())
       .filter((event) => event.canonicalExerciseId === canonicalExerciseId),
   });

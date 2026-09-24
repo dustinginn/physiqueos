@@ -17,6 +17,7 @@ import {
   readCurrentCanonicalTrainingExerciseRegistry,
 } from "./CanonicalExerciseRegistryReadService.js";
 import { createTrainingReportingPresentation } from "../../domain/services/TrainingReportingPresentationService.js";
+import { indexConfirmedHealthKitWorkoutAttachments } from "../../domain/services/HealthKitWorkoutPresentationService.js";
 
 export function createTrainingNavigationReadService({
   store,
@@ -206,9 +207,13 @@ export function createTrainingNavigationReadService({
       return store.run("training.navigation.session", async () => {
         await ensureCanonicalExerciseRegistry();
         const exact = await store.getCanonicalEvidenceObject(sessionId);
-        if (exact) return withSupportingMedia(
-          findSession(createTrainingNavigationReport({ canonicalEvidenceObjects: [exact] }), sessionId),
+        if (exact) return withConfirmedHealthKitAttachment(
+          withSupportingMedia(
+            findSession(createTrainingNavigationReport({ canonicalEvidenceObjects: [exact] }), sessionId),
+            exact,
+          ),
           exact,
+          await loadHealthKitRelationshipState(store),
         );
         const canonicalEvidenceObjects = await store.listCanonicalTrainingEvidenceObjects();
         let session = findSession(createTrainingNavigationReport({ canonicalEvidenceObjects }), sessionId);
@@ -217,7 +222,11 @@ export function createTrainingNavigationReadService({
             item.canonicalId, item.id, item.payload?.id,
             ...(item.provenance?.contributing_evidence_object_ids ?? []),
           ].some((candidate) => String(candidate) === String(sessionId)));
-          return withSupportingMedia(session, record);
+          return withConfirmedHealthKitAttachment(
+            withSupportingMedia(session, record),
+            record,
+            await loadHealthKitRelationshipState(store),
+          );
         }
         session = findSession(createTrainingNavigationReport({
           evidencePackages: await store.listEvidencePackages(),
@@ -261,6 +270,33 @@ function withSupportingMedia(session, record) {
   if (!session) return null;
   const supportingMedia = record?.payload?.metadata?.supporting_media ?? record?.metadata?.supporting_media ?? [];
   return Object.freeze({ ...session, supportingMedia: structuredClone(supportingMedia) });
+}
+
+async function loadHealthKitRelationshipState(store) {
+  if (![store.listHealthKitCanonicalWorkouts, store.listHealthKitWorkoutLinks,
+    store.listHealthKitWorkoutLinkClaims].every((value) => typeof value === "function")) return null;
+  const [canonicalWorkouts, workoutLinks, workoutLinkClaims] = await Promise.all([
+    store.listHealthKitCanonicalWorkouts(),
+    store.listHealthKitWorkoutLinks(),
+    store.listHealthKitWorkoutLinkClaims(),
+  ]);
+  return { canonicalWorkouts, workoutLinks, workoutLinkClaims };
+}
+
+function withConfirmedHealthKitAttachment(session, record, relationshipState) {
+  if (!session || !record || !relationshipState) return session;
+  const index = indexConfirmedHealthKitWorkoutAttachments({
+    canonicalEvidenceObjects: [record],
+    ...relationshipState,
+  });
+  const id = String(record.canonicalId ?? (record.payload ?? record).id ?? session.id);
+  const healthKitAttachment = index.get(id);
+  if (!healthKitAttachment) return session;
+  return Object.freeze({
+    ...session,
+    sourceEvidence: Object.freeze([...new Set([...(session.sourceEvidence ?? []), "Workout Logger", "Apple Health"])]),
+    healthKitAttachment,
+  });
 }
 
 function projectCanonicalExerciseRegistry(exercises = []) {

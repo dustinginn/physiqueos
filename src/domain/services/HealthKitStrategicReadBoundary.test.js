@@ -22,6 +22,12 @@ const ALLOWED = new Set([
   "domain/services/HealthKitWorkoutLinkService.js",
   "domain/services/HealthKitWorkoutRelationshipService.js",
   "domain/services/HealthKitWorkoutService.js",
+  // Presentation-only read path for confirmed, quarantined relationships.
+  // These readers may project provenance/telemetry but the projection service
+  // rejects strategic eligibility and additive Activity semantics.
+  "application/core/CoreNavigationReadService.js",
+  "platform/database/PostgresProgressEvidenceReadStore.js",
+  "platform/database/PostgresTrainingNavigationReadStore.js",
   "platform/migration/phase4DomainCollections.js",
   "platform/operations/HealthKitActivationPolicyRunner.js",
   "platform/operations/HealthKitCanonicalAcceptanceAudit.js",

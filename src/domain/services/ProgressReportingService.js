@@ -47,6 +47,7 @@ import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers"
 import { selectValidDexaScans } from "./DEXAReadModelAdapter";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
 import { formatWholeNumber } from "./HealthKitEvidenceNumberFormatting";
+import { indexConfirmedHealthKitWorkoutAttachments } from "./HealthKitWorkoutPresentationService.js";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
@@ -893,7 +894,12 @@ function hasComparableDEXACoreMetrics(scan) {
 }
 
 function buildActivityReport(context) {
-  const { activityDays = [], goals = [], trainingSessions = [] } = context;
+  const {
+    activityDays = [],
+    confirmedHealthKitWorkoutsBySession = new Map(),
+    goals = [],
+    trainingSessions = [],
+  } = context;
   const latestActivityDay = activityDays.at(-1) ?? null;
   const latestActivityDate = getDateKey(latestActivityDay?.observed_at);
   const latestActivityIsToday =
@@ -935,6 +941,7 @@ function buildActivityReport(context) {
     linkedTrainingContext: getLinkedActivityTrainingContext({
       activityDay: latestActivityDay,
       trainingSessions,
+      confirmedHealthKitWorkoutsBySession,
     }),
     reportPattern:
       "Latest activity day -> current activity protocol -> activity areas -> recent activity history.",
@@ -943,9 +950,12 @@ function buildActivityReport(context) {
 
 export function createProviderActivityEvidenceReport({
   canonicalEvidenceObjects = [],
+  canonicalWorkouts = [],
   dateWindow = null,
   evidencePackages = [],
   goals = [],
+  workoutLinkClaims = [],
+  workoutLinks = [],
 } = {}) {
   const canonicalPayloads = getCanonicalPayloads({
     canonicalEvidenceObjects,
@@ -955,18 +965,25 @@ export function createProviderActivityEvidenceReport({
     canonicalPayloads.filter(isTrainingSession),
     "observed_at"
   );
+  const confirmedHealthKitWorkoutsBySession = indexConfirmedHealthKitWorkoutAttachments({
+    canonicalEvidenceObjects,
+    canonicalWorkouts,
+    workoutLinks,
+    workoutLinkClaims,
+  });
   const allActivityDays = getActivityDaysWithTrainingAggregates({
     explicitActivityDays: sortByDate(
       canonicalPayloads.filter(isActivityDay),
       "observed_at"
     ),
     trainingSessions,
+    confirmedHealthKitWorkoutsBySession,
   });
   const activityDays = dateWindow
     ? allActivityDays.filter((day) => isInsideDateWindow(day.observed_at, dateWindow))
     : allActivityDays;
   return Object.freeze({
-    ...buildActivityReport({ activityDays, goals, trainingSessions }),
+    ...buildActivityReport({ activityDays, goals, trainingSessions, confirmedHealthKitWorkoutsBySession }),
     evidenceWindow: dateWindow,
   });
 }
@@ -1632,6 +1649,7 @@ function getActivityDayRecords(context = {}) {
 function getActivityDaysWithTrainingAggregates({
   explicitActivityDays = [],
   trainingSessions = [],
+  confirmedHealthKitWorkoutsBySession = new Map(),
 } = {}) {
   const activityByDate = new Map(
     explicitActivityDays
@@ -1646,6 +1664,7 @@ function getActivityDaysWithTrainingAggregates({
     const aggregate = createTrainingBackedActivityDay({
       date,
       trainingSessions: sameDayTrainingSessions,
+      confirmedHealthKitWorkoutsBySession,
     });
 
     activityByDate.set(
@@ -1671,11 +1690,21 @@ function groupTrainingSessionsByDate(trainingSessions = []) {
   }, new Map());
 }
 
-function createTrainingBackedActivityDay({ date, trainingSessions = [] } = {}) {
-  const workoutActiveCalories = sumTrainingActiveCalories(trainingSessions);
+function createTrainingBackedActivityDay({
+  date,
+  trainingSessions = [],
+  confirmedHealthKitWorkoutsBySession = new Map(),
+} = {}) {
+  const workoutActiveCalories = sumTrainingActiveCalories(
+    trainingSessions,
+    confirmedHealthKitWorkoutsBySession,
+  );
   const trainingSessionIds = trainingSessions
     .map((session) => session._canonicalId ?? session.id)
     .filter(Boolean);
+  const confirmedHealthKitWorkoutCount = new Set(trainingSessions
+    .map((session) => confirmedHealthKitWorkoutsBySession.get(trainingSessionIdentity(session))?.canonicalWorkoutId)
+    .filter(Boolean)).size;
 
   return {
     id: `activity_training_partial_${date}`,
@@ -1710,6 +1739,7 @@ function createTrainingBackedActivityDay({ date, trainingSessions = [] } = {}) {
       workout_active_calories: workoutActiveCalories,
       non_workout_active_calories: null,
       training_sessions_referenced: trainingSessionIds.length,
+      confirmed_healthkit_workouts_referenced: confirmedHealthKitWorkoutCount,
     },
     references: {
       training_session_ids: trainingSessionIds,
@@ -1734,9 +1764,11 @@ function mergeActivityDayWithTrainingAggregate(activityDay = {}, aggregate = {})
   const moveCalories = Number(dailyActivity.move_calories);
   const aggregateWorkoutActiveCalories = aggregate.derived_metrics?.workout_active_calories;
   const existingWorkoutActiveCalories = activityDay.derived_metrics?.workout_active_calories;
-  const workoutActiveCalories =
-    Number.isFinite(Number(aggregateWorkoutActiveCalories)) &&
-    Number(aggregateWorkoutActiveCalories) > 0
+  const hasConfirmedHealthKitWorkout = Number(aggregate.derived_metrics?.confirmed_healthkit_workouts_referenced) > 0;
+  const workoutActiveCalories = hasConfirmedHealthKitWorkout
+    ? aggregateWorkoutActiveCalories ?? null
+    : aggregateWorkoutActiveCalories !== null && aggregateWorkoutActiveCalories !== undefined &&
+    Number.isFinite(Number(aggregateWorkoutActiveCalories))
       ? aggregateWorkoutActiveCalories
       : existingWorkoutActiveCalories ?? aggregateWorkoutActiveCalories ?? null;
   const nonWorkoutActiveCalories =
@@ -1764,6 +1796,9 @@ function mergeActivityDayWithTrainingAggregate(activityDay = {}, aggregate = {})
       workout_active_calories: workoutActiveCalories,
       non_workout_active_calories: nonWorkoutActiveCalories,
       training_sessions_referenced: trainingSessionIds.length,
+      confirmed_healthkit_workouts_referenced:
+        aggregate.derived_metrics?.confirmed_healthkit_workouts_referenced ??
+        activityDay.derived_metrics?.confirmed_healthkit_workouts_referenced ?? 0,
     },
     references: {
       ...(activityDay.references ?? {}),
@@ -1774,6 +1809,15 @@ function mergeActivityDayWithTrainingAggregate(activityDay = {}, aggregate = {})
 
 function createActivityDayRecord(activityDay = {}) {
   const dateKey = getDateKey(activityDay.observed_at);
+  const activeCalories = finiteNumberOrNull(activityDay.daily_activity?.move_calories);
+  const workoutActiveCalories = finiteNumberOrNull(activityDay.derived_metrics?.workout_active_calories);
+  const energyAnomaly = activeCalories !== null && workoutActiveCalories !== null && workoutActiveCalories > activeCalories
+    ? Object.freeze({
+        code: "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY",
+        dailyActiveCalories: activeCalories,
+        workoutActiveCalories,
+      })
+    : null;
 
   return {
       id: activityDay.id,
@@ -1782,7 +1826,7 @@ function createActivityDayRecord(activityDay = {}) {
       detail: formatActivityDayDetail(activityDay),
       date: activityDay.observed_at,
       isToday: Boolean(dateKey) && dateKey === getTodayDateKey(),
-      activeCalories: activityDay.daily_activity?.move_calories ?? null,
+      activeCalories,
       totalCalories: activityDay.daily_activity?.total_calories_burned ?? null,
       exerciseMinutes: activityDay.daily_activity?.exercise_minutes ?? null,
       standHours: activityDay.daily_activity?.stand_hours ?? null,
@@ -1790,14 +1834,18 @@ function createActivityDayRecord(activityDay = {}) {
       exerciseGoal: activityDay.daily_activity?.exercise_goal ?? null,
       standGoal: activityDay.daily_activity?.stand_goal ?? null,
       ringCompletion: activityDay.daily_activity?.ring_completion ?? {},
-      workoutActiveCalories:
-        activityDay.derived_metrics?.workout_active_calories ?? null,
+      workoutActiveCalories,
       nonWorkoutActiveCalories:
         activityDay.derived_metrics?.non_workout_active_calories ?? null,
       linkedTrainingSessionCount:
         activityDay.derived_metrics?.training_sessions_referenced ??
         activityDay.references?.training_session_ids?.length ??
         0,
+      workoutEnergyAttribution: Object.freeze({
+        policy: "workout_energy_is_descriptive_never_additive",
+        confirmedHealthKitWorkoutCount: Number(activityDay.derived_metrics?.confirmed_healthkit_workouts_referenced ?? 0),
+      }),
+      energyAnomaly,
       protocolStatus: formatActivityProtocolSupport(activityDay),
     };
 }
@@ -2108,12 +2156,29 @@ export function getNutritionSourceLabels(nutritionDay = {}) {
   return [...new Set(refs.map(formatSourceArtifactLabel).filter(Boolean))];
 }
 
-function sumTrainingActiveCalories(trainingSessions = []) {
-  return trainingSessions.reduce((sum, session) => {
-    const value = Number(session.metadata?.active_calories);
-
-    return Number.isFinite(value) ? sum + value : sum;
-  }, 0);
+function sumTrainingActiveCalories(trainingSessions = [], confirmedHealthKitWorkoutsBySession = new Map()) {
+  let total = 0;
+  let found = false;
+  const includedCanonicalWorkoutIds = new Set();
+  for (const session of trainingSessions) {
+    const attachment = confirmedHealthKitWorkoutsBySession.get(trainingSessionIdentity(session));
+    const healthKitValue = finiteNumberOrNull(attachment?.session?.activeCalories);
+    if (attachment) {
+      if (includedCanonicalWorkoutIds.has(attachment.canonicalWorkoutId)) continue;
+      includedCanonicalWorkoutIds.add(attachment.canonicalWorkoutId);
+      if (healthKitValue !== null) {
+        total += healthKitValue;
+        found = true;
+      }
+      continue;
+    }
+    const loggerValue = finiteNumberOrNull(session.metadata?.active_calories);
+    if (loggerValue !== null) {
+      total += loggerValue;
+      found = true;
+    }
+  }
+  return found ? total : null;
 }
 
 function getTrainingUnderstanding({ activityDays = [], trainingSessions = [] } = {}) {
@@ -2247,7 +2312,11 @@ function getActivityAreas(understanding = {}) {
   ];
 }
 
-function getLinkedActivityTrainingContext({ activityDay, trainingSessions = [] } = {}) {
+function getLinkedActivityTrainingContext({
+  activityDay,
+  trainingSessions = [],
+  confirmedHealthKitWorkoutsBySession = new Map(),
+} = {}) {
   if (!activityDay) return [];
 
   const activityDate = getDateKey(activityDay.observed_at);
@@ -2261,12 +2330,27 @@ function getLinkedActivityTrainingContext({ activityDay, trainingSessions = [] }
           linkedIds.has(session.id) ||
           linkedIds.has(session._canonicalId))
     )
-    .map((session) => ({
-      id: session._canonicalId ?? session.id,
+    .map((session) => {
+      const id = trainingSessionIdentity(session);
+      const attachment = confirmedHealthKitWorkoutsBySession.get(id);
+      const activeCalories = finiteNumberOrNull(attachment?.session?.activeCalories);
+      return {
+      id,
       label: session.metadata?.activity_type ?? "Workout",
-      value: formatTrainingRecordValue(session),
+      value: activeCalories !== null ? `${formatWholeNumber(activeCalories)} active cal` : formatTrainingRecordValue(session),
       detail: formatTrainingRecordDetail(session),
-    }));
+      sourceEvidence: attachment ? ["Workout Logger", "Apple Health"] : getSessionSourceLabels(session),
+    };
+    });
+}
+
+function trainingSessionIdentity(session = {}) {
+  return String(session._canonicalId ?? session.canonicalId ?? session.id ?? "");
+}
+
+function finiteNumberOrNull(value) {
+  const number = Number(value);
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(number) ? number : null;
 }
 
 function getTrainingBreakdowns(trainingSessions = []) {
