@@ -13,3 +13,9 @@ Summary: Build 57's starvation defect is confirmed. The selected Native design i
 Detailed report: `agent-handoffs/reports/20260924T132959Z-healthkit-current-day-priority-architecture-audit.md`
 
 Protocol: `agent-handoffs/README.md`
+
+## Agent operating procedures
+
+- Claude phone handoff / Remote Control bootstrap: `agent-handoffs/CLAUDE_PHONE_HANDOFF.md`
+
+The Claude phone-handoff procedure is durable operational guidance. It does not replace task-specific authority or the current primary handoff in `latest.json`.
