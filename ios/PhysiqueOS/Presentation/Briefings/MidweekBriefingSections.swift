@@ -65,12 +65,29 @@ struct MidweekBriefingSections: View {
             rangeLabel: BriefingDateFormatting.humanizedPeriodLabel(content.reportingRangeLabel),
             headline: content.presentationContract?.lead.headline ??
                 content.narrativeV3?.summary ?? content.heroVerdict,
-            narrative: content.presentationContract?.lead.meaning ??
-                content.narrativeV3?.detail.flatMap { $0.isEmpty ? nil : $0 } ??
-                content.heroSummary,
+            narrative: heroNarrative,
             confidence: heroConfidence,
             footerItems: heroFooterItems
         )
+    }
+
+    /// When a bound contract is present, its `lead.meaning` is the whole
+    /// hero body — including when the Server omits it (deduplicated
+    /// against the headline). It must never fall through to
+    /// `narrativeV3.detail`: that is the full concatenated Result/Meaning/
+    /// Action/Watch/Confidence text this screen exists to stop showing in
+    /// the hero. Only a contract-less payload (legacy compatibility path)
+    /// uses the old `detail` / `heroSummary` fallback chain.
+    /// Internal (not `private`) so tests can assert this exact fixed
+    /// invariant directly — that an absent `lead.meaning` never falls
+    /// through to `narrativeV3.detail` when a contract is present — rather
+    /// than through a source-text pattern match.
+    var heroNarrative: String {
+        if let contract = content.presentationContract {
+            return contract.lead.meaning ?? ""
+        }
+        return content.narrativeV3?.detail.flatMap { $0.isEmpty ? nil : $0 } ??
+            content.heroSummary
     }
 
     /// One Confidence surface, exactly. When a bound V3 contract is present,
@@ -133,7 +150,11 @@ struct MidweekBriefingSections: View {
     /// watch -> What To Watch (replacing the legacy Through-Sunday list,
     /// which V3 does not publish).
     private func contractFinale(_ contract: MidweekPresentationContract) -> some View {
-        let bySection = Dictionary(uniqueKeysWithValues: contract.coaching.map { ($0.section, $0.text) })
+        // The mapper's decode-time guard already enforces unique sections,
+        // but `uniqueKeysWithValues:` traps at runtime on any violation —
+        // building this defensively (last write wins) keeps a decode-layer
+        // regression a rendering quirk, not a crash.
+        let bySection = Dictionary(contract.coaching.map { ($0.section, $0.text) }, uniquingKeysWith: { _, latest in latest })
         return BriefingCoachFinale(
             takeaway: bySection["coachTake"] ?? "",
             recommendation: bySection["action"] ?? "",

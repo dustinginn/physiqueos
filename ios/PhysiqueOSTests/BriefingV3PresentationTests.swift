@@ -194,6 +194,22 @@ final class BriefingV3PresentationTests: XCTestCase {
         XCTAssertNil(contract.coaching.first(where: { $0.section == "coachTake" }))
     }
 
+    /// Regression: `lead.meaning` is legitimately absent whenever the
+    /// Server's own text-duplicate dedup drops it against the headline
+    /// (`addClaim` in `createMidweekPresentationContract`) — a real,
+    /// reachable production state, not a hypothetical. Confirms the hero
+    /// narrative falls to an empty string in that case, and specifically
+    /// NEVER falls through to the full concatenated `narrativeV3.detail`,
+    /// which would silently duplicate Result/Meaning/Action/Watch/
+    /// Confidence text this screen exists to stop showing in the hero.
+    func testMidweekHeroNeverFallsThroughToNarrativeDetailWhenContractOmitsMeaning() throws {
+        let midweek = try XCTUnwrap(try map(midweekContractEnvelope(omitMeaning: true)).midweek)
+        XCTAssertNil(midweek.presentationContract?.lead.meaning)
+        XCTAssertNotNil(midweek.narrativeV3?.detail, "the fixture's legacy detail must still be present to prove this isn't a vacuous pass")
+        let view = MidweekBriefingSections(content: midweek, confidence: nil)
+        XCTAssertEqual(view.heroNarrative, "")
+    }
+
     /// Production-fixture parity: the exact Sep 20–22 case (Machine Lateral
     /// Raise 90 lb allocated to Result, Leg Extensions 90 lb an
     /// independent structured Training fact, not narratively prominent).
@@ -265,16 +281,32 @@ final class BriefingV3PresentationTests: XCTestCase {
         XCTAssertNil(view.content.presentationContract?.lead.confidence)
     }
 
-    /// >2 unresolved items would violate the bounded-uncertainty rule.
-    /// The production Server itself caps `visibleItems` at 2 before
-    /// serializing (`boundedUncertainty`); this proves the client renders
-    /// whatever it is given verbatim rather than adding its own truncation
-    /// that could mask a Server regression, while the source-of-truth test
-    /// above proves the Server-bound fixture already respects the cap.
-    func testMidweekUncertaintyCardNeverDeduplicatesAwayDistinctContractText() throws {
+    /// `coveredIds` (uncertainty already owned by Watch/a module caveat)
+    /// decodes as a plain passthrough and stays entirely separate from
+    /// `visibleItems` (what Still Unresolved renders).
+    func testMidweekUncertaintyCoveredIdsDecodeSeparatelyFromVisibleItems() throws {
         let midweek = try XCTUnwrap(try map(midweekContractEnvelope()).midweek)
         let contract = try XCTUnwrap(midweek.presentationContract)
         XCTAssertEqual(contract.uncertainty.coveredIds.count, 3, "Watch/module-covered uncertainty stays out of Still Unresolved")
+        XCTAssertEqual(contract.uncertainty.visibleItems.count, 1)
+    }
+
+    /// >2 unresolved items would violate the bounded-uncertainty rule. The
+    /// production Server itself caps `visibleItems` at 2 before
+    /// serializing (`boundedUncertainty` in the Server's presentation
+    /// service), but the client does not fully trust that: it also clamps
+    /// to 2 client-side (defense in depth against a Server regression).
+    /// This exercises that actual client-side clamp — not just the
+    /// Server-shaped fixture, which by construction never exceeds 2.
+    func testMidweekClientClampsUnresolvedToTwoEvenIfContractSentMore() throws {
+        let midweek = try XCTUnwrap(try map(midweekContractEnvelope(extraUncertaintyItems: true)).midweek)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+        XCTAssertEqual(contract.uncertainty.visibleItems.count, 3, "the fixture itself carries 3 — an out-of-contract Server sender")
+        // The exact clamp MidweekBriefingSections applies before handing
+        // items to BriefingUncertaintyCard.
+        let clamped = Array(contract.uncertainty.visibleItems.prefix(2))
+        let card = BriefingUncertaintyCard(items: clamped)
+        XCTAssertEqual(card.texts.count, 2)
     }
 
     /// V2 fallback boundary: a frozen V2 artifact must never decode a
@@ -450,7 +482,9 @@ final class BriefingV3PresentationTests: XCTestCase {
         moduleOrderMutation: Bool = false,
         artifactIdMismatch: Bool = false,
         duplicateCoachingClaimId: Bool = false,
-        omitConfidence: Bool = false
+        omitConfidence: Bool = false,
+        extraUncertaintyItems: Bool = false,
+        omitMeaning: Bool = false
     ) -> String {
         let artifactId = "midweek-v3c"
         var modules: [[String: Any]] = [
@@ -467,11 +501,13 @@ final class BriefingV3PresentationTests: XCTestCase {
         var lead: [String: Any] = [
             "headlineClaimId": "claim-result",
             "headline": "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.",
-            "meaningClaimId": "claim-meaning",
-            "meaning": "Building Lean Mass, training stayed on track through midweek.",
             "goal": ["id": "goal-1", "name": "Build Lean Mass"],
             "phase": ["id": "phase-1", "name": "Lean Mass Build"],
         ]
+        if !omitMeaning {
+            lead["meaningClaimId"] = "claim-meaning"
+            lead["meaning"] = "Building Lean Mass, training stayed on track through midweek."
+        }
         if !omitConfidence {
             lead["confidence"] = [
                 "claimId": "claim-confidence", "assessmentId": "assessment-midweek-v3c",
@@ -493,7 +529,11 @@ final class BriefingV3PresentationTests: XCTestCase {
             "modules": modules,
             "coaching": coaching,
             "uncertainty": [
-                "visibleItems": [
+                "visibleItems": extraUncertaintyItems ? [
+                    ["uncertaintyId": "u-intake", "type": "intake_uncertainty", "materiality": "moderate", "text": "Intake uncertainty this window."],
+                    ["uncertaintyId": "u-wearable-estimate", "type": "wearable", "materiality": "moderate", "text": "Wearable estimate uncertainty this window."],
+                    ["uncertaintyId": "u-pairing-gap", "type": "energy_pairing", "materiality": "moderate", "text": "Pairing gap uncertainty this window."],
+                ] : [
                     ["uncertaintyId": "u-intake", "type": "intake_uncertainty", "materiality": "moderate", "text": "Intake uncertainty this window."],
                 ],
                 "coveredIds": ["u-wearable", "u-pairing", "u-guardrail"],

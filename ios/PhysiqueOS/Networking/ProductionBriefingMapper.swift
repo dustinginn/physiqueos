@@ -518,7 +518,14 @@ enum ProductionBriefingMapper {
                 section: section, label: label, claimId: claimId, text: text
             )
         }
-        guard Set(coaching.map(\.claimId)).count == coaching.count
+        // Both claimId AND section must be unique: the render layer keys
+        // coaching items into a `[section: text]` dictionary by section,
+        // and a Dictionary built from a duplicate-keyed sequence traps at
+        // runtime — a decode-layer gap here would turn a malformed Server
+        // payload into a hard crash instead of the intended fail-closed
+        // error screen.
+        guard Set(coaching.map(\.claimId)).count == coaching.count,
+              Set(coaching.map(\.section)).count == coaching.count
         else { throw ProductionNativeError.invalidResponse }
 
         // The contract's `visibleItems` carry no `surfaced` flag — the
