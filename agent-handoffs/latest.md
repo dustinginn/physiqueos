@@ -5,11 +5,11 @@ Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 - Task: HealthKit current-day priority and bounded September 23 Activity repair (`codex-healthkit-current-day-priority-sep23-repair-20260924`)
 - Agent: codex
 - Status: partial
-- Generated (UTC): 2026-09-24T13:29:59Z
+- Generated (UTC): 2026-09-24T14:08:22Z
 - Success: false
 
-Summary: The exact Build 57 batching/coalescing implementation was audited and the starvation defect was confirmed. The selected Native design gives Activity and Nutrition an exact-current-local-day lane that runs before the preserved Build 57 historical scope, while both retain the Server automatic namespace; a persisted historical batch can therefore no longer block current-day query, upload, acknowledgement, or revision state. The separate September 23 tool will be exact-day Activity-only and dry-run-only in production, with APPLY hard-disabled absent a future explicit authorization capability. Implementation and tests are in progress; nothing was mutated or uploaded.
+Summary: Exact Native candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448 is implemented, pushed, mutation-tested, and green in 111 relevant HealthKit tests on the sole iPhone 17 Pro simulator. Exact-current-day Activity and Nutrition now run before isolated historical catch-up; zero-valued days remain valid. The separate exact-September-23 Activity repair tool uploads nothing in dry-run and production APPLY remains disabled and authorization-gated. Fresh-context review is pending. Nothing was deployed, uploaded, repaired, or mutated in production.
 
-Detailed report: `agent-handoffs/reports/20260924T132959Z-healthkit-current-day-priority-architecture-audit.md`
+Detailed report: `agent-handoffs/reports/20260924T140822Z-healthkit-current-day-priority-implemented-tested.md`
 
 Protocol: `agent-handoffs/README.md`

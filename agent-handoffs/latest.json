@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T13:29:59Z",
+  "generated_at_utc": "2026-09-24T14:08:22Z",
   "task": {
     "id": "codex-healthkit-current-day-priority-sep23-repair-20260924",
     "title": "HealthKit current-day priority and bounded September 23 Activity repair",
@@ -10,14 +10,14 @@
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
-    "final_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
+    "final_sha": "91de99a33c80c7b5bd9180b38fb79bbec34b5448",
     "production_server_sha": "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d",
     "production_deployment": "e8c3bed3-20f6-4f5c-b34a-d27ab0881480",
     "native_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
     "native_build": 57
   },
   "result": {
-    "summary": "The exact Build 57 batching/coalescing implementation was audited and the starvation defect was confirmed. The selected Native design gives Activity and Nutrition an exact-current-local-day lane that runs before the preserved Build 57 historical scope, while both retain the Server automatic namespace; a persisted historical batch can therefore no longer block current-day query, upload, acknowledgement, or revision state. The separate September 23 tool will be exact-day Activity-only and dry-run-only in production, with APPLY hard-disabled absent a future explicit authorization capability. Implementation and tests are in progress; nothing was mutated or uploaded.",
+    "summary": "Exact Native candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448 is implemented, pushed, mutation-tested, and green in 111 relevant HealthKit tests on the sole iPhone 17 Pro simulator. Exact-current-day Activity and Nutrition now run before isolated historical catch-up; zero-valued days remain valid. The separate exact-September-23 Activity repair tool uploads nothing in dry-run and production APPLY remains disabled and authorization-gated. Fresh-context review is pending. Nothing was deployed, uploaded, repaired, or mutated in production.",
     "success": false,
     "production_mutated": false,
     "deployed": true,
@@ -25,16 +25,16 @@
   },
   "validation": {
     "tests": {
-      "status": "not_run",
-      "summary": "Architecture audit complete. Focused, mutation, and complete relevant Native HealthKit suites remain pending."
+      "status": "passed",
+      "summary": "Focused synchronization/coordinator tests passed 75/75 and the final complete relevant Native HealthKit suite passed 111/111 on the sole existing iPhone 17 Pro simulator. Every injected critical-guard mutation caused the intended targeted failure and was reverted before the green run."
     },
     "review": {
       "status": "not_run",
-      "summary": "Fresh-context independent adversarial review will run only after the exact Native candidate is committed and focused/full relevant tests pass."
+      "summary": "Exact candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448 is frozen and pushed; fresh-context independent adversarial review is the remaining authorized step."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Only source/report reads and public live/ready health reads occurred. No Founder device operation, production data write, Server mutation, upload, policy/strategic change, Strength/Logger mutation, or Cardio work occurred."
+      "summary": "Only Native source/test changes, simulator tests, repository publication, and prior public authority/health reads occurred. No Founder-device operation, production write, Server mutation, upload, repair, policy/strategic change, Strength/Logger mutation, Midweek merge, or Cardio work occurred."
     }
   },
   "decisions_required": [],
@@ -44,12 +44,11 @@
     "The existing foreground sequence completes Activity history before beginning Nutrition, so Activity historical recovery can also delay Nutrition current-day freshness unless all current-day scopes are scheduled first."
   ],
   "backlog": [
-    "Implement and test the isolated exact-current-day Activity/Nutrition lanes while preserving the Build 57 scope for bounded historical recovery.",
-    "Implement and test the Founder-only September 23 Activity dry-run tool with a hard-disabled production APPLY gate.",
-    "Mutation-test critical guards, run the relevant Native HealthKit suites on only iPhone 17 Pro, obtain fresh-context review, and publish the final exact candidate."
+    "Obtain fresh-context independent adversarial review of exact candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448 and publish the final verdict.",
+    "If review is clean, stop for separate TestFlight authorization; September 23 repair application remains a distinct later authorization."
   ],
-  "recommended_next_step": "Continue the authorized Native implementation/test/review work. Do not archive, upload, operate the Founder device, apply the repair, change policy/strategic eligibility, or begin Cardio.",
-  "full_report_path": "agent-handoffs/reports/20260924T132959Z-healthkit-current-day-priority-architecture-audit.md",
+  "recommended_next_step": "Run the authorized fresh-context review of exact Native candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448. Do not archive, upload, operate the Founder device, apply the repair, change policy/strategic eligibility, merge Midweek Native work, or begin Cardio.",
+  "full_report_path": "agent-handoffs/reports/20260924T140822Z-healthkit-current-day-priority-implemented-tested.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
