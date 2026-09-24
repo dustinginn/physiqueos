@@ -144,6 +144,73 @@ final class BriefingV3PresentationTests: XCTestCase {
         XCTAssertEqual(midweek.uncertainty, [])
     }
 
+    func testMidweekV3MapsBoundPresentationContractWithoutReranking() throws {
+        let model = try map(midweekV3Envelope(
+            includeDetail: true, includeUncertainty: true
+        ))
+        let contract = try XCTUnwrap(model.midweek?.presentationContract)
+        XCTAssertEqual(contract.artifactId, "midweek-v3")
+        XCTAssertEqual(contract.assessmentId, "assessment-midweek-v3")
+        XCTAssertEqual(contract.lead.headline, "Midweek V3 headline.")
+        XCTAssertEqual(contract.lead.meaning, "Midweek V3 meaning.")
+        XCTAssertEqual(contract.includedModuleIds, ["energy"])
+        XCTAssertEqual(contract.modules.map(\.id), [
+            "energy", "weight", "body_composition", "training", "recovery"
+        ])
+        XCTAssertEqual(contract.coaching.map(\.section), ["action", "watch"])
+        XCTAssertEqual(contract.uncertainty.visibleItems.map(\.id), ["m-1"])
+        XCTAssertEqual(model.confidence?.source,
+                       MidweekPresentationContract.schemaVersion)
+        XCTAssertEqual(model.confidence?.score, 79)
+    }
+
+    func testMidweekV3RejectsPresentationContractArtifactMismatch() throws {
+        let data = Data(midweekV3Envelope(
+            includeDetail: true, includeUncertainty: true,
+            contractArtifactId: "wrong-artifact"
+        ).utf8)
+        let value = try JSONDecoder().decode(BriefingJSONValue.self, from: data)
+        XCTAssertThrowsError(try ProductionBriefingMapper.detail(value))
+    }
+
+    func testMidweekV3RejectsPresentationContractAssessmentMismatch() throws {
+        let json = midweekV3Envelope(
+            includeDetail: true, includeUncertainty: true
+        ).replacingOccurrences(
+            of: "\"claimId\":\"confidence\",\"assessmentId\":\"assessment-midweek-v3\"",
+            with: "\"claimId\":\"confidence\",\"assessmentId\":\"wrong-assessment\""
+        )
+        let value = try JSONDecoder().decode(
+            BriefingJSONValue.self, from: Data(json.utf8)
+        )
+        XCTAssertThrowsError(try ProductionBriefingMapper.detail(value))
+    }
+
+    func testMidweekProductionParityKeepsDistinctNinetyPoundFactsButOneNarrativeMovement() throws {
+        let model = try map(productionParityMidweekEnvelope())
+        let midweek = try XCTUnwrap(model.midweek)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+        XCTAssertEqual(contract.artifactId,
+            "midweek_briefing_user_founder_001_20260920_20260922")
+        XCTAssertEqual(contract.assessmentId,
+            "confidence_assessment_v3|f5deaf716bae25d2f233fd2d06fcb64124c5a8b9f808b7bf11f10b01ef10c63b")
+        XCTAssertEqual(contract.includedModuleIds,
+            ["energy", "weight", "body_composition", "training"])
+        XCTAssertEqual(contract.lead.headline,
+            "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.")
+        XCTAssertFalse(contract.coaching.map(\.text).contains(
+            "Leg extensions reached 90 lb, up from the previous best of 80 lb."
+        ))
+        let highlights = try XCTUnwrap(midweek.training?.highlights)
+        XCTAssertEqual(highlights.map(\.canonicalExerciseId),
+                       ["lateral_raise_machine", "leg_extension"])
+        XCTAssertEqual(highlights.map(\.exerciseName),
+                       ["Lateral Raises Machine", "Leg Extensions"])
+        XCTAssertEqual(highlights.map(\.performanceValue), ["90 lb", "90 lb"])
+        XCTAssertEqual(contract.uncertainty.visibleItems, [])
+        XCTAssertEqual(contract.uncertainty.coveredIds.count, 3)
+    }
+
     func testMidweekFrozenV2HasNoV3Fields() throws {
         let midweek = try XCTUnwrap(try map(midweekV2Envelope()).midweek)
         XCTAssertNil(midweek.narrativeV3)
@@ -277,20 +344,154 @@ final class BriefingV3PresentationTests: XCTestCase {
         #"{"schemaVersion":"1","artifact":{"artifactId":"weekly-1","artifactType":"scheduled","cadence":"weekly","version":3,"evidenceWindow":{"id":"week-1","startDate":"2026-09-01","endDate":"2026-09-07","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-08T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"presentation":{"hero":{"periodLabel":"Completed week\nSep 1–7","goalLabel":"Build Lean Mass","headline":"Server-owned weekly conclusion","body":"Published narrative.","confidence":{"score":71,"band":"moderate","presentationExplanation":"Canonical weekly Confidence explanation.","movementLabel":"Confidence increased","primaryReason":"Evidence strengthened.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"goalId":"goal-canonical","phaseId":"phase-canonical","assessmentDate":"2026-09-08T14:00:00.000Z","source":"canonical_pi_snapshot"},"strategy":{"name":"Foundation","weekLabel":"Week 2","reviewLabel":"Next review"}},"energy":{"averageIntake":2500,"averageExpenditure":2625,"averageBalance":-125,"pairedDayCount":7,"eligibleDayCount":7,"title":"Calories need more context.","narrative":"Server energy read."},"weight":null,"photos":null,"training":{"title":"Training response","conclusion":"Server training conclusion.","status":{"improving":1,"stable":2},"comparableCategoryCount":3,"insufficientCount":0,"highlights":[],"priorityCategories":[]},"bodyComposition":null,"coachInsight":{"biggestWin":"Strong execution.","keepBuilding":"Keep building.","watchNextWeek":"Watch recovery.","actionItems":["Repeat the plan."]}}}"#
     }
 
-    private func midweekV3Envelope(includeDetail: Bool, includeUncertainty: Bool) -> String {
+    private func midweekV3Envelope(
+        includeDetail: Bool, includeUncertainty: Bool,
+        contractArtifactId: String = "midweek-v3"
+    ) -> String {
         let detail = includeDetail ? #""detail":"Midweek V3 detail.","# : ""
         let uncertainty = includeUncertainty
             ? #""uncertainty":[{"uncertaintyId":"m-1","type":"energy_pairing","domain":"energy","materiality":"moderate","text":"Midweek surfaced uncertainty.","surfaced":true,"surfacedIn":"midweek"},{"uncertaintyId":"m-2","type":"wearable","domain":"energy","materiality":"low","text":"Midweek suppressed.","surfaced":false,"suppressionReason":"budget"}],"#
             : ""
+        let contractUncertainty = includeUncertainty
+            ? #"[{"uncertaintyId":"m-1","type":"energy_pairing","domain":"energy","materiality":"moderate","text":"Midweek surfaced uncertainty.","surfaced":true,"surfacedIn":"watch"}]"#
+            : "[]"
+        let contract = #""presentationContract":{"schemaVersion":"midweek_presentation_contract_v1","artifactId":"#
+            + "\"\(contractArtifactId)\""
+            + #","assessmentId":"assessment-midweek-v3","lead":{"headlineClaimId":"candidate-result","headline":"Midweek V3 headline.","meaningClaimId":"meaning","meaning":"Midweek V3 meaning.","confidence":{"claimId":"confidence","assessmentId":"assessment-midweek-v3","score":79,"band":"high","movement":"no_meaningful_change","movementDirection":"held","delta":0,"reason":"Canonical V3 confidence.","movementLabel":"No meaningful change"}},"modules":[{"id":"energy","payloadKey":"energyBalance","included":true,"reasonCode":"paired_evidence","order":1,"pairedDayCount":1,"chartIncluded":false,"chartReason":"insufficient_paired_days"},{"id":"weight","payloadKey":"weightContext","included":false,"reasonCode":"no_eligible_evidence","order":2,"observationCount":0},{"id":"body_composition","payloadKey":"bodyComposition","included":false,"reasonCode":"no_eligible_evidence","order":3},{"id":"training","payloadKey":"training","included":false,"reasonCode":"no_eligible_evidence","order":4},{"id":"recovery","payloadKey":"recovery","included":false,"reasonCode":"no_eligible_evidence","order":5}],"coaching":[{"section":"action","label":"What To Do","claimId":"action","text":"Midweek V3 action."},{"section":"watch","label":"What To Watch","claimId":"watch","text":"Midweek V3 watch."}],"uncertainty":{"visibleItems":"#
+            + contractUncertainty
+            + #", "coveredIds":["m-1"]}},"#
         return #"{"schemaVersion":"1","artifact":{"artifactId":"midweek-v3","artifactType":"scheduled","cadence":"midweek","version":3,"evidenceWindow":{"id":"window","startDate":"2026-09-20","endDate":"2026-09-22","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-23T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal","phaseId":"phase"},"presentation":{"presentationModel":"canonical_narrative_v3","hero":{"verdict":"Midweek V3 headline.","summary":"Midweek V3 meaning."},"narrativeV3":{"summary":"Midweek V3 headline.","#
             + detail
             + #""sections":{"result":"Midweek V3 result.","meaning":"Midweek V3 meaning.","action":"Midweek V3 action.","watch":"Midweek V3 watch.","confidence":"Midweek V3 confidence."},"coachTake":"Midweek V3 coach take.","recommendation":{"action":"continue_current_strategy"},"strategicQuestion":null,"strategicInterpretationId":"si-1"},"#
             + uncertainty
+            + contract
             + #""energyBalance":{"headline":null,"interpretation":"Server statement.","balanceHeadline":"50 kcal/day below","averageIntake":2650,"estimatedAverageExpenditure":2700,"estimatedDailyBalanceMidpoint":-50,"comparableDays":3,"chartPoints":[]},"coachTake":{"biggestTakeaway":"Midweek V3 coach take.","recommendation":"Midweek V3 action."},"goalConfidence":{"score":79,"band":"high","movementDirection":"held","presentationExplanation":"Canonical V3 confidence.","movementLabel":"No meaningful change","assessmentContext":{"goalId":"goal","phaseId":"phase"},"source":"canonical_confidence_v3_snapshot"},"activeGoal":{"id":"goal","name":"Build Lean Mass"},"activePhase":{"id":"phase","name":"Lean Mass Build"},"prioritiesThroughSunday":["Midweek V3 action.","Midweek V3 watch."]}}"#
     }
 
     private func midweekV2Envelope() -> String {
         #"{"schemaVersion":"1","artifact":{"artifactId":"midweek-1","artifactType":"scheduled","cadence":"midweek","version":2,"evidenceWindow":{"id":"midweek-1","startDate":"2026-09-06","endDate":"2026-09-08","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-09T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"presentation":{"hero":{"verdict":"Server-owned midweek verdict","summary":"Published midweek summary."},"coachTake":{"biggestTakeaway":"Hold steady.","recommendation":"Use the full week."},"goalConfidence":{"score":69,"band":"moderate","movementDirection":"held","presentationExplanation":"Canonical midweek Confidence explanation.","movementLabel":"No meaningful change","primaryReason":"Evidence held.","supportingReasons":[],"limitingReasons":[],"unresolvedUncertainty":[],"assessmentContext":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"assessmentTimestamp":"2026-09-09T14:00:00.000Z","source":"canonical_pi_snapshot"},"activeGoal":{"id":"goal-canonical","name":"Build Lean Mass"},"activePhase":{"id":"phase-canonical","name":"Foundation"},"prioritiesThroughSunday":["Keep the plan steady."]}}"#
+    }
+
+    private func productionParityMidweekEnvelope() -> String {
+        let artifactId =
+            "midweek_briefing_user_founder_001_20260920_20260922"
+        let assessmentId =
+            "confidence_assessment_v3|f5deaf716bae25d2f233fd2d06fcb64124c5a8b9f808b7bf11f10b01ef10c63b"
+        let machine =
+            "Machine lateral raises reached 90 lb, up from the previous best of 85 lb."
+        let leg =
+            "Leg extensions reached 90 lb, up from the previous best of 80 lb."
+        let modules: [[String: Any]] = [
+            ["id": "energy", "payloadKey": "energyBalance", "included": true,
+             "reasonCode": "paired_evidence", "order": 1,
+             "pairedDayCount": 2, "chartIncluded": true],
+            ["id": "weight", "payloadKey": "weightContext", "included": true,
+             "reasonCode": "sufficient_observations", "order": 2,
+             "observationCount": 3],
+            ["id": "body_composition", "payloadKey": "bodyComposition",
+             "included": true, "reasonCode": "phase_baseline", "order": 3],
+            ["id": "training", "payloadKey": "training", "included": true,
+             "reasonCode": "qualifying_training_evidence", "order": 4],
+            ["id": "recovery", "payloadKey": "recovery", "included": false,
+             "reasonCode": "no_eligible_evidence", "order": 5]
+        ]
+        let contract: [String: Any] = [
+            "schemaVersion": MidweekPresentationContract.schemaVersion,
+            "artifactId": artifactId, "assessmentId": assessmentId,
+            "lead": [
+                "headlineClaimId":
+                    "specific_coaching_observation|b23ab648ab1e96f064abdec793607698c2656dac37ce975e42c5d942eb144506",
+                "headline": machine, "meaningClaimId": "meaning",
+                "meaning": "Training is supporting the current phase.",
+                "confidence": [
+                    "claimId": "confidence", "assessmentId": assessmentId,
+                    "score": 79, "band": "moderate",
+                    "movement": "no_meaningful_change",
+                    "movementDirection": "held", "delta": 0,
+                    "reason": "Confidence holds at 79%.",
+                    "movementLabel": "No meaningful change"
+                ]
+            ],
+            "modules": modules,
+            "coaching": [
+                ["section": "action", "label": "What To Do",
+                 "claimId": "action", "text": "Keep the current setup in place."],
+                ["section": "watch", "label": "What To Watch",
+                 "claimId": "watch",
+                 "text": "Treat the Energy estimate as directional until coverage improves."]
+            ],
+            "uncertainty": [
+                "visibleItems": [Any](),
+                "coveredIds": [
+                    "uncertainty|energy_intake_uncertainty|cde5271419d5f36b",
+                    "uncertainty|energy_wearable_estimate|16dd7dcb72b761eb",
+                    "uncertainty|energy_pairing_incomplete|22871e732f5b97d6"
+                ]
+            ]
+        ]
+        let highlight: (String, String, String) -> [String: Any] = {
+            id, name, detail in [
+                "canonicalExerciseId": id, "exerciseName": name,
+                "recordType": "heaviest_load", "performanceValue": "90 lb",
+                "headline": detail, "detail": detail, "delta": "",
+                "tone": "evidence"
+            ]
+        }
+        return json([
+            "schemaVersion": "1",
+            "artifact": [
+                "artifactId": artifactId, "artifactType": "scheduled",
+                "cadence": "midweek", "version": 3,
+                "evidenceWindow": [
+                    "id": "midweek:2026-09-20:2026-09-22:America/Los_Angeles",
+                    "startDate": "2026-09-20", "endDate": "2026-09-22",
+                    "timeZone": "America/Los_Angeles"
+                ],
+                "publicationDate": "2026-09-23T10:01:29.328Z"
+            ],
+            "goalPhaseAttribution": ["goalId": "goal", "phaseId": "phase"],
+            "presentation": [
+                "presentationModel": "canonical_narrative_v3",
+                "hero": ["verdict": machine,
+                         "summary": "Training is supporting the current phase."],
+                "narrativeV3": [
+                    "summary": machine, "detail": "Must not be the hero body.",
+                    "sections": ["result": machine,
+                                 "meaning": "Training is supporting the current phase.",
+                                 "action": "Keep the current setup in place.",
+                                 "watch": "Treat the Energy estimate as directional until coverage improves.",
+                                 "confidence": "Confidence holds at 79%."],
+                    "coachTake": leg
+                ],
+                "presentationContract": contract,
+                "energyBalance": [
+                    "averageIntake": 2500, "estimatedAverageExpenditure": 2600,
+                    "estimatedDailyBalanceMidpoint": -100, "comparableDays": 2,
+                    "chartPoints": [
+                        ["date": "2026-09-20", "complete": false],
+                        ["date": "2026-09-21", "complete": true,
+                         "intake": 2500, "expenditure": 2600, "balance": -100],
+                        ["date": "2026-09-22", "complete": true,
+                         "intake": 2500, "expenditure": 2600, "balance": -100]
+                    ]
+                ],
+                "weightContext": ["averageWeight": 165.7, "observations": 3],
+                "bodyComposition": ["baseline": ["date": "2026-07-18",
+                    "bodyFatPercentage": 8.1, "leanMass": 147.5,
+                    "fatMass": 13.2]],
+                "training": ["sessionsCompleted": 2, "highlights": [
+                    highlight("lateral_raise_machine", "Lateral Raises Machine", machine),
+                    highlight("leg_extension", "Leg Extensions", leg)
+                ]],
+                "goalConfidence": ["score": 79, "band": "moderate",
+                    "movementDirection": "held",
+                    "presentationExplanation": "Confidence holds at 79%.",
+                    "movementLabel": "No meaningful change"],
+                "activeGoal": ["id": "goal", "name": "Build Lean Mass"],
+                "activePhase": ["id": "phase", "name": "Lean Mass Build"],
+                "coachTake": ["biggestTakeaway": leg]
+            ]
+        ])
     }
 
     private func json(_ object: [String: Any]) -> String {

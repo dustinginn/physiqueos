@@ -54,7 +54,7 @@ final class BriefingReadModelTests: XCTestCase {
     func testEveryBriefingKeepsItsCompleteEditorialSectionInventory() {
         XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"])
         XCTAssertEqual(MidweekBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"])
-        XCTAssertEqual(MidweekBriefingSections.canonicalV3SectionInventory, ["Integrated Lead", "Canonical Narrative", "Coach's Take"])
+        XCTAssertEqual(MidweekBriefingSections.canonicalV3SectionInventory, ["Integrated Lead", "Energy", "Weight", "Body Composition", "Training", "Coaching"])
         XCTAssertEqual(Array(DEXABriefingSections.sectionInventory.suffix(4)), ["What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"])
         XCTAssertEqual(PhotoBriefingSections.sectionInventory, ["Hero", "Snapshot", "Progress", "Interpretation", "Coach's Insight", "Completion Decision"])
     }

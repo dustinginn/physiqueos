@@ -102,13 +102,23 @@ enum ProductionBriefingMapper {
         }
         guard cadence == "midweek" else { throw ProductionNativeError.invalidResponse }
         let activeGoal = presentation["activeGoal"]
+        let midweek = try midweek(from: presentation, window: window,
+                                  artifactId: id)
+        let midweekConfidence = midweek.presentationContract == nil
+            ? try confidence(from: presentation["goalConfidence"])
+            : try confidence(
+                from: midweek.presentationContract?.lead.confidence,
+                goalId: attributionValue?["goalId"]?.string ??
+                    "historical-goal",
+                phaseId: attributionValue?["phaseId"]?.string
+            )
         return try makeBase(
             id: id, cadence: .midweek,
             generatedAt: artifact["publicationDate"]?.string ?? "",
             window: window,
             attribution: attribution(from: attributionValue, fallbackTitle: activeGoal?["title"]?.string ?? activeGoal?["name"]?.string ?? "Goal at publication", phaseName: presentation["activePhase"]?["name"]?.string),
-            confidence: try confidence(from: presentation["goalConfidence"]),
-            midweek: try midweek(from: presentation, window: window)
+            confidence: midweekConfidence,
+            midweek: midweek
         )
     }
 
@@ -349,7 +359,9 @@ enum ProductionBriefingMapper {
         )
     }
 
-    private static func midweek(from value: BriefingJSONValue, window: BriefingEvidenceWindowReadModel) throws -> MidweekBriefingContent {
+    private static func midweek(from value: BriefingJSONValue,
+                                window: BriefingEvidenceWindowReadModel,
+                                artifactId: String) throws -> MidweekBriefingContent {
         let narrativeV3: CanonicalNarrativeV3ReadModel?
         if value["presentationModel"]?.string == canonicalNarrativeV3 {
             let narrative = value["narrativeV3"]
@@ -411,6 +423,9 @@ enum ProductionBriefingMapper {
             objective: body?["objective"]?.string ?? "",
             narrative: body?["interpretation"]?.string ?? ""
         )
+        let contract = try midweekPresentationContract(
+            value["presentationContract"], artifactId: artifactId
+        )
         return MidweekBriefingContent(
             reportingRangeLabel: dateRange(window.startDate, window.endDate),
             heroVerdict: value["hero"]?["verdict"]?.string ?? "Midweek Briefing",
@@ -425,7 +440,128 @@ enum ProductionBriefingMapper {
             coachRecommendation: coach?["recommendation"]?.string,
             prioritiesThroughSunday: strings(value["prioritiesThroughSunday"]),
             narrativeV3: narrativeV3,
-            uncertainty: narrativeV3 == nil ? nil : uncertaintyItems(value["uncertainty"] ?? value["narrativeV3"]?["uncertainty"])
+            uncertainty: narrativeV3 == nil ? nil : uncertaintyItems(value["uncertainty"] ?? value["narrativeV3"]?["uncertainty"]),
+            presentationContract: contract
+        )
+    }
+
+    private static func midweekPresentationContract(
+        _ value: BriefingJSONValue?, artifactId: String
+    ) throws -> MidweekPresentationContract? {
+        guard let value else { return nil }
+        guard value["schemaVersion"]?.literalString ==
+                MidweekPresentationContract.schemaVersion,
+              value["artifactId"]?.literalString == artifactId,
+              let headline = nonEmptyString(value["lead"]?["headline"])
+        else { throw ProductionNativeError.invalidResponse }
+        let assessmentId = nonEmptyString(value["assessmentId"])
+
+        let confidenceValue = value["lead"]?["confidence"]
+        let confidence: MidweekPresentationContract.Lead.Confidence?
+        if confidenceValue?.object != nil {
+            guard let claimId = nonEmptyString(confidenceValue?["claimId"]),
+                  let boundAssessmentId = nonEmptyString(
+                    confidenceValue?["assessmentId"]),
+                  assessmentId != nil, boundAssessmentId == assessmentId,
+                  let score = confidenceValue?["score"]?.int,
+                  let band = nonEmptyString(confidenceValue?["band"]),
+                  let movement = nonEmptyString(confidenceValue?["movement"]),
+                  let movementDirection = nonEmptyString(
+                    confidenceValue?["movementDirection"]),
+                  let movementLabel = nonEmptyString(
+                    confidenceValue?["movementLabel"])
+            else { throw ProductionNativeError.invalidResponse }
+            confidence = .init(
+                claimId: claimId, assessmentId: boundAssessmentId,
+                score: score, band: band, movement: movement,
+                movementDirection: movementDirection,
+                delta: confidenceValue?["delta"]?.int,
+                reason: nonEmptyString(confidenceValue?["reason"]),
+                movementLabel: movementLabel
+            )
+        } else {
+            confidence = nil
+        }
+
+        let modules = try (value["modules"]?.array ?? []).map { item in
+            guard let id = nonEmptyString(item["id"]),
+                  let payloadKey = nonEmptyString(item["payloadKey"]),
+                  let included = item["included"]?.bool,
+                  let reasonCode = nonEmptyString(item["reasonCode"]),
+                  let order = item["order"]?.int
+            else { throw ProductionNativeError.invalidResponse }
+            return MidweekPresentationContract.Module(
+                id: id, payloadKey: payloadKey, included: included,
+                reasonCode: reasonCode, order: order,
+                pairedDayCount: item["pairedDayCount"]?.int,
+                chartIncluded: item["chartIncluded"]?.bool,
+                chartReason: item["chartReason"]?.literalString,
+                observationCount: item["observationCount"]?.int
+            )
+        }
+        let allowedModules = Set([
+            "energy", "weight", "body_composition", "training", "recovery"
+        ])
+        guard !modules.isEmpty,
+              Set(modules.map(\.id)).count == modules.count,
+              modules.allSatisfy({ allowedModules.contains($0.id) }),
+              modules.map(\.order) == modules.map(\.order).sorted()
+        else { throw ProductionNativeError.invalidResponse }
+
+        let coaching = try (value["coaching"]?.array ?? []).map { item in
+            guard let section = nonEmptyString(item["section"]),
+                  let label = nonEmptyString(item["label"]),
+                  let claimId = nonEmptyString(item["claimId"]),
+                  let text = nonEmptyString(item["text"])
+            else { throw ProductionNativeError.invalidResponse }
+            return MidweekPresentationContract.CoachingItem(
+                section: section, label: label, claimId: claimId, text: text
+            )
+        }
+        guard Set(coaching.map(\.claimId)).count == coaching.count
+        else { throw ProductionNativeError.invalidResponse }
+
+        let uncertainty = MidweekPresentationContract.Uncertainty(
+            visibleItems: uncertaintyItems(
+                value["uncertainty"]?["visibleItems"]),
+            coveredIds: strings(value["uncertainty"]?["coveredIds"])
+        )
+        return .init(
+            artifactId: artifactId, assessmentId: assessmentId,
+            lead: .init(
+                headlineClaimId: value["lead"]?["headlineClaimId"]?.literalString,
+                headline: headline,
+                meaningClaimId: value["lead"]?["meaningClaimId"]?.literalString,
+                meaning: nonEmptyString(value["lead"]?["meaning"]),
+                confidence: confidence
+            ),
+            modules: modules, coaching: coaching, uncertainty: uncertainty
+        )
+    }
+
+    private static func confidence(
+        from value: MidweekPresentationContract.Lead.Confidence?,
+        goalId: String, phaseId: String?
+    ) throws -> BriefingConfidenceReadModel? {
+        guard let value else { return nil }
+        let movement: BriefingConfidenceReadModel.MovementDirection
+        switch value.movementDirection {
+        case "increased", "increase": movement = .increased
+        case "decreased", "decrease": movement = .decreased
+        case "held", "no_meaningful_change", "stable": movement = .held
+        default: movement = .initial
+        }
+        guard let reason = value.reason, !reason.isEmpty,
+              let movementLabel = value.movementLabel,
+              !movementLabel.isEmpty else { return nil }
+        return .init(
+            score: value.score, band: value.band, priorScore: nil,
+            delta: value.delta, movementDirection: movement,
+            primaryReason: reason, supportingReasons: [], limitingReasons: [],
+            unresolvedUncertainty: [], goalId: goalId, phaseId: phaseId,
+            capturedAt: "", source: MidweekPresentationContract.schemaVersion,
+            presentationExplanation: reason,
+            presentationMovementLabel: movementLabel
         )
     }
 

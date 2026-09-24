@@ -1,14 +1,14 @@
 import SwiftUI
 
-/// Midweek remains the short briefing cadence. Canonical V3 artifacts render
-/// the Server-owned narrative as Integrated Lead → Canonical Narrative →
-/// Coach's Take. Frozen historical V2 artifacts retain their original,
+/// Midweek remains the short briefing cadence. Current canonical V3 artifacts
+/// render the Server-owned presentation contract without local re-ranking.
+/// Frozen historical V2 artifacts retain their original,
 /// denser Energy → Weight → Training → Body Composition presentation.
 /// Confidence is always a read-through passthrough; Native never computes or
 /// refreshes it.
 struct MidweekBriefingSections: View {
     static let sectionInventory = ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"]
-    static let canonicalV3SectionInventory = ["Integrated Lead", "Canonical Narrative", "Coach's Take"]
+    static let canonicalV3SectionInventory = ["Integrated Lead", "Energy", "Weight", "Body Composition", "Training", "Coaching"]
     static let heroTypeLabel = "MIDWEEK BRIEFING"
     let content: MidweekBriefingContent
     let confidence: BriefingConfidenceReadModel?
@@ -16,7 +16,13 @@ struct MidweekBriefingSections: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             hero
-            if let narrative = content.narrativeV3 {
+            if let contract = content.presentationContract {
+                ForEach(contract.modules) { module in
+                    if module.included { contractModule(module) }
+                }
+                contractCoaching(contract.coaching)
+                BriefingUncertaintyCard(items: contract.uncertainty.visibleItems)
+            } else if let narrative = content.narrativeV3 {
                 canonicalNarrativeCard(narrative)
                 BriefingUncertaintyCard(items: content.uncertainty)
                 canonicalCoachTakeCard(narrative.coachTake)
@@ -42,10 +48,67 @@ struct MidweekBriefingSections: View {
         BriefingLeadCard(
             eyebrow: Self.heroTypeLabel,
             rangeLabel: BriefingDateFormatting.humanizedPeriodLabel(content.reportingRangeLabel),
-            headline: content.narrativeV3?.summary ?? content.heroVerdict,
-            narrative: content.narrativeV3?.detail.flatMap { $0.isEmpty ? nil : $0 } ?? content.heroSummary,
-            confidence: confidence
+            headline: content.presentationContract?.lead.headline ??
+                content.narrativeV3?.summary ?? content.heroVerdict,
+            narrative: content.presentationContract?.lead.meaning ??
+                content.narrativeV3?.detail.flatMap { $0.isEmpty ? nil : $0 } ??
+                content.heroSummary,
+            confidence: content.presentationContract == nil ||
+                content.presentationContract?.lead.confidence != nil
+                ? confidence : nil
         )
+    }
+
+    @ViewBuilder
+    private func contractModule(_ module: MidweekPresentationContract.Module) -> some View {
+        switch module.id {
+        case "energy":
+            if let energy = content.energy {
+                WeeklyEnergyCard(
+                    section: energy, showsDailySemanticRows: true,
+                    showsChart: module.chartIncluded == true
+                )
+            }
+        case "weight":
+            if let weight = content.weight {
+                weeklyWeightCard(weight)
+            } else if let narrative = content.weightContextNarrative,
+                      !narrative.isEmpty {
+                narrativeCard(title: "Weight Context", text: narrative)
+            }
+        case "body_composition":
+            if let body = content.bodyComposition {
+                bodyCompositionCard(body)
+            }
+        case "training":
+            if let training = content.training {
+                BriefingTrainingResponseCard(training: training)
+            } else if let narrative = content.trainingResponseNarrative,
+                      !narrative.isEmpty {
+                narrativeCard(title: "Training Response", text: narrative)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func contractCoaching(
+        _ items: [MidweekPresentationContract.CoachingItem]
+    ) -> some View {
+        let guidance = items.filter { $0.section != "coachTake" }
+        if !guidance.isEmpty {
+            BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(guidance) { item in
+                        canonicalNarrativeSection(item.label, item.text)
+                    }
+                }
+            }
+        }
+        ForEach(items.filter { $0.section == "coachTake" }) { item in
+            canonicalCoachTakeCard(item.text)
+        }
     }
 
     private func canonicalNarrativeCard(_ narrative: CanonicalNarrativeV3ReadModel) -> some View {
