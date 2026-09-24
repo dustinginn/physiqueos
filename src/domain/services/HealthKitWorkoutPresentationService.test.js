@@ -52,6 +52,44 @@ describe("confirmed HealthKit workout presentation", () => {
     const additive = createSep23StrengthPresentationFixture();
     additive.canonicalWorkouts[0].activityInteraction.additiveToDailyActivity = true;
     expect(projectConfirmedHealthKitWorkoutAttachments(additive)).toEqual([]);
+
+    const wrongPolicy = createSep23StrengthPresentationFixture();
+    wrongPolicy.canonicalWorkouts[0].activityInteraction.policy = "add_workout_energy";
+    expect(projectConfirmedHealthKitWorkoutAttachments(wrongPolicy)).toEqual([]);
+
+    const wrongDecisionAuthority = createSep23StrengthPresentationFixture();
+    wrongDecisionAuthority.canonicalWorkouts[0].evidenceEligibility.decidedBy = "other-policy";
+    expect(projectConfirmedHealthKitWorkoutAttachments(wrongDecisionAuthority)).toEqual([]);
+  });
+
+  it("fails closed for Cardio, corrupt link authority/quarantine, or an untrusted Logger session", () => {
+    const cardio = createSep23StrengthPresentationFixture();
+    cardio.canonicalWorkouts[0].current.family = "cardio";
+    cardio.canonicalWorkouts[0].current.canonicalType = "running";
+    expect(projectConfirmedHealthKitWorkoutAttachments(cardio)).toEqual([]);
+
+    const strategicLink = createSep23StrengthPresentationFixture();
+    strategicLink.workoutLinks[0].evidenceEligibility = { state: "eligible", strategic: true };
+    expect(projectConfirmedHealthKitWorkoutAttachments(strategicLink)).toEqual([]);
+
+    const wrongAuthority = createSep23StrengthPresentationFixture();
+    wrongAuthority.workoutLinks[0].contentAuthority = { trainingContent: "healthkit", telemetry: "healthkit" };
+    expect(projectConfirmedHealthKitWorkoutAttachments(wrongAuthority)).toEqual([]);
+
+    const untrustedLogger = createSep23StrengthPresentationFixture();
+    const session = untrustedLogger.canonicalEvidenceObjects
+      .find((record) => record.canonicalId === untrustedLogger.ids.session);
+    session.payload.metadata.logger_mode = "imported";
+    expect(projectConfirmedHealthKitWorkoutAttachments(untrustedLogger)).toEqual([]);
+
+    const brokenWorkoutProvenance = createSep23StrengthPresentationFixture();
+    brokenWorkoutProvenance.canonicalWorkouts[0].provenance.currentSourceObservationId = "other-observation";
+    expect(projectConfirmedHealthKitWorkoutAttachments(brokenWorkoutProvenance)).toEqual([]);
+
+    const mismatchedLoggerIdentity = createSep23StrengthPresentationFixture();
+    mismatchedLoggerIdentity.canonicalEvidenceObjects.find((record) => record.canonicalId === mismatchedLoggerIdentity.ids.session)
+      .payload.id = "other-session";
+    expect(projectConfirmedHealthKitWorkoutAttachments(mismatchedLoggerIdentity)).toEqual([]);
   });
 
   it("attributes confirmed HealthKit energy without adding it to the daily total", () => {
@@ -133,7 +171,52 @@ describe("confirmed HealthKit workout presentation", () => {
       .payload.metadata.active_calories = 999;
     const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
     expect(day.workoutActiveCalories).toBeNull();
-    expect(day.nonWorkoutActiveCalories).toBe(606);
+    expect(day.nonWorkoutActiveCalories).toBeNull();
+    expect(day.energyAnomaly).toBeNull();
+  });
+
+  it("keeps multi-workout attribution unknown when any confirmed workout energy is missing", () => {
+    const fixture = createSep23StrengthPresentationFixture({ dailyActiveCalories: 800, workoutActiveCalories: 410 });
+    const secondSessionId = `${fixture.ids.session}-missing-energy`;
+    const secondWorkoutId = `healthkit_canonical_workout_${"b".repeat(40)}`;
+    const secondLinkId = getHealthKitWorkoutLinkRecordId(secondWorkoutId, secondSessionId);
+    const logger = structuredClone(fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session));
+    logger.canonicalId = secondSessionId;
+    logger.payload.id = secondSessionId;
+    logger.payload.metadata.start_time = "2026-09-23T12:00:00-07:00";
+    fixture.canonicalEvidenceObjects.push(logger);
+    const workout = structuredClone(fixture.canonicalWorkouts[0]);
+    workout.id = secondWorkoutId;
+    workout.current.startedAt = "2026-09-23T19:00:00.000Z";
+    workout.current.endedAt = "2026-09-23T19:30:00.000Z";
+    workout.current.telemetry.activeCalories = null;
+    fixture.canonicalWorkouts.push(workout);
+    const link = structuredClone(fixture.workoutLinks[0]);
+    link.id = secondLinkId;
+    link.canonicalWorkoutId = secondWorkoutId;
+    link.loggerSessionCanonicalId = secondSessionId;
+    fixture.workoutLinks.push(link);
+    const claim = (kind, subject) => ({
+      ...structuredClone(fixture.workoutLinkClaims[0]),
+      id: getHealthKitWorkoutLinkClaimId(kind, subject),
+      kind,
+      holderLinkId: secondLinkId,
+      history: [{ status: "held", holderLinkId: secondLinkId, at: link.updatedAt }],
+    });
+    fixture.workoutLinkClaims.push(claim("workout", secondWorkoutId), claim("session", secondSessionId));
+
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+    expect(day.workoutActiveCalories).toBeNull();
+    expect(day.nonWorkoutActiveCalories).toBeNull();
+    expect(day.energyAnomaly).toBeNull();
+  });
+
+  it("keeps non-workout energy unknown when the whole-day Activity total is missing", () => {
+    const fixture = createSep23StrengthPresentationFixture({ dailyActiveCalories: null, workoutActiveCalories: 410 });
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+    expect(day.activeCalories).toBeNull();
+    expect(day.workoutActiveCalories).toBe(410);
+    expect(day.nonWorkoutActiveCalories).toBeNull();
     expect(day.energyAnomaly).toBeNull();
   });
 
@@ -168,6 +251,37 @@ describe("confirmed HealthKit workout presentation", () => {
       healthKitWorkoutLinkClaims: fixture.workoutLinkClaims,
     });
     expect(unconfirmed.loggedToday.rows[0].summary).toBe("Strength Training logged");
+  });
+
+  it("preserves HealthKit provenance on an aggregate Log row with multiple Training sessions", () => {
+    const fixture = createSep23StrengthPresentationFixture();
+    const second = structuredClone(fixture.canonicalEvidenceObjects
+      .find((record) => record.canonicalId === fixture.ids.session));
+    second.canonicalId = `${fixture.ids.session}-walk`;
+    second.payload.id = second.canonicalId;
+    second.payload.metadata.activity_type = "Walking";
+    fixture.canonicalEvidenceObjects.push(second);
+    const log = {
+      localDate: fixture.day,
+      loggedToday: {
+        dateKey: fixture.day,
+        rows: [{
+          id: "training", label: "Training", summary: "Strength Training · Walking",
+          context: null, href: "/progress/training", recordId: null,
+        }],
+      },
+      pendingEvidenceReviews: [],
+    };
+
+    const projected = projectConfirmedHealthKitLogProvenance(log, {
+      canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
+      healthKitCanonicalWorkouts: fixture.canonicalWorkouts,
+      healthKitWorkoutLinks: fixture.workoutLinks,
+      healthKitWorkoutLinkClaims: fixture.workoutLinkClaims,
+    });
+
+    expect(projected.loggedToday.rows).toHaveLength(1);
+    expect(projected.loggedToday.rows[0].summary).toBe("Strength Training · Walking · Apple Health");
   });
 
   it("attaches Apple telemetry to the one Logger-owned Workout Detail projection", async () => {

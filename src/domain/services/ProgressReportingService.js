@@ -1761,7 +1761,7 @@ function createTrainingBackedActivityDay({
 
 function mergeActivityDayWithTrainingAggregate(activityDay = {}, aggregate = {}) {
   const dailyActivity = activityDay.daily_activity ?? {};
-  const moveCalories = Number(dailyActivity.move_calories);
+  const moveCalories = finiteNumberOrNull(dailyActivity.move_calories);
   const aggregateWorkoutActiveCalories = aggregate.derived_metrics?.workout_active_calories;
   const existingWorkoutActiveCalories = activityDay.derived_metrics?.workout_active_calories;
   const hasConfirmedHealthKitWorkout = Number(aggregate.derived_metrics?.confirmed_healthkit_workouts_referenced) > 0;
@@ -1771,9 +1771,11 @@ function mergeActivityDayWithTrainingAggregate(activityDay = {}, aggregate = {})
     Number.isFinite(Number(aggregateWorkoutActiveCalories))
       ? aggregateWorkoutActiveCalories
       : existingWorkoutActiveCalories ?? aggregateWorkoutActiveCalories ?? null;
-  const nonWorkoutActiveCalories =
-    Number.isFinite(moveCalories) && Number.isFinite(Number(workoutActiveCalories))
-      ? Math.max(0, moveCalories - Number(workoutActiveCalories))
+  const normalizedWorkoutActiveCalories = finiteNumberOrNull(workoutActiveCalories);
+  const nonWorkoutActiveCalories = moveCalories !== null && normalizedWorkoutActiveCalories !== null
+    ? Math.max(0, moveCalories - normalizedWorkoutActiveCalories)
+    : hasConfirmedHealthKitWorkout
+      ? null
       : activityDay.derived_metrics?.non_workout_active_calories ?? null;
   const trainingSessionIds = uniqueStrings([
     ...(activityDay.references?.training_session_ids ?? []),
@@ -2159,6 +2161,7 @@ export function getNutritionSourceLabels(nutritionDay = {}) {
 function sumTrainingActiveCalories(trainingSessions = [], confirmedHealthKitWorkoutsBySession = new Map()) {
   let total = 0;
   let found = false;
+  let confirmedHealthKitEnergyIncomplete = false;
   const includedCanonicalWorkoutIds = new Set();
   for (const session of trainingSessions) {
     const attachment = confirmedHealthKitWorkoutsBySession.get(trainingSessionIdentity(session));
@@ -2169,6 +2172,8 @@ function sumTrainingActiveCalories(trainingSessions = [], confirmedHealthKitWork
       if (healthKitValue !== null) {
         total += healthKitValue;
         found = true;
+      } else {
+        confirmedHealthKitEnergyIncomplete = true;
       }
       continue;
     }
@@ -2178,7 +2183,7 @@ function sumTrainingActiveCalories(trainingSessions = [], confirmedHealthKitWork
       found = true;
     }
   }
-  return found ? total : null;
+  return !confirmedHealthKitEnergyIncomplete && found ? total : null;
 }
 
 function getTrainingUnderstanding({ activityDays = [], trainingSessions = [] } = {}) {

@@ -13,6 +13,7 @@ const WORKOUT_CLAIM_ID = "healthkit_link_claim_w_0bf0a0e59c84c0dbd7f1638e6d967ca
 const SESSION_CLAIM_ID = "healthkit_link_claim_s_12126799d47847ac87c7b702828eafe458a21a4a";
 const CANDIDATE_AT = "2026-09-23T18:00:00.000Z";
 const CONFIRMED_AT = "2026-09-24T02:46:00.000Z";
+const OBSERVATION_ID = "healthkit_observation_workout_sep23_strength_fixture";
 
 const quarantine = () => ({
   state: "quarantined",
@@ -61,7 +62,11 @@ export function createSep23StrengthPresentationFixture({
     userId: OWNER,
     localDate: DAY,
     revision: 1,
+    semanticFingerprint: "sha256_sep23_strength_fixture",
+    priorSemanticFingerprint: null,
     current: {
+      sourceObservationId: OBSERVATION_ID,
+      sourceRevision: 1,
       family: "strength",
       canonicalType: "traditional_strength_training",
       appleActivityType: "50",
@@ -77,11 +82,29 @@ export function createSep23StrengthPresentationFixture({
         distanceUnit: null,
         averageHeartRate: 122,
       },
-      source: { sourceName: "Apple Watch", productType: "Watch7,5" },
+      source: {
+        bundleIdentifier: "com.apple.health",
+        sourceName: "Apple Watch",
+        productType: "Watch7,5",
+        deliveryDeviceId: "enrolled-device-fixture",
+      },
+    },
+    revisionHistory: [],
+    provenance: {
+      sourceObservationIds: [OBSERVATION_ID],
+      currentSourceObservationId: OBSERVATION_ID,
+      application: "Apple Health",
+      integration: "HealthKit",
+      modality: "direct",
+      bundleIdentifier: "com.apple.health",
+      basis: "healthkit_workout_observation",
     },
     contentAuthority: { telemetry: "healthkit", trainingContent: "workout_logger" },
     activityInteraction: { policy: "workout_energy_is_descriptive_never_additive", additiveToDailyActivity: false },
     evidenceEligibility: quarantine(),
+    activation: null,
+    createdAt: CANDIDATE_AT,
+    updatedAt: CONFIRMED_AT,
   };
   const link = {
     schemaVersion: "healthkit-workout-link-v1",

@@ -1051,12 +1051,23 @@ export function projectConfirmedHealthKitLogProvenance(log, runtime = {}) {
     workoutLinks: runtime.healthKitWorkoutLinks ?? [],
     workoutLinkClaims: runtime.healthKitWorkoutLinkClaims ?? [],
   });
+  const confirmedSessionIds = new Set(attachments.keys());
+  const confirmedTrainingToday = (runtime.canonicalEvidenceObjects ?? []).some((record) => {
+    const payload = record.payload ?? record;
+    const id = String(record.canonicalId ?? payload.id ?? "");
+    return confirmedSessionIds.has(id) &&
+      record?.quality?.status !== "superseded" && payload?.quality?.status !== "superseded" &&
+      String(payload.observed_at ?? "").slice(0, 10) === log.loggedToday.dateKey;
+  });
   return Object.freeze({
     ...log,
     loggedToday: Object.freeze({
       ...log.loggedToday,
       rows: Object.freeze(log.loggedToday.rows.map((row) => {
-        if (row.id !== "training" || !row.recordId || !attachments.has(String(row.recordId))) return row;
+        const confirmed = row.recordId
+          ? attachments.has(String(row.recordId))
+          : confirmedTrainingToday;
+        if (row.id !== "training" || !confirmed || /Apple Health/i.test(String(row.summary ?? ""))) return row;
         const base = String(row.summary ?? "Workout").replace(/ logged$/i, "");
         return Object.freeze({ ...row, summary: `${base} · Apple Health` });
       })),
