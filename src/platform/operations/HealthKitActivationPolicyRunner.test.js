@@ -6,7 +6,11 @@ import {
   resolveHealthKitCanonicalActivationPolicy,
   resolveHealthKitWorkoutActivationPolicy,
 } from "../../domain/services/HealthKitObservationService.js";
-import { runHealthKitActivationPolicy } from "./HealthKitActivationPolicyRunner.js";
+import {
+  HEALTHKIT_WORKOUT_FAMILY_REPLACEMENT_AUDIT_KIND,
+  runHealthKitActivationPolicy,
+} from "./HealthKitActivationPolicyRunner.js";
+import { buildHealthKitPayload } from "../../../scripts/operations/buildHealthKitPayload.mjs";
 
 const OWNER = "user_founder_001";
 const authorization = {
@@ -443,5 +447,335 @@ describe("Workout preview uses the derived day (review MINOR-4)", () => {
       authorization: { ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-25", endLocalDate: "2026-09-25", authorizationReference: "ref" },
     });
     expect(dry.workoutPreview).toMatchObject({ rawWorkoutObservationsInWindow: 1, byFamily: { cardio: 1 } });
+  });
+});
+
+describe("atomic Workout family-scope replacement (replace-families)", () => {
+  const WORKOUT_ID = "healthkit_workout_canonical_activation_policy";
+
+  // The exact concrete replacement this capability exists for: currently
+  // Strength-only, open-ended, quarantined, no backfill, no auto-confirm ->
+  // widen to Cardio + Strength, preserving every other field.
+  async function strengthOnlyStore() {
+    const records = store();
+    const strengthAuth = {
+      ownerUserId: OWNER, domains: ["workout"], effectiveLocalDate: "2026-09-23", openEnded: true,
+      families: ["strength"], authorizationReference: "founder-chat-strength-prospective",
+    };
+    const dry = await runHealthKitActivationPolicy({ records, authorization: strengthAuth, action: "activate", policyKind: "workout" });
+    await runHealthKitActivationPolicy({ records, authorization: strengthAuth, action: "activate", policyKind: "workout", apply: true, expected: dry.facts });
+    return records;
+  }
+
+  async function currentDigest(records) {
+    const probe = await runHealthKitActivationPolicy({ records, authorization: { ownerUserId: OWNER }, action: "deactivate", policyKind: "workout" });
+    return probe.facts.policyDigest;
+  }
+
+  it("dry-run predicts the exact target mutation (cardio+strength, everything else preserved) and writes nothing", async () => {
+    const records = await strengthOnlyStore();
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const before = records.snapshot();
+    const authorization = {
+      ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"],
+      expectedCurrentPolicyDigest, authorizationReference: "founder-chat-widen-cardio-strength",
+    };
+    const dry = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout" });
+    expect(dry).toMatchObject({
+      outcome: "dry_run",
+      action: "replace-families",
+      policyKind: "workout",
+      policy: {
+        status: "enabled", effectiveLocalDate: "2026-09-23", endLocalDate: null, openEnded: true,
+        families: ["cardio", "strength"], linkAutoConfirm: false,
+      },
+      addedFamilies: ["cardio"],
+      droppedFamilies: [],
+      strategicEvidenceEligibility: "quarantined",
+      historicalBackfill: false,
+      predictedMutations: [
+        { collection: "healthKitConfiguration", recordId: WORKOUT_ID, operation: "update" },
+        { collection: "healthKitConfiguration", operation: "create" },
+      ],
+    });
+    expect(records.snapshot()).toEqual(before);
+    // an unrelated read immediately after the dry-run shows no change occurred
+    const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_ID });
+    expect(resolveHealthKitWorkoutActivationPolicy(stored)).toMatchObject({ families: ["strength"] });
+  });
+
+  it("applies the widen in one guarded transaction: exactly one policy update and one new audit row, everything else byte-identical", async () => {
+    const records = await strengthOnlyStore();
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const authorization = {
+      ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"],
+      expectedCurrentPolicyDigest, authorizationReference: "founder-chat-widen-cardio-strength",
+    };
+    const dry = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout" });
+    const rowsBefore = records.snapshot().healthKitConfiguration.length;
+    // the policy record is an in-place CAS update (records.put with expectedVersion),
+    // which is this store's only counted mutation; the audit row is a fresh insert
+    // (records.putIfAbsent), proven instead by the row-count delta below.
+    const mutationsBefore = records.getMutationCount();
+    const applied = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(applied.outcome).toBe("applied");
+    expect(Object.values(applied.invariants).every(Boolean)).toBe(true);
+    expect(records.getMutationCount() - mutationsBefore).toBe(1);
+    // exactly one new row (the audit row); the policy row was updated in place, not appended
+    expect(records.snapshot().healthKitConfiguration.length - rowsBefore).toBe(1);
+    const stored = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_ID });
+    expect(stored).toMatchObject({
+      status: "enabled", domains: ["workout"], effectiveLocalDate: "2026-09-23", openEnded: true,
+      families: ["cardio", "strength"], strategicEvidenceEligibility: "quarantined", historicalBackfill: false, linkAutoConfirm: false,
+    });
+    expect(stored.endLocalDate).toBeUndefined();
+    expect(resolveHealthKitWorkoutActivationPolicy(stored)).toMatchObject({
+      enabled: true, effectiveLocalDate: "2026-09-23", endLocalDate: null, openEnded: true, families: ["cardio", "strength"], linkAutoConfirm: false,
+    });
+    const audit = records.snapshot().healthKitConfiguration.find((row) => row.kind === HEALTHKIT_WORKOUT_FAMILY_REPLACEMENT_AUDIT_KIND);
+    expect(audit).toMatchObject({
+      action: "replace-families",
+      authorizationReference: "founder-chat-widen-cardio-strength",
+      policyRecordId: WORKOUT_ID,
+      before: { digest: expectedCurrentPolicyDigest, families: ["strength"] },
+      after: { families: ["cardio", "strength"] },
+    });
+    expect(typeof audit.after.digest).toBe("string");
+    expect(audit.after.digest).not.toBe(audit.before.digest);
+  });
+
+  it("idempotent replay: applying the identical authorized replacement again is a zero-write no-op", async () => {
+    const records = await strengthOnlyStore();
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const authorization = {
+      ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"],
+      expectedCurrentPolicyDigest, authorizationReference: "founder-chat-widen-cardio-strength",
+    };
+    const dry = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout" });
+    await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout", apply: true, expected: dry.facts });
+    const before = records.snapshot();
+    const mutationsBefore = records.getMutationCount();
+    const replay = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(replay.outcome).toBe("already_replaced");
+    expect(records.getMutationCount()).toBe(mutationsBefore);
+    expect(records.snapshot()).toEqual(before);
+    // a dry-run replay agrees
+    const dryReplay = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout" });
+    expect(dryReplay.outcome).toBe("already_replaced");
+    expect(records.getMutationCount()).toBe(mutationsBefore);
+  });
+
+  it("refuses cleanly when the caller's belief of the current policy digest is wrong", async () => {
+    const records = await strengthOnlyStore();
+    const mutationsBefore = records.getMutationCount();
+    const authorization = {
+      ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"],
+      expectedCurrentPolicyDigest: "stale-digest-from-before-someone-else-changed-it",
+      authorizationReference: "founder-chat-widen-cardio-strength",
+    };
+    const result = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout" });
+    expect(result.outcome).toBe("refused");
+    expect(result.reasons[0]).toMatch(/expectedCurrentPolicyDigest does not match/);
+    expect(records.getMutationCount()).toBe(mutationsBefore);
+    expect(records.snapshot().healthKitConfiguration.find((row) => row.id === WORKOUT_ID).families).toEqual(["strength"]);
+  });
+
+  it("refuses cleanly when expectedCurrentFamilies is a stale belief of the actual current scope", async () => {
+    const records = await strengthOnlyStore();
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const result = await runHealthKitActivationPolicy({
+      records, action: "replace-families", policyKind: "workout",
+      authorization: {
+        ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["cardio"],
+        expectedCurrentPolicyDigest, authorizationReference: "founder-chat-widen-cardio-strength",
+      },
+    });
+    expect(result.outcome).toBe("refused");
+    expect(result.reasons[0]).toMatch(/expectedCurrentFamilies does not match/);
+  });
+
+  it("refuses an accidental narrowing (omitting strength) unless explicitly acknowledged", async () => {
+    const records = await strengthOnlyStore();
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const accidental = {
+      ownerUserId: OWNER, families: ["cardio"], expectedCurrentFamilies: ["strength"],
+      expectedCurrentPolicyDigest, authorizationReference: "oops-forgot-strength",
+    };
+    const refused = await runHealthKitActivationPolicy({ records, authorization: accidental, action: "replace-families", policyKind: "workout" });
+    expect(refused.outcome).toBe("refused");
+    expect(refused.reasons[0]).toMatch(/drops strength/);
+    expect(refused.droppedFamilies).toEqual(["strength"]);
+    expect(records.snapshot().healthKitConfiguration.find((row) => row.id === WORKOUT_ID).families).toEqual(["strength"]);
+
+    // The same narrowing, explicitly acknowledged, is genuinely intended and proceeds.
+    const acknowledged = { ...accidental, acknowledgeNarrowing: true, authorizationReference: "founder-chat-intentional-narrow-to-cardio-only" };
+    const dry = await runHealthKitActivationPolicy({ records, authorization: acknowledged, action: "replace-families", policyKind: "workout" });
+    expect(dry.outcome).toBe("dry_run");
+    expect(dry.droppedFamilies).toEqual(["strength"]);
+    const applied = await runHealthKitActivationPolicy({ records, authorization: acknowledged, action: "replace-families", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(applied.outcome).toBe("applied");
+    expect(applied.policy.families).toEqual(["cardio"]);
+  });
+
+  it("refuses an invalid or ambiguous target family set (unknown family, empty, duplicates)", async () => {
+    const records = await strengthOnlyStore();
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const base = { ownerUserId: OWNER, expectedCurrentFamilies: ["strength"], expectedCurrentPolicyDigest, authorizationReference: "ref" };
+    for (const families of [["swimming"], [], ["strength", "strength"]]) {
+      const result = await runHealthKitActivationPolicy({ records, authorization: { ...base, families }, action: "replace-families", policyKind: "workout" });
+      expect(result.outcome).toBe("refused");
+    }
+  });
+
+  it("refuses replace-families against the daily policy or an unenabled workout policy", async () => {
+    const dailyRecords = store();
+    await dailyRecords.put({
+      ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: POLICY_ID,
+      payload: { id: POLICY_ID, schemaVersion: "healthkit-canonical-activation-policy-v1", status: "enabled", domains: ["activity", "nutrition"],
+        effectiveLocalDate: "2026-09-21", endLocalDate: "2026-09-21", strategicEvidenceEligibility: "quarantined", historicalBackfill: false },
+    });
+    const daily = await runHealthKitActivationPolicy({
+      records: dailyRecords, action: "replace-families", policyKind: "daily",
+      authorization: { ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"], expectedCurrentPolicyDigest: "x", authorizationReference: "ref" },
+    });
+    expect(daily.outcome).toBe("refused");
+    expect(daily.reasons[0]).toMatch(/workout policy only/);
+
+    const neverActivated = store();
+    const notEnabled = await runHealthKitActivationPolicy({
+      records: neverActivated, action: "replace-families", policyKind: "workout",
+      authorization: { ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"], expectedCurrentPolicyDigest: "x", authorizationReference: "ref" },
+    });
+    expect(notEnabled.outcome).toBe("refused");
+    expect(notEnabled.reasons[0]).toMatch(/must already be enabled/);
+  });
+
+  it("leaves the co-existing Activity/Nutrition policy provably untouched (digest-compared)", async () => {
+    const records = await strengthOnlyStore();
+    await records.put({
+      ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: POLICY_ID,
+      payload: {
+        id: POLICY_ID, schemaVersion: "healthkit-canonical-activation-policy-v1", status: "enabled", domains: ["activity", "nutrition"],
+        effectiveLocalDate: "2026-09-21", endLocalDate: "2026-09-21", strategicEvidenceEligibility: "quarantined", historicalBackfill: false,
+      },
+    });
+    const dailyBefore = structuredClone(records.snapshot().healthKitConfiguration.find((row) => row.id === POLICY_ID));
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const authorization = {
+      ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"],
+      expectedCurrentPolicyDigest, authorizationReference: "founder-chat-widen-cardio-strength",
+    };
+    const dry = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout" });
+    const applied = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(applied.outcome).toBe("applied");
+    expect(applied.invariants.otherPolicyUntouched).toBe(true);
+    const dailyAfter = records.snapshot().healthKitConfiguration.find((row) => row.id === POLICY_ID);
+    expect(dailyAfter).toEqual(dailyBefore);
+  });
+
+  it("leaves canonical workouts, links, claims, evidence, and observations provably untouched (digest-compared)", async () => {
+    const records = await strengthOnlyStore();
+    await records.put({ ownerUserId: OWNER, collection: "healthKitCanonicalWorkouts", recordId: "healthkit_canonical_workout_x", payload: { id: "healthkit_canonical_workout_x", localDate: "2026-09-23", revision: 1 } });
+    await records.put({ ownerUserId: OWNER, collection: "healthKitWorkoutLinks", recordId: "healthkit_workout_link_x", payload: { id: "healthkit_workout_link_x", canonicalWorkoutId: "healthkit_canonical_workout_x", status: "confirmed" } });
+    await records.put({ ownerUserId: OWNER, collection: "healthKitWorkoutLinkClaims", recordId: "healthkit_workout_link_claim_x", payload: { id: "healthkit_workout_link_claim_x", canonicalWorkoutId: "healthkit_canonical_workout_x" } });
+    await records.put({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "evidence_x", payload: { id: "evidence_x", evidence_type: "logger_session" } });
+    await records.put({ ownerUserId: OWNER, collection: "healthKitObservations", recordId: "healthkit_observation_z", payload: { id: "healthkit_observation_z", observationType: "workout", occurrenceDate: "2026-09-23" } });
+
+    const before = structuredClone(records.snapshot());
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const authorization = {
+      ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"],
+      expectedCurrentPolicyDigest, authorizationReference: "founder-chat-widen-cardio-strength",
+    };
+    const dry = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout" });
+    const applied = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(applied.outcome).toBe("applied");
+    expect(applied.invariants).toMatchObject({
+      canonicalWorkoutsUnchanged: true, linksUnchanged: true, claimsUnchanged: true, evidenceUnchanged: true, observationsUnchanged: true,
+    });
+    const after = records.snapshot();
+    for (const collection of ["healthKitCanonicalWorkouts", "healthKitWorkoutLinks", "healthKitWorkoutLinkClaims", "canonicalEvidenceObjects", "healthKitObservations", "healthKitCanonicalDays"]) {
+      expect(after[collection]).toEqual(before[collection]);
+    }
+  });
+
+  it("refuses on drift between dry-run and apply (someone else changed state in between)", async () => {
+    const records = await strengthOnlyStore();
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const authorization = {
+      ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"],
+      expectedCurrentPolicyDigest, authorizationReference: "founder-chat-widen-cardio-strength",
+    };
+    const dry = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout" });
+    await records.put({ ownerUserId: OWNER, collection: "healthKitObservations", recordId: "healthkit_observation_drift", payload: { id: "healthkit_observation_drift", observationType: "workout", occurrenceDate: "2026-09-23" } });
+    const drifted = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout", apply: true, expected: dry.facts });
+    expect(drifted.outcome).toBe("drifted");
+    expect(records.snapshot().healthKitConfiguration.find((row) => row.id === WORKOUT_ID).families).toEqual(["strength"]);
+  });
+
+  it("refuses to reuse an authorization reference for a different family-scope transition (audit row fence, no partial write)", async () => {
+    const records = await strengthOnlyStore();
+    const expectedCurrentPolicyDigest = await currentDigest(records);
+    const authorization = {
+      ownerUserId: OWNER, families: ["cardio", "strength"], expectedCurrentFamilies: ["strength"],
+      expectedCurrentPolicyDigest, authorizationReference: "reused-reference",
+    };
+    const dry = await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout" });
+    await runHealthKitActivationPolicy({ records, authorization, action: "replace-families", policyKind: "workout", apply: true, expected: dry.facts });
+    // narrow back down to strength-only, reusing the SAME authorization reference
+    const digestAfterWiden = await currentDigest(records);
+    const reused = {
+      ownerUserId: OWNER, families: ["strength"], expectedCurrentFamilies: ["cardio", "strength"],
+      expectedCurrentPolicyDigest: digestAfterWiden, acknowledgeNarrowing: true, authorizationReference: "reused-reference",
+    };
+    const reusedDry = await runHealthKitActivationPolicy({ records, authorization: reused, action: "replace-families", policyKind: "workout" });
+    expect(reusedDry.outcome).toBe("dry_run");
+    const before = records.snapshot();
+    await expect(runHealthKitActivationPolicy({ records, authorization: reused, action: "replace-families", policyKind: "workout", apply: true, expected: reusedDry.facts }))
+      .rejects.toMatchObject({ code: "AUDIT_ROW_EXISTS" });
+    expect(records.snapshot()).toEqual(before);
+  });
+});
+
+describe("production tooling: buildHealthKitPayload --kind policy --action replace-families", () => {
+  const SHA = "a40c0b53c49240d5666d2a3475d48541cfd5f57e";
+  const DIGEST = "0123456789abcdef0123456789abcdef";
+
+  it("bundles a dry-run zero-write payload with baked identity and the exact family-scope inputs", async () => {
+    const dry = await buildHealthKitPayload({
+      kind: "policy", policyKind: "workout", action: "replace-families", sha: SHA, mode: "dry-run",
+      families: "cardio,strength", expectedCurrentFamilies: "strength", expectedCurrentPolicyDigest: DIGEST,
+    });
+    expect(dry.code).toContain(SHA);
+    expect(dry.code).toContain("REPEATABLE READ READ ONLY");
+    expect(dry.marker).toContain("WORKOUT_ACTIVATION_REPLACE_FAMILIES_DRYRUN");
+  });
+
+  it("bundles an apply payload only once authorization-ref and expected are both supplied", async () => {
+    await expect(buildHealthKitPayload({
+      kind: "policy", policyKind: "workout", action: "replace-families", sha: SHA, mode: "apply",
+      families: "cardio,strength", expectedCurrentFamilies: "strength", expectedCurrentPolicyDigest: DIGEST,
+    })).rejects.toThrow(/authorization-ref and --expected/);
+    const applied = await buildHealthKitPayload({
+      kind: "policy", policyKind: "workout", action: "replace-families", sha: SHA, mode: "apply",
+      families: "cardio,strength", expectedCurrentFamilies: "strength", expectedCurrentPolicyDigest: DIGEST,
+      authorizationReference: "founder-chat-widen-cardio-strength", expected: JSON.stringify({ policyDigest: DIGEST }),
+    });
+    expect(applied.marker).toContain("WORKOUT_ACTIVATION_REPLACE_FAMILIES_APPLY");
+  });
+
+  it("refuses to bundle without the exact-scope preconditions or against the daily policy kind", async () => {
+    const base = { kind: "policy", policyKind: "workout", action: "replace-families", sha: SHA, mode: "dry-run" };
+    await expect(buildHealthKitPayload({ ...base, expectedCurrentFamilies: "strength", expectedCurrentPolicyDigest: DIGEST }))
+      .rejects.toThrow(/--families/);
+    await expect(buildHealthKitPayload({ ...base, families: "cardio,strength", expectedCurrentPolicyDigest: DIGEST }))
+      .rejects.toThrow(/--expected-current-families/);
+    await expect(buildHealthKitPayload({ ...base, families: "cardio,strength", expectedCurrentFamilies: "strength" }))
+      .rejects.toThrow(/--expected-current-policy-digest/);
+    await expect(buildHealthKitPayload({ ...base, families: "cardio,strength", expectedCurrentFamilies: "strength", expectedCurrentPolicyDigest: "not-hex" }))
+      .rejects.toThrow(/--expected-current-policy-digest/);
+    await expect(buildHealthKitPayload({
+      ...base, policyKind: "daily", families: "cardio,strength", expectedCurrentFamilies: "strength", expectedCurrentPolicyDigest: DIGEST,
+    })).rejects.toThrow(/policy-kind workout/);
   });
 });

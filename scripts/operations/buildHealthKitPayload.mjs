@@ -4,6 +4,15 @@
 //     --action activate|deactivate --domains activity,nutrition --effective YYYY-MM-DD (--end YYYY-MM-DD | --open-ended) \
 //     --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
 //   (policy) add --policy-kind daily|workout (default daily)
+//   node scripts/operations/buildHealthKitPayload.mjs --kind policy --sha <40-hex> --policy-kind workout \
+//     --action replace-families --families cardio,strength --expected-current-families strength \
+//     --expected-current-policy-digest <32-hex> [--acknowledge-narrowing] \
+//     --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
+//   (policy replace-families) atomically replaces an already-enabled Workout policy's exact
+//   family scope in one guarded transaction, no separate deactivate/reactivate pair. --families is
+//   the exact literal target; --expected-current-families/--expected-current-policy-digest are the
+//   caller's stated belief of the live record (refused if wrong); --acknowledge-narrowing is
+//   required only when the target genuinely drops a currently-enabled family.
 //   node scripts/operations/buildHealthKitPayload.mjs --kind graduation --sha <40-hex> --mode dry-run|apply \
 //     --desired '<json: {"projection":{...},"evidenceEligibility":{...}}>' [--authorization-ref <text>] [--expected <json file>] [--no-values] [--simulate-complete] --out <file>
 //   node scripts/operations/buildHealthKitPayload.mjs --kind workout-audit --sha <40-hex> --start YYYY-MM-DD --end YYYY-MM-DD [--no-values] --out <file>
@@ -30,11 +39,14 @@ export async function buildHealthKitPayload({
   kind, sha, action, policyKind = "daily", domains = "", effective = "", end = "", start = "", mode = "dry-run",
   authorizationReference = "", expected = "", includeValues = true, marker, desired = "", simulateComplete = false,
   openEnded = false, families = "", linkAutoConfirm = null,
+  expectedCurrentFamilies = "", expectedCurrentPolicyDigest = "", acknowledgeNarrowing = false,
 } = {}) {
   if (!/^[0-9a-f]{40}$/.test(String(sha ?? ""))) throw new Error("--sha must be the 40-hex production commit the payload is authorized for.");
   const suffix = randomBytes(4).toString("hex");
   if (kind === "policy") {
-    if (!["activate", "deactivate", "set-link-auto-confirm"].includes(action)) throw new Error("--action must be activate, deactivate, or set-link-auto-confirm.");
+    if (!["activate", "deactivate", "set-link-auto-confirm", "replace-families"].includes(action)) {
+      throw new Error("--action must be activate, deactivate, set-link-auto-confirm, or replace-families.");
+    }
     if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
     if (!["daily", "workout"].includes(policyKind)) throw new Error("--policy-kind must be daily or workout.");
     if (families && policyKind !== "workout") throw new Error("--families is only supported for --policy-kind workout.");
@@ -42,6 +54,21 @@ export async function buildHealthKitPayload({
       throw new Error("set-link-auto-confirm requires --policy-kind workout and --link-auto-confirm true|false.");
     }
     if (families && !/^(strength|cardio)(,(strength|cardio))*$/.test(families)) throw new Error("--families must be a comma-separated subset of strength,cardio.");
+    if (expectedCurrentFamilies && !/^(strength|cardio)(,(strength|cardio))*$/.test(expectedCurrentFamilies)) {
+      throw new Error("--expected-current-families must be a comma-separated subset of strength,cardio.");
+    }
+    if (action === "replace-families") {
+      // Atomically replaces the family scope in ONE guarded transaction (no
+      // separate deactivate/reactivate pair, so no disabled-policy window is
+      // ever visible to ingestion). The target is taken literally: the caller
+      // must restate the exact current scope and record digest, or refuse.
+      if (policyKind !== "workout") throw new Error("replace-families requires --policy-kind workout.");
+      if (!families) throw new Error("replace-families requires --families, the exact literal target family scope.");
+      if (!expectedCurrentFamilies) throw new Error("replace-families requires --expected-current-families, the caller's stated belief of the current scope.");
+      if (!/^[0-9a-f]{32}$/.test(String(expectedCurrentPolicyDigest ?? ""))) {
+        throw new Error("replace-families requires --expected-current-policy-digest, the 32-hex digest of the current policy record (from a preceding dry-run's facts.policyDigest).");
+      }
+    }
     if (action === "activate" && !DATE.test(effective)) throw new Error("--effective must be YYYY-MM-DD.");
     if (action === "activate" && !openEnded && !DATE.test(end)) throw new Error("--end must be YYYY-MM-DD (or pass --open-ended with no --end).");
     if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
@@ -58,6 +85,9 @@ export async function buildHealthKitPayload({
         __DOMAINS__: JSON.stringify(domains), __EFFECTIVE__: JSON.stringify(effective), __END__: JSON.stringify(end),
         __OPEN_ENDED__: JSON.stringify(Boolean(openEnded)), __FAMILIES__: JSON.stringify(String(families ?? "")),
         __LINK_AUTO_CONFIRM__: JSON.stringify(linkAutoConfirm),
+        __EXPECTED_CURRENT_FAMILIES__: JSON.stringify(String(expectedCurrentFamilies ?? "")),
+        __EXPECTED_CURRENT_POLICY_DIGEST__: JSON.stringify(String(expectedCurrentPolicyDigest ?? "")),
+        __ACKNOWLEDGE_NARROWING__: JSON.stringify(Boolean(acknowledgeNarrowing)),
         __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference)), __EXPECTED_JSON__: JSON.stringify(String(expected)),
         __MARKER__: JSON.stringify(successMarker),
       },
@@ -185,6 +215,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     kind: args.kind, sha: args.sha, action: args.action, policyKind: args["policy-kind"] ?? "daily", domains: args.domains, effective: args.effective, end: args.end,
     start: args.start, mode: args.mode, authorizationReference: args["authorization-ref"], expected, desired: args.desired, simulateComplete: Boolean(args["simulate-complete"]),
     includeValues: !args["no-values"], openEnded: Boolean(args["open-ended"]), families: args.families ?? "", linkAutoConfirm,
+    expectedCurrentFamilies: args["expected-current-families"] ?? "", expectedCurrentPolicyDigest: args["expected-current-policy-digest"] ?? "",
+    acknowledgeNarrowing: Boolean(args["acknowledge-narrowing"]),
   });
   if (!args.out) throw new Error("--out is required.");
   fs.writeFileSync(args.out, code, { mode: 0o600 });

@@ -17,6 +17,7 @@ import { HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION } from "../../domain/services/H
 
 export const HEALTHKIT_ACTIVATION_AUDIT_RECORD_PREFIX = "healthkit_canonical_activation_audit_";
 export const HEALTHKIT_WORKOUT_ACTIVATION_AUDIT_RECORD_PREFIX = "healthkit_workout_activation_audit_";
+export const HEALTHKIT_WORKOUT_FAMILY_REPLACEMENT_AUDIT_KIND = "healthkit_workout_family_replacement_audit";
 const CONFIGURATION_COLLECTION = "healthKitConfiguration";
 const OBSERVATION_COLLECTION = "healthKitObservations";
 const EVIDENCE_COLLECTION = "canonicalEvidenceObjects";
@@ -77,6 +78,22 @@ const POLICY_KINDS = Object.freeze({
  *               separately toggle only the Workout auto-confirm flag while
  *               preserving the already-active scope, window, families, and
  *               every strategic/backfill guard.
+ *   replace-families
+ *               Workout policy only. Atomically replace an already-enabled
+ *               policy's exact family scope in ONE guarded transaction, so no
+ *               disabled-policy window is ever visible to ingestion (the
+ *               deactivate-then-reactivate path this exists to eliminate).
+ *               The caller must restate the exact CURRENT family set
+ *               (`expectedCurrentFamilies`) and the current policy record's
+ *               digest (`expectedCurrentPolicyDigest`); either mismatching the
+ *               live record refuses cleanly. The target `families` is taken
+ *               literally with no implicit union with the current set; if it
+ *               would drop any currently-enabled family the caller must pass
+ *               `acknowledgeNarrowing: true` or the operation refuses. Every
+ *               other field (window, openEnded, linkAutoConfirm, strategic
+ *               eligibility, backfill) is carried forward unchanged. Replaying
+ *               the identical authorized request after it already applied is
+ *               a safe no-op.
  *   deactivate  set the policy to disabled. Canonical days, workouts, links,
  *               source observations, and Evidence are never deleted or changed.
  */
@@ -91,7 +108,7 @@ export async function runHealthKitActivationPolicy({
 } = {}) {
   const kind = POLICY_KINDS[policyKind];
   if (!kind) throw Object.assign(new Error("Unsupported policy kind."), { code: "POLICY_KIND_INVALID" });
-  if (!["activate", "deactivate", "set-link-auto-confirm"].includes(action)) {
+  if (!["activate", "deactivate", "set-link-auto-confirm", "replace-families"].includes(action)) {
     throw Object.assign(new Error("Unsupported activation action."), { code: "ACTION_INVALID" });
   }
   const { ownerUserId } = authorization;
@@ -109,6 +126,12 @@ export async function runHealthKitActivationPolicy({
   const facts = collectFacts({ policyRecord, otherPolicyRecord, observations, canonicalDays, canonicalWorkouts, links, claims, evidence });
   const current = kind.resolve(policyRecord);
   const operationAt = now().toISOString();
+
+  if (action === "replace-families") {
+    return runFamilyReplacement({
+      records, ownerUserId, kind, policyKind, authorization, policyRecord, current, facts, operationAt, apply, expected,
+    });
+  }
 
   const planned = action === "activate"
     ? planActivation({ kind, policyKind, authorization, policyRecord, current, observations })
@@ -392,6 +415,204 @@ function planLinkAutoConfirm({ policyKind, authorization, policyRecord, current,
     observationsInWindow: 0,
     previouslyPresent: true,
   };
+}
+
+// Atomically replaces an already-enabled Workout policy's exact family scope
+// in one guarded transaction: no separate deactivate/reactivate pair, and
+// therefore no disabled-policy window for ingestion to observe. This never
+// widens, narrows, or touches anything else about the policy implicitly — the
+// target family list is authoritative and literal, and every other field
+// (window, openEnded, linkAutoConfirm, strategic eligibility, backfill) is
+// carried forward byte-for-byte from the current record.
+async function runFamilyReplacement({ records, ownerUserId, kind, policyKind, authorization, policyRecord, current, facts, operationAt, apply, expected }) {
+  const refuse = (reason, detail = {}) => Object.freeze({ outcome: "refused", action: "replace-families", policyKind, reasons: [reason], ...detail, facts });
+
+  if (policyKind !== HealthKitPolicyKind.WORKOUT || !kind.supportsFamilies) {
+    return refuse("Family-scope replacement belongs to the workout policy only.");
+  }
+  if (!policyRecord || !current.enabled) {
+    return refuse("The workout activation policy must already be enabled before its family scope can be replaced. Use activate first.");
+  }
+
+  const { families, expectedCurrentFamilies, expectedCurrentPolicyDigest, acknowledgeNarrowing, authorizationReference } = authorization;
+  if (!Array.isArray(families) || families.length === 0 || families.some((family) => typeof family !== "string")) {
+    return refuse("families must be a non-empty explicit list of the exact target family scope.");
+  }
+  const targetFamilies = [...new Set(families)].sort();
+  if (targetFamilies.length !== families.length) {
+    return refuse("families must not contain duplicate entries; the target scope is stated exactly once per family.");
+  }
+  if (!targetFamilies.every((family) => HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES.includes(family))) {
+    return refuse(`families must be a subset of ${HEALTHKIT_WORKOUT_ACTIVATION_FAMILIES.join("/")}.`);
+  }
+
+  const auditRecordId = `${HEALTHKIT_WORKOUT_ACTIVATION_AUDIT_RECORD_PREFIX}${digest(authorizationReference ?? "").slice(0, 12)}_replace-families`;
+  const summaryOf = (targetSet) => ({
+    status: "enabled",
+    domains: current.domains ?? ["workout"],
+    effectiveLocalDate: current.effectiveLocalDate,
+    endLocalDate: current.endLocalDate,
+    openEnded: current.openEnded === true,
+    families: targetSet,
+    linkAutoConfirm: current.linkAutoConfirm,
+  });
+
+  // Idempotent replay: the exact target scope is already live. Nothing to
+  // write; the only question is whether this authorization already earned
+  // that state (a safe no-op) or the state was reached some other way (which
+  // this authorization reference may not silently claim).
+  if (sameSet(current.families, targetFamilies)) {
+    const summary = summaryOf(targetFamilies);
+    if (!apply) return Object.freeze({ outcome: "already_replaced", action: "replace-families", policyKind, policy: summary, facts });
+    if (!String(authorizationReference ?? "").trim()) {
+      throw Object.assign(new Error("Apply requires an authorization reference."), { code: "AUTHORIZATION_REFERENCE_REQUIRED" });
+    }
+    const existingAudit = await records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: auditRecordId });
+    if (existingAudit?.kind === HEALTHKIT_WORKOUT_FAMILY_REPLACEMENT_AUDIT_KIND &&
+      existingAudit?.authorizationReference === String(authorizationReference) &&
+      sameSet(existingAudit?.after?.families ?? [], targetFamilies)) {
+      return Object.freeze({ outcome: "already_replaced", action: "replace-families", policyKind, policy: summary, auditRecordId, facts });
+    }
+    const replayDrift = compareFacts(expected, facts);
+    if (replayDrift.length > 0) return Object.freeze({ outcome: "drifted", drift: replayDrift, facts });
+    return refuse("The policy already matches the requested family scope but not through a matching authorized replacement; review before reusing this authorization reference.");
+  }
+
+  if (!Array.isArray(expectedCurrentFamilies) || expectedCurrentFamilies.length === 0) {
+    return refuse("expectedCurrentFamilies must be the exact family set the caller believes is currently enabled.");
+  }
+  if (!sameSet(expectedCurrentFamilies, current.families)) {
+    return refuse(`expectedCurrentFamilies does not match the current policy's actual family scope (${[...current.families].sort().join(",")}); refusing to replace against a stale belief of the current scope.`);
+  }
+  if (typeof expectedCurrentPolicyDigest !== "string" || !expectedCurrentPolicyDigest.trim()) {
+    return refuse("expectedCurrentPolicyDigest is required: the digest of the policy record this replacement is authorized against.");
+  }
+  if (expectedCurrentPolicyDigest !== facts.policyDigest) {
+    return refuse("expectedCurrentPolicyDigest does not match the current policy record; it changed since this replacement was authorized.");
+  }
+  const droppedFamilies = current.families.filter((family) => !targetFamilies.includes(family));
+  if (droppedFamilies.length > 0 && acknowledgeNarrowing !== true) {
+    return refuse(`This target drops ${droppedFamilies.join(", ")} from the current scope; pass acknowledgeNarrowing: true if that narrowing is genuinely intended.`, { droppedFamilies });
+  }
+
+  const candidate = { ...policyRecord, families: targetFamilies };
+  const resolvedCandidate = kind.resolve(candidate);
+  if (!resolvedCandidate.enabled || !sameSet(resolvedCandidate.families, targetFamilies)) {
+    return refuse(`The requested family scope is not valid (${resolvedCandidate.invalidReason ?? "families_invalid"}).`);
+  }
+
+  const addedFamilies = targetFamilies.filter((family) => !current.families.includes(family));
+  const summary = summaryOf(targetFamilies);
+  const resultBase = {
+    action: "replace-families",
+    policyKind,
+    policy: summary,
+    auditRecordId,
+    addedFamilies,
+    droppedFamilies,
+    predictedMutations: [
+      { collection: CONFIGURATION_COLLECTION, recordId: kind.recordId, operation: "update" },
+      { collection: CONFIGURATION_COLLECTION, recordId: auditRecordId, operation: "create" },
+    ],
+    unchangedByDesign: {
+      healthKitObservations: facts.observationCount,
+      healthKitCanonicalDays: facts.canonicalDayCount,
+      healthKitCanonicalWorkouts: facts.canonicalWorkoutCount,
+      healthKitWorkoutLinks: facts.linkCount,
+      canonicalEvidenceObjects: facts.evidenceCount,
+      otherPolicyRecord: facts.otherPolicyDigest ?? "absent",
+      linkAutoConfirm: current.linkAutoConfirm,
+      effectiveLocalDate: current.effectiveLocalDate,
+      endLocalDate: current.endLocalDate,
+      openEnded: current.openEnded === true,
+      strategicEvidenceEligibility: "quarantined",
+      historicalBackfill: false,
+    },
+    historicalBackfill: false,
+    strategicEvidenceEligibility: "quarantined",
+    facts,
+  };
+  if (!apply) return Object.freeze({ outcome: "dry_run", ...resultBase });
+
+  const drift = compareFacts(expected, facts);
+  if (drift.length > 0) return Object.freeze({ outcome: "drifted", drift, facts });
+  if (!String(authorizationReference ?? "").trim()) {
+    throw Object.assign(new Error("Apply requires an authorization reference."), { code: "AUTHORIZATION_REFERENCE_REQUIRED" });
+  }
+
+  const at = operationAt;
+  const nextPolicy = { ...candidate, id: kind.recordId, auditRecordId, updatedAt: at };
+  const newDigest = digest(stable(nextPolicy));
+  const audit = await records.putIfAbsent({
+    ownerUserId,
+    collection: CONFIGURATION_COLLECTION,
+    recordId: auditRecordId,
+    sourceIdentity: auditRecordId,
+    payload: {
+      id: auditRecordId,
+      kind: HEALTHKIT_WORKOUT_FAMILY_REPLACEMENT_AUDIT_KIND,
+      action: "replace-families",
+      at,
+      authorizationReference: String(authorizationReference),
+      policyRecordId: kind.recordId,
+      before: { status: policyRecord.status, digest: facts.policyDigest, families: current.families },
+      after: { ...summary, digest: newDigest },
+      strategicEvidenceEligibility: "quarantined",
+      historicalBackfill: false,
+    },
+  });
+  if (!audit.created) {
+    throw Object.assign(new Error("This authorization reference was already used for this action."), { code: "AUDIT_ROW_EXISTS" });
+  }
+
+  const written = await records.put({
+    ownerUserId,
+    collection: CONFIGURATION_COLLECTION,
+    recordId: kind.recordId,
+    expectedVersion: policyRecord.version,
+    sourceIdentity: kind.recordId,
+    payload: nextPolicy,
+  });
+
+  const list = (collection) => records.list({ ownerUserId, collection });
+  const [afterPolicy, afterOther, afterObservations, afterDays, afterWorkouts, afterLinks, afterClaims, afterEvidence] = await Promise.all([
+    records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: kind.recordId }),
+    records.get({ ownerUserId, collection: CONFIGURATION_COLLECTION, recordId: kind.otherRecordId }),
+    list(OBSERVATION_COLLECTION),
+    list(HEALTHKIT_CANONICAL_DAY_COLLECTION),
+    list(HEALTHKIT_CANONICAL_WORKOUT_COLLECTION),
+    list(HEALTHKIT_WORKOUT_LINK_COLLECTION),
+    list(HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION),
+    list(EVIDENCE_COLLECTION),
+  ]);
+  const resolvedAfter = kind.resolve(afterPolicy);
+  const sansVolatile = (record) => {
+    if (!record) return null;
+    const { families: _families, updatedAt: _updatedAt, auditRecordId: _auditRecordId, version: _version, ...rest } = record;
+    return rest;
+  };
+  const invariants = {
+    familiesAreExactlyTheTarget: resolvedAfter.enabled && sameSet(resolvedAfter.families, targetFamilies) && sameSet(afterPolicy?.families ?? [], targetFamilies),
+    onlyFamiliesFieldChanged: stable(sansVolatile(afterPolicy)) === stable(sansVolatile(policyRecord)),
+    windowUnchanged: resolvedAfter.effectiveLocalDate === current.effectiveLocalDate &&
+      resolvedAfter.endLocalDate === current.endLocalDate && resolvedAfter.openEnded === current.openEnded,
+    linkAutoConfirmUnchanged: resolvedAfter.linkAutoConfirm === current.linkAutoConfirm,
+    strategicEligibilityQuarantined: afterPolicy?.strategicEvidenceEligibility === "quarantined",
+    noBackfillRequested: afterPolicy?.historicalBackfill === false,
+    auditRowPresent: audit.record?.id === auditRecordId,
+    auditRecordsOldAndNewDigest: audit.record?.before?.digest === facts.policyDigest && audit.record?.after?.digest === newDigest,
+    otherPolicyUntouched: (afterOther ? digest(stable(afterOther)) : null) === facts.otherPolicyDigest,
+    observationsUnchanged: afterObservations.length === facts.observationCount && listDigest(afterObservations) === facts.observationsDigest,
+    canonicalDaysUnchanged: afterDays.length === facts.canonicalDayCount && listDigest(afterDays) === facts.canonicalDaysDigest,
+    canonicalWorkoutsUnchanged: afterWorkouts.length === facts.canonicalWorkoutCount && listDigest(afterWorkouts) === facts.canonicalWorkoutsDigest,
+    linksUnchanged: afterLinks.length === facts.linkCount && listDigest(afterLinks) === facts.linksDigest,
+    claimsUnchanged: afterClaims.length === facts.claimCount && listDigest(afterClaims) === facts.claimsDigest,
+    evidenceUnchanged: afterEvidence.length === facts.evidenceCount && listDigest(afterEvidence) === facts.evidenceDigest,
+  };
+  if (Object.values(invariants).some((ok) => ok !== true)) {
+    throw Object.assign(new Error("Post-write invariants failed."), { code: "POST_WRITE_INVARIANT_FAILED", invariants });
+  }
+  return Object.freeze({ outcome: "applied", ...resultBase, invariants, policyVersion: written.version });
 }
 
 function collectFacts({ policyRecord, otherPolicyRecord, observations, canonicalDays, canonicalWorkouts, links, claims, evidence }) {

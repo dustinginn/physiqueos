@@ -1,4 +1,5 @@
-// Bounded HealthKit canonical activation-policy operation (activate | deactivate).
+// Bounded HealthKit canonical activation-policy operation
+// (activate | deactivate | set-link-auto-confirm | replace-families).
 //
 // Transported into the existing App Platform `web` component by the accepted console runner
 // (bundled to one file by buildHealthKitPayload.mjs). Production-operations contract: identity
@@ -12,6 +13,13 @@
 //            immediately preceding dry run, both baked in at build time. One READ COMMITTED
 //            transaction under the owner advisory lock; writes exactly the policy record and one
 //            audit row; in-transaction verification; any failure rolls back.
+//
+//   replace-families (Workout policy only) atomically replaces an already-enabled policy's exact
+//            family scope in this SAME one-transaction shape, so no disabled-policy window is ever
+//            visible to ingestion. Requires --expected-current-families and
+//            --expected-current-policy-digest (the caller's stated belief of the live record,
+//            refused if wrong) and --families (the exact literal target; pass --acknowledge-
+//            narrowing if it genuinely drops a currently-enabled family).
 //
 // Executing this is a separate, explicitly authorized act. Nothing here runs it.
 import { createRequire } from "node:module";
@@ -33,6 +41,12 @@ const FAMILIES = typeof __FAMILIES__ === "undefined" ? "" : __FAMILIES__;
 // means the runner's default (every canonicalizable family).
 const AUTHORIZED_FAMILIES = FAMILIES ? FAMILIES.split(",").filter(Boolean) : undefined;
 const LINK_AUTO_CONFIRM = typeof __LINK_AUTO_CONFIRM__ === "undefined" ? null : __LINK_AUTO_CONFIRM__;
+// replace-families only: the caller's stated belief of the CURRENT scope and
+// digest, and an explicit acknowledgement when the target genuinely drops a
+// currently-enabled family. Never used by any other action.
+const EXPECTED_CURRENT_FAMILIES = typeof __EXPECTED_CURRENT_FAMILIES__ === "undefined" ? "" : __EXPECTED_CURRENT_FAMILIES__;
+const EXPECTED_CURRENT_POLICY_DIGEST = typeof __EXPECTED_CURRENT_POLICY_DIGEST__ === "undefined" ? "" : __EXPECTED_CURRENT_POLICY_DIGEST__;
+const ACKNOWLEDGE_NARROWING = typeof __ACKNOWLEDGE_NARROWING__ === "undefined" ? false : __ACKNOWLEDGE_NARROWING__;
 const AUTHORIZATION_REFERENCE = typeof __AUTHORIZATION_REFERENCE__ === "undefined" ? "" : __AUTHORIZATION_REFERENCE__;
 const EXPECTED_JSON = typeof __EXPECTED_JSON__ === "undefined" ? "" : __EXPECTED_JSON__;
 const MARKER = typeof __MARKER__ === "undefined" ? "PHYSIQUEOS_HEALTHKIT_ACTIVATION_SUCCESS" : __MARKER__;
@@ -48,9 +62,13 @@ function stop(code, status = 1) {
 const sanitizedCode = (error) => (/^[A-Za-z0-9_]{3,60}$/.test(String(error?.code ?? "")) ? String(error.code) : "ACTIVATION_ERROR");
 
 if (!["dry-run", "apply"].includes(MODE)) stop("MODE_INVALID");
-if (!["activate", "deactivate", "set-link-auto-confirm"].includes(ACTION)) stop("ACTION_INVALID");
+if (!["activate", "deactivate", "set-link-auto-confirm", "replace-families"].includes(ACTION)) stop("ACTION_INVALID");
 if (!["daily", "workout"].includes(POLICY_KIND)) stop("POLICY_KIND_INVALID");
 if (FAMILIES && POLICY_KIND !== "workout") stop("FAMILIES_NOT_SUPPORTED_FOR_POLICY_KIND");
+if (ACTION === "replace-families" && POLICY_KIND !== "workout") stop("REPLACE_FAMILIES_REQUIRES_WORKOUT_POLICY_KIND");
+if (ACTION === "replace-families" && !FAMILIES) stop("REPLACE_FAMILIES_REQUIRES_TARGET_FAMILIES");
+if (ACTION === "replace-families" && !EXPECTED_CURRENT_FAMILIES) stop("REPLACE_FAMILIES_REQUIRES_EXPECTED_CURRENT_FAMILIES");
+if (ACTION === "replace-families" && !EXPECTED_CURRENT_POLICY_DIGEST) stop("REPLACE_FAMILIES_REQUIRES_EXPECTED_CURRENT_POLICY_DIGEST");
 if (MODE === "apply" && !AUTHORIZATION_REFERENCE.trim()) stop("AUTHORIZATION_REFERENCE_REQUIRED");
 if (MODE === "apply" && !EXPECTED_JSON) stop("EXPECTED_FACTS_REQUIRED");
 if (!/^[0-9a-f]{40}$/.test(EXPECTED_GIT_SHA)) stop("EXPECTED_GIT_SHA_REQUIRED");
@@ -108,6 +126,11 @@ try {
       ...(OPEN_ENDED ? { openEnded: true } : { endLocalDate: END }),
       ...(AUTHORIZED_FAMILIES ? { families: AUTHORIZED_FAMILIES } : {}),
       ...(ACTION === "set-link-auto-confirm" ? { linkAutoConfirm: LINK_AUTO_CONFIRM } : {}),
+      ...(ACTION === "replace-families" ? {
+        expectedCurrentFamilies: EXPECTED_CURRENT_FAMILIES.split(",").filter(Boolean),
+        expectedCurrentPolicyDigest: EXPECTED_CURRENT_POLICY_DIGEST,
+        ...(ACKNOWLEDGE_NARROWING === true ? { acknowledgeNarrowing: true } : {}),
+      } : {}),
       authorizationReference: AUTHORIZATION_REFERENCE,
     },
     action: ACTION,
@@ -128,8 +151,11 @@ try {
 if (failure || !result) stop(failure ?? "ACTIVATION_INCOMPLETE");
 process.stdout.write(`PHYSIQUEOS_HEALTHKIT_ACTIVATION_JSON:${JSON.stringify({ mode: MODE, action: ACTION, policyKind: POLICY_KIND, openEnded: OPEN_ENDED, families: FAMILIES || null, authorizationReference: AUTHORIZATION_REFERENCE || null, ...result })}\n`);
 // The success marker means the operation did what was asked: a dry run that
-// planned, or an apply that committed. Refused, drifted, or otherwise
-// rolled-back outcomes end non-zero with no marker.
-const expectedOutcome = MODE === "apply" ? "applied" : "dry_run";
-if (result.outcome !== expectedOutcome) stop(`OUTCOME_${String(result.outcome).toUpperCase().replace(/[^A-Z0-9_]/g, "_")}`, 2);
+// planned, an apply that committed, or (replace-families only) a replay that
+// safely found the exact authorized state already live. Refused, drifted, or
+// otherwise rolled-back outcomes end non-zero with no marker.
+const acceptable = ACTION === "replace-families"
+  ? (MODE === "apply" ? ["applied", "already_replaced"] : ["dry_run", "already_replaced"])
+  : [MODE === "apply" ? "applied" : "dry_run"];
+if (!acceptable.includes(result.outcome)) stop(`OUTCOME_${String(result.outcome).toUpperCase().replace(/[^A-Z0-9_]/g, "_")}`, 2);
 process.stdout.write(`${MARKER}\n`);
