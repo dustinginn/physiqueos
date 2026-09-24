@@ -15,6 +15,10 @@ export function createEvidenceReviewReadService({ store } = {}) {
           store.getOwnerUserId(),
         ]);
         if (!review || !ownerUserId || review.userId !== ownerUserId) return null;
+        // Reconciliation has a dedicated guarded command and a narrow projected
+        // read contract. Generic evidence edit actions must never receive its
+        // raw relationship, resolution, or lifecycle state.
+        if (isHealthKitWorkoutReconciliationReview(review)) return null;
         return Object.freeze({ review, userId: ownerUserId });
       });
     },

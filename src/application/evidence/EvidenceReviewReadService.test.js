@@ -3,6 +3,27 @@ import { createEvidenceReviewReadService } from "./EvidenceReviewReadService.js"
 import { getHealthKitWorkoutReconciliationId } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 
 describe("EvidenceReviewReadService native detail", () => {
+  it("refuses generic edit context for workout reconciliation records", async () => {
+    const canonicalWorkoutId = "healthkit_canonical_workout_edit_blocked";
+    const review = {
+      schemaVersion: "healthkit-workout-reconciliation-v1",
+      reviewKind: "healthkit_workout_reconciliation",
+      id: getHealthKitWorkoutReconciliationId(canonicalWorkoutId),
+      userId: "founder",
+      canonicalWorkoutId,
+      status: "pending",
+      resolutionHistory: [{ mustNotEscape: true }],
+      lifecycleHistory: [{ mustNotEscape: true }],
+    };
+    const store = {
+      run: vi.fn(async (_scope, operation) => operation()),
+      getReview: vi.fn(async () => review),
+      getOwnerUserId: vi.fn(async () => "founder"),
+    };
+
+    await expect(createEvidenceReviewReadService({ store }).getEditContext(review.id)).resolves.toBeNull();
+  });
+
   it("returns a typed workout reconciliation presentation without loading evidence objects", async () => {
     const canonicalWorkoutId = "healthkit_canonical_workout_one";
     const review = {

@@ -94,6 +94,40 @@ describe("guarded relationship confirmation", () => {
     expect(corrupt.getMutationCount()).toBe(beforeWrites);
   });
 
+  it.each([
+    ["an extra history field", (claim) => ({
+      ...claim,
+      history: claim.history.map((entry, index) => index === 0 ? { ...entry, forged: true } : entry),
+    })],
+    ["a fabricated historical holder", (claim) => ({
+      ...claim,
+      history: claim.history.map((entry, index) => index === 0
+        ? { ...entry, holderLinkId: "healthkit_workout_link_fabricated" }
+        : entry),
+    })],
+  ])("refuses production-shaped released claim history with %s without writing", async (_label, mutate) => {
+    const { records, link } = await world({
+      sessions: [session("S1", "10:01", "10:59")],
+      workouts: [["u1", "10:00", "11:00"]],
+    });
+    const linkId = link("u1", "S1");
+    await confirm(records, linkId);
+    await unlinkHealthKitWorkoutRelationship({ records, ownerUserId: OWNER, linkId, by: FOUNDER, now: T0 });
+    const snapshot = records.snapshot();
+    snapshot.healthKitWorkoutLinkClaims[0] = mutate(snapshot.healthKitWorkoutLinkClaims[0]);
+    const corrupt = createInMemoryCanonicalRecordStore(snapshot);
+    const before = corrupt.snapshot();
+    const beforeWrites = corrupt.getMutationCount();
+
+    expect(findHealthKitWorkoutRelationshipViolations({
+      links: before.healthKitWorkoutLinks,
+      claims: before.healthKitWorkoutLinkClaims,
+    })).toMatchObject({ malformedReleasedClaims: 1 });
+    await expect(confirmWith(corrupt, linkId)).rejects.toMatchObject({ code: "LINK_RELATIONSHIP_INTEGRITY_INVALID" });
+    expect(corrupt.snapshot()).toEqual(before);
+    expect(corrupt.getMutationCount()).toBe(beforeWrites);
+  });
+
   it("refuses a second Apple workout for one Logger session (Logger -> HealthKit one-to-one)", async () => {
     const { records, link } = await world({
       sessions: [session("S1", "10:00", "11:00")],

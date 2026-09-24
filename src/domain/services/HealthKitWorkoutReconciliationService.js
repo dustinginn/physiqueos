@@ -6,6 +6,7 @@ import {
   HealthKitStrengthMatchOutcome,
   HealthKitWorkoutLinkStatus,
   findPossibleDuplicateCanonicalWorkouts,
+  getHealthKitWorkoutLinkRecordId,
   isTrustedNativeLiveLoggerSession,
 } from "./HealthKitWorkoutLinkService.js";
 import { createHealthKitQuarantinedEligibility } from "./HealthKitEvidenceEligibilityPolicy.js";
@@ -193,13 +194,18 @@ export function reopenHealthKitWorkoutReconciliationReview(review, { canonicalWo
   });
 }
 
-export function supersedeHealthKitWorkoutReconciliationReview(review, { now, reason = "no_current_founder_resolution_needed" } = {}) {
+export function supersedeHealthKitWorkoutReconciliationReview(review, { now } = {}) {
   if (review.status !== "pending") return review;
   const at = new Date(now).toISOString();
   return Object.freeze({
     ...review,
     status: "superseded",
-    lifecycleHistory: Object.freeze([...(review.lifecycleHistory ?? []), { status: "superseded", at, by: { kind: "system_matcher" }, reason }]),
+    lifecycleHistory: Object.freeze([...(review.lifecycleHistory ?? []), {
+      status: "superseded",
+      at,
+      by: { kind: "system_matcher" },
+      reason: "no_current_founder_resolution_needed",
+    }]),
     updatedAt: at,
   });
 }
@@ -284,6 +290,11 @@ export function hasExactHealthKitWorkoutReconciliationResolution(review, {
       ? selectedLoggerSessionCanonicalId : null) &&
     (resolution.linkId ?? null) === (action === HealthKitWorkoutReconciliationAction.CONFIRM ? linkId : null);
   if (!exactResolution(review.resolution)) return false;
+  if (action === HealthKitWorkoutReconciliationAction.CONFIRM &&
+    review.resolution.linkId !== getHealthKitWorkoutLinkRecordId(
+      review.canonicalWorkoutId,
+      review.resolution.selectedLoggerSessionCanonicalId,
+    )) return false;
   if (!Array.isArray(review.resolutionHistory) || review.resolutionHistory.length !== 1 ||
     !exactResolution(review.resolutionHistory[0]) ||
     stable(review.resolutionHistory[0]) !== stable(review.resolution)) return false;
@@ -293,7 +304,13 @@ export function hasExactHealthKitWorkoutReconciliationResolution(review, {
   const founderBasis = basis.mode?.startsWith("founder_");
   const deterministicBasis = basis.mode?.startsWith("deterministic_");
   if (!validInstant(resolution.at) || !String(resolution.by?.kind ?? "").trim() ||
-    !String(resolution.by?.ref ?? "").trim() || !hasExactResolutionBasis({ action, basis, review, by: resolution.by }) ||
+    !String(resolution.by?.ref ?? "").trim() || !hasExactResolutionBasis({
+      action,
+      basis,
+      review,
+      by: resolution.by,
+      selectedLoggerSessionCanonicalId: resolution.selectedLoggerSessionCanonicalId,
+    }) ||
     basis.actorRef !== resolution.by.ref ||
     (founderBasis && resolution.by.kind !== "founder") ||
     (deterministicBasis && resolution.by.kind !== "system_matcher") ||
@@ -410,24 +427,31 @@ function validInstant(value) {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
-function hasExactResolutionBasis({ action, basis, review, by }) {
+function hasExactResolutionBasis({ action, basis, review, by, selectedLoggerSessionCanonicalId }) {
   const exactKeys = (keys) => {
     return exactObjectKeys(basis, keys);
   };
+  const candidateIds = exactCandidateIds(review);
+  if (!candidateIds) return false;
   if (basis.mode === "founder_explicit_selection") {
+    const expectedRejectedIds = candidateIds.filter((id) => id !== selectedLoggerSessionCanonicalId).sort();
+    const actualRejectedIds = exactUniqueStringArray(basis.rejectedAlternativeLoggerSessionCanonicalIds);
     return action === HealthKitWorkoutReconciliationAction.CONFIRM &&
       exactKeys(["mode", "matcherVersion", "actorRef", "rejectedAlternativeLoggerSessionCanonicalIds"]) &&
       basis.matcherVersion === review.matcherVersion && basis.actorRef === by.ref &&
-      Array.isArray(basis.rejectedAlternativeLoggerSessionCanonicalIds) &&
-      basis.rejectedAlternativeLoggerSessionCanonicalIds.every((id) => String(id).trim().length > 0);
+      candidateIds.includes(selectedLoggerSessionCanonicalId) && actualRejectedIds != null &&
+      stable(actualRejectedIds) === stable(expectedRejectedIds);
   }
   if (basis.mode === "founder_explicit_no_match") {
+    const releasedIds = exactUniqueStringArray(basis.releasedCandidateLinkIds);
+    const allowedReleasedIds = new Set(candidateIds.map((sessionId) =>
+      getHealthKitWorkoutLinkRecordId(review.canonicalWorkoutId, sessionId)));
     return action === HealthKitWorkoutReconciliationAction.NO_MATCH &&
       exactKeys(["mode", "matcherVersion", "actorRef", "freshAssessmentOutcome", "releasedCandidateLinkIds"]) &&
       basis.matcherVersion === review.matcherVersion && basis.actorRef === by.ref &&
-      Object.values(HealthKitStrengthMatchOutcome).includes(basis.freshAssessmentOutcome) &&
-      Array.isArray(basis.releasedCandidateLinkIds) &&
-      basis.releasedCandidateLinkIds.every((id) => String(id).trim().length > 0);
+      basis.freshAssessmentOutcome === review.assessmentOutcome &&
+      Object.values(HealthKitStrengthMatchOutcome).includes(basis.freshAssessmentOutcome) && releasedIds != null &&
+      releasedIds.every((id) => allowedReleasedIds.has(id));
   }
   if (["deterministic_auto_confirm", "deterministic_auto_confirm_acceptance"].includes(basis.mode)) {
     return action === HealthKitWorkoutReconciliationAction.CONFIRM &&
@@ -435,6 +459,19 @@ function hasExactResolutionBasis({ action, basis, review, by }) {
       basis.ruleVersion === HEALTHKIT_STRENGTH_AUTO_CONFIRM_RULE_VERSION && basis.actorRef === by.ref;
   }
   return false;
+}
+
+function exactCandidateIds(review) {
+  if (!Array.isArray(review?.candidates)) return null;
+  const ids = review.candidates.map((candidate) => candidate?.loggerSessionCanonicalId);
+  return ids.every((id) => typeof id === "string" && id.trim() === id && id.length > 0) &&
+    new Set(ids).size === ids.length ? ids : null;
+}
+
+function exactUniqueStringArray(value) {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string" && item.trim() === item && item.length > 0) ||
+    new Set(value).size !== value.length) return null;
+  return [...value].sort();
 }
 
 function validTerminalLifecycle(review, expectedStatus) {
@@ -454,6 +491,9 @@ function validTerminalLifecycle(review, expectedStatus) {
         !exactObjectKeys(entry.by, terminal ? ["kind", "ref"] : ["kind"]) ||
         (!initial && !terminal && !String(entry.reason ?? "").trim())) return false;
       if (initial) return entry.by.kind === "system_matcher";
+      if (!terminal && (entry.by.kind !== "system_matcher" ||
+        (entry.status === "pending" && entry.reason !== "plausible_match_returned") ||
+        (entry.status === "superseded" && entry.reason !== "no_current_founder_resolution_needed"))) return false;
       const previous = history[index - 1];
       return allowedNext[previous.status]?.has(entry.status) === true &&
         Date.parse(entry.at) >= Date.parse(previous.at);

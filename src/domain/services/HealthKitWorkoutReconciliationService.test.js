@@ -5,11 +5,16 @@ import {
   hasExactHealthKitWorkoutReconciliationResolution,
   hasExactStoredHealthKitWorkoutReconciliationTerminal,
   projectHealthKitWorkoutReconciliationPresentation,
+  reopenHealthKitWorkoutReconciliationReview,
   resolveHealthKitWorkoutReconciliationRecord,
+  supersedeHealthKitWorkoutReconciliationReview,
 } from "./HealthKitWorkoutReconciliationService.js";
+import { getHealthKitWorkoutLinkRecordId } from "./HealthKitWorkoutLinkService.js";
 
 const DAY = "2026-09-23";
 const NOW = "2026-09-23T23:30:00.000Z";
+const LOGGER_SESSION_ID = "logger-sep23";
+const LINK_ID = getHealthKitWorkoutLinkRecordId("workout-sep23", LOGGER_SESSION_ID);
 
 describe("deterministic Strength auto-confirm gate", () => {
   it("accepts the production-shaped Sep 23 Logger-window facts for hard-fact reasons, not the score alone", () => {
@@ -215,10 +220,10 @@ describe("structured reconciliation history", () => {
     const resolved = resolveHealthKitWorkoutReconciliationRecord(review, {
       action: "confirm",
       selectedLoggerSessionCanonicalId: "logger-sep23",
-      linkId: "link-sep23",
+      linkId: LINK_ID,
       by: { kind: "founder", ref: "command" },
       now: NOW,
-      basis: { mode: "founder_explicit_selection", matcherVersion: "healthkit-strength-matcher-v5", rejectedAlternativeLoggerSessionCanonicalIds: [] },
+      basis: { mode: "founder_explicit_selection", matcherVersion: "healthkit-strength-matcher-v5", rejectedAlternativeLoggerSessionCanonicalIds: ["logger-other"] },
     });
     expect(resolved).toMatchObject({
       status: "resolved_confirmed",
@@ -234,14 +239,35 @@ describe("structured reconciliation history", () => {
       resolution: {
         action: "confirm",
         selectedLoggerSessionCanonicalId: "logger-sep23",
-        linkId: "link-sep23",
+        linkId: LINK_ID,
       },
     });
     expect(resolved.resolutionHistory).toHaveLength(1);
     expect(hasExactHealthKitWorkoutReconciliationResolution(resolved, {
-      action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: "link-sep23",
+      action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: LINK_ID,
       ownerUserId: "founder", canonicalWorkoutId: world.canonicalWorkout.id,
     })).toBe(true);
+    const withResolutionBasis = (record, basis) => ({
+      ...record,
+      resolution: { ...record.resolution, basis },
+      resolutionHistory: [{ ...record.resolutionHistory[0], basis }],
+    });
+    for (const rejectedAlternativeLoggerSessionCanonicalIds of [
+      [],
+      ["logger-sep23"],
+      ["logger-other", "logger-other"],
+      ["logger-unrelated"],
+    ]) {
+      expect(hasExactStoredHealthKitWorkoutReconciliationTerminal(withResolutionBasis(resolved, {
+        ...resolved.resolution.basis,
+        rejectedAlternativeLoggerSessionCanonicalIds,
+      }))).toBe(false);
+    }
+    expect(hasExactStoredHealthKitWorkoutReconciliationTerminal({
+      ...resolved,
+      resolution: { ...resolved.resolution, linkId: "healthkit_workout_link_forged" },
+      resolutionHistory: [{ ...resolved.resolutionHistory[0], linkId: "healthkit_workout_link_forged" }],
+    })).toBe(false);
     for (const corrupt of [
       { ...resolved, id: "healthkit_workout_reconciliation_wrong" },
       { ...resolved, userId: "other-user" },
@@ -262,7 +288,7 @@ describe("structured reconciliation history", () => {
       { ...resolved, evidenceEligibility: { ...resolved.evidenceEligibility, state: "eligible" } },
     ]) {
       expect(hasExactHealthKitWorkoutReconciliationResolution(corrupt, {
-        action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: "link-sep23",
+        action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: LINK_ID,
         ownerUserId: "founder", canonicalWorkoutId: world.canonicalWorkout.id,
       })).toBe(false);
       expect(projectHealthKitWorkoutReconciliationPresentation({ ...corrupt, version: 2 }, {
@@ -273,13 +299,13 @@ describe("structured reconciliation history", () => {
     const automatic = resolveHealthKitWorkoutReconciliationRecord(review, {
       action: "confirm",
       selectedLoggerSessionCanonicalId: "logger-sep23",
-      linkId: "link-sep23",
+      linkId: LINK_ID,
       by: { kind: "system_matcher", ref: "healthkit-strength-auto-confirm-v1" },
       now: NOW,
       basis: { mode: "deterministic_auto_confirm", ruleVersion: "healthkit-strength-auto-confirm-v1" },
     });
     expect(hasExactHealthKitWorkoutReconciliationResolution(automatic, {
-      action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: "link-sep23",
+      action: "confirm", selectedLoggerSessionCanonicalId: "logger-sep23", linkId: LINK_ID,
     })).toBe(true);
     for (const forged of [
       { ruleVersion: "healthkit-strength-auto-confirm-v999", actorRef: "healthkit-strength-auto-confirm-v1" },
@@ -304,6 +330,18 @@ describe("structured reconciliation history", () => {
       },
     });
     expect(hasExactStoredHealthKitWorkoutReconciliationTerminal(noMatch)).toBe(true);
+    const allowedReleasedLinkId = getHealthKitWorkoutLinkRecordId(world.canonicalWorkout.id, "logger-other");
+    expect(hasExactStoredHealthKitWorkoutReconciliationTerminal(withResolutionBasis(noMatch, {
+      ...noMatch.resolution.basis,
+      releasedCandidateLinkIds: [allowedReleasedLinkId],
+    }))).toBe(true);
+    for (const corruptBasis of [
+      { ...noMatch.resolution.basis, freshAssessmentOutcome: "no_plausible_match" },
+      { ...noMatch.resolution.basis, releasedCandidateLinkIds: ["healthkit_workout_link_unrelated"] },
+      { ...noMatch.resolution.basis, releasedCandidateLinkIds: [allowedReleasedLinkId, allowedReleasedLinkId] },
+    ]) {
+      expect(hasExactStoredHealthKitWorkoutReconciliationTerminal(withResolutionBasis(noMatch, corruptBasis))).toBe(false);
+    }
     const noMatchWithRule = {
       ...noMatch,
       resolution: { ...noMatch.resolution, basis: { ...noMatch.resolution.basis, ruleVersion: "healthkit-strength-auto-confirm-v1" } },
@@ -318,6 +356,37 @@ describe("structured reconciliation history", () => {
         noMatch.lifecycleHistory.at(-1),
       ],
     })).toBe(false);
+    const superseded = supersedeHealthKitWorkoutReconciliationReview(review, { now: NOW });
+    const reopened = reopenHealthKitWorkoutReconciliationReview(superseded, {
+      canonicalWorkout: world.canonicalWorkout,
+      assessment: ambiguous,
+      now: NOW,
+    });
+    const resolvedAfterLifecycle = resolveHealthKitWorkoutReconciliationRecord(reopened, {
+      action: "no_match",
+      by: { kind: "founder", ref: "no-match-command" },
+      now: NOW,
+      basis: {
+        mode: "founder_explicit_no_match",
+        matcherVersion: "healthkit-strength-matcher-v5",
+        freshAssessmentOutcome: "ambiguous_multiple",
+        releasedCandidateLinkIds: [],
+      },
+    });
+    expect(hasExactStoredHealthKitWorkoutReconciliationTerminal(resolvedAfterLifecycle)).toBe(true);
+    for (const lifecycleHistory of [
+      resolvedAfterLifecycle.lifecycleHistory.map((entry) => entry.status === "superseded"
+        ? { ...entry, by: { kind: "founder" } } : entry),
+      resolvedAfterLifecycle.lifecycleHistory.map((entry) => entry.status === "superseded"
+        ? { ...entry, reason: "invented_reason" } : entry),
+      resolvedAfterLifecycle.lifecycleHistory.map((entry) => entry.status === "pending" && entry.reason
+        ? { ...entry, reason: "invented_reason" } : entry),
+    ]) {
+      expect(hasExactStoredHealthKitWorkoutReconciliationTerminal({
+        ...resolvedAfterLifecycle,
+        lifecycleHistory,
+      })).toBe(false);
+    }
     expect(resolveHealthKitWorkoutReconciliationRecord(resolved, {
       action: "confirm",
       selectedLoggerSessionCanonicalId: "logger-other",
@@ -344,7 +413,7 @@ function fixture() {
     }],
   };
   const link = {
-    id: "link-sep23",
+    id: LINK_ID,
     status: "candidate",
     canonicalWorkoutId: canonicalWorkout.id,
     loggerSessionCanonicalId: "logger-sep23",
