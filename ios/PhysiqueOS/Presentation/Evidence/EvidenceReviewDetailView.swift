@@ -607,7 +607,7 @@ struct EvidenceReviewDetailView: View {
         let requestedAction = loggerSessionCanonicalId == nil ? "no_match" : "confirm"
         actionState = .confirming(loggerSessionCanonicalId == nil ? "Recording no match…" : "Confirming workout match…")
         do {
-            try await environment.evidenceReviewAPI.resolveWorkoutReconciliation(
+            let result = try await environment.evidenceReviewAPI.resolveWorkoutReconciliation(
                 reviewId: review.id,
                 expectedVersion: String(version),
                 loggerSessionCanonicalId: loggerSessionCanonicalId
@@ -615,7 +615,24 @@ struct EvidenceReviewDetailView: View {
             await environment.productionNativeAPI.invalidateReadResources([
                 "evidence-review", "evidence-review-queue", "training-landing", "training-day",
             ])
-            actionState = .workoutReconciliationResolved(requestedAction)
+            if Self.reconciliationCommandResultMatches(
+                result,
+                requestedAction: requestedAction,
+                loggerSessionCanonicalId: loggerSessionCanonicalId
+            ) {
+                actionState = .workoutReconciliationResolved(requestedAction)
+            } else if let refreshed = try? await environment.evidenceReviewAPI.fetchReview(reviewId: review.id) {
+                state = .loaded(refreshed)
+                actionState = Self.reconciliationResolutionMatches(
+                    refreshed,
+                    requestedAction: requestedAction,
+                    loggerSessionCanonicalId: loggerSessionCanonicalId
+                )
+                    ? .workoutReconciliationResolved(requestedAction)
+                    : .refreshRequired("The reconciliation outcome could not be verified as the action you requested. Review the current result before trying again.")
+            } else {
+                actionState = .refreshRequired("The reconciliation may have been accepted, but its exact outcome could not be verified. Refresh before making another change.")
+            }
         } catch {
             if ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) {
                 if let refreshed = try? await environment.evidenceReviewAPI.fetchReview(reviewId: review.id) {
@@ -645,11 +662,29 @@ struct EvidenceReviewDetailView: View {
         if requestedAction == "no_match" {
             return review.status == "resolved_no_match" &&
                 resolution.action == "no_match" &&
-                resolution.selectedLoggerSessionCanonicalId == nil
+                resolution.selectedLoggerSessionCanonicalId == nil &&
+                resolution.linkId == nil
         }
         return review.status == "resolved_confirmed" &&
             resolution.action == "confirm" &&
-            resolution.selectedLoggerSessionCanonicalId == loggerSessionCanonicalId
+            resolution.selectedLoggerSessionCanonicalId == loggerSessionCanonicalId &&
+            !(resolution.linkId ?? "").isEmpty
+    }
+
+    static func reconciliationCommandResultMatches(
+        _ result: WorkoutReconciliationCommandResult,
+        requestedAction: String,
+        loggerSessionCanonicalId: String?
+    ) -> Bool {
+        guard result.status == (requestedAction == "no_match" ? "resolved_no_match" : "resolved_confirmed"),
+              let resolution = result.resolution,
+              resolution.action == requestedAction
+        else { return false }
+        if requestedAction == "no_match" {
+            return resolution.selectedLoggerSessionCanonicalId == nil && resolution.linkId == nil
+        }
+        return resolution.selectedLoggerSessionCanonicalId == loggerSessionCanonicalId &&
+            !(resolution.linkId ?? "").isEmpty
     }
 
     private func confirm(review: EvidenceReviewDetailReadModel) async {

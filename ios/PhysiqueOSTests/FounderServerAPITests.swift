@@ -2179,7 +2179,7 @@ final class FounderServerAPITests: XCTestCase {
     }
 
     func testWorkoutReconciliationResolutionUsesRegisteredVersionedCommandAndStableIdempotency() async throws {
-        let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_confirmed","reviewId":"review-one","revision":3,"linkId":"link-one","loggerSessionCanonicalId":"logger-a","strategicEvidenceEligibility":"quarantined"}"#)
+        let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_confirmed","reviewId":"review-one","revision":3,"resolution":{"action":"confirm","selectedLoggerSessionCanonicalId":"logger-a","linkId":"link-one"},"strategicEvidenceEligibility":"quarantined"}"#)
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(200, response),
@@ -2207,7 +2207,7 @@ final class FounderServerAPITests: XCTestCase {
     }
 
     func testWorkoutReconciliationNoMatchOmitsLoggerIdentity() async throws {
-        let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_no_match","reviewId":"review-one","revision":3}"#)
+        let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_no_match","reviewId":"review-one","revision":3,"resolution":{"action":"no_match","selectedLoggerSessionCanonicalId":null,"linkId":null}}"#)
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(200, response),
@@ -2259,6 +2259,37 @@ final class FounderServerAPITests: XCTestCase {
         ))
         XCTAssertFalse(EvidenceReviewDetailView.reconciliationResolutionMatches(
             review,
+            requestedAction: "confirm",
+            loggerSessionCanonicalId: "logger-a"
+        ))
+    }
+
+    @MainActor
+    func testWorkoutReconciliationCommandSuccessRequiresExactTypedResolution() {
+        let confirmed = WorkoutReconciliationCommandResult(
+            status: "resolved_confirmed",
+            reviewId: "review-one",
+            revision: 3,
+            resolution: .init(action: "confirm", selectedLoggerSessionCanonicalId: "logger-a", linkId: "link-one")
+        )
+        XCTAssertTrue(EvidenceReviewDetailView.reconciliationCommandResultMatches(
+            confirmed,
+            requestedAction: "confirm",
+            loggerSessionCanonicalId: "logger-a"
+        ))
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationCommandResultMatches(
+            confirmed,
+            requestedAction: "confirm",
+            loggerSessionCanonicalId: "logger-b"
+        ))
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationCommandResultMatches(
+            .init(status: "already_resolved", reviewId: "review-one", revision: 3, resolution: confirmed.resolution),
+            requestedAction: "confirm",
+            loggerSessionCanonicalId: "logger-a"
+        ))
+        XCTAssertFalse(EvidenceReviewDetailView.reconciliationCommandResultMatches(
+            .init(status: "resolved_confirmed", reviewId: "review-one", revision: 3,
+                  resolution: .init(action: "confirm", selectedLoggerSessionCanonicalId: "logger-a", linkId: nil)),
             requestedAction: "confirm",
             loggerSessionCanonicalId: "logger-a"
         ))

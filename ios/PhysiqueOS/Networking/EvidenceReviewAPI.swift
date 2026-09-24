@@ -6,7 +6,20 @@ protocol EvidenceReviewAPI: Sendable {
         reviewId: String,
         expectedVersion: String,
         loggerSessionCanonicalId: String?
-    ) async throws
+    ) async throws -> WorkoutReconciliationCommandResult
+}
+
+struct WorkoutReconciliationCommandResult: Decodable, Sendable, Equatable {
+    struct Resolution: Decodable, Sendable, Equatable {
+        var action: String
+        var selectedLoggerSessionCanonicalId: String?
+        var linkId: String?
+    }
+
+    var status: String
+    var reviewId: String
+    var revision: Int?
+    var resolution: Resolution?
 }
 
 extension EvidenceReviewAPI {
@@ -14,7 +27,7 @@ extension EvidenceReviewAPI {
         reviewId: String,
         expectedVersion: String,
         loggerSessionCanonicalId: String?
-    ) async throws {
+    ) async throws -> WorkoutReconciliationCommandResult {
         throw WorkoutReconciliationWriteUnavailable()
     }
 }
@@ -39,7 +52,7 @@ struct NotAvailableEvidenceReviewAPI: EvidenceReviewAPI {
         reviewId: String,
         expectedVersion: String,
         loggerSessionCanonicalId: String?
-    ) async throws {
+    ) async throws -> WorkoutReconciliationCommandResult {
         throw NotAvailable()
     }
 }
@@ -124,7 +137,7 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
         reviewId: String,
         expectedVersion: String,
         loggerSessionCanonicalId: String?
-    ) async throws {
+    ) async throws -> WorkoutReconciliationCommandResult {
         let action = loggerSessionCanonicalId == nil ? "no_match" : "confirm"
         let signature = ProductionIdempotentSubmission.signature([
             ProductionCommandType.resolveWorkoutReconciliation,
@@ -138,13 +151,16 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
             action: action,
             loggerSessionCanonicalId: loggerSessionCanonicalId
         )
-        let outcome: ProductionCommandOutcome<ProductionJSONValue> = try await api.submitCommand(
+        let outcome: ProductionCommandOutcome<WorkoutReconciliationCommandResult> = try await api.submitCommand(
             ProductionCommandType.resolveWorkoutReconciliation,
             idempotencyKey: signature,
             expectedVersion: expectedVersion,
             payload: payload
         )
-        guard outcome.outcome != .pending else { throw ProductionNativeError.networkFailure }
+        guard outcome.outcome != .pending, let result = outcome.receipt.result else {
+            throw ProductionNativeError.networkFailure
+        }
+        return result
     }
 
     private struct Payload: Decodable, @unchecked Sendable {
