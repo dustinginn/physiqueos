@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T14:30:18Z",
+  "generated_at_utc": "2026-09-24T14:43:25Z",
   "task": {
     "id": "codex-healthkit-current-day-priority-sep23-repair-20260924",
     "title": "HealthKit current-day priority and bounded September 23 Activity repair",
     "agent": "codex",
-    "status": "partial"
+    "status": "blocked"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -17,7 +17,7 @@
     "native_build": 57
   },
   "result": {
-    "summary": "The first fresh-context review rejected candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448 with three valid findings. Amended Native candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6 isolates every historical date, authenticates Server recovery identity digests, and refuses to report transient delivery as durable success. It is pushed and green in 150/150 tests across all nine HealthKit classes. Second fresh-context review is pending. Nothing was deployed, uploaded, repaired, or mutated in production.",
+    "summary": "Fresh-context review rejected exact Native candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6. Permanent current-day-first and historical per-day isolation tests are green, but production collision recovery cannot verify the Server digest because the authenticated Server device ID is not exposed to Native. The Sep 23 future-apply seam also lacks a fresh authoritative Server preflight, and exact-day failures are missing from diagnostics. Per prompt, work stopped because Server changes are necessary. Nothing was deployed, uploaded, repaired, or mutated in production.",
     "success": false,
     "production_mutated": false,
     "deployed": true,
@@ -26,30 +26,39 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "The amended synchronization suite passed 55/55, focused Founder replay tests passed 12/12, and the expanded complete Native HealthKit suite passed 150/150 across all nine HealthKit test classes on the sole iPhone 17 Pro simulator. Historical stop-on-first-failure mutation was killed and reverted."
+      "summary": "The amended synchronization suite passed 55/55, focused Founder replay tests passed 12/12, and the expanded complete Native HealthKit suite passed 150/150 across all nine HealthKit test classes on the sole iPhone 17 Pro simulator. Historical stop-on-first-failure mutation was killed and reverted. Review found the mocks concealed a production device-identity mismatch, so passing tests do not make this candidate releasable."
     },
     "review": {
       "status": "changes_requested",
-      "summary": "First fresh-context review rejected candidate 91de99a33c80c7b5bd9180b38fb79bbec34b5448. All three findings are corrected in exact amended candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6; a second fresh-context review is pending."
+      "summary": "Fresh-context independent review of exact amended candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6 completed with REJECT: two high-severity Server/Native authority gaps and one medium diagnostics gap."
     },
     "zero_write_audit": {
       "status": "passed",
       "summary": "Only Native source/test corrections, simulator tests, repository publication, and prior public authority/health reads occurred. No Founder-device operation, production write, Server mutation, upload, repair, policy/strategic change, Strength/Logger mutation, Midweek merge, or Cardio work occurred."
     }
   },
-  "decisions_required": [],
-  "blockers": [],
+  "decisions_required": [
+    "Founder authorization is required for a narrowly scoped Server-plus-Native contract correction; the current task explicitly requires stopping when Server changes are necessary."
+  ],
+  "blockers": [
+    "Production Server pairing/refresh does not expose the authenticated Server device ID used in the recovery identity digest, so Native cannot safely validate collision metadata.",
+    "The bounded September 23 future-apply path has no authenticated read-only Server preflight for fresh runtime, policy, revision/count, and unrelated-data drift facts."
+  ],
   "unexpected_findings": [
     "The first review found that current-day isolation alone did not satisfy the separate invariant that one failed historical date cannot block later historical dates.",
     "The first review found that the parsed Server recovery identity digest was not yet authenticated against the outgoing identity material.",
-    "The first review found that transient delivery could preserve pending state yet still return a misleading successful synchronization outcome."
+    "The first review found that transient delivery could preserve pending state yet still return a misleading successful synchronization outcome.",
+    "The amended review found that Native's Keychain delivery identity and the Server-authenticated device ID are independently generated; tests had incorrectly made them equal.",
+    "The amended review found that September 23 apply-time Server facts are caller-supplied rather than freshly read from authoritative Server state.",
+    "The amended review found that exact-day historical pending/error scopes are not included in automatic diagnostics."
   ],
   "backlog": [
-    "Obtain a second fresh-context independent adversarial review of exact amended candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6 and publish the final verdict.",
-    "If review is clean, stop for separate TestFlight authorization; September 23 repair application remains a distinct later authorization."
+    "Add a narrowly scoped Server contract that exposes the authenticated device ID to Native across pair/refresh/relaunch and provides an authenticated read-only September 23 repair preflight.",
+    "Bind Native recovery verification to the Server identity, add production-shaped identity tests, include per-day historical scopes in diagnostics, rerun focused/full HealthKit tests, and obtain another fresh-context review.",
+    "Only after a clean review may a new TestFlight candidate be proposed; September 23 repair application remains a distinct later authorization."
   ],
-  "recommended_next_step": "Run the authorized second fresh-context review of exact amended Native candidate d7c271fae4ed9a51e13b92f413ea9480c739f7f6. Do not archive, upload, operate the Founder device, apply the repair, change policy/strategic eligibility, merge Midweek Native work, or begin Cardio.",
-  "full_report_path": "agent-handoffs/reports/20260924T143018Z-healthkit-current-day-priority-review-corrections.md",
+  "recommended_next_step": "Authorize a narrowly scoped Server-plus-Native correction for authenticated device identity, a read-only September 23 preflight, and per-day diagnostics, followed by production-shaped tests and a new fresh-context review. Do not upload d7c271fa, operate the Founder device, apply the repair, change policy/strategic eligibility, merge Midweek Native work, or begin Cardio.",
+  "full_report_path": "agent-handoffs/reports/20260924T144325Z-healthkit-current-day-priority-fresh-review-rejected.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
