@@ -211,6 +211,13 @@ describe("Midweek briefing presentation", () => {
       item.claimId)).size).toBe(result.presentationContract.claims.length);
   });
 
+  it("projects without mutating the frozen artifact or bound assessment", () => {
+    const source = v3Source();
+    const before = structuredClone(source);
+    prepareMidweekBriefingReviewPresentation(source);
+    expect(source).toEqual(before);
+  });
+
   it("deduplicates repeated lead meaning and Confidence reason by semantic text", () => {
     const { artifact, assessment } = v3Source();
     artifact.briefing.narrativeV3.sections.meaning =

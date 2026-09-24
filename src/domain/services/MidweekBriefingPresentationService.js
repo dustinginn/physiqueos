@@ -79,6 +79,9 @@ function projectCanonicalMidweekV3(artifact, assessment, lineage) {
       ? { ...briefing.training, interpretation: null, watch: [] } : briefing.training,
     weightContext: briefing.weightContext
       ? { ...briefing.weightContext, interpretation: null } : briefing.weightContext,
+    bodyComposition: briefing.bodyComposition
+      ? { ...briefing.bodyComposition, interpretation: null }
+      : briefing.bodyComposition,
     coachTake: {
       biggestTakeaway: narrativeV3.coachTake,
       recommendation: narrativeV3.sections.action,
@@ -121,6 +124,9 @@ function projectCanonicalMidweekFactualFallback(artifact, lineage) {
     weightContext: briefing.weightContext
       ? { ...briefing.weightContext, interpretation: null }
       : briefing.weightContext,
+    bodyComposition: briefing.bodyComposition
+      ? { ...briefing.bodyComposition, interpretation: null }
+      : briefing.bodyComposition,
     coachTake: null,
     uncertainty: [],
     goalConfidence: null,
@@ -297,7 +303,11 @@ export function createMidweekPresentationContract({ artifact, assessment,
         score: assessment.currentPercentage,
         band: assessment.confidenceBand,
         movement: assessment.movement,
+        movementDirection: confidenceMovementDirection(assessment.movement),
+        delta: assessment.priorPercentage == null ? null :
+          assessment.currentPercentage - assessment.priorPercentage,
         reason: confidenceReasonDistinct ? confidenceReason : null,
+        primaryReason: confidenceReasonDistinct ? confidenceReason : null,
       }),
     }),
     modules: moduleDecisions(briefing),
@@ -312,6 +322,11 @@ export function createMidweekPresentationContract({ artifact, assessment,
         ? "second_movement_not_decision_changing" : null,
     }),
   });
+}
+
+function confidenceMovementDirection(value) {
+  return ({ increase: "increased", decrease: "decreased",
+    no_meaningful_change: "held" })[value] ?? value;
 }
 
 function moduleDecisions(briefing) {
