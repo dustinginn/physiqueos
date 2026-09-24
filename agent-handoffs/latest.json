@@ -1,64 +1,55 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T13:13:23Z",
+  "generated_at_utc": "2026-09-24T13:29:59Z",
   "task": {
-    "id": "codex-healthkit-build57-sep24-acceptance-sep23-repair-20260924",
-    "title": "Build 57 September 24 acceptance and September 23 Activity repair planning",
+    "id": "codex-healthkit-current-day-priority-sep23-repair-20260924",
+    "title": "HealthKit current-day priority and bounded September 23 Activity repair",
     "agent": "codex",
-    "status": "blocked"
+    "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "63395579ed70611be8a57f032133a43a3bc67800",
-    "final_sha": "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d",
+    "base_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
+    "final_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
     "production_server_sha": "28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d",
     "production_deployment": "e8c3bed3-20f6-4f5c-b34a-d27ab0881480",
     "native_sha": "6cca05813ce26e3ddd8ff2dead9867bb4e7e3bb9",
     "native_build": 57
   },
   "result": {
-    "summary": "The September 23 Activity repair dry-run failed closed and made no mutation. Installed Build 57 has no exact-day operational transport for the automatic Activity namespace, the actual September 23 Apple Health aggregate must still be sourced from the phone, and September 24 has no Activity baseline. The bounded design predicts exactly one source observation at revision 51 and one update of the existing September 23 canonical day from revision 50 to 51 after a new Native candidate is implemented, tested, independently reviewed, and separately authorized. September 23 Nutrition is independently healthy at revision 5 and requires no repair.",
+    "summary": "The exact Build 57 batching/coalescing implementation was audited and the starvation defect was confirmed. The selected Native design gives Activity and Nutrition an exact-current-local-day lane that runs before the preserved Build 57 historical scope, while both retain the Server automatic namespace; a persisted historical batch can therefore no longer block current-day query, upload, acknowledgement, or revision state. The separate September 23 tool will be exact-day Activity-only and dry-run-only in production, with APPLY hard-disabled absent a future explicit authorization capability. Implementation and tests are in progress; nothing was mutated or uploaded.",
     "success": false,
     "production_mutated": false,
     "deployed": true,
-    "testflight_uploaded": true
+    "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "failed",
-      "summary": "The read-only dry-run emitted its success marker only after rollback but returned outcome refused: Build 57 cannot target only September 23 in the automatic Activity namespace, the exact device aggregate is absent, and the September 24 baseline is not established. No repair test was or could safely be applied."
+      "status": "not_run",
+      "summary": "Architecture audit complete. Focused, mutation, and complete relevant Native HealthKit suites remain pending."
     },
     "review": {
-      "status": "changes_requested",
-      "summary": "A minimal Native exact-day operational Activity repair path must be implemented, mutation-tested, and independently reviewed. It must bind date/scope/namespace, permit at most the expected revision-51 collision recovery and retry, drift-fence the device aggregate, and refuse every unrelated mutation."
+      "status": "not_run",
+      "summary": "Fresh-context independent adversarial review will run only after the exact Native candidate is committed and focused/full relevant tests pass."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "The successful current-authority audit used exact runtime gating, one owner-scoped connection, PostgreSQL REPEATABLE READ READ ONLY, transaction_read_only=on, parameterized reads, explicit ROLLBACK, and a post-rollback marker. The retiring-deployment attempt stopped before database access. No application, device, database, policy, Strength, Logger, strategic, or Cardio mutation occurred."
+      "summary": "Only source/report reads and public live/ready health reads occurred. No Founder device operation, production data write, Server mutation, upload, policy/strategic change, Strength/Logger mutation, or Cardio work occurred."
     }
   },
-  "decisions_required": [
-    "Founder authorization is required to implement and independently review the smallest exact-day automatic-namespace Native Activity repair candidate; this is not authorization to upload it or perform the repair.",
-    "After implementation and review, separate authorization will be required for any TestFlight upload and a fresh separate authorization will be required for the device repair apply.",
-    "If Build 57 is already foregrounded, the Founder may perform only read-only observation of the automatic diagnostics card and expected Log row label; do not foreground or refresh the app merely for this check."
-  ],
-  "blockers": [
-    "Build 57 has no exact-day operational transport that can mutate only September 23 Activity in the automatic namespace.",
-    "The exact current September 23 Apple Health aggregate and digest have not been read from the phone.",
-    "September 24 Activity has no baseline, so ordinary second-advance acceptance is not testable."
-  ],
+  "decisions_required": [],
+  "blockers": [],
   "unexpected_findings": [
-    "Build 57's normal 30-day Activity batch advances through historical identity collisions one date per attempt, so normal foreground/refresh is not a safe bounded September 23 repair mechanism.",
-    "A separately authorized Midweek deployment changed current Server authority to 28ac1e4f51afdf3a30f2fb50fcb5c95148a2709d during this task; the intervening diff has no HealthKit, Activity, database, or migration change, and the dry-run was rerun against that exact runtime.",
-    "September 23 Nutrition independently reached revision 5 and complete-day coverage, so a symmetry-based Nutrition repair is neither necessary nor authorized."
+    "Sorting current day first inside the existing batch would be insufficient because Build 57 resolves a persisted pending historical batch before issuing any new query.",
+    "The existing foreground sequence completes Activity history before beginning Nutrition, so Activity historical recovery can also delay Nutrition current-day freshness unless all current-day scopes are scheduled first."
   ],
   "backlog": [
-    "Implement, mutation-test, and independently review the exact-day automatic Activity repair candidate after Founder authorization.",
-    "Do not upload a new Native build or perform the September 23 repair without separate subsequent authorizations.",
-    "After repair, establish an ordinary September 24/current-day baseline and prove a later revision 2 advance before starting Cardio."
+    "Implement and test the isolated exact-current-day Activity/Nutrition lanes while preserving the Build 57 scope for bounded historical recovery.",
+    "Implement and test the Founder-only September 23 Activity dry-run tool with a hard-disabled production APPLY gate.",
+    "Mutation-test critical guards, run the relevant Native HealthKit suites on only iPhone 17 Pro, obtain fresh-context review, and publish the final exact candidate."
   ],
-  "recommended_next_step": "Obtain Founder authorization to implement and independently review the bounded exact-day Native Activity repair transport. Keep the device closed unless it is already foregrounded, and do not upload, repair data, change policy/strategic eligibility, or begin Cardio.",
-  "full_report_path": "agent-handoffs/reports/20260924T131323Z-healthkit-sep23-activity-repair-dryrun-refused.md",
+  "recommended_next_step": "Continue the authorized Native implementation/test/review work. Do not archive, upload, operate the Founder device, apply the repair, change policy/strategic eligibility, or begin Cardio.",
+  "full_report_path": "agent-handoffs/reports/20260924T132959Z-healthkit-current-day-priority-architecture-audit.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
