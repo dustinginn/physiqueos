@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T00:57:59Z",
+  "generated_at_utc": "2026-09-24T01:07:55Z",
   "task": {
-    "id": "codex-strength-reconciliation-semantics-20260923",
-    "title": "Strength reconciliation semantics",
+    "id": "codex-strength-reconciliation-eighth-review-20260923",
+    "title": "Strength reconciliation eighth fresh-context review",
     "agent": "codex",
     "status": "partial"
   },
@@ -17,7 +17,7 @@
     "native_build": 56
   },
   "result": {
-    "summary": "Corrected all five seventh-review findings, froze exact clean Server and unchanged Native Build 56 candidates, and passed 200 relevant Server tests, both Phase gates, lint, and the production webpack build. Eighth fresh-context review is pending; production remains unchanged.",
+    "summary": "Eighth fresh-context review rejected the exact candidates for released-claim reuse, incomplete terminal lifecycle/basis exactness, and shallow nested presentation sanitization. Production remains unchanged.",
     "success": false,
     "production_mutated": false,
     "deployed": false,
@@ -26,28 +26,31 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server relevant 200/200, Phase 4 139/139, Phase 5 65/65, production webpack build, ESLint, and diff checks passed. Native is unchanged; its focused tests passed in the seventh review on the sole permitted iPhone 17 Pro simulator."
+      "summary": "Independent reviewer passed 193/193 focused Server tests and 183/183 Native Founder Server API tests on the sole permitted iPhone 17 Pro simulator."
     },
     "review": {
-      "status": "not_run",
-      "summary": "Eighth fresh-context independent review of the exact candidates is the next gate."
+      "status": "changes_requested",
+      "summary": "Rejected: malformed released claims could be promoted; lifecycle/basis schemas were not fully exact; nested presentation objects still shallow-passed raw fields."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "No production deploy, policy mutation, relationship mutation, TestFlight upload, strategic eligibility change, or Cardio work occurred."
+      "summary": "No files were edited by the reviewer and no production deploy, policy mutation, relationship mutation, TestFlight upload, strategic eligibility change, or Cardio work occurred."
     }
   },
   "decisions_required": [],
   "blockers": [],
-  "unexpected_findings": [],
-  "backlog": [
-    "Obtain an eighth fresh-context independent adversarial review of the exact candidates.",
-    "If approved, request separate Founder authorization before any Server deployment.",
-    "Keep Native Build 56 upload separately gated.",
-    "Keep the September 23 relationship unconfirmed and Cardio blocked until the final Strength verdict."
+  "unexpected_findings": [
+    "A malformed released deterministic claim could be recycled into a held claim and confirmed relationship.",
+    "Nested raw fields could cross the otherwise sanitized reconciliation presentation boundary."
   ],
-  "recommended_next_step": "Run the eighth fresh-context independent review against the immutable Server and Native candidates, then publish its verdict.",
-  "full_report_path": "agent-handoffs/reports/20260924T005759Z-strength-reconciliation-seventh-review-corrections.md",
+  "backlog": [
+    "Correct all three eighth-review findings with adversarial regressions.",
+    "Rerun relevant Server gates and freeze a new exact Server candidate.",
+    "Obtain another fresh-context independent review.",
+    "Keep deployment, TestFlight upload, September 23 confirmation, strategic eligibility, and Cardio separately gated."
+  ],
+  "recommended_next_step": "Correct the three findings, freeze a new exact Server candidate, and run a ninth fresh-context independent adversarial review.",
+  "full_report_path": "agent-handoffs/reports/20260924T010755Z-strength-reconciliation-eighth-review-rejected.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
