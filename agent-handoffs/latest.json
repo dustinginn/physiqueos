@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-24T04:07:00Z",
+  "generated_at_utc": "2026-09-24T04:30:00Z",
   "task": {
     "id": "codex-healthkit-revision-recovery-strength-presentation-20260923",
     "title": "HealthKit daily-revision recovery and Strength presentation",
@@ -17,22 +17,22 @@
     "native_build": 56
   },
   "result": {
-    "summary": "Complete candidates are frozen at Server 1f50421f and Native 85e07acb. Daily-revision recovery, Founder automatic-scope diagnostics, and confirmed-Strength Workout Detail / Activity / Log presentation are implemented. Server 89/89 + 3/3 + 441/441 and Native iPhone 17 Pro 81/81 + 302/302 + restored 8/8 suites pass; presentation mutations were caught and restored. Fresh-context review is in progress. No production mutation, deployment, TestFlight upload, Activity repair, policy change, or Cardio work occurred.",
+    "summary": "The first fresh review found blocking presentation defects and bounded persistence/diagnostics gaps. They are corrected in exact amended candidates Server 74c51805 and Native e0ed02be, both pushed to GitHub. Corrected Server suites and Native iPhone 17 Pro suites pass, and a second fresh-context review is in progress. No production mutation, deployment, TestFlight upload, Activity repair, policy change, or Cardio work occurred.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
     "strength_graduation_verdict": "green",
-    "implementation_status": "exact_candidates_frozen_fresh_review_in_progress"
+    "implementation_status": "amended_exact_candidates_frozen_fresh_review_in_progress"
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server focused suites 89/89 + Activity 3/3 + HealthKit 441/441; Native iPhone 17 Pro suites 81/81 + 302/302 + restored presentation 8/8 passed."
+      "summary": "Corrected Server suites 13/13, 72/72, 46/46 and 446 candidate-relevant HealthKit assertions passed; corrected Native iPhone 17 Pro suites 37/37 and 76/76 passed. One missing-energy mutation failed as required and was restored."
     },
     "review": {
       "status": "pending",
-      "summary": "Fresh-context adversarial review is running against exact Server 1f50421f and Native 85e07acb candidate ranges."
+      "summary": "The first fresh review's findings were corrected. A second fresh-context adversarial review is running against exact amended Server 74c5180518b3470e6307cd2d414c79b792397ef5 and Native e0ed02be57fef76b237be3fe4621f946a02ab40c."
     },
     "authority_audit": {
       "status": "passed",
@@ -49,15 +49,18 @@
     "Founder authorization remains required before the bounded September 23 Activity repair apply."
   ],
   "blockers": [],
-  "unexpected_findings": [],
+  "unexpected_findings": [
+    "First fresh review found fail-open Strength projection and incomplete-energy attribution in the initial candidates; both are corrected in the amended candidates.",
+    "First fresh review also found multi-session Log provenance, repeated deferred-tombstone growth, and stale foreground-query diagnostics gaps; all are corrected."
+  ],
   "backlog": [
-    "Complete the in-flight fresh-context independent review of the exact Server/Native candidates.",
+    "Complete the second fresh-context independent review of the exact amended Server/Native candidates.",
     "Keep Workout strategic eligibility and global linkAutoConfirm off unless separately authorized.",
     "Cardio is the next eligible domain but must not begin without a separate instruction.",
     "Design and dry-run the bounded September 23 Activity repair only after the reviewed correction, then ask before mutation."
   ],
   "recommended_next_step": "Complete fresh-context review, publish its result, and stop for separate Founder authorization before any Server deployment.",
-  "full_report_path": "agent-handoffs/reports/20260924T040700Z-healthkit-revision-strength-presentation-candidates.md",
+  "full_report_path": "agent-handoffs/reports/20260924T043000Z-healthkit-revision-strength-presentation-amended-review.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
