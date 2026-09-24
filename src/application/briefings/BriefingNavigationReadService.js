@@ -74,7 +74,8 @@ export function createBriefingNavigationReadService({ store } = {}) {
         });
       }
       if (artifact.cadence === "midweek" && artifact.briefing) {
-        const briefing = prepareMidweekBriefingReviewPresentation({ artifact });
+        const briefing = prepareMidweekBriefingReviewPresentation({ artifact,
+          assessment: context.confidenceAssessment });
         const finished = {
           ...briefing,
           goalConfidence: projectConfidenceExplanationForSurface(

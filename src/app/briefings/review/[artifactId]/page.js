@@ -73,7 +73,8 @@ export default async function BriefingReviewPage({ params, searchParams }) {
       )}}/>;
   }
   if (artifact.cadence === "midweek" && artifact.briefing) {
-    const briefing = prepareMidweekBriefingReviewPresentation({ artifact });
+    const briefing = prepareMidweekBriefingReviewPresentation({ artifact,
+      assessment: confidenceAssessment });
     return <MidweekBriefingScreen briefing={{...briefing,
       goalConfidence: projectConfidenceExplanationForSurface(
         briefing.goalConfidence,

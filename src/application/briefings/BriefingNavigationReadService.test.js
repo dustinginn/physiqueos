@@ -107,7 +107,8 @@ describe("Native Briefing detail composition", () => {
 
   it("keeps the Native Midweek compatibility envelope while projecting canonical V3", async () => {
     const artifact = midweekV3Artifact();
-    const service = createBriefingNavigationReadService({ store: store(artifact) });
+    const service = createBriefingNavigationReadService({ store: store(artifact,
+      { confidenceAssessment: midweekV3Assessment(artifact) }) });
     const result = await service.getNativeArtifact({ artifactId: artifact.id });
     expect(result).toMatchObject({
       schemaVersion: "1",
@@ -130,8 +131,26 @@ describe("Native Briefing detail composition", () => {
           biggestTakeaway: "Canonical V3 coach take.",
           recommendation: "Canonical V3 action.",
         },
+        presentationContract: {
+          schemaVersion: "midweek_presentation_contract_v1",
+          lineage: { valid: true },
+          lead: { confidence: { primarySurface: "lead.confidence" } },
+        },
       },
     });
+  });
+
+  it("does not serve V3 strategic copy when the bound assessment is missing", async () => {
+    const artifact = midweekV3Artifact();
+    const result = await createBriefingNavigationReadService({
+      store: store(artifact),
+    }).getNativeArtifact({ artifactId: artifact.id });
+    expect(result.presentation.presentationModel)
+      .toBe("canonical_narrative_v3_factual_fallback");
+    expect(result.presentation.presentationContract.lineage)
+      .toMatchObject({ valid: false, reason: "assessment_missing" });
+    expect(result.presentation.presentationContract.coaching).toEqual([]);
+    expect(result.presentation.goalConfidence).toBeNull();
   });
 
   it("resolves both Photo Event comparison identities before Native media projection", async () => {
@@ -293,6 +312,7 @@ function midweekV3Artifact() {
       confidence: "Canonical V3 confidence explanation.",
     },
     coachTake: "Canonical V3 coach take.",
+    strategicInterpretationId: "interpretation-v3",
   };
   artifact.briefing.goalConfidence = {
     assessmentId: "confidence-v3",
@@ -306,4 +326,39 @@ function midweekV3Artifact() {
     piVersion: "confidence_v3",
   };
   return artifact;
+}
+
+function midweekV3Assessment(artifact) {
+  return {
+    id: "confidence-v3",
+    assessmentId: "confidence-v3",
+    schemaVersion: "canonical_confidence_assessment_v3",
+    briefingArtifactId: artifact.id,
+    evidenceWindowId: artifact.evidenceWindow.id,
+    goalId: "goal-build",
+    phaseId: "phase-1",
+    currentPercentage: 79,
+    confidenceBand: "high",
+    movement: "no_meaningful_change",
+    narrativeExplanation: { text: "Canonical V3 confidence explanation." },
+    structuredInterpretationId: "interpretation-v3",
+    narrativeAssessmentId: "narrative-plan-v3",
+    strategicInterpretation: {
+      id: "interpretation-v3",
+      coachingObservationSelection: { selected: [] },
+    },
+    narrativePlan: {
+      id: "narrative-plan-v3",
+      strategicInterpretationId: "interpretation-v3",
+      uncertaintyTypes: [],
+      composition: { sectionAllocations: {
+        result: { topicKeys: ["result"] },
+        meaning: { topicKeys: ["goal_implication"] },
+        action: { topicKeys: ["recommendation"] },
+        watch: { topicKeys: ["next_assessment"] },
+        confidence: { topicKeys: ["confidence_movement"] },
+        coachTake: { topicKeys: ["coach_emphasis"] },
+      } },
+    },
+  };
 }

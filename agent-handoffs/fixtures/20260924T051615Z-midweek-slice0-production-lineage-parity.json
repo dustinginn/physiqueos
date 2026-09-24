@@ -1,0 +1,214 @@
+{
+  "fixtureType": "midweek-production-lineage-parity-v1",
+  "capturedAt": "2026-09-24T05:16:15.194Z",
+  "authority": {
+    "applicationId": "bf57cf56-48cc-4cd6-90e4-a23ee5381741",
+    "component": "web",
+    "deploymentId": "117d8a2f-8cc1-4ef1-9247-1029c875e401",
+    "sourceSha": "63395579ed70611be8a57f032133a43a3bc67800",
+    "buildId": "physiqueos-63395579-20260924",
+    "ownerScope": "founder"
+  },
+  "transaction": {
+    "isolation": "repeatable_read",
+    "access": "read_only",
+    "transactionReadOnly": "on",
+    "rollbackVerified": true,
+    "successMarker": "PHYSIQUEOS_MIDWEEK_SLICE0_ROLLBACK_VERIFIED_63395579",
+    "applicationSelectCount": 3,
+    "allSelectsParameterized": true
+  },
+  "artifact": {
+    "storageRecordId": "midweek_briefing_user_founder_001_20260920_20260922",
+    "artifactId": "midweek_briefing_user_founder_001_20260920_20260922",
+    "databaseVersion": 1,
+    "payloadVersion": 1,
+    "payloadDigest": "4095d0769ff6c53f7f07b831608ae671eb9e2922c84cf9fade8219088dbe7f92",
+    "artifactType": "scheduled",
+    "cadence": "midweek",
+    "generatedAt": "2026-09-23T10:01:29.328Z",
+    "evidenceCutoff": "2026-09-23T06:59:59.999Z",
+    "evidenceWindow": {
+      "id": "midweek:2026-09-20:2026-09-22:America/Los_Angeles",
+      "startDate": "2026-09-20",
+      "endDate": "2026-09-22",
+      "briefingDate": "2026-09-23",
+      "timeZone": "America/Los_Angeles",
+      "cutoff": "2026-09-23T06:59:59.999Z",
+      "closed": true
+    },
+    "lifecycle": {
+      "generationStatus": "completed",
+      "claimedAt": "2026-09-23T10:01:29.328Z",
+      "generatedAt": "2026-09-23T10:01:29.328Z",
+      "completedAt": "2026-09-23T10:01:29.328Z"
+    },
+    "goal": {
+      "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+      "name": "Build Lean Mass"
+    },
+    "phase": {
+      "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+      "name": "Lean Mass Build",
+      "status": "active"
+    },
+    "intelligenceRunId": "confidence_v3|midweek|midweek_briefing_user_founder_001_20260920_20260922"
+  },
+  "assessment": {
+    "storageRecordId": "goal_confidence_history_v2|confidence_assessment_v3|f5deaf716bae25d2f233fd2d06fcb64124c5a8b9f808b7bf11f10b01ef10c63b",
+    "assessmentId": "confidence_assessment_v3|f5deaf716bae25d2f233fd2d06fcb64124c5a8b9f808b7bf11f10b01ef10c63b",
+    "databaseVersion": 1,
+    "payloadVersion": 1,
+    "payloadDigest": "0f5c5b58ac7bad98d1d9ed5cac28c86504225caac20197e7c07e9110e789db56",
+    "schemaVersion": "canonical_confidence_assessment_v3",
+    "publisherType": "midweek_briefing",
+    "briefingArtifactId": "midweek_briefing_user_founder_001_20260920_20260922",
+    "evidenceWindowId": "midweek:2026-09-20:2026-09-22:America/Los_Angeles",
+    "goalId": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+    "phaseId": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+    "currentPercentage": 79,
+    "movement": "no_meaningful_change",
+    "publicationTimestamp": "2026-09-23T10:01:29.328Z",
+    "sourceCutoff": "2026-09-23T06:59:59.999Z",
+    "strategicInterpretationId": "strategic_interpretation_v3|578289b1b0a66bf3ef6462b02df0c6b5f48f277091b1cb99ddcb057709d53d75",
+    "narrativePlanId": "narrative_plan_v3|25c926b8fd2148dfcb51002e0f4942f85eb86b0596f07c423f1ded7bddcb0eb0"
+  },
+  "structuredDomains": [
+    { "name": "energy", "present": true, "topLevelFieldCount": 19, "arrayCounts": { "warnings": 2, "chartPoints": 3 } },
+    { "name": "nutrition", "present": false, "topLevelFieldCount": 0, "arrayCounts": {} },
+    { "name": "activity", "present": false, "topLevelFieldCount": 0, "arrayCounts": {} },
+    { "name": "weight", "present": true, "topLevelFieldCount": 7, "arrayCounts": {} },
+    { "name": "body_composition", "present": true, "topLevelFieldCount": 5, "arrayCounts": {} },
+    { "name": "training", "present": true, "topLevelFieldCount": 10, "arrayCounts": { "watch": 2, "warnings": 0, "highlights": 3, "chartPoints": 0, "priorityCategories": 4 } },
+    { "name": "recovery", "present": false, "topLevelFieldCount": 0, "arrayCounts": {} },
+    { "name": "goal", "present": true, "topLevelFieldCount": 3, "arrayCounts": {} },
+    { "name": "phase", "present": true, "topLevelFieldCount": 7, "arrayCounts": { "remainsUnclear": 4, "becomingClearer": 2 } },
+    { "name": "confidence", "present": true, "topLevelFieldCount": 35 },
+    { "name": "narrative_v3", "present": true, "topLevelFieldCount": 10, "arrayCounts": { "uncertainty": 7, "energy.findings": 2, "energy.ambiguity": 3 } }
+  ],
+  "allocations": [
+    { "section": "watch", "purpose": "specific_bounded_attention", "topicKeys": ["energy_ambiguity"], "candidateIds": [] },
+    { "section": "action", "purpose": "current_coaching_action", "topicKeys": ["recommendation"], "candidateIds": [] },
+    { "section": "result", "purpose": "recent_change_worth_knowing", "topicKeys": ["training|lateral_raise_machine|heaviest_load"], "candidateIds": ["specific_coaching_observation|b23ab648ab1e96f064abdec793607698c2656dac37ce975e42c5d942eb144506"] },
+    { "section": "meaning", "purpose": "goal_relative_implication", "topicKeys": ["goal_implication"], "candidateIds": [] },
+    { "section": "coachTake", "purpose": "highest_value_remaining_coaching_point", "topicKeys": ["training|leg_extension|heaviest_load"], "candidateIds": ["specific_coaching_observation|4d28b2c87a2b764cb52e4ed75ea1751082f4cd2eaa925b54dbf314840abaf4a6"] },
+    { "section": "confidence", "purpose": "goal_outlook_movement", "topicKeys": ["confidence_movement"], "candidateIds": [] }
+  ],
+  "uncertainty": [
+    { "uncertaintyId": "uncertainty|measurement_coverage|ca0e52a7ef613d92", "type": "measurement_coverage", "materiality": "high", "surfaced": false, "suppressionReason": "strategy_feasibility_demonstrated_measurement_gap_not_decision_relevant" },
+    { "uncertaintyId": "uncertainty|persistence|3ef7d1ce8162ef26", "type": "persistence", "materiality": "high", "surfaced": false, "suppressionReason": "covered_by_next_evidence_purpose" },
+    { "uncertaintyId": "uncertainty|causal_attribution|ed024df86b0e8926", "type": "causal_attribution", "materiality": "moderate", "surfaced": false, "suppressionReason": "attribution_is_not_the_next_evidence_purpose" },
+    { "uncertaintyId": "uncertainty|guardrail|d117208ae5dc8b78", "type": "guardrail", "materiality": "moderate", "surfaced": false, "suppressionReason": "guardrail_not_relevant_to_current_recommendation" },
+    { "uncertaintyId": "uncertainty|energy_intake_uncertainty|cde5271419d5f36b", "type": "energy_intake_uncertainty", "domain": "energy", "materiality": "moderate", "recommendationEffect": "temper", "surfaced": true, "surfacedIn": "watch" },
+    { "uncertaintyId": "uncertainty|energy_wearable_estimate|16dd7dcb72b761eb", "type": "energy_wearable_estimate", "domain": "energy", "materiality": "moderate", "recommendationEffect": "temper", "surfaced": true, "surfacedIn": "watch" },
+    { "uncertaintyId": "uncertainty|energy_pairing_incomplete|22871e732f5b97d6", "type": "energy_pairing_incomplete", "domain": "energy", "materiality": "moderate", "recommendationEffect": "temper", "surfaced": true, "surfacedIn": "watch" }
+  ],
+  "claims": {
+    "machineLateralRaise90Lb": {
+      "candidateId": "specific_coaching_observation|b23ab648ab1e96f064abdec793607698c2656dac37ce975e42c5d942eb144506",
+      "selected": true,
+      "allocatedSection": "result",
+      "subjectId": "lateral_raise_machine",
+      "subjectLabel": "Lateral Raises Machine",
+      "topicKey": "training|lateral_raise_machine|heaviest_load",
+      "observedAt": "2026-09-22",
+      "metric": "heaviest_load",
+      "value": 90,
+      "previousValue": 85,
+      "unit": "lb",
+      "narrativeText": "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.",
+      "evidenceIds": [
+        "evidence_correction_20260706232319355_training_2026_07_06_traditional_strength_training_3361_237_training_correction",
+        "training_2026-07-13_0802_traditional_strength_training",
+        "training_2026-07-27_traditional_strength_training",
+        "training_2026-08-04_0759_traditional_strength_training_001",
+        "training_2026-08-25_traditional_strength_training_0659",
+        "training_logger_session_54D6CC99-0EE8-4C34-B035-5B1FD1B487E9",
+        "training_logger_session_E017D899-55F6-4983-8F14-022AD7DBE809",
+        "training_logger_session_training_logger_17557b63-1957-478f-b6ed-c8aafd7ef67e",
+        "training_logger_session_training_logger_4ff00451-71fb-467c-9c76-8ce8f523ecf4",
+        "training_logger_session_training_logger_5e867109-0b79-4ef8-b100-804d51935b02",
+        "training_logger_session_training_logger_cf4f9855-bb5f-4dda-9b41-33dc29da1bf3"
+      ],
+      "currentSetSummary": { "performedSets": 4, "repsPerSet": 10, "weight": 90, "unit": "lb" },
+      "coherence": {
+        "subjectMatches": true,
+        "currentEvidenceBound": true,
+        "previousEvidenceBound": true,
+        "metricCurrentMatch": true,
+        "metricPreviousMatch": true,
+        "internallyCoherent": true
+      },
+      "transportCaveat": "The full remote fixture contained the exact resolved session array, but the local Codex transcript clipped its middle. The evidence/session IDs, current set values, and remote-computed coherence verdict survived; the clipped storage IDs and row versions are not reconstructed here."
+    },
+    "legExtensions90Lb": {
+      "candidateId": "specific_coaching_observation|4d28b2c87a2b764cb52e4ed75ea1751082f4cd2eaa925b54dbf314840abaf4a6",
+      "selected": true,
+      "allocatedSection": "coachTake",
+      "subjectId": "leg_extension",
+      "subjectLabel": "Leg Extensions",
+      "topicKey": "training|leg_extension|heaviest_load",
+      "observedAt": "2026-09-21",
+      "metric": "heaviest_load",
+      "value": 90,
+      "previousValue": 80,
+      "unit": "lb",
+      "narrativeText": "Leg extensions reached 90 lb, up from the previous best of 80 lb.",
+      "evidenceIds": [
+        "applefitness_training_2026-08-24_0728",
+        "training_2026-07-10_traditional_strength_training_06-48",
+        "training_2026-07-14_traditional_strength_training_1702-1801",
+        "training_2026-07-28_traditional_strength_training_0739",
+        "training_2026-08-03_TraditionalStrengthTraining_0650",
+        "training_2026-08-25_traditional_strength_training_0659",
+        "training_20260723_tradstr_training_0646_0804",
+        "training_logger_session_36DA022C-2400-4E26-A767-224C27933A2A",
+        "training_logger_session_A5936FA6-FEE7-4BAA-9D84-9E0034BDC8A6",
+        "training_logger_session_training_logger_18a637ae-70cc-4ec8-8b6d-223740292314"
+      ],
+      "resolvedSessionCount": 10,
+      "currentSession": {
+        "storageRecordId": "@index:559",
+        "canonicalId": "training|authoritative|training_logger_draft_36DA022C-2400-4E26-A767-224C27933A2A",
+        "sessionId": "training_logger_session_36DA022C-2400-4E26-A767-224C27933A2A",
+        "databaseVersion": 4,
+        "payloadVersion": 4,
+        "observedDate": "2026-09-21",
+        "performedSets": 4,
+        "repsPerSet": 15,
+        "weight": 90,
+        "unit": "lb"
+      },
+      "previousSession": {
+        "storageRecordId": "@index:507",
+        "canonicalId": "training|authoritative|training_logger_draft_A5936FA6-FEE7-4BAA-9D84-9E0034BDC8A6",
+        "sessionId": "training_logger_session_A5936FA6-FEE7-4BAA-9D84-9E0034BDC8A6",
+        "databaseVersion": 31,
+        "payloadVersion": 31,
+        "observedDate": "2026-09-14",
+        "performedSets": 4,
+        "repsPerSet": 15,
+        "weight": 80,
+        "unit": "lb"
+      },
+      "coherence": {
+        "subjectMatches": true,
+        "currentEvidenceBound": true,
+        "previousEvidenceBound": true,
+        "metricCurrentMatch": true,
+        "metricPreviousMatch": true,
+        "internallyCoherent": true
+      }
+    }
+  },
+  "adjudication": {
+    "machineLateralRaise90LbInternallyCoherent": true,
+    "legExtensions90LbInternallyCoherent": true,
+    "sameCandidate": false,
+    "valueOnlyRelabelIndicated": false,
+    "allocationFinding": "Machine Lateral Raise was selected for Result; Leg Extensions was independently selected for Coach's Take.",
+    "nutritionActivityShapeFinding": "Nutrition and Activity are represented inside the structured Energy module rather than as standalone frozen modules."
+  },
+  "remoteEmittedFullFixtureDigest": "518c8043d2a493bfe2eb437cfc045345574bf7e448d31c591d01c3411669bd11",
+  "productionMutation": false
+}
