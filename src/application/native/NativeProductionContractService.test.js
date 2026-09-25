@@ -703,4 +703,11 @@ describe("Native daily-driver local day (travel)", () => {
     expect(current.readers.core.getHome).toHaveBeenCalledWith();
     expect(current.readers.core.getMorningCheckIn).toHaveBeenCalledWith();
   });
+  it("validates the Training Day zone instead of passing any string to SQL", async () => {
+    const current = fixture();
+    await current.service.read({ request: request(), resource: "training-day", input: { date: "2026-09-23", timeZone: "Mars/Base" } });
+    expect(current.readers.training.getDay).toHaveBeenLastCalledWith({ date: "2026-09-23", timeZone: null });
+    await current.service.read({ request: request(), resource: "training-day", input: { date: "2026-09-23", timeZone: "America/Chicago" } });
+    expect(current.readers.training.getDay).toHaveBeenLastCalledWith({ date: "2026-09-23", timeZone: "America/Chicago" });
+  });
 });

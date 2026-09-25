@@ -72,7 +72,8 @@ export function createTrainingNavigationReadService({
           (record.payload ?? record).evidence_type === "training"
         );
         const evidencePackages = hasCanonicalTraining ? [] : await store.listEvidencePackages();
-        const canonicalEvidenceObjects = withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user);
+        const canonicalEvidenceObjects = withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user,
+          { evidencePackages, logger, event: "training.reporting.healthkit_cardio_unavailable" });
         const { globalReport, scopedReport } = createTrainingReportingReports({
           canonicalEvidenceObjects,
           dateWindow: timeline.goalScoped
@@ -122,7 +123,8 @@ export function createTrainingNavigationReadService({
         const evidencePackages = hasCanonicalTraining
           ? []
           : await store.listEvidencePackages();
-        const canonicalEvidenceObjects = withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user);
+        const canonicalEvidenceObjects = withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user,
+          { evidencePackages, logger, event: "training.landing.healthkit_cardio_unavailable" });
         const { globalReport, scopedReport } = createTrainingLandingReports({
           canonicalEvidenceObjects,
           dateWindow: timeline.goalScoped
@@ -184,7 +186,6 @@ export function createTrainingNavigationReadService({
             ? listPresentableHealthKitCardioWorkouts(store, logger, "training.library.healthkit_cardio_unavailable")
             : [],
         ]);
-        const canonicalEvidenceObjects = withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user);
         const timeline = createTrainingEvidenceContext({
           context,
           currentDate,
@@ -197,6 +198,8 @@ export function createTrainingNavigationReadService({
         const evidencePackages = hasCanonicalTraining
           ? []
           : await store.listEvidencePackages();
+        const canonicalEvidenceObjects = withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user,
+          { evidencePackages, logger, event: "training.library.healthkit_cardio_unavailable" });
         const activitySlug = path[0] === "cardio" && path.length >= 2
           ? path[1]
           : null;
@@ -329,17 +332,28 @@ async function listPresentableHealthKitCardioWorkouts(store, logger, event) {
   }
 }
 
-function withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user) {
-  if (!healthKitCardioWorkouts?.length) return evidenceObjects;
-  return [
-    ...evidenceObjects,
-    ...projectPresentedHealthKitCardioTrainingRecords({
-      canonicalWorkouts: healthKitCardioWorkouts,
-      existingEvidenceObjects: evidenceObjects,
-      // Training Day's own zone resolution for evidence local dates.
-      timeZone: user?.timezone ?? user?.timeZone ?? null,
-    }),
-  ];
+// `evidencePackages` non-empty means the legacy (pre-canonical) package path is
+// active: the reports drop package training once ANY canonical training record is
+// present, and duplicate suppression is never judged against package workouts, so
+// that path keeps its evidence-only history. A projection failure (e.g. a
+// malformed stored record) degrades exactly like Training Day: observable warning,
+// evidence-only history, never a failed Training read.
+function withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user, { evidencePackages = [], logger = null, event } = {}) {
+  if (!healthKitCardioWorkouts?.length || evidencePackages.length > 0) return evidenceObjects;
+  try {
+    return [
+      ...evidenceObjects,
+      ...projectPresentedHealthKitCardioTrainingRecords({
+        canonicalWorkouts: healthKitCardioWorkouts,
+        existingEvidenceObjects: evidenceObjects,
+        // Training Day's own zone resolution for evidence local dates.
+        timeZone: user?.timezone ?? "America/Los_Angeles",
+      }),
+    ];
+  } catch (error) {
+    warnHealthKitCardioFailure(logger, event, error);
+    return evidenceObjects;
+  }
 }
 
 async function loadHealthKitCardioSession(store, sessionId, logger = null) {

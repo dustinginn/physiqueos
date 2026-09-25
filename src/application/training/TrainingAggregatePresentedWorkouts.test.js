@@ -244,6 +244,27 @@ describe("Recent Training History presents Training Day's workout universe", () 
     expect(warn).toHaveBeenCalledWith("training.landing.healthkit_cardio_unavailable", { errorName: "Error", errorCode: "ECONNRESET" });
   });
 
+  it("a malformed stored workout degrades every aggregate surface to evidence-only history instead of failing", async () => {
+    const malformed = { ...SEP23_WALKS[0], coexistence: { state: "matches_existing_evidence_workout", candidates: "not-an-array" } };
+    const warn = vi.fn();
+    const svc = service(fakeStore({ workouts: [malformed, ...SEP24_WALKS] }), { warn });
+    const { report } = await svc.getLanding({ context: "all" });
+    expect(dayOf(report, "2026-09-23").summary).toBe("1 session");
+    await expect(svc.getReporting({ context: "all" })).resolves.toBeTruthy();
+    await expect(svc.getLibrary({ context: "all" })).resolves.toBeTruthy();
+    expect(warn).toHaveBeenCalledWith("training.landing.healthkit_cardio_unavailable", expect.objectContaining({ errorName: "TypeError" }));
+    expect(warn).toHaveBeenCalledWith("training.reporting.healthkit_cardio_unavailable", expect.anything());
+    expect(warn).toHaveBeenCalledWith("training.library.healthkit_cardio_unavailable", expect.anything());
+  });
+
+  it("the legacy evidence-package path (no canonical training) keeps its package history", async () => {
+    const packageWalk = { id: "pkg-walk-1", evidence_type: "training", observed_at: "2026-08-01", exercises: [],
+      metadata: { activity_type: "Outdoor Walk", duration_seconds: 900 }, source: { source_artifact_refs: ["evidence_submission_P_images_file_1"] } };
+    const store = { ...fakeStore({ evidence: [] }), listEvidencePackages: async () => [{ id: "pkg-1", evidence_objects: [packageWalk] }] };
+    const { report } = await service(store).getLanding({ context: "all" });
+    expect(dayOf(report, "2026-08-01")?.summary).toBe("1 session");
+  });
+
   it("the Native landing projection stays decoder-compatible and small", async () => {
     const landing = await service(fakeStore()).getLanding({ context: "all" });
     const projected = projectNativeTrainingLandingRead(landing);

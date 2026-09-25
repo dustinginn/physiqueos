@@ -143,7 +143,7 @@ export function createNativeProductionContractService({
           });
           break;
         }
-        case "training-day": data = await readers.training.getDay({ date: dateKey(input.date, "date"), timeZone: input.timeZone || null }); break;
+        case "training-day": data = await readers.training.getDay({ date: dateKey(input.date, "date"), timeZone: resolveRequestedTimeZone(input.timeZone) }); break;
         case "training-session": data = await readers.training.getSession({ sessionId: required(input.sessionId, "sessionId") }); break;
         case "training-exercise": data = await readers.training.getExercise({ context, currentDate, exerciseSlug: required(input.exerciseId, "exerciseId") }); break;
         case "nutrition": data = projectNativeNutritionRead(await readers.progress.getNutrition({ context, currentDate })); break;
