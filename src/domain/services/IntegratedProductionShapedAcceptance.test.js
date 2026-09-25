@@ -1040,7 +1040,7 @@ describe("Monthly stays on day 1; event-driven DEXA/Photo never enter the settle
       "domain/services/BriefingCadenceSettlementGate.js",
       "domain/services/BriefingEvidenceSettlementArtifact.js",
       "domain/services/BriefingSettlementObservability.js",
-      "testSupport/briefingSettlementWorld.js",
+      "fixtures/briefingSettlementWorld.js",
     ]);
     // The Gate is the only consumer of the policy module (besides tests).
     expect(fs.readFileSync(path.join(root, "domain/services/BriefingCadenceSettlementGate.js"), "utf8"))

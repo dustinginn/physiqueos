@@ -4,7 +4,7 @@ import { BRIEFING_CADENCE_CATCH_UP_POLICY } from "./BriefingCadenceRegistryServi
 import { BriefingSettlementEvent as E } from "./BriefingEvidenceSettlementPolicy.js";
 import {
   at, createWorker, DEADLINE, hkDay, hkRecords,
-} from "../../testSupport/briefingSettlementWorld.js";
+} from "../../fixtures/briefingSettlementWorld.js";
 
 // REQUIRED CONCURRENCY VERIFICATION (deterministic interleaving).
 //

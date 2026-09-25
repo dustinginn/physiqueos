@@ -7,7 +7,7 @@ import { BriefingSettlementEvent } from "./BriefingEvidenceSettlementPolicy.js";
 import { createBriefingSettlementObserver } from "./BriefingSettlementObservability.js";
 import {
   at, createSettlementWorld, createWorker, DEADLINE, flakyRecords, hkDay, hkRecords, OWNER,
-} from "../../testSupport/briefingSettlementWorld.js";
+} from "../../fixtures/briefingSettlementWorld.js";
 
 // LIVE SETTLEMENT OBSERVABILITY: every assertion here is on the REAL logger
 // calls made by the REAL executor path (real gate, reader, generator, artifact
@@ -295,7 +295,7 @@ describe("redaction and vocabulary discipline", () => {
         const full = path.join(directory, entry.name);
         if (entry.isDirectory()) { walk(full); continue; }
         if (!/\.(?:js|mjs)$/u.test(entry.name) || /\.test\.(?:js|mjs)$/u.test(entry.name)) continue;
-        if (/testSupport/u.test(full)) continue;
+        if (/testSupport|[\\/]fixtures[\\/]/u.test(full)) continue;
         if (/["'`]briefing_settlement\./u.test(fs.readFileSync(full, "utf8"))) offenders.push(path.relative(root, full));
       }
     };

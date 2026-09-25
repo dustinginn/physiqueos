@@ -6,7 +6,7 @@ import { createBriefingCadenceSettlementGate } from "./BriefingCadenceSettlement
 import { COVERAGE_UNKNOWN_READ_FAILED } from "./BriefingEvidenceSettlementPolicy.js";
 import {
   at, createSettlementWorld, createWorker, DEADLINE, flakyRecords, hkRecords, MIDWEEK_DUE,
-} from "../../testSupport/briefingSettlementWorld.js";
+} from "../../fixtures/briefingSettlementWorld.js";
 
 // BLOCKER 3: a settlement coverage/read error must FAIL CLOSED before the hard
 // deadline. Only the explicit hard deadline may authorize generation while the

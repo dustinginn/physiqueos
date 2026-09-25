@@ -3,7 +3,7 @@ import { createDailyBriefingRepository } from "../../data/repositories/DailyBrie
 import { HEALTHKIT_CANONICAL_DAY_COLLECTION } from "./HealthKitGraduation.js";
 import {
   at, createSettlementWorld, DAILY_DATE, DEADLINE, hkDay, hkRecords, MIDWEEK_DUE, OWNER, repositoriesFor, TZ,
-} from "../../testSupport/briefingSettlementWorld.js";
+} from "../../fixtures/briefingSettlementWorld.js";
 import { createMidweekBriefingService } from "./MidweekBriefingService";
 import { createMonthlyBriefingService } from "./MonthlyBriefingService";
 import { createWeeklyNarrativeService } from "./WeeklyNarrativeService";
