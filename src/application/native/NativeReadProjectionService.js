@@ -53,6 +53,55 @@ export function projectNativeTrainingReportingRead({ timeline, presentation } = 
   });
 }
 
+// Training landing and library responses are the shared Progress reports, which
+// also carry the full session history (`entries`, and every session inside
+// `trainingDays`) and `trainingBreakdowns`. Native decodes none of that: a
+// production landing read was 1.65 MB, of which ~0.9 MB were never decoded, and
+// Evidence Hub plus every Training visit download it. These allowlists are
+// exactly the keys Native (Build 60, `ProductionDailyDriverAPI` LandingPayload /
+// LibraryPayload / TrainingSessionPreview) decodes, plus `href`, which the
+// envelope turns into `destination`. Values are passed through unchanged.
+const NATIVE_TRAINING_LANDING_REPORT_KEYS = new Set([
+  "title", "subtitle", "tone", "latestTrainingDay", "reportingLinks", "trainingDays",
+  "currentProtocol", "relatedGoals", "sourceEvidence",
+]);
+const NATIVE_TRAINING_DAY_KEYS = new Set(["date", "label", "summary", "href", "destination", "sessions"]);
+const NATIVE_TRAINING_SESSION_PREVIEW_KEYS = new Set([
+  "id", "label", "value", "detail", "date", "sourceEvidence", "href", "destination",
+]);
+const NATIVE_TRAINING_LIBRARY_REPORT_KEYS = new Set(["canonicalExercises"]);
+
+export function projectNativeTrainingLandingRead({ timeline, report, ...rest } = {}) {
+  const projectedReport = pick(report, NATIVE_TRAINING_LANDING_REPORT_KEYS);
+  if (Array.isArray(projectedReport.trainingDays)) {
+    projectedReport.trainingDays = Object.freeze(projectedReport.trainingDays.map(projectTrainingDay));
+  }
+  if (projectedReport.latestTrainingDay && typeof projectedReport.latestTrainingDay === "object") {
+    projectedReport.latestTrainingDay = projectTrainingDay(projectedReport.latestTrainingDay);
+  }
+  return Object.freeze({ ...rest, timeline, report: Object.freeze(projectedReport) });
+}
+
+export function projectNativeTrainingLibraryRead({ report, ...rest } = {}) {
+  return Object.freeze({ ...rest, report: Object.freeze(pick(report, NATIVE_TRAINING_LIBRARY_REPORT_KEYS)) });
+}
+
+function projectTrainingDay(day) {
+  if (!day || typeof day !== "object") return day;
+  const projected = pick(day, NATIVE_TRAINING_DAY_KEYS);
+  if (Array.isArray(projected.sessions)) {
+    projected.sessions = Object.freeze(projected.sessions.map((session) =>
+      session && typeof session === "object" ? Object.freeze(pick(session, NATIVE_TRAINING_SESSION_PREVIEW_KEYS)) : session));
+  }
+  return Object.freeze(projected);
+}
+
+// Keeps the source key order, so href/destination resolve exactly as before.
+function pick(value, keys) {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(Object.entries(value).filter(([key]) => keys.has(key)));
+}
+
 function projectPhotoSession(session) {
   return Object.freeze({
     sessionId: session.id,

@@ -6,6 +6,8 @@ import { nativeProductionContractManifest, NativeProductionResource } from "./na
 import { projectNativeMediaReferences } from "./nativeMediaProjection.js";
 import { createProviderEnergyEvidenceReport } from "../../domain/services/EnergyEvidenceService.js";
 import {
+  projectNativeTrainingLandingRead,
+  projectNativeTrainingLibraryRead,
   projectNativeTrainingReportingRead,
   projectNativeWeightRead,
 } from "./NativeReadProjectionService.js";
@@ -109,7 +111,9 @@ export function createNativeProductionContractService({
           break;
         }
         case "training-logger": data = await readers.core.getTrainingLogger(); break;
-        case "training-landing": data = await readers.training.getLanding({ context, currentDate }); break;
+        case "training-landing": data = projectNativeTrainingLandingRead(
+          await readers.training.getLanding({ context, currentDate }),
+        ); break;
         case "training-reporting": {
           const reporting = await readers.training.getReporting({ context, currentDate });
           data = projectNativeTrainingReportingRead(reporting);
@@ -124,7 +128,7 @@ export function createNativeProductionContractService({
           ]);
           if (!library || !Array.isArray(myLibraryExerciseIds)) throw unavailableResource();
           const membership = new Set(myLibraryExerciseIds);
-          data = {
+          data = projectNativeTrainingLibraryRead({
             ...library,
             myLibraryExerciseIds,
             report: {
@@ -132,7 +136,7 @@ export function createNativeProductionContractService({
               canonicalExercises: library.report.canonicalExercises.filter((exercise) =>
                 libraryScope === "all" || membership.has(exercise.canonicalExerciseId)),
             },
-          };
+          });
           break;
         }
         case "training-day": data = await readers.training.getDay({ date: dateKey(input.date, "date"), timeZone: input.timeZone || null }); break;
