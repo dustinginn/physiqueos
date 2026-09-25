@@ -96,7 +96,7 @@ export function repositoriesFor(artifactRecords) {
 // logger call in order with its level.
 export function createWorker({
   name = "worker", artifactRecords, hk, lock = null, generatorWrap = null, executionStore = null,
-  readerHk = null, logs = [],
+  readerHk = null, logs = [], settlementObserver = null,
 } = {}) {
   const repositories = repositoriesFor(artifactRecords);
   let clock = new Date(at(5));
@@ -126,6 +126,7 @@ export function createWorker({
       },
     },
     executionLock: lock ?? { async acquire() { return { acquired: true, async release() {} }; } },
+    ...(settlementObserver ? { settlementObserver } : {}),
     source: `${name}-test`,
   });
   return {
@@ -147,9 +148,9 @@ export function createWorker({
 }
 
 // Single-worker convenience world (the Blocker 1 / Blocker 3 / observability suites).
-export function createSettlementWorld({ hk = hkRecords(), readerHk = null, lock = null, generatorWrap = null } = {}) {
+export function createSettlementWorld({ hk = hkRecords(), readerHk = null, lock = null, generatorWrap = null, settlementObserver = null } = {}) {
   const artifactRecords = [];
   const logs = [];
-  const worker = createWorker({ artifactRecords, hk, readerHk, lock, generatorWrap, logs });
+  const worker = createWorker({ artifactRecords, hk, readerHk, lock, generatorWrap, logs, settlementObserver });
   return Object.assign(worker, { hk, artifactRecords });
 }

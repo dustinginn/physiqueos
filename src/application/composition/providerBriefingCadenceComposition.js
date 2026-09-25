@@ -24,6 +24,7 @@ import {
 import { createHealthKitGraduationReader } from "../../platform/database/HealthKitGraduationReader.js";
 import { HealthKitGraduationPurpose } from "../../domain/services/HealthKitGraduation.js";
 import { createBriefingCadenceSettlementGate } from "../../domain/services/BriefingCadenceSettlementGate.js";
+import { createBriefingSettlementObserver } from "../../domain/services/BriefingSettlementObservability.js";
 
 export function createProviderBriefingCadenceRunner({
   pool,
@@ -56,6 +57,10 @@ export function createProviderBriefingCadenceRunner({
   const settlementGate = createBriefingCadenceSettlementGate({
     healthKitGraduationReader: healthKitGraduation,
   });
+  // One observer per worker process: its dedup memory (window_closed once per
+  // window, no repeated readiness_satisfied, ...) must outlive a single tick,
+  // and this runner builds a fresh executor every tick.
+  const settlementObserver = createBriefingSettlementObserver({ logger });
   return Object.freeze({
     async execute({ asOf = now() } = {}) {
       // Reset the shared reader's per-run policy memo before ANY read this
@@ -133,6 +138,7 @@ export function createProviderBriefingCadenceRunner({
         },
         settlementGate,
         logger,
+        settlementObserver,
       });
       return executor.execute({ userId: ownerUserId, asOf });
     },

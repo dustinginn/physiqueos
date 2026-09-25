@@ -294,16 +294,25 @@ export function recordDeviceCloseoutReceiptV1({
 //
 // One canonical event vocabulary, cadence-agnostic, so future delivery-
 // timing tuning can query/aggregate these deterministically regardless of
-// which cadence or domain triggered them. Emission (actually logging these
-// at the right call sites) is the next integration step once this policy is
-// wired into the live generation trigger — see the accompanying report's
-// integration-boundary note.
+// which cadence or domain triggered them. These are LIVE: the executor
+// emits them through BriefingSettlementObservability.js (see that module for
+// where each is emitted and its dedup rule). Every emission site uses these
+// constants — never a string literal.
+//
+// CLOSEOUT_REQUESTED is declared for the eventual Native/endpoint path and is
+// deliberately NOT emitted by the Server today (no closeout request/receipt
+// path exists); CLOSEOUT_ELIGIBLE is the honest Server-side signal.
 export const BriefingSettlementEvent = Object.freeze({
   WINDOW_CLOSED: "briefing_settlement.window_closed",
   CLOSEOUT_REQUESTED: "briefing_settlement.closeout_requested",
   CLOSEOUT_ELIGIBLE: "briefing_settlement.closeout_eligible",
   LATEST_RELEVANT_REVISION_RECEIVED: "briefing_settlement.latest_relevant_revision_received",
+  READINESS_CHECKED: "briefing_settlement.readiness_checked",
+  AWAITING_SETTLEMENT: "briefing_settlement.awaiting_settlement",
   READINESS_SATISFIED: "briefing_settlement.readiness_satisfied",
+  SETTLEMENT_NOT_APPLICABLE: "briefing_settlement.settlement_not_applicable",
+  COVERAGE_READ_FAILED: "briefing_settlement.coverage_read_failed",
+  SETTLEMENT_GATE_ERROR: "briefing_settlement.settlement_gate_error",
   BRIEFING_GENERATED: "briefing_settlement.briefing_generated",
   BRIEFING_PUBLISHED: "briefing_settlement.briefing_published",
   DEADLINE_FALLBACK_USED: "briefing_settlement.deadline_fallback_used",

@@ -1031,13 +1031,15 @@ describe("Monthly stays on day 1; event-driven DEXA/Photo never enter the settle
     };
     walk(root);
     // BriefingEvidenceSettlementArtifact.js (Blocker 1: builds/attaches/freezes the persisted
-    // watermark for the recurring cadences) and the shared test world are the only additions;
-    // neither is a DEXA/Photo/event module (asserted below).
+    // watermark for the recurring cadences), BriefingSettlementObservability.js (live lifecycle
+    // emission) and the shared test world are the only additions; none is a DEXA/Photo/event
+    // module (asserted below).
     expect(importers.sort()).toEqual([
       "application/composition/providerBriefingCadenceComposition.js",
       "domain/services/BriefingCadenceExecutorService.js",
       "domain/services/BriefingCadenceSettlementGate.js",
       "domain/services/BriefingEvidenceSettlementArtifact.js",
+      "domain/services/BriefingSettlementObservability.js",
       "testSupport/briefingSettlementWorld.js",
     ]);
     // The Gate is the only consumer of the policy module (besides tests).

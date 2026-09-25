@@ -1,5 +1,6 @@
-import { createSettlementGeneratorInput } from "./BriefingEvidenceSettlementArtifact.js";
+import { createSettlementGeneratorInput, readEvidenceSettlement } from "./BriefingEvidenceSettlementArtifact.js";
 import { SettlementReasonCode } from "./BriefingEvidenceSettlementPolicy.js";
+import { createBriefingSettlementObserver } from "./BriefingSettlementObservability.js";
 import {
   BRIEFING_CADENCE_CATCH_UP_POLICY,
   resolveBriefingCadenceRegistry,
@@ -28,7 +29,12 @@ export function createBriefingCadenceExecutor({
   policy = BRIEFING_CADENCE_CATCH_UP_POLICY,
   settlementGate = null,
   logger = null,
+  // Owns the settlement lifecycle log emission AND its dedup memory. A
+  // long-lived worker passes ONE observer shared across per-tick executors
+  // (the provider composition does); a bare executor gets its own.
+  settlementObserver = null,
 } = {}) {
+  const observer = settlementObserver ?? createBriefingSettlementObserver({ logger });
   return {
     async execute({ userId = null, asOf = now() } = {}) {
       const runId = executionStore.createExecutionId();
@@ -61,7 +67,7 @@ export function createBriefingCadenceExecutor({
             source,
             runtimeIdentity,
             settlementGate,
-            logger,
+            observer,
           });
           retainLock ||= outcome.retainLock === true;
           outcomes.push(outcome);
@@ -93,7 +99,7 @@ async function evaluateEntry({
   source,
   runtimeIdentity,
   settlementGate,
-  logger,
+  observer,
 }) {
   const started = Date.now();
   const base = {
@@ -192,10 +198,7 @@ async function evaluateEntry({
       // closed internally). Anything else that escapes must still fail CLOSED
       // and stay per-entry: retry next tick, never generate, never abort the
       // other cadences in this tick.
-      logger?.warn?.("briefing_settlement.settlement_gate_error", {
-        cadenceKey: entry.cadence, userId: entry.userId, reasonCode: SettlementReasonCode.GATE_ERROR,
-        errorName: String(error?.name ?? "Error").slice(0, 80), errorCode: String(error?.code ?? "UNCLASSIFIED_ERROR").slice(0, 80),
-      });
+      observer.observeGateError({ entry, error });
       return finish("awaiting_evidence_settlement", {
         ...base,
         artifactOutcome: "none",
@@ -204,17 +207,7 @@ async function evaluateEntry({
         retryability: true,
       });
     }
-    if (settlement.coverageReadFailed) {
-      logger?.warn?.("briefing_settlement.coverage_read_failed", {
-        cadenceKey: entry.cadence, userId: entry.userId, reasonCode: settlement.reasonCode, action: settlement.action,
-        readErrorStage: settlement.readError?.stage ?? null, readErrorName: settlement.readError?.name ?? null,
-        readErrorCode: settlement.readError?.code ?? null, hardDeadlineAt: settlement.hardDeadlineAt ?? null,
-      });
-    }
-    logger?.info?.(settlementEventName(settlement), {
-      cadenceKey: entry.cadence, userId: entry.userId,
-      reasonCode: settlement.reasonCode, unsettledDomains: settlement.unsettledDomains ?? [],
-    });
+    observer.observeCheck({ entry, decision: settlement, asOf });
     if (settlement.action !== "generate") {
       return finish("awaiting_evidence_settlement", {
         ...base,
@@ -273,20 +266,24 @@ async function evaluateEntry({
   }
   const result = timed.value;
   if (result?.state === "completed") {
-    if (!result.idempotent) {
-      logger?.info?.("briefing_settlement.briefing_generated", {
-        cadenceKey: entry.cadence, userId: entry.userId,
-        artifactId: result.artifact?.id ?? entry.expectedArtifactId,
-        settlementReasonCode: base.settlementReasonCode ?? null,
-      });
-      logger?.info?.("briefing_settlement.briefing_published", {
-        cadenceKey: entry.cadence, userId: entry.userId,
-        artifactId: result.artifact?.id ?? entry.expectedArtifactId,
+    // "Created by THIS attempt" — not merely "the generator said completed". An
+    // idempotent/matched/duplicate result, or a returned artifact whose persisted
+    // watermark is not the one this attempt built (another worker published the
+    // occurrence first, so the existing artifact and its watermark won), must not
+    // emit a second generated/published lifecycle.
+    const artifactWatermark = readEvidenceSettlement(result.artifact);
+    const supersededByExisting = Boolean(settlementInput && artifactWatermark &&
+      artifactWatermark.integrity?.digest !== settlementInput.watermark.integrity.digest);
+    const created = !result.idempotent && !supersededByExisting;
+    if (created && settlementGate) {
+      observer.observeCreated({
+        entry, artifactId: result.artifact?.id ?? entry.expectedArtifactId,
+        decision: settlementInput?.decision, watermark: settlementInput?.watermark, asOf,
       });
     }
-    return finish(result.idempotent ? "already_completed" : "generation_completed", {
+    return finish(created ? "generation_completed" : "already_completed", {
       ...base,
-      artifactOutcome: result.idempotent ? "matched" : "created",
+      artifactOutcome: created ? "created" : "matched",
       artifactId: result.artifact?.id ?? entry.expectedArtifactId,
       retryability: false,
     });
@@ -342,20 +339,6 @@ async function evaluateEntry({
     await executionStore.record(record);
     return record;
   }
-}
-
-// Event name selection is keyed on the settlement decision's actual reason,
-// not just the coarse wait/generate action — a "generate" outcome reached by
-// hitting the hard deadline or because the gate did not apply at all is
-// never labeled the same as ordinary readiness, so filtering by event name
-// alone (not just the reasonCode payload field) distinguishes them.
-function settlementEventName(settlement) {
-  if (settlement.action !== "generate") return "briefing_settlement.awaiting_settlement";
-  if (settlement.reasonCode === "hard_deadline_reached") return "briefing_settlement.deadline_fallback_used";
-  if (settlement.reasonCode === "no_healthkit_backed_domains_settlement_not_applicable") {
-    return "briefing_settlement.settlement_not_applicable";
-  }
-  return "briefing_settlement.readiness_satisfied";
 }
 
 function withTimeout(operation, timeoutMs) {

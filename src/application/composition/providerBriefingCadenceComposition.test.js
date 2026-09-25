@@ -6,6 +6,9 @@ vi.mock("../../domain/services/BriefingCadenceExecutorService", () => ({
     async execute() {
       captured.repositories = options.repositories;
       captured.generators = options.generators;
+      captured.settlementObserver = options.settlementObserver;
+      captured.settlementGate = options.settlementGate;
+      captured.logger = options.logger;
       // Mimic the one real-executor action this file's tests care about:
       // beginTick() is the settlement gate's own per-tick reset. The real
       // executor always calls it; a stub that skipped it would hide a bug
@@ -170,5 +173,62 @@ describe("provider briefing cadence: graduated HealthKit evidence", () => {
     // tick's overlay, not only the runner's first tick.
     expect(tickTwoOverlayIndex).toBeGreaterThan(0);
     expect(readerCallOrder.slice(0, tickTwoOverlayIndex)).toContain("beginRun");
+  });
+});
+
+describe("provider briefing cadence: settlement observability + fail-closed wiring", () => {
+  const authorityStore = { read: async () => ({ state: {
+    authority: "provider-authoritative", workerAuthority: "provider", publicRuntimeAuthority: "provider", canonicalStoreEpoch: "postgres-canonical",
+    firstProviderCanonicalWriteAt: "2026-09-01T00:00:00.000Z", firstProviderCommandId: "cmd",
+  } }) };
+  const runtime = () => ({ user: { id: OWNER, timeZone: "America/Los_Angeles" }, canonicalEvidenceObjects: [] });
+
+  it("hands EVERY tick's executor the SAME settlement observer (its dedup memory outlives a tick) wired to the worker logger", async () => {
+    const policyRecord = policy(on);
+    const pool = { query: async (text, values = []) => {
+      if (/record_id=\$3/.test(text)) return { rows: [{ payload: policyRecord, version: 1 }] };
+      if (values[1] === "healthKitCanonicalDays") return { rows: [] };
+      return { rows: [] };
+    } };
+    const logger = { info() {}, warn() {}, error() {} };
+    const runner = createProviderBriefingCadenceRunner({
+      pool, ownerUserId: OWNER, authorityStore, logger,
+      loadCanonicalRuntime: async () => runtime(),
+      loadCanonicalCommitBindings: async () => ({ mutateCanonicalRuntime: async () => ({}) }),
+    });
+    await runner.execute({ asOf: new Date("2026-09-22T10:00:00.000Z") });
+    const first = captured.settlementObserver;
+    await runner.execute({ asOf: new Date("2026-09-22T10:05:00.000Z") });
+    expect(first).toBeDefined();
+    expect(captured.settlementObserver).toBe(first);
+    expect(captured.logger).toBe(logger);
+  });
+
+  it("a transient read failure during the tick's evidence overlay makes the real gate WAIT (fail closed), not generate", async () => {
+    const policyRecord = policy(on);
+    let failing = true;
+    const pool = { query: async (text, values = []) => {
+      if (/record_id=\$3/.test(text)) return { rows: [{ payload: policyRecord, version: 1 }] };
+      if (values[1] === "healthKitCanonicalDays") {
+        if (failing) throw Object.assign(new Error("connection reset host=db.internal"), { code: "ECONNRESET" });
+        return { rows: [day("activity"), day("nutrition")].map((payload) => ({ payload, version: 1 })) };
+      }
+      return { rows: [] };
+    } };
+    const runner = createProviderBriefingCadenceRunner({
+      pool, ownerUserId: OWNER, authorityStore,
+      loadCanonicalRuntime: async () => runtime(),
+      loadCanonicalCommitBindings: async () => ({ mutateCanonicalRuntime: async () => ({}) }),
+    });
+    await runner.execute({ asOf: new Date("2026-09-22T10:00:00.000Z") });
+    const args = { finalEvidenceDate: DATE, earliestPublishAt: "2026-09-22T10:00:00.000Z", now: "2026-09-22T10:05:00.000Z" };
+    const held = await captured.settlementGate.evaluate(args);
+    expect(held).toMatchObject({ action: "retry", reasonCode: "coverage_read_failed", coverageReadFailed: true });
+    expect(JSON.stringify(held)).not.toMatch(/db\.internal|connection reset/iu);
+    // The store recovers: the next tick's overlay reads cleanly and the same gate proceeds normally.
+    failing = false;
+    await runner.execute({ asOf: new Date("2026-09-22T10:10:00.000Z") });
+    const proceed = await captured.settlementGate.evaluate({ ...args, now: "2026-09-22T10:10:00.000Z" });
+    expect(proceed).toMatchObject({ action: "generate", reasonCode: "readiness_satisfied" });
   });
 });
