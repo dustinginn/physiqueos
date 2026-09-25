@@ -548,7 +548,8 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                     HealthKitSynchronizationStream.heartRate.objectTypeIdentifier,
                     HealthKitSynchronizationStream.walkingRunningDistance.objectTypeIdentifier,
                     HealthKitSynchronizationStream.cyclingDistance.objectTypeIdentifier,
-                ]
+                ],
+                isIndoorWorkout: indoorWorkoutFlag(workout.metadata)
             ))
         } else if let category = sample as? HKCategorySample, stream == .sleepAnalysis {
             payload = .sleep(HealthKitQuerySleep(stageValue: category.value))
@@ -601,6 +602,20 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
     private static func timeZone(for sample: HKSample) -> TimeZone? {
         guard let identifier = sample.metadata?["HKTimeZone"] as? String else { return nil }
         return TimeZone(identifier: identifier)
+    }
+
+    /// Apple's own Indoor/Outdoor distinction for a workout
+    /// (`HKMetadataKeyIndoorWorkout`) -- a separate boolean metadata key,
+    /// not a different `workoutActivityType` raw value (Indoor Walk and
+    /// Outdoor Walk share the same raw value, as do indoor/outdoor running
+    /// and cycling). HealthKit metadata dictionaries can store a boolean as
+    /// either `Bool` or `NSNumber`, so both are checked. `nil` (key absent
+    /// or not boolean) means unknown -- never guessed as `true`/`false`.
+    private static func indoorWorkoutFlag(_ metadata: [String: Any]?) -> Bool? {
+        guard let value = metadata?[HKMetadataKeyIndoorWorkout] else { return nil }
+        if let value = value as? Bool { return value }
+        if let value = value as? NSNumber { return value.boolValue }
+        return nil
     }
 
     private static func allowlistedMetadata(_ metadata: [String: Any]?) -> [String: String] {

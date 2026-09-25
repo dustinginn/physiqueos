@@ -328,6 +328,7 @@
 		0000000000000000000012BB /* HealthKitFounderCanaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012BA /* HealthKitFounderCanaryTests.swift */; };
 		0000000000000000000012BD /* HealthKitAutomaticSynchronizationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012BC /* HealthKitAutomaticSynchronizationCoordinatorTests.swift */; };
 		0000000000000000000012BF /* HealthKitQueryClientDefaultBoundsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012BE /* HealthKitQueryClientDefaultBoundsTests.swift */; };
+		0000000000000000000012C1 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C0 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift */; };
 		0000000000000000000012A3 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012A2 /* HealthKit.framework */; };
 /* End PBXBuildFile section */
 
@@ -671,6 +672,7 @@
 		0000000000000000000012BA /* HealthKitFounderCanaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitFounderCanaryTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012BC /* HealthKitAutomaticSynchronizationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitAutomaticSynchronizationCoordinatorTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012BE /* HealthKitQueryClientDefaultBoundsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitQueryClientDefaultBoundsTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012C0 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitWorkoutIndoorOutdoorFidelityTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001288 /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012A2 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		000000000000000000001272 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1196,6 +1198,7 @@
 				0000000000000000000012BA /* HealthKitFounderCanaryTests.swift */,
 				0000000000000000000012BC /* HealthKitAutomaticSynchronizationCoordinatorTests.swift */,
 				0000000000000000000012BE /* HealthKitQueryClientDefaultBoundsTests.swift */,
+				0000000000000000000012C0 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1683,6 +1686,7 @@
 				0000000000000000000012BB /* HealthKitFounderCanaryTests.swift in Sources */,
 				0000000000000000000012BD /* HealthKitAutomaticSynchronizationCoordinatorTests.swift in Sources */,
 				0000000000000000000012BF /* HealthKitQueryClientDefaultBoundsTests.swift in Sources */,
+				0000000000000000000012C1 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

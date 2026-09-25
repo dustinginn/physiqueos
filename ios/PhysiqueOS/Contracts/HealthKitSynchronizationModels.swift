@@ -132,6 +132,37 @@ struct HealthKitQueryWorkout: Equatable, Codable, Sendable {
     let distanceUnit: String?
     let averageHeartRate: Double?
     let telemetryTypeIdentifiers: [String]
+    /// Apple's own `HKMetadataKeyIndoorWorkout` metadata boolean, read
+    /// through unchanged: `nil` when HealthKit does not carry the key for
+    /// this workout (unknown -- e.g. Strength has no indoor/outdoor
+    /// concept), `true` for indoor, `false` for outdoor. Distinguishes
+    /// Indoor Walk from Outdoor Walk (and similarly indoor/outdoor running
+    /// and cycling), which otherwise share the same `activityType` raw
+    /// value. Never derived from GPS/location/distance/speed/date -- only
+    /// this exact metadata key.
+    let isIndoorWorkout: Bool?
+
+    init(
+        activityType: String,
+        durationSeconds: Double?,
+        activeCalories: Double?,
+        totalCalories: Double?,
+        distance: Double?,
+        distanceUnit: String?,
+        averageHeartRate: Double?,
+        telemetryTypeIdentifiers: [String],
+        isIndoorWorkout: Bool? = nil
+    ) {
+        self.activityType = activityType
+        self.durationSeconds = durationSeconds
+        self.activeCalories = activeCalories
+        self.totalCalories = totalCalories
+        self.distance = distance
+        self.distanceUnit = distanceUnit
+        self.averageHeartRate = averageHeartRate
+        self.telemetryTypeIdentifiers = telemetryTypeIdentifiers
+        self.isIndoorWorkout = isIndoorWorkout
+    }
 }
 
 struct HealthKitQueryActivitySummary: Equatable, Codable, Sendable {
