@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  projectNativeNutritionRead,
   projectNativePhotosRead,
   projectNativeTrainingLandingRead,
   projectNativeTrainingLibraryRead,
@@ -157,5 +158,26 @@ describe("Native Training landing/library projections (performance)", () => {
     expect(projectNativeTrainingLandingRead({ timeline: null, report: { title: "T", trainingDays: [], latestTrainingDay: null } }).report)
       .toEqual({ title: "T", trainingDays: [], latestTrainingDay: null });
     expect(projectNativeTrainingLibraryRead({ report: null }).report).toEqual({});
+  });
+});
+
+describe("Native Nutrition projection (performance)", () => {
+  it("keeps exactly the report keys Native decodes and drops the duplicate entries history", () => {
+    const day = { id: "nutrition-1", date: "2026-09-24", totals: { calories: 2400 }, meals: [{ id: "m1" }] };
+    const nutrition = {
+      timeline: { contextId: "all" },
+      report: {
+        id: "nutrition", title: "Nutrition", subtitle: "s", tone: "evidence", status: "x", metric: "1", trend: "up",
+        latestNutrition: day, nutritionDays: [day], entries: [day, day], nutritionLibrary: [{ id: "calories" }],
+        nutritionReportingLinks: [{ id: "macros", href: "/progress/nutrition/reporting/macros" }], dataSources: [{ id: "a" }],
+        relatedGoals: [], currentNutritionProtocol: {}, reportPattern: "p", destination: {}, lastUpdated: "2026-09-24",
+      },
+    };
+    const projected = projectNativeNutritionRead(nutrition);
+    expect(projected.timeline).toBe(nutrition.timeline);
+    expect(Object.keys(projected.report)).toEqual([
+      "title", "subtitle", "tone", "nutritionDays", "nutritionLibrary", "nutritionReportingLinks", "dataSources",
+    ]);
+    for (const key of Object.keys(projected.report)) expect(projected.report[key]).toBe(nutrition.report[key]);
   });
 });

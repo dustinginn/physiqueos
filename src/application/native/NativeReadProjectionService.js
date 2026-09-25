@@ -70,6 +70,15 @@ const NATIVE_TRAINING_SESSION_PREVIEW_KEYS = new Set([
   "id", "label", "value", "detail", "date", "sourceEvidence", "href", "destination",
 ]);
 const NATIVE_TRAINING_LIBRARY_REPORT_KEYS = new Set(["canonicalExercises"]);
+// Nutrition carries every day twice: `nutritionDays` (decoded) and `entries`
+// (632 KB of a 1.27 MB production read, never decoded by Native).
+const NATIVE_NUTRITION_REPORT_KEYS = new Set([
+  "title", "subtitle", "tone", "nutritionDays", "nutritionLibrary", "nutritionReportingLinks", "dataSources",
+]);
+
+export function projectNativeNutritionRead({ report, ...rest } = {}) {
+  return Object.freeze({ ...rest, report: Object.freeze(pick(report, NATIVE_NUTRITION_REPORT_KEYS)) });
+}
 
 export function projectNativeTrainingLandingRead({ timeline, report, ...rest } = {}) {
   const projectedReport = pick(report, NATIVE_TRAINING_LANDING_REPORT_KEYS);

@@ -6,6 +6,7 @@ import { nativeProductionContractManifest, NativeProductionResource } from "./na
 import { projectNativeMediaReferences } from "./nativeMediaProjection.js";
 import { createProviderEnergyEvidenceReport } from "../../domain/services/EnergyEvidenceService.js";
 import {
+  projectNativeNutritionRead,
   projectNativeTrainingLandingRead,
   projectNativeTrainingLibraryRead,
   projectNativeTrainingReportingRead,
@@ -142,7 +143,7 @@ export function createNativeProductionContractService({
         case "training-day": data = await readers.training.getDay({ date: dateKey(input.date, "date"), timeZone: input.timeZone || null }); break;
         case "training-session": data = await readers.training.getSession({ sessionId: required(input.sessionId, "sessionId") }); break;
         case "training-exercise": data = await readers.training.getExercise({ context, currentDate, exerciseSlug: required(input.exerciseId, "exerciseId") }); break;
-        case "nutrition": data = await readers.progress.getNutrition({ context, currentDate }); break;
+        case "nutrition": data = projectNativeNutritionRead(await readers.progress.getNutrition({ context, currentDate })); break;
         case "activity": data = await readers.progress.getActivity({ context, currentDate }); break;
         case "healthkit-activity-canary": data = await readers.healthKitCanary.getActivityValidation({
           startDate: required(input.startDate, "startDate"),
