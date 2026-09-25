@@ -40,8 +40,9 @@ struct LogView: View {
         // day's rows after midnight until a tab switch or pull to refresh.
         .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) { await viewModel?.load() }
         // On a resume that crosses midnight the re-evaluation invalidates and
-        // publishes the new day (which reloads above); only a same-day resume
-        // loads here, so the visible Log never reads twice.
+        // publishes the new day (which reloads above); this closure loads only
+        // when its own re-evaluation saw no change. If the root scene's
+        // re-evaluation published first, the visible Log may read once more.
         .refreshesOnForegroundWhenVisible {
             if await !environment.reevaluateDailyDriverDay() { await viewModel?.load() }
         }

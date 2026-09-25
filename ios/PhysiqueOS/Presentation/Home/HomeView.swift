@@ -64,9 +64,16 @@ struct HomeView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active || phase == .inactive else { return }
             Task {
-                // A resume that crosses midnight / changes zone reloads through
-                // the day-change path below instead (no duplicate Home read).
-                if phase == .active, await !environment.reevaluateDailyDriverDay() { await viewModel?.load() }
+                // Re-evaluate first so a resume across midnight / a zone change
+                // has invalidated the day-scoped caches before Home reads; Home
+                // always loads here (visible or not) so the notification sync
+                // below never runs on the previous day's model. On a crossing
+                // resume a visible Home may also reload once via the day-change
+                // path (at most one extra read, first resume of a day).
+                if phase == .active {
+                    await environment.reevaluateDailyDriverDay()
+                    await viewModel?.load()
+                }
                 await syncPriorityNotifications()
             }
         }
