@@ -17,6 +17,7 @@ import SwiftUI
 /// consistency with the sibling Evidence day-detail screen.
 struct ActivityDayView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: ActivityDayViewModel?
     let date: String
 
@@ -34,6 +35,21 @@ struct ActivityDayView: View {
             viewModel = ActivityDayViewModel(api: environment.activityAPI, date: date)
             await viewModel?.load()
         }
+        // Matches `ActivityHistoryView`'s own refreshable/scenePhase
+        // reload — the "refresh asymmetry" half of the Build 58 stale-
+        // Detail defect (History could force a fresh read; Detail had no
+        // way to). `ActivityAPI.fetchActivityDay(date:)` itself always
+        // bypasses the cache now (see its doc comment), so this reload is
+        // belt-and-suspenders freshness plus keeping the shared
+        // `activity` cache bucket in sync for other readers, not the sole
+        // guarantee against staleness.
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["activity"])
+            }
+            await viewModel?.load()
+        }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
     }
 
     @ViewBuilder

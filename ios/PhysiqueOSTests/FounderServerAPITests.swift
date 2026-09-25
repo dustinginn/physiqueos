@@ -4739,6 +4739,203 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(mediaStore.manifestState, .unavailable)
         XCTAssertTrue(mediaStore.itemsByViewIdentity.isEmpty)
     }
+
+    // MARK: - Activity Day Detail cache-consistency regression (Build 58)
+    //
+    // Founder-observed defect: "Recent Activity History" showed a fresh
+    // Sep 23 revision (783 active cal / 107 min, HealthKit revision 51 /
+    // `complete_day`) while "Activity Day Detail" for the exact same date
+    // kept showing a stale snapshot (606 active cal / 102 min, revision 50 /
+    // `partial_day`, ~4 hours older). Root cause: `ProductionActivityAPI`'s
+    // Detail lookup (`fetchActivityDay`) always queried `context=all` while
+    // History used the Founder's selected scope — two different cache keys
+    // — and Detail had no explicit refresh trigger of its own, so it
+    // depended entirely on whatever another, unrelated caller had last left
+    // sitting in the shared `activity?context=all` bucket. The fix makes
+    // Detail always bypass the cache (`policy: .reload`) instead of
+    // inventing a new per-date server resource, matching the server's own
+    // uncached `/read/activity` guarantee.
+
+    func testActivityDayDetailNeverServesAnOlderRevisionThanHistoryOnceObserved() async throws {
+        let revision50 = activityLandingFixtureJSON(
+            latest: activityDayFixtureJSON(id: "activity-2026-09-23-r50", date: "2026-09-23", isToday: true, activeCalories: 606, exerciseMinutes: 102, value: "606 active cal / 102 min"),
+            history: [activityDayFixtureJSON(id: "activity-2026-09-23-r50", date: "2026-09-23", isToday: true, activeCalories: 606, exerciseMinutes: 102, value: "606 active cal / 102 min")]
+        )
+        let revision51 = activityLandingFixtureJSON(
+            latest: activityDayFixtureJSON(id: "activity-2026-09-23-r51", date: "2026-09-23", isToday: true, activeCalories: 782.7, exerciseMinutes: 107, value: "782.7 active cal / 107 min"),
+            history: [activityDayFixtureJSON(id: "activity-2026-09-23-r51", date: "2026-09-23", isToday: true, activeCalories: 782.7, exerciseMinutes: 107, value: "782.7 active cal / 107 min")]
+        )
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, revision50), // History's first load — canonical day still `partial_day`.
+            .json(200, revision51), // History's pull-to-refresh — canonical day now `complete_day`.
+            .json(200, revision51), // Detail opened immediately after — must be a genuine live read.
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Activity revision test")
+        let api = ProductionActivityAPI(api: native)
+
+        let firstLanding = try await api.fetchActivityLanding(scope: .all)
+        XCTAssertEqual(firstLanding.latestActivityDay?.activeCalories, 606)
+
+        // Mirrors `ActivityHistoryView.refreshable`.
+        await native.invalidateReadResources(["activity"])
+        let refreshedLanding = try await api.fetchActivityLanding(scope: .all)
+        XCTAssertEqual(refreshedLanding.latestActivityDay?.activeCalories, 782.7)
+        XCTAssertEqual(refreshedLanding.latestActivityDay?.exerciseMinutes, 107)
+
+        // Detail opens right after — well inside the read cache's TTL, so a
+        // pre-fix cache-first lookup on a shared bucket could still be
+        // holding revision 50. It must never resolve to that value again.
+        let detailDay = try await api.fetchActivityDay(date: "2026-09-23")
+        XCTAssertEqual(detailDay?.activeCalories, 782.7)
+        XCTAssertEqual(detailDay?.exerciseMinutes, 107)
+        XCTAssertNotEqual(detailDay?.activeCalories, 606, "Activity Day Detail must never resolve to the superseded revision once a newer one has been observed")
+
+        let activityReads = await transport.requests.filter { $0.url?.path.hasSuffix("/read/activity") == true }
+        XCTAssertEqual(activityReads.count, 3, "Detail must always perform its own live read rather than opportunistically reusing a cached response")
+    }
+
+    /// Requirement 7 (race/coalescing guard), exercised against the actual
+    /// Activity resource and fixture values: an older in-flight response
+    /// (revision 50, started before an invalidation) that resolves AFTER a
+    /// newer response (revision 51, started after the invalidation) has
+    /// already been stored must never be allowed to clobber the cache.
+    /// Mirrors `testInvalidatedReviewReadCannotJoinOldFlightOrEraseNewFlight`'s
+    /// proven pattern for a different resource, confirming
+    /// `ProductionNativeAPI`'s generation-gated cache store (already shared,
+    /// generic infrastructure — not something this fix needed to add)
+    /// protects Activity the same way.
+    func testActivityReadCacheRejectsAnOlderInFlightResponseArrivingAfterANewerOne() async throws {
+        actor HeldActivityTransport: FounderHTTPTransport {
+            let responses: [String]
+            let started: [XCTestExpectation]
+            var reads = 0
+            var held: [Int: CheckedContinuation<Void, Never>] = [:]
+            init(responses: [String], started: [XCTestExpectation]) {
+                self.responses = responses
+                self.started = started
+            }
+            func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+                if request.url?.path.hasSuffix("/auth/pair") == true { return (Data(responses[0].utf8), response) }
+                reads += 1
+                let index = reads
+                if index <= 2 {
+                    await withCheckedContinuation { continuation in
+                        held[index] = continuation
+                        started[index - 1].fulfill()
+                    }
+                } else { started[2].fulfill() }
+                return (Data(responses[index == 1 ? 1 : 2].utf8), response)
+            }
+            func release(_ index: Int) { held.removeValue(forKey: index)?.resume() }
+        }
+        let oldStarted = expectation(description: "pre-invalidation activity GET")
+        let newStarted = expectation(description: "post-invalidation activity GET")
+        let unexpectedThird = expectation(description: "old completion must not detach the new GET")
+        unexpectedThird.isInverted = true
+        let revision50 = activityLandingFixtureJSON(
+            latest: activityDayFixtureJSON(id: "activity-2026-09-23-r50", date: "2026-09-23", isToday: true, activeCalories: 606, exerciseMinutes: 102, value: "606 active cal / 102 min"),
+            history: [activityDayFixtureJSON(id: "activity-2026-09-23-r50", date: "2026-09-23", isToday: true, activeCalories: 606, exerciseMinutes: 102, value: "606 active cal / 102 min")]
+        )
+        let revision51 = activityLandingFixtureJSON(
+            latest: activityDayFixtureJSON(id: "activity-2026-09-23-r51", date: "2026-09-23", isToday: true, activeCalories: 782.7, exerciseMinutes: 107, value: "782.7 active cal / 107 min"),
+            history: [activityDayFixtureJSON(id: "activity-2026-09-23-r51", date: "2026-09-23", isToday: true, activeCalories: 782.7, exerciseMinutes: 107, value: "782.7 active cal / 107 min")]
+        )
+        let transport = HeldActivityTransport(responses: [sessionJSON(access: "a", refresh: "r"), revision50, revision51], started: [oldStarted, newStarted, unexpectedThird])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Activity race test")
+        let api = ProductionActivityAPI(api: native)
+
+        let old = Task { try await api.fetchActivityLanding(scope: .all) }
+        await fulfillment(of: [oldStarted], timeout: 2)
+        await native.invalidateReadResources(["activity"])
+        let fresh = Task { try await api.fetchActivityLanding(scope: .all) }
+        await fulfillment(of: [newStarted], timeout: 2)
+        await transport.release(1) // The stale (revision 50) response resolves only now, after the newer fetch already started.
+        let oldValue = try await old.value
+        XCTAssertEqual(oldValue.latestActivityDay?.activeCalories, 606)
+
+        let joined = Task { try await api.fetchActivityLanding(scope: .all) }
+        await fulfillment(of: [unexpectedThird], timeout: 0.2)
+        await transport.release(2)
+        let freshValue = try await fresh.value
+        let joinedValue = try await joined.value
+        XCTAssertEqual(freshValue.latestActivityDay?.activeCalories, 782.7)
+        XCTAssertEqual(joinedValue.latestActivityDay?.activeCalories, 782.7, "A read taken after the newer fetch resolved must never rejoin/see the superseded revision-50 response")
+
+        // The strongest check: a brand-new cache-first read afterward must
+        // reuse the STORED cache entry, and that entry must be the newer
+        // revision — proving the orphaned old flight never overwrote it.
+        let afterward = try await api.fetchActivityLanding(scope: .all)
+        XCTAssertEqual(afterward.latestActivityDay?.activeCalories, 782.7)
+        let finalReadCount = await transport.reads
+        XCTAssertEqual(finalReadCount, 2, "A subsequent cache-first read must reuse the stored revision-51 response, not reveal a corrupted (reverted-to-50) cache")
+    }
+
+    /// Requirements 3 & 4: looking up two different Activity dates never
+    /// cross-contaminates, and invalidating Activity's cache (what History's
+    /// pull-to-refresh and Detail's own refresh both do) never touches an
+    /// unrelated resource's cache entry.
+    func testActivityDayLookupsAcrossDatesDoNotCrossContaminateAndInvalidationStaysScopedToActivity() async throws {
+        let dayLower = activityDayFixtureJSON(id: "activity-2026-09-22", date: "2026-09-22", isToday: false, activeCalories: 500, exerciseMinutes: 60, value: "500 active cal / 60 min")
+        let dayUpper = activityDayFixtureJSON(id: "activity-2026-09-23", date: "2026-09-23", isToday: true, activeCalories: 782.7, exerciseMinutes: 107, value: "782.7 active cal / 107 min")
+        let multiDay = activityLandingFixtureJSON(latest: dayUpper, history: [dayUpper, dayLower])
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["activity": multiDay, "weight": productionWeightJSON(value: 170.4)]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Activity cross-date test")
+        let api = ProductionActivityAPI(api: native)
+
+        let olderDay = try await api.fetchActivityDay(date: "2026-09-22")
+        let newerDay = try await api.fetchActivityDay(date: "2026-09-23")
+        XCTAssertEqual(olderDay?.activeCalories, 500)
+        XCTAssertEqual(newerDay?.activeCalories, 782.7)
+        XCTAssertNotEqual(olderDay?.id, newerDay?.id, "Two distinct dates must never resolve to the same record")
+
+        // Prime an unrelated resource's cache.
+        _ = try await native.readWeight()
+        var weightReads = await transport.requests.filter { $0.url?.path.hasSuffix("/read/weight") == true }
+        XCTAssertEqual(weightReads.count, 1)
+
+        await native.invalidateReadResources(["activity"])
+        _ = try await native.readWeight()
+        weightReads = await transport.requests.filter { $0.url?.path.hasSuffix("/read/weight") == true }
+        XCTAssertEqual(weightReads.count, 1, "Invalidating Activity's cache must never evict Weight's (or any other unrelated resource's) cache entry")
+    }
+
+    /// Requirement 5: Nutrition's own caching is a separate resource and
+    /// this fix must not regress it. Unlike the fixed
+    /// `ProductionActivityAPI.fetchActivityDay`, `ProductionNutritionAPI`
+    /// was not touched at all — `fetchNutritionDay` still shares one cached
+    /// read with `fetchNutritionLanding`, and Activity's own cache
+    /// invalidation must never evict Nutrition's entry. Nothing in the
+    /// shared `ProductionNativeAPI` caching layer (`readCacheKey`,
+    /// `cacheLifetime`, `invalidateReadResources`) was changed by this fix.
+    func testNutritionCachingIsUnaffectedByTheActivityDayDetailFix() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["nutrition": productionNutritionJSON, "activity": productionActivityJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Nutrition regression test")
+        let nutritionAPI = ProductionNutritionAPI(api: native)
+
+        _ = try await nutritionAPI.fetchNutritionLanding(scope: .all)
+        let day = try await nutritionAPI.fetchNutritionDay(dayId: "nutrition-day-canonical")
+        XCTAssertEqual(day?.totals.calories, 2_300)
+        let nutritionReads = await transport.requests.filter { $0.url?.path.hasSuffix("/read/nutrition") == true }
+        XCTAssertEqual(nutritionReads.count, 1, "Nutrition's landing and day lookup must still share exactly one cached network read — cache-bypass-on-read is scoped to Activity Day Detail only")
+
+        _ = try await ProductionActivityAPI(api: native).fetchActivityLanding(scope: .all)
+        await native.invalidateReadResources(["activity"])
+        _ = try await nutritionAPI.fetchNutritionLanding(scope: .all)
+        let nutritionReadsAfter = await transport.requests.filter { $0.url?.path.hasSuffix("/read/nutrition") == true }
+        XCTAssertEqual(nutritionReadsAfter.count, 1, "Invalidating Activity's cache must never evict Nutrition's cache entry")
+    }
 }
 
 private enum FocusedReadFailure: Error { case unavailable }
@@ -4859,6 +5056,24 @@ private let productionNutritionJSON = productionEnvelope(resource: "nutrition", 
 /// non-empty entry in that exact leaner shape or it can't catch a
 /// regression to non-optional `date`/`sourceEvidence` decode requirements.
 private let productionActivityJSON = productionEnvelope(resource: "activity", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Activity","selected":true}]},"report":{"title":"Activity","subtitle":"Whole-day movement","tone":"success","latestActivityDay":{"id":"activity-day-canonical","label":"Daily Activity","value":"650 active cal / 45 min","detail":"1 workout linked","date":"2026-09-10","isToday":true,"activeCalories":650,"totalCalories":null,"exerciseMinutes":45,"standHours":12,"moveGoal":600,"exerciseGoal":30,"standGoal":12,"ringCompletion":null,"workoutActiveCalories":400,"nonWorkoutActiveCalories":250,"linkedTrainingSessionCount":1,"protocolStatus":"50 active calories above target."},"activityAreas":[],"linkedTrainingContext":[{"id":"training-canonical","label":"Traditional Strength Training","value":"356 active cal","detail":"1h 12m · 4 exercises"}],"activityHistory":[{"id":"activity-day-canonical","label":"Daily Activity","value":"650 active cal / 45 min","detail":"1 workout linked","date":"2026-09-10","isToday":true,"activeCalories":650,"totalCalories":null,"exerciseMinutes":45,"standHours":12,"moveGoal":600,"exerciseGoal":30,"standGoal":12,"ringCompletion":null,"workoutActiveCalories":400,"nonWorkoutActiveCalories":250,"linkedTrainingSessionCount":1,"protocolStatus":"50 active calories above target."}],"dataSources":[{"name":"Web","status":"Connected"}]}}"#)
+
+/// Builds one `ActivityDayRecord`'s wire JSON (see `ActivityReadModel.swift`)
+/// with every required field populated, varying only the identity/metrics
+/// the Activity Day Detail regression tests above need to control.
+private func activityDayFixtureJSON(
+    id: String, date: String, isToday: Bool, activeCalories: Double, exerciseMinutes: Double,
+    value: String, protocolStatus: String = "Activity context available."
+) -> String {
+    #"{"id":"\#(id)","label":"Daily Activity","value":"\#(value)","detail":"Evidence detail","date":"\#(date)","isToday":\#(isToday),"activeCalories":\#(activeCalories),"totalCalories":null,"exerciseMinutes":\#(exerciseMinutes),"standHours":12,"moveGoal":600,"exerciseGoal":30,"standGoal":12,"ringCompletion":null,"workoutActiveCalories":400,"nonWorkoutActiveCalories":250,"linkedTrainingSessionCount":1,"protocolStatus":"\#(protocolStatus)"}"#
+}
+
+/// Builds a full `activity` resource envelope (as `ProductionActivityAPI`
+/// decodes it) from pre-built `activityDayFixtureJSON` day objects.
+private func activityLandingFixtureJSON(latest: String, history: [String]) -> String {
+    productionEnvelope(resource: "activity", data: """
+    {"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Activity","selected":true}]},"report":{"title":"Activity","subtitle":"Whole-day movement","tone":"success","latestActivityDay":\(latest),"activityAreas":[],"linkedTrainingContext":[],"activityHistory":[\(history.joined(separator: ","))],"dataSources":[{"name":"Web","status":"Connected"}]}}
+    """)
+}
 
 private let productionEnergyJSON = productionEnvelope(resource: "energy", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Energy","selected":true}]},"summary":{"averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDays":1,"evidenceDays":2},"days":[{"date":"2026-09-10","nutritionDayId":null,"activityDayId":"activity-1","calorieIntake":null,"activeCalories":500,"rmr":1700,"estimatedExpenditure":2200,"energyBalance":null,"completeness":"activity-only","sources":{"nutrition":[],"activity":["Activity"]}},{"date":"2026-09-09","nutritionDayId":"nutrition-1","activityDayId":"activity-2","calorieIntake":0,"activeCalories":600,"rmr":1700,"estimatedExpenditure":2300,"energyBalance":-2300,"completeness":"complete","sources":{"nutrition":["Web"],"activity":["Activity"]}}],"weeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"recentFourWeeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"latestEvidenceDate":"2026-09-10","dataSources":[{"name":"Nutrition","status":"Connected"}],"audit":{"nutritionDays":1,"activityDays":2,"overlappingDates":1}}"#)
 
