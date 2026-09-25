@@ -71,6 +71,32 @@ private struct VisibleForegroundRefresh: ViewModifier {
     }
 }
 
+/// Reloads the on-screen view when the daily-driver day changes. A screen that
+/// is not visible (a background tab root, or under a pushed child) does not
+/// join the rollover burst: its read cache was already invalidated, and its
+/// own `.task` re-reads when it next appears.
+private struct VisibleDailyDriverDayReload: ViewModifier {
+    @State private var isVisible = false
+    let day: DailyDriverLocalDay
+    let action: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { isVisible = true }
+            .onDisappear { isVisible = false }
+            .onChange(of: day) { _, _ in
+                guard isVisible else { return }
+                Task { await action() }
+            }
+    }
+}
+
+extension View {
+    func reloadsOnDailyDriverDayChangeWhenVisible(_ day: DailyDriverLocalDay, _ action: @escaping () async -> Void) -> some View {
+        modifier(VisibleDailyDriverDayReload(day: day, action: action))
+    }
+}
+
 extension View {
     /// Replaces a bare `.onChange(of: scenePhase)` reload for screens whose
     /// `.task` already reloads on appearance.

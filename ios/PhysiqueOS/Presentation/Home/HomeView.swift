@@ -64,7 +64,9 @@ struct HomeView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active || phase == .inactive else { return }
             Task {
-                if phase == .active { await viewModel?.load() }
+                // A resume that crosses midnight / changes zone reloads through
+                // the day-change path below instead (no duplicate Home read).
+                if phase == .active, await !environment.reevaluateDailyDriverDay() { await viewModel?.load() }
                 await syncPriorityNotifications()
             }
         }
@@ -73,11 +75,9 @@ struct HomeView: View {
         }
         // A foregrounded Home crossing local midnight or a zone change reloads
         // from a fresh read (the day-scoped cache was invalidated first).
-        .onChange(of: environment.dailyDriverDay) { _, _ in
-            Task {
-                await viewModel?.load()
-                await syncPriorityNotifications()
-            }
+        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) {
+            await viewModel?.load()
+            await syncPriorityNotifications()
         }
         .alert("Priority could not be completed", isPresented: Binding(
             get: { completionError != nil },

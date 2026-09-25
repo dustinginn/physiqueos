@@ -36,9 +36,7 @@ struct EvidenceView: View {
             }
             await viewModel?.load()
         }
-        .onChange(of: environment.dailyDriverDay) { _, _ in
-            Task { await viewModel?.load() }
-        }
+        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) { await viewModel?.load() }
     }
 
     @ViewBuilder

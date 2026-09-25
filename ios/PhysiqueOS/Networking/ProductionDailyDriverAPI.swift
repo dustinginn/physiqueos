@@ -96,8 +96,8 @@ struct ProductionHomeAPI: HomeAPI {
     /// zone partitions the in-memory cache and the persisted last-known
     /// snapshot, so a snapshot saved in one zone can never be painted in
     /// another.
-    private var query: [String: String] {
-        ["presentationVersion": "2", "timeZone": timeZone().identifier]
+    private func query(in zone: TimeZone) -> [String: String] {
+        ["presentationVersion": "2", "timeZone": zone.identifier]
     }
 
     func fetchHome() async throws -> HomeReadModel {
@@ -106,7 +106,7 @@ struct ProductionHomeAPI: HomeAPI {
         // and receives the server's neutral v1 icon fallback; corrected
         // clients receive canonical domain icons such as `pills`.
         let envelope = try await api.readResource(
-            "home", query: query, as: Payload.self
+            "home", query: query(in: timeZone()), as: Payload.self
         )
         return try Self.readModel(from: envelope)
     }
@@ -116,7 +116,7 @@ struct ProductionHomeAPI: HomeAPI {
         var deviceCalendar = Calendar(identifier: .gregorian)
         deviceCalendar.timeZone = zone
         let current = now()
-        guard let envelope = await api.lastKnownResource("home", query: query, as: Payload.self),
+        guard let envelope = await api.lastKnownResource("home", query: query(in: zone), as: Payload.self),
               let generatedAt = Self.serverInstant(envelope.generatedAt),
               // Home is a today surface (Today's Focus, briefing slots): a
               // snapshot is refused unless it was generated on the SAME day

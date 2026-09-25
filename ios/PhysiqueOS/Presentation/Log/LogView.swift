@@ -38,10 +38,13 @@ struct LogView: View {
         // read before publishing the new day) and whenever it is foregrounded
         // while visible. Before this, a retained Log kept showing the previous
         // day's rows after midnight until a tab switch or pull to refresh.
-        .onChange(of: environment.dailyDriverDay) { _, _ in
-            Task { await viewModel?.load() }
+        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) { await viewModel?.load() }
+        // On a resume that crosses midnight the re-evaluation invalidates and
+        // publishes the new day (which reloads above); only a same-day resume
+        // loads here, so the visible Log never reads twice.
+        .refreshesOnForegroundWhenVisible {
+            if await !environment.reevaluateDailyDriverDay() { await viewModel?.load() }
         }
-        .refreshesOnForegroundWhenVisible { await viewModel?.load() }
         // While a confirmed review is Processing, refresh on a bounded cadence so the
         // card clears when the Server finishes. `.task` is cancelled when the screen
         // leaves, the app backgrounds (scenePhase in the id), or nothing is processing.

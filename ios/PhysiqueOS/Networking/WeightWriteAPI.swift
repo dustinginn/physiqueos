@@ -207,10 +207,14 @@ struct ProductionWeightWriteAPI: WeightWriteAPI {
         timeZone: String?
     ) async throws -> WeightSubmitResult {
         try NativeProductWriteGuard.authorize(.morningCheckInAndWeight, in: .founderProduction)
+        // The zone is part of the Server's payload hash, so it is part of the
+        // key's signature: a retry after a zone change gets a new key instead of
+        // a 409 IDEMPOTENCY_KEY_REUSED. (nil for the Morning Check-In keeps its
+        // established signature.)
         let signature = ProductionIdempotentSubmission.signature([
             commandType, localDate, String(value), expectedVersion ?? "new",
             reconciliationSubmissions.map(signatureFragment) ?? "",
-        ])
+        ] + (timeZone.map { ["tz=\($0)"] } ?? []))
         let idempotencyKey = idempotencyStore.resolvedKey(scope: scope, signature: signature)
         let payload = Payload(localDate: localDate, value: value, reconciliationSubmissions: reconciliationSubmissions, timeZone: timeZone)
         let outcome: ProductionCommandOutcome<WeightSubmitResult> = try await api.submitCommand(

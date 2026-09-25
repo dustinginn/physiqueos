@@ -33,10 +33,16 @@ struct DailyDriverLocalDay: Equatable, Hashable, Sendable {
         )
     }
 
-    /// The device's current zone. `resetSystemTimeZone()` drops Foundation's
-    /// cached system zone so a zone change made while the process was alive is
-    /// observed immediately rather than at the next launch.
+    /// The device's current zone for a read. Cheap: no cache reset per call.
     static func currentDeviceTimeZone() -> TimeZone {
+        TimeZone.current
+    }
+
+    /// The device's current zone for a day re-evaluation. `resetSystemTimeZone()`
+    /// drops Foundation's cached system zone so a zone change made while the
+    /// process was alive is observed immediately rather than at the next launch;
+    /// every read after the re-evaluation then sees the new zone.
+    static func refreshedDeviceTimeZone() -> TimeZone {
         NSTimeZone.resetSystemTimeZone()
         return TimeZone.current
     }

@@ -680,7 +680,7 @@ extension AppEnvironment {
     @discardableResult
     func reevaluateDailyDriverDay(
         at instant: Date = Date(),
-        timeZone: TimeZone = DailyDriverLocalDay.currentDeviceTimeZone()
+        timeZone: TimeZone = DailyDriverLocalDay.refreshedDeviceTimeZone()
     ) async -> Bool {
         let next = DailyDriverLocalDay.resolve(at: instant, in: timeZone)
         guard next != dailyDriverDay else { return false }

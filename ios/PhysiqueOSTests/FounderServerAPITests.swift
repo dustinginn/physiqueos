@@ -5658,6 +5658,13 @@ final class DailyDriverLocalDayTests: XCTestCase {
     private static func zone(_ id: String) -> TimeZone { TimeZone(identifier: id)! }
     private static func day(_ at: String, _ zone: String) -> DailyDriverLocalDay { .resolve(at: instant(at), in: Self.zone(zone)) }
 
+    /// The shared Home fixture has no `notificationTimeZone` (its calendar would
+    /// fall back to the host's zone); these tests pin the canonical zone.
+    private static func canonicalHomeJSON(confidence: Int = 71) -> String {
+        productionHomeJSON(priorityID: "priority-1", goalID: "goal-server", confidence: confidence)
+            .replacingOccurrences(of: #""todaysFocus":"#, with: #""notificationTimeZone":"America/Los_Angeles","todaysFocus":"#)
+    }
+
     private static func pairedAPI(_ transport: some FounderHTTPTransport, snapshotStore: ProductionReadSnapshotStore? = nil) async throws -> ProductionNativeAPI {
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport, snapshotStore: snapshotStore)
         _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
@@ -5670,7 +5677,7 @@ final class DailyDriverLocalDayTests: XCTestCase {
             byResource: [
                 "evidence-review-queue": productionLogJSON,
                 "weight": productionWeightForLogJSON(date: "2026-09-10", value: 172.9),
-                "home": productionHomeJSON(priorityID: "priority-1", goalID: "goal-server", confidence: 71),
+                "home": canonicalHomeJSON(),
             ]
         )
     }
@@ -5811,7 +5818,7 @@ final class DailyDriverLocalDayTests: XCTestCase {
         let credentials = MemoryCredentialStore()
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
-            .json(200, productionHomeJSON(priorityID: "priority-old", goalID: "goal-server", confidence: 71)),
+            .json(200, canonicalHomeJSON()),
         ])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
         _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
@@ -5861,12 +5868,38 @@ final class DailyDriverLocalDayTests: XCTestCase {
 
     @MainActor
     func testDayChangeRetiresTheLastKnownHomeSnapshot() async throws {
-        let (store, credentials) = try await Self.persistHome(at: "2026-09-10T16:00:00Z", zone: "America/Los_Angeles")
-        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: SequencedFounderTransport([]), snapshotStore: store)
+        let store = ProductionReadSnapshotStore(directory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("physiqueos-daily-driver-\(UUID().uuidString)", isDirectory: true))
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, Self.canonicalHomeJSON()),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport, snapshotStore: store)
+        // Environment first (its initial evaluation is not under test), then persist.
         let environment = await Self.environment(api: api, at: "2026-09-10T16:00:00Z", zone: "America/Los_Angeles")
-        await environment.reevaluateDailyDriverDay(at: Self.instant("2026-09-11T07:30:00Z"), timeZone: Self.zone("America/Los_Angeles"))
-        let afterRollover = await ProductionHomeAPI(api: api, now: { Self.instant("2026-09-10T23:00:00Z") }, timeZone: { Self.zone("America/Los_Angeles") }).lastKnownHome()
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let home = ProductionHomeAPI(api: api, now: { Self.instant("2026-09-10T23:00:00Z") }, timeZone: { Self.zone("America/Los_Angeles") })
+        _ = try await home.fetchHome()
+        let persisted = await home.lastKnownHome()
+        XCTAssertNotNil(persisted, "precondition: a same-day snapshot is persisted")
+        let unchanged = await environment.reevaluateDailyDriverDay(at: Self.instant("2026-09-10T23:30:00Z"), timeZone: Self.zone("America/Los_Angeles"))
+        XCTAssertFalse(unchanged)
+        let stillThere = await home.lastKnownHome()
+        XCTAssertNotNil(stillThere, "a same-day activation must not discard the snapshot")
+        let changed = await environment.reevaluateDailyDriverDay(at: Self.instant("2026-09-11T07:30:00Z"), timeZone: Self.zone("America/Los_Angeles"))
+        XCTAssertTrue(changed)
+        let afterRollover = await home.lastKnownHome()
         XCTAssertNil(afterRollover, "a rollover retires the persisted snapshot, not just the in-memory cache")
+    }
+
+    func testHomeSnapshotIsRefusedWhenOnlyTheDeviceDayHasTurned() async throws {
+        // Device east of the canonical zone: 15:00Z = 20:30 IST Sep 10; 19:00Z = 00:30 IST Sep 11,
+        // while the canonical America/Los_Angeles day is Sep 10 at both instants.
+        let (store, credentials) = try await Self.persistHome(at: "2026-09-10T16:00:00Z", zone: "Asia/Kolkata")
+        let sameDeviceDay = await Self.lastKnown(store, credentials, at: "2026-09-10T18:00:00Z", zone: "Asia/Kolkata")
+        XCTAssertNotNil(sameDeviceDay)
+        let deviceNextDay = await Self.lastKnown(store, credentials, at: "2026-09-10T19:00:00Z", zone: "Asia/Kolkata")
+        XCTAssertNil(deviceNextDay, "the Founder's own day has turned; yesterday's Home is not today's")
     }
 
     func testHomeNotificationCalendarStaysCanonicalWhateverTheDeviceZone() async throws {
@@ -5895,5 +5928,6 @@ final class DailyDriverLocalDayTests: XCTestCase {
         XCTAssertEqual(weight?["timeZone"] as? String, DailyDriverLocalDay.currentDeviceTimeZone().identifier)
         let checkIn = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[2].httpBody)) as? [String: Any])["payload"] as? [String: Any]
         XCTAssertNil(checkIn?["timeZone"], "the Morning Check-In stays on the Server-owned canonical day")
+        XCTAssertNotEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
     }
 }
