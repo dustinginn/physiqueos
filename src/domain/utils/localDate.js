@@ -1,5 +1,30 @@
 export const DEFAULT_LOCAL_TIME_ZONE = "America/Los_Angeles";
 
+// Constructing an Intl.DateTimeFormat costs far more than formatting with one,
+// and these helpers run per record on every read (a Home read made thousands of
+// calls). Formatters are immutable and their output depends only on the fixed
+// options below plus the time zone, so one instance per zone is equivalent.
+// A zone that fails to construct is never cached, so it keeps throwing exactly
+// as before. Maps are bounded so arbitrary zone strings cannot grow memory.
+const MAX_CACHED_TIME_ZONES = 64;
+const DATE_KEY_FORMATTERS = new Map();
+const DATE_TIME_FORMATTERS = new Map();
+const RESOLVED_TIME_ZONES = new Map();
+
+function cachedFormatter(cache, timeZone, options) {
+  const key = String(timeZone);
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const formatter = new Intl.DateTimeFormat("en-US", options);
+  remember(cache, key, formatter);
+  return formatter;
+}
+
+function remember(cache, key, value) {
+  if (cache.size >= MAX_CACHED_TIME_ZONES) cache.delete(cache.keys().next().value);
+  cache.set(key, value);
+}
+
 export function getLocalDateKey(value, timeZone = DEFAULT_LOCAL_TIME_ZONE) {
   const resolvedValue = arguments.length === 0 ? new Date() : value;
   if (!resolvedValue) return null;
@@ -10,7 +35,7 @@ export function getLocalDateKey(value, timeZone = DEFAULT_LOCAL_TIME_ZONE) {
   const date = resolvedValue instanceof Date ? resolvedValue : new Date(resolvedValue);
   if (Number.isNaN(date.getTime())) return text.slice(0, 10) || null;
 
-  const parts = new Intl.DateTimeFormat("en-US", {
+  const parts = cachedFormatter(DATE_KEY_FORMATTERS, timeZone, {
     day: "2-digit",
     month: "2-digit",
     timeZone,
@@ -74,13 +99,18 @@ function isValidDateKey(value) {
 
 export function resolveLocalTimeZone(value) {
   const candidate = String(value ?? "").trim() || DEFAULT_LOCAL_TIME_ZONE;
+  const known = RESOLVED_TIME_ZONES.get(candidate);
+  if (known) return known;
 
+  let resolved;
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(new Date());
-    return candidate;
+    resolved = candidate;
   } catch {
-    return DEFAULT_LOCAL_TIME_ZONE;
+    resolved = DEFAULT_LOCAL_TIME_ZONE;
   }
+  remember(RESOLVED_TIME_ZONES, candidate, resolved);
+  return resolved;
 }
 
 export function formatLocalShortDate(value, timeZone = DEFAULT_LOCAL_TIME_ZONE) {
@@ -109,7 +139,7 @@ function localMidnightToUtc(dateKey, timeZone) {
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const parts = Object.fromEntries(
-      new Intl.DateTimeFormat("en-US", {
+      cachedFormatter(DATE_TIME_FORMATTERS, timeZone, {
         timeZone,
         year: "numeric",
         month: "2-digit",
