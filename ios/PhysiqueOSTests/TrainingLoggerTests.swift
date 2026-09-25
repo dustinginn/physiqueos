@@ -1282,13 +1282,13 @@ final class TrainingLoggerTests: XCTestCase {
 
     /// `CFBundleVersion` must be bumped in lockstep with
     /// `ios/Scripts/generate_project.py`'s `APP_BUILD_NUMBER` on every
-    /// release; this assertion was last updated for Build 59 and needs the
+    /// release; this assertion was last updated for Build 60 and needs the
     /// same one-line bump on the next release, exactly like that constant.
     func testAppDeclaresExemptEncryptionAndCurrentBuildInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "59")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "60")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }
