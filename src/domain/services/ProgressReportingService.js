@@ -49,8 +49,10 @@ import { scopeRepositoryReadService } from "../../application/read-models/Reposi
 import { formatWholeNumber } from "./HealthKitEvidenceNumberFormatting";
 import {
   indexConfirmedHealthKitWorkoutAttachments,
+  indexWholeDayEligibleHealthKitWorkoutsByDate,
   projectHealthKitStrengthWorkoutPresentationBySession,
 } from "./HealthKitWorkoutPresentationService.js";
+import { composeDailyActiveEnergyWithWorkouts } from "./HealthKitWorkoutService.js";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
@@ -977,6 +979,17 @@ export function createProviderActivityEvidenceReport({
     workoutLinks,
     workoutLinkClaims,
   });
+  // Part E: whole-day workout-calorie accounting is canonical-workout-
+  // identity-driven, keyed by the workout's own localDate -- not purely
+  // Logger-session-driven -- so Cardio (which never has a Logger session at
+  // all) can contribute alongside a confirmed Strength link. See
+  // `projectWholeDayEligibleHealthKitWorkouts`'s eligibility policy.
+  const eligibleHealthKitWorkoutsByDate = indexWholeDayEligibleHealthKitWorkoutsByDate({
+    canonicalEvidenceObjects,
+    canonicalWorkouts,
+    workoutLinks,
+    workoutLinkClaims,
+  });
   const allActivityDays = getActivityDaysWithTrainingAggregates({
     explicitActivityDays: sortByDate(
       canonicalPayloads.filter(isActivityDay),
@@ -984,6 +997,7 @@ export function createProviderActivityEvidenceReport({
     ),
     trainingSessions,
     confirmedHealthKitWorkoutsBySession,
+    eligibleHealthKitWorkoutsByDate,
   });
   const activityDays = dateWindow
     ? allActivityDays.filter((day) => isInsideDateWindow(day.observed_at, dateWindow))
@@ -1671,6 +1685,7 @@ function getActivityDaysWithTrainingAggregates({
   explicitActivityDays = [],
   trainingSessions = [],
   confirmedHealthKitWorkoutsBySession = new Map(),
+  eligibleHealthKitWorkoutsByDate = new Map(),
 } = {}) {
   const activityByDate = new Map(
     explicitActivityDays
@@ -1679,13 +1694,23 @@ function getActivityDaysWithTrainingAggregates({
       .filter(([date]) => Boolean(date))
   );
   const trainingByDate = groupTrainingSessionsByDate(trainingSessions);
+  // A day can need a training aggregate purely because a canonical Cardio
+  // workout exists for it -- Cardio never has a Logger session, so
+  // `trainingByDate` alone would never surface that date. Callers that don't
+  // pass `eligibleHealthKitWorkoutsByDate` (an empty Map, the default) see
+  // this union collapse back to exactly `trainingByDate`'s keys, unchanged.
+  const datesNeedingAggregation = new Set([
+    ...trainingByDate.keys(),
+    ...eligibleHealthKitWorkoutsByDate.keys(),
+  ]);
 
-  trainingByDate.forEach((sameDayTrainingSessions, date) => {
+  datesNeedingAggregation.forEach((date) => {
     const existingActivityDay = activityByDate.get(date);
     const aggregate = createTrainingBackedActivityDay({
       date,
-      trainingSessions: sameDayTrainingSessions,
+      trainingSessions: trainingByDate.get(date) ?? [],
       confirmedHealthKitWorkoutsBySession,
+      eligibleHealthKitWorkouts: eligibleHealthKitWorkoutsByDate.get(date) ?? [],
     });
 
     activityByDate.set(
@@ -1715,11 +1740,13 @@ function createTrainingBackedActivityDay({
   date,
   trainingSessions = [],
   confirmedHealthKitWorkoutsBySession = new Map(),
+  eligibleHealthKitWorkouts = [],
 } = {}) {
-  const workoutActiveCalories = sumTrainingActiveCalories(
+  const energy = composeWholeDayWorkoutEnergy({
     trainingSessions,
     confirmedHealthKitWorkoutsBySession,
-  );
+    eligibleHealthKitWorkouts,
+  });
   const trainingSessionIds = trainingSessions
     .map((session) => session._canonicalId ?? session.id)
     .filter(Boolean);
@@ -1757,10 +1784,13 @@ function createTrainingBackedActivityDay({
       },
     },
     derived_metrics: {
-      workout_active_calories: workoutActiveCalories,
+      workout_active_calories: energy.workoutActiveCalories,
       non_workout_active_calories: null,
       training_sessions_referenced: trainingSessionIds.length,
       confirmed_healthkit_workouts_referenced: confirmedHealthKitWorkoutCount,
+      healthkit_eligible_workout_count: energy.eligibleWorkoutCount,
+      healthkit_eligible_workouts: energy.contributingWorkouts,
+      healthkit_workout_energy_incomplete: energy.incomplete,
     },
     references: {
       training_session_ids: trainingSessionIds,
@@ -1780,13 +1810,123 @@ function createTrainingBackedActivityDay({
   };
 }
 
+/**
+ * Part E's canonical-workout-aware `workout_active_calories`. Strength's
+ * contribution is UNCHANGED from before Part E: one Logger session,
+ * cross-referenced against its CONFIRMED canonical HK workout, summed by the
+ * pre-existing `sumTrainingActiveCalories` -- which already sources a
+ * confirmed session's energy from the canonical workout's own telemetry
+ * (never the Logger's own frozen/synthetic duration), so the Sep 23 case
+ * arrives at the identical number through this new, canonical-workout-
+ * identity-driven path (see the regression test in
+ * ProgressReportingService.test.js proving this byte-for-byte).
+ *
+ * Cardio is added on top: every eligible canonical workout NOT already
+ * reachable through a Logger session (today, structurally, that is exactly
+ * "every eligible Cardio workout" -- an eligible Strength workout always has
+ * a confirmed Logger session). Eligible-workout identities are defensively
+ * deduped by id (requirements 4/8: one identity contributes at most once),
+ * and Cardio's own summation reuses `composeDailyActiveEnergyWithWorkouts`'s
+ * arithmetic (Part D's dormant whole-day model) rather than re-implementing
+ * a sum.
+ *
+ * Missing-energy policy (an explicit product decision, not a default): if
+ * ANY confirmed Strength attachment or eligible Cardio workout for the date
+ * is missing its own `activeCalories`, the WHOLE day's `workout_active_calories`
+ * (and therefore `non_workout_active_calories`) becomes `null` -- "unknown"
+ * -- rather than silently treating the missing amount as zero. This mirrors
+ * this file's own pre-existing convention for a confirmed Strength workout
+ * with missing energy (`sumTrainingActiveCalories`'s
+ * `confirmedHealthKitEnergyIncomplete`): a day's total is never presented as
+ * a lower, wrong number just because one contributor's energy has not
+ * arrived yet. A Logger session with NO HealthKit relationship at all and no
+ * self-reported calories is treated as a zero contribution, not "unknown" --
+ * that is the pre-existing, unrelated behavior for a purely manual entry,
+ * and Part E does not change it.
+ */
+function composeWholeDayWorkoutEnergy({
+  trainingSessions = [],
+  confirmedHealthKitWorkoutsBySession = new Map(),
+  eligibleHealthKitWorkouts = [],
+} = {}) {
+  const dedupedEligibleWorkouts = dedupeEligibleWorkoutsById(eligibleHealthKitWorkouts);
+  const loggerDrivenWorkoutActiveCalories = sumTrainingActiveCalories(
+    trainingSessions,
+    confirmedHealthKitWorkoutsBySession,
+  );
+  const confirmedWorkoutIdsForDate = new Set(trainingSessions
+    .map((session) => confirmedHealthKitWorkoutsBySession.get(trainingSessionIdentity(session))?.canonicalWorkoutId)
+    .filter(Boolean));
+  // A confirmed Strength attachment with missing energy is a real, known
+  // match whose amount is simply absent -- that must poison the day (see
+  // above). A session with NO confirmed attachment at all contributing
+  // nothing is not "incomplete"; it never had HealthKit energy to report.
+  const strengthIncomplete = trainingSessions.some((session) => {
+    const attachment = confirmedHealthKitWorkoutsBySession.get(trainingSessionIdentity(session));
+    return Boolean(attachment) && !Number.isFinite(finiteNumberOrNull(attachment.session?.activeCalories));
+  });
+
+  // Everything eligible not already reachable through a Logger session --
+  // structurally, only Cardio today.
+  const cardioLikeWorkouts = dedupedEligibleWorkouts.filter(
+    (entry) => !confirmedWorkoutIdsForDate.has(entry.canonicalWorkoutId)
+  );
+  const cardioLikeIncomplete = cardioLikeWorkouts.some(
+    (entry) => !Number.isFinite(entry.session?.activeCalories)
+  );
+  const cardioComposed = composeDailyActiveEnergyWithWorkouts({
+    dailyMoveCalories: 0,
+    canonicalWorkouts: cardioLikeWorkouts.map((entry) => ({
+      current: { telemetry: { activeCalories: entry.session?.activeCalories ?? null } },
+    })),
+  });
+
+  const hasLoggerSessions = trainingSessions.length > 0;
+  const incomplete = strengthIncomplete || cardioLikeIncomplete;
+  const loggerContribution = loggerDrivenWorkoutActiveCalories === null
+    ? (strengthIncomplete ? null : 0)
+    : loggerDrivenWorkoutActiveCalories;
+  const hasAnyContribution = hasLoggerSessions || cardioLikeWorkouts.length > 0;
+
+  const workoutActiveCalories = incomplete
+    ? null
+    : hasAnyContribution
+      ? (loggerContribution ?? 0) +
+        (cardioLikeWorkouts.length > 0 ? cardioComposed.workoutEnergyIncludedInDailyTotal : 0)
+      : null;
+
+  return {
+    workoutActiveCalories,
+    incomplete,
+    eligibleWorkoutCount: confirmedWorkoutIdsForDate.size + cardioLikeWorkouts.length,
+    contributingWorkouts: dedupedEligibleWorkouts,
+  };
+}
+
+function dedupeEligibleWorkoutsById(entries = []) {
+  const seen = new Set();
+  const output = [];
+  for (const entry of entries) {
+    const id = entry?.canonicalWorkoutId;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    output.push(entry);
+  }
+  return output;
+}
+
 function mergeActivityDayWithTrainingAggregate(activityDay = {}, aggregate = {}) {
   const dailyActivity = activityDay.daily_activity ?? {};
   const moveCalories = finiteNumberOrNull(dailyActivity.move_calories);
   const aggregateWorkoutActiveCalories = aggregate.derived_metrics?.workout_active_calories;
   const existingWorkoutActiveCalories = activityDay.derived_metrics?.workout_active_calories;
-  const hasConfirmedHealthKitWorkout = Number(aggregate.derived_metrics?.confirmed_healthkit_workouts_referenced) > 0;
-  const workoutActiveCalories = hasConfirmedHealthKitWorkout
+  // Generalizes the old `hasConfirmedHealthKitWorkout` gate (Strength-only)
+  // to "this day's workout number is HealthKit-driven at all" -- true for a
+  // confirmed Strength link OR an eligible Cardio workout, either of which
+  // must be trusted (including an honest `null`/unknown) over any stale
+  // pre-existing value on the raw activity-day record.
+  const hasHealthKitDrivenWorkoutEnergy = Number(aggregate.derived_metrics?.healthkit_eligible_workout_count) > 0;
+  const workoutActiveCalories = hasHealthKitDrivenWorkoutEnergy
     ? aggregateWorkoutActiveCalories ?? null
     : aggregateWorkoutActiveCalories !== null && aggregateWorkoutActiveCalories !== undefined &&
     Number.isFinite(Number(aggregateWorkoutActiveCalories))
@@ -1795,7 +1935,7 @@ function mergeActivityDayWithTrainingAggregate(activityDay = {}, aggregate = {})
   const normalizedWorkoutActiveCalories = finiteNumberOrNull(workoutActiveCalories);
   const nonWorkoutActiveCalories = moveCalories !== null && normalizedWorkoutActiveCalories !== null
     ? Math.max(0, moveCalories - normalizedWorkoutActiveCalories)
-    : hasConfirmedHealthKitWorkout
+    : hasHealthKitDrivenWorkoutEnergy
       ? null
       : activityDay.derived_metrics?.non_workout_active_calories ?? null;
   const trainingSessionIds = uniqueStrings([
@@ -1822,6 +1962,15 @@ function mergeActivityDayWithTrainingAggregate(activityDay = {}, aggregate = {})
       confirmed_healthkit_workouts_referenced:
         aggregate.derived_metrics?.confirmed_healthkit_workouts_referenced ??
         activityDay.derived_metrics?.confirmed_healthkit_workouts_referenced ?? 0,
+      healthkit_eligible_workout_count:
+        aggregate.derived_metrics?.healthkit_eligible_workout_count ??
+        activityDay.derived_metrics?.healthkit_eligible_workout_count ?? 0,
+      healthkit_eligible_workouts:
+        aggregate.derived_metrics?.healthkit_eligible_workouts ??
+        activityDay.derived_metrics?.healthkit_eligible_workouts ?? [],
+      healthkit_workout_energy_incomplete:
+        aggregate.derived_metrics?.healthkit_workout_energy_incomplete ??
+        activityDay.derived_metrics?.healthkit_workout_energy_incomplete ?? false,
     },
     references: {
       ...(activityDay.references ?? {}),
@@ -1867,10 +2016,39 @@ function createActivityDayRecord(activityDay = {}) {
       workoutEnergyAttribution: Object.freeze({
         policy: "workout_energy_is_descriptive_never_additive",
         confirmedHealthKitWorkoutCount: Number(activityDay.derived_metrics?.confirmed_healthkit_workouts_referenced ?? 0),
+        eligibleHealthKitWorkoutCount: Number(activityDay.derived_metrics?.healthkit_eligible_workout_count ?? 0),
+        workoutEnergyDataIncomplete: Boolean(activityDay.derived_metrics?.healthkit_workout_energy_incomplete),
       }),
+      // Part E, requirement 7: the individual canonical HealthKit workouts
+      // (Strength confirmed, Cardio canonicalized) that contributed to
+      // `workoutActiveCalories`, so Activity Detail can render each as its
+      // own distinct row -- family, type, local start/end, duration, energy,
+      // and provenance -- rather than only the summed total.
+      contributingWorkouts: Object.freeze(
+        (activityDay.derived_metrics?.healthkit_eligible_workouts ?? [])
+          .map(createContributingWorkoutRecord)
+      ),
       energyAnomaly,
       protocolStatus: formatActivityProtocolSupport(activityDay),
     };
+}
+
+function createContributingWorkoutRecord(entry = {}) {
+  return Object.freeze({
+    id: entry.canonicalWorkoutId ?? null,
+    family: entry.family ?? null,
+    canonicalType: entry.canonicalType ?? null,
+    startTime: entry.session?.startedAt ?? null,
+    endTime: entry.session?.endedAt ?? null,
+    durationSeconds: entry.session?.durationSeconds ?? null,
+    activeCalories: entry.session?.activeCalories ?? null,
+    sourceEvidence: ["Apple Health"],
+    provenance: Object.freeze({
+      basis: entry.eligibility?.basis ?? null,
+      application: entry.source?.application ?? "Apple Health",
+      sourceName: entry.source?.sourceName ?? null,
+    }),
+  });
 }
 
 function isActivityDay(evidenceObject) {

@@ -99,6 +99,21 @@ export function composeLoggedTodaySummary({
   });
 }
 
+// Part E/F decision: a canonicalized Cardio workout deliberately gets NO Log
+// row of its own here. This Training row is keyed entirely off a Training
+// Logger `evidence_type: "training"` session -- and Cardio structurally
+// never has one (see HealthKitWorkoutLinkService.js's cardio-coexistence
+// branch: Cardio has no confirm/deny step and no Logger session to confirm
+// against). Faking a Training row for a canonical Cardio workout would mean
+// inventing a Logger-session identity that does not exist, or repurposing
+// this row for something it was never built to represent. Founder
+// acceptance testing for Cardio's whole-day contribution is served instead
+// by Activity Detail's `contributingWorkouts` list
+// (ProgressReportingService.js's `createActivityDayRecord`), which already
+// shows family/canonicalType/local start-end/duration/energy/provenance per
+// eligible workout -- a strictly more honest surface for data with no
+// Logger session to anchor a Log row to, and adding a second, redundant
+// surface here would be scope creep.
 function composeTrainingRow(sessions, healthKitStrengthPresentationBySession = new Map()) {
   if (!sessions.length) return emptyRow("training", "Training");
 

@@ -3,11 +3,14 @@ import { projectConfirmedHealthKitLogProvenance } from "../../application/core/C
 import { createProviderActivityEvidenceReport } from "./ProgressReportingService.js";
 import {
   indexConfirmedHealthKitWorkoutAttachments,
+  indexWholeDayEligibleHealthKitWorkoutsByDate,
   projectConfirmedHealthKitWorkoutAttachments,
   projectHealthKitStrengthWorkoutPresentationBySession,
+  projectWholeDayEligibleHealthKitWorkouts,
 } from "./HealthKitWorkoutPresentationService.js";
 import { createSep23StrengthPresentationFixture } from "../../fixtures/healthKitSep23StrengthPresentationFixture.js";
 import { createSep24StrengthPresentationFixture } from "../../fixtures/healthKitSep24StrengthPresentationFixture.js";
+import { createCardioWholeDayAttributionFixture } from "../../fixtures/healthKitCardioWholeDayAttributionFixture.js";
 import { createTrainingNavigationReadService } from "../../application/training/TrainingNavigationReadService.js";
 import {
   HealthKitStrengthMatchOutcome,
@@ -466,5 +469,175 @@ describe("HK telemetry presentation for an unconfirmed Logger session (September
     });
     expect(logger.payload.exercises).toEqual(exercisesBefore);
     expect(logger.payload.metadata.duration_seconds).toBe(5647);
+  });
+});
+
+describe("Part E: whole-day HealthKit workout-calorie attribution", () => {
+  it("projects an eligible Cardio workout without any confirmed link, and a confirmed Strength workout, each tagged with its own eligibility basis", () => {
+    const strength = createSep23StrengthPresentationFixture();
+    const cardio = createCardioWholeDayAttributionFixture();
+    const combined = {
+      canonicalEvidenceObjects: strength.canonicalEvidenceObjects,
+      canonicalWorkouts: [...strength.canonicalWorkouts, ...cardio.canonicalWorkouts],
+      workoutLinks: strength.workoutLinks,
+      workoutLinkClaims: strength.workoutLinkClaims,
+    };
+    const eligible = projectWholeDayEligibleHealthKitWorkouts(combined);
+    expect(eligible).toHaveLength(2);
+    expect(eligible.find((entry) => entry.family === "strength")).toMatchObject({
+      canonicalWorkoutId: strength.ids.workout,
+      eligibility: { basis: "confirmed_strength_link", includedInWholeDayEnergy: true },
+      session: { activeCalories: 410 },
+    });
+    expect(eligible.find((entry) => entry.family === "cardio")).toMatchObject({
+      canonicalWorkoutId: cardio.ids.cardioWorkout,
+      eligibility: { basis: "canonicalized_cardio", includedInWholeDayEnergy: true },
+      session: { activeCalories: 300 },
+    });
+  });
+
+  it("never treats an unconfirmed candidate Strength workout as whole-day-eligible, unlike Cardio which needs no confirmation", () => {
+    const fixture = createSep24StrengthPresentationFixture();
+    // No confirmed link exists in this fixture at all (audited "no_match").
+    const eligible = projectWholeDayEligibleHealthKitWorkouts(fixture);
+    expect(eligible.every((entry) => entry.family !== "strength")).toBe(true);
+    expect(eligible.map((entry) => entry.canonicalWorkoutId).sort()).toEqual(
+      [fixture.ids.walkBefore, fixture.ids.walkAfter].sort()
+    );
+  });
+
+  it("groups eligible workouts by their own canonical localDate for the day the accounting engine needs, not any Logger session's date", () => {
+    const cardio = createCardioWholeDayAttributionFixture({ day: "2026-09-25" });
+    const byDate = indexWholeDayEligibleHealthKitWorkoutsByDate(cardio);
+    expect([...byDate.keys()]).toEqual(["2026-09-25"]);
+    expect(byDate.get("2026-09-25")).toHaveLength(1);
+  });
+
+  it("keeps the Sep 23 confirmed-Strength case byte-identical, now sourced through the canonical-workout-identity path instead of the Logger-session path", () => {
+    const fixture = createSep23StrengthPresentationFixture({ dailyActiveCalories: 606, workoutActiveCalories: 410 });
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+
+    // Byte-identical to the pre-Part-E numbers this file already pinned above.
+    expect(day.activeCalories).toBe(606);
+    expect(day.workoutActiveCalories).toBe(410);
+    expect(day.nonWorkoutActiveCalories).toBe(196);
+    expect(day.workoutEnergyAttribution.confirmedHealthKitWorkoutCount).toBe(1);
+    expect(day.workoutEnergyAttribution.eligibleHealthKitWorkoutCount).toBe(1);
+    expect(day.workoutEnergyAttribution.workoutEnergyDataIncomplete).toBe(false);
+
+    // The "different path": one contributing workout, resolved by canonical
+    // workout identity (confirmed link), not by re-deriving from the Logger
+    // session's own metadata.
+    expect(day.contributingWorkouts).toHaveLength(1);
+    expect(day.contributingWorkouts[0]).toMatchObject({
+      id: fixture.ids.workout,
+      family: "strength",
+      activeCalories: 410,
+      provenance: { basis: "confirmed_strength_link" },
+    });
+  });
+
+  it("adds a canonicalized Cardio workout's energy to Activity without ever recomputing the whole-day HealthKit total, and removes it symmetrically from non-workout energy", () => {
+    const before = createCardioWholeDayAttributionFixture({ dailyActiveCalories: 900, cardioActiveCalories: 300 });
+    before.canonicalWorkouts = []; // Not canonicalized yet.
+    const dayBefore = createProviderActivityEvidenceReport(before).latestActivityDay;
+    expect(dayBefore.activeCalories).toBe(900);
+    expect(dayBefore.workoutActiveCalories).toBe(0);
+    expect(dayBefore.nonWorkoutActiveCalories).toBe(900);
+
+    const after = createCardioWholeDayAttributionFixture({ dailyActiveCalories: 900, cardioActiveCalories: 300 });
+    const dayAfter = createProviderActivityEvidenceReport(after).latestActivityDay;
+
+    // The daily HealthKit aggregate itself never moves: canonicalizing a
+    // workout only reshuffles ITS OWN breakdown, never the whole-day figure.
+    expect(dayAfter.activeCalories).toBe(900);
+    expect(dayAfter.workoutActiveCalories).toBe(300);
+    expect(dayAfter.nonWorkoutActiveCalories).toBe(600);
+    expect(dayAfter.activeCalories - dayBefore.activeCalories).toBe(0);
+    expect(dayAfter.workoutActiveCalories - dayBefore.workoutActiveCalories).toBe(300);
+    expect(dayBefore.nonWorkoutActiveCalories - dayAfter.nonWorkoutActiveCalories).toBe(300);
+
+    expect(dayAfter.contributingWorkouts).toEqual([expect.objectContaining({
+      id: after.ids.cardioWorkout,
+      family: "cardio",
+      canonicalType: "walking",
+      activeCalories: 300,
+      provenance: expect.objectContaining({ basis: "canonicalized_cardio" }),
+    })]);
+  });
+
+  it("combines a confirmed canonical Strength workout and a canonicalized Cardio workout on the same day, each exactly once, with no double count even if a duplicate entry sneaks in", () => {
+    const strength = createSep23StrengthPresentationFixture({ dailyActiveCalories: 900, workoutActiveCalories: 410 });
+    const cardio = createCardioWholeDayAttributionFixture({ day: strength.day, cardioActiveCalories: 150 });
+    const duplicateCardio = structuredClone(cardio.canonicalWorkouts[0]);
+    const fixture = {
+      canonicalEvidenceObjects: strength.canonicalEvidenceObjects,
+      // Same cardio workout id appears twice -- defensive dedup must still
+      // count its energy exactly once.
+      canonicalWorkouts: [...strength.canonicalWorkouts, ...cardio.canonicalWorkouts, duplicateCardio],
+      workoutLinks: strength.workoutLinks,
+      workoutLinkClaims: strength.workoutLinkClaims,
+    };
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+
+    expect(day.workoutActiveCalories).toBe(560); // 410 (strength) + 150 (cardio), once each.
+    expect(day.nonWorkoutActiveCalories).toBe(340); // 900 - 560
+    expect(day.workoutEnergyAttribution.eligibleHealthKitWorkoutCount).toBe(2);
+    expect(day.contributingWorkouts).toHaveLength(2);
+    expect(new Set(day.contributingWorkouts.map((workout) => workout.id)).size).toBe(2);
+  });
+
+  it("clamps non-workout energy at zero, never negative, when eligible workout energy exceeds the daily total", () => {
+    const fixture = createCardioWholeDayAttributionFixture({ dailyActiveCalories: 100, cardioActiveCalories: 300 });
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+    expect(day.workoutActiveCalories).toBe(300);
+    expect(day.nonWorkoutActiveCalories).toBe(0);
+    expect(day.energyAnomaly).toEqual({
+      code: "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY",
+      dailyActiveCalories: 100,
+      workoutActiveCalories: 300,
+    });
+  });
+
+  it("keeps whole-day workout energy explicitly unknown -- never a silent zero -- when an eligible Cardio workout's own energy has not arrived yet", () => {
+    const fixture = createCardioWholeDayAttributionFixture({ dailyActiveCalories: 900, cardioActiveCalories: null });
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+    expect(day.workoutActiveCalories).toBeNull();
+    expect(day.nonWorkoutActiveCalories).toBeNull();
+    expect(day.workoutEnergyAttribution.workoutEnergyDataIncomplete).toBe(true);
+    expect(day.workoutEnergyAttribution.eligibleHealthKitWorkoutCount).toBe(1);
+    // The row is still visible on Activity Detail -- honestly showing no
+    // energy -- rather than disappearing or reading zero.
+    expect(day.contributingWorkouts).toEqual([expect.objectContaining({
+      id: fixture.ids.cardioWorkout,
+      activeCalories: null,
+    })]);
+  });
+
+  it("never creates a Training Logger session, a HealthKit workout link, or a link claim for a canonicalized Cardio workout used in whole-day accounting", () => {
+    const fixture = createCardioWholeDayAttributionFixture();
+    const beforeEvidenceCount = fixture.canonicalEvidenceObjects.length;
+    const beforeEvidence = structuredClone(fixture.canonicalEvidenceObjects);
+    const beforeLinks = structuredClone(fixture.workoutLinks);
+    const beforeClaims = structuredClone(fixture.workoutLinkClaims);
+
+    const report = createProviderActivityEvidenceReport(fixture);
+
+    // No Training Logger session for Cardio, before or after.
+    expect(fixture.canonicalEvidenceObjects).toHaveLength(beforeEvidenceCount);
+    expect(fixture.canonicalEvidenceObjects.filter((record) =>
+      (record.payload ?? record).evidence_type === "training")).toHaveLength(0);
+    // Nothing in the source evidence, links, or claims was mutated by
+    // read-only whole-day accounting.
+    expect(fixture.canonicalEvidenceObjects).toEqual(beforeEvidence);
+    expect(fixture.workoutLinks).toEqual(beforeLinks);
+    expect(fixture.workoutLinkClaims).toEqual(beforeClaims);
+    expect(fixture.workoutLinks).toEqual([]);
+    expect(fixture.workoutLinkClaims).toEqual([]);
+    // The Log surface's Training row keys off `evidence_type === "training"`
+    // Logger sessions only (see LoggedTodayService.js's composeTrainingRow);
+    // with none created, Cardio never fabricates a Training row.
+    expect(report.linkedTrainingContext).toEqual([]);
+    expect(report.latestActivityDay.contributingWorkouts).toHaveLength(1);
   });
 });

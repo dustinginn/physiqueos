@@ -206,6 +206,17 @@ function buildCandidateHealthKitWorkoutPresentation({ workout, sessionId, assess
 }
 
 function isPresentableCanonicalWorkout(workout) {
+  return isPresentableCanonicalWorkoutOfFamily(workout, HealthKitWorkoutFamily.STRENGTH);
+}
+
+// Same structural-integrity check `isPresentableCanonicalWorkout` has always
+// used for a Strength presentation candidate, generalized to any family so
+// Part E's whole-day-accounting eligibility (see
+// `projectWholeDayEligibleHealthKitWorkouts` below) can reuse it for Cardio
+// too, without weakening what Strength presentation itself accepts. Pure
+// refactor of the existing checks -- `isPresentableCanonicalWorkout`'s own
+// behavior for Strength is unchanged.
+function isPresentableCanonicalWorkoutOfFamily(workout, family) {
   const current = workout?.current;
   const provenance = workout?.provenance;
   const sourceObservationIds = provenance?.sourceObservationIds;
@@ -221,7 +232,7 @@ function isPresentableCanonicalWorkout(workout) {
       additiveToDailyActivity: false,
     }) &&
     current && typeof current === "object" &&
-    current.family === HealthKitWorkoutFamily.STRENGTH &&
+    current.family === family &&
     workout.localDate === current.localDate &&
     typeof current.startedAt === "string" && Number.isFinite(Date.parse(current.startedAt)) &&
     typeof current.sourceObservationId === "string" && current.sourceObservationId.length > 0 &&
@@ -230,6 +241,117 @@ function isPresentableCanonicalWorkout(workout) {
     provenance?.application === "Apple Health" && provenance?.integration === "HealthKit" &&
     provenance?.modality === "direct" && provenance?.basis === "healthkit_workout_observation" &&
     provenance?.bundleIdentifier === current.source?.bundleIdentifier;
+}
+
+/**
+ * Part E: whole-day workout-calorie-accounting eligibility. This answers a
+ * different, narrower question than
+ * `projectHealthKitStrengthWorkoutPresentationBySession` above -- not "what
+ * should Training / Workout-Detail DISPLAY for this Logger session" but
+ * "whose energy, already inside the whole-day HealthKit active-energy total,
+ * may be broken out as Activity's `workout_active_calories`". It never
+ * creates, confirms, or reads any relationship beyond what already exists.
+ *
+ * Eligibility (a deliberate, documented product decision -- see the Part E
+ * report for full reasoning):
+ *  - Strength: CONFIRMED link only, reusing
+ *    `projectConfirmedHealthKitWorkoutAttachments` unchanged. An unconfirmed
+ *    candidate is real enough to *show* (Part B), but not confident enough to
+ *    count in a Founder-facing whole-day calorie number -- Strength has an
+ *    explicit confirm/deny step for exactly this reason.
+ *  - Cardio: every canonicalized Cardio workout, confirmed or not. Cardio
+ *    structurally has no Logger session and no confirm/deny step at all (see
+ *    `HealthKitWorkoutLinkService.js`'s cardio-coexistence branch) --
+ *    canonicalization IS Cardio's inclusion decision.
+ * One canonical workout identity contributes at most once, defensively
+ * deduped by id even though today's shape cannot produce a duplicate.
+ */
+export function projectWholeDayEligibleHealthKitWorkouts({
+  canonicalEvidenceObjects = [],
+  canonicalWorkouts = [],
+  workoutLinks = [],
+  workoutLinkClaims = [],
+} = {}) {
+  const confirmedStrength = projectConfirmedHealthKitWorkoutAttachments({
+    canonicalEvidenceObjects, canonicalWorkouts, workoutLinks, workoutLinkClaims,
+  });
+  const workoutsById = new Map(canonicalWorkouts.map((workout) => [workout.id, workout]));
+  const seen = new Set();
+  const output = [];
+
+  for (const attachment of confirmedStrength) {
+    const workout = workoutsById.get(attachment.canonicalWorkoutId);
+    if (!workout || !isPresentableCanonicalWorkoutOfFamily(workout, HealthKitWorkoutFamily.STRENGTH)) continue;
+    if (seen.has(workout.id)) continue;
+    seen.add(workout.id);
+    output.push(buildEligibleWholeDayWorkout({
+      workout,
+      basis: "confirmed_strength_link",
+      loggerSessionCanonicalId: attachment.loggerSessionCanonicalId,
+    }));
+  }
+
+  for (const workout of canonicalWorkouts) {
+    if (!isPresentableCanonicalWorkoutOfFamily(workout, HealthKitWorkoutFamily.CARDIO)) continue;
+    if (seen.has(workout.id)) continue;
+    seen.add(workout.id);
+    output.push(buildEligibleWholeDayWorkout({
+      workout,
+      basis: "canonicalized_cardio",
+      loggerSessionCanonicalId: null,
+    }));
+  }
+
+  return Object.freeze(output.sort((left, right) => left.canonicalWorkoutId.localeCompare(right.canonicalWorkoutId)));
+}
+
+function buildEligibleWholeDayWorkout({ workout, basis, loggerSessionCanonicalId }) {
+  const current = workout.current;
+  return Object.freeze({
+    canonicalWorkoutId: workout.id,
+    loggerSessionCanonicalId,
+    family: current.family,
+    canonicalType: current.canonicalType,
+    localDate: workout.localDate,
+    eligibility: Object.freeze({
+      basis,
+      includedInWholeDayEnergy: true,
+    }),
+    source: Object.freeze({
+      application: "Apple Health",
+      sourceName: current.source?.sourceName ?? "Apple Health",
+      productType: current.source?.productType ?? null,
+    }),
+    session: Object.freeze({
+      startedAt: current.startedAt ?? null,
+      endedAt: current.endedAt ?? null,
+      durationSeconds: finiteOrNull(current.telemetry?.durationSeconds),
+      activeCalories: finiteOrNull(current.telemetry?.activeCalories),
+      totalCalories: finiteOrNull(current.telemetry?.totalCalories),
+      distance: finiteOrNull(current.telemetry?.distance),
+      distanceUnit: current.telemetry?.distanceUnit ?? null,
+      averageHeartRate: finiteOrNull(current.telemetry?.averageHeartRate),
+    }),
+  });
+}
+
+/**
+ * Same eligible-workout set as `projectWholeDayEligibleHealthKitWorkouts`,
+ * grouped by the workout's own canonical `localDate` -- the grouping
+ * `ProgressReportingService.js` needs to merge Cardio (which has no Logger
+ * session, and therefore no date to group by via any training session) into
+ * a day's whole-day workout-energy accounting.
+ */
+export function indexWholeDayEligibleHealthKitWorkoutsByDate(input = {}) {
+  const eligible = projectWholeDayEligibleHealthKitWorkouts(input);
+  const byDate = new Map();
+  for (const entry of eligible) {
+    if (!entry.localDate) continue;
+    if (!byDate.has(entry.localDate)) byDate.set(entry.localDate, []);
+    byDate.get(entry.localDate).push(entry);
+  }
+  for (const [date, list] of byDate) byDate.set(date, Object.freeze(list));
+  return Object.freeze(byDate);
 }
 
 function isPresentableConfirmedStrengthLink({ link, workout, loggerSession }) {
