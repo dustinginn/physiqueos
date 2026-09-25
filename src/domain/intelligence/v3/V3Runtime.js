@@ -82,6 +82,37 @@ export function uniqueStrings(values = []) {
   return [...new Set(values.filter(Boolean).map(String))].sort();
 }
 
+const SEMANTIC_OVERLAP_STOPWORDS = new Set(["the", "a", "an", "and", "or",
+  "to", "of", "in", "is", "it", "that", "this", "for", "with", "your"]);
+
+// Deterministic semantic-equivalence heuristic shared by every V3 composition
+// and presentation layer that must de-duplicate user-facing text — not just
+// within one function's own six sections, but across any two claims that
+// might independently restate the same fact in different wording (a
+// different claim ID, a different section, even a different file/pipeline
+// stage). Cheap, structural, and testable: normalized-token overlap, not an
+// LLM judgment call.
+export function normalizeSemanticText(value) {
+  return String(value ?? "").toLocaleLowerCase("en-US")
+    .replaceAll(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+export function semanticTextOverlap(left, right) {
+  const tokens = (value) => new Set(normalizeSemanticText(value).split(" ")
+    .filter((item) => item && !SEMANTIC_OVERLAP_STOPWORDS.has(item)));
+  const leftTokens = tokens(left);
+  const rightTokens = tokens(right);
+  if (leftTokens.size < 5 || rightTokens.size < 5) return 0;
+  const shared = [...leftTokens].filter((item) => rightTokens.has(item)).length;
+  return shared / Math.min(leftTokens.size, rightTokens.size);
+}
+
+export function isSemanticallyEquivalent(left, right, { overlapThreshold = 0.9 } = {}) {
+  if (!left || !right) return false;
+  return normalizeSemanticText(left) === normalizeSemanticText(right) ||
+    semanticTextOverlap(left, right) >= overlapThreshold;
+}
+
 export function round(value, precision = 2) {
   if (!Number.isFinite(value)) return null;
   const factor = 10 ** precision;

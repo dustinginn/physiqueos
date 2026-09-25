@@ -161,8 +161,16 @@ describe("V3 specific longitudinal coaching intelligence", () => {
 
   it("surfaces a Narrative-worthy observation without changing Confidence", () => {
     const { event, recurring } = runSpecificSequence();
-    expect(recurring.narrativePlan.composition.finalNarrative)
-      .toContain("Seated cable row reached 90 lb");
+    const { composition, narrativeSalience } = recurring.narrativePlan;
+    // A holistic training-support signal is present in this fixture (see
+    // `observation()`), so Result stays holistic rather than the movement —
+    // the observation is still surfaced: selected, and explicitly tracked as
+    // a suppressed Result candidate rather than silently dropped.
+    const selected = narrativeSalience.selectedCoachingObservations.find(
+      (item) => item.topicKey.includes("row"));
+    expect(selected).toBeDefined();
+    expect(composition.sectionAllocations.result.suppressedCandidateIds)
+      .toContain(selected.candidateId);
     expect(recurring.confidence.currentPercentage)
       .toBe(event.confidence.currentPercentage);
   });

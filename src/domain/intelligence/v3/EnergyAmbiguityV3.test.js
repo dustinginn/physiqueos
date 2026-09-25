@@ -83,17 +83,29 @@ describe("Energy execution and ambiguity (V3)", () => {
     expect(applyEnergyAmbiguityToRecommendation({ action: "x" }, execution).strength).toBe("firm");
   });
 
-  it("describes every Energy ambiguity in plain language and composes a factual Energy statement", () => {
+  it("describes every Energy ambiguity in plain language, and keeps the findings/estimate as structured data rather than prose", () => {
     const execution = deriveEnergyExecutionV3({ goalContract, observations: fullObservations() });
     for (const item of execution.ambiguity) {
       const text = describeUncertaintyV3(item);
       expect(text).toMatch(/^[A-Z].*\.$/);
       expect(text).not.toMatch(/energy_|uncertainty\|/);
     }
-    const statement = composeEnergyStatementV3({ execution });
-    expect(statement).toMatch(/Calorie intake averaged 2,457 kcal\/day, in line with the 2,500 kcal\/day target/);
-    expect(statement).toMatch(/Active calories averaged 900 kcal\/day, 100 kcal\/day above the 800 kcal\/day target/);
-    expect(statement).toMatch(/-289 kcal\/day across 6 of 7 paired days/);
+    // Data-first: the per-dimension deviations and the paired-day estimate
+    // are available as structured data for every surface to render as
+    // rows/metric tiles — never restated as prose here.
+    const intake = execution.findings.find((item) => item.dimension === "intake");
+    expect(intake).toMatchObject({ observedValue: 2457, targetValue: 2500, state: "on_plan" });
+    const activity = execution.findings.find((item) => item.dimension === "activity");
+    expect(activity).toMatchObject({ observedValue: 900, targetValue: 800, state: "above_plan" });
+    expect(execution.estimate).toMatchObject({ pairing: { pairedDayCount: 6, eligibleDayCount: 7 } });
+    // Without an ambiguity clause, the module's own prose statement is empty
+    // — the structured data above already says everything, so no sentence
+    // restates it.
+    expect(composeEnergyStatementV3({ execution })).toBeNull();
+    // With an ambiguity/uncertainty clause, that IS the (at most one)
+    // concise incremental sentence — verbatim passthrough, nothing appended.
+    expect(composeEnergyStatementV3({ execution, ambiguityText: "Treat the estimate as directional." }))
+      .toBe("Treat the estimate as directional.");
   });
 
   it("words a guardrail that could not be assessed without doubled punctuation", () => {

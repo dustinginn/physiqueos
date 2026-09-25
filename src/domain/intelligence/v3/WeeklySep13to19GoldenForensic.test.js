@@ -162,11 +162,17 @@ describe("Sep 13–19 Weekly: corrected V3 forensic replay", () => {
     }
     const highOrModerate = types.filter((item) => ["high", "moderate"].includes(item.materiality));
     expect(highOrModerate.every((item) => item.surfaced || item.suppressionReason)).toBe(true);
-    // The Energy ambiguity is realized in the narrative, derived from structured types.
+    // The Energy ambiguity is realized in the narrative, derived from
+    // structured types — surfaced via the Energy module's own factual
+    // interpretation (`narrativeV3.energy.statement`), not restated in
+    // Watch, which stays reserved for the next forward-looking trigger.
     expect(prepared.narrativePlan.composition.energyAmbiguity).toMatch(/directional/);
-    expect(prepared.narrativePlan.composition.sections.watch).toContain(prepared.narrativePlan.composition.energyAmbiguity);
+    expect(prepared.narrativePlan.composition.sections.watch)
+      .not.toContain(prepared.narrativePlan.composition.energyAmbiguity);
+    expect(prepared.artifact.briefing.narrativeV3.energy.statement)
+      .toBe(prepared.narrativePlan.composition.energyAmbiguity);
     const energyTypes = types.filter((item) => /^energy_/.test(item.type));
-    expect(energyTypes.some((item) => item.surfaced)).toBe(true);
+    expect(energyTypes.some((item) => item.surfaced && item.surfacedIn === "module")).toBe(true);
   });
 
   it("lets ambiguity temper recommendation strength without changing the action or Confidence", async () => {
@@ -219,7 +225,11 @@ describe("Sep 13–19 Weekly: corrected V3 forensic replay", () => {
     expect(energy.length).toBeGreaterThanOrEqual(4);
     const served = createWeeklyBriefingScreenPresentation(
       (await adaptWeeklyArtifactForPresentation({ artifact: prepared.artifact })).briefing.weeklyNarrative);
-    expect(served.energy.title).toMatch(/^Calorie intake averaged 2,4\d\d kcal\/day, in line with the 2,500 kcal\/day target\.$/);
+    // Energy's title is the first sentence of its own factual statement —
+    // now the module's one concise incremental sentence (the ambiguity/
+    // uncertainty clause), not a restatement of the per-dimension findings
+    // already shown as structured rows.
+    expect(served.energy.title).toMatch(/^Treat the calorie estimate as directional:.*\.$/);
     expect(served.energy.narrative).toBe(prepared.artifact.briefing.narrativeV3.energy.statement);
     const actions = served.coachInsight.actionItems;
     expect(new Set(actions).size).toBe(actions.length);

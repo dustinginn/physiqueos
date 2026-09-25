@@ -517,28 +517,34 @@ export function createMidweekEnergyPresentation(energy = {}) {
   });
 }
 
+// A kcal/day change smaller than this does not change what someone would do
+// differently from the prior period, so it stays out of the coaching text —
+// the raw numbers are still visible in the metric tiles either way.
+const MATERIAL_PRIOR_PERIOD_CHANGE_KCAL = 150;
+
 function energyComparisonText(energy) {
   const previous = energy.comparison?.averageBalance;
   const current = Number.isFinite(energy.estimatedAverageDailyBalance)
     ? energy.estimatedAverageDailyBalance
     : energy.estimatedDailyBalanceMidpoint;
-  if (!Number.isFinite(previous) || !Number.isFinite(current)) {
-    return "The prior comparable period does not have enough paired evidence for a directional comparison.";
+  const parts = [];
+  if (Number.isFinite(previous) && Number.isFinite(current)) {
+    const change = Math.round(current - previous);
+    if (Math.abs(change) >= MATERIAL_PRIOR_PERIOD_CHANGE_KCAL) {
+      const direction = change > 0 ? "higher than" : "lower than";
+      parts.push(`Average estimated balance was ${direction} the prior comparable period by ${Math.abs(change).toLocaleString("en-US")} kcal/day.`);
+    }
   }
-  const change = Math.round(current - previous);
-  const direction = Math.abs(change) < 25 ? "was similar to" : change > 0 ? "was higher than" : "was lower than";
-  const rmr = energy.rmrProvenance?.sourceDexaDate
-    ? ` Estimated expenditure uses the DEXA RMR available on ${shortDate(energy.rmrProvenance.sourceDexaDate)} plus active calories.`
-    : " Estimated expenditure is limited because an eligible RMR source is unavailable.";
-  return `Average estimated balance ${direction} the prior comparable period by ${Math.abs(change).toLocaleString("en-US")} kcal/day.${rmr}`;
+  // Methodology is a compact, subordinate note — only when the RMR source is
+  // actually a limitation on the estimate (missing), never when the estimate
+  // is using a normal, current source; that case is not decision-relevant.
+  if (!energy.rmrProvenance?.sourceDexaDate) {
+    parts.push("Estimated expenditure is limited because an eligible RMR source is unavailable.");
+  }
+  return parts.length ? parts.join(" ") : null;
 }
 
 function longDay(value) {
   return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" })
-    .format(new Date(`${value}T12:00:00Z`));
-}
-
-function shortDate(value) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
     .format(new Date(`${value}T12:00:00Z`));
 }

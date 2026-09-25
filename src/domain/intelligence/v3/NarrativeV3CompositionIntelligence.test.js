@@ -46,22 +46,50 @@ describe("Narrative V3 briefing section intelligence", () => {
     expect(founderCopy(recurring)).not.toMatch(/energy|calorie|estimate|expenditure/iu);
   });
 
-  it("preserves a specific movement observation through composition", () => {
+  // A movement candidate is a `detail`-scope claim: it is preserved (selected,
+  // tracked, available for Training) but does not become the hero merely for
+  // being the strongest specific claim — here a `holistic` operating signal
+  // ("Training supported the plan.") is also present and wins Result, per
+  // the hero scope/salience gate. The movement stays out of the hero, not
+  // dropped: it is recorded as an explicitly suppressed candidate with a
+  // scope-aware reason, and remains selected in narrativeSalience.
+  it("preserves a specific movement observation through composition without letting it dominate a holistic hero", () => {
     const { recurring } = recurringWithDetails({ exercises: [exercisePi({
       id: "leg_press", label: "Leg Press", category: "Lower Body",
       prs: [{ type: "session_volume", value: 13100,
         previous_best: 11000, unit: "lb" }],
     })] });
-    expect(recurring.narrativePlan.composition.sections.result)
-      .toBe("Leg Press set another session-volume best, 19.1% above the previous one.");
+    const { composition, narrativeSalience } = recurring.narrativePlan;
+    expect(composition.sections.result).toBe("Training supported the plan.");
+    expect(composition.sectionAllocations.result.scope).toBe("holistic");
+    const selected = narrativeSalience.selectedCoachingObservations.find(
+      (item) => item.topicKey.includes("leg_press"));
+    expect(selected).toBeDefined();
+    expect(composition.sectionAllocations.result.suppressedCandidateIds)
+      .toContain(selected.candidateId);
+    expect(composition.sectionAllocations.result.suppressionReason)
+      .toBe("detail_subordinate_to_holistic_claim");
   });
 
-  it("uses natural movement-level coaching instead of a generic domain summary", () => {
+  // Same gate exercised again with a different movement/domain shape: the
+  // holistic signal still wins Result, and the movement stays a tracked,
+  // explicitly-suppressed candidate rather than the hero.
+  it("keeps Result holistic even when the movement's own coaching language would otherwise be natural", () => {
     const { recurring } = recurringWithDetails({ exercises: [exercisePi({
       id: "row", label: "ISO-Lateral High Rows", percent: 36.4,
     })] });
-    expect(founderCopy(recurring)).toMatch(/ISO-Lateral High Rows.*36\.4%/u);
-    expect(founderCopy(recurring)).not.toMatch(/upper-body pulling produced|training support remains positive|longitudinal progression detected/iu);
+    const { composition, narrativeSalience } = recurring.narrativePlan;
+    expect(composition.sections.result).toBe("Training supported the plan.");
+    const selected = narrativeSalience.selectedCoachingObservations.find(
+      (item) => item.topicKey.includes("row"));
+    expect(selected).toBeDefined();
+    expect(composition.sectionAllocations.result.suppressedCandidateIds)
+      .toContain(selected.candidateId);
+    // Not in the hero (Result/meaning) — Confidence's own concrete-evidence
+    // reason (Part A2) may still name it elsewhere, which is correct and
+    // distinct from promoting it to the hero.
+    expect(composition.sections.result).not.toMatch(/ISO-Lateral High Rows/u);
+    expect(composition.sections.meaning).not.toMatch(/ISO-Lateral High Rows/u);
   });
 
   it("does not automatically duplicate Result in Coach's Take", () => {
@@ -116,7 +144,7 @@ describe("Narrative V3 briefing section intelligence", () => {
       .toBe(true);
   });
 
-  it("keeps one movement prominent when a second movement is not decision-changing", () => {
+  it("keeps one movement prominent when a second movement is not decision-changing, and keeps Result holistic rather than either movement", () => {
     const { event, recurring } = recurringWithDetails({ exercises: [
       exercisePi({ id: "leg_press", label: "Leg Press", category: "Lower Body",
         prs: [{ type: "session_volume", value: 13100,
@@ -125,12 +153,18 @@ describe("Narrative V3 briefing section intelligence", () => {
     ] });
     const selected = recurring.strategicInterpretation
       .coachingObservationSelection.selected;
+    // Result: holistic, not either movement — the first movement candidate
+    // is explicitly tracked as suppressed, not silently dropped.
     expect(recurring.narrativePlan.composition.sections.result)
-      .toMatch(/Leg Press/iu);
+      .toBe("Training supported the plan.");
+    expect(recurring.narrativePlan.composition.sectionAllocations.result)
+      .toMatchObject({ scope: "holistic",
+        suppressedCandidateIds: [selected[0].candidateId] });
+    // Coach's Take: the second movement is still independently suppressed by
+    // its own, unrelated gate (not decision-changing) — unaffected by the
+    // Result gate above.
     expect(recurring.narrativePlan.composition.coachTake)
       .not.toMatch(/Leg Press|ISO-Lateral High Rows/iu);
-    expect(recurring.narrativePlan.composition.sectionAllocations.result)
-      .toMatchObject({ candidateIds: [selected[0].candidateId] });
     expect(recurring.narrativePlan.composition.sectionAllocations.coachTake)
       .toMatchObject({
         allocationReason: "second_movement_not_decision_changing",
@@ -140,7 +174,13 @@ describe("Narrative V3 briefing section intelligence", () => {
       .toBe(event.confidence.currentPercentage);
   });
 
-  it("keeps the frozen 90 lb movements distinct while allocating only Machine Lateral Raise to narrative", () => {
+  // Production-fixture parity: the exact Sep 20–22 case (Machine Lateral
+  // Raise 90 lb / Leg Extensions 90 lb). Both facts remain distinct and
+  // selected; neither dominates the hero — Result is the holistic training
+  // signal, and both movements are available as structured Training facts
+  // (verified here via narrativeSalience/suppressedCandidateIds, since this
+  // unit only tests composition, not the full presentation contract).
+  it("keeps the frozen 90 lb movements distinct while never letting either dominate the hero", () => {
     const { recurring } = recurringWithDetails({ exercises: [
       exercisePi({ id: "lateral_raise_machine",
         label: "Lateral Raises Machine", date: "2026-09-22",
@@ -157,13 +197,15 @@ describe("Narrative V3 briefing section intelligence", () => {
       .toEqual([["lateral_raise_machine", 90, 85],
         ["leg_extension", 90, 80]]);
     expect(recurring.narrativePlan.composition.sections.result)
-      .toBe("Machine lateral raises reached 90 lb, up from the previous best of 85 lb.");
+      .toBe("Training supported the plan.");
     expect(recurring.narrativePlan.composition.coachTake)
       .not.toMatch(/Leg Extensions|90 lb/iu);
+    expect(founderCopy(recurring)).not.toMatch(/90 lb/u);
     expect(recurring.narrativePlan.composition.sectionAllocations.result)
       .toMatchObject({
-        topicKeys: ["training|lateral_raise_machine|heaviest_load"],
-        candidateIds: [selected[0].candidateId],
+        scope: "holistic",
+        suppressedCandidateIds: [selected[0].candidateId],
+        suppressionReason: "detail_subordinate_to_holistic_claim",
       });
     expect(recurring.narrativePlan.composition.sectionAllocations.coachTake)
       .toMatchObject({
@@ -172,14 +214,14 @@ describe("Narrative V3 briefing section intelligence", () => {
       });
   });
 
-  it("keeps a single movement in Result and uses broad coaching for Coach's Take", () => {
+  it("keeps a single movement out of a holistic Result and uses broad coaching for Coach's Take", () => {
     const { recurring } = recurringWithDetails({ exercises: [exercisePi({
       id: "row", label: "ISO-Lateral High Rows", percent: 20,
       prs: [{ type: "heaviest_load", value: 120,
         previous_best: 100, unit: "lb" }],
     })] });
     expect(recurring.narrativePlan.composition.sections.result)
-      .toMatch(/ISO-Lateral High Rows.*120 lb/iu);
+      .toBe("Training supported the plan.");
     expect(recurring.narrativePlan.composition.coachTake)
       .not.toMatch(/ISO-Lateral High Rows|120 lb/iu);
     expect(recurring.narrativePlan.composition.sectionAllocations.coachTake)

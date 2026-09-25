@@ -87,28 +87,16 @@ export function buildCanonicalNarrativeV3Extensions({ strategicInterpretation, n
   return { uncertainty, energy };
 }
 
-// Factual, strategy-relative Energy statement derived only from the structured
-// V3 Energy execution and ambiguity. It states what was observed against the
-// current plan and what the estimate can and cannot support.
+// Data-first Energy interpretation. `execution.findings` (per-dimension,
+// target-relative) and `execution.estimate` (the paired-day balance
+// estimate) are served as structured data alongside this statement — every
+// surface already renders them as rows/metric tiles/a paired-day badge, not
+// prose. This function's only job is to add, at most, one concise sentence
+// of INCREMENTAL meaning the structured data cannot say on its own (a
+// materially decision-relevant uncertainty/caveat); it must never
+// prose-serialize a target-relative deviation or a paired-day average that a
+// factual module already displays as data.
 export function composeEnergyStatementV3({ execution, ambiguityText = null } = {}) {
   if (!execution) return null;
-  const parts = [];
-  const phrase = (finding, noun) => {
-    const gap = Math.abs(Math.round(finding.deviation));
-    const relation = finding.state === "on_plan" ? "in line with"
-      : finding.state === "below_plan" ? `${gap.toLocaleString("en-US")} kcal/day below`
-        : `${gap.toLocaleString("en-US")} kcal/day above`;
-    return `${noun} averaged ${Math.round(finding.observedValue).toLocaleString("en-US")} kcal/day, ${relation} the ${finding.targetValue.toLocaleString("en-US")} kcal/day target.`;
-  };
-  for (const [dimension, noun] of [["intake", "Calorie intake"], ["activity", "Active calories"]]) {
-    const finding = execution.findings.find((item) => item.dimension === dimension);
-    if (finding) parts.push(phrase(finding, noun));
-  }
-  const estimate = execution.estimate;
-  if (Number.isFinite(estimate?.averageKcalPerDay) && estimate.pairing?.pairedDayCount) {
-    const value = Math.round(estimate.averageKcalPerDay);
-    parts.push(`The energy estimate averaged ${value > 0 ? "+" : ""}${value.toLocaleString("en-US")} kcal/day across ${estimate.pairing.pairedDayCount} of ${estimate.pairing.eligibleDayCount} paired days.`);
-  }
-  if (ambiguityText) parts.push(ambiguityText);
-  return parts.length ? parts.join(" ") : null;
+  return ambiguityText || null;
 }

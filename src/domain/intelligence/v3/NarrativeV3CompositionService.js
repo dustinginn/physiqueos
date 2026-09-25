@@ -1,5 +1,5 @@
 import { ENERGY_AMBIGUITY_CLAUSES_V3 } from "./AmbiguityVocabularyV3.js";
-import { V3_SCHEMA, deepFreeze, round, semanticFingerprint } from "./V3Runtime.js";
+import { V3_SCHEMA, deepFreeze, isSemanticallyEquivalent, round, semanticFingerprint } from "./V3Runtime.js";
 import {
   configuredNarrativeCapitalizationTerms,
   naturalizeUserFacingNarrativeProjection,
@@ -15,6 +15,12 @@ const RAW_ENGINE_LANGUAGE = [
   /\bReason:\s*/u,
   /\b(?:direct result|paired (?:energy )?evidence|current operating evidence|estimate-vs-outcome tension|leading-vs-lagging tension|support index|evidence authority|persistence state)\b/iu,
   /\breported intake minus estimated expenditure\b/iu,
+  // Undefined generic referents standing in for evidence that was available
+  // but not named concretely (the exact defect class the diagnostic found in
+  // Confidence's hold/delta-0 explanation): a bare "update"/"signal"/
+  // "evidence item" with no concrete subject attached.
+  /\b(?:one|an|this) update (?:does not|doesn't|did not|didn't)\b/iu,
+  /\ban evidence item\b/iu,
 ];
 
 export const NARRATIVE_V3_SECTION_PURPOSES = deepFreeze({
@@ -90,6 +96,9 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   };
   const paragraphs = Object.values(sections).filter(Boolean);
   const headline = firstSentence(sections.result ?? sections.meaning ?? sections.action);
+  if (context.useRecurringSectionPlan) {
+    assertHeroOutputBudget({ headline, meaning: sections.meaning });
+  }
   const coachTake = naturalizeUserFacingNarrativeText(
     composeCoachTake(context), casingOptions);
   const finalNarrative = paragraphs.join("\n\n");
@@ -209,6 +218,41 @@ function assertNarrativeV3Voice(value) {
   if (violations.length) throw new Error(`Narrative V3 voice invariant failed: ${violations.join(", ")}`);
 }
 
+// Recurring-cadence hero budget: a short headline and a one-to-two sentence
+// body, so the hero stays a period-level synthesis rather than absorbing
+// detail that belongs in a factual module. Deterministic, not a subjective
+// LLM check.
+const HERO_HEADLINE_MAX_CHARS = 160;
+const HERO_BODY_MAX_SENTENCES = 2;
+
+function assertHeroOutputBudget({ headline, meaning }) {
+  if (headline && headline.length > HERO_HEADLINE_MAX_CHARS) {
+    throw new Error(`Narrative V3 hero headline exceeds ${HERO_HEADLINE_MAX_CHARS} characters: ${headline.length}`);
+  }
+  const sentenceCount = countSentences(meaning);
+  if (sentenceCount > HERO_BODY_MAX_SENTENCES) {
+    throw new Error(`Narrative V3 hero body exceeds ${HERO_BODY_MAX_SENTENCES} sentences: ${sentenceCount}`);
+  }
+}
+
+function countSentences(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return 0;
+  return (text.match(/[.!?](?:\s|$)/gu) ?? []).length || 1;
+}
+
+// Semantic-equivalence distinctness within one narrative plan's six main
+// surfaces. Confidence's own deep-explanation free text (the Confidence
+// detail sheet) is a separate, secondary expansion surface — it may
+// legitimately restate supporting context in more depth without that being
+// the harmful duplication this guards against, so it is intentionally not
+// compared here as a hard-fail invariant (that would block briefing
+// generation for many ordinary, legitimate cases). Energy-module and
+// confidence-reason cross-file text get the corresponding soft check — an
+// omission, not a thrown error — at the presentation-contract boundary in
+// `MidweekBriefingPresentationService.js`'s `createMidweekPresentationContract`,
+// where Energy's statement and the confidence-reason claim both become
+// visible at once.
 function assertDistinctSectionComposition({ context, sections, coachTake }) {
   if (!context.useRecurringSectionPlan) return;
   const values = { ...sections, coachTake };
@@ -218,9 +262,7 @@ function assertDistinctSectionComposition({ context, sections, coachTake }) {
       rightIndex += 1) {
       const [leftName, left] = entries[leftIndex];
       const [rightName, right] = entries[rightIndex];
-      const exact = normalizeCoachingText(left) === normalizeCoachingText(right);
-      const overlap = coachingTokenOverlap(left, right);
-      if (exact || overlap >= 0.9) {
+      if (isSemanticallyEquivalent(left, right)) {
         throw new Error(`Narrative V3 section redundancy: ${leftName} and ${rightName}`);
       }
     }
@@ -239,23 +281,6 @@ function assertDistinctSectionComposition({ context, sections, coachTake }) {
       usedTopics.set(topic, section);
     }
   }
-}
-
-function normalizeCoachingText(value) {
-  return String(value ?? "").toLocaleLowerCase("en-US")
-    .replaceAll(/[^\p{L}\p{N}]+/gu, " ").trim();
-}
-
-function coachingTokenOverlap(left, right) {
-  const ignored = new Set(["the", "a", "an", "and", "or", "to", "of",
-    "in", "is", "it", "that", "this", "for", "with", "your"]);
-  const tokens = (value) => new Set(normalizeCoachingText(value).split(" ")
-    .filter((item) => item && !ignored.has(item)));
-  const leftTokens = tokens(left);
-  const rightTokens = tokens(right);
-  if (leftTokens.size < 5 || rightTokens.size < 5) return 0;
-  const shared = [...leftTokens].filter((item) => rightTokens.has(item)).length;
-  return shared / Math.min(leftTokens.size, rightTokens.size);
 }
 
 function narrativeContext(goalContract, interpretation, objective) {
@@ -308,6 +333,21 @@ function nextEvidenceName(context) { return `the next ${context.nextEvidence.dis
 function nextEvidenceVerb(context) { return context.nextEvidence.grammaticalNumber === "plural" ? "are" : "is"; }
 function continuationPhrase(context) { return context.objectiveWords.continuationPhrase ?? (isMaintenanceObjective(context.objectiveDefinition) ? "this stability" : "this level of progress"); }
 
+// Hero/Result claim scope, from broadest to narrowest. `holistic`/`domain`
+// both come from cross-domain synthesis (`context.operatingSignals`, already
+// a synthesized signal spanning evidence, not a raw single fact) and are
+// treated as one tier here since the current interpretation layer does not
+// yet distinguish a period-level synthesis from a single selected domain
+// signal; `detail` is a single movement/metric-specific claim
+// (`SpecificCoachingObservationV3`). `none` is the generic no-material-change
+// fallback. A `detail` claim may win Result/headline ONLY when it is
+// deterministically decision-changing (the same primitive already gating a
+// second movement into Coach's Take, `evaluateSecondMovementNarrativeAllocation`)
+// — never merely because it is the strongest specific claim available.
+const NarrativeClaimScope = Object.freeze({
+  HOLISTIC: "holistic", DOMAIN: "domain", DETAIL: "detail", NONE: "none",
+});
+
 function allocateNarrativeSections(context) {
   if (!context.useRecurringSectionPlan) {
     return { mode: "event_focused", content: {}, allocations: eventAllocations() };
@@ -322,14 +362,28 @@ function allocateNarrativeSections(context) {
   const operatingSignal = context.operatingSignals.find((item) =>
     item !== energySignal && item.factualSummary && !isEnergyFamilySignal(item));
   const signalClauses = coachingClauses(operatingSignal?.factualSummary);
-  const resultText = resultObservation
-    ? realizeCoachingObservation(resultObservation, "result")
-    : signalClauses[0] ? sentence(signalClauses[0])
+  const resultDecisionChanging = resultObservation?.recommendationCapability?.decisionChanging === true;
+  const holisticResultText = signalClauses[0] ? sentence(signalClauses[0]) : null;
+  let resultScope = NarrativeClaimScope.NONE;
+  const resultText = holisticResultText
+    ? (resultScope = NarrativeClaimScope.HOLISTIC, holisticResultText)
+    : resultObservation && resultDecisionChanging
+      ? (resultScope = NarrativeClaimScope.DETAIL, realizeCoachingObservation(resultObservation, "result"))
       : context.interpretation.recommendation.action === "continue_current_strategy"
         ? "Nothing here calls for a change."
         : null;
+  // Confidence's own deep-explanation "what supports it now" independently
+  // draws on the same operatingSignals pool (see composeConfidenceDeepExplanation
+  // below) — record which signal Result already surfaced so that list doesn't
+  // restate it.
+  context.resultOperatingSignal = resultScope === NarrativeClaimScope.HOLISTIC
+    ? operatingSignal : null;
+  // A movement claim that exists but is not decision-changing, and has no
+  // holistic signal to defer to, stays out of the hero entirely — it remains
+  // available as a structured Training fact, never promoted here merely for
+  // being the strongest specific claim on hand.
   const meaningText = recurringMeaning(context, {
-    resultObservation,
+    resultObservation: resultScope === NarrativeClaimScope.DETAIL ? resultObservation : null,
     operatingSignal,
   });
   const secondMovementDecision = evaluateSecondMovementNarrativeAllocation({
@@ -344,24 +398,38 @@ function allocateNarrativeSections(context) {
     ? secondObservation : null;
   const actionText = recurringAction(context);
   const energyText = translateEnergyForCoaching(context, energySignal);
+  // The Energy module's own factual interpretation now carries this
+  // ambiguity text directly (see `composeEnergyStatementV3` in
+  // BriefingV3Projection.js) — Watch must not repeat it; Watch stays
+  // reserved for the next forward-looking trigger, distinct from any
+  // factual-module interpretation.
   const ambiguityText = translateEnergyAmbiguityForCoaching(context);
   context.energyAmbiguityText = ambiguityText;
-  const watchText = [ambiguityText, energyText ?? recurringNextCheck(context)]
-    .filter(Boolean).join(" ") || null;
+  const watchText = energyText ?? recurringNextCheck(context);
+  const gatedResultObservation = resultScope === NarrativeClaimScope.DETAIL
+    ? resultObservation : null;
   const coachText = coachObservation
     ? realizeCoachingObservation(coachObservation, "coach_take")
     : signalClauses[1]
       ? `${upperFirst(sentence(signalClauses[1]))} That is the one area to watch over the next few sessions, not a reason to change the whole plan.`
-      : recurringCoachTake(context, { resultObservation, operatingSignal });
+      : recurringCoachTake(context, { resultObservation: gatedResultObservation, operatingSignal });
   const allocations = {
     result: allocation("recent_change_worth_knowing",
-      resultObservation?.topicKey ?? operatingSignal?.signalId ?? "no_material_change",
-      resultObservation ? { candidateIds: [resultObservation.candidateId] } : {}),
+      gatedResultObservation?.topicKey ?? operatingSignal?.signalId ?? "no_material_change",
+      {
+        scope: resultScope,
+        ...(gatedResultObservation ? { candidateIds: [gatedResultObservation.candidateId] } : {}),
+        ...(resultObservation && !gatedResultObservation
+          ? { suppressedCandidateIds: [resultObservation.candidateId],
+            suppressionReason: resultScope === NarrativeClaimScope.HOLISTIC
+              ? "detail_subordinate_to_holistic_claim"
+              : "detail_not_decision_changing" }
+          : {}),
+      }),
     meaning: allocation("goal_relative_implication", "goal_implication"),
     action: allocation("current_coaching_action", "recommendation"),
     watch: allocation("specific_bounded_attention",
-      ambiguityText ? "energy_ambiguity"
-        : energyText ? energySignal?.signalId : "next_assessment"),
+      energyText ? energySignal?.signalId : "next_assessment"),
     confidence: allocation("goal_outlook_movement", "confidence_movement"),
     coachTake: allocation("highest_value_remaining_coaching_point",
       coachObservation?.topicKey ?? (signalClauses[1]
@@ -588,10 +656,11 @@ function translateEnergyAmbiguityForCoaching(context) {
     ENERGY_AMBIGUITY_CLAUSES_V3[item.type]);
   if (!items.length) return null;
   const clauses = items.map((item) => ENERGY_AMBIGUITY_CLAUSES_V3[item.type](item));
-  const guidance = context.interpretation.recommendation.nonAction?.includes(
-    "no_energy_target_change_on_the_estimate_alone")
-    ? " Keep calorie targets where they are unless something more than the estimate calls for a change." : "";
-  return `Treat the calorie estimate as directional: ${naturalList(clauses)}.${guidance}`;
+  // Watch states only the uncertainty itself — what to keep an eye on — not a
+  // recommendation. "Keep calorie targets where they are" is action-shaped
+  // content and belongs in Action/Recommendation, which already covers the
+  // continue_current_strategy case on its own; Watch must not duplicate it.
+  return `Treat the calorie estimate as directional: ${naturalList(clauses)}.`;
 }
 
 function phaseReference(context) {
@@ -983,8 +1052,14 @@ function composeConfidenceBriefing(context) {
   }
   if (confidence.delta === 0) {
     const specific = context.specificCoachingObservations[0];
-    return { heading, body: specific
-      ? "Confidence holds. This progress supports the current approach, but one update does not change the overall goal outlook."
+    // The concrete evidence that mattered, named directly — never a generic
+    // stand-in noun like "update"/"signal"/"evidence item"/"movement" with no
+    // referent. Phrased direction-neutrally: the candidate here may be a
+    // positive milestone or a plateau worth watching, and this is only ever
+    // Confidence's own reason, never a restatement of the hero or a module.
+    const evidenceLabel = specific ? coachingSubject(specific.subjectLabel) : null;
+    return { heading, body: evidenceLabel
+      ? `Confidence holds. ${evidenceLabel}’s recent result does not move the overall goal outlook by itself; the rest of the evidence still needs to confirm the trend before confidence can shift.`
       : confidence.projectionPolicy.mode === "continuity_hold" ?
         "Confidence holds. Nothing new changes the outlook for the goal." :
         "Confidence holds. This check-in does not change the outlook for reaching the goal." };
@@ -1022,6 +1097,9 @@ function composeConfidenceDeepExplanation(context) {
     `There is enough time to finish ahead of schedule if ${continuationPhrase(context)} continues.` :
       trajectory?.deadlineContributionApplicable && trajectory.scheduleState === "at_risk" ? "The remaining work is becoming harder to fit into the available time." : null;
   const currentSupport = context.operatingSignals
+    // Already surfaced as the hero Result — Confidence's own supporting-
+    // evidence list adds other current support, not a restatement of it.
+    .filter((item) => item !== context.resultOperatingSignal)
     .filter((item) => item.direction === "supports" && item.factualSummary)
     .map((item) => item.semanticClass === "DERIVED_ESTIMATE"
       ? translateEnergyForCoaching(context, item)
@@ -1105,8 +1183,12 @@ function formatCoachingMeasurement(value, unit) {
 function resolveUncertaintySurfacing(item, interpretation, context) {
   if (item.domain === "energy") {
     if (item.recommendationEffect === "temper") {
+      // Surfaced via the Energy module's own factual interpretation, not
+      // Watch (see composeEnergyStatementV3 / the watchText change above) —
+      // "module" is the same value `boundedUncertainty()` already recognizes
+      // as covered, keeping it out of the separate Still Unresolved list.
       return context.energyAmbiguityText
-        ? { surfaced: true, surfacedIn: "watch", suppressionReason: null }
+        ? { surfaced: true, surfacedIn: "module", suppressionReason: null }
         : { surfaced: false, suppressionReason: "energy_context_unavailable_for_narrative" };
     }
     return { surfaced: false, suppressionReason: "low_materiality_no_recommendation_effect" };
