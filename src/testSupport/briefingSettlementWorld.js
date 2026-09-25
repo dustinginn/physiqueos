@@ -66,7 +66,7 @@ export function flakyRecords(records) {
   };
 }
 
-export function repositoriesFor(artifactRecords) {
+export function repositoriesFor(artifactRecords, { beforeEvidenceRead = null } = {}) {
   const user = { id: OWNER, timeZone: TZ };
   const protocol = { id: "briefings", protocolType: "briefings", currentVersionId: "briefings-v1" };
   return {
@@ -84,7 +84,7 @@ export function repositoriesFor(artifactRecords) {
       })),
     },
     dailyBriefings: createDailyBriefingRepository(artifactRecords),
-    canonicalEvidence: { listCanonicalEvidenceObjects: vi.fn(async () => []) },
+    canonicalEvidence: { listCanonicalEvidenceObjects: vi.fn(async () => { await beforeEvidenceRead?.(); return []; }) },
     weights: { listWeightEntries: vi.fn(async () => []) },
     dexaScans: { listDEXAScans: vi.fn(async () => []) },
     goals: { getActiveGoal: vi.fn(async () => ({ id: "goal-build", title: "Build Lean Mass", phases: [] })) },
@@ -96,9 +96,9 @@ export function repositoriesFor(artifactRecords) {
 // logger call in order with its level.
 export function createWorker({
   name = "worker", artifactRecords, hk, lock = null, generatorWrap = null, executionStore = null,
-  readerHk = null, logs = [], settlementObserver = null,
+  readerHk = null, logs = [], settlementObserver = null, beforeEvidenceRead = null, policy = null,
 } = {}) {
-  const repositories = repositoriesFor(artifactRecords);
+  const repositories = repositoriesFor(artifactRecords, { beforeEvidenceRead });
   let clock = new Date(at(5));
   const midweekService = createMidweekBriefingService({ repositories, now: () => clock });
   const inner = (input) => midweekService.generateForCurrentWindow(input);
@@ -127,6 +127,7 @@ export function createWorker({
     },
     executionLock: lock ?? { async acquire() { return { acquired: true, async release() {} }; } },
     ...(settlementObserver ? { settlementObserver } : {}),
+    ...(policy ? { policy } : {}),
     source: `${name}-test`,
   });
   return {

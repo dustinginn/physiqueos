@@ -23,6 +23,7 @@ import {
   recordDeviceCloseoutReceiptV1,
   verifyEvidenceSettlementWatermarkIntegrity,
 } from "./BriefingEvidenceSettlementPolicy.js";
+import { applyNarrativeV3ToBriefingArtifact } from "./BriefingGoalConfidencePresentationService.js";
 import midweekFixture from "../../fixtures/briefingFamilyV3/midweekBriefingV2.json";
 
 // BLOCKER 1: the immutable evidence-settlement watermark is built by the real
@@ -387,5 +388,19 @@ describe("the other recurring generators carry the same watermark", () => {
     const result = await service.generateForCurrentWindow({ userId: OWNER, asOf, settlement });
     expect(result.state).toBe("completed");
     expect(publisher.mock.calls[0][0].prepared.artifact.evidenceSettlement).toMatchObject({ cadence: "monthly", publishReasonCode: "readiness_satisfied" });
+  });
+});
+
+describe("the production V3 publication clone carries the watermark through unchanged", () => {
+  it.each(["midweek", "weekly"])("applyNarrativeV3ToBriefingArtifact (%s) preserves artifact.evidenceSettlement and does not mutate its input", (type) => {
+    const mark = buildEvidenceSettlementWatermarkV1({
+      evidenceWindow: { startDate: "2026-09-13", endDate: "2026-09-15" }, readiness: evaluateBriefingReadinessV1({ domainStates: {} }),
+      publishDecision: { reasonCode: "hard_deadline_reached", unsettledDomains: ["nutrition"] }, generatedAt: at(DEADLINE) });
+    const artifact = { id: "a", evidenceSettlement: mark, briefing: { weeklyNarrative: { cards: {} } } };
+    const out = applyNarrativeV3ToBriefingArtifact({ artifact, publicationType: type,
+      narrativePlan: { composition: { sections: {} } }, strategicInterpretation: {} });
+    expect(out.evidenceSettlement).toEqual(mark);
+    expect(verifyEvidenceSettlementWatermarkIntegrity(out.evidenceSettlement)).toBe(true);
+    expect(artifact.evidenceSettlement).toBe(mark);
   });
 });
