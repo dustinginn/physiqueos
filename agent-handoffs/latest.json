@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-25T15:55:00Z",
+  "generated_at_utc": "2026-09-25T16:20:00Z",
   "task": {
-    "id": "claude-healthkit-cardio-gates-5-6-activate-verify-20260925",
-    "title": "HealthKit Cardio graduation Gate 5 (policy APPLY) + Gate 6 (verification) — Cardio policy scope now ON prospectively; historical walks NOT reconciled",
+    "id": "claude-healthkit-cardio-historical-reconciliation-serial-20260925",
+    "title": "HealthKit Cardio historical reconciliation (Gates 7/8/9) — four deferred walks reconciled serially and verified",
     "agent": "claude",
     "status": "awaiting_founder_direction"
   },
@@ -28,13 +28,16 @@
     "server_candidate_note": "c58dcca9 is included in the deployed combined Server e88b8ef7",
     "live_workout_policy_version": 4,
     "live_workout_policy_effective_local_date": "2026-09-23",
-    "deferred_cardio_backlog_count": 4,
+    "deferred_cardio_backlog_count": 0,
     "live_workout_policy_audit_record": "healthkit_workout_activation_audit_c237cca36ea3_replace-families",
     "live_workout_policy_applied_at_utc": "2026-09-25T15:48:43.485Z",
-    "deferred_cardio_backlog_state": "still deferred and uncanonicalized (Gates 7/8 not authorized)"
+    "deferred_cardio_backlog_state": "all four legacy walks reconciled (canonical Cardio walking, generic type); no deferred workout observations remain",
+    "canonical_workouts_total": 9,
+    "canonical_cardio_workouts": 6,
+    "canonical_strength_workouts": 3
   },
   "result": {
-    "summary": "Gate 5 applied and Gate 6 passed. After fresh authority/inventory reads (Server e88b8ef7 ACTIVE, policy Strength-only v3, same four deferred walks, no new workouts) a fresh replace-families dry run returned dry_run and the atomic apply (expected snapshot built from that fresh dry run's facts, Founder authorization reference founder-chat-2026-09-25-cardio-gates-5-6-replace-families-strength-to-cardio-strength) returned applied: the workout policy is now version 4 with families exactly [cardio,strength]; effectiveLocalDate, openEnded, quarantined, historicalBackfill false, linkAutoConfirm false, domains and status preserved; one audit row (healthkit_workout_activation_audit_c237cca36ea3_replace-families) added. Independent read-only Gate 6 proved: the four deferred walks remain deferred and uncanonicalized; all 9 workout rows, canonical workouts, links, claims, observations, canonical days and evidence are identical to pre-apply; no Cardio Logger session/link/claim; Activity/Nutrition and graduation policy unchanged; 34 of 35 strategic digests identical (the only change is the intended healthKitConfiguration policy+audit rows); migrations unchanged; production healthy; no error-level logs. Cardio canonicalization is enabled prospectively only. Historical Sep23/24 walks lack isIndoorWorkout and are valid tests for reconciliation/accounting/presentation but NOT for Indoor-vs-Outdoor fidelity; tomorrow's first new Apple Watch Cardio workout is the empirical type-fidelity acceptance.",
+    "summary": "All four legacy deferred Sep23/24 walks were reconciled STRICTLY SERIALLY (per entry: fresh authority+state read, fresh dry run bound to that entry, apply from that dry run's facts, immediate read-only verification, idempotency replay) under Server e88b8ef7 and workout policy v4 [cardio,strength]. Each dry run returned dry_run predicting exactly four mutations (canonical workout create + coexistence, observation reconciliation update, one audit row); each apply returned applied; each verification and the final invariant audit passed. Four canonical Cardio 'walking' workouts (generic — none stored isIndoorWorkout; Indoor/Outdoor NOT inferred) now exist with telemetry equal to the stored observations. Whole-day canonical Activity totals are byte-identical (Sep23 782.698 kcal, Sep24 914.709 kcal, rev unchanged); workout attribution changed only by each walk's retained active energy (Sep23 workout 320.5->506.3, non-workout 462.2->276.4; Sep24 workout none->345.7, non-workout 568.99) with no double counting. No Logger session/link/claim for Cardio; Strength workouts, links (2) and claims (4) unchanged; 32 of 35 strategic digests identical (the 3 that changed are the reconciliation-owned HealthKit training collections); policy record unchanged; migrations unchanged; production healthy; no error logs. Indoor-vs-Outdoor fidelity remains untested by the historical four and awaits the first new prospective Cardio workout with isIndoorWorkout metadata.",
     "success": true,
     "production_mutated": true,
     "deployed": false,
@@ -44,39 +47,37 @@
   "validation": {
     "tests": {
       "status": "not_applicable",
-      "summary": "No code changed; existing reviewed replace-families tooling and read-only audit payloads were used."
+      "summary": "No code changed; reviewed reconciliation runner and read-only audit payloads were used."
     },
     "review": {
       "status": "not_required",
-      "summary": "Operational gate using previously reviewed tooling with hard pre-apply assertions; result independently verified by a separate read-only production read."
+      "summary": "Operational gates using previously reviewed tooling with hard per-stage assertions; each entry independently verified by a separate read-only production read."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Pre-apply reads and the Gate 6 verification were BEGIN REPEATABLE READ READ ONLY. The only production write was the single guarded policy update plus one audit row (runner-verified invariants all true; independently confirmed)."
+      "summary": "Reads were BEGIN REPEATABLE READ READ ONLY. The only writes were the four guarded reconciliations (each: one canonical workout + coexistence patch, one observation reconciliation update, one audit row)."
     }
   },
   "decisions_required": [
-    "Gates 7/8: Founder authorization, per entry and strictly serial (never batched), for a fresh-inventory dry run then a separately authorized apply of deferred-Cardio reconciliation for each of the 4 known walks.",
-    "Optional sequencing choice: validate tomorrow's first new Cardio workout (prospective Indoor/Outdoor type fidelity) before, or in parallel with, the historical reconciliation."
+    "Founder real-device acceptance of Build 60 Activity Detail: Sep23 and Sep24 each show two historical Cardio workout rows (generic Walking/Cardio expected), whole-day totals unchanged, Strength detail healthy.",
+    "Observe the first new post-activation Apple Watch Cardio workout to validate prospective Indoor/Outdoor type fidelity (no action needed from Claude until it exists)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "The policy record's own authorizationReference still holds the earlier 2026-09-23 reference; the new authorization reference is recorded in the audit row.",
-    "canonical_training_records/healthKitConfiguration is counted among the strategic digests because the HealthKit configuration lives in the training table; its change (14 -> 15 rows) is the intended policy update plus audit row.",
-    "The auto-mode classifier blocked the production write until a plain-words Founder confirmation was given in chat."
+    "Sep 24's Strength workout is still only an unconfirmed candidate, so by existing semantics its 206 kcal is not counted as workout energy; the Sep 24 workout attribution (345.7 kcal) is the two Cardio walks only.",
+    "The auto-mode classifier required a plain-words Founder chat confirmation before the four serial production writes."
   ],
   "backlog": [
-    "Gates 7/8: strictly serial per-entry dry-run/apply of the 4 deferred walks (fresh inventory each time; use the new policy digest 4e1c59ab2f09bf886cd69207eb22fed3 where a policy digest is required).",
-    "Gate 9: pre/post invariant audits around the reconciliation (whole-day Activity invariance, no double count, no Logger/link/claim).",
-    "Gate 10: Founder real-device acceptance, including tomorrow's prospective Indoor/Outdoor type-fidelity check on the first new Cardio workout.",
+    "Founder device acceptance of the reconciled historical Cardio rows.",
+    "Prospective Indoor/Outdoor type-fidelity acceptance on the first new Apple Watch Cardio workout.",
     "Strategic-evidence eligibility for Cardio remains a later, separate project."
   ],
-  "recommended_next_step": "Await Founder authorization for Gate 7 (first deferred walk dry run) and/or observe tomorrow's first new Cardio workout for prospective type fidelity. Before any reconciliation: re-verify Server e88b8ef7, take a fresh inventory, and dry-run that single entry immediately before its own authorized apply.",
-  "full_report_path": "agent-handoffs/reports/20260925T155500Z-healthkit-cardio-gates-5-6-activate-verify.md",
+  "recommended_next_step": "Founder acceptance of Activity Detail on device; then wait for the first new Cardio workout to validate specific Indoor/Outdoor type. No further Cardio graduation gates remain except those acceptances.",
+  "full_report_path": "agent-handoffs/reports/20260925T161800Z-healthkit-cardio-historical-reconciliation-serial.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260925T155500Z-healthkit-cardio-gates-5-6-activate-verify.md",
     "agent-handoffs/reports/20260925T155000Z-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun.md",
-    "agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md",
-    "agent-handoffs/reports/20260925T150000Z-midweek-v3-server-e88b8ef7-deployment-checkpoint.md"
+    "agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md"
   ],
   "safety": {
     "contains_secrets": false,
