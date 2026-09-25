@@ -37,6 +37,123 @@ describe("HealthKit workout type classification", () => {
   });
 });
 
+// Apple's HKWorkoutActivityType raw value is identical for the indoor and
+// outdoor variant of a cardio activity; only the separate, explicit
+// HKMetadataKeyIndoorWorkout boolean distinguishes them. These tests cover
+// classifyHealthKitWorkoutType's second, optional argument end to end.
+describe("indoor/outdoor cardio specialization (explicit signal only)", () => {
+  it("specializes every supported cardio type into its indoor variant when the signal is explicitly true, without changing family", () => {
+    expect(classifyHealthKitWorkoutType("52", { isIndoorWorkout: true }))
+      .toMatchObject({ family: "cardio", canonicalType: "indoor_walking" });
+    expect(classifyHealthKitWorkoutType("37", { isIndoorWorkout: true }))
+      .toMatchObject({ family: "cardio", canonicalType: "indoor_running" });
+    expect(classifyHealthKitWorkoutType("13", { isIndoorWorkout: true }))
+      .toMatchObject({ family: "cardio", canonicalType: "indoor_cycling" });
+  });
+
+  it("specializes every supported cardio type into its outdoor variant when the signal is explicitly false, without changing family", () => {
+    expect(classifyHealthKitWorkoutType("52", { isIndoorWorkout: false }))
+      .toMatchObject({ family: "cardio", canonicalType: "outdoor_walking" });
+    expect(classifyHealthKitWorkoutType("37", { isIndoorWorkout: false }))
+      .toMatchObject({ family: "cardio", canonicalType: "outdoor_running" });
+    expect(classifyHealthKitWorkoutType("13", { isIndoorWorkout: false }))
+      .toMatchObject({ family: "cardio", canonicalType: "outdoor_cycling" });
+  });
+
+  it("keeps the exact generic canonicalType -- never guessed toward indoor or outdoor -- when the signal is absent, null, or omitted entirely", () => {
+    expect(classifyHealthKitWorkoutType("52")).toMatchObject({ family: "cardio", canonicalType: "walking" });
+    expect(classifyHealthKitWorkoutType("52", {})).toMatchObject({ family: "cardio", canonicalType: "walking" });
+    expect(classifyHealthKitWorkoutType("52", { isIndoorWorkout: null })).toMatchObject({ family: "cardio", canonicalType: "walking" });
+    expect(classifyHealthKitWorkoutType("52", { isIndoorWorkout: undefined })).toMatchObject({ family: "cardio", canonicalType: "walking" });
+  });
+
+  it("never lets the indoor/outdoor signal change family classification -- cardio stays cardio either way", () => {
+    const indoor = classifyHealthKitWorkoutType("52", { isIndoorWorkout: true });
+    const outdoor = classifyHealthKitWorkoutType("52", { isIndoorWorkout: false });
+    expect(indoor.family).toBe("cardio");
+    expect(outdoor.family).toBe("cardio");
+    expect(indoor.canonicalType).not.toBe(outdoor.canonicalType);
+  });
+
+  it("leaves Strength completely byte-identical whether or not an indoor/outdoor signal is supplied -- it never applies outside cardio", () => {
+    const withoutSignal = classifyHealthKitWorkoutType("50");
+    const withTrueSignal = classifyHealthKitWorkoutType("50", { isIndoorWorkout: true });
+    const withFalseSignal = classifyHealthKitWorkoutType("50", { isIndoorWorkout: false });
+    expect(withTrueSignal).toEqual(withoutSignal);
+    expect(withFalseSignal).toEqual(withoutSignal);
+    expect(withoutSignal).toMatchObject({ family: "strength", canonicalType: "traditional_strength_training" });
+  });
+
+  it("never lets an unsupported/unrecognized activity type silently become a known specific type just because an indoor/outdoor signal was supplied", () => {
+    for (const type of ["16", "44", "3000", "Elliptical", "Swimming", "Yoga"]) {
+      const withIndoorTrue = classifyHealthKitWorkoutType(type, { isIndoorWorkout: true });
+      const withIndoorFalse = classifyHealthKitWorkoutType(type, { isIndoorWorkout: false });
+      expect(withIndoorTrue, String(type)).toMatchObject({ family: HealthKitWorkoutFamily.UNSUPPORTED, canonicalType: null });
+      expect(withIndoorFalse, String(type)).toMatchObject({ family: HealthKitWorkoutFamily.UNSUPPORTED, canonicalType: null });
+      // Specifically never "indoor_walking" or any other known specific type.
+      expect(withIndoorTrue.canonicalType).not.toBe("indoor_walking");
+      expect(withIndoorFalse.canonicalType).not.toBe("outdoor_walking");
+    }
+  });
+});
+
+// End-to-end: the same signal, carried through normalizeHealthKitObservationBatch
+// (HealthKitObservationService.js) and into reconcileHealthKitCanonicalWorkout
+// (the same constructor both first-delivery ingestion and the deferred
+// reconciliation runner use), produces the correct canonical record.
+describe("indoor/outdoor signal end to end (observation normalization -> canonical workout)", () => {
+  it("an Outdoor Walk source (isIndoorWorkout: false) canonicalizes to family cardio with canonicalType outdoor_walking", () => {
+    const record = reconcile(workout({ activityType: "52", isIndoorWorkout: false })).record;
+    expect(record.current).toMatchObject({ family: "cardio", canonicalType: "outdoor_walking" });
+  });
+
+  it("an Indoor Walk source (isIndoorWorkout: true) canonicalizes to family cardio with canonicalType indoor_walking", () => {
+    const record = reconcile(workout({ activityType: "52", isIndoorWorkout: true })).record;
+    expect(record.current).toMatchObject({ family: "cardio", canonicalType: "indoor_walking" });
+  });
+
+  it("keeps Indoor and Outdoor distinct even when every other telemetry field (duration, calories, heart rate, distance) is identical", () => {
+    const shared = {
+      activityType: "52", durationSeconds: 1200, activeCalories: 160, averageHeartRate: 124,
+      startedAt: "2026-09-23T10:00:00-07:00", endedAt: "2026-09-23T10:20:00-07:00",
+    };
+    const indoor = reconcile(workout({ ...shared, externalId: "indoor-walk-uuid", isIndoorWorkout: true })).record;
+    const outdoor = reconcile(workout({ ...shared, externalId: "outdoor-walk-uuid", isIndoorWorkout: false })).record;
+    expect(indoor.current.telemetry).toEqual(outdoor.current.telemetry);
+    expect(indoor.current.family).toBe(outdoor.current.family);
+    expect(indoor.current.canonicalType).not.toBe(outdoor.current.canonicalType);
+    expect(indoor.current.canonicalType).toBe("indoor_walking");
+    expect(outdoor.current.canonicalType).toBe("outdoor_walking");
+  });
+
+  it("never overwrites family with the more specific canonicalType, or vice versa -- both are independently correct on the same record", () => {
+    const indoor = reconcile(workout({ activityType: "37", isIndoorWorkout: true })).record;
+    expect(indoor.current.family).toBe("cardio");
+    expect(indoor.current.canonicalType).toBe("indoor_running");
+    // The family classification is untouched by knowing the specific type.
+    expect(indoor.current.family).not.toBe("indoor_running");
+    // The specific type is untouched by (never collapsed to) the family.
+    expect(indoor.current.canonicalType).not.toBe("cardio");
+  });
+
+  it("never infers indoor/outdoor from GPS-shaped telemetry (distance present) when no explicit signal was ever sent -- stays the generic type", () => {
+    const record = reconcile(workout({ activityType: "52", durationSeconds: 1800, activeCalories: 200 })).record;
+    // No isIndoorWorkout key at all in the observation, despite distance-like
+    // telemetry (duration/calories consistent with an outdoor GPS walk).
+    expect(record.current).toMatchObject({ family: "cardio", canonicalType: "walking" });
+    expect(record.current.canonicalType).not.toBe("indoor_walking");
+    expect(record.current.canonicalType).not.toBe("outdoor_walking");
+  });
+
+  it("a legacy/historical payload with no isIndoorWorkout field normalizes and canonicalizes exactly as it did before this change (backward compatibility)", () => {
+    const legacyObservation = normalize(workout({ activityType: "52" }));
+    expect(legacyObservation.measurement).not.toHaveProperty("isIndoorWorkout");
+    const record = reconcile(workout({ activityType: "52" })).record;
+    expect(record.current.canonicalType).toBe("walking");
+    expect(record.current.family).toBe("cardio");
+  });
+});
+
 describe("effective date authority", () => {
   it("comes from the workout's own start in its own time zone, not the client label or ingestion time", () => {
     // 23:50 PDT on Sep 23 is 06:50Z on Sep 24.
@@ -150,12 +267,17 @@ function normalize(input) {
 function workout({
   activityType = "50", externalId = HK_UUID, startedAt = "2026-09-23T10:00:00-07:00", endedAt = "2026-09-23T11:00:00-07:00",
   clientLocalDate = "2026-09-23", durationSeconds = 3600, activeCalories = 400, averageHeartRate = 122, sourceRevision,
+  isIndoorWorkout,
 } = {}) {
   return {
     observationType: "workout",
     externalId,
     source: { bundleIdentifier: "com.apple.health.watch", sourceName: "Apple Watch", productType: "Watch7,5" },
     occurrence: { localDate: clientLocalDate, timeZone: "America/Los_Angeles", startedAt, endedAt },
-    workout: { activityType, durationSeconds, activeCalories, averageHeartRate, ...(sourceRevision ? { sourceRevision } : {}) },
+    workout: {
+      activityType, durationSeconds, activeCalories, averageHeartRate,
+      ...(sourceRevision ? { sourceRevision } : {}),
+      ...(typeof isIndoorWorkout === "boolean" ? { isIndoorWorkout } : {}),
+    },
   };
 }

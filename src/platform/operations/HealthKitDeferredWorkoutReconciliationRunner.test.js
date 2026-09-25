@@ -325,6 +325,62 @@ describe("guarded deferred HealthKit workout reconciliation operation", () => {
     expect(resultWithRef.outcome).toBe("already_canonicalized");
   });
 
+  it("propagates an explicit isIndoorWorkout signal through deferred reconciliation into a specific canonicalType, while a signal-less deferred observation stays the generic type (matching the real historical four)", async () => {
+    const indoorWalk = buildWalkObservation({
+      externalId: "sep24-indoor-signal-walk", startedAt: "2026-09-24T21:00:00Z", endedAt: "2026-09-24T21:18:00Z",
+      activeCalories: 150, averageHeartRate: 118, distance: 1500, isIndoorWorkout: true,
+    });
+    const indoorWalkRecord = {
+      ...createHealthKitObservationRecord({
+        observation: indoorWalk,
+        reconciliation: { state: HealthKitReconciliationState.WORKOUT_CANONICALIZATION_DEFERRED, reason: WORKOUT_FAMILY_OUT_OF_SCOPE_REASON },
+        ownerUserId: OWNER,
+        receivedAt: NOW,
+      }),
+      version: 1,
+    };
+    const records = createInMemoryCanonicalRecordStore({
+      user: [{ id: OWNER, timeZone: "America/Los_Angeles", version: 1 }],
+      canonicalEvidenceObjects: [],
+      healthKitCanonicalWorkouts: [],
+      healthKitWorkoutLinks: [],
+      healthKitWorkoutLinkClaims: [],
+      healthKitObservations: [indoorWalkRecord],
+      healthKitConfiguration: [workoutPolicyRecordFor({ cardioInScope: true, effectiveLocalDate: "2026-09-13" })],
+    });
+
+    const dry = await runHealthKitDeferredWorkoutReconciliation({
+      records, authorization: { ownerUserId: OWNER, observationId: indoorWalkRecord.id, authorizationReference: "" }, now,
+    });
+    expect(dry).toMatchObject({ outcome: "dry_run", canonicalType: "indoor_walking", workoutFamily: "cardio" });
+
+    const applied = await runHealthKitDeferredWorkoutReconciliation({
+      records,
+      authorization: { ownerUserId: OWNER, authorizationReference: "founder-chat-approved-sep24-indoor-signal", observationId: indoorWalkRecord.id },
+      apply: true,
+      expected: dry.facts,
+      now,
+    });
+    expect(applied.outcome).toBe("applied");
+    expect(applied.canonicalType).toBe("indoor_walking");
+
+    const canonicalWorkoutId = getHealthKitCanonicalWorkoutRecordId(indoorWalkRecord);
+    const workout = records.snapshot().healthKitCanonicalWorkouts.find((item) => item.id === canonicalWorkoutId);
+    expect(workout.current).toMatchObject({ family: "cardio", canonicalType: "indoor_walking" });
+
+    // Cross-check against a signal-less deferred observation (the shape of
+    // the real historical four this task must never retroactively touch):
+    // it reconciles to the generic "walking", never a guessed specific type.
+    // (Proven end to end above in "applies: creates exactly one canonical
+    // cardio workout..." with walk1Record, which carries no isIndoorWorkout
+    // field at all.)
+    const { records: genericRecords, walk1Record } = await world();
+    const genericDry = await runHealthKitDeferredWorkoutReconciliation({
+      records: genericRecords, authorization: { ownerUserId: OWNER, observationId: walk1Record.id, authorizationReference: "" }, now,
+    });
+    expect(genericDry).toMatchObject({ outcome: "dry_run", canonicalType: "walking", workoutFamily: "cardio" });
+  });
+
   it("bundles the registered deferred-workout-reconcile entry with apply safety requirements", async () => {
     const sha = "a".repeat(40);
     const dry = await buildHealthKitPayload({ kind: "deferred-workout-reconcile", sha, observationId: "healthkit_observation_example", mode: "dry-run" });
@@ -336,7 +392,7 @@ describe("guarded deferred HealthKit workout reconciliation operation", () => {
   });
 });
 
-function buildWalkObservation({ externalId, startedAt, endedAt, activeCalories, averageHeartRate, distance }) {
+function buildWalkObservation({ externalId, startedAt, endedAt, activeCalories, averageHeartRate, distance, isIndoorWorkout }) {
   return normalizeHealthKitObservationBatch({
     batchId: `walk-batch-${externalId}`,
     principalDeviceId: "founder-iphone",
@@ -352,6 +408,7 @@ function buildWalkObservation({ externalId, startedAt, endedAt, activeCalories, 
         averageHeartRate,
         distance,
         distanceUnit: "m",
+        ...(typeof isIndoorWorkout === "boolean" ? { isIndoorWorkout } : {}),
       },
     }],
   }).observations[0];

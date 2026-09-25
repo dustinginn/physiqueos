@@ -640,4 +640,19 @@ describe("Part E: whole-day HealthKit workout-calorie attribution", () => {
     expect(report.linkedTrainingContext).toEqual([]);
     expect(report.latestActivityDay.contributingWorkouts).toHaveLength(1);
   });
+
+  it("exposes the specific indoor/outdoor canonical type on Activity Detail's contributingWorkouts, not merely the generic family or the unspecific type", () => {
+    const fixture = createCardioWholeDayAttributionFixture({ canonicalType: "indoor_walking" });
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+
+    expect(day.contributingWorkouts).toHaveLength(1);
+    expect(day.contributingWorkouts[0]).toMatchObject({
+      id: fixture.ids.cardioWorkout,
+      family: "cardio",
+      canonicalType: "indoor_walking",
+    });
+    // Never collapsed to the family or to the generic (unspecific) type.
+    expect(day.contributingWorkouts[0].canonicalType).not.toBe("cardio");
+    expect(day.contributingWorkouts[0].canonicalType).not.toBe("walking");
+  });
 });

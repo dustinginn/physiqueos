@@ -30,6 +30,12 @@ export function createCardioWholeDayAttributionFixture({
   observationId = OBSERVATION_ID,
   startedAt = "2026-09-25T17:00:00.000Z",
   endedAt = "2026-09-25T17:30:00.000Z",
+  // Defaults to the generic (indoor/outdoor-unknown) type this fixture has
+  // always used. A caller may override it to a location-specific canonical
+  // type (e.g. "indoor_walking") to prove presentation forwards whatever
+  // specificity the canonical workout already carries, without this fixture
+  // needing to know anything about how that specificity was derived.
+  canonicalType = "walking",
 } = {}) {
   const cardioWorkout = {
     schemaVersion: "healthkit-canonical-workout-v1",
@@ -43,7 +49,7 @@ export function createCardioWholeDayAttributionFixture({
       sourceObservationId: observationId,
       sourceRevision: 1,
       family: "cardio",
-      canonicalType: "walking",
+      canonicalType,
       appleActivityType: "52",
       localDate: day,
       timeZone: "America/Los_Angeles",

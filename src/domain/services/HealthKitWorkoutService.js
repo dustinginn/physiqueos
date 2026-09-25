@@ -37,7 +37,52 @@ const NUMERIC_TYPES = Object.freeze({
   13: { family: HealthKitWorkoutFamily.CARDIO, canonicalType: "cycling" },
 });
 
-export function classifyHealthKitWorkoutType(activityType) {
+// Apple uses the SAME raw HKWorkoutActivityType value for the indoor and
+// outdoor variant of a given cardio activity (e.g. "52" is walking whether
+// Indoor Walk or Outdoor Walk); the two are only distinguished by a separate
+// boolean, `HKMetadataKeyIndoorWorkout`. Only the cardio canonical types below
+// have a location-specific variant. This table is the one place that variant
+// naming lives, so it stays consistent with this codebase's existing
+// snake_case canonicalType convention (see `traditional_strength_training`).
+const CARDIO_LOCATION_VARIANTS = Object.freeze({
+  walking: Object.freeze({ indoor: "indoor_walking", outdoor: "outdoor_walking" }),
+  running: Object.freeze({ indoor: "indoor_running", outdoor: "outdoor_running" }),
+  cycling: Object.freeze({ indoor: "indoor_cycling", outdoor: "outdoor_cycling" }),
+});
+
+/**
+ * Classify a raw Apple workout activity type into { family, canonicalType }.
+ *
+ * `isIndoorWorkout` is the explicit, optional Apple signal (true = indoor,
+ * false = outdoor, null/omitted = unknown) -- read directly from
+ * `HKMetadataKeyIndoorWorkout` upstream and NEVER inferred from GPS,
+ * distance, speed, or date. It only ever specializes a cardio canonicalType
+ * that already has a location variant (walking/running/cycling); it can
+ * never change `family`, and it never affects a non-cardio or unsupported
+ * type. An unknown/omitted signal always keeps the generic canonicalType
+ * exactly as classified today -- this is the case every currently-stored
+ * historical workout (and any future workout Apple never tags) falls into,
+ * and it is never guessed toward indoor or outdoor.
+ */
+export function classifyHealthKitWorkoutType(activityType, { isIndoorWorkout = null } = {}) {
+  const base = classifyHealthKitWorkoutFamilyAndType(activityType);
+  if (typeof isIndoorWorkout !== "boolean") return base;
+  const variant = base.family === HealthKitWorkoutFamily.CARDIO
+    ? CARDIO_LOCATION_VARIANTS[base.canonicalType]
+    : null;
+  if (!variant) return base;
+  return Object.freeze({
+    ...base,
+    canonicalType: isIndoorWorkout ? variant.indoor : variant.outdoor,
+    locationBasis: "explicit_indoor_workout_metadata",
+  });
+}
+
+// The raw family/canonicalType mapping table, unaware of indoor/outdoor.
+// `classifyHealthKitWorkoutType` above is the only caller; keeping this
+// separate means the indoor/outdoor overlay composes with it instead of
+// duplicating (or being tangled into) the family-mapping table itself.
+function classifyHealthKitWorkoutFamilyAndType(activityType) {
   const text = String(activityType ?? "").trim();
   if (Object.hasOwn(NUMERIC_TYPES, text)) {
     return Object.freeze({ ...NUMERIC_TYPES[text], appleActivityType: text, basis: "numeric_raw_value" });
@@ -173,7 +218,11 @@ export function reconcileHealthKitCanonicalWorkout({
     throw new TypeError("Only a HealthKit workout observation can canonicalize to a workout.");
   }
   const at = new Date(now).toISOString();
-  const classification = classifyHealthKitWorkoutType(observation.measurement.activityType);
+  const classification = classifyHealthKitWorkoutType(observation.measurement.activityType, {
+    isIndoorWorkout: typeof observation.measurement.isIndoorWorkout === "boolean"
+      ? observation.measurement.isIndoorWorkout
+      : null,
+  });
   const incoming = snapshotOf(observation, classification);
   const id = getHealthKitCanonicalWorkoutRecordId(observation);
 

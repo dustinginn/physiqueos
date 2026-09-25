@@ -627,6 +627,15 @@ function normalizeMeasurement(value, observationType, index) {
       distance: optionalFinite(workout.distance, `observations[${index}].workout.distance`),
       distanceUnit: optionalText(workout.distanceUnit, `observations[${index}].workout.distanceUnit`),
       averageHeartRate: optionalFinite(workout.averageHeartRate, `observations[${index}].workout.averageHeartRate`),
+      // Explicit Apple `HKMetadataKeyIndoorWorkout` signal only -- never
+      // inferred from GPS, distance, speed, or date. Only a literal boolean
+      // is accepted; anything else (omitted, non-boolean, legacy payload)
+      // normalizes to null and is then dropped by `compact` below, so the
+      // key is simply absent -- unknown, exactly like every other optional
+      // field here when its source data was never provided. A genuine
+      // `false` (explicitly outdoor) is preserved: `compact` only drops
+      // null/undefined/"", never `false`.
+      isIndoorWorkout: typeof workout.isIndoorWorkout === "boolean" ? workout.isIndoorWorkout : null,
       // A first revision is the same observation whether stated or not.
       sourceRevision: workout.sourceRevision == null
         ? null
