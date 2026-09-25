@@ -24,6 +24,8 @@ export function createBriefingCadenceExecutor({
   source = "manual",
   runtimeIdentity = null,
   policy = BRIEFING_CADENCE_CATCH_UP_POLICY,
+  settlementGate = null,
+  logger = null,
 } = {}) {
   return {
     async execute({ userId = null, asOf = now() } = {}) {
@@ -42,6 +44,7 @@ export function createBriefingCadenceExecutor({
           acquiredAt: asOf.toISOString(),
         })
         : { acquired: false, reason: "no_eligible_cadence", release() {} };
+      await settlementGate?.beginTick();
       const outcomes = [];
       let retainLock = false;
       try {
@@ -55,6 +58,8 @@ export function createBriefingCadenceExecutor({
             policy,
             source,
             runtimeIdentity,
+            settlementGate,
+            logger,
           });
           retainLock ||= outcome.retainLock === true;
           outcomes.push(outcome);
@@ -85,6 +90,8 @@ async function evaluateEntry({
   policy,
   source,
   runtimeIdentity,
+  settlementGate,
+  logger,
 }) {
   const started = Date.now();
   const base = {
@@ -169,6 +176,29 @@ async function evaluateEntry({
     });
   }
 
+  if (settlementGate) {
+    const settlement = await settlementGate.evaluate({
+      finalEvidenceDate: entry.evidenceWindow?.endDate,
+      earliestPublishAt: entry.dueAt,
+      now: asOf,
+    });
+    logger?.info?.(settlementEventName(settlement), {
+      cadenceKey: entry.cadence, userId: entry.userId,
+      reasonCode: settlement.reasonCode, unsettledDomains: settlement.unsettledDomains ?? [],
+    });
+    if (settlement.action !== "generate") {
+      return finish("awaiting_evidence_settlement", {
+        ...base,
+        artifactOutcome: "none",
+        skipReason: settlement.reasonCode,
+        unsettledDomains: settlement.unsettledDomains ?? [],
+        retryability: true,
+        nextRetryAt: settlement.nextCheckAt ?? null,
+      });
+    }
+    base.settlementReasonCode = settlement.reasonCode;
+  }
+
   await executionStore.record({
     ...base,
     resultStatus: "generation_started",
@@ -199,6 +229,17 @@ async function evaluateEntry({
   }
   const result = timed.value;
   if (result?.state === "completed") {
+    if (!result.idempotent) {
+      logger?.info?.("briefing_settlement.briefing_generated", {
+        cadenceKey: entry.cadence, userId: entry.userId,
+        artifactId: result.artifact?.id ?? entry.expectedArtifactId,
+        settlementReasonCode: base.settlementReasonCode ?? null,
+      });
+      logger?.info?.("briefing_settlement.briefing_published", {
+        cadenceKey: entry.cadence, userId: entry.userId,
+        artifactId: result.artifact?.id ?? entry.expectedArtifactId,
+      });
+    }
     return finish(result.idempotent ? "already_completed" : "generation_completed", {
       ...base,
       artifactOutcome: result.idempotent ? "matched" : "created",
@@ -256,6 +297,20 @@ async function evaluateEntry({
     await executionStore.record(record);
     return record;
   }
+}
+
+// Event name selection is keyed on the settlement decision's actual reason,
+// not just the coarse wait/generate action — a "generate" outcome reached by
+// hitting the hard deadline or because the gate did not apply at all is
+// never labeled the same as ordinary readiness, so filtering by event name
+// alone (not just the reasonCode payload field) distinguishes them.
+function settlementEventName(settlement) {
+  if (settlement.action !== "generate") return "briefing_settlement.awaiting_settlement";
+  if (settlement.reasonCode === "hard_deadline_reached") return "briefing_settlement.deadline_fallback_used";
+  if (settlement.reasonCode === "no_healthkit_backed_domains_settlement_not_applicable") {
+    return "briefing_settlement.settlement_not_applicable";
+  }
+  return "briefing_settlement.readiness_satisfied";
 }
 
 function withTimeout(operation, timeoutMs) {

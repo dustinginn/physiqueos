@@ -1,4 +1,6 @@
 import { semanticFingerprint, uniqueStrings } from "./V3Runtime.js";
+import { assessEnergyVariabilityV3 } from "./EnergyVariabilityV3.js";
+import { PLAN_TOLERANCE_RATIO } from "../CadenceEnergyObservationsV3.js";
 
 // Energy execution and ambiguity as first-class V3 interpretation.
 //
@@ -64,6 +66,18 @@ export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}
       }));
     }
   }
+
+  // Period-level intake variability/predictability (distinct from the
+  // per-window findings above): does the PATTERN of daily deviation from the
+  // current protocol target materially reduce predictability. Null when
+  // there is no intake target to measure deviation against — no claim
+  // without a target, never a claim against a universal/invented rate.
+  const intakeObservation = byCapability("execution.energy_intake")[0] ?? null;
+  const variability = deriveIntakeVariabilityV3({
+    intakeObservation,
+    intakeTarget: energyStrategy?.intakeTarget,
+    effectiveAt: energyStrategy?.effectiveAt,
+  });
 
   const ambiguity = [];
   const intakeCodes = uniqueStrings(energyObservations.flatMap((item) => [
@@ -143,7 +157,36 @@ export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}
     estimate,
     findings: Object.freeze(findings),
     ambiguity: Object.freeze(ambiguity),
+    variability,
   });
+}
+
+function deriveIntakeVariabilityV3({ intakeObservation, intakeTarget, effectiveAt }) {
+  if (!intakeObservation || !Number.isFinite(intakeTarget?.value) || intakeTarget.value === 0) return null;
+  const metadata = intakeObservation.capabilities
+    .find((measurement) => measurement.capabilityId === "execution.energy_intake")?.metadata ?? {};
+  return assessEnergyVariabilityV3({
+    periodDailyDeviations: dailyDeviationDays(metadata.dailySeries, intakeTarget, effectiveAt),
+    historicalDailyDeviations: dailyDeviationDays(metadata.comparisonDailySeries, intakeTarget, effectiveAt),
+  });
+}
+
+// A day before the current protocol revision took effect was measured
+// against a different target; including it would compare today's discipline
+// to a target that no longer applies. Excluded from both the current period
+// and the historical baseline alike, not just the baseline, since either can
+// in principle span a boundary.
+function dailyDeviationDays(series, target, effectiveAt) {
+  const cutoff = effectiveAt ? String(effectiveAt).slice(0, 10) : null;
+  return (series ?? [])
+    .filter((day) => !cutoff || day.date >= cutoff)
+    .map((day) => ({
+      date: day.date,
+      hasPairedEvidence: Number.isFinite(day.value),
+      deviationRatio: Number.isFinite(day.value)
+        ? (day.value - target.value) / target.value / PLAN_TOLERANCE_RATIO
+        : null,
+    }));
 }
 
 // Ambiguity shapes recommendation strength; it never rewrites the action and

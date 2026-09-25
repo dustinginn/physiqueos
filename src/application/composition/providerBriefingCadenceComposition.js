@@ -23,6 +23,7 @@ import {
 
 import { createHealthKitGraduationReader } from "../../platform/database/HealthKitGraduationReader.js";
 import { HealthKitGraduationPurpose } from "../../domain/services/HealthKitGraduation.js";
+import { createBriefingCadenceSettlementGate } from "../../domain/services/BriefingCadenceSettlementGate.js";
 
 export function createProviderBriefingCadenceRunner({
   pool,
@@ -32,6 +33,7 @@ export function createProviderBriefingCadenceRunner({
   loadCanonicalCommitBindings,
   now = () => new Date(),
   runtimeIdentity = null,
+  logger = null,
 } = {}) {
   if (!pool || !ownerUserId || !authorityStore?.read ||
       typeof loadCanonicalRuntime !== "function" ||
@@ -51,8 +53,18 @@ export function createProviderBriefingCadenceRunner({
     query: (text, values) => pool.query(text, values),
     ownerUserId,
   });
+  const settlementGate = createBriefingCadenceSettlementGate({
+    healthKitGraduationReader: healthKitGraduation,
+  });
   return Object.freeze({
     async execute({ asOf = now() } = {}) {
+      // Reset the shared reader's per-run policy memo before ANY read this
+      // tick — including the evidence overlay below, which runs before the
+      // settlement gate does and would otherwise still see the previous
+      // tick's cached policy for as long as a cadence sits in a settlement
+      // wait (the reader only re-memoizes when a fresh run explicitly
+      // begins; it does not expire on its own).
+      healthKitGraduation.beginRun();
       await assertProviderAuthority(authorityStore);
       const [canonicalRuntime, commitBindings] = await Promise.all([
         loadCanonicalRuntime(),
@@ -119,6 +131,8 @@ export function createProviderBriefingCadenceRunner({
           ...BRIEFING_CADENCE_CATCH_UP_POLICY,
           generatorTimeoutMs: 120_000,
         },
+        settlementGate,
+        logger,
       });
       return executor.execute({ userId: ownerUserId, asOf });
     },

@@ -284,6 +284,7 @@ if (workerBootProbe) {
           sourceCommit: buildIdentity.gitSha,
           workerId: worker.workerId,
         },
+        logger,
       });
       loops.push(runBriefingCadenceLoop({
         execute: cadenceRunner.execute,

@@ -133,6 +133,7 @@ export function createStrategicInterpretationV3({
         estimate: energyExecution.estimate,
         findings: energyExecution.findings,
         ambiguityIds: energyExecution.ambiguity.map((item) => item.uncertaintyId),
+        variability: energyExecution.variability,
       } } : {}),
     evidenceSignals,
     crossDomainSynthesis,

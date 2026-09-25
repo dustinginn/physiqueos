@@ -19,7 +19,10 @@ import { createEvidenceObservationV3 } from "./v3/EvidenceObservationV3.js";
 // changes what V3 knows, and therefore what it can say and how firmly it can
 // recommend.
 
-const PLAN_TOLERANCE_RATIO = 0.1;
+// Exported so EnergyAmbiguityV3.js's per-day variability wiring uses the
+// identical protocol-relative tolerance band as this file's own single-window
+// plan comparison, rather than a second, drifting definition of "on plan."
+export const PLAN_TOLERANCE_RATIO = 0.1;
 const TENSION_MIN_EXPECTED_LB = 0.3;
 const TENSION_MIN_OBSERVED_LB = 0.2;
 const KCAL_PER_LB = 3500;
@@ -147,6 +150,11 @@ export function adaptEnergyObservationsV3({
           plan,
           intakeEvidence,
           ambiguity: intakeAmbiguity(intakeEvidence),
+          // Per-day source, additive-only, for EnergyVariabilityV3. Carried
+          // through unchanged from the V2 PI producer; no consumer of the
+          // average-based fields above is affected by its presence.
+          dailySeries: intake.explanationData?.dailySeries ?? [],
+          comparisonDailySeries: intake.explanationData?.comparisonDailySeries ?? [],
         },
       }],
       limitations: [...(intake.confidence?.limitations ?? []), ...intakeAmbiguity(intakeEvidence)],

@@ -124,4 +124,100 @@ describe("HealthKit graduation reader", () => {
     await reader.overlay(ordinary());
     expect(memory.getMutationCount()).toBe(0);
   });
+
+  describe("readSettlementCoverage (Briefing Evidence Settlement gate)", () => {
+    it("returns no active domains, no coverage read, when evidence-eligibility is off", async () => {
+      const { records, spy } = tracked({ healthKitConfiguration: [policy()], healthKitCanonicalDays: [day("activity"), day("nutrition")] });
+      const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+      const result = await reader.readSettlementCoverage({ localDate: DATE });
+      expect(result).toEqual({ activeDomains: [], domainStates: {} });
+      expect(spy.list).not.toHaveBeenCalled();
+    });
+
+    it("returns coverage/identity/revision only, never an observed value, for each active domain", async () => {
+      const { records } = tracked({
+        healthKitConfiguration: [policy({ evidenceEligibility: { enabled: true, domains: ["activity", "nutrition"], startLocalDate: DATE, endLocalDate: null } })],
+        healthKitCanonicalDays: [day("activity"), day("nutrition")],
+      });
+      const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+      const result = await reader.readSettlementCoverage({ localDate: DATE });
+      expect(result.activeDomains).toEqual(["activity", "nutrition"]);
+      expect(result.domainStates.activity).toMatchObject({ present: true, coverage: "complete_day", revision: 1 });
+      expect(result.domainStates.nutrition).toMatchObject({ present: true, coverage: "complete_day", revision: 1 });
+      expect(JSON.stringify(result)).not.toMatch(/move_calories|dailyTotals|calories/);
+    });
+
+    it("restricts to only the domains actually in evidence-eligibility scope", async () => {
+      const { records } = tracked({
+        healthKitConfiguration: [policy({ evidenceEligibility: { enabled: true, domains: ["activity"], startLocalDate: DATE, endLocalDate: null } })],
+        healthKitCanonicalDays: [day("activity"), day("nutrition")],
+      });
+      const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+      const result = await reader.readSettlementCoverage({ localDate: DATE, domains: ["activity", "nutrition"] });
+      expect(result.activeDomains).toEqual(["activity"]);
+      expect(result.domainStates).not.toHaveProperty("nutrition");
+    });
+
+    it("treats a date before the evidence-eligibility scope's startLocalDate as not applicable, not as unsettled", async () => {
+      const { records } = tracked({
+        healthKitConfiguration: [policy({ evidenceEligibility: { enabled: true, domains: ["activity"], startLocalDate: "2026-09-22", endLocalDate: null } })],
+        healthKitCanonicalDays: [],
+      });
+      const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+      // The domain is graduated in general, but this specific date is before
+      // graduation started — it must never sit waiting for evidence that was
+      // never going to canonicalize.
+      const result = await reader.readSettlementCoverage({ localDate: "2026-09-15", domains: ["activity"] });
+      expect(result).toEqual({ activeDomains: [], domainStates: {} });
+    });
+
+    it("treats a date after the evidence-eligibility scope's endLocalDate as not applicable", async () => {
+      const { records } = tracked({
+        healthKitConfiguration: [policy({ evidenceEligibility: { enabled: true, domains: ["activity"], startLocalDate: "2026-01-01", endLocalDate: "2026-09-01" } })],
+        healthKitCanonicalDays: [],
+      });
+      const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+      const result = await reader.readSettlementCoverage({ localDate: DATE, domains: ["activity"] });
+      expect(result).toEqual({ activeDomains: [], domainStates: {} });
+    });
+
+    it("reports a missing domain as present:false rather than throwing", async () => {
+      const { records } = tracked({
+        healthKitConfiguration: [policy({ evidenceEligibility: { enabled: true, domains: ["activity", "nutrition"], startLocalDate: DATE, endLocalDate: null } })],
+        healthKitCanonicalDays: [day("activity")],
+      });
+      const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+      const result = await reader.readSettlementCoverage({ localDate: DATE });
+      expect(result.domainStates.nutrition).toEqual({ present: false, coverage: "missing" });
+    });
+
+    it("only reads days for the requested local date, not the whole collection's dates", async () => {
+      const { records } = tracked({
+        healthKitConfiguration: [policy({ evidenceEligibility: { enabled: true, domains: ["activity"], startLocalDate: "2026-09-01", endLocalDate: null } })],
+        healthKitCanonicalDays: [day("activity", "2026-09-20"), day("activity", DATE)],
+      });
+      const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+      const result = await reader.readSettlementCoverage({ localDate: DATE, domains: ["activity"] });
+      expect(result.domainStates.activity.canonicalRecordId).toBe(`healthkit_canonical_day_activity_${DATE}`);
+    });
+
+    it("fails closed to no active domains when reading fails, never blocking generation on an infra error", async () => {
+      const onError = vi.fn();
+      const records = { get: async () => { throw new Error("database unavailable"); }, list: async () => [] };
+      const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER, onError });
+      const result = await reader.readSettlementCoverage({ localDate: DATE });
+      expect(result).toEqual({ activeDomains: [], domainStates: {} });
+      expect(onError).toHaveBeenCalledOnce();
+    });
+
+    it("never writes anything", async () => {
+      const memory = createInMemoryCanonicalRecordStore({
+        healthKitConfiguration: [policy({ evidenceEligibility: { enabled: true, domains: ["activity"], startLocalDate: DATE, endLocalDate: null } })],
+        healthKitCanonicalDays: [day("activity")],
+      });
+      const reader = createHealthKitGraduationReader({ records: memory, ownerUserId: OWNER });
+      await reader.readSettlementCoverage({ localDate: DATE });
+      expect(memory.getMutationCount()).toBe(0);
+    });
+  });
 });

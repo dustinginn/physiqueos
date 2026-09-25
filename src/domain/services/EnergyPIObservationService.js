@@ -415,10 +415,24 @@ function createMetricObservation({
         ? { intakeEvidence: summarizeIntakeEvidence(current) } : {}),
       ...(metric.key !== "intake"
         ? { activityEvidence: summarizeActivityEvidence(current) } : {}),
+      // Per-day source for downstream variability assessment. Additive only:
+      // every existing consumer keeps reading currentAverage/comparisonAverage
+      // and never sees this field. Intake-only, matching the daily-variability
+      // spec's own scope (calorie intake days, not the noisier wearable-
+      // estimated activity metric).
+      ...(metric.key === "intake"
+        ? {
+          dailySeries: dailySeriesOf(currentRows, metric.field),
+          comparisonDailySeries: dailySeriesOf(comparisonRows, metric.field),
+        } : {}),
       limitations,
     },
     provenance: provenance("energy_period_average", sourceEvidenceIds),
   });
+}
+
+function dailySeriesOf(rows, field) {
+  return rows.map((day) => ({ date: day.date, value: day[field] }));
 }
 
 function createCoverageObservation({

@@ -4,6 +4,7 @@ import {
   HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION,
   HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
   HealthKitGraduationPurpose,
+  isHealthKitGraduationInScope,
   overlayGraduatedHealthKitDays,
   resolveHealthKitGraduationPolicy,
 } from "../../domain/services/HealthKitGraduation.js";
@@ -64,6 +65,50 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
       } catch (error) {
         onError?.(error);
         return canonicalObjects;
+      }
+    },
+    /**
+     * Coverage-only read for the Briefing Evidence Settlement gate: whether a
+     * domain's final local evidence day has settled as `complete_day` in
+     * HealthKit, restricted to whichever of `domains` are actually in
+     * evidence-eligibility scope for this owner right now. Never returns an
+     * observed value — coverage/canonical-record-identity/revision only —
+     * because the settlement gate decides WHEN to generate, never WHAT a
+     * briefing says, and observed values must stay out of any read that
+     * isn't itself already the evidence-eligibility overlay above. Fails
+     * closed to "nothing is HealthKit-backed" on any read error, the same
+     * fail-open-to-ordinary-behavior contract `overlay()` has: an optional
+     * settlement gate must never itself become a reason generation stalls.
+     */
+    async readSettlementCoverage({ localDate, domains = ["activity", "nutrition"] } = {}) {
+      try {
+        const policy = resolveHealthKitGraduationPolicy(await lookup());
+        const scope = policy.evidenceEligibility;
+        // Domain in scope is necessary but not sufficient: a cadence whose
+        // final evidence day falls before the scope's own startLocalDate (or
+        // after an endLocalDate) is not HealthKit-backed for THIS date, even
+        // though the domain itself is graduated in general — that date must
+        // short-circuit to "not applicable" exactly like a non-graduated
+        // domain, not sit waiting on a day HealthKit was never going to
+        // canonicalize.
+        const activeDomains = domains.filter((domain) =>
+          isHealthKitGraduationInScope(scope, { domain, localDate }));
+        if (activeDomains.length === 0) return { activeDomains: [], domainStates: {} };
+        const days = (await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }))
+          .filter((day) => activeDomains.includes(day?.domain) && day?.localDate === localDate);
+        const domainStates = Object.fromEntries(activeDomains.map((domain) => {
+          const day = days.find((item) => item.domain === domain);
+          return [domain, day ? {
+            present: true,
+            coverage: day.current?.coverage ?? "missing",
+            canonicalRecordId: day.current?.canonicalRecordId ?? day.id ?? null,
+            revision: day.current?.revision ?? day.revision ?? null,
+          } : { present: false, coverage: "missing" }];
+        }));
+        return { activeDomains, domainStates };
+      } catch (error) {
+        onError?.(error);
+        return { activeDomains: [], domainStates: {} };
       }
     },
   });

@@ -1,4 +1,5 @@
 import { describeUncertaintyV3 } from "../intelligence/v3/AmbiguityVocabularyV3.js";
+import { describeEnergyVariabilityNudgeV3 } from "../intelligence/v3/EnergyVariabilityV3.js";
 
 // Shared served-V3 projection.
 //
@@ -79,6 +80,7 @@ export function buildCanonicalNarrativeV3Extensions({ strategicInterpretation, n
     estimate: execution.estimate,
     findings: execution.findings.map((item) => ({ ...item })),
     ambiguity: energyUncertainty,
+    variability: execution.variability ?? null,
     statement: composeEnergyStatementV3({
       execution,
       ambiguityText: narrativePlan?.composition?.energyAmbiguity ?? null,
@@ -98,5 +100,6 @@ export function buildCanonicalNarrativeV3Extensions({ strategicInterpretation, n
 // factual module already displays as data.
 export function composeEnergyStatementV3({ execution, ambiguityText = null } = {}) {
   if (!execution) return null;
-  return ambiguityText || null;
+  const variabilityText = describeEnergyVariabilityNudgeV3(execution.variability);
+  return [ambiguityText, variabilityText].filter(Boolean).join(" ") || null;
 }

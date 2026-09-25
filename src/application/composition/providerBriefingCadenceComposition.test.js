@@ -6,10 +6,32 @@ vi.mock("../../domain/services/BriefingCadenceExecutorService", () => ({
     async execute() {
       captured.repositories = options.repositories;
       captured.generators = options.generators;
+      // Mimic the one real-executor action this file's tests care about:
+      // beginTick() is the settlement gate's own per-tick reset. The real
+      // executor always calls it; a stub that skipped it would hide a bug
+      // where the composition relies on the executor for a reset the
+      // composition itself must also guarantee before the overlay above runs.
+      await options.settlementGate?.beginTick();
       return { ok: true };
     },
   }),
 }));
+const readerCallOrder = [];
+vi.mock("../../platform/database/HealthKitGraduationReader.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createHealthKitGraduationReader: (...args) => {
+      const real = actual.createHealthKitGraduationReader(...args);
+      return {
+        ...real,
+        beginRun: (...a) => { readerCallOrder.push("beginRun"); return real.beginRun(...a); },
+        overlay: async (...a) => { readerCallOrder.push("overlay"); return real.overlay(...a); },
+        readSettlementCoverage: async (...a) => { readerCallOrder.push("readSettlementCoverage"); return real.readSettlementCoverage(...a); },
+      };
+    },
+  };
+});
 vi.mock("../../domain/services/WeeklyNarrativeService", () => ({
   createWeeklyNarrativeService: (options) => { captured.weekly = options; return {}; },
 }));
@@ -103,5 +125,50 @@ describe("provider briefing cadence: graduated HealthKit evidence", () => {
     await run({ policyRecord: policy(on), days: [day("activity")] });
     await expect(Promise.resolve().then(() => captured.repositories.canonicalEvidence.upsertCanonicalEvidenceObjects([{ canonicalId: "x" }])))
       .rejects.toMatchObject({ code: "PROVIDER_CADENCE_SNAPSHOT_WRITE_FORBIDDEN" });
+  });
+
+  it("begins a fresh reader run before the evidence overlay reads, on the SAME runner's second tick — not only its first", async () => {
+    // The overlay above and the settlement gate share one reader instance,
+    // constructed once per runner and reused across every execute() tick.
+    // The reader only clears its per-run policy memo when beginRun() is
+    // called explicitly; it does not expire on its own, and by the second
+    // tick the executor's OWN settlementGate.beginTick() reset (mimicked by
+    // this file's executor stub, see readerCallOrder above) has already run
+    // once before. The overlay runs before the executor on every tick, so
+    // execute() itself must call beginRun() again on tick two — relying on
+    // tick one's now-stale reset would leave the overlay reading a memo left
+    // over from the previous tick for as long as a cadence sits waiting.
+    const policyRecord = policy(on);
+    const days = [day("activity"), day("nutrition")];
+    const runtime = { user: { id: OWNER, timeZone: "America/Los_Angeles" }, canonicalEvidenceObjects: [] };
+    const pool = { query: async (text, values = []) => {
+      if (/record_id=\$3/.test(text)) return { rows: [{ payload: policyRecord, version: 1 }] };
+      if (values[1] === "healthKitCanonicalDays") return { rows: days.map((payload) => ({ payload, version: 1 })) };
+      return { rows: [] };
+    } };
+    const authorityStore = { read: async () => ({ state: {
+      authority: "provider-authoritative", workerAuthority: "provider", publicRuntimeAuthority: "provider", canonicalStoreEpoch: "postgres-canonical",
+      firstProviderCanonicalWriteAt: "2026-09-01T00:00:00.000Z", firstProviderCommandId: "cmd",
+    } }) };
+    const runner = createProviderBriefingCadenceRunner({
+      pool, ownerUserId: OWNER, authorityStore,
+      loadCanonicalRuntime: async () => runtime,
+      loadCanonicalCommitBindings: async () => ({ mutateCanonicalRuntime: async () => ({}) }),
+    });
+    readerCallOrder.length = 0;
+    await runner.execute({ asOf: new Date("2026-09-22T10:00:00.000Z") });
+    const tickOneBeginRunCount = readerCallOrder.filter((event) => event === "beginRun").length;
+    const tickOneOverlayIndex = readerCallOrder.indexOf("overlay");
+    expect(readerCallOrder.lastIndexOf("beginRun", tickOneOverlayIndex)).toBe(0);
+    expect(tickOneBeginRunCount).toBeGreaterThanOrEqual(1);
+
+    readerCallOrder.length = 0;
+    await runner.execute({ asOf: new Date("2026-09-22T10:05:00.000Z") });
+    const tickTwoOverlayIndex = readerCallOrder.indexOf("overlay");
+    // The critical assertion: on this SAME runner's SECOND tick, a beginRun()
+    // still precedes the overlay — proving execute() resets before every
+    // tick's overlay, not only the runner's first tick.
+    expect(tickTwoOverlayIndex).toBeGreaterThan(0);
+    expect(readerCallOrder.slice(0, tickTwoOverlayIndex)).toContain("beginRun");
   });
 });
