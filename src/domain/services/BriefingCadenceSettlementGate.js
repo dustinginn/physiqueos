@@ -2,6 +2,8 @@ import {
   DEFAULT_SETTLEMENT_POLICY,
   decideBriefingPublishActionV1,
   evaluateBriefingReadinessV1,
+  resolveBriefingHardDeadline,
+  SettlementReasonCode,
 } from "./BriefingEvidenceSettlementPolicy.js";
 
 // The read side of the settlement gate: turns a recurring cadence's final
@@ -39,12 +41,17 @@ export function createBriefingCadenceSettlementGate({
       const { activeDomains, domainStates } = await healthKitGraduationReader.readSettlementCoverage({
         localDate: finalEvidenceDate, domains: policy.readinessDomains,
       });
+      const timing = {
+        earliestPublishAt: new Date(earliestPublishAt).toISOString(),
+        hardDeadlineAt: resolveBriefingHardDeadline({ policy, earliestPublishAt }).toISOString(),
+      };
       if (activeDomains.length === 0) {
         return {
           action: "generate",
-          reasonCode: "no_healthkit_backed_domains_settlement_not_applicable",
+          reasonCode: SettlementReasonCode.NOT_APPLICABLE,
           readiness: null,
           unsettledDomains: [],
+          ...timing,
         };
       }
       const scopedPolicy = { ...policy, readinessDomains: activeDomains };
@@ -52,7 +59,7 @@ export function createBriefingCadenceSettlementGate({
       const decision = decideBriefingPublishActionV1({
         policy: scopedPolicy, earliestPublishAt, now, readiness,
       });
-      return { ...decision, readiness };
+      return { ...decision, readiness, ...timing };
     },
   });
 }

@@ -24,6 +24,7 @@ import {
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 import { attachBriefingDependencyManifest } from
   "./BriefingDependencyManifestService";
+import { attachEvidenceSettlement } from "./BriefingEvidenceSettlementArtifact.js";
 import { createCadencePIEvidenceEnvelope } from
   "./CadencePIEvidenceEnvelopeService";
 import { createStrategicInterpretationPublicationServiceV3 } from
@@ -59,7 +60,7 @@ export function createMonthlyBriefingService({
   if (!publicationService) throw new Error("Monthly publication service is required.");
 
   const service = {
-    async generateForCurrentWindow({ userId = null, asOf = now() } = {}) {
+    async generateForCurrentWindow({ userId = null, asOf = now(), settlement = null } = {}) {
       const user = userId
         ? await repositories.users.getUserById(userId)
         : await repositories.users.getCurrentUser();
@@ -85,6 +86,8 @@ export function createMonthlyBriefingService({
         window, artifactId: getMonthlyArtifactId({ userId: resolvedUserId, window }),
         generatedAt: asOf.toISOString(), existing: null,
       });
+      // Immutable evidence-settlement watermark, frozen with the artifact at first publication.
+      if (settlement) prepared.artifact = attachEvidenceSettlement(prepared.artifact, settlement);
       try {
         return await occurrencePublisher({
           prepared, publicationService, now, operation: "create",

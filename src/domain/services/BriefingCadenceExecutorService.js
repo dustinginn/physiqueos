@@ -1,3 +1,4 @@
+import { createSettlementGeneratorInput } from "./BriefingEvidenceSettlementArtifact.js";
 import {
   BRIEFING_CADENCE_CATCH_UP_POLICY,
   resolveBriefingCadenceRegistry,
@@ -176,6 +177,7 @@ async function evaluateEntry({
     });
   }
 
+  let settlementInput = null;
   if (settlementGate) {
     const settlement = await settlementGate.evaluate({
       finalEvidenceDate: entry.evidenceWindow?.endDate,
@@ -197,6 +199,20 @@ async function evaluateEntry({
       });
     }
     base.settlementReasonCode = settlement.reasonCode;
+    try {
+      settlementInput = createSettlementGeneratorInput({ entry, decision: settlement, asOf });
+    } catch (error) {
+      // A publication that cannot carry its immutable watermark must not be
+      // generated: fail closed, retry next tick.
+      return finish("transient_failure", {
+        ...base,
+        artifactOutcome: "none",
+        failureCategory: "evidence_settlement_watermark_failed",
+        retryability: true,
+        errorSummary: String(error?.message ?? error).slice(0, 300),
+      });
+    }
+    base.settlementDeadlineFallback = settlementInput?.watermark?.deadlineFallback ?? false;
   }
 
   await executionStore.record({
@@ -210,6 +226,7 @@ async function evaluateEntry({
     entry.generator.generateForCurrentWindow({
       userId: entry.userId,
       asOf,
+      ...(settlementInput ? { settlement: settlementInput } : {}),
     })
   );
   const timed = await withTimeout(operation, policy.generatorTimeoutMs);

@@ -1,7 +1,15 @@
 import { latestByDate } from "./repositoryUtils";
+import {
+  freezeStoredEvidenceSettlement,
+  preserveOccurrenceEvidenceSettlement,
+} from "../../domain/services/BriefingEvidenceSettlementArtifact.js";
 import { assertFlatBriefingHistory, classifyBriefingCadence, createBriefingHistoryEntry, flattenBriefingHistory, getBriefingOccurrenceIdentity } from "./DailyBriefingHistory";
 
 export function createDailyBriefingRepository(dailyBriefings = [], options = {}) {
+  // A persisted evidence-settlement watermark is immutable on readback too: the
+  // canonical store hands back plain parsed JSON, so freeze it as the repository
+  // wraps the records. Historical artifacts without the field are untouched.
+  for (const record of dailyBriefings) freezeStoredEvidenceSettlement(record);
   return {
     async listDailyBriefings(userId) {
       return dailyBriefings.filter((briefing) => briefing.userId === userId);
@@ -92,10 +100,12 @@ export function createDailyBriefingRepository(dailyBriefings = [], options = {})
     async completeScheduledBriefing(artifact) {
       const index = dailyBriefings.findIndex((item) => item.id === artifact.id);
       if (index < 0) throw new Error(`Scheduled briefing claim ${artifact.id} was not found.`);
-      dailyBriefings[index] = structuredClone(artifact);
+      const completed = preserveOccurrenceEvidenceSettlement(
+        structuredClone(artifact), [dailyBriefings[index]]);
+      dailyBriefings[index] = completed;
       assertFlatBriefingHistory(dailyBriefings);
       options.onChange?.();
-      return structuredClone(artifact);
+      return structuredClone(completed);
     },
 
     async failScheduledBriefing(id, { failedAt, reason }) {
@@ -136,6 +146,9 @@ export function createDailyBriefingRepository(dailyBriefings = [], options = {})
         hasSameBriefingOccurrence(item, briefing)
       );
 
+      // The occurrence's OLDEST evidence-settlement watermark stays authoritative
+      // across replacement/retry; a first publication keeps its own.
+      preserveOccurrenceEvidenceSettlement(briefing, matchingBriefings);
       if (matchingBriefings.length > 0) {
         for (let index = dailyBriefings.length - 1; index >= 0; index -= 1) {
           if (hasSameBriefingOccurrence(dailyBriefings[index], briefing)) {

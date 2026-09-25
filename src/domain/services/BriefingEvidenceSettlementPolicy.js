@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { stableSerialize } from "../../data/repositories/DailyBriefingHistory.js";
 import { deepFreeze } from "../intelligence/v3/V3Runtime.js";
 
 // Server-owned policy for WHETHER a recurring (Midweek/Weekly/Monthly)
@@ -31,6 +33,30 @@ import { deepFreeze } from "../intelligence/v3/V3Runtime.js";
 
 export const BRIEFING_EVIDENCE_SETTLEMENT_POLICY_VERSION =
   "briefing_evidence_settlement_policy_v1";
+
+// Version of the record persisted on a published briefing artifact
+// (`artifact.evidenceSettlement`). Distinct from the policy version above: the
+// policy version says which rules decided, this says which SHAPE was frozen.
+export const BRIEFING_EVIDENCE_SETTLEMENT_WATERMARK_VERSION =
+  "briefing_evidence_settlement_watermark_v1";
+
+// Every reason code the gate/policy can produce, in one place, so the executor,
+// the persisted watermark, and the logs never disagree on spelling.
+export const SettlementReasonCode = Object.freeze({
+  BEFORE_EARLIEST_PUBLISH_TIME: "before_earliest_publish_time",
+  READINESS_SATISFIED: "readiness_satisfied",
+  HARD_DEADLINE_REACHED: "hard_deadline_reached",
+  AWAITING_SETTLEMENT: "awaiting_settlement",
+  // The settlement-coverage read itself failed (transient store error). Never
+  // authorizes generation before the hard deadline.
+  COVERAGE_READ_FAILED: "coverage_read_failed",
+  NOT_APPLICABLE: "no_healthkit_backed_domains_settlement_not_applicable",
+  GATE_ERROR: "settlement_gate_error",
+});
+
+// Coverage vocabulary a domain carries when its state could not be READ at all
+// (as opposed to being read and found partial/missing).
+export const COVERAGE_UNKNOWN_READ_FAILED = "unknown_coverage_read_failed";
 
 // Conservative initial defaults, chosen from existing evidence/timing in
 // this codebase rather than invented:
@@ -137,6 +163,16 @@ export function decideBriefingPublishActionV1({
     unsettledDomains: readiness.unsettledDomains, nextCheckAt: nextCheckAt.toISOString() });
 }
 
+// The instant after which unresolved readiness (or an unreadable coverage
+// state) no longer delays generation. Same arithmetic decideBriefingPublishActionV1
+// applies, exposed so the watermark records the exact deadline it was judged by.
+export function resolveBriefingHardDeadline({
+  policy = DEFAULT_SETTLEMENT_POLICY,
+  earliestPublishAt,
+} = {}) {
+  return new Date(new Date(earliestPublishAt).valueOf() + policy.maximumWaitMinutes * 60_000);
+}
+
 // The freeze/watermark record: recorded once, at generation time, and
 // never mutated afterward. A later evidence revision updates current
 // Evidence but must never silently rewrite this record, the frozen
@@ -150,6 +186,13 @@ export function buildEvidenceSettlementWatermarkV1({
   publishDecision,
   closeoutReceipt = null,
   generatedAt,
+  cadence = null,
+  timeZone = null,
+  timeZoneAuthority = null,
+  earliestPublishAt = null,
+  hardDeadlineAt = null,
+  settlementApplicable = true,
+  coverageReadFailed = false,
 } = {}) {
   if (!evidenceWindow?.startDate || !evidenceWindow?.endDate) {
     throw new Error("buildEvidenceSettlementWatermarkV1 requires evidenceWindow.startDate/endDate.");
@@ -157,21 +200,66 @@ export function buildEvidenceSettlementWatermarkV1({
   if (!readiness) throw new Error("buildEvidenceSettlementWatermarkV1 requires a readiness evaluation.");
   if (!publishDecision) throw new Error("buildEvidenceSettlementWatermarkV1 requires a publish decision.");
   if (!generatedAt) throw new Error("buildEvidenceSettlementWatermarkV1 requires generatedAt.");
-  return Object.freeze({
+  const body = {
     schemaVersion: BRIEFING_EVIDENCE_SETTLEMENT_POLICY_VERSION,
+    watermarkVersion: BRIEFING_EVIDENCE_SETTLEMENT_WATERMARK_VERSION,
+    cadence,
     // Deeply frozen, not just at the top level: `evidenceWindow` is
     // Server-supplied and could in principle carry a nested object/array
     // field in the future — this record's "immutable freeze" claim must
     // actually hold at every depth, not only for the fields it happens to
     // receive today.
     evidenceWindow: deepFreeze({ ...evidenceWindow }),
+    // The instant the evidence window closed for this artifact (the window's
+    // own cutoff when it has one; otherwise null — never invented).
+    evidenceCutoff: evidenceWindow.cutoff ?? null,
+    // Canonical timezone authority the window/deadline were resolved in.
+    timeZone: timeZone ?? evidenceWindow.timeZone ?? null,
+    timeZoneAuthority,
+    // false = no HealthKit-backed readiness domain applied to this window, so
+    // there was nothing to settle: an honest "not applicable", never "ready".
+    settlementApplicable: settlementApplicable === true,
+    // Per-domain readiness state, INCLUDING canonicalRecordId + revision for
+    // every domain whose canonical day existed at generation time.
     domains: readiness.domains,
-    readyAtGeneration: readiness.ready,
+    readyAtGeneration: settlementApplicable === true ? readiness.ready : null,
     unsettledDomainsAtGeneration: Object.freeze([...(publishDecision.unsettledDomains ?? [])]),
     publishReasonCode: publishDecision.reasonCode,
+    // True when publication happened because the hard deadline was reached,
+    // not because readiness was satisfied.
+    deadlineFallback: publishDecision.reasonCode === SettlementReasonCode.HARD_DEADLINE_REACHED,
+    // True when the settlement-coverage read itself was failing at generation
+    // time: the per-domain state is then UNKNOWN (never "settled").
+    coverageReadFailed: coverageReadFailed === true,
+    earliestPublishAt,
+    hardDeadlineAt,
+    // null unless a real device closeout receipt exists; there is no Server
+    // endpoint that records one yet, so today this is honestly always null.
     closeoutReceipt: closeoutReceipt ? Object.freeze({ ...closeoutReceipt }) : null,
+    // The artifact model does not distinguish generation from publication
+    // (lifecycle.completedAt === generatedAt), so there is no separate
+    // publish timestamp to record; this is the freeze instant.
     generatedAt,
-  });
+  };
+  return deepFreeze({ ...body, integrity: settlementIntegrity(body) });
+}
+
+// Integrity envelope over the watermark body: a later reader (or an audit) can
+// prove the persisted record is exactly what was frozen at generation time.
+export function settlementIntegrity(body) {
+  return {
+    algorithm: "sha256:stable-json",
+    // JSON round-trip first: the digest must survive persistence, which
+    // drops `undefined` members.
+    digest: createHash("sha256")
+      .update(stableSerialize(JSON.parse(JSON.stringify(body)))).digest("hex"),
+  };
+}
+
+export function verifyEvidenceSettlementWatermarkIntegrity(watermark) {
+  if (!watermark || typeof watermark !== "object" || !watermark.integrity?.digest) return false;
+  const { integrity, ...body } = watermark;
+  return settlementIntegrity(body).digest === integrity.digest;
 }
 
 // --- Device closeout contract (D2) ---

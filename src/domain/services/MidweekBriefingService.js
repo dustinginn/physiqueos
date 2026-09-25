@@ -25,6 +25,7 @@ import { createPICadenceBriefingLifecycleService } from "./PICadenceBriefingLife
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 import { attachBriefingDependencyManifest } from
   "./BriefingDependencyManifestService";
+import { attachEvidenceSettlement } from "./BriefingEvidenceSettlementArtifact.js";
 
 // Explicit diagnostic boundary only. Production generation never invokes,
 // returns, persists, renders, or hands off this result.
@@ -59,6 +60,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
       windowOverride = null,
       ignoreExisting = false,
       reason = "scheduled_midweek_cadence",
+      settlement = null,
     } = {}) {
       const user = userId ? await repositories.users.getUserById(userId) : await repositories.users.getCurrentUser();
       const resolvedUserId = user?.id ?? userId;
@@ -244,6 +246,9 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
           ...dexaScans,
           ...progressPhotos,
         ]);
+        // Immutable evidence-settlement watermark (executor-supplied): frozen with the
+        // artifact at first publication; absent for ad-hoc/manual generation.
+        artifact = attachEvidenceSettlement(artifact, settlement);
         if (authoritative) {
           try {
             artifact.piMemory = mergePIBriefingMemory(
