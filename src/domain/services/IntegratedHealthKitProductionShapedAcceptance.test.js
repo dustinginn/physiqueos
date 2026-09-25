@@ -408,6 +408,13 @@ const diffAvailable = gitAvailable();
 const git = (...args) => execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 // Committed history only: excludes this acceptance suite itself, which is
 // added on top of the candidate and is not part of the candidate under test.
+// The command-ports file hosts the Workout/graduation write paths this guard protects. The
+// daily-driver local-day lane (weigh-in future-date guard in the device zone) is the only reviewed
+// change allowed there: every added line must be that time-zone pass-through or its comment.
+const COMMAND_PORTS = "src/application/commands/CanonicalPersistenceCommandPorts.js";
+const commandPortsChangeIsOnlyTheWeighInZone = () => git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", COMMAND_PORTS)
+  .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++"))
+  .every((line) => /^\+\s*(\/\/.*|import \{ getLocalDateKey, resolveLocalTimeZone, resolveRequestedTimeZone \} from "\.\.\/\.\.\/domain\/utils\/localDate\.js";|timeZone: reconcilePreviousDayPriorities === false|\? resolveRequestedTimeZone\(context\.payload\.timeZone\) \?\? undefined|: undefined,)$/u.test(line));
 const candidateNames = () => git("diff", "--name-only", PRODUCTION_BASE, "HEAD")
   .split("\n").filter(Boolean).filter((name) => !/IntegratedProductionShapedAcceptance\.test\.js$|IntegratedHealthKitProductionShapedAcceptance\.test\.js$/u.test(name));
 
@@ -480,10 +487,11 @@ describe("Item 15: Cardio is NOT activated by the combined candidate", () => {
   });
 
   it.skipIf(!diffAvailable)("git diff 01d1900b..HEAD adds no line that writes/creates/activates a Workout or graduation policy", () => {
-    const untouched = ["src/application/commands/CanonicalPersistenceCommandPorts.js", "src/domain/services/HealthKitGraduation.js",
+    const untouched = ["src/domain/services/HealthKitGraduation.js",
       "src/platform/operations/HealthKitDeferredWorkoutReconciliationRunner.js", "src/domain/services/HealthKitEvidenceEligibilityPolicy.js"];
     const names = candidateNames();
     for (const file of untouched) expect(names, file).not.toContain(file);
+    if (names.includes(COMMAND_PORTS)) expect(commandPortsChangeIsOnlyTheWeighInZone(), COMMAND_PORTS).toBe(true);
     const added = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", "src", "scripts", ":(exclude)*.test.js")
       .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++"));
     expect(added.length).toBeGreaterThan(0);
@@ -622,7 +630,7 @@ describe("Item 16: historical deferred Cardio walks are never auto-reconciled or
     if (diffAvailable) {
       const names = candidateNames();
       expect(names).not.toContain("src/platform/operations/HealthKitDeferredWorkoutReconciliationRunner.js");
-      expect(names).not.toContain("src/application/commands/CanonicalPersistenceCommandPorts.js");
+      if (names.includes(COMMAND_PORTS)) expect(commandPortsChangeIsOnlyTheWeighInZone(), COMMAND_PORTS).toBe(true);
       expect(names).not.toContain("scripts/operations/healthKitDeferredWorkoutReconciliation.entry.mjs");
     }
   });
