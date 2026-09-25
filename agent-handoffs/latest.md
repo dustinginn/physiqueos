@@ -2,20 +2,18 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Cardio graduation readiness — prepared, not activated (`claude-healthkit-cardio-graduation-preparation-20260924`)
+- Task: HealthKit Cardio graduation Gate 3 (fresh inventory) + Gate 4 (atomic policy-replacement DRY RUN) — passed, nothing applied (`claude-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun-20260925`)
 - Agent: claude
-- Status: awaiting Founder direction — fully prepared and independently reviewed (APPROVE WITH NOTES), nothing deployed/activated/mutated
-- Generated (UTC): 2026-09-25T03:30:00Z
+- Status: awaiting Founder direction — Gate 5 (apply) is recommended but NOT authorized or executed
+- Generated (UTC): 2026-09-25T15:50:00Z
 - Success: true
 
-Summary: Cardio graduation is now design-ready as a short sequence of already-reviewed, already-gated production steps — none of them run yet. Re-verified (against real source, with a fresh 51/51 test pass) that the existing atomic policy-widening tool and the existing bounded deferred-workout reconciliation runner are safe and compatible with the not-yet-deployed workout-type-fidelity Server fix. Re-confirmed with a fresh, widened production read — not assumed — that the deferred-Cardio backlog is still exactly the same 4 walks from Sep 23–24, with no new ones since. Built exact future dry-run command packages, Activity-accounting pre/post invariants, a Founder real-device acceptance checklist, and a 10-gate execution sequence.
+Summary: Production reverified exact Server `e88b8ef7` (deployment `9727de79` ACTIVE, healthy) with Native Build 60 (Apple delivery VALID) accepted on device by the Founder. A fresh, complete, zero-write inventory confirms the deferred-Cardio backlog is still exactly 4 Apple-type-52 walks (2 Sep23 LA, 2 Sep24 Chicago), all classify cardio/walking, none stores `isIndoorWorkout` (Indoor/Outdoor not recoverable and not inferred), none canonicalized, and no new workouts since Sep24. The workout policy is Strength-only (digest `dc7ba152cf5e9dd528e380bed6bc0366`, version 3, effective 2026-09-23, open-ended, quarantined, no backfill, no auto-confirm); Cardio is NOT active. The atomic replace-families dry run (`strength` -> `[cardio,strength]`) returned `dry_run`, predicting exactly one policy update plus one audit row and preserving every non-family field; an independent post-dry-run read proved zero writes.
 
-A fresh-context adversarial review found two real, non-blocking issues, both fixed in the published report before finishing: the reconciliation runner's own safety fencing means the 4 deferred walks must be dry-run and applied one at a time, strictly in sequence — never as a single batched pass; and this report's own manifest checksum turned out to have no real, reproducible implementation behind it, so it's now clearly marked as a human-readable convenience only, with the runner's own tested, built-in digest checks identified as the thing that actually protects execution time.
+Nothing was applied, activated, reconciled, deployed, uploaded, or mutated. Next (Founder authorization required): Gate 5 apply, with a fresh dry-run taken immediately before it because the runner's drift fence hashes the full observation collection.
 
-Nothing was deployed, uploaded, activated, or mutated. The two things still needed before any of the 10 gates can begin: deploying the Server type-fidelity fix, and folding the Native Strength-label fix into the next release build — each its own separate authorization, as always.
+Detailed report: `agent-handoffs/reports/20260925T155000Z-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun.md`
 
-Detailed report: `agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md`
-
-Related: `agent-handoffs/reports/20260925T023000Z-healthkit-strength-fix-workout-type-fidelity-reviewed.md`, `agent-handoffs/reports/20260925T012000Z-healthkit-build59-strength-detail-diagnostic.md`
+Related: `agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md`, `agent-handoffs/reports/20260925T150000Z-midweek-v3-server-e88b8ef7-deployment-checkpoint.md`, `agent-handoffs/reports/20260925T160000Z-build60-testflight-uploaded-valid.md`
 
 Protocol: `agent-handoffs/README.md`
