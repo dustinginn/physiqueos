@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-25T18:56:10Z",
+  "generated_at_utc": "2026-09-25T19:29:46Z",
   "task": {
     "id": "claude-native-daily-driver-performance-phase2-20260925",
-    "title": "Native daily-driver performance Phase 2: baseline and diagnostic (report 1 of 3)",
+    "title": "Native daily-driver performance Phase 2: candidates ready, before/after accepted; awaiting release authorization",
     "agent": "claude",
-    "status": "partial"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "a399916ac9b1c9128067f0f77fb7fd05666aa92a",
-    "final_sha": null,
+    "final_sha": "afdc849a6399130668d846544e85236fe1974741",
     "production_server_sha": "a399916ac9b1c9128067f0f77fb7fd05666aa92a",
     "production_deployment": "66ee39f6-c4d7-49c8-9012-3de1a77a832c",
-    "native_sha": "00321dcc6dd86a6479dbca5dd27e691c87348cd8",
+    "native_sha": "c736254b23b169b144b8e998fe6476d4cd79fe95",
     "native_build": 60
   },
   "result": {
-    "summary": "Baseline measured on production data with a zero-write in-container benchmark of the exact Native read service plus today's Founder production read diagnostics and CPU profiles. No common path is SEVERE/CRITICAL; historical ~10s Priority navigation, 7.6-10s Training Library and Visible Abs 503 did not reproduce. Ranked bottlenecks: Home cold launch (2-3s spinner; ~4.8s after restart; ~0.55s of Home CPU is Intl formatter construction), Priority Detail completion acknowledgement waiting on a full Home read, Training Logger 1.7-2.9s CPU in exercise-phrase normalization, resume burst on a 5-connection pool, ~3.2MB mostly-undecoded Evidence Hub payload. Limits: no Founder-device operation; Native end-to-end numbers are composed from measured Server time, measured network overhead and the source request graph.",
+    "summary": "Server candidate afdc849a (base prod a399916a) and Native candidate c736254b (base Build 60 00321dcc) are ready, not deployed/uploaded. Before->after on production data with identical parity digests: Home warm 1.69->0.97 s, cold 3.33->1.79 s (compute -54%); Training Logger 1.45/2.50->0.98/1.11 s; Progress Photos 1.29->0.33 s; Training landing 1.65 MB->148 KB, library 191->12.6 KB, Nutrition 1.27->0.64 MB (Native-only projections keeping every Build 60 decode key); Evidence Hub ~3.2->~1.0 MB. Native: cold-launch Home paints a labelled same-day last-known snapshot in ~4 ms; Priority Detail acknowledges completion after the durable command instead of after a full Home read (~2-3.3 s -> command round trip); 19 read screens keep their view model; only the visible screen refreshes on resume. No common path >3 s remains (composed). HealthKit/Cardio paths unchanged. STOP for Founder release authorization.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -25,29 +25,36 @@
   },
   "validation": {
     "tests": {
-      "status": "not_applicable",
-      "summary": "Baseline/diagnostic report; tests are reported with the candidate."
+      "status": "passed",
+      "summary": "Server: focused suites pass; full unit suite 301 pre-existing environment failures identical to a399916a, +17 new passing; production webpack build passes on afdc849a. Native: unit 1395/1395; FounderServerAPITests 201/201 (13 new); UI 11/12 with one pre-existing flake (testReportingJourneys) that passes on recheck."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "Diagnostic only."
+      "status": "approved",
+      "summary": "Two fresh-context adversarial reviews (Server, Native): nothing blocking; medium/low findings fixed in afdc849a / c736254b."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Benchmark ran in a READ ONLY transaction with a SELECT/WITH-only statement guard and ROLLBACK; logs read-only."
+      "summary": "All production benchmarks ran READ ONLY with a SELECT/WITH-only guard and ROLLBACK; parity digests identical for every non-projected resource."
     }
   },
-  "decisions_required": [],
+  "decisions_required": [
+    "Authorize Server deploy of afdc849a (backward compatible with installed Build 60).",
+    "Authorize Native Build 61 release prep from c736254b after HealthKit Cardio acceptance closes."
+  ],
   "blockers": [],
   "unexpected_findings": [
-    "Priority Detail completion awaits a full canonical Home read before acknowledging.",
-    "Home read twice at cold launch in production logs (cause unproven without a device trace)."
+    "Priority Detail completion acknowledgement waited on a full canonical Home read.",
+    "Home read twice at cold launch in production logs (cause unproven without a device trace).",
+    "Pre-existing UI test flake testReportingJourneys."
   ],
   "backlog": [
-    "Candidate implementation and before/after acceptance reports follow."
+    "Phase 3: pre-projected/bounded read models for Home/Log/Goals/Morning Check-In (DB 0.5-1.1 s).",
+    "Auth last-seen writes off the read path; DB pool size 5 -> 10 (spec change).",
+    "Proactive access-token refresh; release-safe Native timing diagnostics.",
+    "Last-known snapshots for Log/Evidence Hub; Training Logger alias index."
   ],
-  "recommended_next_step": "Review the implementation candidate report when published.",
-  "full_report_path": "agent-handoffs/reports/20260925T185500Z-native-daily-driver-performance-phase2-baseline.md",
+  "recommended_next_step": "Founder authorizes Server afdc849a deploy first (then rerun the benchmark against the live SHA); Build 61 from c736254b later.",
+  "full_report_path": "agent-handoffs/reports/20260925T194500Z-native-daily-driver-performance-phase2-acceptance.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
