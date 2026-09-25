@@ -55,6 +55,7 @@ function projectCanonicalMidweekV3(artifact, assessment, lineage) {
     ...factual
   } = briefing;
   const energy = createMidweekEnergyPresentation(briefing.energyBalance);
+  const comparisonNarrativeV3 = energyComparisonTextV3(briefing.energyBalance);
   const { remainsUnclear: _remainsUnclear, ...activePhase } = briefing.activePhase ?? {};
   const presentationContract = createMidweekPresentationContract({
     artifact,
@@ -70,7 +71,7 @@ function projectCanonicalMidweekV3(artifact, assessment, lineage) {
       ...briefing.energyBalance,
       // Factual values only; interpretation is the V3 Energy statement.
       balanceHeadline: energy.balanceHeadline,
-      comparisonNarrative: energy.comparisonNarrative,
+      comparisonNarrative: comparisonNarrativeV3,
       chartTitle: energy.chartTitle,
       headline: null,
       interpretation: narrativeV3.energy?.statement ?? null,
@@ -98,6 +99,7 @@ function projectCanonicalMidweekV3(artifact, assessment, lineage) {
 function projectCanonicalMidweekFactualFallback(artifact, lineage) {
   const briefing = artifact.briefing;
   const energy = createMidweekEnergyPresentation(briefing.energyBalance);
+  const comparisonNarrativeV3 = energyComparisonTextV3(briefing.energyBalance);
   const { remainsUnclear: _remainsUnclear, ...activePhase } =
     briefing.activePhase ?? {};
   return {
@@ -113,7 +115,7 @@ function projectCanonicalMidweekFactualFallback(artifact, lineage) {
     energyBalance: briefing.energyBalance ? {
       ...briefing.energyBalance,
       balanceHeadline: energy.balanceHeadline,
-      comparisonNarrative: energy.comparisonNarrative,
+      comparisonNarrative: comparisonNarrativeV3,
       chartTitle: energy.chartTitle,
       headline: null,
       interpretation: null,
@@ -517,12 +519,38 @@ export function createMidweekEnergyPresentation(energy = {}) {
   });
 }
 
+// Legacy V2 comparison text — unconditional, exactly as it always was. V2
+// historical Midweek briefings must keep their original read-time-computed
+// presentation unchanged; this task's content-quality fixes apply to the V3
+// content-generation path only (see energyComparisonTextV3 below, used
+// exclusively by the V3 projection functions).
+function energyComparisonText(energy) {
+  const previous = energy.comparison?.averageBalance;
+  const current = Number.isFinite(energy.estimatedAverageDailyBalance)
+    ? energy.estimatedAverageDailyBalance
+    : energy.estimatedDailyBalanceMidpoint;
+  if (!Number.isFinite(previous) || !Number.isFinite(current)) {
+    return "The prior comparable period does not have enough paired evidence for a directional comparison.";
+  }
+  const change = Math.round(current - previous);
+  const direction = Math.abs(change) < 25 ? "was similar to" : change > 0 ? "was higher than" : "was lower than";
+  const rmr = energy.rmrProvenance?.sourceDexaDate
+    ? ` Estimated expenditure uses the DEXA RMR available on ${shortDate(energy.rmrProvenance.sourceDexaDate)} plus active calories.`
+    : " Estimated expenditure is limited because an eligible RMR source is unavailable.";
+  return `Average estimated balance ${direction} the prior comparable period by ${Math.abs(change).toLocaleString("en-US")} kcal/day.${rmr}`;
+}
+
 // A kcal/day change smaller than this does not change what someone would do
-// differently from the prior period, so it stays out of the coaching text —
-// the raw numbers are still visible in the metric tiles either way.
+// differently from the prior period, so it stays out of the V3 coaching
+// text — the raw numbers are still visible in the metric tiles either way.
 const MATERIAL_PRIOR_PERIOD_CHANGE_KCAL = 150;
 
-function energyComparisonText(energy) {
+// V3-only: materiality-gated comparison + a compact, subordinate methodology
+// note included only when the RMR source is actually a limitation (missing),
+// never unconditionally. Used exclusively by projectCanonicalMidweekV3 /
+// projectCanonicalMidweekFactualFallback — never by the V2 legacy path
+// above, which keeps its own always-on text unchanged.
+function energyComparisonTextV3(energy) {
   const previous = energy.comparison?.averageBalance;
   const current = Number.isFinite(energy.estimatedAverageDailyBalance)
     ? energy.estimatedAverageDailyBalance
@@ -535,9 +563,6 @@ function energyComparisonText(energy) {
       parts.push(`Average estimated balance was ${direction} the prior comparable period by ${Math.abs(change).toLocaleString("en-US")} kcal/day.`);
     }
   }
-  // Methodology is a compact, subordinate note — only when the RMR source is
-  // actually a limitation on the estimate (missing), never when the estimate
-  // is using a normal, current source; that case is not decision-relevant.
   if (!energy.rmrProvenance?.sourceDexaDate) {
     parts.push("Estimated expenditure is limited because an eligible RMR source is unavailable.");
   }
@@ -546,5 +571,10 @@ function energyComparisonText(energy) {
 
 function longDay(value) {
   return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" })
+    .format(new Date(`${value}T12:00:00Z`));
+}
+
+function shortDate(value) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
     .format(new Date(`${value}T12:00:00Z`));
 }

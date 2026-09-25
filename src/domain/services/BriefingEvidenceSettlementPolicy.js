@@ -1,3 +1,5 @@
+import { deepFreeze } from "../intelligence/v3/V3Runtime.js";
+
 // Server-owned policy for WHETHER a recurring (Midweek/Weekly/Monthly)
 // briefing's final local evidence day has settled enough continuous
 // HealthKit-backed evidence to generate with confidence, and WHEN to
@@ -157,7 +159,12 @@ export function buildEvidenceSettlementWatermarkV1({
   if (!generatedAt) throw new Error("buildEvidenceSettlementWatermarkV1 requires generatedAt.");
   return Object.freeze({
     schemaVersion: BRIEFING_EVIDENCE_SETTLEMENT_POLICY_VERSION,
-    evidenceWindow: Object.freeze({ ...evidenceWindow }),
+    // Deeply frozen, not just at the top level: `evidenceWindow` is
+    // Server-supplied and could in principle carry a nested object/array
+    // field in the future — this record's "immutable freeze" claim must
+    // actually hold at every depth, not only for the fields it happens to
+    // receive today.
+    evidenceWindow: deepFreeze({ ...evidenceWindow }),
     domains: readiness.domains,
     readyAtGeneration: readiness.ready,
     unsettledDomainsAtGeneration: Object.freeze([...(publishDecision.unsettledDomains ?? [])]),

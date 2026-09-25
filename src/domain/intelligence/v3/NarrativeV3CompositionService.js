@@ -1099,7 +1099,14 @@ function composeConfidenceDeepExplanation(context) {
   const currentSupport = context.operatingSignals
     // Already surfaced as the hero Result — Confidence's own supporting-
     // evidence list adds other current support, not a restatement of it.
-    .filter((item) => item !== context.resultOperatingSignal)
+    // Semantic (content) equality, not object identity: a different signal
+    // object carrying the same or near-identical factualSummary text (e.g.
+    // two domains independently producing a similar templated summary)
+    // must be excluded too, the same way this file's own
+    // isSemanticallyEquivalent primitive already guards every other
+    // section-distinctness check.
+    .filter((item) => !isSemanticallyEquivalent(
+      item.factualSummary, context.resultOperatingSignal?.factualSummary))
     .filter((item) => item.direction === "supports" && item.factualSummary)
     .map((item) => item.semanticClass === "DERIVED_ESTIMATE"
       ? translateEnergyForCoaching(context, item)

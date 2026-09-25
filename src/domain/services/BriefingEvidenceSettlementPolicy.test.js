@@ -180,6 +180,18 @@ describe("Briefing evidence settlement policy", () => {
       expect(() => { watermark.publishReasonCode = "tampered"; }).toThrow();
     });
 
+    it("is deeply immutable — a nested evidenceWindow field cannot be mutated either", () => {
+      const readiness = evaluateBriefingReadinessV1({ domainStates: settledDomains });
+      const watermark = buildEvidenceSettlementWatermarkV1({
+        evidenceWindow: { startDate: "2026-09-20", endDate: "2026-09-22",
+          // A nested field, to prove the freeze isn't only shallow.
+          notes: { source: "goal_contract" } },
+        readiness, publishDecision: { action: "generate", reasonCode: "readiness_satisfied", unsettledDomains: [] },
+        generatedAt: "2026-09-23T10:01:29.328Z",
+      });
+      expect(() => { watermark.evidenceWindow.notes.source = "tampered"; }).toThrow();
+    });
+
     it("records a device closeout receipt on the watermark when one occurred", () => {
       const readiness = evaluateBriefingReadinessV1({ domainStates: settledDomains });
       const receipt = recordDeviceCloseoutReceiptV1({
