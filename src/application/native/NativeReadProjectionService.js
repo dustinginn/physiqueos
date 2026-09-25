@@ -76,11 +76,16 @@ const NATIVE_NUTRITION_REPORT_KEYS = new Set([
   "title", "subtitle", "tone", "nutritionDays", "nutritionLibrary", "nutritionReportingLinks", "dataSources",
 ]);
 
-export function projectNativeNutritionRead({ report, ...rest } = {}) {
+export function projectNativeNutritionRead(value) {
+  if (value == null) return value;
+  const { report, ...rest } = value;
   return Object.freeze({ ...rest, report: Object.freeze(pick(report, NATIVE_NUTRITION_REPORT_KEYS)) });
 }
 
-export function projectNativeTrainingLandingRead({ timeline, report, ...rest } = {}) {
+export function projectNativeTrainingLandingRead(value) {
+  // A missing read stays missing, so the route still answers 404.
+  if (value == null) return value;
+  const { timeline, report, ...rest } = value;
   const projectedReport = pick(report, NATIVE_TRAINING_LANDING_REPORT_KEYS);
   if (Array.isArray(projectedReport.trainingDays)) {
     projectedReport.trainingDays = Object.freeze(projectedReport.trainingDays.map(projectTrainingDay));
@@ -91,7 +96,9 @@ export function projectNativeTrainingLandingRead({ timeline, report, ...rest } =
   return Object.freeze({ ...rest, timeline, report: Object.freeze(projectedReport) });
 }
 
-export function projectNativeTrainingLibraryRead({ report, ...rest } = {}) {
+export function projectNativeTrainingLibraryRead(value) {
+  if (value == null) return value;
+  const { report, ...rest } = value;
   return Object.freeze({ ...rest, report: Object.freeze(pick(report, NATIVE_TRAINING_LIBRARY_REPORT_KEYS)) });
 }
 

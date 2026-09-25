@@ -159,6 +159,13 @@ describe("Native Training landing/library projections (performance)", () => {
       .toEqual({ title: "T", trainingDays: [], latestTrainingDay: null });
     expect(projectNativeTrainingLibraryRead({ report: null }).report).toEqual({});
   });
+
+  it("leaves an absent read absent so the route still answers 404", () => {
+    for (const project of [projectNativeTrainingLandingRead, projectNativeTrainingLibraryRead, projectNativeNutritionRead]) {
+      expect(project(null)).toBeNull();
+      expect(project(undefined)).toBeUndefined();
+    }
+  });
 });
 
 describe("Native Nutrition projection (performance)", () => {
