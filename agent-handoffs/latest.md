@@ -2,20 +2,20 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Sep24 decode fix + workout-type fidelity, both candidates reviewed (`claude-healthkit-strength-fix-workout-type-fidelity-20260924`)
+- Task: HealthKit Cardio graduation readiness — prepared, not activated (`claude-healthkit-cardio-graduation-preparation-20260924`)
 - Agent: claude
-- Status: awaiting Founder direction — implemented, tested, independently reviewed (APPROVE on both), nothing deployed/uploaded
-- Generated (UTC): 2026-09-25T02:30:00Z
+- Status: awaiting Founder direction — fully prepared and independently reviewed (APPROVE WITH NOTES), nothing deployed/activated/mutated
+- Generated (UTC): 2026-09-25T03:30:00Z
 - Success: true
 
-Summary: Fixed the proven Sep24 Training Detail crash — Native's `TrainingReadModel.swift` required a confirmation timestamp that a legitimate "possible match" response never has; that field is now optional and the app decodes it honestly. Along the way, the implementer found and closed a *second* gap: a separate wire-transport struct that's the actual thing sent over the network also needed the fix. Also added prospective workout-type fidelity: Apple's HealthKit uses the same code for Indoor and Outdoor Walk (and Run, and Cycle) — the app now reads the one flag that actually distinguishes them and passes it through to the server, which now preserves it as a specific type instead of collapsing it to generic "cardio." This only helps future workouts; the four already-recorded deferred walks are proven, not just assumed, to be permanently unrecoverable at the specific-type level, which the Founder has explicitly said is fine.
+Summary: Cardio graduation is now design-ready as a short sequence of already-reviewed, already-gated production steps — none of them run yet. Re-verified (against real source, with a fresh 51/51 test pass) that the existing atomic policy-widening tool and the existing bounded deferred-workout reconciliation runner are safe and compatible with the not-yet-deployed workout-type-fidelity Server fix. Re-confirmed with a fresh, widened production read — not assumed — that the deferred-Cardio backlog is still exactly the same 4 walks from Sep 23–24, with no new ones since. Built exact future dry-run command packages, Activity-accounting pre/post invariants, a Founder real-device acceptance checklist, and a 10-gate execution sequence.
 
-An independent review of the Native work caught one real issue before this was called done: a hardcoded "Confirmed" label would have falsely claimed the Founder's real (unconfirmed) Sep 24 match was confirmed. That's fixed too, and re-verified. Server side came back clean on first review.
+A fresh-context adversarial review found two real, non-blocking issues, both fixed in the published report before finishing: the reconciliation runner's own safety fencing means the 4 deferred walks must be dry-run and applied one at a time, strictly in sequence — never as a single batched pass; and this report's own manifest checksum turned out to have no real, reproducible implementation behind it, so it's now clearly marked as a human-readable convenience only, with the runner's own tested, built-in digest checks identified as the thing that actually protects execution time.
 
-Both final candidates (Native `6a108d25e2a05b63c9561be3aeb9952f4e9dafe1`, built from an isolated worktree preserving Build 59 exactly; Server `c58dcca97e7b1a32c829485b7f8dc3d8fa5bb5a5`) are local-only — neither pushed, deployed, or uploaded. The Midweek team's own worktree was never touched. No policy change, no Cardio activation, no data reconciliation, no phone operation.
+Nothing was deployed, uploaded, activated, or mutated. The two things still needed before any of the 10 gates can begin: deploying the Server type-fidelity fix, and folding the Native Strength-label fix into the next release build — each its own separate authorization, as always.
 
-Detailed report: `agent-handoffs/reports/20260925T023000Z-healthkit-strength-fix-workout-type-fidelity-reviewed.md`
+Detailed report: `agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md`
 
-Related: `agent-handoffs/reports/20260925T012000Z-healthkit-build59-strength-detail-diagnostic.md`, `agent-handoffs/reports/20260925T004500Z-healthkit-server-corrections-cardio-tooling-deployed.md`
+Related: `agent-handoffs/reports/20260925T023000Z-healthkit-strength-fix-workout-type-fidelity-reviewed.md`, `agent-handoffs/reports/20260925T012000Z-healthkit-build59-strength-detail-diagnostic.md`
 
 Protocol: `agent-handoffs/README.md`

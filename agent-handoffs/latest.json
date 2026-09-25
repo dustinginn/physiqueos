@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-25T02:30:00Z",
+  "generated_at_utc": "2026-09-25T03:30:00Z",
   "task": {
-    "id": "claude-healthkit-strength-fix-workout-type-fidelity-20260924",
-    "title": "HealthKit Sep24 decode fix + workout-type fidelity, both candidates reviewed",
+    "id": "claude-healthkit-cardio-graduation-preparation-20260924",
+    "title": "HealthKit Cardio graduation readiness — prepared, not activated",
     "agent": "claude",
     "status": "awaiting_founder_direction"
   },
@@ -23,10 +23,12 @@
     "server_worktree": "/private/tmp/physiqueos-healthkit-current-day-review-server",
     "server_candidate_pushed": false,
     "production_server_sha": "01d1900bcbb9db32ce270e49c7d24e919ba0d7d7",
-    "production_deployment": "8da160ac-7ae5-4b69-8fd7-342cfff30099"
+    "production_deployment": "8da160ac-7ae5-4b69-8fd7-342cfff30099",
+    "live_workout_policy_families": ["strength"],
+    "live_workout_policy_digest": "dc7ba152cf5e9dd528e380bed6bc0366"
   },
   "result": {
-    "summary": "Claude implemented, tested, and had independently fresh-context reviewed (APPROVE on both) the proven Sep24 Training Detail decode fix (Native: confirmedAt made optional, candidate fields added, plus a second transport-struct gap the implementer found and closed) and prospective HealthKit workout-type fidelity (Native: captures HKMetadataKeyIndoorWorkout only; Server: accepts and classifies it into a specific canonicalType without ever changing the cardio family). One real follow-up defect found by the first review round -- a hardcoded 'Confirmed' label that would have misrepresented an unconfirmed candidate match -- was fixed and re-verified before finalizing. Code/test/review only. Neither final candidate pushed, deployed, uploaded, or activated. The Midweek lane's live worktree was not touched.",
+    "summary": "Claude prepared (did not execute) the full Cardio graduation package: re-verified the atomic policy-replacement runner and bounded deferred-reconciliation runner are safe and compatible with the not-yet-deployed workout-type-fidelity Server candidate; re-confirmed via a fresh, widened, read-only production inventory that the deferred-Cardio backlog is still exactly 4 (2 walks Sep23, 2 walks Sep24), none carrying recoverable Indoor/Outdoor metadata; built exact future dry-run command packages for both the policy widening and the per-observation reconciliation; defined Activity-accounting pre/post invariants and a no-double-count guard; wrote a Founder real-device acceptance checklist; and defined a 10-gate execution sequence, each gate its own separate future authorization. A fresh-context adversarial review (independent test re-run + source ground-truthing) returned APPROVE WITH NOTES: two real findings -- the reconciliation runner's collection-wide drift fence means the 4 entries must be dry-run/applied strictly serially, never batched; and this report's own manifest checksum has no executable implementation and is non-authoritative, superseded by the runner's own built-in digest fencing -- both were corrected in the published report before finalizing. No code changes were needed. Nothing was deployed, uploaded, activated, or mutated.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -36,40 +38,43 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Native: full suite 1377/1377 (up from 1375 pre-fix). Server: all 5 directly-affected files 68/68 combined + HealthKitObservationService.test.js's own coverage; vitest.package7.config.js 559/565 (6 pre-existing unrelated); vitest.phase4.config.js 139/139. Production webpack build exits 0 with Compiled successfully."
+      "summary": "Fresh re-run: HealthKitActivationPolicyRunner.test.js + HealthKitDeferredWorkoutReconciliationRunner.test.js -> 51/51 passed, independently reconfirmed a second time by the fresh-context reviewer. No new tests were needed -- the required 'preserves specific type when present, generic when absent' regression and all Activity-accounting invariants were confirmed already present and green."
     },
     "review": {
-      "status": "approved",
-      "summary": "Two independent fresh-context reviews. Server: clean APPROVE (one non-blocking commit-message prose inaccuracy, not a code defect). Native: first pass APPROVE WITH CONCERNS (found a hardcoded confirmation label that would misrepresent an unconfirmed match) -- fixed by the implementer and independently re-verified; final SHA reflects the fix."
+      "status": "approved_with_notes",
+      "summary": "Fresh-context adversarial review of the complete readiness package (design-level; no code changed to review as a diff). Verdict: APPROVE WITH NOTES. Independently ground-truthed every Part A/E/F claim against real source with line citations and independently re-ran the cited tests rather than trusting the report. Two genuine findings, both incorporated before publishing: (1) Gates 7/8 cannot be run as a single batched dry-run-all/apply-all pass -- the reconciliation runner's drift fence hashes the full observation/canonical-workout collections, so entries must be dry-run and applied strictly serially, one at a time; (2) this report's own SHA-256 manifest checksum has no corresponding script in buildHealthKitPayload.mjs and cannot be mechanically reproduced -- it is now explicitly scoped as a non-authoritative, human-readable preparation artifact only, with the runner's own built-in per-observation digest/idempotency fencing as the real execution-time drift protection. No rejection-level defect found; gate ordering independently confirmed correct."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "No production database access at all in this task -- ground truth for the deferred-Cardio ledger and historical-data-unrecoverability was carried forward from the prior diagnostic's bounded read-only audit, not re-queried. Both reviewers independently mutation-tested critical guards (family-never-changes invariant on the Server side) with RED-then-GREEN proof, worktrees restored clean."
+      "summary": "Every production interaction in this task was bounded and read-only: a widened (2026-09-22 through 2026-09-27) fresh inventory read confirming the deferred-Cardio backlog is still exactly 4 with no new arrivals, plus a safe zero-write 'digest discovery via deliberate refusal' read of the live policy digest. No write of any kind was attempted or reached."
     }
   },
   "decisions_required": [
-    "Authorize Server deployment of c58dcca97e7b1a32c829485b7f8dc3d8fa5bb5a5.",
-    "Authorize folding Native candidate 6a108d25e2a05b63c9561be3aeb9952f4e9dafe1 (built on exact Build 59 base) into the next consolidated Native release candidate -- that reconciliation with any further Midweek-lane work is a separate, not-yet-started task needing its own authorization.",
-    "After both are live/installed: authorize a dry-run then a separate apply of the atomic policy-replacement tooling (Strength-only -> [cardio, strength]).",
-    "After that: authorize a dry-run then a separate apply of the deferred-Cardio-reconciliation runner for all four known identities (which will present as generic Cardio/Walking, since the specific Indoor/Outdoor type is provably unrecoverable for this historical data -- Founder has explicitly accepted this as prospective-only)."
+    "Gate 1: Authorize deployment of Server type-fidelity candidate c58dcca97e7b1a32c829485b7f8dc3d8fa5bb5a5, unless superseded by a clean combined candidate with Midweek's work.",
+    "Gate 2: Authorize installing/accepting a combined Native build containing Strength-fix candidate 6a108d25e2a05b63c9561be3aeb9952f4e9dafe1.",
+    "Gate 4/5: After Gates 1-3, authorize a dry-run then separately authorize apply of the atomic policy-replacement tooling (Strength-only -> [cardio, strength]).",
+    "Gate 7/8: After Gate 6, authorize -- per entry, strictly serially, not batched -- a dry-run then separately authorize apply of the deferred-Cardio-reconciliation runner for each of the 4 known identities."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "The Native decode fix has a second, independent transport gap: a distinct, narrower wire-encoding struct (separate from the in-memory query-client model) is what actually gets sent to the Server, and it also needed the new indoor/outdoor field threaded through -- found and fixed by the implementer, independently confirmed by the reviewer tracing the real network encode/send call chain.",
-    "The first fresh-context Native review found a real, in-scope defect the implementation itself didn't introduce but made newly reachable: a hardcoded 'Confirmed with Workout Logger' label that would have misrepresented the Founder's real, unconfirmed Sep24 match as confirmed. Fixed with a 2-line label branch plus 2 new tests before finalizing.",
-    "The Server-side request-bounds byte-budget accounting needed a small, necessary extension to correctly account for the new field -- found by the implementer, confirmed additive-only and non-shrinking of other fields' budget by the reviewer."
+    "The deferred-Cardio backlog was re-verified fresh rather than assumed: still exactly 4, no new cardio-family observations have arrived in production since Sep24, confirmed via a widened read window through Sep27.",
+    "The two Sep23 deferred observations were recorded under America/Los_Angeles while the two Sep24 observations were recorded under America/Chicago -- a genuine device/location timezone difference between the two days, not a data inconsistency.",
+    "The fresh-context reviewer found that the reconciliation runner's drift fence is collection-wide (not per-observation only), which silently invalidates a naive 'dry-run all 4, then apply all 4' execution plan -- corrected in this report to a strictly serial per-entry sequence before publishing.",
+    "The fresh-context reviewer found this report's own bespoke manifest-checksum scheme has no corresponding executable tooling and cannot be mechanically reproduced at execution time -- rescoped in this report to a non-authoritative preparation artifact, with the runner's own tested digest fencing identified as the real execution-time protection."
   ],
   "backlog": [
-    "Deploy Server c58dcca9... (own authorization).",
-    "Fold Native 6a108d25... into the next consolidated release candidate with Midweek's own work (own authorization, separate task).",
-    "Real-device acceptance of the Sep24 fix and the honest candidate/confirmed label.",
-    "Dry-run + apply atomic policy replacement, then dry-run + apply deferred-Cardio reconciliation for all 4 known identities -- each its own authorization."
+    "Gate 1: deploy Server c58dcca9 (own authorization).",
+    "Gate 2: fold Native 6a108d25 into the next consolidated release candidate with Midweek's work (own authorization, separate task).",
+    "Gate 3: refresh the bounded deferred-Cardio inventory and live policy digest immediately before activation.",
+    "Gates 4-9: dry-run/apply the policy replacement, then strictly-serial per-entry dry-run/apply of deferred-Cardio reconciliation for all 4 identities, each its own authorization, verified by pre/post read-only audits.",
+    "Gate 10: Founder real-device acceptance per the prepared checklist.",
+    "Strategic-evidence eligibility for Cardio remains a later, separate, not-yet-started project."
   ],
-  "recommended_next_step": "Claude should await Founder direction. The Native fix (/private/tmp/physiqueos-healthkit-strength-fix-workout-type-fidelity, exact 6a108d25e2a05b63c9561be3aeb9952f4e9dafe1) is an isolated worktree preserving exact Build 59 as its base -- ready to be reconciled onto whatever the next consolidated Native candidate is, once that reconciliation is separately authorized. Do not deploy, upload, activate Cardio, mutate policy, reconcile deferred workouts, repair September 23 (not required), or operate the phone without the specific matching authorization for each gate.",
-  "full_report_path": "agent-handoffs/reports/20260925T023000Z-healthkit-strength-fix-workout-type-fidelity-reviewed.md",
+  "recommended_next_step": "Claude should await Founder direction on Gate 1 (Server deployment of c58dcca9) and Gate 2 (Native candidate 6a108d25 reconciliation into the next consolidated build). No further Cardio-graduation preparation work is needed until those two are live/installed -- the remaining Gates 3-10 are fully specified in the published report and require only their own separate authorizations at that time, per-entry-serial for the reconciliation gates specifically.",
+  "full_report_path": "agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260925T023000Z-healthkit-strength-fix-workout-type-fidelity-reviewed.md",
     "agent-handoffs/reports/20260925T012000Z-healthkit-build59-strength-detail-diagnostic.md",
-    "agent-handoffs/reports/20260925T004500Z-healthkit-server-corrections-cardio-tooling-deployed.md",
     "agent-handoffs/reports/20260924T230500Z-healthkit-corrections-cardio-readiness-implemented-reviewed.md"
   ],
   "safety": {
