@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatShortMonthDay,
   getLocalDateKey,
   getLocalDayWindow,
   getPreviousLocalDayWindow,
@@ -125,5 +126,37 @@ describe("cached time-zone formatting (performance)", () => {
     const spring = getLocalDayWindow({ dateKey: "2026-03-08", timeZone: "America/Los_Angeles" });
     expect(spring.startInclusive).toBe("2026-03-08T08:00:00.000Z");
     expect(spring.endExclusive).toBe("2026-03-09T07:00:00.000Z");
+  });
+});
+
+describe("formatShortMonthDay (cached toLocaleDateString equivalent)", () => {
+  const reference = (date) => date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  it("matches toLocaleDateString for local calendar dates across two years", () => {
+    for (let offset = 0; offset < 800; offset += 1) {
+      const date = new Date(2025, 0, 1 + offset);
+      expect(formatShortMonthDay(date)).toBe(reference(date));
+    }
+  });
+
+  it("matches for instants near midnight and for invalid dates", () => {
+    for (const iso of ["2026-03-08T09:59:59Z", "2026-11-01T08:30:00Z", "2026-12-31T23:59:59Z", "2026-01-01T00:00:00Z"]) {
+      expect(formatShortMonthDay(new Date(iso))).toBe(reference(new Date(iso)));
+    }
+    expect(formatShortMonthDay(new Date(Number.NaN))).toBe(reference(new Date(Number.NaN)));
+    expect(formatShortMonthDay(new Date(undefined, Number.NaN, 1))).toBe("Invalid Date");
+  });
+
+  it("follows a runtime host time-zone change exactly like toLocaleDateString", () => {
+    const previous = process.env.TZ;
+    try {
+      const instant = new Date("2026-09-26T03:30:00Z");
+      for (const zone of ["America/Los_Angeles", "Asia/Tokyo", "UTC"]) {
+        process.env.TZ = zone;
+        expect(formatShortMonthDay(instant)).toBe(reference(instant));
+      }
+    } finally {
+      if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous;
+    }
   });
 });

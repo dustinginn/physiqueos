@@ -11,6 +11,25 @@ const DATE_KEY_FORMATTERS = new Map();
 const DATE_TIME_FORMATTERS = new Map();
 const RESOLVED_TIME_ZONES = new Map();
 
+const SHORT_MONTH_DAY_FORMATTERS = new Map();
+
+// Identical to date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+// (which builds a new formatter per call) — including "Invalid Date" for an
+// invalid date. Keyed by the host zone because that is the zone
+// toLocaleDateString uses; Node re-reads TZ when process.env.TZ changes.
+export function formatShortMonthDay(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return new Date(Number.NaN).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  const hostZone = String(globalThis.process?.env?.TZ ?? "");
+  let formatter = SHORT_MONTH_DAY_FORMATTERS.get(hostZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+    remember(SHORT_MONTH_DAY_FORMATTERS, hostZone, formatter);
+  }
+  return formatter.format(date);
+}
+
 function cachedFormatter(cache, timeZone, options) {
   const key = String(timeZone);
   const cached = cache.get(key);

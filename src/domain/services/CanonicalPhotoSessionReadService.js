@@ -2,6 +2,7 @@ import { getProgressPhotoCategoryId, getProgressPhotoCategoryLabel } from "../mo
 import { composeGalleryInterpretation } from "./GalleryInterpretationService";
 import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers";
 import { requiresAnalysisDerivative } from "./ImageContainerDetection.js";
+import { formatShortMonthDay } from "../utils/localDate";
 
 const POSE_ORDER = ["front-relaxed", "back-relaxed", "back-flexed", "side-relaxed", "left-side-relaxed", "right-side-relaxed", "front-flexed"];
 const INACTIVE = new Set(["duplicate", "superseded", "inactive"]);
@@ -437,5 +438,5 @@ function hashText(value) { let hash=2166136261;for(const char of String(value)){
 function mostCommon(values) { const counts=new Map();values.forEach((value)=>counts.set(value,(counts.get(value)??0)+1));return [...counts.entries()].sort((left,right)=>right[1]-left[1]||left[0].localeCompare(right[0]))[0]?.[0]??null; }
 function privateHref(value) { if (!value) return null; const mediaId=parsePrivateMediaReference(value);if(mediaId)return `/api/private-evidence/media/${mediaId}`;if(String(value).startsWith("media://"))return null;return `/api/private-evidence/${String(value).replace(/^private[\\/]/i, "").replaceAll("\\", "/")}`; }
 function dateKey(value) { return String(value ?? "").slice(0, 10); }
-function formatDate(value) { if (!value) return "Pending"; const [year, month, day] = dateKey(value).split("-").map(Number); return new Date(year, month - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+function formatDate(value) { if (!value) return "Pending"; const [year, month, day] = dateKey(value).split("-").map(Number); return formatShortMonthDay(new Date(year, month - 1, day)); }
 function unique(values) { return [...new Set(values.filter(Boolean))]; }

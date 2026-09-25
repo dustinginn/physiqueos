@@ -1,3 +1,4 @@
+import { formatShortMonthDay } from "../utils/localDate";
 export function composeGalleryInterpretation(view = {}) {
   const comparison = view.comparison ?? null;
   const findings = selectEvidenceFindings(view);
@@ -58,4 +59,4 @@ function normalize(value) { return value.toLowerCase().replace(/[^a-z0-9]+/g," "
 function ensurePeriod(value) { return /[.!?]$/.test(value)?value:`${value}.`; }
 function join(values) { if(values.length<2)return values[0]??"";return `${values.slice(0,-1).join(", ")} and ${values.at(-1)}`; }
 function formatDateFromSubject(subject) { return subject.replace(/^The /, "").replace(/ photo$/, ""); }
-function formatDate(value) { if(!value)return"the prior date";const [year,month,day]=String(value).slice(0,10).split("-").map(Number);return new Date(year,month-1,day).toLocaleDateString("en-US",{month:"short",day:"numeric"}); }
+function formatDate(value) { if(!value)return"the prior date";const [year,month,day]=String(value).slice(0,10).split("-").map(Number);return formatShortMonthDay(new Date(year,month-1,day)); }
