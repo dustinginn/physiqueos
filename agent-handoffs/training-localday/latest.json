@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-09-25T23:41:14Z",
+  "task": {
+    "id": "claude-training-aggregation-and-local-day-correctness-20260925",
+    "title": "Training aggregate consistency + daily-driver local-day/timezone correctness: Server 09f04dc5 and Native c15f0881 candidates accepted read-only; STOP for release authorization",
+    "agent": "claude",
+    "status": "completed"
+  },
+  "repository": "dustinginn/physiqueos",
+  "authority": {
+    "base_sha": "afdc849a6399130668d846544e85236fe1974741",
+    "final_sha": "09f04dc54eb26bfccdd2aeb34b156d8fc7d3f80e",
+    "production_server_sha": "afdc849a6399130668d846544e85236fe1974741",
+    "production_deployment": "c4d8484e-0bfa-4d07-9cf4-0cf591ac3ee2",
+    "native_sha": "00321dcc6dd86a6479dbca5dd27e691c87348cd8",
+    "native_build": 60
+  },
+  "result": {
+    "summary": "Recent Training History (and reporting history, latest-day/Evidence Hub training stream, web Cardio library) now present Training Day's workout universe with its duplicate suppression: production read-only probe Sep21 3->3, Sep22 3->3 (duplicates suppressed, not 5), Sep23 1->3, Sep24 1->3, every day equal to Training Day; Strength performance and Native Library byte-identical; Native landing +2.1% bytes. Founder 00:11 Texas observation explained (Server-canonical Pacific day); Logged Today now follows the device day when Native names its zone, weigh-in future guard judges the device day, briefing/check-in/Home stay canonical. Native candidate (descends from c736254b) rolls Today over at midnight, on resume and on zone change, invalidates day-scoped caches first, and refuses/partitions the last-known Home snapshot by device+canonical day and zone. Server candidate 09f04dc5 (base afdc849a), Native candidate c15f0881 (base c736254b). Tests, mutations, webpack, fresh-context reviews pass. Nothing deployed/uploaded/mutated. STOP for Founder release authorization.",
+    "success": true,
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
+  },
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "summary": "Server focused 468/468, broad suite no new failures vs clean afdc849a; Native focused 220/220 and full PhysiqueOSTests unit target 1414/1414 (UI target not run: disk reserve). Mutation checks all RED."
+    },
+    "review": {
+      "status": "approved",
+      "summary": "Fresh-context Server and Native reviews PASS-WITH-NOTES; all actionable notes fixed and re-reviewed."
+    },
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "Read-only production probe (identity-gated, READ ONLY transaction, rolled back) of deployed-code baseline vs candidate over the same data."
+    }
+  },
+  "decisions_required": [
+    "Authorize Server 09f04dc5 deployment (guarded two-step) to fix Recent Training History for Build 60.",
+    "After tomorrow's prospective Cardio acceptance, authorize Build 61 prep from Native c15f0881 (Performance Phase 2 + local-day correctness)."
+  ],
+  "blockers": [],
+  "unexpected_findings": [
+    "Every projected HealthKit Cardio record previously shared the duplicate identity 'Apple Health', so any aggregate merge would have collapsed them into one record (fixed with source.workout_id).",
+    "Manual weigh-ins dated on the device day after local midnight east of Pacific were rejected by the Server future-date guard (fixed via optional validated zone).",
+    "Native Log had no foreground refresh or day-change handling at all."
+  ],
+  "backlog": [
+    "Web-only /progress hub all-time training metric still counts evidence only.",
+    "HealthKit lane: verify possible workout-calorie double count inside Activity decomposition on screenshot+HealthKit duplicate days (not a session count).",
+    "Other retained screens (Training history, Activity/Nutrition day, Priority Detail, Morning Check-In) do not observe the day change directly; caches are invalidated so next load is fresh.",
+    "Run the Native UI-test target when disk reserve is >= 20 GiB."
+  ],
+  "recommended_next_step": "Founder: authorize Server 09f04dc5 deployment (then re-run the read-only aggregate probe); Build 61 from c15f0881 later under separate authorization.",
+  "full_report_path": "agent-handoffs/reports/20260925T233800Z-training-localday-final-acceptance.md",
+  "safety": {
+    "contains_secrets": false,
+    "contains_credentials": false,
+    "contains_production_exports": false,
+    "contains_founder_evidence": false,
+    "safe_for_chatgpt_retrieval": true
+  }
+}
