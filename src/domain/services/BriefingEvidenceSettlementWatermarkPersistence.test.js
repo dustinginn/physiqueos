@@ -1,20 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDailyBriefingRepository } from "../../data/repositories/DailyBriefingRepository.js";
-import { createInMemoryCanonicalRecordStore } from "../../platform/database/Phase4CanonicalRecordStore.js";
-import { createHealthKitGraduationReader } from "../../platform/database/HealthKitGraduationReader.js";
+import { HEALTHKIT_CANONICAL_DAY_COLLECTION } from "./HealthKitGraduation.js";
 import {
-  HEALTHKIT_CANONICAL_DAY_COLLECTION,
-  HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION,
-  HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
-  HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION,
-} from "./HealthKitGraduation.js";
-import { createBriefingCadenceExecutor } from "./BriefingCadenceExecutorService";
-import { createBriefingCadenceSettlementGate } from "./BriefingCadenceSettlementGate.js";
+  at, createSettlementWorld, DAILY_DATE, DEADLINE, hkDay, hkRecords, MIDWEEK_DUE, OWNER, repositoriesFor, TZ,
+} from "../../testSupport/briefingSettlementWorld.js";
 import { createMidweekBriefingService } from "./MidweekBriefingService";
 import { createMonthlyBriefingService } from "./MonthlyBriefingService";
 import { createWeeklyNarrativeService } from "./WeeklyNarrativeService";
 import { createMidweekEvidenceWindow, createWeeklyEvidenceWindow } from "./BriefingEvidenceWindowService";
-import { resolveBriefingDueInstant } from "./BriefingScheduleAuthority.js";
 import { prepareMidweekBriefingReviewPresentation } from "./MidweekBriefingPresentationService";
 import {
   attachEvidenceSettlement,
@@ -26,7 +19,6 @@ import {
 import {
   BRIEFING_EVIDENCE_SETTLEMENT_WATERMARK_VERSION,
   buildEvidenceSettlementWatermarkV1,
-  DEFAULT_SETTLEMENT_POLICY,
   evaluateBriefingReadinessV1,
   recordDeviceCloseoutReceiptV1,
   verifyEvidenceSettlementWatermarkIntegrity,
@@ -38,99 +30,7 @@ import midweekFixture from "../../fixtures/briefingFamilyV3/midweekBriefingV2.js
 // with the real artifact, written by the real artifact repository, and read
 // back — without a schema migration (one optional member of the artifact JSON).
 
-const OWNER = "user_founder_001";
-const TZ = "America/Los_Angeles";
-const DAILY_DATE = "2026-09-15";
-const MIDWEEK_DUE = resolveBriefingDueInstant({ localDate: "2026-09-16", timeZone: TZ });
-const at = (minutesAfterDue) => new Date(MIDWEEK_DUE.valueOf() + minutesAfterDue * 60_000).toISOString();
-const DEADLINE = DEFAULT_SETTLEMENT_POLICY.maximumWaitMinutes;
-
-const day = (domain, coverage, revision = 1) => ({
-  id: `healthkit_canonical_day_${domain}_${DAILY_DATE}`, domain, localDate: DAILY_DATE, userId: OWNER,
-  revision, version: revision, semanticFingerprint: `s${revision}`,
-  createdAt: "2026-09-16T05:00:00.000Z", updatedAt: "2026-09-16T05:00:00.000Z",
-  current: { coverage, sourceRevision: revision, deliveryDeviceId: "d", basis: "b",
-    canonicalRecordId: `canon_${domain}_${DAILY_DATE}`, revision, values: {} },
-  provenance: { sourceObservationIds: ["obs"] },
-});
-
-function hkRecords({ activity = "complete_day", nutrition = "complete_day", graduated = true } = {}) {
-  const on = { enabled: true, domains: ["activity", "nutrition"], startLocalDate: "2026-09-13", endLocalDate: null };
-  return createInMemoryCanonicalRecordStore({
-    [HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION]: graduated ? [{
-      id: HEALTHKIT_GRADUATION_POLICY_RECORD_ID, schemaVersion: HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION,
-      version: 1, historicalBriefingRegeneration: false, projection: { enabled: false }, evidenceEligibility: on,
-    }] : [],
-    [HEALTHKIT_CANONICAL_DAY_COLLECTION]: [
-      ...(activity ? [day("activity", activity)] : []),
-      ...(nutrition ? [day("nutrition", nutrition)] : []),
-    ],
-  });
-}
-
-function repositoriesFor(records) {
-  const user = { id: OWNER, timeZone: TZ };
-  const protocol = { id: "briefings", protocolType: "briefings", currentVersionId: "briefings-v1" };
-  return {
-    users: { getCurrentUser: vi.fn(async () => user), getUserById: vi.fn(async () => user) },
-    protocols: { listActiveProtocols: vi.fn(async () => [protocol]) },
-    protocolVersions: {
-      getCurrentVersion: vi.fn(async () => ({
-        id: "briefings-v1", protocolId: "briefings", effectiveAt: "2026-07-01",
-        coachingUpdates: {
-          schemaVersion: "coaching_updates_schedule_v1", timeZone: TZ,
-          midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
-          weekly: { enabled: true, day: "sunday", localTime: "00:00" },
-          daily: { enabled: false }, notificationPreference: "available_without_notification",
-        },
-      })),
-    },
-    dailyBriefings: createDailyBriefingRepository(records),
-    canonicalEvidence: { listCanonicalEvidenceObjects: vi.fn(async () => []) },
-    weights: { listWeightEntries: vi.fn(async () => []) },
-    dexaScans: { listDEXAScans: vi.fn(async () => []) },
-    goals: { getActiveGoal: vi.fn(async () => ({ id: "goal-build", title: "Build Lean Mass", phases: [] })) },
-  };
-}
-
-// Real executor + real gate + real reader + REAL Midweek generator over the real
-// in-memory artifact repository.
-function world({ hk = hkRecords() } = {}) {
-  const artifactRecords = [];
-  const repositories = repositoriesFor(artifactRecords);
-  let clock = new Date(at(5));
-  const midweekService = createMidweekBriefingService({ repositories, now: () => clock });
-  const generate = vi.fn((input) => midweekService.generateForCurrentWindow(input));
-  const generators = {
-    midweek: { generateForCurrentWindow: generate },
-    weekly: { generateForCurrentWindow: vi.fn(async () => ({ state: "not_eligible", reason: "not_weekly_day" })) },
-    monthly: { generateForCurrentWindow: vi.fn(async () => ({ state: "not_eligible", reason: "before_monthly_eligibility" })) },
-  };
-  const reader = createHealthKitGraduationReader({ records: hk, ownerUserId: OWNER });
-  const info = vi.fn();
-  const executionRecords = [];
-  const executor = createBriefingCadenceExecutor({
-    repositories, generators, logger: { info, warn: info },
-    settlementGate: createBriefingCadenceSettlementGate({ healthKitGraduationReader: reader }),
-    executionStore: {
-      createExecutionId: () => `run-${executionRecords.length}`,
-      async record(record) { executionRecords.push(record); },
-      async getRetryState() {
-        return { terminalFailure: false, consecutiveTransientFailures: 0, lastFailureAt: null, lastFailureCategory: null };
-      },
-    },
-    executionLock: { async acquire() { return { acquired: true, async release() {} }; } },
-    source: "watermark-test",
-  });
-  return {
-    hk, artifactRecords, repositories, generate, info, executionRecords,
-    async run(iso) {
-      clock = new Date(iso);
-      const result = await executor.execute({ asOf: clock });
-      return result.outcomes.find((outcome) => outcome.cadenceKey === "midweek");
-    },
-  };
-}
+const world = createSettlementWorld;
 
 describe("watermark persisted on the real published Midweek artifact", () => {
   it("normal readiness generation persists the full watermark and only that", async () => {
@@ -277,7 +177,7 @@ describe("a later evidence revision never touches the stored watermark or artifa
     const before = JSON.stringify(w.artifactRecords);
     // Nutrition later settles at revision 2.
     await w.hk.put({ collection: HEALTHKIT_CANONICAL_DAY_COLLECTION,
-      recordId: `healthkit_canonical_day_nutrition_${DAILY_DATE}`, payload: day("nutrition", "complete_day", 2) });
+      recordId: `healthkit_canonical_day_nutrition_${DAILY_DATE}`, payload: hkDay("nutrition", "complete_day", 2) });
     const later = await w.run(at(DEADLINE + 60));
     expect(later).toMatchObject({ resultStatus: "already_completed", artifactOutcome: "existing_immutable_artifact" });
     expect(w.generate).toHaveBeenCalledOnce();

@@ -201,13 +201,79 @@ describe("HealthKit graduation reader", () => {
       expect(result.domainStates.activity.canonicalRecordId).toBe(`healthkit_canonical_day_activity_${DATE}`);
     });
 
-    it("fails closed to no active domains when reading fails, never blocking generation on an infra error", async () => {
+    // Blocker 3: a failed read is NOT "nothing is HealthKit-backed". It returns an
+    // explicit `readError` (class name/code only, never the driver's message) so the
+    // gate can fail CLOSED before the hard deadline instead of generating.
+    it("reports a read failure as an explicit readError, distinct from a legitimate 'no active domains'", async () => {
       const onError = vi.fn();
-      const records = { get: async () => { throw new Error("database unavailable"); }, list: async () => [] };
+      const records = { get: async () => { throw Object.assign(new Error("connection refused host=db.internal password=x"), { code: "ECONNREFUSED" }); }, list: async () => [] };
       const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER, onError });
       const result = await reader.readSettlementCoverage({ localDate: DATE });
-      expect(result).toEqual({ activeDomains: [], domainStates: {} });
+      expect(result).toEqual({ activeDomains: [], domainStates: {},
+        readError: { stage: "settlement_coverage", name: "Error", code: "ECONNREFUSED" } });
+      // The message (which may carry hosts/credentials/SQL) is never propagated.
+      expect(JSON.stringify(result)).not.toMatch(/password|db\.internal|connection refused/iu);
       expect(onError).toHaveBeenCalledOnce();
+    });
+
+    it("a legitimate 'not applicable' result carries NO readError", async () => {
+      const { records } = tracked({ healthKitConfiguration: [], healthKitCanonicalDays: [] });
+      const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+      const result = await reader.readSettlementCoverage({ localDate: DATE });
+      expect(result).toEqual({ activeDomains: [], domainStates: {} });
+      expect(result).not.toHaveProperty("readError");
+    });
+
+    it("a failed canonical-day list (after a successful policy read) is also a readError", async () => {
+      const { records } = tracked({
+        healthKitConfiguration: [policy({ evidenceEligibility: { enabled: true, domains: ["activity"], startLocalDate: DATE, endLocalDate: null } })],
+        healthKitCanonicalDays: [],
+      });
+      const failing = { ...records, list: async () => { throw new Error("timeout"); } };
+      const reader = createHealthKitGraduationReader({ records: failing, ownerUserId: OWNER });
+      const result = await reader.readSettlementCoverage({ localDate: DATE, domains: ["activity"] });
+      expect(result.readError).toMatchObject({ stage: "settlement_coverage" });
+    });
+
+    it("an EVIDENCE overlay that silently degraded to ordinary evidence poisons settlement coverage until a later overlay reads successfully", async () => {
+      const { records } = tracked({
+        healthKitConfiguration: [policy({ evidenceEligibility: { enabled: true, domains: ["activity"], startLocalDate: DATE, endLocalDate: null } })],
+        healthKitCanonicalDays: [day("activity")],
+      });
+      let failing = true;
+      const flaky = { ...records, list: async (...args) => { if (failing) throw new Error("blip"); return records.list(...args); } };
+      const reader = createHealthKitGraduationReader({ records: flaky, ownerUserId: OWNER });
+      const ordinary = [];
+      reader.beginRun();
+      // The overlay itself stays fail-open to ordinary evidence (unchanged contract) ...
+      expect(await reader.overlay(ordinary, { purpose: Purpose.EVIDENCE })).toBe(ordinary);
+      // ... but the gate's own beginRun does not hide that this tick's evidence is degraded.
+      reader.beginRun();
+      const degraded = await reader.readSettlementCoverage({ localDate: DATE, domains: ["activity"] });
+      expect(degraded.readError).toMatchObject({ stage: "evidence_overlay" });
+      // A PROJECTION overlay failure never poisons it.
+      // The next tick's successful evidence overlay clears it.
+      failing = false;
+      reader.beginRun();
+      await reader.overlay(ordinary, { purpose: Purpose.EVIDENCE });
+      const recovered = await reader.readSettlementCoverage({ localDate: DATE, domains: ["activity"] });
+      expect(recovered).not.toHaveProperty("readError");
+      expect(recovered.activeDomains).toEqual(["activity"]);
+    });
+
+    it("a failing PROJECTION overlay does not affect settlement coverage", async () => {
+      const { records } = tracked({
+        healthKitConfiguration: [policy({ projection: { enabled: true, domains: ["activity"], startLocalDate: DATE, endLocalDate: null },
+          evidenceEligibility: { enabled: true, domains: ["activity"], startLocalDate: DATE, endLocalDate: null } })],
+        healthKitCanonicalDays: [day("activity")],
+      });
+      let failing = false;
+      const flaky = { ...records, list: async (...args) => { if (failing) throw new Error("blip"); return records.list(...args); } };
+      const reader = createHealthKitGraduationReader({ records: flaky, ownerUserId: OWNER });
+      failing = true;
+      await reader.overlay([], { purpose: Purpose.PROJECTION });
+      failing = false;
+      expect(await reader.readSettlementCoverage({ localDate: DATE, domains: ["activity"] })).not.toHaveProperty("readError");
     });
 
     it("never writes anything", async () => {

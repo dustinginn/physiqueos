@@ -28,6 +28,13 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
   // policy change is never masked by a stale memo.
   let pending = null;
   let inRun = false;
+  // Set when the most recent EVIDENCE overlay could not read HealthKit state and
+  // therefore fell back to the ordinary, un-overlaid evidence. Cleared only by a
+  // later EVIDENCE overlay that read successfully (each cadence tick performs
+  // one before evaluating settlement), never by `beginRun`: the settlement gate
+  // must be able to tell that THIS tick's evidence is degraded even though it
+  // begins its own run after the overlay ran.
+  let evidenceOverlayFailure = null;
   const fetchPolicy = () => store.get({
     ownerUserId,
     collection: HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION,
@@ -51,18 +58,13 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
      *   query (null when none exists); skips the lookup entirely
      */
     async overlay(canonicalObjects, { purpose = HealthKitGraduationPurpose.PROJECTION, domains = ["activity", "nutrition"], keepDateOrder = false, dateWindow = null, policyRecord } = {}) {
+      const isEvidence = purpose === HealthKitGraduationPurpose.EVIDENCE;
       try {
-        const policy = resolveHealthKitGraduationPolicy(policyRecord === undefined ? await lookup() : policyRecord);
-        const scope = purpose === HealthKitGraduationPurpose.EVIDENCE ? policy.evidenceEligibility : policy.projection;
-        if (!scope.enabled || !domains.some((domain) => scope.domains.includes(domain))) return canonicalObjects;
-        const days = (await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }))
-          .filter((day) => domains.includes(day?.domain))
-          .filter((day) => !dateWindow || (day.localDate >= dateWindow.startDate && day.localDate <= dateWindow.endDate));
-        if (days.length === 0) return canonicalObjects;
-        const { objects } = overlayGraduatedHealthKitDays({ canonicalObjects, healthKitDays: days, policy, purpose });
-        if (objects === canonicalObjects) return canonicalObjects;
-        return keepDateOrder ? insertInDateOrder(canonicalObjects, objects) : objects;
+        const result = await overlayUnchecked(canonicalObjects, { purpose, domains, keepDateOrder, dateWindow, policyRecord });
+        if (isEvidence) evidenceOverlayFailure = null;
+        return result;
       } catch (error) {
+        if (isEvidence) evidenceOverlayFailure = describeReadError(error, "evidence_overlay");
         onError?.(error);
         return canonicalObjects;
       }
@@ -75,42 +77,78 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
      * observed value — coverage/canonical-record-identity/revision only —
      * because the settlement gate decides WHEN to generate, never WHAT a
      * briefing says, and observed values must stay out of any read that
-     * isn't itself already the evidence-eligibility overlay above. Fails
-     * closed to "nothing is HealthKit-backed" on any read error, the same
-     * fail-open-to-ordinary-behavior contract `overlay()` has: an optional
-     * settlement gate must never itself become a reason generation stalls.
+     * isn't itself already the evidence-eligibility overlay above.
+     *
+     * A READ FAILURE IS NOT "nothing is HealthKit-backed". `activeDomains: []`
+     * means the owner genuinely has no in-scope domain for that date (settlement
+     * not applicable). A failed read returns `{ readError }` instead — with
+     * `activeDomains: []` for shape stability — so the gate can fail CLOSED
+     * (wait/retry until the hard deadline) instead of freezing a briefing on
+     * partial evidence because of a transient store error. The same applies when
+     * this tick's evidence overlay silently degraded to ordinary evidence.
+     * `readError` carries only an error class name/code, never a message.
      */
     async readSettlementCoverage({ localDate, domains = ["activity", "nutrition"] } = {}) {
+      if (evidenceOverlayFailure) {
+        return { activeDomains: [], domainStates: {}, readError: evidenceOverlayFailure };
+      }
       try {
-        const policy = resolveHealthKitGraduationPolicy(await lookup());
-        const scope = policy.evidenceEligibility;
-        // Domain in scope is necessary but not sufficient: a cadence whose
-        // final evidence day falls before the scope's own startLocalDate (or
-        // after an endLocalDate) is not HealthKit-backed for THIS date, even
-        // though the domain itself is graduated in general — that date must
-        // short-circuit to "not applicable" exactly like a non-graduated
-        // domain, not sit waiting on a day HealthKit was never going to
-        // canonicalize.
-        const activeDomains = domains.filter((domain) =>
-          isHealthKitGraduationInScope(scope, { domain, localDate }));
-        if (activeDomains.length === 0) return { activeDomains: [], domainStates: {} };
-        const days = (await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }))
-          .filter((day) => activeDomains.includes(day?.domain) && day?.localDate === localDate);
-        const domainStates = Object.fromEntries(activeDomains.map((domain) => {
-          const day = days.find((item) => item.domain === domain);
-          return [domain, day ? {
-            present: true,
-            coverage: day.current?.coverage ?? "missing",
-            canonicalRecordId: day.current?.canonicalRecordId ?? day.id ?? null,
-            revision: day.current?.revision ?? day.revision ?? null,
-          } : { present: false, coverage: "missing" }];
-        }));
-        return { activeDomains, domainStates };
+        return await readSettlementCoverageUnchecked({ localDate, domains });
       } catch (error) {
         onError?.(error);
-        return { activeDomains: [], domainStates: {} };
+        return { activeDomains: [], domainStates: {}, readError: describeReadError(error, "settlement_coverage") };
       }
     },
+  });
+
+  async function overlayUnchecked(canonicalObjects, { purpose, domains, keepDateOrder, dateWindow, policyRecord }) {
+    const policy = resolveHealthKitGraduationPolicy(policyRecord === undefined ? await lookup() : policyRecord);
+    const scope = purpose === HealthKitGraduationPurpose.EVIDENCE ? policy.evidenceEligibility : policy.projection;
+    if (!scope.enabled || !domains.some((domain) => scope.domains.includes(domain))) return canonicalObjects;
+    const days = (await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }))
+      .filter((day) => domains.includes(day?.domain))
+      .filter((day) => !dateWindow || (day.localDate >= dateWindow.startDate && day.localDate <= dateWindow.endDate));
+    if (days.length === 0) return canonicalObjects;
+    const { objects } = overlayGraduatedHealthKitDays({ canonicalObjects, healthKitDays: days, policy, purpose });
+    if (objects === canonicalObjects) return canonicalObjects;
+    return keepDateOrder ? insertInDateOrder(canonicalObjects, objects) : objects;
+  }
+
+  async function readSettlementCoverageUnchecked({ localDate, domains }) {
+    const policy = resolveHealthKitGraduationPolicy(await lookup());
+    const scope = policy.evidenceEligibility;
+    // Domain in scope is necessary but not sufficient: a cadence whose
+    // final evidence day falls before the scope's own startLocalDate (or
+    // after an endLocalDate) is not HealthKit-backed for THIS date, even
+    // though the domain itself is graduated in general — that date must
+    // short-circuit to "not applicable" exactly like a non-graduated
+    // domain, not sit waiting on a day HealthKit was never going to
+    // canonicalize.
+    const activeDomains = domains.filter((domain) =>
+      isHealthKitGraduationInScope(scope, { domain, localDate }));
+    if (activeDomains.length === 0) return { activeDomains: [], domainStates: {} };
+    const days = (await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }))
+      .filter((day) => activeDomains.includes(day?.domain) && day?.localDate === localDate);
+    const domainStates = Object.fromEntries(activeDomains.map((domain) => {
+      const day = days.find((item) => item.domain === domain);
+      return [domain, day ? {
+        present: true,
+        coverage: day.current?.coverage ?? "missing",
+        canonicalRecordId: day.current?.canonicalRecordId ?? day.id ?? null,
+        revision: day.current?.revision ?? day.revision ?? null,
+      } : { present: false, coverage: "missing" }];
+    }));
+    return { activeDomains, domainStates };
+  }
+}
+
+// Only the error class and code: never a message (drivers put SQL, parameters
+// and host names in messages) — safe for an operational log line.
+function describeReadError(error, stage) {
+  return Object.freeze({
+    stage,
+    name: String(error?.name ?? "Error").slice(0, 80),
+    code: String(error?.code ?? "UNCLASSIFIED_ERROR").slice(0, 80),
   });
 }
 

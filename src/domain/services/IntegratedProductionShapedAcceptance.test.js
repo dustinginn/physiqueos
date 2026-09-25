@@ -892,7 +892,7 @@ describe("Items 7-10: Midweek settlement lifecycle over real HealthKit ingestion
     expect(world.generators.midweek.generateForCurrentWindow).toHaveBeenCalledOnce();
   });
 
-  it("Item 9: at the hard deadline it publishes anyway and logs which domains were unsettled (watermark persistence on the artifact is a disclosed, unwired gap)", async () => {
+  it("Item 9: at the hard deadline it publishes anyway, logs which domains were unsettled, and hands the generator the immutable watermark to persist", async () => {
     const records = hkStore();
     await ingestMidweekWeek(records, { finalNutrition: "partial_day" });
     const world = cadenceWorld({ records, energyObservations: unsettledEnergyObservations });
@@ -911,6 +911,13 @@ describe("Items 7-10: Midweek settlement lifecycle over real HealthKit ingestion
     expect(generationRecords.length).toBeGreaterThan(0);
     for (const record of generationRecords) expect(record.settlementReasonCode).toBe("hard_deadline_reached");
 
+    // The generator was handed the watermark that gets persisted with the artifact (Blocker 1): the
+    // same decision, frozen, with the fallback flag and the unsettled domains.
+    const handed = world.generators.midweek.generateForCurrentWindow.mock.calls[0][0].settlement;
+    expect(handed.watermark).toMatchObject({
+      deadlineFallback: true, readyAtGeneration: false, unsettledDomainsAtGeneration: ["nutrition"],
+      publishReasonCode: "hard_deadline_reached", generatedAt: at(DEADLINE_MINUTES), coverageReadFailed: false });
+    expect(Object.isFrozen(handed.watermark)).toBe(true);
     // The freeze/watermark shaped from the very same decision retains the unsettled domains, immutably.
     const gateDecision = await world.gate.evaluate({
       finalEvidenceDate: "2026-09-15", earliestPublishAt: MIDWEEK_DUE.toISOString(), now: at(DEADLINE_MINUTES) });
@@ -1023,10 +1030,15 @@ describe("Monthly stays on day 1; event-driven DEXA/Photo never enter the settle
       }
     };
     walk(root);
+    // BriefingEvidenceSettlementArtifact.js (Blocker 1: builds/attaches/freezes the persisted
+    // watermark for the recurring cadences) and the shared test world are the only additions;
+    // neither is a DEXA/Photo/event module (asserted below).
     expect(importers.sort()).toEqual([
       "application/composition/providerBriefingCadenceComposition.js",
       "domain/services/BriefingCadenceExecutorService.js",
       "domain/services/BriefingCadenceSettlementGate.js",
+      "domain/services/BriefingEvidenceSettlementArtifact.js",
+      "testSupport/briefingSettlementWorld.js",
     ]);
     // The Gate is the only consumer of the policy module (besides tests).
     expect(fs.readFileSync(path.join(root, "domain/services/BriefingCadenceSettlementGate.js"), "utf8"))

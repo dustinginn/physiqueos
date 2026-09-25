@@ -1,4 +1,5 @@
 import { createSettlementGeneratorInput } from "./BriefingEvidenceSettlementArtifact.js";
+import { SettlementReasonCode } from "./BriefingEvidenceSettlementPolicy.js";
 import {
   BRIEFING_CADENCE_CATCH_UP_POLICY,
   resolveBriefingCadenceRegistry,
@@ -179,11 +180,37 @@ async function evaluateEntry({
 
   let settlementInput = null;
   if (settlementGate) {
-    const settlement = await settlementGate.evaluate({
-      finalEvidenceDate: entry.evidenceWindow?.endDate,
-      earliestPublishAt: entry.dueAt,
-      now: asOf,
-    });
+    let settlement;
+    try {
+      settlement = await settlementGate.evaluate({
+        finalEvidenceDate: entry.evidenceWindow?.endDate,
+        earliestPublishAt: entry.dueAt,
+        now: asOf,
+      });
+    } catch (error) {
+      // The gate itself never throws for a coverage read failure (it fails
+      // closed internally). Anything else that escapes must still fail CLOSED
+      // and stay per-entry: retry next tick, never generate, never abort the
+      // other cadences in this tick.
+      logger?.warn?.("briefing_settlement.settlement_gate_error", {
+        cadenceKey: entry.cadence, userId: entry.userId, reasonCode: SettlementReasonCode.GATE_ERROR,
+        errorName: String(error?.name ?? "Error").slice(0, 80), errorCode: String(error?.code ?? "UNCLASSIFIED_ERROR").slice(0, 80),
+      });
+      return finish("awaiting_evidence_settlement", {
+        ...base,
+        artifactOutcome: "none",
+        skipReason: SettlementReasonCode.GATE_ERROR,
+        unsettledDomains: [],
+        retryability: true,
+      });
+    }
+    if (settlement.coverageReadFailed) {
+      logger?.warn?.("briefing_settlement.coverage_read_failed", {
+        cadenceKey: entry.cadence, userId: entry.userId, reasonCode: settlement.reasonCode, action: settlement.action,
+        readErrorStage: settlement.readError?.stage ?? null, readErrorName: settlement.readError?.name ?? null,
+        readErrorCode: settlement.readError?.code ?? null, hardDeadlineAt: settlement.hardDeadlineAt ?? null,
+      });
+    }
     logger?.info?.(settlementEventName(settlement), {
       cadenceKey: entry.cadence, userId: entry.userId,
       reasonCode: settlement.reasonCode, unsettledDomains: settlement.unsettledDomains ?? [],
@@ -304,9 +331,10 @@ async function evaluateEntry({
     };
     if (
       entry.eligible &&
-      !["already_completed", "generation_completed", "generation_in_progress"].includes(
-        resultStatus
-      ) &&
+      // A bounded, deliberate settlement wait is not a missing artifact: the hard
+      // deadline guarantees generation, and a failure AFTER it still warns.
+      !["already_completed", "generation_completed", "generation_in_progress",
+        "awaiting_evidence_settlement"].includes(resultStatus) &&
       minutesSinceEligible(entry) >= policy.missingArtifactGraceMinutes
     ) {
       record.operationalWarning = "eligible_artifact_missing_after_grace";

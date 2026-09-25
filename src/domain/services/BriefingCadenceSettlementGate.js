@@ -1,4 +1,5 @@
 import {
+  COVERAGE_UNKNOWN_READ_FAILED,
   DEFAULT_SETTLEMENT_POLICY,
   decideBriefingPublishActionV1,
   evaluateBriefingReadinessV1,
@@ -17,6 +18,14 @@ import {
 // reader already restricts what it returns to domains actually in
 // evidence-eligibility scope, coverage/identity/revision only, never an
 // observed value.
+//
+// FAIL CLOSED ON READ ERRORS. "The coverage read failed" is never "nothing is
+// HealthKit-backed": a failed read (a thrown error, or an explicit `readError`
+// from the reader) yields wait/retry until the hard deadline, exactly as if
+// every readiness domain were unsettled-and-unknown. Only the hard deadline may
+// authorize generation while the coverage state cannot be read, and then the
+// decision is flagged `coverageReadFailed` so the persisted watermark and the
+// logs say so honestly (every domain `unknown_coverage_read_failed`).
 //
 // A user who has not graduated any domain to HealthKit yet — the ordinary
 // case for most of this codebase's history, and still ordinary for a domain
@@ -38,13 +47,35 @@ export function createBriefingCadenceSettlementGate({
       healthKitGraduationReader.beginRun();
     },
     async evaluate({ finalEvidenceDate, earliestPublishAt, now }) {
-      const { activeDomains, domainStates } = await healthKitGraduationReader.readSettlementCoverage({
-        localDate: finalEvidenceDate, domains: policy.readinessDomains,
-      });
       const timing = {
         earliestPublishAt: new Date(earliestPublishAt).toISOString(),
         hardDeadlineAt: resolveBriefingHardDeadline({ policy, earliestPublishAt }).toISOString(),
       };
+      let coverage;
+      try {
+        coverage = await healthKitGraduationReader.readSettlementCoverage({
+          localDate: finalEvidenceDate, domains: policy.readinessDomains,
+        });
+      } catch (error) {
+        coverage = { readError: { stage: "settlement_coverage", name: String(error?.name ?? "Error").slice(0, 80),
+          code: String(error?.code ?? "UNCLASSIFIED_ERROR").slice(0, 80) } };
+      }
+      if (coverage?.readError) {
+        const readiness = evaluateBriefingReadinessV1({
+          policy,
+          domainStates: Object.fromEntries(policy.readinessDomains.map((domain) =>
+            [domain, { present: false, coverage: COVERAGE_UNKNOWN_READ_FAILED }])),
+        });
+        const decision = decideBriefingPublishActionV1({ policy, earliestPublishAt, now, readiness });
+        return {
+          ...decision,
+          // A retry before the deadline is specifically "the read failed", so the
+          // reason is not mistaken for an ordinary partial-day wait.
+          reasonCode: decision.action === "retry" ? SettlementReasonCode.COVERAGE_READ_FAILED : decision.reasonCode,
+          readiness, coverageReadFailed: true, readError: coverage.readError, ...timing,
+        };
+      }
+      const { activeDomains, domainStates } = coverage;
       if (activeDomains.length === 0) {
         return {
           action: "generate",
