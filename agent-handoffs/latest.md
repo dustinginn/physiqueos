@@ -2,25 +2,20 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit corrections + Cardio-readiness implementation, Parts A-F (`claude-healthkit-corrections-cardio-readiness-implementation-20260924`)
+- Task: HealthKit Build 59 Sep24 Training Detail failure diagnostic + deferred-Cardio inventory (`claude-healthkit-build59-strength-final-diagnostic-20260924`)
 - Agent: claude
-- Status: awaiting Founder direction — both final candidates implemented, tested, and independently fresh-context reviewed (APPROVE on both); neither deployed
-- Generated (UTC): 2026-09-24T23:05:00Z
+- Status: awaiting Founder direction — root cause proven, read-only diagnostic complete, nothing patched
+- Generated (UTC): 2026-09-25T01:20:00Z
 - Success: true
 
-Summary: Claude owns the HealthKit lane and completed all six parts of the corrections/Cardio-readiness task, code/test/review only, exactly as authorized:
+Summary: On installed Build 59, Founder reported Sep24 Training Detail fails to load ("This session could not be loaded") while Sep23 is healthy. **Root cause proven with certainty**, without touching any private production data directly: running the real, currently-deployed Server presentation function against this repository's own production-validated Sep23/Sep24 fixtures shows the Server correctly returns two intentionally different JSON shapes — a `confirmed` relationship (always has `confirmedAt`) for Sep23, and an unconfirmed `candidate` relationship (never has `confirmedAt`, has `matchOutcome`/`confidence` instead) for Sep24. The installed Native app's `TrainingReadModel.swift` declares `confirmedAt` as a required, non-optional field, so decoding Sep24's correct candidate response throws and takes down the whole session-detail screen. This is a **Native-only** fix (make `confirmedAt` optional, add the candidate's own fields) — the Server needs no change. The one existing Native test for this model hand-builds the Swift struct directly rather than decoding real JSON, which is exactly why this shipped uncaught.
 
-- **Part A (Native):** fixed Activity Day Detail so it can no longer serve a stale cached revision after Recent Activity History already observed a newer one. Candidate `236f208edffddcad4ace8748874993ed7daa05da`.
-- **Part B (Server):** real Apple Health Strength telemetry now displays instead of a frozen synthetic Logger duration, without inventing a confirmed relationship or mutating the frozen evidence record.
-- **Part C (Server, not executed):** a new atomic mechanism to widen the workout policy's family scope in one transaction, closing a real gap where the only previously-available path (deactivate then reactivate) could let an old, ungated code path fire in between.
-- **Part D (Server, not executed):** a new bounded runner that can canonicalize the two known already-deferred Indoor Walk observations by exact identity, with no bulk mode.
-- **Part E (Server):** wires canonical-workout-aware whole-day Activity-calorie attribution, with an explicit, reviewed product decision on how Strength (confirmed-link required) and Cardio (none required, since it has no confirm step) each count.
-- **Part F (Server):** decided Activity Detail's new per-workout row list is the right visible surface for Cardio; no new Log UI needed.
+Also completed a full deferred-Cardio-observation inventory: found **4** deferred Indoor Walk observations, not the 2 previously known — September 23 has the identical cardio→strength→cardio pattern September 24 does, with two additional deferred walks no prior report had identified. Also found and independently ruled benign: three already-canonicalized workouts from September 22, predating the current policy window (live policy independently re-verified unchanged — Cardio is not activated).
 
-Both final candidates (`236f208e` Native, `01d1900b` Server) passed two separate independent fresh-context adversarial reviews with APPROVE verdicts (a small number of non-blocking notes on each, listed in the full report). Neither has been pushed, deployed, uploaded, or activated. Production Server (`f8c28700...`) and installed Native (Build 58) are unchanged. No policy mutation, no Cardio activation, no September 23 repair, no Founder-device operation occurred.
+No patch, deploy, upload, policy mutation, Cardio activation, reconciliation, or Founder-device operation occurred. The Midweek worktree hosting the installed build was inspected read-only only.
 
-Detailed report: `agent-handoffs/reports/20260924T230500Z-healthkit-corrections-cardio-readiness-implemented-reviewed.md`
+Detailed report: `agent-handoffs/reports/20260925T012000Z-healthkit-build59-strength-detail-diagnostic.md`
 
-Related: `agent-handoffs/reports/20260924T203000Z-healthkit-corrections-partAB-checkpoint.md`, `agent-handoffs/reports/20260924T181500Z-healthkit-activity-workout-cardio-reconciliation.md`
+Related: `agent-handoffs/reports/20260925T004500Z-healthkit-server-corrections-cardio-tooling-deployed.md`, `agent-handoffs/reports/20260924T230500Z-healthkit-corrections-cardio-readiness-implemented-reviewed.md`
 
 Protocol: `agent-handoffs/README.md`
