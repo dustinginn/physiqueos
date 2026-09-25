@@ -41,6 +41,13 @@ describe("provider-native core navigation reads", () => {
     );
   });
 
+  it("Log follows a requested daily-driver zone without changing the canonical default", async () => {
+    const { narrow } = services();
+    expect((await narrow.getLog()).localDate).toBe("2026-08-29");
+    expect((await narrow.getLog({ timeZone: "Asia/Tokyo" })).localDate).toBe("2026-08-30");
+    expect((await narrow.getLog({ timeZone: null })).localDate).toBe("2026-08-29");
+  });
+
   it("keeps Goals output equivalent, including Confidence and transition state", async () => {
     const { legacyRepositories, narrow, principal, runtime } = services();
     expect(await narrow.getGoals()).toEqual(

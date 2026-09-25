@@ -132,6 +132,20 @@ export function resolveLocalTimeZone(value) {
   return resolved;
 }
 
+// A client-requested IANA zone (e.g. the device's current zone for daily-driver
+// "Today" reads), or null when absent/malformed/unknown so the caller falls back
+// to its own canonical zone. Never persisted: it only selects which local
+// calendar day a read or a write guard treats as "today".
+export function resolveRequestedTimeZone(value) {
+  const candidate = String(value ?? "").trim();
+  if (!candidate || candidate.length > 64 || !/^[A-Za-z][A-Za-z0-9_+\-]*(\/[A-Za-z0-9_+\-]+){0,2}$/.test(candidate)) return null;
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: candidate }).resolvedOptions().timeZone ? candidate : null;
+  } catch {
+    return null;
+  }
+}
+
 export function formatLocalShortDate(value, timeZone = DEFAULT_LOCAL_TIME_ZONE) {
   const dateKey = getLocalDateKey(value, timeZone);
   if (!dateKey) return "Pending";

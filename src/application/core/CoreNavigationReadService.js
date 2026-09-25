@@ -107,12 +107,16 @@ export function createCoreNavigationReadService({
         createHomeBriefingService({ repositories, readRuntimeStore: () => runtime, now })
           .getHomeBriefing(ownerUserId));
     },
-    getLog() {
+    // `timeZone` is an optional, already-validated requested zone (the device's
+    // current zone): Logged Today is a daily-driver surface and follows the
+    // user's current local day. It never changes the stored user zone or any
+    // record's canonical localDate.
+    getLog({ timeZone = null } = {}) {
       return withContext("core.navigation.log", "log", async ({ ownerUserId, principal, repositories, runtime }) => {
         const user = runtime.user?.id === ownerUserId ? runtime.user : null;
         const log = await createLogReadService({ repositories, now }).getLog({
           principal,
-          timeZone: user?.timeZone ?? user?.timezone,
+          timeZone: timeZone ?? user?.timeZone ?? user?.timezone,
           healthKitRelationshipState: {
             canonicalWorkouts: runtime.healthKitCanonicalWorkouts ?? [],
             workoutLinks: runtime.healthKitWorkoutLinks ?? [],

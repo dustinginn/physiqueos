@@ -684,3 +684,23 @@ describe("Native production contract boundary", () => {
 function request() {
   return new Request("https://physiqueos.example/api/v1/native/read/home", { headers: { authorization: `Bearer ${"x".repeat(43)}` } });
 }
+
+describe("Native daily-driver local day (travel)", () => {
+  it("passes a validated device zone to Logged Today and ignores a malformed one", async () => {
+    const current = fixture();
+    await current.service.read({ request: request(), resource: "evidence-review-queue", input: { timeZone: "America/Chicago" } });
+    expect(current.readers.core.getLog).toHaveBeenLastCalledWith({ timeZone: "America/Chicago" });
+    await current.service.read({ request: request(), resource: "evidence-review-queue", input: { timeZone: "Mars/Base" } });
+    expect(current.readers.core.getLog).toHaveBeenLastCalledWith({ timeZone: null });
+    await current.service.read({ request: request(), resource: "evidence-review-queue", input: {} });
+    expect(current.readers.core.getLog).toHaveBeenLastCalledWith({ timeZone: null });
+  });
+
+  it("keeps Home and Morning Check-In on the Server-owned canonical day even when a zone is sent", async () => {
+    const current = fixture();
+    await current.service.read({ request: request(), resource: "home", input: { timeZone: "America/Chicago", presentationVersion: "2" } });
+    await current.service.read({ request: request(), resource: "morning-check-in", input: { timeZone: "America/Chicago" } });
+    expect(current.readers.core.getHome).toHaveBeenCalledWith();
+    expect(current.readers.core.getMorningCheckIn).toHaveBeenCalledWith();
+  });
+});

@@ -139,7 +139,7 @@ import {
 } from "../../domain/services/SupplementStrategyManagementService.js";
 import { buildSupplementProvenance } from "../../domain/services/SupplementStrategyFormService.js";
 import { buildStrategySuccessorPayload } from "../../domain/services/StrategyEditorService.js";
-import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";
+import { getLocalDateKey, resolveLocalTimeZone, resolveRequestedTimeZone } from "../../domain/utils/localDate.js";
 import {
   applyPreparedCoachingUpdatesStrategyTransition,
   CoachingUpdatesStrategyOutcome,
@@ -1891,6 +1891,13 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       weighInContext: context.payload.weighInContext ?? null,
       reconcilePreviousDayPriorities,
       reconciliationSubmissions: context.payload.reconciliationSubmissions ?? [],
+      // A plain weigh-in may name the device's current zone so the future-date
+      // guard judges "today" on the user's current local day (travel east of
+      // the canonical zone after local midnight). The Morning Check-In keeps the
+      // canonical zone: it reconciles the Server-owned briefing/priority day.
+      timeZone: reconcilePreviousDayPriorities === false
+        ? resolveRequestedTimeZone(context.payload.timeZone) ?? undefined
+        : undefined,
     });
     const persisted = await persistCandidateCollections({
       before,

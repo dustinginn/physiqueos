@@ -13,6 +13,7 @@ import {
   projectNativeWeightRead,
 } from "./NativeReadProjectionService.js";
 import { Phase3Command } from "../commands/Phase3CommandService.js";
+import { resolveRequestedTimeZone } from "../../domain/utils/localDate.js";
 import { assertEvidenceCanonicalCommitReady, EvidenceCanonicalCommitReadinessCode } from
   "../../domain/services/EvidenceCanonicalCommitReadinessService.js";
 
@@ -183,7 +184,9 @@ export function createNativeProductionContractService({
         case "photo-event": data = await readers.photoEvents.getPhotoEvent({ sessionId: required(input.sessionId, "sessionId") }); break;
         case "confidence": data = (await readers.activeGoal.getPreview({ currentDate }))?.confidence ?? null; break;
         case "evidence-review": data = await readers.evidenceReview.getReview(required(input.reviewId, "reviewId")); break;
-        case "evidence-review-queue": data = await readers.core.getLog(); break;
+        // Daily-driver "Logged Today" follows the device's current local day when
+        // the client sends its zone (travel); otherwise the canonical user zone.
+        case "evidence-review-queue": data = await readers.core.getLog({ timeZone: resolveRequestedTimeZone(input.timeZone) }); break;
         case "timeline": data = await readers.timeline.getPage({ limit: boundedLimit(input.limit) }); break;
         case "operating-plan-recurring-support": data = await readers.core.getRecurringSupport({
           executionId: required(input.executionId, "executionId"),
