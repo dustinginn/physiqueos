@@ -2,18 +2,18 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Cardio graduation Gate 3 (fresh inventory) + Gate 4 (atomic policy-replacement DRY RUN) — passed, nothing applied (`claude-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun-20260925`)
+- Task: HealthKit Cardio graduation Gate 5 (atomic policy APPLY) + Gate 6 (read-only verification) — applied and verified (`claude-healthkit-cardio-gates-5-6-activate-verify-20260925`)
 - Agent: claude
-- Status: awaiting Founder direction — Gate 5 (apply) is recommended but NOT authorized or executed
-- Generated (UTC): 2026-09-25T15:50:00Z
+- Status: awaiting Founder direction — Gates 7/8 (historical deferred-walk reconciliation) NOT authorized or executed
+- Generated (UTC): 2026-09-25T15:55:00Z
 - Success: true
 
-Summary: Production reverified exact Server `e88b8ef7` (deployment `9727de79` ACTIVE, healthy) with Native Build 60 (Apple delivery VALID) accepted on device by the Founder. A fresh, complete, zero-write inventory confirms the deferred-Cardio backlog is still exactly 4 Apple-type-52 walks (2 Sep23 LA, 2 Sep24 Chicago), all classify cardio/walking, none stores `isIndoorWorkout` (Indoor/Outdoor not recoverable and not inferred), none canonicalized, and no new workouts since Sep24. The workout policy is Strength-only (digest `dc7ba152cf5e9dd528e380bed6bc0366`, version 3, effective 2026-09-23, open-ended, quarantined, no backfill, no auto-confirm); Cardio is NOT active. The atomic replace-families dry run (`strength` -> `[cardio,strength]`) returned `dry_run`, predicting exactly one policy update plus one audit row and preserving every non-family field; an independent post-dry-run read proved zero writes.
+Summary: After fresh authority and inventory reads (Server `e88b8ef7` ACTIVE and healthy, policy Strength-only v3, the same four deferred walks, no new workouts), a fresh replace-families dry run returned `dry_run` and the atomic apply returned `applied`. The workout policy is now **version 4 with families exactly `[cardio, strength]`** (new digest `4e1c59ab2f09bf886cd69207eb22fed3`, audit row `healthkit_workout_activation_audit_c237cca36ea3_replace-families`); effective date, open-ended, quarantined, no backfill, no auto-confirm, domains and status are all preserved. Independent read-only Gate 6 proved the four deferred walks remain deferred and uncanonicalized, every workout/canonical/link/claim/observation/evidence collection is identical to pre-apply, no Cardio Logger session/link/claim exists, and 34 of 35 strategic digests are identical (the one change is the intended policy+audit rows). Migrations unchanged, production healthy, no error logs.
 
-Nothing was applied, activated, reconciled, deployed, uploaded, or mutated. Next (Founder authorization required): Gate 5 apply, with a fresh dry-run taken immediately before it because the runner's drift fence hashes the full observation collection.
+Cardio canonicalization is enabled prospectively only. The historical Sep23/24 walks lack `isIndoorWorkout`: they are valid later tests for reconciliation/accounting/presentation but NOT for Indoor-vs-Outdoor fidelity; tomorrow's first new Apple Watch Cardio workout is the empirical type-fidelity acceptance (pending).
 
-Detailed report: `agent-handoffs/reports/20260925T155000Z-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun.md`
+Detailed report: `agent-handoffs/reports/20260925T155500Z-healthkit-cardio-gates-5-6-activate-verify.md`
 
-Related: `agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md`, `agent-handoffs/reports/20260925T150000Z-midweek-v3-server-e88b8ef7-deployment-checkpoint.md`, `agent-handoffs/reports/20260925T160000Z-build60-testflight-uploaded-valid.md`
+Related: `agent-handoffs/reports/20260925T155000Z-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun.md`, `agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md`
 
 Protocol: `agent-handoffs/README.md`

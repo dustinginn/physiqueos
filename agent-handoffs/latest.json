@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-25T15:50:00Z",
+  "generated_at_utc": "2026-09-25T15:55:00Z",
   "task": {
-    "id": "claude-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun-20260925",
-    "title": "HealthKit Cardio graduation Gate 3 (fresh inventory) + Gate 4 (policy-replacement DRY RUN) — passed, nothing applied",
+    "id": "claude-healthkit-cardio-gates-5-6-activate-verify-20260925",
+    "title": "HealthKit Cardio graduation Gate 5 (policy APPLY) + Gate 6 (verification) — Cardio policy scope now ON prospectively; historical walks NOT reconciled",
     "agent": "claude",
     "status": "awaiting_founder_direction"
   },
@@ -18,25 +18,25 @@
     "production_server_sha": "e88b8ef78fa236ce09660997f4084bde069018a7",
     "production_deployment": "9727de79-588e-4445-9306-53b0ee26971e",
     "live_workout_policy_families": [
+      "cardio",
       "strength"
     ],
-    "live_workout_policy_digest": "dc7ba152cf5e9dd528e380bed6bc0366",
+    "live_workout_policy_digest": "4e1c59ab2f09bf886cd69207eb22fed3",
     "native_installed_apple_delivery": "23788859-48c2-4386-adb4-568a3a898adf",
     "native_installed_founder_acceptance": "Build 60 Strength accepted on device per Founder (Sep23 confirmed PASS, Sep24 candidate PASS)",
     "native_candidate_note": "6a108d25 is included in Build 60 (release 00321dcc)",
     "server_candidate_note": "c58dcca9 is included in the deployed combined Server e88b8ef7",
-    "live_workout_policy_version": 3,
+    "live_workout_policy_version": 4,
     "live_workout_policy_effective_local_date": "2026-09-23",
     "deferred_cardio_backlog_count": 4,
-    "policy_dryrun_predicted_target_families": [
-      "cardio",
-      "strength"
-    ]
+    "live_workout_policy_audit_record": "healthkit_workout_activation_audit_c237cca36ea3_replace-families",
+    "live_workout_policy_applied_at_utc": "2026-09-25T15:48:43.485Z",
+    "deferred_cardio_backlog_state": "still deferred and uncanonicalized (Gates 7/8 not authorized)"
   },
   "result": {
-    "summary": "Gate 3 and Gate 4 passed; nothing was applied. Production reverified exact Server e88b8ef7 (deployment 9727de79 ACTIVE, healthy, migrations unchanged) with Native Build 60 (Apple delivery VALID) accepted on device by the Founder. A fresh, complete, zero-write inventory (all 270 observations, 9 workouts) confirms the deferred-Cardio backlog is still exactly 4 Apple-type-52 walks (2 Sep23 America/Los_Angeles, 2 Sep24 America/Chicago), all classify cardio/walking under the deployed classifier, none stores isIndoorWorkout (Indoor/Outdoor not recoverable, not inferred), none canonicalized; no new Sep25+ workouts. The workout policy was freshly re-read: Strength-only, digest dc7ba152cf5e9dd528e380bed6bc0366, version 3, effective 2026-09-23, openEnded, quarantined, no backfill, no auto-confirm — Cardio NOT active. The atomic replace-families dry-run (strength -> [cardio,strength]) returned outcome dry_run, predicting exactly the policy update plus one audit row and preserving every non-family field; an independent post-dry-run read proved zero writes (policy, six HealthKit collections, 9 workout rows, 35 strategic digests all identical). Gate 5 APPLY is recommended, pending Founder authorization; a fresh dry-run must be taken immediately before apply because the drift fence hashes the full observation collection.",
+    "summary": "Gate 5 applied and Gate 6 passed. After fresh authority/inventory reads (Server e88b8ef7 ACTIVE, policy Strength-only v3, same four deferred walks, no new workouts) a fresh replace-families dry run returned dry_run and the atomic apply (expected snapshot built from that fresh dry run's facts, Founder authorization reference founder-chat-2026-09-25-cardio-gates-5-6-replace-families-strength-to-cardio-strength) returned applied: the workout policy is now version 4 with families exactly [cardio,strength]; effectiveLocalDate, openEnded, quarantined, historicalBackfill false, linkAutoConfirm false, domains and status preserved; one audit row (healthkit_workout_activation_audit_c237cca36ea3_replace-families) added. Independent read-only Gate 6 proved: the four deferred walks remain deferred and uncanonicalized; all 9 workout rows, canonical workouts, links, claims, observations, canonical days and evidence are identical to pre-apply; no Cardio Logger session/link/claim; Activity/Nutrition and graduation policy unchanged; 34 of 35 strategic digests identical (the only change is the intended healthKitConfiguration policy+audit rows); migrations unchanged; production healthy; no error-level logs. Cardio canonicalization is enabled prospectively only. Historical Sep23/24 walks lack isIndoorWorkout and are valid tests for reconciliation/accounting/presentation but NOT for Indoor-vs-Outdoor fidelity; tomorrow's first new Apple Watch Cardio workout is the empirical type-fidelity acceptance.",
     "success": true,
-    "production_mutated": false,
+    "production_mutated": true,
     "deployed": false,
     "testflight_uploaded": false,
     "founder_device_operated": false
@@ -44,40 +44,39 @@
   "validation": {
     "tests": {
       "status": "not_applicable",
-      "summary": "No code changed; the existing tooling (buildHealthKitPayload replace-families + workout-audit) was used as reviewed."
+      "summary": "No code changed; existing reviewed replace-families tooling and read-only audit payloads were used."
     },
     "review": {
       "status": "not_required",
-      "summary": "Operational gate (read-only inventory + dry-run) using previously reviewed tooling; results independently re-verified by a post-dry-run production read."
+      "summary": "Operational gate using previously reviewed tooling with hard pre-apply assertions; result independently verified by a separate read-only production read."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "All reads were BEGIN REPEATABLE READ READ ONLY with transaction_read_only=on, owner-scoped SELECTs, explicit ROLLBACK. Post-dry-run read vs Gate 3: workout policy record, Activity/Nutrition and graduation policy, six HealthKit collections, nine workout rows and 35 strategic digests all identical."
+      "summary": "Pre-apply reads and the Gate 6 verification were BEGIN REPEATABLE READ READ ONLY. The only production write was the single guarded policy update plus one audit row (runner-verified invariants all true; independently confirmed)."
     }
   },
   "decisions_required": [
-    "Gate 5: Founder authorization to APPLY the atomic workout-policy replacement strength -> [cardio, strength] (a fresh dry-run is taken immediately before apply; apply needs the Founder's authorization reference).",
-    "After Gate 5/6 only: per-entry, strictly serial dry-run then separately authorized apply of deferred-Cardio reconciliation for each of the 4 known identities (Gates 7/8)."
+    "Gates 7/8: Founder authorization, per entry and strictly serial (never batched), for a fresh-inventory dry run then a separately authorized apply of deferred-Cardio reconciliation for each of the 4 known walks.",
+    "Optional sequencing choice: validate tomorrow's first new Cardio workout (prospective Indoor/Outdoor type fidelity) before, or in parallel with, the historical reconciliation."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Two Cardio walking canonical workouts from the Sep 22 canary period already exist (policy was later narrowed to Strength-only on 2026-09-23); 'Cardio not active' therefore refers to the policy family scope.",
-    "The runner's drift fence hashes the full observation collection, and live Activity/Nutrition sync keeps changing it — so the pre-apply dry-run and the apply must be taken back-to-back and the --expected snapshot rebuilt from the fresh dry-run.",
-    "No workout has been ingested since the e88b8ef7 deployment, so prospective Indoor/Outdoor type fidelity has not yet been empirically observed (code-level presence confirmed)."
+    "The policy record's own authorizationReference still holds the earlier 2026-09-23 reference; the new authorization reference is recorded in the audit row.",
+    "canonical_training_records/healthKitConfiguration is counted among the strategic digests because the HealthKit configuration lives in the training table; its change (14 -> 15 rows) is the intended policy update plus audit row.",
+    "The auto-mode classifier blocked the production write until a plain-words Founder confirmation was given in chat."
   ],
   "backlog": [
-    "Gate 5: apply the policy replacement (own authorization) with a fresh dry-run immediately before.",
-    "Gate 6: post-apply read-only verification (families exactly [cardio,strength], everything else unchanged).",
-    "Gates 7-9: strictly serial per-entry dry-run/apply of the 4 deferred walks, then pre/post invariant audits.",
-    "Gate 10: Founder real-device acceptance per the prepared checklist.",
+    "Gates 7/8: strictly serial per-entry dry-run/apply of the 4 deferred walks (fresh inventory each time; use the new policy digest 4e1c59ab2f09bf886cd69207eb22fed3 where a policy digest is required).",
+    "Gate 9: pre/post invariant audits around the reconciliation (whole-day Activity invariance, no double count, no Logger/link/claim).",
+    "Gate 10: Founder real-device acceptance, including tomorrow's prospective Indoor/Outdoor type-fidelity check on the first new Cardio workout.",
     "Strategic-evidence eligibility for Cardio remains a later, separate project."
   ],
-  "recommended_next_step": "Await Founder authorization for Gate 5 (apply policy replacement). Before applying: re-verify Server e88b8ef7, re-take the policy dry-run, and rebuild the --expected snapshot from that fresh dry-run's facts.",
-  "full_report_path": "agent-handoffs/reports/20260925T155000Z-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun.md",
+  "recommended_next_step": "Await Founder authorization for Gate 7 (first deferred walk dry run) and/or observe tomorrow's first new Cardio workout for prospective type fidelity. Before any reconciliation: re-verify Server e88b8ef7, take a fresh inventory, and dry-run that single entry immediately before its own authorized apply.",
+  "full_report_path": "agent-handoffs/reports/20260925T155500Z-healthkit-cardio-gates-5-6-activate-verify.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260925T155000Z-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun.md",
     "agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md",
-    "agent-handoffs/reports/20260925T150000Z-midweek-v3-server-e88b8ef7-deployment-checkpoint.md",
-    "agent-handoffs/reports/20260925T160000Z-build60-testflight-uploaded-valid.md"
+    "agent-handoffs/reports/20260925T150000Z-midweek-v3-server-e88b8ef7-deployment-checkpoint.md"
   ],
   "safety": {
     "contains_secrets": false,
