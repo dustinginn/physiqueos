@@ -242,4 +242,30 @@ final class TrainingSessionDetailPresentationTests: XCTestCase {
         XCTAssertEqual(attachment.session.activeCalories, 206.2)
         XCTAssertEqual(attachment.session.averageHeartRate, 120.14)
     }
+
+    /// A confirmed relationship keeps the existing "Confirmed" label.
+    @MainActor
+    func testAppleHealthAttachmentLabelSaysConfirmedOnlyForAConfirmedRelationship() {
+        let confirmed = HealthKitWorkoutAttachmentReadModel.Relationship(
+            status: "confirmed", confirmedAt: "2026-09-24T02:46:00.000Z",
+            contentAuthority: .init(trainingContent: "workout_logger", telemetry: "healthkit")
+        )
+        XCTAssertEqual(TrainingSessionDetailView.relationshipLabel(for: confirmed), "Confirmed with Workout Logger")
+    }
+
+    /// A candidate (unconfirmed) relationship -- the Sep24 real case this
+    /// fix makes decodable -- must never claim confirmation. Before the
+    /// Sep24 decode fix, a candidate shape could never even reach this
+    /// view (it always threw during decode), so this label was implicitly
+    /// always true; now it must be gated honestly.
+    @MainActor
+    func testAppleHealthAttachmentLabelNeverClaimsConfirmedForACandidateRelationship() {
+        let candidate = HealthKitWorkoutAttachmentReadModel.Relationship(
+            status: "candidate", matchOutcome: "possible_match", confidence: 60,
+            contentAuthority: .init(trainingContent: "workout_logger", telemetry: "healthkit")
+        )
+        let label = TrainingSessionDetailView.relationshipLabel(for: candidate)
+        XCTAssertNotEqual(label, "Confirmed with Workout Logger")
+        XCTAssertFalse(label.contains("Confirmed"), "A candidate match must never use the word \"Confirmed\": \(label)")
+    }
 }
