@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   FOUNDER_ALPHA_TRAINING_EXERCISES,
   listCanonicalTrainingExerciseIdentities,
+  normalizeExercisePhrase,
   registerRuntimeTrainingExercises,
   resolveTrainingExerciseOccurrenceIdentity,
   resolveTrainingExerciseIdentity,
@@ -134,5 +135,41 @@ describe("Founder Alpha incline bench identity",()=>{
       canonicalExerciseId: "founder_cable_arc",
       name: "Bench Press",
     });
+  });
+});
+
+describe("memoized exercise phrase normalization (performance)", () => {
+  function referenceNormalize(value) {
+    return String(value ?? "")
+      .toLowerCase()
+      .replace(/[-_]/g, " ")
+      .replace(/\bdb\b/g, "dumbbell")
+      .replace(/\bez\b/g, "ez")
+      .replace(/\bpresses\b/g, "press")
+      .replace(/\bflies\b/g, "fly")
+      .replace(/\b(thrust|curl|squat|lunge|row|raise|extension|abduction|adduction)s\b/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  it("returns exactly the uncached normalization for every registry name and alias, repeatedly", () => {
+    const phrases = FOUNDER_ALPHA_TRAINING_EXERCISES.flatMap((item) => [item.name, item.id, ...(item.aliases ?? [])]);
+    expect(phrases.length).toBeGreaterThan(100);
+    for (let pass = 0; pass < 3; pass += 1) {
+      for (const phrase of phrases) expect(normalizeExercisePhrase(phrase)).toBe(referenceNormalize(phrase));
+    }
+  });
+
+  it("matches for non-string, empty, and edge inputs", () => {
+    for (const value of [null, undefined, "", "  ", 42, "DB  Curls", "EZ-bar_curls", "Leg Presses", "Chest Flies", "Hip Thrusts ", "Ab_Adductions"]) {
+      expect(normalizeExercisePhrase(value)).toBe(referenceNormalize(value));
+      expect(normalizeExercisePhrase(value)).toBe(referenceNormalize(value));
+    }
+  });
+
+  it("stays exact beyond the memo bound", () => {
+    const inputs = Array.from({ length: 5000 }, (_, index) => `Incline DB Presses ${index}_set-${index % 7}`);
+    for (const value of inputs) expect(normalizeExercisePhrase(value)).toBe(referenceNormalize(value));
+    for (const value of inputs.slice(0, 50)) expect(normalizeExercisePhrase(value)).toBe(referenceNormalize(value));
   });
 });

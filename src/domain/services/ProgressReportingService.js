@@ -3507,10 +3507,24 @@ function formatDate(value) {
 
   if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
 
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+  // Identical to date.toLocaleDateString("en-US", { month, day }), which builds
+  // a new formatter per call; this runs per training/activity day on every read.
+  return shortMonthDayFormatter().format(date);
+}
+
+// Keyed by the host zone (Node re-reads TZ when process.env.TZ changes), so it
+// formats in the same default zone toLocaleDateString would use at call time.
+const SHORT_MONTH_DAY_FORMATTERS = new Map();
+
+function shortMonthDayFormatter() {
+  const hostZone = String(process.env.TZ ?? "");
+  let formatter = SHORT_MONTH_DAY_FORMATTERS.get(hostZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+    if (SHORT_MONTH_DAY_FORMATTERS.size >= 8) SHORT_MONTH_DAY_FORMATTERS.clear();
+    SHORT_MONTH_DAY_FORMATTERS.set(hostZone, formatter);
+  }
+  return formatter;
 }
 
 function formatWeightDirection(value) {
@@ -3541,12 +3555,7 @@ function getLocalDateKey(value = new Date(), timeZone = DEFAULT_TIME_ZONE) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return getDateKey(value);
 
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone,
-    year: "numeric",
-  }).formatToParts(date);
+  const parts = dateKeyFormatter(timeZone).formatToParts(date);
   const year = parts.find((part) => part.type === "year")?.value;
   const month = parts.find((part) => part.type === "month")?.value;
   const day = parts.find((part) => part.type === "day")?.value;
@@ -3554,6 +3563,21 @@ function getLocalDateKey(value = new Date(), timeZone = DEFAULT_TIME_ZONE) {
   return year && month && day
     ? `${year}-${month}-${day}`
     : date.toISOString().slice(0, 10);
+}
+
+// One formatter per zone (a zone that fails to construct is not cached and keeps
+// throwing as before); constructing one per call dominated the Training landing read.
+const DATE_KEY_FORMATTERS = new Map();
+
+function dateKeyFormatter(timeZone) {
+  const key = String(timeZone);
+  let formatter = DATE_KEY_FORMATTERS.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "2-digit", timeZone, year: "numeric" });
+    if (DATE_KEY_FORMATTERS.size >= 64) DATE_KEY_FORMATTERS.delete(DATE_KEY_FORMATTERS.keys().next().value);
+    DATE_KEY_FORMATTERS.set(key, formatter);
+  }
+  return formatter;
 }
 
 function getPrivateEvidenceHref(relativePath) {

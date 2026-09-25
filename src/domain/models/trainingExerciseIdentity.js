@@ -321,8 +321,27 @@ function createUnrecognizedResolution(sourceExercisePhrase, reason = "No canonic
   };
 }
 
+// Alias matching normalizes every registry name and alias for every lookup, and
+// the Training Logger read performs thousands of lookups (≈1.1 s of CPU per read
+// in a production profile). The result depends only on the input string, so a
+// bounded memo returns identical values.
+const NORMALIZED_EXERCISE_PHRASES = new Map();
+const MAX_NORMALIZED_EXERCISE_PHRASES = 4096;
+
 export function normalizeExercisePhrase(value) {
-  return String(value ?? "")
+  const text = String(value ?? "");
+  const cached = NORMALIZED_EXERCISE_PHRASES.get(text);
+  if (cached !== undefined) return cached;
+  const normalized = computeNormalizedExercisePhrase(text);
+  if (NORMALIZED_EXERCISE_PHRASES.size >= MAX_NORMALIZED_EXERCISE_PHRASES) {
+    NORMALIZED_EXERCISE_PHRASES.delete(NORMALIZED_EXERCISE_PHRASES.keys().next().value);
+  }
+  NORMALIZED_EXERCISE_PHRASES.set(text, normalized);
+  return normalized;
+}
+
+function computeNormalizedExercisePhrase(text) {
+  return text
     .toLowerCase()
     .replace(/[-_]/g, " ")
     .replace(/\bdb\b/g, "dumbbell")
