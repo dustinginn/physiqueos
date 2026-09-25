@@ -126,7 +126,7 @@ struct TrainingSessionDetailView: View {
                         Text(attachment.source.sourceName)
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text("Confirmed with Workout Logger")
+                        Text(Self.relationshipLabel(for: attachment.relationship))
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
@@ -312,6 +312,16 @@ struct TrainingSessionDetailView: View {
                 }
             }
         }
+    }
+
+    /// Never claims confirmation for an unconfirmed match. Before the
+    /// Sep24 decode fix, only a `confirmed` relationship could ever
+    /// successfully decode at all (a `candidate` shape always threw), so
+    /// this label was safe to hardcode; now that `candidate` decodes too,
+    /// it must say so honestly rather than showing "Confirmed" for a
+    /// merely possible match.
+    static func relationshipLabel(for relationship: HealthKitWorkoutAttachmentReadModel.Relationship) -> String {
+        relationship.status == "confirmed" ? "Confirmed with Workout Logger" : "Possible match with Workout Logger"
     }
 
     static func formatDate(_ value: String) -> String {

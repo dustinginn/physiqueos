@@ -395,7 +395,16 @@ struct HealthKitWorkoutAttachmentReadModel: Codable, Equatable {
             var telemetry: String
         }
         var status: String
-        var confirmedAt: String
+        /// Present only on a "confirmed" relationship. A "candidate" (an
+        /// unconfirmed but plausible HealthKit match) never carries this key
+        /// by design -- there is no confirmation instant yet -- and must
+        /// decode to `nil`, never a synthesized/fabricated timestamp.
+        var confirmedAt: String?
+        /// Present only on a "candidate" relationship.
+        var matchOutcome: String?
+        /// Present only on a "candidate" relationship. Decoded as `Double?`
+        /// so either an integer or decimal JSON number is accepted.
+        var confidence: Double?
         var contentAuthority: ContentAuthority
     }
     struct Source: Codable, Equatable {

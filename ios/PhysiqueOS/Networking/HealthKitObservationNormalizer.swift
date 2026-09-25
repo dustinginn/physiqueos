@@ -326,6 +326,11 @@ struct HealthKitS1WireObservation: Encodable, Sendable {
         let distance: Double?
         let distanceUnit: String?
         let averageHeartRate: Double?
+        /// Apple's `HKMetadataKeyIndoorWorkout`, read through unchanged --
+        /// `nil` when HealthKit does not carry the key (unknown), `true`
+        /// for indoor, `false` for outdoor. See
+        /// `HealthKitQueryWorkout.isIndoorWorkout`.
+        let isIndoorWorkout: Bool?
     }
 
     struct QuantitySample: Encodable, Sendable {
@@ -445,7 +450,8 @@ enum HealthKitS1WireMapper {
                     totalCalories: workout.totalCalories,
                     distance: workout.distance,
                     distanceUnit: workout.distanceUnit,
-                    averageHeartRate: workout.averageHeartRate
+                    averageHeartRate: workout.averageHeartRate,
+                    isIndoorWorkout: workout.isIndoorWorkout
                 ),
                 quantitySample: nil
             )
