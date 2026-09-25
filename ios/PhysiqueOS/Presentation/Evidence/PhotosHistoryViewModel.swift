@@ -57,9 +57,14 @@ final class PhotosHistoryViewModel {
     }
 
     func load() async {
+        // See ActivityHistoryViewModel.load: a stale-scope response is dropped.
+        let requestedScope = scope
         do {
-            state = .loaded(try await api.fetchPhotosLanding(scope: scope))
+            let value = try await api.fetchPhotosLanding(scope: requestedScope)
+            guard requestedScope == scope else { return }
+            state = .loaded(value)
         } catch {
+            guard requestedScope == scope else { return }
             state = .failed("Progress Photos could not be loaded.")
         }
     }

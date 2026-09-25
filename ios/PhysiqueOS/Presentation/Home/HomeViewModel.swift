@@ -20,6 +20,7 @@ final class HomeViewModel {
     /// read from this session. Completion is disabled and notifications are
     /// not reconciled from it.
     private(set) var lastKnownGeneratedAt: String?
+    private(set) var lastKnownGeneratedDate: Date?
     /// The authoritative refresh behind a last-known Home failed.
     private(set) var lastKnownRefreshFailed = false
     var isShowingLastKnown: Bool { lastKnownGeneratedAt != nil }
@@ -75,6 +76,7 @@ final class HomeViewModel {
             for index in home.todaysFocus.indices { home.todaysFocus[index].completable = false }
             state = .loaded(home)
             lastKnownGeneratedAt = snapshot.generatedAt
+            lastKnownGeneratedDate = snapshot.generatedDate
         }
         do {
             var home = try await api.fetchHome()
@@ -87,6 +89,7 @@ final class HomeViewModel {
             }
             state = .loaded(home)
             lastKnownGeneratedAt = nil
+            lastKnownGeneratedDate = nil
             lastKnownRefreshFailed = false
         } catch {
             if isShowingLastKnown {

@@ -20,9 +20,14 @@ final class EnergyHistoryViewModel {
     }
 
     func load() async {
+        // See ActivityHistoryViewModel.load: a stale-scope response is dropped.
+        let requestedScope = scope
         do {
-            state = .loaded(try await api.fetchEnergyReport(scope: scope))
+            let value = try await api.fetchEnergyReport(scope: requestedScope)
+            guard requestedScope == scope else { return }
+            state = .loaded(value)
         } catch {
+            guard requestedScope == scope else { return }
             state = .failed("Energy could not be loaded.")
         }
     }

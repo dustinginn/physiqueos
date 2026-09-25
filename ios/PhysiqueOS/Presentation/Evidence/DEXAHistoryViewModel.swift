@@ -18,9 +18,14 @@ final class DEXAHistoryViewModel {
     }
 
     func load() async {
+        // See ActivityHistoryViewModel.load: a stale-scope response is dropped.
+        let requestedScope = scope
         do {
-            state = .loaded(try await api.fetchDEXAReport(scope: scope))
+            let value = try await api.fetchDEXAReport(scope: requestedScope)
+            guard requestedScope == scope else { return }
+            state = .loaded(value)
         } catch {
+            guard requestedScope == scope else { return }
             state = .failed("DEXA could not be loaded.")
         }
     }

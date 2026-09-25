@@ -22,9 +22,14 @@ final class TrainingHistoryViewModel {
     }
 
     func load() async {
+        // See ActivityHistoryViewModel.load: a stale-scope response is dropped.
+        let requestedScope = scope
         do {
-            state = .loaded(try await api.fetchTrainingLanding(scope: scope))
+            let value = try await api.fetchTrainingLanding(scope: requestedScope)
+            guard requestedScope == scope else { return }
+            state = .loaded(value)
         } catch {
+            guard requestedScope == scope else { return }
             state = .failed("Training could not be loaded.")
         }
     }

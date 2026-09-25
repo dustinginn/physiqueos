@@ -20,6 +20,7 @@ extension HomeAPI {
 struct HomeLastKnownSnapshot: Sendable {
     var home: HomeReadModel
     var generatedAt: String
+    var generatedDate: Date
 }
 
 /// Fixture-backed conformance: decodes the same bundled JSON a live

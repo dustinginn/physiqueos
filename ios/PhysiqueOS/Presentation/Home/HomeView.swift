@@ -54,7 +54,7 @@ struct HomeView: View {
         }
         .refreshable {
             if environment.nativeAuthority == .founderProduction {
-                await environment.productionNativeAPI.invalidateReadResources(["home"])
+                await environment.productionNativeAPI.invalidateReadResources(["home"], retainingLastKnown: true)
             }
             await viewModel?.loadAndReconcileBeforePrefetch(
                 reconcileNotifications: { await syncPriorityNotifications() },
@@ -173,7 +173,10 @@ struct HomeView: View {
                 HomeHeaderView(header: home.header)
 
                 if let viewModel, viewModel.isShowingLastKnown {
-                    LastKnownHomeNotice(refreshFailed: viewModel.lastKnownRefreshFailed)
+                    LastKnownHomeNotice(
+                        refreshFailed: viewModel.lastKnownRefreshFailed,
+                        generatedDate: viewModel.lastKnownGeneratedDate
+                    )
                 }
 
                 HomeHeroCardView(hero: home.hero) {
@@ -295,6 +298,11 @@ private struct NotificationsDisabledNotice: View {
 /// launch — the content is labelled, never passed off as current.
 private struct LastKnownHomeNotice: View {
     let refreshFailed: Bool
+    let generatedDate: Date?
+
+    private var asOf: String {
+        generatedDate.map { " from \($0.formatted(date: .omitted, time: .shortened))" } ?? ""
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -304,8 +312,8 @@ private struct LastKnownHomeNotice: View {
                     .tint(PhysiqueOSTheme.textSecondary)
             }
             Text(refreshFailed
-                ? "Couldn't refresh. Showing your last update — pull to refresh."
-                : "Updating…")
+                ? "Couldn't refresh. Showing your last update\(asOf) — pull to refresh."
+                : "Updating your last update\(asOf)…")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
         }

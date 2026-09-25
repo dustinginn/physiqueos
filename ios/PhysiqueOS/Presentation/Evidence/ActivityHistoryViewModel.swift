@@ -21,9 +21,16 @@ final class ActivityHistoryViewModel {
     }
 
     func load() async {
+        // A reload that finishes after the Founder picked another scope must
+        // not overwrite the newer scope's content (view models now survive
+        // reappearance, so a reappearance reload can overlap a scope change).
+        let requestedScope = scope
         do {
-            state = .loaded(try await api.fetchActivityLanding(scope: scope))
+            let value = try await api.fetchActivityLanding(scope: requestedScope)
+            guard requestedScope == scope else { return }
+            state = .loaded(value)
         } catch {
+            guard requestedScope == scope else { return }
             state = .failed("Activity could not be loaded.")
         }
     }

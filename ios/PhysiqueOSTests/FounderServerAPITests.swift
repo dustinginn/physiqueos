@@ -698,6 +698,13 @@ final class FounderServerAPITests: XCTestCase {
 
     // MARK: - Performance Phase 2: last-known Home, write retirement, request counts
 
+    /// Snapshot fixtures are generated 2026-09-10T15:00Z; pin the same UTC day.
+    private static func homeAPI(_ api: ProductionNativeAPI, now: Date = ISO8601DateFormatter().date(from: "2026-09-10T20:00:00Z")!) -> ProductionHomeAPI {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return ProductionHomeAPI(api: api, now: { now }, calendar: calendar)
+    }
+
     private static func temporarySnapshotStore() -> ProductionReadSnapshotStore {
         ProductionReadSnapshotStore(directory: FileManager.default.temporaryDirectory
             .appendingPathComponent("physiqueos-last-known-\(UUID().uuidString)", isDirectory: true))
@@ -715,7 +722,7 @@ final class FounderServerAPITests: XCTestCase {
         ])
         let first = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
         _ = try await first.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
-        _ = try await ProductionHomeAPI(api: first).fetchHome()
+        _ = try await Self.homeAPI(first).fetchHome()
         return (store, credentials)
     }
 
@@ -724,7 +731,7 @@ final class FounderServerAPITests: XCTestCase {
         let transport = SequencedFounderTransport([])
         let relaunched = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
 
-        let loaded = await ProductionHomeAPI(api: relaunched).lastKnownHome()
+        let loaded = await Self.homeAPI(relaunched).lastKnownHome()
         let snapshot = try XCTUnwrap(loaded)
         XCTAssertEqual(snapshot.home.hero.confidence, 71)
         XCTAssertEqual(snapshot.generatedAt, "2026-09-10T15:00:00.000Z")
@@ -740,11 +747,11 @@ final class FounderServerAPITests: XCTestCase {
         ])
         let relaunched = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
 
-        let home = try await ProductionHomeAPI(api: relaunched).fetchHome()
+        let home = try await Self.homeAPI(relaunched).fetchHome()
         XCTAssertEqual(home.hero.confidence, 74)
         let paths = await transport.requests.compactMap { $0.url?.path }
         XCTAssertEqual(paths.filter { $0.hasSuffix("/read/home") }.count, 1)
-        let persisted = await ProductionHomeAPI(api: relaunched).lastKnownHome()
+        let persisted = await Self.homeAPI(relaunched).lastKnownHome()
         let replaced = try XCTUnwrap(persisted)
         XCTAssertEqual(replaced.home.hero.confidence, 74, "each authoritative read replaces the snapshot")
     }
@@ -755,7 +762,7 @@ final class FounderServerAPITests: XCTestCase {
         let transport = SequencedFounderTransport([.failure(URLError(.notConnectedToInternet))])
         let relaunched = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
         let viewModel = HomeViewModel(
-            api: ProductionHomeAPI(api: relaunched),
+            api: Self.homeAPI(relaunched),
             priorityStore: LoggingSandboxStore(),
             goalsSandboxStore: GoalsSandboxStore(),
             briefingStore: BriefingSandboxStore(),
@@ -782,7 +789,7 @@ final class FounderServerAPITests: XCTestCase {
         ])
         let relaunched = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
         let viewModel = HomeViewModel(
-            api: ProductionHomeAPI(api: relaunched),
+            api: Self.homeAPI(relaunched),
             priorityStore: LoggingSandboxStore(),
             goalsSandboxStore: GoalsSandboxStore(),
             briefingStore: BriefingSandboxStore(),
@@ -811,13 +818,13 @@ final class FounderServerAPITests: XCTestCase {
             .json(200, productionCommandOutcomeJSON(result: #"{"status":"committed","record":{"id":"ignored"}}"#)),
         ])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
-        let before = await ProductionHomeAPI(api: api).lastKnownHome()
+        let before = await Self.homeAPI(api).lastKnownHome()
         XCTAssertNotNil(before)
 
         let writeAPI = ProductionPriorityCompletionWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
         try await writeAPI.complete(priorityId: "completion-canonical", occurrenceDate: "2026-09-10", context: .init(occurrenceDate: "2026-09-10", dose: nil, protocolId: nil), expectedVersion: 7)
 
-        let retired = await ProductionHomeAPI(api: api).lastKnownHome()
+        let retired = await Self.homeAPI(api).lastKnownHome()
         XCTAssertNil(retired, "a completed priority must not reappear from a pre-write snapshot on the next cold launch")
     }
 
@@ -826,8 +833,57 @@ final class FounderServerAPITests: XCTestCase {
         let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "c", refresh: "t"))])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
         _ = try await api.pair(pairingCredential: String(repeating: "q", count: 43), displayName: "Founder iPhone")
-        let cleared = await ProductionHomeAPI(api: api).lastKnownHome()
+        let cleared = await Self.homeAPI(api).lastKnownHome()
         XCTAssertNil(cleared)
+    }
+
+    func testLastKnownHomeFromAnEarlierLocalDayIsRefused() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: SequencedFounderTransport([]), snapshotStore: store)
+        let nextDay = ISO8601DateFormatter().date(from: "2026-09-11T00:30:00Z")!
+        let refused = await Self.homeAPI(api, now: nextDay).lastKnownHome()
+        XCTAssertNil(refused, "yesterday's Today's Focus must never be painted as last-known Home")
+        let sameDay = await Self.homeAPI(api).lastKnownHome()
+        XCTAssertNotNil(sameDay)
+    }
+
+    func testRejectedRefreshCredentialRetiresLastKnownHome() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let transport = SequencedFounderTransport([.problem(401, code: "REFRESH_CREDENTIAL_INVALID")])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+        do {
+            _ = try await Self.homeAPI(api).fetchHome()
+            XCTFail("A revoked session must not read Home")
+        } catch {}
+        let retired = await Self.homeAPI(api).lastKnownHome()
+        XCTAssertNil(retired, "a Server-side revocation must not leave the session's Home on the device")
+    }
+
+    func testPullToRefreshInvalidationKeepsLastKnownHome() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: SequencedFounderTransport([]), snapshotStore: store)
+        await api.invalidateReadResources(["home"], retainingLastKnown: true)
+        let kept = await Self.homeAPI(api).lastKnownHome()
+        XCTAssertNotNil(kept, "an explicit refresh is not a write")
+        await api.invalidateReadResources(["home"])
+        let retired = await Self.homeAPI(api).lastKnownHome()
+        XCTAssertNil(retired)
+    }
+
+    func testHomeReadInFlightAcrossAWriteDoesNotRepersistPreWriteContent() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let transport = GatedHomeTransport(
+            session: sessionJSON(access: "b", refresh: "s"),
+            home: productionHomeJSON(priorityID: "priority-pre-write", goalID: "goal-server", confidence: 72)
+        )
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+        let read = Task { try await Self.homeAPI(api).fetchHome() }
+        await transport.waitForHomeRequest()
+        await api.invalidateReadResources(["home", "priority"])   // a write commits meanwhile
+        await transport.releaseHome()
+        _ = try await read.value
+        let snapshot = await Self.homeAPI(api).lastKnownHome()
+        XCTAssertNil(snapshot, "a read that started before the write must not persist its pre-write Home")
     }
 
     func testOnlyAllowlistedResourcesPersistLastKnownSnapshots() {
@@ -5547,5 +5603,47 @@ private func XCTAssertThrowsErrorAsync<T>(
         XCTFail("Expected an error.", file: file, line: line)
     } catch {
         errorHandler(error)
+    }
+}
+
+/// Holds the first `/read/home` response until released, so a test can
+/// commit a write while that read is in flight.
+private actor GatedHomeTransport: FounderHTTPTransport {
+    private let session: String
+    private let home: String
+    private var homeArrived: CheckedContinuation<Void, Never>?
+    private var homeRequested = false
+    private var gate: CheckedContinuation<Void, Never>?
+    private var released = false
+
+    init(session: String, home: String) {
+        self.session = session
+        self.home = home
+    }
+
+    func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let path = request.url?.path ?? ""
+        let body: String
+        if path.hasSuffix("/read/home") {
+            homeRequested = true
+            homeArrived?.resume()
+            homeArrived = nil
+            if !released { await withCheckedContinuation { gate = $0 } }
+            body = home
+        } else {
+            body = session
+        }
+        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!)
+    }
+
+    func waitForHomeRequest() async {
+        if homeRequested { return }
+        await withCheckedContinuation { homeArrived = $0 }
+    }
+
+    func releaseHome() {
+        released = true
+        gate?.resume()
+        gate = nil
     }
 }

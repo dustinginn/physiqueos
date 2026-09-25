@@ -442,7 +442,7 @@ actor ProductionNativeAPI {
             bearer: nil
         )
         try persist(session)
-        snapshotStore?.removeAll()
+        retireAllLastKnownSnapshots()
         return session
     }
 
@@ -454,7 +454,7 @@ actor ProductionNativeAPI {
         guard response.revoked else { throw ProductionNativeError.invalidResponse }
         accessToken = nil
         authenticatedDeviceId = nil
-        snapshotStore?.removeAll()
+        retireAllLastKnownSnapshots()
         try credentialStore.deleteRefreshCredential()
     }
 
@@ -589,12 +589,16 @@ actor ProductionNativeAPI {
         }
     }
 
-    func invalidateReadResources(_ resources: Set<String>) {
-        // A write that makes a read stale also retires its persisted
-        // last-known snapshot, so a later cold launch cannot show pre-write
-        // content (e.g. an already-completed priority).
-        for resource in resources where Self.lastKnownSnapshotResources.contains(resource) {
-            snapshotStore?.removeResource(resource)
+    /// `retainingLastKnown` is only for an explicit user refresh (pull to
+    /// refresh), which is not a write: a failed offline refresh must not
+    /// discard the last-known Home. Every write-driven invalidation retires
+    /// the persisted snapshot, so a later cold launch cannot show pre-write
+    /// content (e.g. an already-completed priority).
+    func invalidateReadResources(_ resources: Set<String>, retainingLastKnown: Bool = false) {
+        if !retainingLastKnown {
+            for resource in resources where Self.lastKnownSnapshotResources.contains(resource) {
+                snapshotStore?.removeResource(resource)
+            }
         }
         readCacheGeneration += 1
         // Detach affected pre-mutation GETs without cancelling their callers.
@@ -609,6 +613,14 @@ actor ProductionNativeAPI {
         readCacheOrder.removeAll { key in
             resources.contains(where: { key == $0 || key.hasPrefix("\($0)?") })
         }
+    }
+
+    /// Pairing, revocation, and a rejected refresh credential end the
+    /// session whose reads were persisted. Bumping the generation also stops
+    /// any read still in flight from re-persisting after the snapshots go.
+    private func retireAllLastKnownSnapshots() {
+        readCacheGeneration += 1
+        snapshotStore?.removeAll()
     }
 
     func acknowledgeAcceptedEvidenceReviewProcessing(_ value: AcceptedEvidenceReviewProcessing) {
@@ -908,6 +920,9 @@ actor ProductionNativeAPI {
             if case ProductionNativeError.unauthenticated = error {
                 accessToken = nil
                 authenticatedDeviceId = nil
+                // A Server-side revocation must not leave this session's
+                // last-known Home on the device.
+                retireAllLastKnownSnapshots()
                 try? credentialStore.deleteRefreshCredential()
             }
             throw error

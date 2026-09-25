@@ -20,9 +20,14 @@ final class TrainingReportingViewModel {
     }
 
     func load() async {
+        // See ActivityHistoryViewModel.load: a stale-scope response is dropped.
+        let requestedScope = scope
         do {
-            state = .loaded(try await api.fetchTrainingReporting(reportId: reportId, scope: scope))
+            let value = try await api.fetchTrainingReporting(reportId: reportId, scope: requestedScope)
+            guard requestedScope == scope else { return }
+            state = .loaded(value)
         } catch {
+            guard requestedScope == scope else { return }
             state = .failed("This report could not be loaded.")
         }
     }

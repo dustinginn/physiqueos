@@ -87,6 +87,8 @@ struct NativeGoalPhaseContext: Decodable, Sendable {
 
 struct ProductionHomeAPI: HomeAPI {
     let api: ProductionNativeAPI
+    var now: @Sendable () -> Date = { Date() }
+    var calendar = Calendar.current
 
     func fetchHome() async throws -> HomeReadModel {
         // Presentation capability v2 advertises forward-compatible Home
@@ -101,9 +103,19 @@ struct ProductionHomeAPI: HomeAPI {
 
     func lastKnownHome() async -> HomeLastKnownSnapshot? {
         guard let envelope = await api.lastKnownResource("home", query: Self.query, as: Payload.self),
+              let generatedAt = Self.serverInstant(envelope.generatedAt),
+              // Home is a today surface (Today's Focus, briefing slots): a
+              // snapshot from an earlier local day is refused, not shown.
+              calendar.isDate(generatedAt, inSameDayAs: now()),
               let home = try? Self.readModel(from: envelope)
         else { return nil }
-        return HomeLastKnownSnapshot(home: home, generatedAt: envelope.generatedAt)
+        return HomeLastKnownSnapshot(home: home, generatedAt: envelope.generatedAt, generatedDate: generatedAt)
+    }
+
+    private static func serverInstant(_ value: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 
     private static let query = ["presentationVersion": "2"]

@@ -28,11 +28,15 @@ final class WeightHistoryViewModel {
     }
 
     func load() async {
+        // See ActivityHistoryViewModel.load: a stale-scope response is dropped.
+        let requestedScope = scope
         do {
-            let report = try await api.fetchWeightReport(scope: scope)
+            let report = try await api.fetchWeightReport(scope: requestedScope)
+            guard requestedScope == scope else { return }
             state = .loaded(report)
             selectedChartPointID = report.chart.points.last?.id
         } catch {
+            guard requestedScope == scope else { return }
             state = .failed("Weight could not be loaded.")
         }
     }
