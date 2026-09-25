@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-25T01:20:00Z",
+  "generated_at_utc": "2026-09-25T02:30:00Z",
   "task": {
-    "id": "claude-healthkit-build59-strength-final-diagnostic-20260924",
-    "title": "HealthKit Build 59 Sep24 Training Detail failure diagnostic + deferred-Cardio inventory",
+    "id": "claude-healthkit-strength-fix-workout-type-fidelity-20260924",
+    "title": "HealthKit Sep24 decode fix + workout-type fidelity, both candidates reviewed",
     "agent": "claude",
     "status": "awaiting_founder_direction"
   },
@@ -13,18 +13,20 @@
     "native_installed_build": 59,
     "native_installed_worktree": "/Users/dustinginn/Developer/PhysiqueOS/native-midweek-v3",
     "native_installed_branch": "claude/midweek-standard-format-v3",
-    "healthkit_native_final_candidate_sha": "236f208edffddcad4ace8748874993ed7daa05da",
-    "healthkit_native_branch": "codex/healthkit-revision-recovery-native",
-    "healthkit_native_worktree": "/private/tmp/physiqueos-healthkit-revision-recovery-native",
-    "healthkit_native_candidate_pushed": false,
-    "server_final_candidate_sha": "01d1900bcbb9db32ce270e49c7d24e919ba0d7d7",
+    "native_final_candidate_sha": "6a108d25e2a05b63c9561be3aeb9952f4e9dafe1",
+    "native_candidate_branch": "codex/healthkit-strength-fix-workout-type-fidelity",
+    "native_candidate_worktree": "/private/tmp/physiqueos-healthkit-strength-fix-workout-type-fidelity",
+    "native_candidate_base_preserved": "a269700bdc391476403c368d13f49887dd4a366a",
+    "native_candidate_pushed": false,
+    "server_final_candidate_sha": "c58dcca97e7b1a32c829485b7f8dc3d8fa5bb5a5",
     "server_branch": "codex/healthkit-current-day-review-server",
     "server_worktree": "/private/tmp/physiqueos-healthkit-current-day-review-server",
+    "server_candidate_pushed": false,
     "production_server_sha": "01d1900bcbb9db32ce270e49c7d24e919ba0d7d7",
     "production_deployment": "8da160ac-7ae5-4b69-8fd7-342cfff30099"
   },
   "result": {
-    "summary": "Claude ran a bounded, read-only diagnostic on the Founder's Build 59 report that Sep24 Training Detail fails to load ('This session could not be loaded') while Sep23 is healthy. Root cause proven with certainty by running the real production presentation code against production-validated fixtures and reading the real installed Native DTO source: a client-side Swift Codable decode failure in TrainingReadModel.swift, whose Relationship struct declares confirmedAt as a required non-optional field, which the intentional, correct 'candidate' relationship shape (introduced for unconfirmed HK Strength matches) never populates. Server behavior is correct and unchanged; fix is Native-only. Also completed a full deferred-Cardio-observation inventory, which found 2 additional deferred Sep23 Indoor Walks beyond the 2 previously-known Sep24 ones (4 total). No patch, deploy, policy mutation, or Cardio activation occurred.",
+    "summary": "Claude implemented, tested, and had independently fresh-context reviewed (APPROVE on both) the proven Sep24 Training Detail decode fix (Native: confirmedAt made optional, candidate fields added, plus a second transport-struct gap the implementer found and closed) and prospective HealthKit workout-type fidelity (Native: captures HKMetadataKeyIndoorWorkout only; Server: accepts and classifies it into a specific canonicalType without ever changing the cardio family). One real follow-up defect found by the first review round -- a hardcoded 'Confirmed' label that would have misrepresented an unconfirmed candidate match -- was fixed and re-verified before finalizing. Code/test/review only. Neither final candidate pushed, deployed, uploaded, or activated. The Midweek lane's live worktree was not touched.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -33,45 +35,42 @@
   },
   "validation": {
     "tests": {
-      "status": "not_applicable",
-      "summary": "Read-only diagnostic only, per explicit task scope. Root cause was proven by running the actual, currently-deployed production function (projectHealthKitStrengthWorkoutPresentationBySession) against the repository's own production-validated Sep23/Sep24 fixtures -- not by writing new code or new automated tests. No implementation was authorized in this task."
+      "status": "passed",
+      "summary": "Native: full suite 1377/1377 (up from 1375 pre-fix). Server: all 5 directly-affected files 68/68 combined + HealthKitObservationService.test.js's own coverage; vitest.package7.config.js 559/565 (6 pre-existing unrelated); vitest.phase4.config.js 139/139. Production webpack build exits 0 with Compiled successfully."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "Diagnostic-only task; no code change was made, so no review was performed or needed."
+      "status": "approved",
+      "summary": "Two independent fresh-context reviews. Server: clean APPROVE (one non-blocking commit-message prose inaccuracy, not a code defect). Native: first pass APPROVE WITH CONCERNS (found a hardcoded confirmation label that would misrepresent an unconfirmed match) -- fixed by the implementer and independently re-verified; final SHA reflects the fix."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "All production reads were bounded, read-only, zero-write (owner-scoped REPEATABLE READ READ ONLY, explicit ROLLBACK). The live workout policy was independently re-read and confirmed unchanged (families:['strength']) after an unexpected finding (pre-existing Sep22 canonicalized Cardio workouts, predating the current policy window) required ruling out any unauthorized mutation."
+      "summary": "No production database access at all in this task -- ground truth for the deferred-Cardio ledger and historical-data-unrecoverability was carried forward from the prior diagnostic's bounded read-only audit, not re-queried. Both reviewers independently mutation-tested critical guards (family-never-changes invariant on the Server side) with RED-then-GREEN proof, worktrees restored clean."
     }
   },
   "decisions_required": [
-    "Authorize the small Native-only fix (TrainingReadModel.swift: make Relationship.confirmedAt optional, add optional matchOutcome/confidence fields) to be implemented and tested, then folded into the next consolidated Native release candidate.",
-    "Authorize, when ready, a dry-run then a separate apply of the already-deployed atomic policy-replacement tooling (Strength-only -> [cardio, strength]).",
-    "Authorize, when ready, a dry-run then a separate apply of the already-deployed deferred-Cardio-reconciliation runner -- now scoped to FOUR exact observation identities (2 Sep23 + 2 Sep24 Indoor Walks), not the two previously known.",
-    "September 23 Activity repair: remains not required, unaffected by this diagnostic."
+    "Authorize Server deployment of c58dcca97e7b1a32c829485b7f8dc3d8fa5bb5a5.",
+    "Authorize folding Native candidate 6a108d25e2a05b63c9561be3aeb9952f4e9dafe1 (built on exact Build 59 base) into the next consolidated Native release candidate -- that reconciliation with any further Midweek-lane work is a separate, not-yet-started task needing its own authorization.",
+    "After both are live/installed: authorize a dry-run then a separate apply of the atomic policy-replacement tooling (Strength-only -> [cardio, strength]).",
+    "After that: authorize a dry-run then a separate apply of the deferred-Cardio-reconciliation runner for all four known identities (which will present as generic Cardio/Walking, since the specific Indoor/Outdoor type is provably unrecoverable for this historical data -- Founder has explicitly accepted this as prospective-only)."
   ],
-  "blockers": [
-    "Sep24 Training Detail is currently broken for the Founder on installed Build 59 until the Native-only fix above is implemented, tested, released, and installed."
-  ],
+  "blockers": [],
   "unexpected_findings": [
-    "The candidate/confirmed HK Strength presentation projection introduced in ca21aa26 (Part B) produces a genuinely different, and correct, JSON shape for an unconfirmed candidate (status, matchOutcome, confidence -- no confirmedAt) versus a confirmed relationship (status, confirmedAt) -- but the pre-existing Native DTO (written before the candidate concept existed) declares confirmedAt as required and non-optional, so any candidate-shaped response fails to decode entirely, taking down the whole session detail screen rather than just omitting the HK provenance block.",
-    "The one existing Native test that touches this model (TrainingSessionDetailPresentationTests.swift) hand-constructs the Swift struct directly rather than decoding real JSON, so it structurally could not have caught this contract mismatch -- no test anywhere in the Native suite exercises a real JSONDecoder pass over a candidate-shaped payload.",
-    "September 23 has the identical cardio-strength-cardio workout pattern September 24 does, with two additional deferred Indoor Walk observations that no prior report (including the original forensic reconciliation) had identified -- the deferred-Cardio backlog is 4 observations across 2 days, not 2.",
-    "Three already-canonicalized workouts (2 cardio, 1 strength) were found dated 2026-09-22, predating the current Strength-only workout policy's effective date -- independently investigated and confirmed benign: they canonicalized under an earlier, no-longer-live policy configuration and, per this codebase's terminal-canonicalization design, were never retroactively affected by the later narrowing. The live policy was independently re-verified unchanged; this is not evidence of any unauthorized Cardio activation."
+    "The Native decode fix has a second, independent transport gap: a distinct, narrower wire-encoding struct (separate from the in-memory query-client model) is what actually gets sent to the Server, and it also needed the new indoor/outdoor field threaded through -- found and fixed by the implementer, independently confirmed by the reviewer tracing the real network encode/send call chain.",
+    "The first fresh-context Native review found a real, in-scope defect the implementation itself didn't introduce but made newly reachable: a hardcoded 'Confirmed with Workout Logger' label that would have misrepresented the Founder's real, unconfirmed Sep24 match as confirmed. Fixed with a 2-line label branch plus 2 new tests before finalizing.",
+    "The Server-side request-bounds byte-budget accounting needed a small, necessary extension to correctly account for the new field -- found by the implementer, confirmed additive-only and non-shrinking of other fields' budget by the reviewer."
   ],
   "backlog": [
-    "Implement + test the Native TrainingReadModel.swift fix (own authorization), fold into the next consolidated Native candidate.",
-    "Dry-run + apply the atomic workout-policy replacement (families:['strength'] -> ['cardio','strength']), each its own authorization.",
-    "Dry-run + apply the deferred-Cardio reconciliation for all 4 known deferred Indoor Walk identities (2 Sep23 + 2 Sep24), each its own authorization.",
-    "Real-device acceptance of Sep23/Sep24 Training Detail parity, then of Cardio Activity attribution, once the above are live."
+    "Deploy Server c58dcca9... (own authorization).",
+    "Fold Native 6a108d25... into the next consolidated release candidate with Midweek's own work (own authorization, separate task).",
+    "Real-device acceptance of the Sep24 fix and the honest candidate/confirmed label.",
+    "Dry-run + apply atomic policy replacement, then dry-run + apply deferred-Cardio reconciliation for all 4 known identities -- each its own authorization."
   ],
-  "recommended_next_step": "Claude should await Founder direction. The Native fix belongs in whichever worktree hosts the next consolidated Native candidate (currently /Users/dustinginn/Developer/PhysiqueOS/native-midweek-v3, branch claude/midweek-standard-format-v3, at a269700b) -- Claude has only read that worktree so far, per the diagnostic-only scope of this task, and will not modify it without explicit authorization naming that worktree. Do not patch, deploy, upload, activate Cardio, mutate policy, reconcile deferred workouts, repair September 23 (not required), or operate the phone without the specific matching authorization for each gate.",
-  "full_report_path": "agent-handoffs/reports/20260925T012000Z-healthkit-build59-strength-detail-diagnostic.md",
+  "recommended_next_step": "Claude should await Founder direction. The Native fix (/private/tmp/physiqueos-healthkit-strength-fix-workout-type-fidelity, exact 6a108d25e2a05b63c9561be3aeb9952f4e9dafe1) is an isolated worktree preserving exact Build 59 as its base -- ready to be reconciled onto whatever the next consolidated Native candidate is, once that reconciliation is separately authorized. Do not deploy, upload, activate Cardio, mutate policy, reconcile deferred workouts, repair September 23 (not required), or operate the phone without the specific matching authorization for each gate.",
+  "full_report_path": "agent-handoffs/reports/20260925T023000Z-healthkit-strength-fix-workout-type-fidelity-reviewed.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260925T012000Z-healthkit-build59-strength-detail-diagnostic.md",
     "agent-handoffs/reports/20260925T004500Z-healthkit-server-corrections-cardio-tooling-deployed.md",
-    "agent-handoffs/reports/20260924T230500Z-healthkit-corrections-cardio-readiness-implemented-reviewed.md",
-    "agent-handoffs/reports/20260924T181500Z-healthkit-activity-workout-cardio-reconciliation.md"
+    "agent-handoffs/reports/20260924T230500Z-healthkit-corrections-cardio-readiness-implemented-reviewed.md"
   ],
   "safety": {
     "contains_secrets": false,
