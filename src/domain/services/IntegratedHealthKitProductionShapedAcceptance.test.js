@@ -412,8 +412,11 @@ const git = (...args) => execFileSync("git", args, { cwd: REPO_ROOT, encoding: "
 // daily-driver local-day lane (weigh-in future-date guard in the device zone) is the only reviewed
 // change allowed there: every added line must be that time-zone pass-through or its comment.
 const COMMAND_PORTS = "src/application/commands/CanonicalPersistenceCommandPorts.js";
-const commandPortsChangeIsOnlyTheWeighInZone = () => git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", COMMAND_PORTS)
-  .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++"))
+const commandPortsDiff = () => git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", COMMAND_PORTS).split("\n");
+const commandPortsChangeIsOnlyTheWeighInZone = () => commandPortsDiff()
+  .filter((line) => line.startsWith("-") && !line.startsWith("---"))
+  .every((line) => line === '-import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";') && commandPortsDiff()
+  .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
   .every((line) => /^\+\s*(\/\/.*|import \{ getLocalDateKey, resolveLocalTimeZone, resolveRequestedTimeZone \} from "\.\.\/\.\.\/domain\/utils\/localDate\.js";|timeZone: reconcilePreviousDayPriorities === false|\? resolveRequestedTimeZone\(context\.payload\.timeZone\) \?\? undefined|: undefined,)$/u.test(line));
 const candidateNames = () => git("diff", "--name-only", PRODUCTION_BASE, "HEAD")
   .split("\n").filter(Boolean).filter((name) => !/IntegratedProductionShapedAcceptance\.test\.js$|IntegratedHealthKitProductionShapedAcceptance\.test\.js$/u.test(name));
