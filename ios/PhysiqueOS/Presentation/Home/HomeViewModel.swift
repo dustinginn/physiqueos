@@ -15,6 +15,14 @@ final class HomeViewModel {
     }
 
     private(set) var state: LoadState = .loading
+    /// Non-nil while `state` shows the device's last-known Home (the
+    /// Server's `generatedAt` of that snapshot) instead of an authoritative
+    /// read from this session. Completion is disabled and notifications are
+    /// not reconciled from it.
+    private(set) var lastKnownGeneratedAt: String?
+    /// The authoritative refresh behind a last-known Home failed.
+    private(set) var lastKnownRefreshFailed = false
+    var isShowingLastKnown: Bool { lastKnownGeneratedAt != nil }
     private let api: HomeAPI
     /// The shared Priority engine — `todaysFocus` is computed from here,
     /// not from the static Home fixture, so it can never drift from what
@@ -60,6 +68,14 @@ final class HomeViewModel {
     }
 
     func load(now: Date = Date()) async {
+        // Cold launch only: paint the last authoritative Home immediately,
+        // then replace it with this session's read below.
+        if case .loading = state, !appliesSandboxProjections, let snapshot = await api.lastKnownHome() {
+            var home = snapshot.home
+            for index in home.todaysFocus.indices { home.todaysFocus[index].completable = false }
+            state = .loaded(home)
+            lastKnownGeneratedAt = snapshot.generatedAt
+        }
         do {
             var home = try await api.fetchHome()
             if appliesSandboxProjections {
@@ -70,8 +86,14 @@ final class HomeViewModel {
                 home.briefingCards = Self.projectBriefingCards(from: briefingStore.latestForHome(now: now))
             }
             state = .loaded(home)
+            lastKnownGeneratedAt = nil
+            lastKnownRefreshFailed = false
         } catch {
-            state = .failed("Home could not be loaded.")
+            if isShowingLastKnown {
+                lastKnownRefreshFailed = true
+            } else {
+                state = .failed("Home could not be loaded.")
+            }
         }
     }
 

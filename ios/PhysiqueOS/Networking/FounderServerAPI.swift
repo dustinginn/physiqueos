@@ -400,6 +400,13 @@ actor ProductionNativeAPI {
     private var readCacheGeneration = 0
     private let maximumCachedReads = 32
     private var acceptedEvidenceReviewProcessing: [String: AcceptedEvidenceReviewProcessing] = [:]
+    private let snapshotStore: ProductionReadSnapshotStore?
+
+    /// Resources whose last validated envelope survives process death so a
+    /// cold launch can show last-known content while the authoritative read
+    /// runs. Snapshots are never served as a read result — only through
+    /// `lastKnownResource`, which callers must present as last-known.
+    static let lastKnownSnapshotResources: Set<String> = ["home"]
 
     enum ReadPolicy: Sendable, Equatable {
         case cacheFirst
@@ -410,13 +417,15 @@ actor ProductionNativeAPI {
         configuration: NativeAPIEnvironment = .founderProduction,
         baseURL: URL? = nil,
         credentialStore: FounderRefreshCredentialStore? = nil,
-        transport: FounderHTTPTransport = URLSessionFounderHTTPTransport()
+        transport: FounderHTTPTransport = URLSessionFounderHTTPTransport(),
+        snapshotStore: ProductionReadSnapshotStore? = nil
     ) {
         precondition(configuration == .founderProduction, "ProductionNativeAPI requires Founder Production authority.")
         self.configuration = configuration
         self.baseURL = baseURL ?? configuration.baseURL
         self.credentialStore = credentialStore ?? KeychainFounderCredentialStore(namespace: configuration.credentialNamespace)
         self.transport = transport
+        self.snapshotStore = snapshotStore
     }
 
     func hasStoredSession() throws -> Bool {
@@ -433,6 +442,7 @@ actor ProductionNativeAPI {
             bearer: nil
         )
         try persist(session)
+        snapshotStore?.removeAll()
         return session
     }
 
@@ -444,6 +454,7 @@ actor ProductionNativeAPI {
         guard response.revoked else { throw ProductionNativeError.invalidResponse }
         accessToken = nil
         authenticatedDeviceId = nil
+        snapshotStore?.removeAll()
         try credentialStore.deleteRefreshCredential()
     }
 
@@ -544,6 +555,7 @@ actor ProductionNativeAPI {
         try validate(envelope, expectedResource: resource)
         if let generationForStore, generationForStore == readCacheGeneration {
             storeRead(data, for: key)
+            if Self.lastKnownSnapshotResources.contains(resource) { snapshotStore?.save(data, for: key) }
         }
 #if DEBUG
         NativePerformanceDiagnostics.recordRead(
@@ -557,7 +569,33 @@ actor ProductionNativeAPI {
         return envelope
     }
 
+    /// The last validated envelope persisted for this exact resource+query,
+    /// or nil. Never touches the network and never counts as a fresh read.
+    func lastKnownResource<Payload: Decodable & Sendable>(
+        _ resource: String,
+        query: [String: String] = [:],
+        as type: Payload.Type
+    ) -> ProductionResponseEnvelope<Payload>? {
+        guard Self.lastKnownSnapshotResources.contains(resource) else { return nil }
+        let key = readCacheKey(resource: resource, query: query)
+        guard let data = snapshotStore?.load(for: key) else { return nil }
+        do {
+            let envelope = try decoder.decode(ProductionResponseEnvelope<Payload>.self, from: data)
+            try validate(envelope, expectedResource: resource)
+            return envelope
+        } catch {
+            snapshotStore?.remove(for: key)
+            return nil
+        }
+    }
+
     func invalidateReadResources(_ resources: Set<String>) {
+        // A write that makes a read stale also retires its persisted
+        // last-known snapshot, so a later cold launch cannot show pre-write
+        // content (e.g. an already-completed priority).
+        for resource in resources where Self.lastKnownSnapshotResources.contains(resource) {
+            snapshotStore?.removeResource(resource)
+        }
         readCacheGeneration += 1
         // Detach affected pre-mutation GETs without cancelling their callers.
         // A post-mutation read must not join old data; the flight ID prevents
@@ -1127,4 +1165,66 @@ private struct RefreshRequest: Encodable {
 
 private struct RevocationResponse: Decodable {
     let revoked: Bool
+}
+
+/// Disk persistence for `ProductionNativeAPI.lastKnownSnapshotResources`.
+/// One file per cache key, written atomically with complete file protection
+/// and excluded from backup. Reads fail closed (locked device, missing or
+/// corrupt file) to nil, which callers treat as "no last-known content".
+struct ProductionReadSnapshotStore: Sendable {
+    let directory: URL
+
+    static func applicationSupport(namespace: String) -> ProductionReadSnapshotStore? {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        return ProductionReadSnapshotStore(
+            directory: base.appendingPathComponent("PhysiqueOS/LastKnownReads/\(namespace)", isDirectory: true)
+        )
+    }
+
+    func save(_ data: Data, for key: String) {
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            var excluded = URLResourceValues()
+            excluded.isExcludedFromBackup = true
+            var mutableDirectory = directory
+            try? mutableDirectory.setResourceValues(excluded)
+            try data.write(to: fileURL(for: key), options: [.atomic, .completeFileProtection])
+        } catch {
+            remove(for: key)
+        }
+    }
+
+    func load(for key: String) -> Data? {
+        try? Data(contentsOf: fileURL(for: key))
+    }
+
+    func remove(for key: String) {
+        try? FileManager.default.removeItem(at: fileURL(for: key))
+    }
+
+    /// Removes every key of a resource (`home`, `home?…`).
+    func removeResource(_ resource: String) {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        let prefix = Self.fileName(for: resource)
+        let queryPrefix = Self.fileName(for: "\(resource)?")
+        for file in files where file.lastPathComponent == prefix || file.lastPathComponent.hasPrefix(queryPrefix) {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
+    func removeAll() {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    private func fileURL(for key: String) -> URL {
+        directory.appendingPathComponent(Self.fileName(for: key), isDirectory: false)
+    }
+
+    /// Keys are `resource[?k=v&…]`; percent-encoding keeps them one path
+    /// component while preserving prefix order for `removeResource`.
+    static func fileName(for key: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-_.")
+        return key.addingPercentEncoding(withAllowedCharacters: allowed) ?? key
+    }
 }

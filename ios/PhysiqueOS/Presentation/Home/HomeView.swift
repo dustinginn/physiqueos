@@ -96,6 +96,7 @@ struct HomeView: View {
     /// is no separate error state to show for that.
     private func syncPriorityNotifications() async {
         guard environment.nativeAuthority == .founderProduction,
+              viewModel?.isShowingLastKnown == false,
               case .loaded(let home) = viewModel?.state
         else { return }
         let center = UNUserNotificationCenter.current()
@@ -170,6 +171,10 @@ struct HomeView: View {
         case .loaded(let home):
             VStack(alignment: .leading, spacing: 10) {
                 HomeHeaderView(header: home.header)
+
+                if let viewModel, viewModel.isShowingLastKnown {
+                    LastKnownHomeNotice(refreshFailed: viewModel.lastKnownRefreshFailed)
+                }
 
                 HomeHeroCardView(hero: home.hero) {
                     if let confidence = home.hero.confidence, let detail = home.hero.confidenceDetail {
@@ -283,5 +288,28 @@ private struct NotificationsDisabledNotice: View {
             }
         }
         .accessibilityIdentifier("home.notificationsDisabledNotice")
+    }
+}
+
+/// Shown only while Home displays the device's last-known Home at cold
+/// launch — the content is labelled, never passed off as current.
+private struct LastKnownHomeNotice: View {
+    let refreshFailed: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if !refreshFailed {
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(PhysiqueOSTheme.textSecondary)
+            }
+            Text(refreshFailed
+                ? "Couldn't refresh. Showing your last update — pull to refresh."
+                : "Updating…")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home.lastKnownNotice")
     }
 }

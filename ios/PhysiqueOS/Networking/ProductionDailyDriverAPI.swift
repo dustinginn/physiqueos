@@ -94,8 +94,21 @@ struct ProductionHomeAPI: HomeAPI {
         // and receives the server's neutral v1 icon fallback; corrected
         // clients receive canonical domain icons such as `pills`.
         let envelope = try await api.readResource(
-            "home", query: ["presentationVersion": "2"], as: Payload.self
+            "home", query: Self.query, as: Payload.self
         )
+        return try Self.readModel(from: envelope)
+    }
+
+    func lastKnownHome() async -> HomeLastKnownSnapshot? {
+        guard let envelope = await api.lastKnownResource("home", query: Self.query, as: Payload.self),
+              let home = try? Self.readModel(from: envelope)
+        else { return nil }
+        return HomeLastKnownSnapshot(home: home, generatedAt: envelope.generatedAt)
+    }
+
+    private static let query = ["presentationVersion": "2"]
+
+    private static func readModel(from envelope: ProductionResponseEnvelope<Payload>) throws -> HomeReadModel {
         let priorities = envelope.data.todaysFocus.map { $0.readOnlyOccurrence }
         let notificationOccurrences = (envelope.data.notificationOccurrences ?? envelope.data.todaysFocus)
             .map { $0.readOnlyOccurrence }

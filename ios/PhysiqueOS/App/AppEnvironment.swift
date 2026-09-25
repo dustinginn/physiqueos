@@ -559,7 +559,9 @@ final class AppEnvironment {
         goalsSandboxStore: GoalsSandboxStore = GoalsSandboxStore(),
         briefingSandboxStore: BriefingSandboxStore = BriefingSandboxStore(),
         founderServerAPI: FounderServerAPI = FounderServerAPI(),
-        productionNativeAPI: ProductionNativeAPI = ProductionNativeAPI(),
+        productionNativeAPI: ProductionNativeAPI = ProductionNativeAPI(
+            snapshotStore: .applicationSupport(namespace: "founder-production")
+        ),
         founderPhotoMediaStore: FounderPhotoMediaStore? = nil,
         healthKitFeatureGate: HealthKitFeatureGate = .n0Disabled,
         healthKitService: any HealthKitService = SystemHealthKitService(),

@@ -6,6 +6,20 @@ import Foundation
 /// pre-declare methods no screen calls yet.
 protocol HomeAPI: Sendable {
     func fetchHome() async throws -> HomeReadModel
+    /// The last authoritative Home persisted on this device, for cold-launch
+    /// display while `fetchHome()` runs. Nil when there is none.
+    func lastKnownHome() async -> HomeLastKnownSnapshot?
+}
+
+extension HomeAPI {
+    func lastKnownHome() async -> HomeLastKnownSnapshot? { nil }
+}
+
+/// A previously-authoritative Home, labelled with the Server's own
+/// `generatedAt`. It is never canonical for writes or notifications.
+struct HomeLastKnownSnapshot: Sendable {
+    var home: HomeReadModel
+    var generatedAt: String
 }
 
 /// Fixture-backed conformance: decodes the same bundled JSON a live

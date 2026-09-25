@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import SwiftUI
 @testable import PhysiqueOS
 
 final class FounderServerAPITests: XCTestCase {
@@ -693,6 +694,152 @@ final class FounderServerAPITests: XCTestCase {
         // Build 30 enables priority completion only after the read contract
         // supplies the canonical reminder version required by If-Match.
         XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
+    }
+
+    // MARK: - Performance Phase 2: last-known Home, write retirement, request counts
+
+    private static func temporarySnapshotStore() -> ProductionReadSnapshotStore {
+        ProductionReadSnapshotStore(directory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("physiqueos-last-known-\(UUID().uuidString)", isDirectory: true))
+    }
+
+    /// Persists one authoritative Home through a fully paired API, then
+    /// returns the shared snapshot store and credential store a relaunched
+    /// process would reuse.
+    private static func persistAuthoritativeHome(confidence: Int) async throws -> (ProductionReadSnapshotStore, MemoryCredentialStore) {
+        let store = Self.temporarySnapshotStore()
+        let credentials = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionHomeJSON(priorityID: "priority-old", goalID: "goal-server", confidence: confidence)),
+        ])
+        let first = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+        _ = try await first.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        _ = try await ProductionHomeAPI(api: first).fetchHome()
+        return (store, credentials)
+    }
+
+    func testLastKnownHomeSurvivesRelaunchWithoutAnyRequest() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let transport = SequencedFounderTransport([])
+        let relaunched = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+
+        let loaded = await ProductionHomeAPI(api: relaunched).lastKnownHome()
+        let snapshot = try XCTUnwrap(loaded)
+        XCTAssertEqual(snapshot.home.hero.confidence, 71)
+        XCTAssertEqual(snapshot.generatedAt, "2026-09-10T15:00:00.000Z")
+        let requestCount = await transport.requests.count
+        XCTAssertEqual(requestCount, 0, "last-known Home must never touch the network")
+    }
+
+    func testLastKnownSnapshotIsNeverServedAsAReadResult() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "b", refresh: "s")),
+            .json(200, productionHomeJSON(priorityID: "priority-new", goalID: "goal-server", confidence: 74)),
+        ])
+        let relaunched = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+
+        let home = try await ProductionHomeAPI(api: relaunched).fetchHome()
+        XCTAssertEqual(home.hero.confidence, 74)
+        let paths = await transport.requests.compactMap { $0.url?.path }
+        XCTAssertEqual(paths.filter { $0.hasSuffix("/read/home") }.count, 1)
+        let persisted = await ProductionHomeAPI(api: relaunched).lastKnownHome()
+        let replaced = try XCTUnwrap(persisted)
+        XCTAssertEqual(replaced.home.hero.confidence, 74, "each authoritative read replaces the snapshot")
+    }
+
+    @MainActor
+    func testColdLaunchHomePaintsLabelledLastKnownWhenRefreshFails() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let transport = SequencedFounderTransport([.failure(URLError(.notConnectedToInternet))])
+        let relaunched = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+        let viewModel = HomeViewModel(
+            api: ProductionHomeAPI(api: relaunched),
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+
+        await viewModel.load()
+
+        guard case .loaded(let home) = viewModel.state else { return XCTFail("Expected last-known Home, got \(viewModel.state)") }
+        XCTAssertEqual(home.hero.confidence, 71)
+        XCTAssertTrue(viewModel.isShowingLastKnown)
+        XCTAssertTrue(viewModel.lastKnownRefreshFailed)
+        XCTAssertEqual(viewModel.lastKnownGeneratedAt, "2026-09-10T15:00:00.000Z")
+        XCTAssertFalse(home.todaysFocus.isEmpty)
+        XCTAssertTrue(home.todaysFocus.allSatisfy { !$0.completable }, "last-known priorities are never completable")
+    }
+
+    @MainActor
+    func testColdLaunchHomeReplacesLastKnownWithAuthoritativeRead() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "b", refresh: "s")),
+            .json(200, productionHomeJSON(priorityID: "priority-new", goalID: "goal-server", confidence: 74)),
+        ])
+        let relaunched = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+        let viewModel = HomeViewModel(
+            api: ProductionHomeAPI(api: relaunched),
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+
+        await viewModel.load()
+
+        guard case .loaded(let home) = viewModel.state else { return XCTFail("Expected authoritative Home") }
+        XCTAssertEqual(home.hero.confidence, 74)
+        XCTAssertEqual(home.todaysFocus.first?.id, "priority-new")
+        XCTAssertTrue(home.todaysFocus.first?.completable == true)
+        XCTAssertFalse(viewModel.isShowingLastKnown)
+        XCTAssertFalse(viewModel.lastKnownRefreshFailed)
+
+        // A warm revisit neither re-reads the snapshot nor re-requests Home.
+        await viewModel.load()
+        let homeReads = await transport.requests.filter { $0.url?.path.hasSuffix("/read/home") == true }.count
+        XCTAssertEqual(homeReads, 1)
+    }
+
+    func testPriorityCompletionRetiresLastKnownHome() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "b", refresh: "s")),
+            .json(200, productionCommandOutcomeJSON(result: #"{"status":"committed","record":{"id":"ignored"}}"#)),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+        let before = await ProductionHomeAPI(api: api).lastKnownHome()
+        XCTAssertNotNil(before)
+
+        let writeAPI = ProductionPriorityCompletionWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        try await writeAPI.complete(priorityId: "completion-canonical", occurrenceDate: "2026-09-10", context: .init(occurrenceDate: "2026-09-10", dose: nil, protocolId: nil), expectedVersion: 7)
+
+        let retired = await ProductionHomeAPI(api: api).lastKnownHome()
+        XCTAssertNil(retired, "a completed priority must not reappear from a pre-write snapshot on the next cold launch")
+    }
+
+    func testPairingClearsLastKnownHome() async throws {
+        let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "c", refresh: "t"))])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+        _ = try await api.pair(pairingCredential: String(repeating: "q", count: 43), displayName: "Founder iPhone")
+        let cleared = await ProductionHomeAPI(api: api).lastKnownHome()
+        XCTAssertNil(cleared)
+    }
+
+    func testOnlyAllowlistedResourcesPersistLastKnownSnapshots() {
+        XCTAssertEqual(ProductionNativeAPI.lastKnownSnapshotResources, ["home"])
+        XCTAssertEqual(ProductionReadSnapshotStore.fileName(for: "home?presentationVersion=2"), "home%3FpresentationVersion%3D2")
+    }
+
+    func testForegroundRefreshOnlyForVisibleScreens() {
+        XCTAssertTrue(ForegroundRefreshPolicy.shouldRefresh(phase: .active, isVisible: true))
+        XCTAssertFalse(ForegroundRefreshPolicy.shouldRefresh(phase: .active, isVisible: false))
+        XCTAssertFalse(ForegroundRefreshPolicy.shouldRefresh(phase: .background, isVisible: true))
+        XCTAssertFalse(ForegroundRefreshPolicy.shouldRefresh(phase: .inactive, isVisible: true))
     }
 
     @MainActor
