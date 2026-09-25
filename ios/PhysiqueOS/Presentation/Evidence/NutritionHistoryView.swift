@@ -31,8 +31,8 @@ import SwiftUI
 struct NutritionHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: NutritionHistoryViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var isHistorySheetPresented = false
 
     /// `NUTRITION_HISTORY_PREVIEW_LIMIT` (`ProgressPlaceholderScreen.jsx`).
@@ -66,7 +66,10 @@ struct NutritionHistoryView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = NutritionHistoryViewModel(api: environment.nutritionAPI)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = NutritionHistoryViewModel(api: environment.nutritionAPI)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
         .refreshable {
@@ -75,7 +78,7 @@ struct NutritionHistoryView: View {
             }
             await viewModel?.load()
         }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
+        .refreshesOnForegroundWhenVisible { await viewModel?.load() }
     }
 
     @ViewBuilder

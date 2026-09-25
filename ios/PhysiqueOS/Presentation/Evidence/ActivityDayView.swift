@@ -17,8 +17,8 @@ import SwiftUI
 /// consistency with the sibling Evidence day-detail screen.
 struct ActivityDayView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: ActivityDayViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     let date: String
 
     var body: some View {
@@ -32,7 +32,10 @@ struct ActivityDayView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = ActivityDayViewModel(api: environment.activityAPI, date: date)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = ActivityDayViewModel(api: environment.activityAPI, date: date)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
         // Matches `ActivityHistoryView`'s own refreshable/scenePhase
@@ -49,7 +52,7 @@ struct ActivityDayView: View {
             }
             await viewModel?.load()
         }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
+        .refreshesOnForegroundWhenVisible { await viewModel?.load() }
     }
 
     @ViewBuilder

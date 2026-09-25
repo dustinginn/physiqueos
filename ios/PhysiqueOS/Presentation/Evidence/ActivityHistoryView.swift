@@ -43,8 +43,8 @@ import SwiftUI
 struct ActivityHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: ActivityHistoryViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var isHistorySheetPresented = false
 
     /// `ACTIVITY_HISTORY_PREVIEW_LIMIT` (`ProgressPlaceholderScreen.jsx`).
@@ -78,7 +78,10 @@ struct ActivityHistoryView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = ActivityHistoryViewModel(api: environment.activityAPI)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = ActivityHistoryViewModel(api: environment.activityAPI)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
         .refreshable {
@@ -87,7 +90,7 @@ struct ActivityHistoryView: View {
             }
             await viewModel?.load()
         }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
+        .refreshesOnForegroundWhenVisible { await viewModel?.load() }
     }
 
     @ViewBuilder

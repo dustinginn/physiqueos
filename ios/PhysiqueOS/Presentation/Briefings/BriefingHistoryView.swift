@@ -15,7 +15,6 @@ import SwiftUI
 struct BriefingHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     @State private var state: LoadState = .loading
@@ -57,10 +56,7 @@ struct BriefingHistoryView: View {
         .task(id: environment.nativeAuthority) {
             await load(showLoading: true)
         }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await load(showLoading: false) }
-        }
+        .refreshesOnForegroundWhenVisible { await load(showLoading: false) }
     }
 
     @MainActor

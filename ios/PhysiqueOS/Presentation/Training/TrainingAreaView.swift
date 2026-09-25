@@ -35,6 +35,7 @@ import SwiftUI
 struct TrainingAreaView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: TrainingAreaViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     let areaId: String
     var browseAll = false
 
@@ -50,7 +51,10 @@ struct TrainingAreaView: View {
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId, browseAll: browseAll)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId, browseAll: browseAll)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }

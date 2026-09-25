@@ -4,6 +4,7 @@ struct GoalStrategyView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: GoalStrategyViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
 
     let goalId: String
     let focus: GoalPlanFocus
@@ -30,7 +31,10 @@ struct GoalStrategyView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = GoalStrategyViewModel(api: environment.goalsAPI, goalId: goalId, focus: focus)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = GoalStrategyViewModel(api: environment.goalsAPI, goalId: goalId, focus: focus)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }

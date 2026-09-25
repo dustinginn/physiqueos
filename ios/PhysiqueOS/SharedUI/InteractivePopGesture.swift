@@ -44,3 +44,37 @@ extension View {
         background(InteractivePopGestureEnabler().frame(width: 0, height: 0))
     }
 }
+
+enum ForegroundRefreshPolicy {
+    /// Only the on-screen view refreshes on foreground. A tab root or a
+    /// screen underneath a pushed child is not visible; it refreshes through
+    /// its own `.task` when it next appears, instead of joining a resume burst
+    /// that queues the visible screen's reads behind invisible ones.
+    static func shouldRefresh(phase: ScenePhase, isVisible: Bool) -> Bool {
+        phase == .active && isVisible
+    }
+}
+
+private struct VisibleForegroundRefresh: ViewModifier {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isVisible = false
+    let action: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { isVisible = true }
+            .onDisappear { isVisible = false }
+            .onChange(of: scenePhase) { _, phase in
+                guard ForegroundRefreshPolicy.shouldRefresh(phase: phase, isVisible: isVisible) else { return }
+                Task { await action() }
+            }
+    }
+}
+
+extension View {
+    /// Replaces a bare `.onChange(of: scenePhase)` reload for screens whose
+    /// `.task` already reloads on appearance.
+    func refreshesOnForegroundWhenVisible(_ action: @escaping () async -> Void) -> some View {
+        modifier(VisibleForegroundRefresh(action: action))
+    }
+}

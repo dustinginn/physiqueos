@@ -21,8 +21,8 @@ import SwiftUI
 struct EnergyHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: EnergyHistoryViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
 
     @State private var selectedOverTimeWeekID: String?
     @State private var selectedRecentWeekID: String?
@@ -59,7 +59,10 @@ struct EnergyHistoryView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = EnergyHistoryViewModel(api: environment.energyAPI)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = EnergyHistoryViewModel(api: environment.energyAPI)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
         .refreshable {
@@ -68,7 +71,7 @@ struct EnergyHistoryView: View {
             }
             await viewModel?.load()
         }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
+        .refreshesOnForegroundWhenVisible { await viewModel?.load() }
     }
 
     @ViewBuilder

@@ -17,6 +17,7 @@ struct PhotosHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: PhotosHistoryViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var isHistoryExpanded = false
     @State private var selectedPhotoSet: PhotoSetRecord?
 
@@ -50,10 +51,13 @@ struct PhotosHistoryView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = PhotosHistoryViewModel(
-                api: environment.photosAPI,
-                briefingAPI: environment.nativeAuthority == .founderProduction ? environment.briefingAPI : nil
-            )
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = PhotosHistoryViewModel(
+                    api: environment.photosAPI,
+                    briefingAPI: environment.nativeAuthority == .founderProduction ? environment.briefingAPI : nil
+                )
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
             if environment.nativeAuthority == .sandbox {
                 await environment.founderPhotoMediaStore.loadManifestIfNeeded()

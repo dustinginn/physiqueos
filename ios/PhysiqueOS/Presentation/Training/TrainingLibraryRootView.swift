@@ -14,8 +14,8 @@ import SwiftUI
 /// page, but not this one).
 struct TrainingLibraryRootView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: TrainingLibraryRootViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
 
     var body: some View {
         ScrollView {
@@ -29,7 +29,10 @@ struct TrainingLibraryRootView: View {
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = TrainingLibraryRootViewModel(api: environment.trainingAPI)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = TrainingLibraryRootViewModel(api: environment.trainingAPI)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
         .refreshable {
@@ -38,7 +41,7 @@ struct TrainingLibraryRootView: View {
             }
             await viewModel?.load()
         }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
+        .refreshesOnForegroundWhenVisible { await viewModel?.load() }
     }
 
     @ViewBuilder

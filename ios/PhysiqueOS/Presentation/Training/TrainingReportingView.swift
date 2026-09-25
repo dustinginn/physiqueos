@@ -8,6 +8,7 @@ import SwiftUI
 struct TrainingReportingView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: TrainingReportingViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var selectedStatusGroup: TrainingResistanceStatusGroup?
     @State private var selectedAnalysisSheet: TrainingReportingAnalysisSheet?
     let reportId: String
@@ -24,7 +25,10 @@ struct TrainingReportingView: View {
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = TrainingReportingViewModel(api: environment.trainingAPI, reportId: reportId)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = TrainingReportingViewModel(api: environment.trainingAPI, reportId: reportId)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
         .sheet(item: $selectedStatusGroup) { group in

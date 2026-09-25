@@ -4,6 +4,7 @@ struct GoalDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: GoalDetailViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
 
     let goalId: String
     let onNavigate: (AppDestination) -> Void
@@ -31,12 +32,15 @@ struct GoalDetailView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = GoalDetailViewModel(
-                api: environment.goalsAPI,
-                store: environment.goalsSandboxStore,
-                usesSandboxStore: environment.nativeAuthority == .sandbox,
-                goalId: goalId
-            )
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = GoalDetailViewModel(
+                    api: environment.goalsAPI,
+                    store: environment.goalsSandboxStore,
+                    usesSandboxStore: environment.nativeAuthority == .sandbox,
+                    goalId: goalId
+                )
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }

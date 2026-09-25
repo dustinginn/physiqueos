@@ -20,6 +20,7 @@ import SwiftUI
 struct TrainingSessionDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: TrainingSessionDetailViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     let sessionId: String
 
     @State private var correctionDraftText: String = ""
@@ -47,7 +48,10 @@ struct TrainingSessionDetailView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = TrainingSessionDetailViewModel(api: environment.trainingAPI, sessionId: sessionId)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = TrainingSessionDetailViewModel(api: environment.trainingAPI, sessionId: sessionId)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }

@@ -8,7 +8,6 @@ import SwiftUI
 /// items and, for Supplements, the "Add Supplement" header action.
 struct OperatingPlanLandingView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.scenePhase) private var scenePhase
     @State private var state: LoadState = .loading
     let onNavigate: (AppDestination) -> Void
 
@@ -46,10 +45,7 @@ struct OperatingPlanLandingView: View {
             }
             await load()
         }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await load() }
-        }
+        .refreshesOnForegroundWhenVisible { await load() }
         .onChange(of: environment.nativeAuthority) { _, _ in Task { await load() } }
     }
 

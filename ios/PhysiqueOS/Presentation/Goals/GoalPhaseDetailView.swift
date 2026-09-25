@@ -4,6 +4,7 @@ struct GoalPhaseDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: GoalPhaseDetailViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
 
     let goalId: String
     let phaseId: String
@@ -30,13 +31,16 @@ struct GoalPhaseDetailView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = GoalPhaseDetailViewModel(
-                api: environment.goalsAPI,
-                store: environment.goalsSandboxStore,
-                usesSandboxStore: environment.nativeAuthority == .sandbox,
-                goalId: goalId,
-                phaseId: phaseId
-            )
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = GoalPhaseDetailViewModel(
+                    api: environment.goalsAPI,
+                    store: environment.goalsSandboxStore,
+                    usesSandboxStore: environment.nativeAuthority == .sandbox,
+                    goalId: goalId,
+                    phaseId: phaseId
+                )
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }

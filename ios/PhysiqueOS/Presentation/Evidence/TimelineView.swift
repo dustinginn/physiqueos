@@ -9,6 +9,7 @@ struct TimelineView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: TimelineViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
 
     var body: some View {
         ScrollView {
@@ -36,7 +37,10 @@ struct TimelineView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = TimelineViewModel(api: environment.timelineAPI)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = TimelineViewModel(api: environment.timelineAPI)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }

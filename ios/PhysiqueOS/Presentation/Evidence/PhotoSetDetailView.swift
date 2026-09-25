@@ -11,6 +11,7 @@ import SwiftUI
 struct PhotoSetDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: PhotoSetDetailViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var selectedViewIndex = 0
     @State private var didApplyInitialPose = false
     @State private var isSourceHistoryExpanded = false
@@ -33,7 +34,10 @@ struct PhotoSetDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = PhotoSetDetailViewModel(api: environment.photosAPI, setId: setId)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = PhotoSetDetailViewModel(api: environment.photosAPI, setId: setId)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
             if environment.nativeAuthority == .sandbox {
                 await environment.founderPhotoMediaStore.loadManifestIfNeeded()

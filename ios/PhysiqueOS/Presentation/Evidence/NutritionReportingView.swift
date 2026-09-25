@@ -32,6 +32,7 @@ import SwiftUI
 struct NutritionReportingView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: NutritionReportingViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
 
     @State private var selectedCaloriesWeek: String?
     @State private var selectedMacrosWeek: String?
@@ -60,7 +61,10 @@ struct NutritionReportingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = NutritionReportingViewModel(api: environment.nutritionAPI, reportId: reportId)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = NutritionReportingViewModel(api: environment.nutritionAPI, reportId: reportId)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }

@@ -6,8 +6,8 @@ import SwiftUI
 /// longer renders them as separate cards.
 struct GoalsView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: GoalsViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     let onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -19,11 +19,14 @@ struct GoalsView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .task(id: environment.nativeAuthority) {
-            viewModel = GoalsViewModel(
-                api: environment.goalsAPI,
-                store: environment.goalsSandboxStore,
-                usesSandboxStore: environment.nativeAuthority == .sandbox
-            )
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = GoalsViewModel(
+                    api: environment.goalsAPI,
+                    store: environment.goalsSandboxStore,
+                    usesSandboxStore: environment.nativeAuthority == .sandbox
+                )
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
         .refreshable {
@@ -32,10 +35,7 @@ struct GoalsView: View {
             }
             await viewModel?.load()
         }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await viewModel?.load() }
-        }
+        .refreshesOnForegroundWhenVisible { await viewModel?.load() }
     }
 
     @ViewBuilder

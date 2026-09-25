@@ -25,7 +25,6 @@ struct BriefingDetailView: View {
     static let architectureInvariant = "shared-artifact-detail-renderer"
 
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.scenePhase) private var scenePhase
     let briefingId: String
     var onNavigate: (AppDestination) -> Void = { _ in }
     var onReturnToHome: () -> Void = {}
@@ -61,10 +60,7 @@ struct BriefingDetailView: View {
         .task(id: "\(environment.nativeAuthority.rawValue):\(briefingId)") {
             await load(showLoading: true)
         }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await load(showLoading: false) }
-        }
+        .refreshesOnForegroundWhenVisible { await load(showLoading: false) }
     }
 
     @ViewBuilder

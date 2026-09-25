@@ -25,6 +25,7 @@ struct DEXAHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: DEXAHistoryViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
 
     @State private var selectedBodyFatPointID: String?
     /// One selection per secondary metric series, keyed by a
@@ -76,7 +77,10 @@ struct DEXAHistoryView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = DEXAHistoryViewModel(api: environment.dexaAPI)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = DEXAHistoryViewModel(api: environment.dexaAPI)
+                viewModelAuthority = environment.nativeAuthority
+            }
             selectedPDF = nil
             sourceMediaMessage = nil
             loadingSourceMediaID = nil

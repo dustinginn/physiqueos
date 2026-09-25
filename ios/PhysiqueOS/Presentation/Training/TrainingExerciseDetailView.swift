@@ -32,6 +32,7 @@ import SwiftUI
 struct TrainingExerciseDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: TrainingExerciseDetailViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var expandedHistoryOccurrenceIds: Set<String> = []
     let exerciseId: String
 
@@ -47,7 +48,10 @@ struct TrainingExerciseDetailView: View {
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = TrainingExerciseDetailViewModel(api: environment.trainingAPI, exerciseId: exerciseId)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = TrainingExerciseDetailViewModel(api: environment.trainingAPI, exerciseId: exerciseId)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }

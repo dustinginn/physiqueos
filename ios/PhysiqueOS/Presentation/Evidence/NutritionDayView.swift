@@ -11,6 +11,7 @@ import SwiftUI
 struct NutritionDayView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: NutritionDayViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     let dayId: String
 
     var body: some View {
@@ -24,7 +25,10 @@ struct NutritionDayView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
-            viewModel = NutritionDayViewModel(api: environment.nutritionAPI, dayId: dayId)
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = NutritionDayViewModel(api: environment.nutritionAPI, dayId: dayId)
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
         }
     }
