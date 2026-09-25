@@ -468,9 +468,15 @@ describe("Item 15: Cardio is NOT activated by the combined candidate", () => {
     const names = candidateNames();
     expect(names.length).toBeGreaterThan(0);
     expect(names.filter((name) => /(^|\/)(migrations?|schema)(\/|\.)|\.sql$|prisma|drizzle|knex|ddl|seed/iu.test(name))).toEqual([]);
-    // The only file under a database path is the READ-ONLY graduation reader (and its test).
+    // The only files under a database path are the READ-ONLY graduation reader (and its test) and, for the
+    // Training Day Cardio presentation fix, the READ-ONLY Training navigation read store (SELECT-only; asserted below).
     expect(names.filter((name) => /(^|\/)database\//u.test(name)).sort()).toEqual([
-      "src/platform/database/HealthKitGraduationReader.js", "src/platform/database/HealthKitGraduationReader.test.js"]);
+      "src/platform/database/HealthKitGraduationReader.js", "src/platform/database/HealthKitGraduationReader.test.js",
+      "src/platform/database/PostgresTrainingNavigationReadStore.js"]);
+    const storeAdded = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", "src/platform/database/PostgresTrainingNavigationReadStore.js")
+      .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n");
+    expect(storeAdded).toMatch(/SELECT payload,version FROM/u);
+    expect(storeAdded).not.toMatch(/\b(INSERT|UPDATE|DELETE|UPSERT|ALTER|CREATE|DROP|TRUNCATE)\b/iu);
   });
 
   it.skipIf(!diffAvailable)("git diff 01d1900b..HEAD adds no line that writes/creates/activates a Workout or graduation policy", () => {
