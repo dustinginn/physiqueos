@@ -417,16 +417,53 @@ struct BriefingCoachFinale: View {
         self.actions = actions
     }
 
+    /// A slot with no distinct Server content is omitted entirely — heading
+    /// and body together — never rendered with an empty body. Midweek's V3
+    /// contract can legitimately suppress Biggest Takeaway (e.g. a second
+    /// movement that isn't decision-changing); Native must not invent
+    /// substitute content or show a bare heading when that happens.
+    private var hasTakeaway: Bool { !takeaway.isEmpty }
+    private var hasRecommendation: Bool { !recommendation.isEmpty }
+    private var hasWatch: Bool { (watch?.isEmpty == false) }
+
+    /// Exactly which slot headings this instance would render, in order —
+    /// deterministic and directly testable, matching the established
+    /// `renderedSectionTitles` convention already used elsewhere in this
+    /// codebase (e.g. `MonthlyStrategicSummaryCard`) for verifying which
+    /// optional sections a component decided to show without needing to
+    /// inspect a rendered image.
+    var renderedSectionTitles: [String] {
+        [
+            hasTakeaway ? "Biggest Takeaway" : nil,
+            hasRecommendation ? "What To Do" : nil,
+            hasWatch ? "What To Watch" : nil,
+            !actions.isEmpty ? actionTitle : nil,
+        ].compactMap { $0 }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             Text("COACH'S TAKE")
                 .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
                 .foregroundStyle(.white.opacity(0.82))
-            finaleSection("💡 Biggest Takeaway", takeaway)
-            Divider().overlay(Color.white.opacity(0.22))
-            finaleSection("🧠 My Recommendation", recommendation)
-            if let watch, !watch.isEmpty {
-                Divider().overlay(Color.white.opacity(0.22))
+            if hasTakeaway {
+                finaleSection("💡 Biggest Takeaway", takeaway)
+                if hasRecommendation || hasWatch {
+                    Divider().overlay(Color.white.opacity(0.22))
+                }
+            }
+            if hasRecommendation {
+                // Product-persona rule: no first-person AI ownership ("My").
+                // Labeled to match the Server's own contract semantics for
+                // this exact claim (`sectionDecision("action", "What To Do", ...)`
+                // in MidweekBriefingPresentationService.js) rather than a
+                // Native-invented label.
+                finaleSection("🧠 What To Do", recommendation)
+                if hasWatch {
+                    Divider().overlay(Color.white.opacity(0.22))
+                }
+            }
+            if let watch, hasWatch {
                 finaleSection("👀 What To Watch", watch)
             }
             if !actions.isEmpty {

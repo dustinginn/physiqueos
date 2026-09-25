@@ -281,6 +281,48 @@ final class BriefingV3PresentationTests: XCTestCase {
         XCTAssertNil(view.content.presentationContract?.lead.confidence)
     }
 
+    /// Regression: Biggest Takeaway must never render as a blank heading.
+    /// The default fixture's contract suppresses `coachTake` (second
+    /// movement, not decision-changing) — exactly the production Sep20–22
+    /// shape — so `BriefingCoachFinale` must omit that whole slot rather
+    /// than showing "💡 Biggest Takeaway" over empty text.
+    func testMidweekCoachFinaleOmitsBiggestTakeawayWhenContractSuppressesIt() throws {
+        let midweek = try XCTUnwrap(try map(midweekContractEnvelope()).midweek)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+        XCTAssertNil(contract.coaching.first(where: { $0.section == "coachTake" }))
+        let bySection = Dictionary(contract.coaching.map { ($0.section, $0.text) }, uniquingKeysWith: { _, latest in latest })
+        let finale = BriefingCoachFinale(
+            takeaway: bySection["coachTake"] ?? "",
+            recommendation: bySection["action"] ?? "",
+            watch: bySection["watch"]
+        )
+        XCTAssertFalse(finale.renderedSectionTitles.contains("Biggest Takeaway"))
+        XCTAssertTrue(finale.renderedSectionTitles.contains("What To Do"))
+    }
+
+    /// The inverse: with a real coachTake claim, Biggest Takeaway renders.
+    func testMidweekCoachFinaleRendersBiggestTakeawayWhenContractProvidesIt() {
+        let finale = BriefingCoachFinale(takeaway: "A real takeaway.", recommendation: "Do the thing.", watch: "Watch this.")
+        XCTAssertEqual(finale.renderedSectionTitles, ["Biggest Takeaway", "What To Do", "What To Watch"])
+    }
+
+    /// No first-person AI-assistant ownership label anywhere in the finale.
+    func testMidweekCoachFinaleUsesNoFirstPersonLabel() {
+        let finale = BriefingCoachFinale(takeaway: "A takeaway.", recommendation: "Do the thing.")
+        for title in finale.renderedSectionTitles {
+            XCTAssertFalse(title.localizedCaseInsensitiveContains("my"), "label must not use first-person ownership: \(title)")
+        }
+        XCTAssertTrue(finale.renderedSectionTitles.contains("What To Do"))
+    }
+
+    /// Weekly's call site (always Server-populated takeaway/recommendation,
+    /// no `watch`) is unaffected by the empty-content guard.
+    func testWeeklyCoachFinaleUnaffectedByEmptyContentGuard() {
+        let finale = BriefingCoachFinale(takeaway: "Weekly takeaway.", recommendation: "Weekly recommendation.",
+                                          actionTitle: "Into Next Week", actions: ["Priority one."])
+        XCTAssertEqual(finale.renderedSectionTitles, ["Biggest Takeaway", "What To Do", "Into Next Week"])
+    }
+
     /// `coveredIds` (uncertainty already owned by Watch/a module caveat)
     /// decodes as a plain passthrough and stays entirely separate from
     /// `visibleItems` (what Still Unresolved renders).
