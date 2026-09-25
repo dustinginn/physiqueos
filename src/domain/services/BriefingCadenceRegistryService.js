@@ -3,7 +3,7 @@ import {
   createMonthlyEvidenceWindow,
   createWeeklyEvidenceWindow,
 } from "./BriefingEvidenceWindowService";
-import { createCoachingUpdatesReadService } from "./CoachingUpdatesReadService";
+import { resolveRecurringBriefingTimeZone } from "./RecurringBriefingTimeZoneAuthority";
 import { getMidweekArtifactId } from "./MidweekBriefingService";
 import { getMonthlyArtifactId } from "./MonthlyBriefingService";
 import { artifactIdForWeeklyWindow } from "./WeeklyClosedWindowContract";
@@ -15,7 +15,7 @@ import {
   BRIEFING_GENERATION_LOCAL_TIME,
   hasReachedBriefingGenerationTime,
   resolveBriefingDueInstant,
-  resolveBriefingTimeZone,
+  resolveBriefingTimeZoneAuthority,
 } from "./BriefingScheduleAuthority";
 
 export const BRIEFING_CADENCE_REGISTRY_VERSION = "briefing_cadence_registry_v2";
@@ -44,12 +44,17 @@ export async function resolveBriefingCadenceRegistry({
     ? await repositories.users.getUserById(userId)
     : await repositories.users.getCurrentUser();
   const resolvedUserId = user?.id ?? userId ?? null;
-  const configured = resolvedUserId
-    ? await createCoachingUpdatesReadService({ repositories })
-      .getCurrent({ userId: resolvedUserId })
-    : null;
-  const schedule = configured ?? DEFAULT_SCHEDULE;
-  const timeZone = resolveBriefingTimeZone({ coachingUpdates: schedule, user });
+  // The single recurring-briefing timezone authority (shared with the
+  // Midweek / Weekly / Monthly generators): explicit Coaching Updates
+  // timezone -> stored user timezone -> product default.
+  const authority = resolvedUserId
+    ? await resolveRecurringBriefingTimeZone({
+      repositories, userId: resolvedUserId, user,
+    })
+    : { ...resolveBriefingTimeZoneAuthority({ user }), coachingUpdates: null };
+  const schedule = authority.coachingUpdates ?? DEFAULT_SCHEDULE;
+  const timeZone = authority.timeZone;
+  const timeZoneSource = authority.source;
   const local = localParts(now, timeZone);
 
   const entries = [
@@ -60,6 +65,7 @@ export async function resolveBriefingCadenceRegistry({
       repositories,
       userId: resolvedUserId,
       timeZone,
+      timeZoneSource,
       local,
       now,
       windowBuilder: (options) => createMidweekEvidenceWindow({
@@ -78,6 +84,7 @@ export async function resolveBriefingCadenceRegistry({
       repositories,
       userId: resolvedUserId,
       timeZone,
+      timeZoneSource,
       local,
       now,
       windowBuilder: createWeeklyEvidenceWindow,
@@ -91,6 +98,7 @@ export async function resolveBriefingCadenceRegistry({
       repositories,
       userId: resolvedUserId,
       timeZone,
+      timeZoneSource,
       local,
       now,
       windowBuilder: createMonthlyEvidenceWindow,
@@ -128,6 +136,7 @@ function createEntry({
   repositories,
   userId,
   timeZone,
+  timeZoneSource,
   local,
   now,
   windowBuilder,
@@ -159,6 +168,7 @@ function createEntry({
     localEligibleTime,
     validLocalWeekdays,
     timeZone,
+    timeZoneSource,
     userId,
     localDate: local.date,
     localTime: local.time,

@@ -11,8 +11,10 @@ import {
   resolveCurrentPublishedBriefing,
 } from "./CurrentPublishedBriefingService";
 import {
+  COACHING_UPDATES_SCHEMA_VERSION,
   resolveCoachingUpdatesReadModel,
 } from "./CoachingUpdatesReadService";
+import { resolveUserProfileTimeZone } from "./BriefingScheduleAuthority";
 
 const CADENCE_REVISIONS = new Set(["weekly", "midweek", "monthly"]);
 const PENDING_COMMIT_ID = "pending_source_commit";
@@ -137,7 +139,7 @@ export function createBriefingReconciliationEnqueueService({
   });
 }
 
-function resolveCoachingUpdates(candidate, userId) {
+function findBriefingsVersion(candidate, userId) {
   const protocol = (candidate.protocols ?? []).find((item) =>
     item.status === "active" &&
     (item.protocolType ?? item.category) === "briefings" &&
@@ -146,6 +148,11 @@ function resolveCoachingUpdates(candidate, userId) {
   const version = (candidate.protocolVersions ?? []).find((item) =>
     item.id === protocol?.currentVersionId
   );
+  return { protocol, version };
+}
+
+function resolveCoachingUpdates(candidate, userId) {
+  const { protocol, version } = findBriefingsVersion(candidate, userId);
   const goal = (candidate.goals ?? []).find((item) =>
     item.status === "active" && (!userId || !item.userId || item.userId === userId)
   );
@@ -156,15 +163,24 @@ function resolveCoachingUpdates(candidate, userId) {
     protocol,
     version,
     goal,
-    timeZone: user?.timeZone ?? user?.timezone,
+    timeZone: resolveUserProfileTimeZone(user) ?? undefined,
   });
 }
 
+// Recurring-briefing timezone for choosing the current published briefing:
+// the same precedence as the scheduler (explicit stored Coaching Updates zone
+// -> stored user zone), then the zone the published artifacts themselves were
+// built in, then the product default.
 function resolveTimeZone(candidate, userId, publications) {
   const user = candidate.user?.id === userId
     ? candidate.user
     : (candidate.users ?? []).find((item) => item.id === userId);
-  return user?.timeZone ?? user?.timezone ??
+  const stored = findBriefingsVersion(candidate, userId).version?.coachingUpdates;
+  const explicit = stored?.schemaVersion === COACHING_UPDATES_SCHEMA_VERSION &&
+    typeof stored.timeZone === "string" && stored.timeZone.trim()
+    ? stored.timeZone
+    : null;
+  return explicit ?? resolveUserProfileTimeZone(user) ??
     publications.find((item) => item.userId === userId)?.evidenceWindow?.timeZone ??
     "America/Los_Angeles";
 }

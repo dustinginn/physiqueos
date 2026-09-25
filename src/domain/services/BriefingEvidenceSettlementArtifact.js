@@ -20,6 +20,7 @@ import {
 //   an artifact is read back through the repository.
 
 export const EVIDENCE_SETTLEMENT_ARTIFACT_FIELD = "evidenceSettlement";
+const TIME_ZONE_AUTHORITY = "briefing_schedule_authority";
 
 // Executor side. Turns the gate's decision for a cadence entry into the
 // `settlement` generator input: `{ decision, readiness, evidenceWindow,
@@ -33,14 +34,26 @@ export function createSettlementGeneratorInput({ entry, decision, asOf } = {}) {
     schemaVersion: null, domains: Object.freeze({}), ready: null,
     unsettledDomains: Object.freeze([]),
   });
+  const timeZone = entry.timeZone ?? entry.evidenceWindow.timeZone ?? null;
+  // One canonical recurring-briefing timezone: the zone the cadence was
+  // scheduled under must be the zone its evidence window was built in.
+  if (entry.evidenceWindow.timeZone && timeZone !== entry.evidenceWindow.timeZone) {
+    throw settlementError("evidence_settlement_timezone_mismatch",
+      "The cadence timezone differs from its evidence window timezone.");
+  }
   const watermark = buildEvidenceSettlementWatermarkV1({
     evidenceWindow: entry.evidenceWindow,
     readiness,
     publishDecision: decision,
     generatedAt: asOf.toISOString(),
     cadence: entry.cadence ?? entry.evidenceWindow.cadence ?? null,
-    timeZone: entry.timeZone ?? entry.evidenceWindow.timeZone ?? null,
-    timeZoneAuthority: "briefing_schedule_authority",
+    timeZone,
+    // The schedule authority, qualified by WHICH input supplied the zone
+    // (coaching_updates | user_profile | product_default) when the registry
+    // reported it.
+    timeZoneAuthority: entry.timeZoneSource
+      ? `${TIME_ZONE_AUTHORITY}:${entry.timeZoneSource}`
+      : TIME_ZONE_AUTHORITY,
     earliestPublishAt: decision.earliestPublishAt ?? entry.dueAt ?? null,
     hardDeadlineAt: decision.hardDeadlineAt ?? null,
     settlementApplicable: applicable,
@@ -66,22 +79,18 @@ export function attachEvidenceSettlement(artifact, settlement = null) {
   }
   // A watermark describing a different window than the artifact being built
   // would be a false statement about that artifact: fail loudly instead.
-  // The window id embeds the timezone. The cadence registry and the generators
-  // resolve that timezone through different fallback chains, so two ids may
-  // differ ONLY by timezone while naming the exact same evidence days; that
-  // must not block first publication forever (the watermark records its own
-  // timeZone/timeZoneAuthority honestly). Any difference in the covered days,
-  // or an id mismatch with no comparable dates, still fails loudly.
+  // Scheduler, evidence window, generator and watermark all resolve ONE
+  // canonical recurring-briefing timezone (RecurringBriefingTimeZoneAuthority),
+  // so the window id (which embeds the timezone) and the timezone must match
+  // exactly. A mismatch here is a genuine defect, never something to tolerate.
   const artifactWindow = artifact?.evidenceWindow;
-  const sameEvidenceDays = Boolean(
-    artifactWindow?.startDate && artifactWindow?.endDate &&
-    watermark.evidenceWindow?.startDate === artifactWindow.startDate &&
-    watermark.evidenceWindow?.endDate === artifactWindow.endDate
-  );
-  if (artifactWindow?.id &&
-      watermark.evidenceWindow?.id !== artifactWindow.id && !sameEvidenceDays) {
+  if (artifactWindow?.id && watermark.evidenceWindow?.id !== artifactWindow.id) {
     throw settlementError("evidence_settlement_window_mismatch",
       "The evidence-settlement watermark does not describe this artifact's window.");
+  }
+  if (artifactWindow?.timeZone && watermark.timeZone !== artifactWindow.timeZone) {
+    throw settlementError("evidence_settlement_timezone_mismatch",
+      "The evidence-settlement watermark timezone differs from this artifact's window timezone.");
   }
   return { ...artifact, [EVIDENCE_SETTLEMENT_ARTIFACT_FIELD]: watermark };
 }

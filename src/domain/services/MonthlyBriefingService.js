@@ -14,6 +14,7 @@ import { applyNarrativeV3ToBriefingArtifact,
   createBriefingGoalConfidenceBlockFromV3 } from
   "./BriefingGoalConfidencePresentationService";
 import { createMonthlyEvidenceWindow } from "./BriefingEvidenceWindowService";
+import { resolveRecurringBriefingTimeZone } from "./RecurringBriefingTimeZoneAuthority";
 import { hasReachedBriefingGenerationTime } from "./BriefingScheduleAuthority";
 import {
   createMonthlyBriefingPreviewService,
@@ -60,7 +61,9 @@ export function createMonthlyBriefingService({
   if (!publicationService) throw new Error("Monthly publication service is required.");
 
   const service = {
-    async generateForCurrentWindow({ userId = null, asOf = now(), settlement = null } = {}) {
+    async generateForCurrentWindow({
+      userId = null, asOf = now(), settlement = null, timeZone: suppliedTimeZone = null,
+    } = {}) {
       const user = userId
         ? await repositories.users.getUserById(userId)
         : await repositories.users.getCurrentUser();
@@ -68,7 +71,9 @@ export function createMonthlyBriefingService({
       if (!resolvedUserId) {
         return { state: "not_eligible", reason: "user_not_found" };
       }
-      const timeZone = user?.timeZone ?? "America/Los_Angeles";
+      const { timeZone } = await resolveRecurringBriefingTimeZone({
+        repositories, userId: resolvedUserId, user, suppliedTimeZone,
+      });
       if (!isMonthlyEligible(asOf, timeZone)) {
         return { state: "not_eligible", reason: "before_monthly_eligibility" };
       }
@@ -123,7 +128,10 @@ export function createMonthlyBriefingService({
       }
       const prepared = await occurrencePreparer({
         repositories, publicationService, userId: resolvedUserId,
-        timeZone: existing.timeZone ?? user?.timeZone ?? "America/Los_Angeles",
+        timeZone: existing.timeZone ??
+          (await resolveRecurringBriefingTimeZone({
+            repositories, userId: resolvedUserId, user,
+          })).timeZone,
         window: existing.evidenceWindow, artifactId: existing.id,
         generatedAt: now().toISOString(), existing,
       });

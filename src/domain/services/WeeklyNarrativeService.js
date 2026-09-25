@@ -1,7 +1,7 @@
 import { selectLiveTrainingPerformanceEvents } from "./TrainingPerformanceEventLiveness";
 import { attachEvidenceSettlement } from "./BriefingEvidenceSettlementArtifact.js";
 import { createWeeklyEvidenceWindow, selectScheduledBriefingCadence } from "./BriefingEvidenceWindowService";
-import { createCoachingUpdatesReadService } from "./CoachingUpdatesReadService";
+import { resolveRecurringBriefingTimeZone } from "./RecurringBriefingTimeZoneAuthority";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import { CADENCE_RMR_STRATEGIES, createCadenceEnergyAssessment, createEnergyVariabilityBaselineDays } from "./CadenceEnergyAssessmentService";
 import { loadLatestCadenceBriefingContinuity } from "./CadenceBriefingContinuityService";
@@ -346,9 +346,9 @@ export function createFounderWeeklyNarrativeService({repositories,now=()=>new Da
 
 export function createWeeklyNarrativeService({repositories,now=()=>new Date(),weeklyPersistence=null,confidenceStoreResolver=()=>null,cadenceLifecycle=null}){const service={
  async getLatest({userId,weekId=null}={}){if(weekId)return findExisting(repositories,userId,weekId);return repositories.dailyBriefings.getLatestWeeklyBriefing?repositories.dailyBriefings.getLatestWeeklyBriefing(userId):null;},
- async generateForCurrentWindow({userId,asOf=now(),settlement=null}={}){const user=userId?await repositories.users.getUserById(userId):await repositories.users.getCurrentUser();const resolvedUserId=user?.id??userId;if(!resolvedUserId)return{state:"not_eligible",reason:"user_not_found"};const timeZone=user?.timeZone??"America/Los_Angeles";const coachingUpdates=await createCoachingUpdatesReadService({repositories}).getCurrent({userId:resolvedUserId});if(selectScheduledBriefingCadence({now:asOf,timeZone,coachingUpdates})!=="weekly")return{state:"not_eligible",reason:"not_weekly_day"};try{const artifact=await service.generate({userId:resolvedUserId,reason:"scheduled_weekly_cadence",asOf,settlement});return{state:"completed",artifact};}catch(error){return{state:"failed",reason:error?.code??"weekly_persistence_failure",error:typedError(error)};}},
+ async generateForCurrentWindow({userId,asOf=now(),settlement=null,timeZone:suppliedTimeZone=null}={}){const user=userId?await repositories.users.getUserById(userId):await repositories.users.getCurrentUser();const resolvedUserId=user?.id??userId;if(!resolvedUserId)return{state:"not_eligible",reason:"user_not_found"};const{timeZone,coachingUpdates}=await resolveRecurringBriefingTimeZone({repositories,userId:resolvedUserId,user,suppliedTimeZone});if(selectScheduledBriefingCadence({now:asOf,timeZone,coachingUpdates})!=="weekly")return{state:"not_eligible",reason:"not_weekly_day"};try{const artifact=await service.generate({userId:resolvedUserId,reason:"scheduled_weekly_cadence",asOf,settlement,timeZone});return{state:"completed",artifact};}catch(error){return{state:"failed",reason:error?.code??"weekly_persistence_failure",error:typedError(error)};}},
  async preview({userId}){return buildWeeklyArtifact({repositories,userId,now,persist:false,confidenceStoreResolver});},
- async generate({userId,reason="explicit_generation",asOf=null,settlement=null}){const artifact=attachEvidenceSettlement(await buildWeeklyArtifact({repositories,userId,now:asOf?()=>asOf:now,persist:false,reason,confidenceStoreResolver}),settlement);if(cadenceLifecycle){const result=await publishWeeklyCadence({cadenceLifecycle,artifact,reason,operation:"create"});if(result.committed||result.status==="matched")return result.artifact;const error=new Error(result.error?.message??`Weekly cadence publication failed: ${result.status}`);error.code=result.status;throw error;}const persistence=requireWeeklyPersistence(weeklyPersistence);const baseline=persistence.captureBaseline();const result=await persistence.commit(createWeeklyPreparedCommit({operation:"normal_generation",artifact,baseline,reason}));return committedArtifactOrThrow(result);},
+ async generate({userId,reason="explicit_generation",asOf=null,settlement=null,timeZone=null}){const artifact=attachEvidenceSettlement(await buildWeeklyArtifact({repositories,userId,now:asOf?()=>asOf:now,persist:false,reason,confidenceStoreResolver,timeZone}),settlement);if(cadenceLifecycle){const result=await publishWeeklyCadence({cadenceLifecycle,artifact,reason,operation:"create"});if(result.committed||result.status==="matched")return result.artifact;const error=new Error(result.error?.message??`Weekly cadence publication failed: ${result.status}`);error.code=result.status;throw error;}const persistence=requireWeeklyPersistence(weeklyPersistence);const baseline=persistence.captureBaseline();const result=await persistence.commit(createWeeklyPreparedCommit({operation:"normal_generation",artifact,baseline,reason}));return committedArtifactOrThrow(result);},
  async prepareClosedWindow({userId,windowContract}){
    const validation=createWeeklyClosedWindowContract(windowContract,{now:now()});
    if(validation.status!=="valid")return validation;
@@ -378,7 +378,7 @@ export function createWeeklyNarrativeService({repositories,now=()=>new Date(),we
  },
  async catchUpLatestClosedWindow({userId,reason="missed_run_catch_up"}){
    const user=await repositories.users.getCurrentUser();
-   const timeZone=user?.timeZone??"America/Los_Angeles";
+   const{timeZone}=await resolveRecurringBriefingTimeZone({repositories,userId:user?.id??userId,user});
    const window=createWeeklyEvidenceWindow({now:now(),timeZone});
    return service.catchUpClosedWindow({userId,windowContract:{cadence:"weekly",startDate:window.startDate,endDate:window.endDate,briefingDate:window.briefingDate,timeZone,expectedArtifactId:artifactIdForWeeklyWindow(window.startDate,window.endDate),source:"latest_closed_window",reason}});
  },
@@ -437,9 +437,12 @@ function validatePreparedNarrative(narrative) {
   };
 }
 
-async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,windowOverride=null,existingArtifactId=null,ignoreExisting=false,confidenceStoreResolver}) {
+async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,windowOverride=null,existingArtifactId=null,ignoreExisting=false,confidenceStoreResolver,timeZone:suppliedTimeZone=null}) {
   const user=await repositories.users.getCurrentUser();
-  const timeZone=user?.timeZone??"America/Los_Angeles";
+  // The window timezone is the one shared recurring-briefing authority (or the
+  // executor-supplied zone that authority already produced); an explicit window
+  // keeps its own zone so a historical artifact never moves.
+  const timeZone=windowOverride?.timeZone??(await resolveRecurringBriefingTimeZone({repositories,userId:user?.id??userId,user,suppliedTimeZone})).timeZone;
   const window=windowOverride??createWeeklyEvidenceWindow({now:now(),timeZone});
   const artifactId=existingArtifactId??`weekly_briefing_${window.startDate}_${window.endDate}`;
   let discoveryFailed=false;

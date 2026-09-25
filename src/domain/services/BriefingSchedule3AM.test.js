@@ -212,7 +212,10 @@ describe("historical published artifacts are never regenerated or changed", () =
     const world = createWorld();
     await tickThroughLocalDay(world, "2026-09-23");
     for (const call of world.calls) {
-      expect(Object.keys(call).sort()).toEqual(["asOf", "userId"]);
+      // `timeZone` is the executor-resolved recurring-briefing zone (additive
+      // input); there is still no window override or historical-window input.
+      expect(Object.keys(call).sort()).toEqual(["asOf", "timeZone", "userId"]);
+      expect(call.timeZone).toBe("America/Los_Angeles");
     }
   });
 });

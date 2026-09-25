@@ -1,4 +1,5 @@
 import { createMidweekEvidenceWindow } from "./BriefingEvidenceWindowService";
+import { resolveRecurringBriefingTimeZone } from "./RecurringBriefingTimeZoneAuthority";
 import { expectedPhaseReviewDate } from "./GoalPhaseTimelineIntegrityService";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import { createWeeklyTrainingPresentationModel } from "./WeeklyTrainingPresentationService";
@@ -20,7 +21,10 @@ export const MIDWEEK_BRIEFING_VERSION = "midweek_briefing_v1";
 export function createMidweekBriefingPreviewService({ repositories, now = () => new Date() } = {}) {
   return { async preview({ userId, previewDate } = {}) {
     const user = await repositories.users.getCurrentUser();
-    const timeZone = user?.timeZone ?? "America/Los_Angeles";
+    // Same recurring-briefing timezone authority as the scheduler/generator.
+    const { timeZone } = await resolveRecurringBriefingTimeZone({
+      repositories, userId: userId ?? user?.id, user,
+    });
     const at = previewDate ? new Date(`${previewDate}T12:00:00Z`) : now();
     const window = createMidweekEvidenceWindow({ now: at, timeZone });
     const [canonicalObjects, weights, dexaScans, goal] = await Promise.all([repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId ?? user?.id), repositories.weights.listWeightEntries(userId ?? user?.id), repositories.dexaScans.listDEXAScans(userId ?? user?.id), repositories.goals.getActiveGoal(userId ?? user?.id)]);

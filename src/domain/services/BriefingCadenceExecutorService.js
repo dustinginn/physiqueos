@@ -246,6 +246,9 @@ async function evaluateEntry({
     entry.generator.generateForCurrentWindow({
       userId: entry.userId,
       asOf,
+      // The recurring-briefing timezone this occurrence was scheduled under,
+      // so the generator builds its window in exactly that zone.
+      timeZone: entry.timeZone,
       ...(settlementInput ? { settlement: settlementInput } : {}),
     })
   );

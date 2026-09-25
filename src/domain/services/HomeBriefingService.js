@@ -23,6 +23,11 @@ import {
   resolveNextEligibleCoachingUpdates,
 } from "./CoachingUpdatesReadService";
 import { resolveLocalTimeZone } from "../utils/localDate";
+import {
+  BRIEFING_DEFAULT_TIME_ZONE,
+  resolveBriefingTimeZone,
+  resolveUserProfileTimeZone,
+} from "./BriefingScheduleAuthority";
 
 const placeholderHeader = {
   greeting: "Good morning,",
@@ -125,18 +130,22 @@ export function createHomeBriefingService({
         protocol: coachingProtocol,
         version: coachingVersion,
         goal: activeGoal,
-        timeZone: user?.timeZone ?? "America/Los_Angeles",
+        timeZone: resolveUserProfileTimeZone(user) ?? BRIEFING_DEFAULT_TIME_ZONE,
       });
+      // Home's view of the recurring (Midweek / Weekly / Monthly) briefings must
+      // use the SAME timezone the scheduler and generators built them in, or
+      // the expected window id never matches the published artifact.
+      const recurringTimeZone = resolveBriefingTimeZone({ coachingUpdates, user });
       const homeCoachingUpdates = coachingUpdates ? {
         ...coachingUpdates,
         nextEligible: resolveNextEligibleCoachingUpdates(coachingUpdates, {
           now: now(),
-          timeZone: user?.timeZone ?? "America/Los_Angeles",
+          timeZone: recurringTimeZone,
         }),
       } : null;
       const expectation = resolveScheduledBriefingExpectation({
         now: now(),
-        timeZone: user?.timeZone ?? "America/Los_Angeles",
+        timeZone: recurringTimeZone,
         coachingUpdates: homeCoachingUpdates,
       });
       const expectedDailyWindow = createPreviousDayEvidenceWindow({
@@ -226,7 +235,7 @@ export function createHomeBriefingService({
         midweekArtifact: latestMidweekBriefing,
         monthlyArtifact: latestMonthlyBriefing,
         now: now(),
-        timeZone: user?.timeZone ?? "America/Los_Angeles",
+        timeZone: recurringTimeZone,
         weeklyArtifact: latestWeeklyBriefing,
         coachingUpdates: homeCoachingUpdates,
       });

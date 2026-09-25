@@ -54,7 +54,8 @@ describe("watermark persisted on the real published Midweek artifact", () => {
       coverageReadFailed: false,
       closeoutReceipt: null,
       timeZone: TZ,
-      timeZoneAuthority: "briefing_schedule_authority",
+      // The schedule authority qualified by the input that supplied the zone.
+      timeZoneAuthority: "briefing_schedule_authority:coaching_updates",
       evidenceCutoff: window.cutoff,
       earliestPublishAt: MIDWEEK_DUE.toISOString(),
       hardDeadlineAt: at(DEADLINE),
@@ -334,16 +335,29 @@ describe("attachEvidenceSettlement guards", () => {
     expect(attachEvidenceSettlement(stamped, settlementFor())).toBe(stamped);
   });
 
-  it("accepts an id that differs only by timezone when the covered evidence days are identical (N1)", () => {
+  it("refuses an id or timezone that differs from the artifact window, even when the covered days are identical (N1 tightened)", () => {
+    // Contract change (intended, not a weakening): the scheduler, evidence
+    // window, generators and watermark now resolve ONE canonical recurring
+    // timezone (RecurringBriefingTimeZoneAuthority), so a timezone-only
+    // difference is a genuine defect and must fail loudly instead of being
+    // tolerated. The previous tolerance existed only because the generators
+    // used a different fallback chain than the registry.
     const tzOnly = { ...window, id: window.id.replace("America/Los_Angeles", "America/New_York") };
     expect(tzOnly.id).not.toBe(window.id);
-    const stamped = attachEvidenceSettlement({ id: "a", evidenceWindow: tzOnly }, settlementFor());
-    expect(stamped.evidenceSettlement.evidenceWindow.id).toBe(window.id);
-    expect(stamped.evidenceSettlement.timeZone).toBe(TZ);
-    // Different covered days still refuse, even with a matching-looking id shape.
+    expect(() => attachEvidenceSettlement({ id: "a", evidenceWindow: tzOnly }, settlementFor()))
+      .toThrow(expect.objectContaining({ code: "evidence_settlement_window_mismatch" }));
+    // Same id but the artifact window records a different timezone: also refused.
+    const zoneOnly = { ...window, timeZone: "America/New_York" };
+    expect(() => attachEvidenceSettlement({ id: "a", evidenceWindow: zoneOnly }, settlementFor()))
+      .toThrow(expect.objectContaining({ code: "evidence_settlement_timezone_mismatch" }));
+    // Different covered days still refuse.
     const shifted = { ...tzOnly, startDate: "2026-09-06", endDate: "2026-09-08" };
     expect(() => attachEvidenceSettlement({ id: "a", evidenceWindow: shifted }, settlementFor()))
       .toThrow(expect.objectContaining({ code: "evidence_settlement_window_mismatch" }));
+    // The exactly matching window is accepted and records the zone honestly.
+    const stamped = attachEvidenceSettlement({ id: "a", evidenceWindow: window }, settlementFor());
+    expect(stamped.evidenceSettlement.timeZone).toBe(TZ);
+    expect(stamped.evidenceSettlement.evidenceWindow.id).toBe(window.id);
   });
 
   it("refuses a watermark that describes a different window, or one that fails integrity", () => {

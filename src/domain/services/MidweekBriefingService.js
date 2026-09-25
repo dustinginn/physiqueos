@@ -14,7 +14,7 @@ import { mergePIBriefingMemory } from "./PIBriefingMemoryService";
 import { adaptMidweekPISelection } from "./MidweekPINarrativeCandidateService";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService";
-import { createCoachingUpdatesReadService } from "./CoachingUpdatesReadService";
+import { resolveRecurringBriefingTimeZone } from "./RecurringBriefingTimeZoneAuthority";
 import { loadApplicationCanonicalRuntime } from "../../application/runtime/ApplicationCanonicalRuntime";
 import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
 import { createBriefingGoalConfidenceBlock } from "./BriefingGoalConfidencePresentationService";
@@ -62,13 +62,21 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
       ignoreExisting = false,
       reason = "scheduled_midweek_cadence",
       settlement = null,
+      // The recurring-briefing timezone the cadence executor already resolved
+      // (`entry.timeZone`). Absent for direct/manual invocations, which then
+      // resolve through the identical shared authority.
+      timeZone: suppliedTimeZone = null,
     } = {}) {
       const user = userId ? await repositories.users.getUserById(userId) : await repositories.users.getCurrentUser();
       const resolvedUserId = user?.id ?? userId;
       if (!resolvedUserId) return { state: "not_eligible", reason: "user_not_found" };
-      const timeZone = user?.timeZone ?? "America/Los_Angeles";
-      const coachingUpdates = await createCoachingUpdatesReadService({ repositories })
-        .getCurrent({ userId: resolvedUserId });
+      const resolvedZone = await resolveRecurringBriefingTimeZone({
+        repositories, userId: resolvedUserId, user, suppliedTimeZone,
+      });
+      const { coachingUpdates } = resolvedZone;
+      // An explicit window (regeneration of an existing occurrence) keeps its
+      // own timezone: a historical artifact never moves to a newer zone.
+      const timeZone = windowOverride?.timeZone ?? resolvedZone.timeZone;
       if (!windowOverride &&
           selectScheduledBriefingCadence({ now: asOf, timeZone, coachingUpdates }) !== "midweek") {
         return { state: "not_eligible", reason: "not_wednesday" };

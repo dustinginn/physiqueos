@@ -28,14 +28,63 @@ const WEEKDAYS = Object.freeze([
 ]);
 const MINUTE_MS = 60_000;
 
-// The briefing timezone: the configured Coaching Updates timezone, then the
-// user's profile timezone, then the product default. Never the server's.
+// Where a resolved recurring-briefing timezone came from. Recorded on the
+// evidence-settlement watermark (`timeZoneAuthority`) so the artifact states
+// honestly which authority supplied the zone that built its window.
+export const BriefingTimeZoneSource = Object.freeze({
+  COACHING_UPDATES: "coaching_updates",
+  USER_PROFILE: "user_profile",
+  PRODUCT_DEFAULT: "product_default",
+});
+
+// The user's stored profile timezone: `timeZone`, then the legacy lowercase
+// `timezone` key. Null when the profile carries neither.
+export function resolveUserProfileTimeZone(user = null) {
+  return nonEmpty(user?.timeZone) ?? nonEmpty(user?.timezone) ?? null;
+}
+
+// THE recurring-briefing timezone authority (Midweek / Weekly / Monthly
+// eligibility, evidence window, settlement policy, generator window and the
+// persisted watermark all resolve through here): the configured Coaching
+// Updates timezone, then the user's stored profile timezone, then the product
+// default LAST. Never the server's, and never a transient device/travel
+// timezone: nothing request- or client-derived is an input.
+//
+// `coachingTimeZoneSource` is the source the Coaching Updates read model
+// reports for its own timezone (its value already embeds the user/default
+// fallback when the stored version has no explicit zone). When absent the
+// value is attributed to Coaching Updates.
+export function resolveBriefingTimeZoneAuthority({
+  coachingUpdates = null,
+  user = null,
+  coachingTimeZoneSource = null,
+} = {}) {
+  const coaching = nonEmpty(coachingUpdates?.timeZone);
+  if (coaching) {
+    return Object.freeze({
+      timeZone: coaching,
+      source: coachingTimeZoneSource ?? BriefingTimeZoneSource.COACHING_UPDATES,
+    });
+  }
+  const profile = resolveUserProfileTimeZone(user);
+  if (profile) {
+    return Object.freeze({ timeZone: profile, source: BriefingTimeZoneSource.USER_PROFILE });
+  }
+  return Object.freeze({
+    timeZone: BRIEFING_DEFAULT_TIME_ZONE,
+    source: BriefingTimeZoneSource.PRODUCT_DEFAULT,
+  });
+}
+
 export function resolveBriefingTimeZone({
   coachingUpdates = null,
   user = null,
 } = {}) {
-  return coachingUpdates?.timeZone ?? user?.timeZone ?? user?.timezone ??
-    BRIEFING_DEFAULT_TIME_ZONE;
+  return resolveBriefingTimeZoneAuthority({ coachingUpdates, user }).timeZone;
+}
+
+function nonEmpty(value) {
+  return typeof value === "string" && value.trim() ? value : null;
 }
 
 // `localTime` is a zero-padded 24-hour "HH:MM" already expressed in the

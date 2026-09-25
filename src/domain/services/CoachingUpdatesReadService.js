@@ -1,5 +1,10 @@
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
-import { BRIEFING_GENERATION_LOCAL_TIME } from "./BriefingScheduleAuthority";
+import {
+  BRIEFING_DEFAULT_TIME_ZONE,
+  BRIEFING_GENERATION_LOCAL_TIME,
+  BriefingTimeZoneSource,
+  resolveUserProfileTimeZone,
+} from "./BriefingScheduleAuthority";
 
 export const COACHING_UPDATES_SCHEMA_VERSION = "coaching_updates_schedule_v1";
 export const COACHING_NOTIFICATION_PREFERENCES = Object.freeze([
@@ -15,29 +20,54 @@ export const WEEKDAYS = Object.freeze([
 // Recurring briefings generate at one system time; a stored surface localTime
 // (a former "preferred delivery time") is history, not a scheduling input.
 const LEGACY_TIME = BRIEFING_GENERATION_LOCAL_TIME;
-const DEFAULT_TIME_ZONE = "America/Los_Angeles";
+const DEFAULT_TIME_ZONE = BRIEFING_DEFAULT_TIME_ZONE;
 
 export function createCoachingUpdatesReadService({ repositories }) {
   return scopeRepositoryReadService({ repositories, namespace: "coaching-updates", service: {
     async getCurrent({ protocolId = null, userId } = {}) {
-      const [protocols, goal, user] = await Promise.all([
-        repositories.protocols?.listActiveProtocols?.(userId) ??
-          repositories.protocols?.listProtocols?.(userId) ?? [],
-        repositories.goals?.getActiveGoal?.(userId) ?? null,
-        repositories.users?.getUserById?.(userId) ??
-          repositories.users?.getCurrentUser?.() ?? null,
-      ]);
-      const protocol = protocols.find((item) =>
-        (protocolId ? item.id === protocolId : true) &&
-        (item.protocolType ?? item.category) === "briefings");
-      if (!protocol?.currentVersionId) return null;
-      const version = await repositories.protocolVersions?.getCurrentVersion?.(protocol.id);
-      if (!version || version.id !== protocol.currentVersionId) return null;
-      return resolveCoachingUpdatesReadModel({
-        protocol, version, goal, timeZone: user?.timeZone ?? DEFAULT_TIME_ZONE,
-      });
+      return (await readCurrent({ repositories, protocolId, userId })).model;
+    },
+    // The same read model plus WHICH authority supplied its timezone
+    // (`coaching_updates` when the stored version carries an explicit zone,
+    // else the user profile, else the product default). The model itself is
+    // unchanged; this is the additive channel the recurring-briefing timezone
+    // authority uses to record its source honestly.
+    async getCurrentWithTimeZoneSource({ protocolId = null, userId } = {}) {
+      return readCurrent({ repositories, protocolId, userId });
     },
   }});
+}
+
+async function readCurrent({ repositories, protocolId, userId }) {
+  const [protocols, goal, user] = await Promise.all([
+    repositories.protocols?.listActiveProtocols?.(userId) ??
+      repositories.protocols?.listProtocols?.(userId) ?? [],
+    repositories.goals?.getActiveGoal?.(userId) ?? null,
+    repositories.users?.getUserById?.(userId) ??
+      repositories.users?.getCurrentUser?.() ?? null,
+  ]);
+  const protocol = protocols.find((item) =>
+    (protocolId ? item.id === protocolId : true) &&
+    (item.protocolType ?? item.category) === "briefings");
+  if (!protocol?.currentVersionId) return { model: null, timeZoneSource: null };
+  const version = await repositories.protocolVersions?.getCurrentVersion?.(protocol.id);
+  if (!version || version.id !== protocol.currentVersionId) {
+    return { model: null, timeZoneSource: null };
+  }
+  const profileTimeZone = resolveUserProfileTimeZone(user);
+  const model = resolveCoachingUpdatesReadModel({
+    protocol, version, goal, timeZone: profileTimeZone ?? DEFAULT_TIME_ZONE,
+  });
+  const explicit = version.coachingUpdates?.schemaVersion === COACHING_UPDATES_SCHEMA_VERSION &&
+    typeof version.coachingUpdates.timeZone === "string" &&
+    version.coachingUpdates.timeZone.trim() !== "";
+  return {
+    model,
+    timeZoneSource: !model ? null
+      : explicit ? BriefingTimeZoneSource.COACHING_UPDATES
+      : profileTimeZone ? BriefingTimeZoneSource.USER_PROFILE
+      : BriefingTimeZoneSource.PRODUCT_DEFAULT,
+  };
 }
 
 export function resolveCoachingUpdatesReadModel({

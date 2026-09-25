@@ -1,4 +1,5 @@
 import { createWeeklyEvidenceWindow } from "./BriefingEvidenceWindowService";
+import { resolveRecurringBriefingTimeZone } from "./RecurringBriefingTimeZoneAuthority";
 import { composeWeeklyNarrative } from "./WeeklyNarrativeService";
 import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
 
@@ -8,7 +9,7 @@ export function createWeeklyBriefingV4PreviewService({repositories,now=()=>new D
   return { async preview({userId,previewDate}={}) {
     const user=await repositories.users.getCurrentUser();
     const at=previewDate?new Date(`${previewDate}T12:00:00Z`):now();
-    const timeZone=user?.timeZone??"America/Los_Angeles";
+    const{timeZone}=await resolveRecurringBriefingTimeZone({repositories,userId:userId??user?.id,user});
     const window=createWeeklyEvidenceWindow({now:at,timeZone});
     const [canonicalObjects,weights,dexaScans,artifacts,currentGoal]=await Promise.all([
       repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId??user?.id),
