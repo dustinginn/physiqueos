@@ -32,6 +32,6 @@ A device closeout is an **optional accelerant**, not a requirement: when iOS gra
 
 ## Integration boundary (updated after live wiring)
 
-The readiness/publish-action policy is now wired into the live generation path: `BriefingCadenceExecutorService` consults `BriefingCadenceSettlementGate` (built in `providerBriefingCadenceComposition`) before invoking a recurring cadence's generator, and Server owns delivery time. Event-driven DEXA/Photo briefings and Monthly's day-1 cadence do not pass through the gate.
+The readiness/publish-action policy is now wired into the live generation path: `BriefingCadenceExecutorService` consults `BriefingCadenceSettlementGate` (built in `providerBriefingCadenceComposition`) before invoking a recurring cadence's generator, and Server owns delivery time. Event-driven DEXA/Photo briefings do not pass through the gate. Monthly does (every recurring registry entry is gated) but stays on day 1: it waits for settlement and falls back at the hard deadline within that same local day.
 
 Still NOT wired: `buildEvidenceSettlementWatermarkV1` has no production caller. The live path records `settlementReasonCode` on the execution record and emits `briefing_settlement.*` log events (including `unsettledDomains` on deadline fallback), but the frozen watermark (cutoff, record/revision identities, readiness state, closeout receipt, generation timestamp) is not yet persisted on the published artifact. `recordDeviceCloseoutReceiptV1` likewise has no Native->Server endpoint yet. Both are separate, explicitly authorized follow-ups.

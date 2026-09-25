@@ -892,7 +892,7 @@ describe("Items 7-10: Midweek settlement lifecycle over real HealthKit ingestion
     expect(world.generators.midweek.generateForCurrentWindow).toHaveBeenCalledOnce();
   });
 
-  it("Item 9: at the hard deadline it publishes anyway and records which domains were unsettled", async () => {
+  it("Item 9: at the hard deadline it publishes anyway and logs which domains were unsettled (watermark persistence on the artifact is a disclosed, unwired gap)", async () => {
     const records = hkStore();
     await ingestMidweekWeek(records, { finalNutrition: "partial_day" });
     const world = cadenceWorld({ records, energyObservations: unsettledEnergyObservations });
