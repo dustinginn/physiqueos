@@ -1519,6 +1519,40 @@ final class FounderServerAPITests: XCTestCase {
     }
 
     @MainActor
+    func testPriorityDetailAcknowledgesCompletionBeforeNotificationReconciliation() async throws {
+        let occurrence = PriorityOccurrence(
+            id: "foam", routePriorityId: "reminder-foam", executionItemId: "execution-foam", date: "2026-09-13",
+            title: "Foam Rolling", subtitle: "Tonight", metadata: nil, changeLabel: nil,
+            icon: .activity, color: .success, urgency: .available, completed: false, completable: true,
+            expectedVersion: 4, actionLabel: nil,
+            completionContext: .init(occurrenceDate: "2026-09-13", dose: nil, protocolId: nil),
+            continueActionDestination: nil
+        )
+        let writer = RecordingPriorityCompletionAPI()
+        var stateWhenCleanupStarted: PriorityDetailViewModel.LoadState?
+        var viewModel: PriorityDetailViewModel!
+        viewModel = PriorityDetailViewModel(
+            api: FirstPriorityThenFailureAPI(occurrence: occurrence), writeAPI: writer,
+            morningCheckInAPI: NotAvailableMorningCheckInAPI(),
+            store: LoggingSandboxStore(), authority: .founderProduction,
+            priorityId: "reminder-foam", occurrenceDate: "2026-09-13",
+            notificationCleanup: { _, _ in
+                // Production cleanup performs a full canonical Home read here.
+                stateWhenCleanupStarted = viewModel.state
+            }
+        )
+
+        await viewModel.load()
+        await viewModel.complete()
+
+        guard case .loaded(.some(let seen)) = stateWhenCleanupStarted else {
+            return XCTFail("Completion must be visibly acknowledged before notification reconciliation runs")
+        }
+        XCTAssertTrue(seen.completed)
+        XCTAssertFalse(seen.completable)
+    }
+
+    @MainActor
     func testHomeKeepsDurablePriorityCompletionWhenReconciliationReadFails() async throws {
         let occurrence = PriorityOccurrence(
             id: "foam", routePriorityId: "reminder-foam", executionItemId: "execution-foam", date: "2026-09-13",

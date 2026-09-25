@@ -71,14 +71,18 @@ final class PriorityDetailViewModel {
                 context: occurrence.completionContext,
                 expectedVersion: version
             )
-            await notificationCleanup(
-                occurrence.routePriorityId ?? occurrence.id,
-                occurrence.date
-            )
+            // The durable command is the canonical fact: acknowledge it now.
+            // Notification cleanup reconciles the canonical occurrence
+            // horizon (a full Home read, 1.4-2.4 s in production) and must
+            // not hold the visible acknowledgement hostage.
             var acknowledged = occurrence
             acknowledged.completed = true
             acknowledged.completable = false
             state = .loaded(acknowledged)
+            await notificationCleanup(
+                occurrence.routePriorityId ?? occurrence.id,
+                occurrence.date
+            )
             do {
                 state = .loaded(try await api.fetchPriority(priorityId: priorityId, occurrenceDate: occurrenceDate))
             } catch {
