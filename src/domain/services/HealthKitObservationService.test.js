@@ -74,6 +74,39 @@ describe("HealthKitObservationService V1 compatibility", () => {
     });
   });
 
+  describe("workout isIndoorWorkout (explicit Apple HKMetadataKeyIndoorWorkout signal)", () => {
+    it("is purely additive and optional: a legacy/signal-less workout payload normalizes exactly as it always has", () => {
+      const legacy = normalize("batch-one", [workout()]).observations[0];
+      expect(legacy.measurement).not.toHaveProperty("isIndoorWorkout");
+      // Same exact measurement shape (and V1 identity) this suite already pins
+      // for a plain workout with no isIndoorWorkout field at all.
+      expect(legacy.measurement).toEqual({
+        activityType: "Traditional Strength Training",
+        durationSeconds: 3600,
+        activeCalories: 400,
+        averageHeartRate: 122,
+      });
+    });
+
+    it("accepts and preserves a true or false signal in the normalized measurement", () => {
+      const indoor = normalize("batch-one", [workout({ isIndoorWorkout: true })]).observations[0];
+      const outdoor = normalize("batch-two", [workout({ externalId: "hk-workout-002", isIndoorWorkout: false })]).observations[0];
+      expect(indoor.measurement.isIndoorWorkout).toBe(true);
+      expect(outdoor.measurement.isIndoorWorkout).toBe(false);
+    });
+
+    it("treats a non-boolean or missing value as unknown, never a guess -- the key is simply absent, same as any other unset optional field", () => {
+      for (const value of [null, undefined, "true", 1, 0, "indoor"]) {
+        const observation = normalize("batch", [workout({ isIndoorWorkout: value })]).observations[0];
+        expect(observation.measurement, JSON.stringify(value)).not.toHaveProperty("isIndoorWorkout");
+      }
+    });
+
+    it("never makes isIndoorWorkout required -- omitting it entirely still normalizes successfully", () => {
+      expect(() => normalize("batch", [workout()])).not.toThrow();
+    });
+  });
+
   describe("Nutrition daily totals", () => {
     it("normalizes a HealthKit daily aggregate with calories, protein, carbohydrates, and fat only", () => {
       const observation = normalize("nutrition", [nutritionDailyTotal()]).observations[0];
@@ -310,6 +343,7 @@ function source() {
 function workout({
   activityType = "Traditional Strength Training",
   externalId = "hk-workout-001",
+  isIndoorWorkout,
 } = {}) {
   return {
     observationType: "workout",
@@ -321,7 +355,10 @@ function workout({
       startedAt: "2026-09-12T10:00:00-07:00",
       endedAt: "2026-09-12T11:00:00-07:00",
     },
-    workout: { activityType, durationSeconds: 3600, activeCalories: 400, averageHeartRate: 122 },
+    workout: {
+      activityType, durationSeconds: 3600, activeCalories: 400, averageHeartRate: 122,
+      ...(isIndoorWorkout !== undefined ? { isIndoorWorkout } : {}),
+    },
   };
 }
 

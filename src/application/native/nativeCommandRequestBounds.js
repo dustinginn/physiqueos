@@ -69,6 +69,9 @@ export function nativeCommandRequestMaximumBytes(body) {
  *   timestamp  bounded string, HEALTHKIT_MAX_TIMESTAMP_LENGTH code units
  *   numeric    number or numeric string, HEALTHKIT_MAX_NUMERIC_TEXT_LENGTH units
  *   metrics    the bounded dailyActivity metric map
+ *   boolean    a literal `true`/`false`; any other value is treated as absent
+ *              (never guessed), so it can never be padded beyond its own
+ *              fixed-length literal encoding
  *   { exact }  compared exactly and never trimmed, so it cannot be padded
  */
 export const HEALTHKIT_OBSERVATION_WIRE_FIELDS = Object.freeze({
@@ -93,6 +96,7 @@ export const HEALTHKIT_OBSERVATION_WIRE_FIELDS = Object.freeze({
   workout: Object.freeze({
     activityType: "text", durationSeconds: "numeric", activeCalories: "numeric", totalCalories: "numeric",
     distance: "numeric", distanceUnit: "text", averageHeartRate: "numeric", sourceRevision: "numeric",
+    isIndoorWorkout: "boolean",
   }),
   quantitySample: Object.freeze({
     sampleType: "text", value: "numeric", unit: "text", workoutExternalId: "text",
@@ -139,6 +143,7 @@ export function computeHealthKitIngestMaximumRequestBytes() {
     if (kind === "timestamp") return units(HEALTHKIT_MAX_TIMESTAMP_LENGTH);
     if (kind === "numeric") return units(HEALTHKIT_MAX_NUMERIC_TEXT_LENGTH);
     if (kind === "metrics") return metrics();
+    if (kind === "boolean") return false; // "false" (5 bytes) is the longer of the two literals.
     if (typeof kind?.exact === "string") return kind.exact;
     throw new Error(`Unknown HealthKit wire field kind: ${JSON.stringify(kind)}`);
   };
