@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-25T16:20:00Z",
+  "generated_at_utc": "2026-09-25T17:20:00Z",
   "task": {
-    "id": "claude-healthkit-cardio-historical-reconciliation-serial-20260925",
-    "title": "HealthKit Cardio historical reconciliation (Gates 7/8/9) — four deferred walks reconciled serially and verified",
+    "id": "claude-healthkit-training-day-cardio-presentation-diagnostic-20260925",
+    "title": "Training Day is missing the reconciled Cardio walks — root cause proven, Server fix built and reviewed (not deployed)",
     "agent": "claude",
     "status": "awaiting_founder_direction"
   },
@@ -34,50 +34,55 @@
     "deferred_cardio_backlog_state": "all four legacy walks reconciled (canonical Cardio walking, generic type); no deferred workout observations remain",
     "canonical_workouts_total": 9,
     "canonical_cardio_workouts": 6,
-    "canonical_strength_workouts": 3
+    "canonical_strength_workouts": 3,
+    "training_day_cardio_fix_server_candidate_sha": "a399916ac9b1c9128067f0f77fb7fd05666aa92a",
+    "training_day_cardio_fix_branch": "claude/training-day-healthkit-cardio-20260925",
+    "training_day_cardio_fix_base": "e88b8ef78fa236ce09660997f4084bde069018a7",
+    "training_day_cardio_fix_deployed": false,
+    "native_change_required": false
   },
   "result": {
-    "summary": "All four legacy deferred Sep23/24 walks were reconciled STRICTLY SERIALLY (per entry: fresh authority+state read, fresh dry run bound to that entry, apply from that dry run's facts, immediate read-only verification, idempotency replay) under Server e88b8ef7 and workout policy v4 [cardio,strength]. Each dry run returned dry_run predicting exactly four mutations (canonical workout create + coexistence, observation reconciliation update, one audit row); each apply returned applied; each verification and the final invariant audit passed. Four canonical Cardio 'walking' workouts (generic — none stored isIndoorWorkout; Indoor/Outdoor NOT inferred) now exist with telemetry equal to the stored observations. Whole-day canonical Activity totals are byte-identical (Sep23 782.698 kcal, Sep24 914.709 kcal, rev unchanged); workout attribution changed only by each walk's retained active energy (Sep23 workout 320.5->506.3, non-workout 462.2->276.4; Sep24 workout none->345.7, non-workout 568.99) with no double counting. No Logger session/link/claim for Cardio; Strength workouts, links (2) and claims (4) unchanged; 32 of 35 strategic digests identical (the 3 that changed are the reconciliation-owned HealthKit training collections); policy record unchanged; migrations unchanged; production healthy; no error logs. Indoor-vs-Outdoor fidelity remains untested by the historical four and awaits the first new prospective Cardio workout with isIndoorWorkout metadata.",
+    "summary": "CORRECTION: the prior report's acceptance covered Server reconciliation and Activity accounting only; the Founder's Training Day presentation acceptance FAILED because the four reconciled Cardio walks are missing from Sep23/Sep24 Training Day (Sep21 control shows two Outdoor Walk rows + Strength; Activity Day is accounting-only and needs no rows). Root cause PROVEN by running the deployed Training Day store query + createTrainingDayReadModel over production data read-only: Training Day is built only from canonical training EVIDENCE objects; the Sep20-22 walks are screenshot-derived evidence objects, while the reconciled Sep23/24 walks are canonical HealthKit workouts in a separate collection that Training Day never read. Canonical data is valid (identical structure to the Sep22 canary; Sep22's two HealthKit walks are recorded as duplicates of the screenshot walks, so naive addition would double-show). A minimal Server-only fix adapts canonical Cardio workouts into the existing row shape (presentation only: no Logger/link/claim/strategic change, generic Walking stays generic, Indoor/Outdoor only from stored canonicalType, active-evidence dedup with live coexistence reassessment, Activity-parity gate, established captured_at ordering form). On real production data the candidate turns Sep23/Sep24 into Walking, Walking, Strength while Sep20/21/22/25 stay byte-identical. 24 new tests, 10 mutations RED, Part F 71/71, broad failures identical to production, webpack build passes, two fresh-context reviews PASS-WITH-NOTES. Candidate a399916a; Native needs no change (no Build 61); NOT deployed.",
     "success": true,
-    "production_mutated": true,
+    "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
-      "status": "not_applicable",
-      "summary": "No code changed; reviewed reconciliation runner and read-only audit payloads were used."
+      "status": "passed",
+      "summary": "24 new Training Day Cardio tests, Part F 71/71, broad Server failures identical to clean production (none new), production webpack build on the exact SHA."
     },
     "review": {
-      "status": "not_required",
-      "summary": "Operational gates using previously reviewed tooling with hard per-stage assertions; each entry independently verified by a separate read-only production read."
+      "status": "approved_with_notes",
+      "summary": "Two fresh-context adversarial reviews (79b2e9d2 then exact final a399916a): PASS-WITH-NOTES, no blocking; review-1 findings (superseded evidence vanish, late-screenshot double-show, cycle classification, silent catch, looser gate) fixed and confirmed closed."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Reads were BEGIN REPEATABLE READ READ ONLY. The only writes were the four guarded reconciliations (each: one canonical workout + coexistence patch, one observation reconciliation update, one audit row)."
+      "summary": "All production access was BEGIN REPEATABLE READ READ ONLY and rolled back; nothing was mutated or deployed."
     }
   },
   "decisions_required": [
-    "Founder real-device acceptance of Build 60 Activity Detail: Sep23 and Sep24 each show two historical Cardio workout rows (generic Walking/Cardio expected), whole-day totals unchanged, Strength detail healthy.",
-    "Observe the first new post-activation Apple Watch Cardio workout to validate prospective Indoor/Outdoor type fidelity (no action needed from Claude until it exists)."
+    "Authorize the Server-only deploy of candidate a399916a (fast-forward the production branch, then the two-step apps update --spec + create-deployment --force-rebuild); no Native build is needed.",
+    "Optional follow-up scope: unify Training landing/history/reporting/library counts with reconciled Cardio (they still read only evidence collections)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Sep 24's Strength workout is still only an unconfirmed candidate, so by existing semantics its 206 kcal is not counted as workout energy; the Sep 24 workout attribution (345.7 kcal) is the two Cardio walks only.",
-    "The auto-mode classifier required a plain-words Founder chat confirmation before the four serial production writes."
+    "Training Day ordering is by the string captured_at (Logger Strength sessions store a T12:00:00Z placeholder), not workout start time; reconciled Cardio rows use workout-local time with offset to match the established Sep 21 order.",
+    "Sep22's two canonical HealthKit walks duplicate the screenshot walks (coexistence matches_existing_evidence_workout), so presenting canonical Cardio requires duplicate suppression.",
+    "Other Training surfaces (landing, reporting, library, rollups) still omit reconciled Cardio."
   ],
   "backlog": [
-    "Founder device acceptance of the reconciled historical Cardio rows.",
-    "Prospective Indoor/Outdoor type-fidelity acceptance on the first new Apple Watch Cardio workout.",
-    "Strategic-evidence eligibility for Cardio remains a later, separate project."
+    "Founder deployment authorization for Server candidate a399916a, then re-verify Sep23/Sep24 Training Day on device.",
+    "Prospective Indoor/Outdoor type-fidelity acceptance on the first new post-activation Cardio workout.",
+    "Optional: unify Training landing/reporting/library with reconciled Cardio."
   ],
-  "recommended_next_step": "Founder acceptance of Activity Detail on device; then wait for the first new Cardio workout to validate specific Indoor/Outdoor type. No further Cardio graduation gates remain except those acceptances.",
-  "full_report_path": "agent-handoffs/reports/20260925T161800Z-healthkit-cardio-historical-reconciliation-serial.md",
+  "recommended_next_step": "Founder authorizes the Server-only deploy of a399916a; then verify Sep23/Sep24 Training Day (two Walking rows + Strength each) and Sep21 unchanged on device.",
+  "full_report_path": "agent-handoffs/reports/20260925T171500Z-healthkit-training-day-cardio-presentation-diagnostic-and-fix.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260925T155500Z-healthkit-cardio-gates-5-6-activate-verify.md",
-    "agent-handoffs/reports/20260925T155000Z-healthkit-cardio-gates-3-4-refresh-and-policy-dryrun.md",
-    "agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md"
+    "agent-handoffs/reports/20260925T161800Z-healthkit-cardio-historical-reconciliation-serial.md",
+    "agent-handoffs/reports/20260925T155500Z-healthkit-cardio-gates-5-6-activate-verify.md"
   ],
   "safety": {
     "contains_secrets": false,
