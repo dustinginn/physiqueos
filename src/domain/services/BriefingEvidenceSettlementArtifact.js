@@ -66,8 +66,20 @@ export function attachEvidenceSettlement(artifact, settlement = null) {
   }
   // A watermark describing a different window than the artifact being built
   // would be a false statement about that artifact: fail loudly instead.
-  if (artifact?.evidenceWindow?.id &&
-      watermark.evidenceWindow?.id !== artifact.evidenceWindow.id) {
+  // The window id embeds the timezone. The cadence registry and the generators
+  // resolve that timezone through different fallback chains, so two ids may
+  // differ ONLY by timezone while naming the exact same evidence days; that
+  // must not block first publication forever (the watermark records its own
+  // timeZone/timeZoneAuthority honestly). Any difference in the covered days,
+  // or an id mismatch with no comparable dates, still fails loudly.
+  const artifactWindow = artifact?.evidenceWindow;
+  const sameEvidenceDays = Boolean(
+    artifactWindow?.startDate && artifactWindow?.endDate &&
+    watermark.evidenceWindow?.startDate === artifactWindow.startDate &&
+    watermark.evidenceWindow?.endDate === artifactWindow.endDate
+  );
+  if (artifactWindow?.id &&
+      watermark.evidenceWindow?.id !== artifactWindow.id && !sameEvidenceDays) {
     throw settlementError("evidence_settlement_window_mismatch",
       "The evidence-settlement watermark does not describe this artifact's window.");
   }

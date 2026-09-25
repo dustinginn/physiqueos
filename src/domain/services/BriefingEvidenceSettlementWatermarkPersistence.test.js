@@ -334,8 +334,20 @@ describe("attachEvidenceSettlement guards", () => {
     expect(attachEvidenceSettlement(stamped, settlementFor())).toBe(stamped);
   });
 
+  it("accepts an id that differs only by timezone when the covered evidence days are identical (N1)", () => {
+    const tzOnly = { ...window, id: window.id.replace("America/Los_Angeles", "America/New_York") };
+    expect(tzOnly.id).not.toBe(window.id);
+    const stamped = attachEvidenceSettlement({ id: "a", evidenceWindow: tzOnly }, settlementFor());
+    expect(stamped.evidenceSettlement.evidenceWindow.id).toBe(window.id);
+    expect(stamped.evidenceSettlement.timeZone).toBe(TZ);
+    // Different covered days still refuse, even with a matching-looking id shape.
+    const shifted = { ...tzOnly, startDate: "2026-09-06", endDate: "2026-09-08" };
+    expect(() => attachEvidenceSettlement({ id: "a", evidenceWindow: shifted }, settlementFor()))
+      .toThrow(expect.objectContaining({ code: "evidence_settlement_window_mismatch" }));
+  });
+
   it("refuses a watermark that describes a different window, or one that fails integrity", () => {
-    const other = { ...window, id: "midweek:2026-09-06:2026-09-08:America/Los_Angeles" };
+    const other = { ...window, id: "midweek:2026-09-06:2026-09-08:America/Los_Angeles", startDate: "2026-09-06", endDate: "2026-09-08" };
     expect(() => attachEvidenceSettlement({ id: "a", evidenceWindow: other }, settlementFor()))
       .toThrow(expect.objectContaining({ code: "evidence_settlement_window_mismatch" }));
     const tampered = { watermark: { ...settlementFor().watermark, deadlineFallback: true } };
