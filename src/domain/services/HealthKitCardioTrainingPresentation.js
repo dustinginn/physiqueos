@@ -3,6 +3,7 @@ import {
   HealthKitWorkoutFamily,
 } from "./HealthKitWorkoutService.js";
 import { isActiveCanonicalTrainingSession } from "./CanonicalReadModel.js";
+import { getLocalDateKey, resolveLocalTimeZone } from "../utils/localDate.js";
 import { isPresentableCanonicalCardioWorkout } from "./HealthKitWorkoutPresentationService.js";
 import {
   HealthKitCardioCoexistenceState,
@@ -109,7 +110,11 @@ export function projectHealthKitCardioWorkoutAsTrainingRecord(workout) {
       captured_at: localCaptureTimestamp(current.startedAt, current.timeZone) ?? current.startedAt ?? workout.createdAt ?? localDate,
       exercises: [],
       metadata,
-      source: { application: "apple_health", integration: "healthkit", modality: "workout", source_artifact_refs: ["Apple Health"] },
+      // `workout_id` is the record's authoritative duplicate identity. Without it the
+      // only identity would be the shared "Apple Health" artifact ref, so every
+      // projected workout would collapse into ONE record wherever the aggregate
+      // Training reports dedupe by workout identity (landing/reporting/library).
+      source: { application: "apple_health", integration: "healthkit", modality: "workout", workout_id: workout.id, source_artifact_refs: ["Apple Health"] },
       provenance: {
         source_artifact_refs: ["Apple Health"],
         healthkit_canonical_workout_id: workout.id,
@@ -170,6 +175,50 @@ export function projectHealthKitCardioTrainingRecords({ canonicalWorkouts = [], 
     records.push(record);
   }
   return records;
+}
+
+/**
+ * The presented-workout universe for the AGGREGATE Training surfaces (landing /
+ * Recent Training History, reporting, Cardio library history): every canonical
+ * HealthKit Cardio workout that Training Day would present for its own local
+ * date, across all dates, with exactly Training Day's per-day duplicate
+ * suppression. Each workout is judged only against the active evidence that
+ * Training Day would place on that same day (evidence local date resolved in the
+ * same time zone Training Day uses), so an aggregate day and its Training Day
+ * always agree on which workouts exist. Output order is deterministic
+ * (local date, then capture stamp, then id) regardless of input order.
+ */
+export function projectPresentedHealthKitCardioTrainingRecords({ canonicalWorkouts = [], existingEvidenceObjects = [], timeZone = null } = {}) {
+  const zone = resolveLocalTimeZone(timeZone);
+  const evidenceByDate = new Map();
+  for (const record of existingEvidenceObjects) {
+    const payload = record?.payload ?? record ?? {};
+    if (payload.evidence_type !== "training") continue;
+    const dateKey = getLocalDateKey(payload.observed_at ?? record?.lastObservedAt, zone);
+    if (!dateKey) continue;
+    if (!evidenceByDate.has(dateKey)) evidenceByDate.set(dateKey, []);
+    evidenceByDate.get(dateKey).push(record);
+  }
+  const workoutsByDate = new Map();
+  for (const workout of canonicalWorkouts) {
+    const localDate = workout?.localDate ?? workout?.current?.localDate ?? null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(localDate ?? ""))) continue;
+    if (!workoutsByDate.has(localDate)) workoutsByDate.set(localDate, []);
+    workoutsByDate.get(localDate).push(workout);
+  }
+  const records = [];
+  for (const date of [...workoutsByDate.keys()].sort()) {
+    const ordered = workoutsByDate.get(date).slice().sort((left, right) => String(left?.id).localeCompare(String(right?.id)));
+    records.push(...projectHealthKitCardioTrainingRecords({
+      canonicalWorkouts: ordered,
+      date,
+      existingEvidenceObjects: evidenceByDate.get(date) ?? [],
+    }));
+  }
+  return records.sort((left, right) =>
+    left.payload.observed_at.localeCompare(right.payload.observed_at) ||
+    String(left.payload.captured_at).localeCompare(String(right.payload.captured_at)) ||
+    left.id.localeCompare(right.id));
 }
 
 // "2026-09-23T13:29:52.000Z" + "America/Los_Angeles" -> "2026-09-23T06:29:52-07:00".

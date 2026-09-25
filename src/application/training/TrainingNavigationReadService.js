@@ -23,6 +23,7 @@ import {
   isHealthKitCanonicalWorkoutIdentity,
   projectHealthKitCardioTrainingRecords,
   projectHealthKitCardioWorkoutAsTrainingRecord,
+  projectPresentedHealthKitCardioTrainingRecords,
 } from "../../domain/services/HealthKitCardioTrainingPresentation.js";
 
 export function createTrainingNavigationReadService({
@@ -60,16 +61,18 @@ export function createTrainingNavigationReadService({
     getReporting({ context, currentDate = new Date() } = {}) {
       return store.run("training.reporting", async () => {
         await ensureCanonicalExerciseRegistry();
-        const [user, goals, canonicalEvidenceObjects] = await Promise.all([
+        const [user, goals, evidenceObjects, healthKitCardioWorkouts] = await Promise.all([
           store.getUser(),
           store.listGoals(),
           store.listCanonicalTrainingAndActivityEvidenceObjects(),
+          listPresentableHealthKitCardioWorkouts(store, logger, "training.reporting.healthkit_cardio_unavailable"),
         ]);
         const timeline = createTrainingEvidenceContext({ context, currentDate, goals, user });
-        const hasCanonicalTraining = canonicalEvidenceObjects.some((record) =>
+        const hasCanonicalTraining = evidenceObjects.some((record) =>
           (record.payload ?? record).evidence_type === "training"
         );
         const evidencePackages = hasCanonicalTraining ? [] : await store.listEvidencePackages();
+        const canonicalEvidenceObjects = withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user);
         const { globalReport, scopedReport } = createTrainingReportingReports({
           canonicalEvidenceObjects,
           dateWindow: timeline.goalScoped
@@ -98,10 +101,14 @@ export function createTrainingNavigationReadService({
     getLanding({ context, currentDate = new Date() } = {}) {
       return store.run("training.landing", async () => {
         await ensureCanonicalExerciseRegistry();
-        const [user, goals, canonicalEvidenceObjects] = await Promise.all([
+        // Recent Training History presents the same workout universe as Training
+        // Day: Logger/screenshot sessions plus canonical HealthKit Cardio workouts,
+        // with Training Day's duplicate suppression.
+        const [user, goals, evidenceObjects, healthKitCardioWorkouts] = await Promise.all([
           store.getUser(),
           store.listGoals(),
           store.listCanonicalTrainingAndActivityEvidenceObjects(),
+          listPresentableHealthKitCardioWorkouts(store, logger, "training.landing.healthkit_cardio_unavailable"),
         ]);
         const timeline = createTrainingEvidenceContext({
           context,
@@ -109,12 +116,13 @@ export function createTrainingNavigationReadService({
           goals,
           user,
         });
-        const hasCanonicalTraining = canonicalEvidenceObjects.some((record) =>
+        const hasCanonicalTraining = evidenceObjects.some((record) =>
           (record.payload ?? record).evidence_type === "training"
         );
         const evidencePackages = hasCanonicalTraining
           ? []
           : await store.listEvidencePackages();
+        const canonicalEvidenceObjects = withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user);
         const { globalReport, scopedReport } = createTrainingLandingReports({
           canonicalEvidenceObjects,
           dateWindow: timeline.goalScoped
@@ -158,23 +166,32 @@ export function createTrainingNavigationReadService({
         });
       });
     },
-    getLibrary({ context, currentDate = new Date(), path = [], registryHydrated = false } = {}) {
+    // `includePresentedCardio` adds canonical HealthKit Cardio to the Cardio
+    // breakdown / Cardio activity history (workout-history semantics). Exercise
+    // lists, exercise records and PRs are unaffected either way: a Cardio workout
+    // has no exercises. A caller that only consumes the exercise registry (the
+    // Native Library projection) passes false and skips the read entirely.
+    getLibrary({ context, currentDate = new Date(), path = [], registryHydrated = false, includePresentedCardio = true } = {}) {
       return store.run("training.navigation.library", async () => {
         const canonicalExercises = registryHydrated
           ? readCurrentCanonicalTrainingExerciseRegistry()
           : await ensureCanonicalExerciseRegistry();
-        const [user, goals, canonicalEvidenceObjects] = await Promise.all([
+        const [user, goals, evidenceObjects, healthKitCardioWorkouts] = await Promise.all([
           store.getUser(),
           store.listGoals(),
           store.listCanonicalTrainingEvidenceObjects(),
+          includePresentedCardio
+            ? listPresentableHealthKitCardioWorkouts(store, logger, "training.library.healthkit_cardio_unavailable")
+            : [],
         ]);
+        const canonicalEvidenceObjects = withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user);
         const timeline = createTrainingEvidenceContext({
           context,
           currentDate,
           goals,
           user,
         });
-        const hasCanonicalTraining = canonicalEvidenceObjects.some((record) =>
+        const hasCanonicalTraining = evidenceObjects.some((record) =>
           (record.payload ?? record).evidence_type === "training"
         );
         const evidencePackages = hasCanonicalTraining
@@ -296,6 +313,33 @@ async function loadHealthKitCardioTrainingRecords(store, date, evidenceObjects, 
     warnHealthKitCardioFailure(logger, "training.day.healthkit_cardio_unavailable", error);
     return [];
   }
+}
+
+// Canonical HealthKit Cardio workouts for the aggregate Training surfaces. Same
+// failure isolation as Training Day: a HealthKit read failure degrades to the
+// evidence-only history (observable), never to a broken Training read.
+async function listPresentableHealthKitCardioWorkouts(store, logger, event) {
+  try {
+    if (typeof store.listHealthKitCanonicalCardioWorkouts === "function") return await store.listHealthKitCanonicalCardioWorkouts();
+    if (typeof store.listHealthKitCanonicalWorkouts === "function") return await store.listHealthKitCanonicalWorkouts();
+    return [];
+  } catch (error) {
+    warnHealthKitCardioFailure(logger, event, error);
+    return [];
+  }
+}
+
+function withPresentedHealthKitCardio(evidenceObjects, healthKitCardioWorkouts, user) {
+  if (!healthKitCardioWorkouts?.length) return evidenceObjects;
+  return [
+    ...evidenceObjects,
+    ...projectPresentedHealthKitCardioTrainingRecords({
+      canonicalWorkouts: healthKitCardioWorkouts,
+      existingEvidenceObjects: evidenceObjects,
+      // Training Day's own zone resolution for evidence local dates.
+      timeZone: user?.timezone ?? user?.timeZone ?? null,
+    }),
+  ];
 }
 
 async function loadHealthKitCardioSession(store, sessionId, logger = null) {

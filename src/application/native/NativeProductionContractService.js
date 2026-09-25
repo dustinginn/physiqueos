@@ -124,7 +124,9 @@ export function createNativeProductionContractService({
           const libraryScope = input.libraryScope ?? "my-library";
           if (!["my-library", "all"].includes(libraryScope)) throw validation("libraryScope", "Choose My Library or All Exercises.");
           const [library, myLibraryExerciseIds] = await Promise.all([
-            readers.training.getLibrary({ context, currentDate, path: pathParts(input.path) }),
+            // The Native Library projection keeps only the exercise registry, so it
+            // skips the Cardio workout-history read.
+            readers.training.getLibrary({ context, currentDate, path: pathParts(input.path), includePresentedCardio: false }),
             readers.core.getTrainingMyLibrary(),
           ]);
           if (!library || !Array.isArray(myLibraryExerciseIds)) throw unavailableResource();
