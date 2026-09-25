@@ -146,7 +146,7 @@ struct MidweekBriefingSections: View {
 
     /// The established purple Coach's Take finale, filled from the
     /// Server's coaching items rather than legacy priority semantics:
-    /// coachTake -> Biggest Takeaway, action -> My Recommendation,
+    /// coachTake -> Biggest Takeaway, action -> What To Do,
     /// watch -> What To Watch (replacing the legacy Through-Sunday list,
     /// which V3 does not publish).
     private func contractFinale(_ contract: MidweekPresentationContract) -> some View {

@@ -323,6 +323,18 @@ final class BriefingV3PresentationTests: XCTestCase {
         XCTAssertEqual(finale.renderedSectionTitles, ["Biggest Takeaway", "What To Do", "Into Next Week"])
     }
 
+    /// The Weekly mapper falls back to `""`/`[]` when the Server payload
+    /// omits `coachInsight` (not exercised by the fixture above, which is
+    /// always well-formed) — not a scenario this fix can prevent (Weekly's
+    /// content is Server-owned, not gated by this component), but it must
+    /// degrade gracefully rather than newly crash or invent content: no
+    /// slot renders, only the "COACH'S TAKE" label. Pre-existing behavior,
+    /// explicitly proven here rather than left an unverified assumption.
+    func testCoachFinaleDegradesGracefullyWithNoContentAtAll() {
+        let finale = BriefingCoachFinale(takeaway: "", recommendation: "")
+        XCTAssertEqual(finale.renderedSectionTitles, [])
+    }
+
     /// `coveredIds` (uncertainty already owned by Watch/a module caveat)
     /// decodes as a plain passthrough and stays entirely separate from
     /// `visibleItems` (what Still Unresolved renders).
