@@ -4,6 +4,7 @@ import {
 } from "./PIObservationService";
 import { reconcileEnergyDays } from "./EnergyDailyReconciliationService";
 import { createEnergyPresentation } from "./EnergyEvidenceService";
+import { selectEnergyVariabilityBaselineSeries } from "../intelligence/v3/EnergyVariabilityBaselineV3.js";
 
 export const ENERGY_PI_PRODUCER_VERSION = "energy_pi_v1";
 export const DAILY_ENERGY_PI_SEMANTIC_HORIZON = "daily";
@@ -42,6 +43,12 @@ export function createEnergyPIObservations({
   ],
   semanticHorizon = "rolling_7_days",
   includeInsufficientData = false,
+  // Optional bounded HISTORICAL baseline for per-day variability. Independent
+  // of the cadence window length: `baselineDays` are reconciled rows from the
+  // preceding lookback (see EnergyVariabilityBaselineV3.js) and are never part
+  // of `days`, so the window/comparison averages are unaffected by them.
+  baselineDays = null,
+  baselineWindow = null,
 } = {}) {
   const reconciled = resolveDays({ days, reconciliationInput });
   const current = selectDays(reconciled, observationWindow);
@@ -50,6 +57,14 @@ export function createEnergyPIObservations({
     : [];
   const kinds = normalizeKinds(requestedKinds);
   const observations = [];
+  const baseline = baselineDays && baselineWindow
+    ? {
+      window: baselineWindow,
+      series: selectEnergyVariabilityBaselineSeries({
+        days: baselineDays, observationWindow, baselineWindow,
+      }),
+    }
+    : null;
 
   METRICS.filter((metric) => kinds.includes(metric.kind)).forEach((metric) => {
     const observation = createMetricObservation({
@@ -60,6 +75,7 @@ export function createEnergyPIObservations({
       metric,
       observationWindow,
       semanticHorizon,
+      baseline,
     });
     if (observation) observations.push(observation);
   });
@@ -344,6 +360,7 @@ function createMetricObservation({
   metric,
   observationWindow,
   semanticHorizon,
+  baseline = null,
 }) {
   const currentRows = current.filter((day) => day[metric.field] != null);
   const comparisonRows = comparison.filter((day) => day[metric.field] != null);
@@ -424,6 +441,16 @@ function createMetricObservation({
         ? {
           dailySeries: dailySeriesOf(currentRows, metric.field),
           comparisonDailySeries: dailySeriesOf(comparisonRows, metric.field),
+          // Bounded preceding history (strictly before the current window,
+          // complete-source days only) so the 14-day minimum is reachable
+          // independent of cadence window length.
+          ...(baseline ? {
+            baselineDailySeries: baseline.series,
+            baselineWindow: {
+              startDate: baseline.window.startDate,
+              endDate: baseline.window.endDate,
+            },
+          } : {}),
         } : {}),
       limitations,
     },
@@ -432,7 +459,15 @@ function createMetricObservation({
 }
 
 function dailySeriesOf(rows, field) {
-  return rows.map((day) => ({ date: day.date, value: day[field] }));
+  return rows.map((day) => ({
+    date: day.date,
+    value: day[field],
+    // Source completeness travels with the value so variability can exclude
+    // days whose source is not confirmed complete (N7). Absent for legacy
+    // rows that carry none.
+    ...(day.nutritionCompleteness !== undefined
+      ? { nutritionCompleteness: day.nutritionCompleteness } : {}),
+  }));
 }
 
 function createCoverageObservation({

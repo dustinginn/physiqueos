@@ -3,7 +3,7 @@ import { attachEvidenceSettlement } from "./BriefingEvidenceSettlementArtifact.j
 import { createWeeklyEvidenceWindow, selectScheduledBriefingCadence } from "./BriefingEvidenceWindowService";
 import { createCoachingUpdatesReadService } from "./CoachingUpdatesReadService";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
-import { CADENCE_RMR_STRATEGIES, createCadenceEnergyAssessment } from "./CadenceEnergyAssessmentService";
+import { CADENCE_RMR_STRATEGIES, createCadenceEnergyAssessment, createEnergyVariabilityBaselineDays } from "./CadenceEnergyAssessmentService";
 import { loadLatestCadenceBriefingContinuity } from "./CadenceBriefingContinuityService";
 import { mergePIBriefingMemory } from "./PIBriefingMemoryService";
 import { createWeeklyBriefingPIResult } from "./WeeklyBriefingPIService";
@@ -476,7 +476,9 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
     const currentEnergyAssessment=createCadenceEnergyAssessment({...energyInput,window,comparisonWindow});
     const comparisonEnergyAssessment=createCadenceEnergyAssessment({...energyInput,window:comparisonWindow});
     weeklyEnergy={current:currentEnergyAssessment,comparison:comparisonEnergyAssessment};
-    authoritative=createWeeklyBriefingPIResult({evidenceWindow:window,comparisonWindow,evaluationDate:window.endDate,timeZone,weights,trainingReport:trainingPerformance,canonicalTrainingEvidence:canonicalObjects.filter((item)=>(item?.payload??item)?.evidence_type==="training"),recoveryEvidenceRecords:canonicalObjects.map((item)=>item?.payload??item).filter((item)=>item?.schemaVersion==="recovery_evidence_v1"),currentEnergyAssessment,comparisonEnergyAssessment,activeGoal:goal,activePhase,continuity,dexaScans,photoSessions:createPhotoSessionReadModels({canonicalObjects,legacyPhotos:progressPhotos,weights,analyses})});
+    // Bounded preceding Energy history for EnergyVariabilityV3 (from the canonical evidence already read; no extra read; null on failure => conservative).
+    const energyVariabilityBaseline=createEnergyVariabilityBaselineDays({...energyInput,window});
+    authoritative=createWeeklyBriefingPIResult({evidenceWindow:window,comparisonWindow,evaluationDate:window.endDate,timeZone,weights,trainingReport:trainingPerformance,canonicalTrainingEvidence:canonicalObjects.filter((item)=>(item?.payload??item)?.evidence_type==="training"),recoveryEvidenceRecords:canonicalObjects.map((item)=>item?.payload??item).filter((item)=>item?.schemaVersion==="recovery_evidence_v1"),currentEnergyAssessment,comparisonEnergyAssessment,energyVariabilityBaseline,activeGoal:goal,activePhase,continuity,dexaScans,photoSessions:createPhotoSessionReadModels({canonicalObjects,legacyPhotos:progressPhotos,weights,analyses})});
   } catch {
     authoritative=null;
     weeklyEnergy=null;

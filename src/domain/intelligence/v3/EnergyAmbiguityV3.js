@@ -1,6 +1,7 @@
 import { semanticFingerprint, uniqueStrings } from "./V3Runtime.js";
 import { assessEnergyVariabilityV3 } from "./EnergyVariabilityV3.js";
 import { PLAN_TOLERANCE_RATIO } from "../CadenceEnergyObservationsV3.js";
+import { isComparableNutritionDay } from "./EnergyVariabilityBaselineV3.js";
 
 // Energy execution and ambiguity as first-class V3 interpretation.
 //
@@ -165,21 +166,52 @@ function deriveIntakeVariabilityV3({ intakeObservation, intakeTarget, effectiveA
   if (!intakeObservation || !Number.isFinite(intakeTarget?.value) || intakeTarget.value === 0) return null;
   const metadata = intakeObservation.capabilities
     .find((measurement) => measurement.capabilityId === "execution.energy_intake")?.metadata ?? {};
+  const periodSeries = metadata.dailySeries ?? [];
+  const periodDays = dailyDeviationDays(periodSeries, intakeTarget, effectiveAt);
   return assessEnergyVariabilityV3({
-    periodDailyDeviations: dailyDeviationDays(metadata.dailySeries, intakeTarget, effectiveAt),
-    historicalDailyDeviations: dailyDeviationDays(metadata.comparisonDailySeries, intakeTarget, effectiveAt),
+    periodDailyDeviations: periodDays,
+    historicalDailyDeviations: historicalDeviationDays({ metadata, periodSeries, intakeTarget, effectiveAt }),
   });
+}
+
+// Historical baseline = the equal-length comparison window plus, when the
+// cadence supplied one, the bounded preceding lookback (see
+// EnergyVariabilityBaselineV3.js). Guarantees, independent of what upstream
+// supplied:
+//   - no historical day falls on/after the first day of the current period
+//     (current-window values are never part of their own baseline, and a day
+//     is never counted twice);
+//   - the extended lookback is used only when the regime start
+//     (effectiveAt) is known. Without it the lookback cannot be proven to sit
+//     inside one protocol regime, so only the short comparison window is used
+//     and the signal stays conservative rather than mixing regimes.
+function historicalDeviationDays({ metadata, periodSeries, intakeTarget, effectiveAt }) {
+  const periodDates = (periodSeries ?? []).map((day) => day.date).filter(Boolean).sort();
+  const periodStart = periodDates[0] ?? null;
+  const merged = new Map();
+  for (const day of metadata.comparisonDailySeries ?? []) merged.set(day.date, day);
+  if (effectiveAt) {
+    for (const day of metadata.baselineDailySeries ?? []) merged.set(day.date, day);
+  }
+  const preceding = [...merged.values()]
+    .filter((day) => !periodStart || day.date < periodStart)
+    .sort((left, right) => String(left.date).localeCompare(String(right.date)));
+  return dailyDeviationDays(preceding, intakeTarget, effectiveAt);
 }
 
 // A day before the current protocol revision took effect was measured
 // against a different target; including it would compare today's discipline
 // to a target that no longer applies. Excluded from both the current period
 // and the historical baseline alike, not just the baseline, since either can
-// in principle span a boundary.
+// in principle span a boundary. A day whose nutrition source is not confirmed
+// complete (N7) is excluded from both as well: partial logging must never
+// masquerade as a below-plan day. That is a comparability rule, not a
+// completeness judgment — distance from target never excludes a day.
 function dailyDeviationDays(series, target, effectiveAt) {
   const cutoff = effectiveAt ? String(effectiveAt).slice(0, 10) : null;
   return (series ?? [])
     .filter((day) => !cutoff || day.date >= cutoff)
+    .filter((day) => isComparableNutritionDay(day))
     .map((day) => ({
       date: day.date,
       hasPairedEvidence: Number.isFinite(day.value),

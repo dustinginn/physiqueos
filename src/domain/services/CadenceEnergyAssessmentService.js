@@ -15,6 +15,8 @@ import {
   resolvePairedEnergyDayCompleteness,
 } from "./EnergyEvidenceCompletenessService";
 
+import { resolveEnergyVariabilityBaselineWindow } from "../intelligence/v3/EnergyVariabilityBaselineV3.js";
+
 export const CADENCE_ENERGY_ASSESSMENT_SCHEMA_VERSION =
   "cadence_energy_assessment_v1";
 export const CADENCE_ENERGY_ASSESSMENT_SERVICE_VERSION =
@@ -118,6 +120,23 @@ export function createCadenceEnergyAssessment({
     throw new Error("Cadence Energy assessment input mutation detected.");
   }
   return deepFreeze(result);
+}
+
+// Bounded HISTORICAL baseline rows for EnergyVariabilityV3 (Blocker 2). Reuses
+// the same in-memory canonical evidence the cadence already read for its
+// current/comparison windows (no additional repository read) and derives the
+// per-day rows only for the preceding lookback window, so the variability
+// baseline length no longer depends on the cadence window length. Optional
+// and non-fatal by design: any failure returns null (the variability signal
+// then stays conservative/no-nudge) and can never block briefing generation.
+export function createEnergyVariabilityBaselineDays({ window, ...energyInput } = {}) {
+  try {
+    const baselineWindow = resolveEnergyVariabilityBaselineWindow(window);
+    const assessment = createCadenceEnergyAssessment({ ...energyInput, window: baselineWindow });
+    return { window: baselineWindow, days: assessment.dailyRecords };
+  } catch {
+    return null;
+  }
 }
 
 export function createCadenceEnergyComparison(currentAssessment, comparisonAssessment) {

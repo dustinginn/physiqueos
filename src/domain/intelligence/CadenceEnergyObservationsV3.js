@@ -155,6 +155,12 @@ export function adaptEnergyObservationsV3({
           // average-based fields above is affected by its presence.
           dailySeries: intake.explanationData?.dailySeries ?? [],
           comparisonDailySeries: intake.explanationData?.comparisonDailySeries ?? [],
+          // Bounded preceding history for EnergyVariabilityV3 (additive; only
+          // present when the cadence supplied a baseline lookback).
+          ...(intake.explanationData?.baselineDailySeries ? {
+            baselineDailySeries: intake.explanationData.baselineDailySeries,
+            baselineWindow: intake.explanationData.baselineWindow ?? null,
+          } : {}),
         },
       }],
       limitations: [...(intake.confidence?.limitations ?? []), ...intakeAmbiguity(intakeEvidence)],

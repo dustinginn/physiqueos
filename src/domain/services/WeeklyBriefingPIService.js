@@ -60,6 +60,8 @@ export function createWeeklyBriefingPIResult(input = {}) {
       comparisonWindow: input.comparisonWindow,
       semanticHorizon: "weekly",
       includeInsufficientData: true,
+      baselineDays: input.energyVariabilityBaseline?.days ?? null,
+      baselineWindow: input.energyVariabilityBaseline?.window ?? null,
     }),
     ...bodyCompositionObservations(input),
   ], goalContext);

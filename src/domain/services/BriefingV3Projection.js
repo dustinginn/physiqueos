@@ -1,5 +1,6 @@
 import { describeUncertaintyV3 } from "../intelligence/v3/AmbiguityVocabularyV3.js";
 import { describeEnergyVariabilityNudgeV3 } from "../intelligence/v3/EnergyVariabilityV3.js";
+import { isSemanticallyEquivalent } from "../intelligence/v3/V3Runtime.js";
 
 // Shared served-V3 projection.
 //
@@ -101,5 +102,9 @@ export function buildCanonicalNarrativeV3Extensions({ strategicInterpretation, n
 export function composeEnergyStatementV3({ execution, ambiguityText = null } = {}) {
   if (!execution) return null;
   const variabilityText = describeEnergyVariabilityNudgeV3(execution.variability);
-  return [ambiguityText, variabilityText].filter(Boolean).join(" ") || null;
+  // The nudge says one thing once: if the ambiguity sentence already carries
+  // the same meaning, the nudge is not repeated.
+  const nudge = variabilityText && isSemanticallyEquivalent(ambiguityText, variabilityText)
+    ? null : variabilityText;
+  return [ambiguityText, nudge].filter(Boolean).join(" ") || null;
 }

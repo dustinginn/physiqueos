@@ -7,6 +7,7 @@ import { createPIDecisionCadenceShadow } from "./PIDecisionCadenceShadowService"
 import {
   CADENCE_RMR_STRATEGIES,
   createCadenceEnergyAssessment,
+  createEnergyVariabilityBaselineDays,
 } from "./CadenceEnergyAssessmentService";
 import { loadLatestCadenceBriefingContinuity } from "./CadenceBriefingContinuityService";
 import { mergePIBriefingMemory } from "./PIBriefingMemoryService";
@@ -138,6 +139,13 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
             ...energyInput,
             window: comparisonWindow,
           });
+          // Bounded preceding Energy history for EnergyVariabilityV3 (from the
+          // canonical evidence already read above; no extra read). Null on any
+          // failure: the variability signal then stays conservative.
+          const energyVariabilityBaseline = createEnergyVariabilityBaselineDays({
+            ...energyInput,
+            window,
+          });
           const trainingReport = createTrainingPerformanceIntelligenceReport({
             canonicalObjects: canonicalObjects.filter((item) =>
               String(item?.payload?.observed_at ?? item?.observed_at ?? "").slice(0, 10) <= window.endDate
@@ -160,6 +168,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
               .filter((item) => item?.schemaVersion === "recovery_evidence_v1"),
             currentEnergyAssessment,
             comparisonEnergyAssessment,
+            energyVariabilityBaseline,
             activeGoal: goal,
             activePhase,
             dexaScans,

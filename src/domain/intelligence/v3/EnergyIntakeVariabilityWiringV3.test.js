@@ -188,6 +188,44 @@ describe("EnergyVariabilityV3 wiring — deriveEnergyExecutionV3", () => {
   });
 });
 
+describe("EnergyVariabilityV3 wiring — bounded historical baseline series", () => {
+  const withBaseline = (baselineDailySeries, effectiveAt) => deriveEnergyExecutionV3({
+    goalContract: effectiveAt === undefined ? goalContract : { strategy: { energyStrategy: {
+      ...goalContract.strategy.energyStrategy, effectiveAt } } },
+    observations: [(() => {
+      const observation = intakeObservation({
+        dailySeries: [day("2026-09-01", 3000), day("2026-09-02", 3000), day("2026-09-03", 3000)],
+        comparisonDailySeries: quietHistory(3, 25), // equal-length comparison only: far below 14
+      });
+      observation.capabilities[0].metadata.baselineDailySeries = baselineDailySeries;
+      return observation;
+    })()],
+  });
+  const longBaseline = () => quietHistory(28, 1);
+
+  it("a sufficient baselineDailySeries lets the signal fire when the regime start is known", () => {
+    const execution = withBaseline(longBaseline(), "2026-07-01");
+    expect(execution.variability.hasSufficientHistoricalBaseline).toBe(true);
+    expect(execution.variability.nudgeWarranted).toBe(true);
+  });
+
+  it("is not trusted without a known regime start (conservative, comparison window only)", () => {
+    const execution = withBaseline(longBaseline());
+    expect(execution.variability.hasSufficientHistoricalBaseline).toBe(false);
+    expect(execution.variability.nudgeWarranted).toBe(false);
+  });
+
+  it("excludes baseline days before the protocol's effective date and any not-complete-source day", () => {
+    const partial = quietHistory(28, 1).map((item, index) => (index % 2 ? { ...item, nutritionCompleteness: "partial", value: 900 } : item));
+    const execution = withBaseline(partial, "2026-07-01");
+    // 14 complete + 14 partial: exactly the 14-day minimum is still met, and the partial (900 kcal) days never count as below plan.
+    expect(execution.variability.hasSufficientHistoricalBaseline).toBe(true);
+    expect(execution.variability.historicalOffPlanRatio).toBe(0);
+    const tooFew = withBaseline(quietHistory(28, 1).map((item, index) => (index % 2 === 0 ? { ...item, nutritionCompleteness: "unknown" } : item)).slice(0, 27), "2026-07-01");
+    expect(tooFew.variability.hasSufficientHistoricalBaseline).toBe(false);
+  });
+});
+
 describe("EnergyVariabilityV3 wiring — composeEnergyStatementV3 dedup", () => {
   it("surfaces a genuine variability nudge alongside an unrelated evidence-quality caveat without duplicating either meaning", () => {
     const execution = deriveEnergyExecutionV3({
@@ -203,6 +241,20 @@ describe("EnergyVariabilityV3 wiring — composeEnergyStatementV3 dedup", () => 
     expect(statement).toMatch(/running above plan more often than usual/);
     expect(isSemanticallyEquivalent(ambiguityText,
       "Energy has been running above plan more often than usual for you recently, enough that the period's overall balance is less predictable than it has been.")).toBe(false);
+  });
+
+  it("does not repeat the nudge when the ambiguity sentence already carries the same meaning", () => {
+    const execution = deriveEnergyExecutionV3({
+      goalContract,
+      observations: [intakeObservation({
+        dailySeries: [day("2026-09-01", 3000), day("2026-09-02", 3000), day("2026-09-03", 3000), day("2026-09-04", 2500), day("2026-09-05", 2500)],
+        comparisonDailySeries: quietHistory(),
+      })],
+    });
+    const nudge = "Energy has been running above plan more often than usual for you recently, enough that the period's overall balance is less predictable than it has been.";
+    const statement = composeEnergyStatementV3({ execution, ambiguityText: nudge });
+    expect(statement).toBe(nudge);
+    expect(statement.match(/more often than usual/gu)).toHaveLength(1);
   });
 
   it("surfaces nothing extra when no nudge is warranted, keeping the Energy card data-first", () => {

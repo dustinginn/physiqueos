@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import { createPairedCalibrationFixtures } from
   "../../../fixtures/confidenceNarrativeV3CalibrationFixtures.js";
 import { createEvidenceObservationV3 } from "./EvidenceObservationV3.js";
+import { createGoalContractV3 } from "./GoalContractV3.js";
+import { isSemanticallyEquivalent } from "./V3Runtime.js";
+import { resolveEnergyVariabilityBaselineWindow } from "./EnergyVariabilityBaselineV3.js";
+import { adaptEnergyObservationsV3 } from "../CadenceEnergyObservationsV3.js";
+import { createEnergyPIObservations } from "../../services/EnergyPIObservationService.js";
+import { buildCanonicalNarrativeV3Extensions } from "../../services/BriefingV3Projection.js";
 import { runConfidenceNarrativeV3 } from "./ConfidenceNarrativeV3Pipeline.js";
 import { deriveCadenceCoachingDetailsV3 } from
   "./SpecificCoachingObservationV3.js";
@@ -111,6 +117,33 @@ describe("Narrative V3 briefing section intelligence", () => {
     const { sections, coachTake } = recurring.narrativePlan.composition;
     expect(coachTake).not.toBe(sections.watch);
     expect(coachTake).not.toContain(sections.watch);
+  });
+
+  // Release Blocker 2: with a sufficient historical baseline the Energy
+  // variability nudge can now fire for a recurring briefing. It belongs to the
+  // Energy statement only; it must not be re-said by Hero/Result, What To Do,
+  // What To Watch, or Coach's Take, and must appear exactly once.
+  it("keeps the Energy variability nudge in the Energy statement only, never duplicated across Hero/Result/Watch/Coach's Take", () => {
+    const { recurring } = recurringWithEnergyVariability();
+    const variability = recurring.strategicInterpretation.energyExecution?.variability;
+    expect(variability).toMatchObject({ nudgeWarranted: true, dominantDirection: "upward" });
+    const { energy } = buildCanonicalNarrativeV3Extensions({
+      strategicInterpretation: recurring.strategicInterpretation,
+      narrativePlan: recurring.narrativePlan,
+    });
+    expect(energy.statement).toMatch(/running above plan more often than usual/);
+    const composition = recurring.narrativePlan.composition;
+    const otherSurfaces = [
+      composition.summary, composition.finalNarrative, composition.coachTake,
+      ...Object.values(composition.sections),
+    ].filter(Boolean);
+    for (const text of otherSurfaces) {
+      expect(text).not.toMatch(/more often than usual|less predictable|running (?:above|below) plan/iu);
+      expect(isSemanticallyEquivalent(energy.statement, text)).toBe(false);
+    }
+    expect(otherSurfaces.filter((text) => text.includes(energy.statement))).toHaveLength(0);
+    // The statement itself says the pattern once, without a repeated clause.
+    expect((energy.statement.match(/more often than usual/gu) ?? [])).toHaveLength(1);
   });
 
   it("does not repeat the recent DEXA conclusion across a recurring briefing", () => {
@@ -332,6 +365,64 @@ function recurringWithDetails({ exercises = [exercisePi()],
     evaluationContext: { ...fixtures.weekly.evaluationContext,
       evidenceCutoff: "2026-09-16T23:59:59.999Z",
       evaluatedAt: "2026-09-17T00:00:00.000Z" },
+    surface: "midweek_briefing" });
+  return { event, recurring };
+}
+
+// A recurring briefing whose Energy evidence flows through the real per-day
+// path (EnergyPIObservationService with a bounded historical baseline ->
+// CadenceEnergyObservationsV3) so EnergyVariabilityV3 has a sufficient
+// baseline and a repeated upward current pattern.
+function recurringWithEnergyVariability() {
+  const fixtures = createPairedCalibrationFixtures();
+  const event = runConfidenceNarrativeV3(fixtures.dexa);
+  const baseContract = fixtures.weekly.goalContract;
+  const energyPolicy = baseContract.evidencePolicies
+    .find((item) => item.capabilityPattern === "strategy.energy_balance_estimate");
+  const goalContract = createGoalContractV3({
+    ...baseContract,
+    evidencePolicies: [...baseContract.evidencePolicies, ...["execution.energy_intake"].map((pattern) => ({
+      ...energyPolicy, policyId: `strategy_${pattern}|test`, capabilityPattern: pattern,
+      semanticClass: "EXECUTION_SUPPORT", vocabularyKey: "energy_intake_execution",
+      reconciliationGroup: "energy_intake_plan", participation: "NARRATIVE_CONTEXT_ONLY",
+      usableFor: ["narrative", "attribution", "execution"],
+    }))],
+    strategy: { ...fixtures.weekly.goalContract.strategy, energyStrategy: {
+      intakeTarget: { value: 2500, unit: "kcal/day" }, activityTarget: { value: 800, unit: "kcal/day" },
+      adjustmentAuthorization: "user_required", automaticAdjustmentAllowed: false,
+      effectiveAt: "2026-08-01T00:00:00.000Z",
+    } },
+  });
+  const day = (date, kcal) => ({
+    date, calorieIntake: kcal, activeCalories: 500, rmr: 1700, estimatedExpenditure: 2200, energyBalance: kcal - 2200,
+    nutritionCompleteness: "complete", pairedCompleteness: "complete",
+    nutritionAuthority: {
+      tier: "full_day_asserted", reliability: "high", energyUsable: true, ambiguity: [],
+      mealDetailCompleteness: "complete",
+    },
+    activitySource: { captureMethod: "device_aggregate", reliability: "high", measurementType: "wearable_estimate" },
+  });
+  const dates = (from, to) => {
+    const out = [];
+    for (let d = new Date(`${from}T00:00:00Z`); d <= new Date(`${to}T00:00:00Z`); d = new Date(d.getTime() + 86400000)) out.push(d.toISOString().slice(0, 10));
+    return out;
+  };
+  const window = { startDate: "2026-09-13", endDate: "2026-09-16" };
+  const piObservations = createEnergyPIObservations({
+    days: dates("2026-09-13", "2026-09-16").map((date) => day(date, 3200)),
+    observationWindow: window, semanticHorizon: "midweek",
+    baselineDays: dates("2026-08-02", "2026-09-12").map((date) => day(date, 2500)),
+    baselineWindow: resolveEnergyVariabilityBaselineWindow(window),
+  });
+  const observations = adaptEnergyObservationsV3({
+    observations: piObservations, goalContract, artifactId: "variability", evidenceCutoff: "2026-09-16T23:59:59.999Z",
+  });
+  const recurring = runConfidenceNarrativeV3({ ...fixtures.weekly,
+    goalContract, observations, priorInterpretation: event.strategicInterpretation,
+    priorCoachingState: event.coachingState, priorConfidence: event.confidence,
+    priorNarrativePlan: event.narrativePlan,
+    evaluationContext: { ...fixtures.weekly.evaluationContext,
+      evidenceCutoff: "2026-09-16T23:59:59.999Z", evaluatedAt: "2026-09-17T00:00:00.000Z" },
     surface: "midweek_briefing" });
   return { event, recurring };
 }

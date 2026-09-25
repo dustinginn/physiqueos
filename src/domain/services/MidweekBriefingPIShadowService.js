@@ -71,6 +71,8 @@ export function createMidweekPIShadowResult(input = {}) {
     comparisonWindow,
     semanticHorizon: "midweek",
     includeInsufficientData: input.includeInsufficientObservations === true,
+    baselineDays: input.energyVariabilityBaseline?.days ?? null,
+    baselineWindow: input.energyVariabilityBaseline?.window ?? null,
   });
   const goalContext = createPIGoalContext({
     activeGoal: input.activeGoal ?? null,

@@ -191,6 +191,11 @@ function normalizeEnergyStrategy(input) {
     protocolVersionId: input.protocolVersionId ?? null,
     protocolVersionNumber: input.protocolVersionNumber ?? null,
     confirmationAuthority: input.confirmationAuthority ?? null,
+    // The instant the current Energy protocol revision took effect. It is the
+    // regime boundary for per-day Energy variability (days before it were
+    // measured against a different target and must not enter a baseline).
+    // Dropping it here would make that boundary unknowable downstream.
+    effectiveAt: input.effectiveAt ?? null,
     source: input.source ?? null,
   };
 }
