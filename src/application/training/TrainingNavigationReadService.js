@@ -19,6 +19,11 @@ import {
 import { createTrainingReportingPresentation } from "../../domain/services/TrainingReportingPresentationService.js";
 import { projectHealthKitStrengthWorkoutPresentationBySession } from "../../domain/services/HealthKitWorkoutPresentationService.js";
 import { applyHealthKitStrengthPresentationToTrainingRecord } from "../../domain/services/ProgressReportingService.js";
+import {
+  isHealthKitCanonicalWorkoutIdentity,
+  projectHealthKitCardioTrainingRecords,
+  projectHealthKitCardioWorkoutAsTrainingRecord,
+} from "../../domain/services/HealthKitCardioTrainingPresentation.js";
 
 export function createTrainingNavigationReadService({
   store,
@@ -136,12 +141,17 @@ export function createTrainingNavigationReadService({
       return store.run("training.navigation.day", async () => {
         await ensureCanonicalExerciseRegistry();
         const user = await store.getUser();
-        const canonicalEvidenceObjects = await store.listCanonicalTrainingEvidenceForDate(
+        const evidenceObjects = await store.listCanonicalTrainingEvidenceForDate(
           date,
           timeZone ?? user?.timezone ?? "America/Los_Angeles"
         );
+        // Training Day is a unified workout surface: canonical HealthKit Cardio
+        // workouts (which live outside the training evidence collection) are
+        // presented as Cardio rows alongside Logger/screenshot sessions. A failure
+        // reading them must never take the whole day down.
+        const healthKitCardioRecords = await loadHealthKitCardioTrainingRecords(store, date, evidenceObjects);
         return createTrainingDayReadModel({
-          canonicalEvidenceObjects,
+          canonicalEvidenceObjects: [...evidenceObjects, ...healthKitCardioRecords],
           date,
           timeZone: timeZone ?? user?.timezone,
         });
@@ -207,6 +217,12 @@ export function createTrainingNavigationReadService({
     getSession({ sessionId } = {}) {
       return store.run("training.navigation.session", async () => {
         await ensureCanonicalExerciseRegistry();
+        // A canonical HealthKit Cardio workout row from Training Day opens the same
+        // existing Cardio session detail (no Logger session, exercises or link).
+        if (isHealthKitCanonicalWorkoutIdentity(sessionId)) {
+          const cardio = await loadHealthKitCardioSession(store, sessionId);
+          if (cardio) return cardio;
+        }
         const exact = await store.getCanonicalEvidenceObject(sessionId);
         if (exact) return withHealthKitPresentation(
           withSupportingMedia(
@@ -265,6 +281,28 @@ export function createTrainingNavigationReadService({
       });
     },
   });
+}
+
+async function loadHealthKitCardioTrainingRecords(store, date, evidenceObjects) {
+  try {
+    const canonicalWorkouts = typeof store.listHealthKitCanonicalWorkoutsForDate === "function"
+      ? await store.listHealthKitCanonicalWorkoutsForDate(date)
+      : typeof store.listHealthKitCanonicalWorkouts === "function"
+        ? await store.listHealthKitCanonicalWorkouts()
+        : [];
+    return projectHealthKitCardioTrainingRecords({ canonicalWorkouts, date, existingEvidenceObjects: evidenceObjects });
+  } catch {
+    return [];
+  }
+}
+
+async function loadHealthKitCardioSession(store, sessionId) {
+  if (typeof store.getHealthKitCanonicalWorkout !== "function") return null;
+  let workout = null;
+  try { workout = await store.getHealthKitCanonicalWorkout(sessionId); } catch { return null; }
+  const record = projectHealthKitCardioWorkoutAsTrainingRecord(workout);
+  if (!record) return null;
+  return findSession(createTrainingNavigationReport({ canonicalEvidenceObjects: [record] }), sessionId);
 }
 
 function withSupportingMedia(session, record) {

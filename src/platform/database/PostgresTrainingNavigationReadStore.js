@@ -87,6 +87,16 @@ export function createPostgresTrainingNavigationReadStore({
     ),
     listEvidencePackages: () => list("evidencePackages"),
     listHealthKitCanonicalWorkouts: () => list("healthKitCanonicalWorkouts"),
+    // Bounded, owner-scoped: only the canonical workouts of one workout-local date
+    // (Training Day presentation of Cardio).
+    listHealthKitCanonicalWorkoutsForDate: (date) => queryRecords(
+      `SELECT payload,version FROM physiqueos.canonical_training_records
+       WHERE owner_user_id=$1 AND collection_name='healthKitCanonicalWorkouts'
+         AND COALESCE(payload->>'localDate',payload#>>'{current,localDate}')=$2
+       ORDER BY record_id`,
+      [ownerUserId, date]
+    ),
+    getHealthKitCanonicalWorkout: (recordId) => records.get({ ownerUserId, collection: "healthKitCanonicalWorkouts", recordId }),
     listHealthKitWorkoutLinks: () => list("healthKitWorkoutLinks"),
     listHealthKitWorkoutLinkClaims: () => list("healthKitWorkoutLinkClaims"),
     listTrainingPerformanceEventsByExercise: (canonicalExerciseId) => queryRecords(
@@ -115,6 +125,10 @@ export function createRepositoryTrainingNavigationReadStore({ repositories } = {
     listCanonicalTrainingEvidenceForDate: async () => repositories.canonicalEvidence.listCanonicalEvidenceObjects((await repositories.users.getCurrentUser())?.id),
     listEvidencePackages: async () => repositories.evidencePackages.listEvidencePackages((await repositories.users.getCurrentUser())?.id),
     listHealthKitCanonicalWorkouts: async () => repositories.healthKitCanonicalWorkouts?.list?.() ?? [],
+    listHealthKitCanonicalWorkoutsForDate: async (date) => ((await repositories.healthKitCanonicalWorkouts?.list?.()) ?? [])
+      .filter((workout) => (workout?.localDate ?? workout?.current?.localDate) === date),
+    getHealthKitCanonicalWorkout: async (recordId) => ((await repositories.healthKitCanonicalWorkouts?.list?.()) ?? [])
+      .find((workout) => workout?.id === recordId) ?? null,
     listHealthKitWorkoutLinks: async () => repositories.healthKitWorkoutLinks?.list?.() ?? [],
     listHealthKitWorkoutLinkClaims: async () => repositories.healthKitWorkoutLinkClaims?.list?.() ?? [],
     listTrainingPerformanceEventsByExercise: async (canonicalExerciseId) => (await repositories.trainingPerformanceEvents.listTrainingPerformanceEvents())
