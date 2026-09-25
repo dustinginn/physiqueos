@@ -61,14 +61,16 @@ export function createProviderBriefingCadenceRunner({
   // window, no repeated readiness_satisfied, ...) must outlive a single tick,
   // and this runner builds a fresh executor every tick.
   const settlementObserver = createBriefingSettlementObserver({ logger });
-  return Object.freeze({
+  const tick = {
     async execute({ asOf = now() } = {}) {
-      // Reset the shared reader's per-run policy memo before ANY read this
-      // tick — including the evidence overlay below, which runs before the
-      // settlement gate does and would otherwise still see the previous
-      // tick's cached policy for as long as a cadence sits in a settlement
-      // wait (the reader only re-memoizes when a fresh run explicitly
-      // begins; it does not expire on its own).
+      // ONE run == one tick == one coherent HealthKit evidence view (review
+      // N2). Begin it before ANY read this tick: the evidence overlay below and
+      // the settlement gate's later coverage reads share this run's single
+      // canonical-day snapshot (the gate adopts the run, it never resets it), so
+      // readiness, the persisted watermark, and the generator inputs cannot
+      // disagree about which revision they saw, however long an earlier cadence
+      // generated. Beginning here also drops the previous tick's policy/day
+      // snapshot (the reader only re-memoizes when a run explicitly begins).
       healthKitGraduation.beginRun();
       await assertProviderAuthority(authorityStore);
       const [canonicalRuntime, commitBindings] = await Promise.all([
@@ -141,6 +143,17 @@ export function createProviderBriefingCadenceRunner({
         settlementObserver,
       });
       return executor.execute({ userId: ownerUserId, asOf });
+    },
+  };
+  return Object.freeze({
+    async execute(options) {
+      try {
+        return await tick.execute(options);
+      } finally {
+        // The run ends with the tick: the day snapshot and policy memo are
+        // dropped (bounded memory) and nothing is served stale afterward.
+        healthKitGraduation.endRun();
+      }
     },
   });
 }

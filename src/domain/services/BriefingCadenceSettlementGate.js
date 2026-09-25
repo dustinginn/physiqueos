@@ -27,6 +27,27 @@ import {
 // decision is flagged `coverageReadFailed` so the persisted watermark and the
 // logs say so honestly (every domain `unknown_coverage_read_failed`).
 //
+// ONE COHERENT SNAPSHOT (review N2). Readiness, the persisted watermark's
+// canonical record/revision identities, and the generator's evidence inputs all
+// derive from the reader's single per-run HealthKit day snapshot: the evidence
+// overlay the generator freezes and `readSettlementCoverage` share it, so a
+// canonical revision that lands mid-tick can never be watermarked while an
+// older one is what the artifact actually used. Evidence that advances after
+// the snapshot is picked up by the NEXT tick's snapshot (a new current-Evidence
+// revision) and never mutates a frozen artifact.
+//
+// ACCEPTED FAIL-SAFE (review N3, Founder-accepted 2026-09-25). A coverage read
+// failure fails closed here but is bounded by the hard deadline (above). An
+// UNEXPECTED non-coverage exception escaping `evaluate` (a programming or
+// configuration error) is deliberately NOT bounded by the hard deadline: the
+// executor catches it per entry, logs it through the settlement observer with
+// only an error class/code (never a message or stack), reports
+// `awaiting_evidence_settlement`/retryable, and NEVER generates — unknown
+// errors must not force publication of a potentially invalid strategic
+// artifact. Repeated failure writes only execution records (no artifact, so no
+// duplicate). Future work: alert on a sustained `gate_error` rate, since this
+// state has no self-resolving deadline.
+//
 // A user who has not graduated any domain to HealthKit yet — the ordinary
 // case for most of this codebase's history, and still ordinary for a domain
 // a person simply never enables — must never be blocked waiting for
@@ -42,9 +63,18 @@ export function createBriefingCadenceSettlementGate({
   }
   return Object.freeze({
     // Call once per executor tick, before evaluating any cadence entry, so
-    // every entry in the same tick reads one consistent policy snapshot.
+    // every entry in the same tick reads one consistent policy AND day
+    // snapshot. When the tick owner (the cadence composition) already began a
+    // run before its evidence overlay read, the gate ADOPTS that run instead of
+    // resetting it: resetting would let coverage be re-read at a later revision
+    // than the one the generator froze (review N2). A reader without
+    // `beginSettlementRun` (a minimal test double) simply begins a run.
     async beginTick() {
-      healthKitGraduationReader.beginRun();
+      if (typeof healthKitGraduationReader.beginSettlementRun === "function") {
+        healthKitGraduationReader.beginSettlementRun();
+      } else {
+        healthKitGraduationReader.beginRun();
+      }
     },
     async evaluate({ finalEvidenceDate, earliestPublishAt, now }) {
       const timing = {

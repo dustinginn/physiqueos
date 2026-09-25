@@ -15,6 +15,9 @@ vi.mock("../../domain/services/BriefingCadenceExecutorService", () => ({
       // where the composition relies on the executor for a reset the
       // composition itself must also guarantee before the overlay above runs.
       await options.settlementGate?.beginTick();
+      // Additive hook: lets a test act like the executor's per-entry settlement
+      // evaluation, INSIDE the tick (after beginTick, before the run ends).
+      await captured.duringExecute?.(options);
       return { ok: true };
     },
   }),
@@ -230,5 +233,80 @@ describe("provider briefing cadence: settlement observability + fail-closed wiri
     await runner.execute({ asOf: new Date("2026-09-22T10:10:00.000Z") });
     const proceed = await captured.settlementGate.evaluate({ ...args, now: "2026-09-22T10:10:00.000Z" });
     expect(proceed).toMatchObject({ action: "generate", reasonCode: "readiness_satisfied" });
+  });
+});
+
+describe("provider briefing cadence: ONE coherent HealthKit snapshot per tick (review N2)", () => {
+  const authorityStore = { read: async () => ({ state: {
+    authority: "provider-authoritative", workerAuthority: "provider", publicRuntimeAuthority: "provider", canonicalStoreEpoch: "postgres-canonical",
+    firstProviderCanonicalWriteAt: "2026-09-01T00:00:00.000Z", firstProviderCommandId: "cmd",
+  } }) };
+  const atRevision = (domain, revision) => {
+    const base = day(domain);
+    return { ...base, revision, version: revision, current: { ...base.current, revision, canonicalRecordId: `canon_${domain}` } };
+  };
+
+  it("the evidence overlay and the gate's coverage share one day-list read even though the canonical store advances between them; the gate adopts the composition's run", async () => {
+    const policyRecord = policy(on);
+    const state = { revision: 1, dayQueries: 0 };
+    const pool = { query: async (text, values = []) => {
+      if (/record_id=\$3/.test(text)) return { rows: [{ payload: policyRecord, version: 1 }] };
+      if (values[1] === "healthKitCanonicalDays") {
+        state.dayQueries += 1;
+        const rows = [atRevision("activity", state.revision), atRevision("nutrition", state.revision)].map((payload) => ({ payload, version: 1 }));
+        state.revision = 2; // a background sync lands right after this read
+        return { rows };
+      }
+      return { rows: [] };
+    } };
+    const runner = createProviderBriefingCadenceRunner({
+      pool, ownerUserId: OWNER, authorityStore,
+      loadCanonicalRuntime: async () => ({ user: { id: OWNER, timeZone: "America/Los_Angeles" }, canonicalEvidenceObjects: [] }),
+      loadCanonicalCommitBindings: async () => ({ mutateCanonicalRuntime: async () => ({}) }),
+    });
+    const inside = {};
+    captured.duringExecute = async (options) => {
+      inside.decision = await options.settlementGate.evaluate({ finalEvidenceDate: DATE, earliestPublishAt: "2026-09-22T10:00:00.000Z", now: "2026-09-22T10:05:00.000Z" });
+      inside.evidence = await options.repositories.canonicalEvidence.listCanonicalEvidenceObjects(OWNER);
+      inside.dayQueriesInTick = state.dayQueries;
+    };
+    try {
+      readerCallOrder.length = 0;
+      await runner.execute({ asOf: new Date("2026-09-22T10:00:00.000Z") });
+    } finally { captured.duringExecute = null; }
+    expect(inside.decision).toMatchObject({ action: "generate", reasonCode: "readiness_satisfied" });
+    expect(inside.decision.readiness.domains.activity.revision).toBe(1);
+    expect(inside.evidence.map((object) => object.provenance.healthkit_canonical_day_revision)).toEqual([1, 1]);
+    expect(inside.dayQueriesInTick).toBe(1); // overlay + coverage: one read
+    // The run began before the overlay and the gate did not begin another run in front of coverage.
+    expect(readerCallOrder.slice(0, 2)).toEqual(["beginRun", "overlay"]);
+    expect(readerCallOrder.filter((event) => event === "beginRun")).toHaveLength(1);
+
+    // The run ended with the tick: a later read is fresh (revision 2), never a stale memo.
+    const after = await captured.settlementGate.evaluate({ finalEvidenceDate: DATE, earliestPublishAt: "2026-09-22T10:00:00.000Z", now: "2026-09-22T10:10:00.000Z" });
+    expect(after.readiness.domains.activity.revision).toBe(2);
+    expect(state.dayQueries).toBe(2);
+  });
+
+  it("the run is ended even when the tick throws (a failed tick never leaves a snapshot behind)", async () => {
+    const policyRecord = policy(on);
+    const state = { revision: 1 };
+    const pool = { query: async (text, values = []) => {
+      if (/record_id=\$3/.test(text)) return { rows: [{ payload: policyRecord, version: 1 }] };
+      if (values[1] === "healthKitCanonicalDays") return { rows: [atRevision("activity", state.revision)].map((payload) => ({ payload, version: 1 })) };
+      return { rows: [] };
+    } };
+    const runner = createProviderBriefingCadenceRunner({
+      pool, ownerUserId: OWNER, authorityStore,
+      loadCanonicalRuntime: async () => ({ user: { id: OWNER }, canonicalEvidenceObjects: [] }),
+      loadCanonicalCommitBindings: async () => ({ mutateCanonicalRuntime: async () => ({}) }),
+    });
+    captured.duringExecute = async () => { throw new Error("tick failed"); };
+    try {
+      await expect(runner.execute({ asOf: new Date("2026-09-22T10:00:00.000Z") })).rejects.toThrow("tick failed");
+    } finally { captured.duringExecute = null; }
+    state.revision = 3;
+    const fresh = await captured.settlementGate.evaluate({ finalEvidenceDate: DATE, earliestPublishAt: "2026-09-22T10:00:00.000Z", now: "2026-09-22T10:05:00.000Z" });
+    expect(fresh.readiness.domains.activity.revision).toBe(3);
   });
 });

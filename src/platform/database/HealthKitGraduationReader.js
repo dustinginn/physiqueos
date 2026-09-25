@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
 import {
   HEALTHKIT_CANONICAL_DAY_COLLECTION,
@@ -28,6 +29,20 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
   // policy change is never masked by a stale memo.
   let pending = null;
   let inRun = false;
+  // ONE coherent HealthKit canonical-day snapshot per run. Inside a run the day
+  // list is read at most once and the SAME promise (resolved or rejected) serves
+  // every consumer: the evidence overlay a briefing generator freezes AND the
+  // settlement coverage that authorizes and watermarks it. Coverage is never
+  // re-read from the store later in the tick, so the readiness decision, the
+  // watermark's canonical record/revision identities, and the generator inputs
+  // cannot disagree about which revision was seen. Outside a run every consumer
+  // reads fresh (long-lived worker semantics). A new run drops the snapshot, so
+  // a rejected read never outlives its tick.
+  let daysPending = null;
+  // True once a settlement gate has adopted the current run (see
+  // `beginSettlementRun`): a second gate tick must start a new run rather than
+  // re-serve a snapshot that is already a tick old.
+  let runAdoptedBySettlement = false;
   // Set when the most recent EVIDENCE overlay could not read HealthKit state and
   // therefore fell back to the ordinary, un-overlaid evidence. Cleared only by a
   // later EVIDENCE overlay that read successfully (each cadence tick performs
@@ -45,8 +60,51 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
     pending ??= fetchPolicy();
     return pending;
   };
+  const fetchDays = () => store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION });
+  const loadDays = () => {
+    if (!inRun) return fetchDays();
+    daysPending ??= fetchDays();
+    return daysPending;
+  };
   return Object.freeze({
-    beginRun() { pending = null; inRun = true; },
+    beginRun() { pending = null; daysPending = null; inRun = true; runAdoptedBySettlement = false; },
+    /**
+     * The settlement gate's per-tick entry point. If a run was already begun by
+     * the tick owner (the cadence composition begins one BEFORE the evidence
+     * overlay reads) and no gate has adopted it yet, the gate ADOPTS it and the
+     * overlay's snapshot stays the one coverage is derived from. Otherwise (a
+     * stand-alone gate, or a second gate tick over the same run) it begins a
+     * fresh run, so a gate that is not driven by a composition still gets one
+     * coherent snapshot per tick and never a stale one across ticks.
+     */
+    beginSettlementRun() {
+      if (inRun && !runAdoptedBySettlement) { runAdoptedBySettlement = true; return; }
+      pending = null; daysPending = null; inRun = true; runAdoptedBySettlement = true;
+    },
+    /** Ends the run: drops the memoized policy and day snapshot (bounded memory) and returns to fresh reads. */
+    endRun() { pending = null; daysPending = null; inRun = false; runAdoptedBySettlement = false; },
+    /**
+     * PII-free descriptor of the run's day snapshot: a digest over the
+     * (domain, localDate, canonicalRecordId, revision, coverage) tuples only
+     * (never a value), so a test or a log can prove two consumers used the same
+     * snapshot. null when no run is active, no read has happened yet, or the
+     * snapshot read failed.
+     */
+    async describeSnapshot() {
+      if (!inRun || !daysPending) return null;
+      let days;
+      try { days = await daysPending; } catch { return null; }
+      const tuples = days.map((day) => [
+        day?.domain ?? null, day?.localDate ?? null,
+        day?.current?.canonicalRecordId ?? day?.id ?? null,
+        day?.current?.revision ?? day?.revision ?? null,
+        day?.current?.coverage ?? null,
+      ]).sort((a, b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : 1);
+      return Object.freeze({
+        dayCount: tuples.length,
+        digest: createHash("sha256").update(JSON.stringify(tuples)).digest("hex"),
+      });
+    },
     /**
      * @param canonicalObjects the ordinary canonical evidence array
      * @param purpose projection (UI read models) or evidence (V3 / Energy / briefings)
@@ -105,7 +163,7 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
     const policy = resolveHealthKitGraduationPolicy(policyRecord === undefined ? await lookup() : policyRecord);
     const scope = purpose === HealthKitGraduationPurpose.EVIDENCE ? policy.evidenceEligibility : policy.projection;
     if (!scope.enabled || !domains.some((domain) => scope.domains.includes(domain))) return canonicalObjects;
-    const days = (await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }))
+    const days = (await loadDays())
       .filter((day) => domains.includes(day?.domain))
       .filter((day) => !dateWindow || (day.localDate >= dateWindow.startDate && day.localDate <= dateWindow.endDate));
     if (days.length === 0) return canonicalObjects;
@@ -127,7 +185,7 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
     const activeDomains = domains.filter((domain) =>
       isHealthKitGraduationInScope(scope, { domain, localDate }));
     if (activeDomains.length === 0) return { activeDomains: [], domainStates: {} };
-    const days = (await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }))
+    const days = (await loadDays())
       .filter((day) => activeDomains.includes(day?.domain) && day?.localDate === localDate);
     const domainStates = Object.fromEntries(activeDomains.map((domain) => {
       const day = days.find((item) => item.domain === domain);
