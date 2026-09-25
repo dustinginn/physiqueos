@@ -193,7 +193,7 @@ function sessionDetail({ activityType, bodyAreas, exercises, metadata }) {
 function classifySession({ activityType, exercises }) {
   if (exercises.length || /strength|resistance|lifting|weights?/i.test(activityType)) return "strength";
   if (/walk/i.test(activityType)) return "walking";
-  if (/cardio|stair|stepper|elliptical|treadmill|cycling|bike|run/i.test(activityType)) return "cardio";
+  if (/cardio|stair|stepper|elliptical|treadmill|cycl(?:e|ing)|bike|run/i.test(activityType)) return "cardio";
   return "other";
 }
 

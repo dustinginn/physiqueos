@@ -27,6 +27,7 @@ import {
 
 export function createTrainingNavigationReadService({
   store,
+  logger = null,
   readCanonicalExerciseRegistry = null,
   hydrateCanonicalExerciseRegistry = null,
 } = {}) {
@@ -149,7 +150,7 @@ export function createTrainingNavigationReadService({
         // workouts (which live outside the training evidence collection) are
         // presented as Cardio rows alongside Logger/screenshot sessions. A failure
         // reading them must never take the whole day down.
-        const healthKitCardioRecords = await loadHealthKitCardioTrainingRecords(store, date, evidenceObjects);
+        const healthKitCardioRecords = await loadHealthKitCardioTrainingRecords(store, date, evidenceObjects, logger);
         return createTrainingDayReadModel({
           canonicalEvidenceObjects: [...evidenceObjects, ...healthKitCardioRecords],
           date,
@@ -220,7 +221,7 @@ export function createTrainingNavigationReadService({
         // A canonical HealthKit Cardio workout row from Training Day opens the same
         // existing Cardio session detail (no Logger session, exercises or link).
         if (isHealthKitCanonicalWorkoutIdentity(sessionId)) {
-          const cardio = await loadHealthKitCardioSession(store, sessionId);
+          const cardio = await loadHealthKitCardioSession(store, sessionId, logger);
           if (cardio) return cardio;
         }
         const exact = await store.getCanonicalEvidenceObject(sessionId);
@@ -283,7 +284,7 @@ export function createTrainingNavigationReadService({
   });
 }
 
-async function loadHealthKitCardioTrainingRecords(store, date, evidenceObjects) {
+async function loadHealthKitCardioTrainingRecords(store, date, evidenceObjects, logger = null) {
   try {
     const canonicalWorkouts = typeof store.listHealthKitCanonicalWorkoutsForDate === "function"
       ? await store.listHealthKitCanonicalWorkoutsForDate(date)
@@ -291,18 +292,30 @@ async function loadHealthKitCardioTrainingRecords(store, date, evidenceObjects) 
         ? await store.listHealthKitCanonicalWorkouts()
         : [];
     return projectHealthKitCardioTrainingRecords({ canonicalWorkouts, date, existingEvidenceObjects: evidenceObjects });
-  } catch {
+  } catch (error) {
+    warnHealthKitCardioFailure(logger, "training.day.healthkit_cardio_unavailable", error);
     return [];
   }
 }
 
-async function loadHealthKitCardioSession(store, sessionId) {
+async function loadHealthKitCardioSession(store, sessionId, logger = null) {
   if (typeof store.getHealthKitCanonicalWorkout !== "function") return null;
   let workout = null;
-  try { workout = await store.getHealthKitCanonicalWorkout(sessionId); } catch { return null; }
+  try { workout = await store.getHealthKitCanonicalWorkout(sessionId); } catch (error) {
+    warnHealthKitCardioFailure(logger, "training.session.healthkit_cardio_unavailable", error);
+    return null;
+  }
   const record = projectHealthKitCardioWorkoutAsTrainingRecord(workout);
   if (!record) return null;
   return findSession(createTrainingNavigationReport({ canonicalEvidenceObjects: [record] }), sessionId);
+}
+
+// Failure isolation must never be silent: an outage would otherwise recreate the
+// missing-Cardio defect with no signal. Class name and code only (no message/PII).
+function warnHealthKitCardioFailure(logger, event, error) {
+  const fields = { errorName: String(error?.name ?? "Error").slice(0, 80), errorCode: String(error?.code ?? "UNCLASSIFIED").slice(0, 80) };
+  if (logger?.warn) logger.warn(event, fields);
+  else console.warn(event, JSON.stringify(fields));
 }
 
 function withSupportingMedia(session, record) {

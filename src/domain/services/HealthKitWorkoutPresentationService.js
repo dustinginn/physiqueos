@@ -209,6 +209,12 @@ function isPresentableCanonicalWorkout(workout) {
   return isPresentableCanonicalWorkoutOfFamily(workout, HealthKitWorkoutFamily.STRENGTH);
 }
 
+// The same structural-integrity gate Activity's whole-day accounting applies to a Cardio
+// workout, exported so Training Day presents exactly the Cardio workouts Activity counts.
+export function isPresentableCanonicalCardioWorkout(workout) {
+  return isPresentableCanonicalWorkoutOfFamily(workout, HealthKitWorkoutFamily.CARDIO);
+}
+
 // Same structural-integrity check `isPresentableCanonicalWorkout` has always
 // used for a Strength presentation candidate, generalized to any family so
 // Part E's whole-day-accounting eligibility (see

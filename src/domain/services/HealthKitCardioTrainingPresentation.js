@@ -2,6 +2,12 @@ import {
   HEALTHKIT_CANONICAL_WORKOUT_ID_PREFIX,
   HealthKitWorkoutFamily,
 } from "./HealthKitWorkoutService.js";
+import { isActiveCanonicalTrainingSession } from "./CanonicalReadModel.js";
+import { isPresentableCanonicalCardioWorkout } from "./HealthKitWorkoutPresentationService.js";
+import {
+  HealthKitCardioCoexistenceState,
+  assessHealthKitCardioCoexistence,
+} from "./HealthKitWorkoutLinkService.js";
 
 // Training Day / Training Session presentation of canonical HealthKit Cardio
 // workouts.
@@ -61,6 +67,9 @@ export function projectHealthKitCardioWorkoutAsTrainingRecord(workout) {
   if (!workout?.id || !isHealthKitCanonicalWorkoutIdentity(workout.id) || !current) return null;
   if (current.family !== HealthKitWorkoutFamily.CARDIO) return null;
   if (workout.retiredAt || workout.quality?.status === "superseded") return null;
+  // Same structural-integrity gate Activity's whole-day accounting uses, so a
+  // workout is presented in Training Day exactly when Activity counts it.
+  if (!isPresentableCanonicalCardioWorkout(workout)) return null;
   const localDate = workout.localDate ?? current.localDate ?? null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(localDate ?? ""))) return null;
 
@@ -113,12 +122,24 @@ export function projectHealthKitCardioWorkoutAsTrainingRecord(workout) {
   });
 }
 
-function shouldSuppressAsDuplicate(workout, presentEvidenceIdentities) {
-  const coexistence = workout?.coexistence;
-  if (coexistence?.state !== COEXISTS_WITH_EVIDENCE) return false;
-  // Only suppress when the matching evidence workout is really on the page, so a
-  // retired/removed screenshot workout can never make the Cardio row vanish.
-  return (coexistence.candidates ?? []).some((candidate) => presentEvidenceIdentities.has(String(candidate?.canonicalId)));
+function shouldSuppressAsDuplicate(workout, activeEvidenceObjects, presentEvidenceIdentities) {
+  // 1. Stored decision: the canonicalizer recorded this workout as the same workout as a
+  //    present evidence workout. Only suppress when that evidence is really ACTIVE on the
+  //    page, so a retired/superseded screenshot workout can never make the row vanish.
+  const stored = workout?.coexistence;
+  if (stored?.state === HealthKitCardioCoexistenceState.MATCHES_EXISTING_WORKOUT &&
+    (stored.candidates ?? []).some((candidate) => presentEvidenceIdentities.has(String(candidate?.canonicalId)))) return true;
+  // 2. Live reassessment: the stored decision is computed only at HealthKit ingestion /
+  //    reassessment time, so a screenshot uploaded AFTER canonicalization would otherwise
+  //    show as a second row. Re-run the same pure assessment against the active evidence on
+  //    the page; only a single unambiguous duplicate suppresses (ambiguous / possible /
+  //    unverifiable always fail open and show both).
+  try {
+    return assessHealthKitCardioCoexistence({ canonicalWorkout: workout, canonicalObjects: activeEvidenceObjects })
+      .state === HealthKitCardioCoexistenceState.MATCHES_EXISTING_WORKOUT;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -129,8 +150,11 @@ function shouldSuppressAsDuplicate(workout, presentEvidenceIdentities) {
  * canonical identity.
  */
 export function projectHealthKitCardioTrainingRecords({ canonicalWorkouts = [], date, existingEvidenceObjects = [] } = {}) {
+  // Only ACTIVE evidence workouts count as "already on the page" (Training Day itself drops
+  // superseded/retired evidence, so suppressing against one would make the workout vanish).
+  const activeEvidence = existingEvidenceObjects.filter(isActiveCanonicalTrainingSession);
   const present = new Set();
-  for (const record of existingEvidenceObjects) {
+  for (const record of activeEvidence) {
     for (const value of [record?.canonicalId, record?.id, record?.payload?.id]) if (value != null) present.add(String(value));
   }
   const seen = new Set();
@@ -139,7 +163,7 @@ export function projectHealthKitCardioTrainingRecords({ canonicalWorkouts = [], 
     if (!workout?.id || seen.has(workout.id)) continue;
     const localDate = workout.localDate ?? workout.current?.localDate ?? null;
     if (date && localDate !== date) continue;
-    if (shouldSuppressAsDuplicate(workout, present)) continue;
+    if (shouldSuppressAsDuplicate(workout, activeEvidence, present)) continue;
     const record = projectHealthKitCardioWorkoutAsTrainingRecord(workout);
     if (!record) continue;
     seen.add(workout.id);

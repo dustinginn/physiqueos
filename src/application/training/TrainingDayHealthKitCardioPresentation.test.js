@@ -14,14 +14,14 @@ import {
 
 const WALK_ID = (n) => `healthkit_canonical_workout_${String(n).padStart(40, "0")}`;
 
-function walkEvidence({ id, date, capturedAt, activityType = "Outdoor Walk", seconds, miles, kcal }) {
+function walkEvidence({ id, date, capturedAt, activityType = "Outdoor Walk", seconds, miles, kcal, start = null, end = null, quality = { status: "active" } }) {
   return {
     canonicalId: id, id,
     payload: {
       id, evidence_type: "training", observed_at: date, captured_at: capturedAt, exercises: [],
-      metadata: { activity_type: activityType, duration_seconds: seconds, distance: miles, distance_unit: "mi", active_calories: kcal, average_heart_rate: 100, average_pace: null, effort_level: null, location: null, start_time: null, end_time: null, total_calories: null },
+      metadata: { activity_type: activityType, duration_seconds: seconds, distance: miles, distance_unit: "mi", active_calories: kcal, average_heart_rate: 100, average_pace: null, effort_level: null, location: null, start_time: start, end_time: end, total_calories: null },
       source: { application: "screenshot", integration: "apple_health", modality: "image", source_artifact_refs: ["Apple Health Screenshot 1.jpg"] },
-      provenance: {}, quality: { status: "active" }, removed: false, values: {},
+      provenance: {}, quality, removed: false, values: {},
     },
   };
 }
@@ -41,12 +41,22 @@ function strengthEvidence({ id, date, capturedAt }) {
 
 function canonicalWorkout({ n, family = "cardio", canonicalType = "walking", localDate, startedAt, endedAt, timeZone = "America/Los_Angeles",
   seconds, meters, kcal, hr, coexistence = { candidates: [], state: "no_other_source", unverifiableCount: 0 }, extra = {} }) {
+  // Exact production record shape (the same structural gate Activity's whole-day accounting applies).
   return {
-    id: WALK_ID(n), schemaVersion: "healthkit-canonical-workout-v1", version: 2, revision: 1, localDate, createdAt: "2026-09-25T16:05:24.036Z", updatedAt: "2026-09-25T16:05:24.036Z",
+    id: WALK_ID(n), schemaVersion: "healthkit-canonical-workout-v1", userId: "user_founder_001", version: 2, revision: 1, localDate,
+    semanticFingerprint: `sha256_${String(n).padStart(64, "0")}`, priorSemanticFingerprint: null, revisionHistory: [],
+    createdAt: "2026-09-25T16:05:24.036Z", updatedAt: "2026-09-25T16:05:24.036Z",
+    contentAuthority: { telemetry: "healthkit", trainingContent: "workout_logger" },
+    activityInteraction: { policy: "workout_energy_is_descriptive_never_additive", additiveToDailyActivity: false },
     current: { family, canonicalType, appleActivityType: "52", localDate, localDateBasis: "workout_start_in_workout_time_zone", timeZone, startedAt, endedAt, sourceRevision: 1,
+      sourceObservationId: `obs_${n}`,
+      source: { bundleIdentifier: "com.apple.health.fixture", sourceName: "Apple Watch", productType: "Watch7,12" },
       telemetry: { durationSeconds: seconds, activeCalories: kcal, totalCalories: null, distance: meters, distanceUnit: "m", averageHeartRate: hr } },
     coexistence, evidenceEligibility: { state: "quarantined", strategic: false, decidedBy: "healthkit-strategic-evidence-quarantine-v1" },
-    linkAssessment: null, provenance: { sourceObservationIds: [`obs_${n}`] }, ...extra,
+    linkAssessment: null,
+    provenance: { application: "Apple Health", integration: "HealthKit", modality: "direct", basis: "healthkit_workout_observation",
+      bundleIdentifier: "com.apple.health.fixture", currentSourceObservationId: `obs_${n}`, sourceObservationIds: [`obs_${n}`] },
+    ...extra,
   };
 }
 
@@ -225,3 +235,69 @@ describe("Training Day presents canonical HealthKit Cardio workouts (Founder acc
     expect(source).not.toMatch(/ProgressReportingService|composeDailyActiveEnergyWithWorkouts|non_workout|move_calories|workoutEnergy/);
   });
 });
+
+describe("review hardening (N1-N5)", () => {
+  const dupCoexistence = (id) => ({ candidates: [{ canonicalId: id, confidence: 99, outcome: "duplicate" }], state: "matches_existing_evidence_workout", unverifiableCount: 0 });
+
+  it("N1: a SUPERSEDED matching screenshot workout must not suppress the HealthKit row (the workout can never vanish)", async () => {
+    const superseded = walkEvidence({ id: "training|authoritative|evidence_submission_S_images_file_1", date: "2026-09-22", capturedAt: "2026-09-22T06:44:00-07:00", seconds: 1200, miles: 0.9, kcal: 90, quality: { status: "superseded" } });
+    const wk = canonicalWorkout({ n: 20, localDate: "2026-09-22", startedAt: "2026-09-22T13:44:00.000Z", endedAt: "2026-09-22T14:04:00.000Z", seconds: 1200, meters: 1500, kcal: 90, hr: 100, coexistence: dupCoexistence(superseded.canonicalId) });
+    const day = await service(fakeStore({ evidence: { "2026-09-22": [superseded] }, workouts: [wk] })).getDay({ date: "2026-09-22" });
+    expect(titles(day)).toEqual(["Walking"]); // shown once; the superseded evidence is dropped by the day itself
+  });
+
+  it("N2: a screenshot uploaded AFTER canonicalization (stale no_other_source) is reassessed at read time and not double-shown", async () => {
+    const shot = walkEvidence({ id: "training|authoritative|evidence_submission_LATE_images_file_1", date: "2026-09-23", capturedAt: "2026-09-23T06:29:00-07:00",
+      seconds: 1080, miles: 0.94, kcal: 79, start: "2026-09-23T06:29:52-07:00", end: "2026-09-23T06:47:51-07:00" });
+    const staleNoOtherSource = { ...SEP23_WALKS[0] }; // stored coexistence says no_other_source
+    expect(staleNoOtherSource.coexistence.state).toBe("no_other_source");
+    const day = await service(fakeStore({ evidence: { "2026-09-23": [shot] }, workouts: [staleNoOtherSource] })).getDay({ date: "2026-09-23" });
+    expect(titles(day)).toEqual(["Outdoor Walk"]); // the screenshot row only, no duplicate HealthKit row
+    // Unverifiable / non-matching evidence always fails open (both shown).
+    const unrelated = walkEvidence({ id: "training|authoritative|evidence_submission_OTHER_images_file_1", date: "2026-09-23", capturedAt: "2026-09-23T17:00:00-07:00", seconds: 300, miles: 0.2, kcal: 20 });
+    const both = await service(fakeStore({ evidence: { "2026-09-23": [unrelated] }, workouts: [staleNoOtherSource] })).getDay({ date: "2026-09-23" });
+    expect(titles(both).sort()).toEqual(["Outdoor Walk", "Walking"]);
+  });
+
+  it("N3: Indoor/Outdoor Cycle (and running/walking variants) classify as Cardio rows and set the day's Cardio summary", () => {
+    for (const [type, kind] of [["indoor_cycling", "cardio"], ["outdoor_cycling", "cardio"], ["cycling", "cardio"], ["indoor_running", "cardio"], ["outdoor_running", "cardio"], ["running", "cardio"], ["indoor_walking", "walking"], ["outdoor_walking", "walking"], ["walking", "walking"]]) {
+      const wk = canonicalWorkout({ n: 30, canonicalType: type, localDate: "2026-09-26", startedAt: "2026-09-26T15:00:00.000Z", endedAt: "2026-09-26T15:20:00.000Z", seconds: 1200, meters: 5000, kcal: 200, hr: 130 });
+      const day = createTrainingDayReadModel({ canonicalEvidenceObjects: projectHealthKitCardioTrainingRecords({ canonicalWorkouts: [wk], date: "2026-09-26" }), date: "2026-09-26" });
+      expect(day.sessions[0].kind, type).toBe(kind);
+      expect(day.summary.hasCardio, type).toBe(true);
+    }
+  });
+
+  it("N4: a HealthKit read failure is isolated AND observable (class/code only, no message)", async () => {
+    const events = [];
+    const svc = createTrainingNavigationReadService({ store: fakeStore({ workouts: SEP23_WALKS, failWorkouts: true }), readCanonicalExerciseRegistry: async () => [], logger: { warn: (event, fields) => events.push({ event, fields }) } });
+    await svc.getDay({ date: "2026-09-23" });
+    expect(events).toEqual([{ event: "training.day.healthkit_cardio_unavailable", fields: { errorName: "Error", errorCode: "UNCLASSIFIED" } }]);
+    expect(JSON.stringify(events)).not.toContain("store down");
+    const failingDetail = fakeStore({ workouts: SEP23_WALKS }); failingDetail.getHealthKitCanonicalWorkout = async () => { throw Object.assign(new Error("secret host"), { code: "ECONNRESET" }); };
+    const detailEvents = [];
+    const svc2 = createTrainingNavigationReadService({ store: failingDetail, readCanonicalExerciseRegistry: async () => [], logger: { warn: (e, f) => detailEvents.push({ e, f }) } });
+    expect(await svc2.getSession({ sessionId: SEP23_WALKS[0].id })).toBeNull(); // falls through to the existing path
+    expect(detailEvents).toEqual([{ e: "training.session.healthkit_cardio_unavailable", f: { errorName: "Error", errorCode: "ECONNRESET" } }]);
+  });
+
+  it("N5: Training Day presents exactly the Cardio workouts Activity counts: a structurally malformed canonical record is not presented", () => {
+    const malformed = { ...SEP23_WALKS[0], semanticFingerprint: "nope" };
+    expect(projectHealthKitCardioWorkoutAsTrainingRecord(malformed)).toBeNull();
+    expect(projectHealthKitCardioWorkoutAsTrainingRecord({ ...SEP23_WALKS[0], evidenceEligibility: { state: "eligible", strategic: true } })).toBeNull();
+    expect(projectHealthKitCardioWorkoutAsTrainingRecord(SEP23_WALKS[0])).not.toBeNull();
+  });
+
+  it("a Strength-family HealthKit id is never opened as a Cardio row (falls through to the existing path)", async () => {
+    const strengthWk = canonicalWorkout({ n: 40, family: "strength", canonicalType: "traditional_strength_training", localDate: "2026-09-23", startedAt: "2026-09-23T13:47:54.000Z", endedAt: "2026-09-23T14:57:12.000Z", seconds: 4157, meters: null, kcal: 320, hr: 100, coexistence: null });
+    expect(await service(fakeStore({ workouts: [strengthWk] })).getSession({ sessionId: strengthWk.id })).toBeNull();
+  });
+
+  it("a store without the HealthKit lookups still serves Training Day (legacy/repository stores)", async () => {
+    const legacy = fakeStore({}); delete legacy.listHealthKitCanonicalWorkoutsForDate; delete legacy.listHealthKitCanonicalWorkouts; delete legacy.getHealthKitCanonicalWorkout;
+    const strength = strengthEvidence({ id: "training|authoritative|training_logger_draft_9", date: "2026-09-23", capturedAt: "2026-09-23T12:00:00.000Z" });
+    legacy.listCanonicalTrainingEvidenceForDate = async () => [strength];
+    expect(titles(await service(legacy).getDay({ date: "2026-09-23" }))).toEqual(["Traditional Strength Training"]);
+  });
+});
+
