@@ -164,6 +164,7 @@ struct MorningCheckInSubmissionLifecycle {
 struct ProductionWeightWriteAPI: WeightWriteAPI {
     let api: ProductionNativeAPI
     let idempotencyStore: ProductionIdempotencyKeyStore
+    var timeZone: @Sendable () -> TimeZone = { DailyDriverLocalDay.currentDeviceTimeZone() }
 
     func submitWeight(localDate: String, value: Double, expectedVersion: String?) async throws -> WeightSubmitResult {
         try await submit(
@@ -176,7 +177,7 @@ struct ProductionWeightWriteAPI: WeightWriteAPI {
             // A plain weigh-in is dated on the device's local day; naming the
             // zone lets the Server's future-date guard judge the same day
             // (travel east of the canonical zone after local midnight).
-            timeZone: DailyDriverLocalDay.currentDeviceTimeZone().identifier
+            timeZone: timeZone().identifier
         )
     }
 

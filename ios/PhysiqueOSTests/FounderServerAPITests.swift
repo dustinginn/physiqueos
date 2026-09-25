@@ -5928,6 +5928,22 @@ final class DailyDriverLocalDayTests: XCTestCase {
         XCTAssertEqual(weight?["timeZone"] as? String, DailyDriverLocalDay.currentDeviceTimeZone().identifier)
         let checkIn = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[2].httpBody)) as? [String: Any])["payload"] as? [String: Any]
         XCTAssertNil(checkIn?["timeZone"], "the Morning Check-In stays on the Server-owned canonical day")
-        XCTAssertNotEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
+    }
+
+    func testWeighInRetryKeepsItsKeyInOneZoneAndGetsANewKeyAfterAZoneChange() async throws {
+        let outcome = productionCommandOutcomeJSON(result: #"{"status":"committed","weightId":"weight_2026_09_25","weightRevision":1,"checkInId":null,"checkInRevision":null,"analysisId":null,"intendedDate":"2026-09-25","goalIds":[],"continuationWorkItemIds":[]}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, outcome), .json(200, outcome), .json(200, outcome),
+        ])
+        let api = try await Self.pairedAPI(transport)
+        let defaults = UserDefaults(suiteName: "PhysiqueOS.DailyDriverWeightKey.\(UUID().uuidString)")!
+        let pacific = ProductionWeightWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults), timeZone: { Self.zone("America/Los_Angeles") })
+        let texas = ProductionWeightWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: defaults), timeZone: { Self.zone("America/Chicago") })
+        _ = try await pacific.submitWeight(localDate: "2026-09-25", value: 175.9, expectedVersion: nil)
+        _ = try await pacific.submitWeight(localDate: "2026-09-25", value: 175.9, expectedVersion: nil)
+        _ = try await texas.submitWeight(localDate: "2026-09-25", value: 175.9, expectedVersion: nil)
+        let keys = await transport.requests.dropFirst().map { $0.value(forHTTPHeaderField: "Idempotency-Key") }
+        XCTAssertEqual(keys[0], keys[1], "an exact retry replays under the same key")
+        XCTAssertNotEqual(keys[1], keys[2], "the zone is in the Server's payload hash, so it must be in the key's signature")
     }
 }
