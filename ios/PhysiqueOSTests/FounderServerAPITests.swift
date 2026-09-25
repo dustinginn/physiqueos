@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 import SwiftUI
+import UIKit
 @testable import PhysiqueOS
 
 final class FounderServerAPITests: XCTestCase {
@@ -699,10 +700,8 @@ final class FounderServerAPITests: XCTestCase {
     // MARK: - Performance Phase 2: last-known Home, write retirement, request counts
 
     /// Snapshot fixtures are generated 2026-09-10T15:00Z; pin the same UTC day.
-    private static func homeAPI(_ api: ProductionNativeAPI, now: Date = ISO8601DateFormatter().date(from: "2026-09-10T20:00:00Z")!) -> ProductionHomeAPI {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return ProductionHomeAPI(api: api, now: { now }, calendar: calendar)
+    private static func homeAPI(_ api: ProductionNativeAPI, now: Date = ISO8601DateFormatter().date(from: "2026-09-10T20:00:00Z")!, timeZone: String = "UTC") -> ProductionHomeAPI {
+        ProductionHomeAPI(api: api, now: { now }, timeZone: { TimeZone(identifier: timeZone)! })
     }
 
     private static func temporarySnapshotStore() -> ProductionReadSnapshotStore {
@@ -5645,5 +5644,256 @@ private actor GatedHomeTransport: FounderHTTPTransport {
         released = true
         gate?.resume()
         gate = nil
+    }
+}
+
+
+// MARK: - Daily-driver local day / timezone rollover (deterministic matrix)
+
+/// Pins "Today" semantics without wall-clock sleeps: every case injects the
+/// instant and the device zone. Founder control: 2026-09-25T05:11Z is 00:11
+/// Sep 25 in Texas and 22:11 Sep 24 in the canonical America/Los_Angeles.
+final class DailyDriverLocalDayTests: XCTestCase {
+    private static func instant(_ value: String) -> Date { ISO8601DateFormatter().date(from: value)! }
+    private static func zone(_ id: String) -> TimeZone { TimeZone(identifier: id)! }
+    private static func day(_ at: String, _ zone: String) -> DailyDriverLocalDay { .resolve(at: instant(at), in: Self.zone(zone)) }
+
+    private static func pairedAPI(_ transport: some FounderHTTPTransport, snapshotStore: ProductionReadSnapshotStore? = nil) async throws -> ProductionNativeAPI {
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport, snapshotStore: snapshotStore)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        return api
+    }
+
+    private static func routed() -> RoutedFounderTransport {
+        RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionLogJSON,
+                "weight": productionWeightForLogJSON(date: "2026-09-10", value: 172.9),
+                "home": productionHomeJSON(priorityID: "priority-1", goalID: "goal-server", confidence: 71),
+            ]
+        )
+    }
+
+    private static func count(_ transport: RoutedFounderTransport, _ resource: String) async -> Int {
+        await transport.requests.filter { $0.url?.lastPathComponent == resource }.count
+    }
+
+    @MainActor
+    private static func environment(api: ProductionNativeAPI, at: String, zone: String) async -> AppEnvironment {
+        let suite = "PhysiqueOS.DailyDriverDay.\(UUID().uuidString)"
+        let selection = UserDefaultsNativeAuthoritySelectionStore(defaults: UserDefaults(suiteName: suite)!, key: "authority")
+        let environment = AppEnvironment(nativeAuthority: .founderProduction, authoritySelectionStore: selection, productionNativeAPI: api)
+        await environment.reevaluateDailyDriverDay(at: instant(at), timeZone: Self.zone(zone))
+        return environment
+    }
+
+    // MARK: pure day resolution
+
+    func testServerUTCDateDiffersFromDeviceLocalDate() {
+        XCTAssertEqual(Self.day("2026-09-25T02:00:00Z", "UTC").dateKey, "2026-09-25")
+        XCTAssertEqual(Self.day("2026-09-25T02:00:00Z", "America/Los_Angeles").dateKey, "2026-09-24")
+    }
+
+    func testEastwardZoneChangeIsAnImmediateNextDay() {
+        let pacific = Self.day("2026-09-25T05:11:00Z", "America/Los_Angeles")
+        let texas = Self.day("2026-09-25T05:11:00Z", "America/Chicago")
+        XCTAssertEqual(pacific.dateKey, "2026-09-24")
+        XCTAssertEqual(texas.dateKey, "2026-09-25")
+        XCTAssertNotEqual(pacific, texas)
+    }
+
+    func testWestwardZoneChangeIsAnApparentPreviousDay() {
+        XCTAssertEqual(Self.day("2026-09-25T08:30:00Z", "America/Los_Angeles").dateKey, "2026-09-25")
+        XCTAssertEqual(Self.day("2026-09-25T08:30:00Z", "Pacific/Honolulu").dateKey, "2026-09-24")
+    }
+
+    func testZoneChangeWithoutDateChangeStillChangesTheDayIdentity() {
+        let pacific = Self.day("2026-09-25T18:00:00Z", "America/Los_Angeles")
+        let mountain = Self.day("2026-09-25T18:00:00Z", "America/Denver")
+        XCTAssertEqual(pacific.dateKey, mountain.dateKey)
+        XCTAssertNotEqual(pacific, mountain, "zone-partitioned caches must not be reused across zones")
+    }
+
+    func testDSTSpringForwardDayIs23HoursAndRollsOverAtLocalMidnight() {
+        XCTAssertEqual(Self.day("2027-03-14T07:59:00Z", "America/Los_Angeles").dateKey, "2027-03-13")
+        XCTAssertEqual(Self.day("2027-03-14T08:00:00Z", "America/Los_Angeles").dateKey, "2027-03-14") // 00:00 PST
+        XCTAssertEqual(Self.day("2027-03-14T09:59:00Z", "America/Los_Angeles").dateKey, "2027-03-14") // 01:59 PST
+        XCTAssertEqual(Self.day("2027-03-14T10:00:00Z", "America/Los_Angeles").dateKey, "2027-03-14") // 03:00 PDT
+        XCTAssertEqual(Self.day("2027-03-15T06:59:00Z", "America/Los_Angeles").dateKey, "2027-03-14") // 23:59 PDT
+        XCTAssertEqual(Self.day("2027-03-15T07:00:00Z", "America/Los_Angeles").dateKey, "2027-03-15")
+    }
+
+    func testDSTFallBackDayIs25HoursAndRollsOverAtLocalMidnight() {
+        XCTAssertEqual(Self.day("2026-11-01T08:30:00Z", "America/Los_Angeles").dateKey, "2026-11-01") // 01:30 PDT
+        XCTAssertEqual(Self.day("2026-11-01T09:30:00Z", "America/Los_Angeles").dateKey, "2026-11-01") // 01:30 PST
+        XCTAssertEqual(Self.day("2026-11-02T07:59:00Z", "America/Los_Angeles").dateKey, "2026-11-01") // 23:59 PST
+        XCTAssertEqual(Self.day("2026-11-02T08:00:00Z", "America/Los_Angeles").dateKey, "2026-11-02")
+    }
+
+    func testRolloverTriggersIncludeMidnightSignificantTimeAndZoneChange() {
+        XCTAssertEqual(Set(DailyDriverDayTrigger.notificationNames), [
+            .NSCalendarDayChanged, UIApplication.significantTimeChangeNotification, .NSSystemTimeZoneDidChange,
+        ])
+    }
+
+    func testDayScopedResourcesCoverEveryTodaySurface() {
+        for resource in ["home", "evidence-review-queue", "morning-check-in", "weight", "activity", "nutrition", "training-landing", "training-logger", "priority"] {
+            XCTAssertTrue(DailyDriverLocalDay.dayScopedReadResources.contains(resource), resource)
+        }
+        // Immutable history/briefing artifacts are not day-scoped caches.
+        XCTAssertFalse(DailyDriverLocalDay.dayScopedReadResources.contains("briefing"))
+    }
+
+    // MARK: environment rollover (foreground, background -> foreground)
+
+    @MainActor
+    func testForegroundAppCrossingLocalMidnightInvalidatesTodayReads() async throws {
+        let transport = Self.routed()
+        let api = try await Self.pairedAPI(transport)
+        let environment = await Self.environment(api: api, at: "2026-09-25T06:59:00Z", zone: "America/Los_Angeles")
+        let log = ProductionLogAPI(api: api, timeZone: { Self.zone("America/Los_Angeles") })
+        _ = try await log.fetchLog()
+        _ = try await log.fetchLog()
+        let cached = await Self.count(transport, "evidence-review-queue")
+        XCTAssertEqual(cached, 1, "same day: served from cache")
+
+        // NSCalendarDayChanged at 00:00 PDT -> recomputed from the system clock.
+        let changed = await environment.reevaluateDailyDriverDay(at: Self.instant("2026-09-25T07:00:30Z"), timeZone: Self.zone("America/Los_Angeles"))
+        XCTAssertTrue(changed)
+        XCTAssertEqual(environment.dailyDriverDay.dateKey, "2026-09-25")
+        _ = try await log.fetchLog()
+        let afterMidnight = await Self.count(transport, "evidence-review-queue")
+        XCTAssertEqual(afterMidnight, 2, "Logged Today must re-read after local midnight, not serve yesterday's cache")
+        let weightReads = await Self.count(transport, "weight")
+        XCTAssertEqual(weightReads, 2, "Weight's today row re-reads too")
+    }
+
+    @MainActor
+    func testBackgroundedBeforeMidnightForegroundedAfterRollsOver() async throws {
+        let transport = Self.routed()
+        let api = try await Self.pairedAPI(transport)
+        let environment = await Self.environment(api: api, at: "2026-09-24T22:00:00Z", zone: "America/Los_Angeles")
+        XCTAssertEqual(environment.dailyDriverDay.dateKey, "2026-09-24")
+        // Suspended: no notification is delivered. The activation handler
+        // recomputes from the system clock hours later.
+        let changed = await environment.reevaluateDailyDriverDay(at: Self.instant("2026-09-25T15:30:00Z"), timeZone: Self.zone("America/Los_Angeles"))
+        XCTAssertTrue(changed)
+        XCTAssertEqual(environment.dailyDriverDay.dateKey, "2026-09-25")
+        // A second activation the same day is a no-op (no needless invalidation).
+        let again = await environment.reevaluateDailyDriverDay(at: Self.instant("2026-09-25T16:00:00Z"), timeZone: Self.zone("America/Los_Angeles"))
+        XCTAssertFalse(again)
+    }
+
+    @MainActor
+    func testTimezoneChangeRecomputesTodayAndPartitionsTheLogRead() async throws {
+        let transport = Self.routed()
+        let api = try await Self.pairedAPI(transport)
+        let environment = await Self.environment(api: api, at: "2026-09-25T05:11:00Z", zone: "America/Los_Angeles")
+        XCTAssertEqual(environment.dailyDriverDay.dateKey, "2026-09-24")
+        let changed = await environment.reevaluateDailyDriverDay(at: Self.instant("2026-09-25T05:11:00Z"), timeZone: Self.zone("America/Chicago"))
+        XCTAssertTrue(changed)
+        XCTAssertEqual(environment.dailyDriverDay, DailyDriverLocalDay(dateKey: "2026-09-25", timeZoneIdentifier: "America/Chicago"))
+
+        _ = try await ProductionLogAPI(api: api, timeZone: { Self.zone("America/Los_Angeles") }).fetchLog()
+        _ = try await ProductionLogAPI(api: api, timeZone: { Self.zone("America/Chicago") }).fetchLog()
+        let zones = await transport.requests
+            .filter { $0.url?.lastPathComponent == "evidence-review-queue" }
+            .map { URLComponents(url: $0.url!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "timeZone" })?.value }
+        XCTAssertEqual(zones, ["America/Los_Angeles", "America/Chicago"], "Logged Today names the device zone; a new zone never reuses the old zone's cache")
+    }
+
+    // MARK: Home last-known snapshot (Performance Phase 2 c736254b)
+
+    private static func persistHome(at: String, zone: String) async throws -> (ProductionReadSnapshotStore, MemoryCredentialStore) {
+        let store = ProductionReadSnapshotStore(directory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("physiqueos-daily-driver-\(UUID().uuidString)", isDirectory: true))
+        let credentials = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionHomeJSON(priorityID: "priority-old", goalID: "goal-server", confidence: 71)),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        _ = try await ProductionHomeAPI(api: api, now: { instant(at) }, timeZone: { Self.zone(zone) }).fetchHome()
+        return (store, credentials)
+    }
+
+    private static func lastKnown(_ store: ProductionReadSnapshotStore, _ credentials: MemoryCredentialStore, at: String, zone: String) async -> HomeLastKnownSnapshot? {
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: SequencedFounderTransport([]), snapshotStore: store)
+        return await ProductionHomeAPI(api: api, now: { instant(at) }, timeZone: { Self.zone(zone) }).lastKnownHome()
+    }
+
+    func testHomeSnapshotFromThePriorLocalDayIsRefused() async throws {
+        // Fixture envelope generatedAt = 2026-09-10T15:00Z (08:00 PDT Sep 10).
+        let (store, credentials) = try await Self.persistHome(at: "2026-09-10T16:00:00Z", zone: "America/Los_Angeles")
+        let sameDay = await Self.lastKnown(store, credentials, at: "2026-09-10T23:00:00Z", zone: "America/Los_Angeles")
+        XCTAssertNotNil(sameDay)
+        let nextDay = await Self.lastKnown(store, credentials, at: "2026-09-11T07:30:00Z", zone: "America/Los_Angeles")
+        XCTAssertNil(nextDay, "00:30 Sep 11 local: yesterday's Today's Focus must not be painted")
+    }
+
+    func testHomeSnapshotCreatedInOneZoneIsNeverPaintedInAnother() async throws {
+        let (store, credentials) = try await Self.persistHome(at: "2026-09-10T16:00:00Z", zone: "America/Los_Angeles")
+        // Same absolute instant, device now in Tokyo (Sep 11 local).
+        let tokyo = await Self.lastKnown(store, credentials, at: "2026-09-10T16:00:00Z", zone: "Asia/Tokyo")
+        XCTAssertNil(tokyo)
+        // Same date, different zone: still refused (zone-partitioned key).
+        let denver = await Self.lastKnown(store, credentials, at: "2026-09-10T16:00:00Z", zone: "America/Denver")
+        XCTAssertNil(denver)
+        let back = await Self.lastKnown(store, credentials, at: "2026-09-10T16:00:00Z", zone: "America/Los_Angeles")
+        XCTAssertNotNil(back)
+    }
+
+    func testHomeSnapshotIsRefusedWhenTheCanonicalBriefingDayHasTurned() async throws {
+        // Device in UTC: generatedAt 15:00Z Sep 10 and now 23:30Z Sep 10 are the
+        // same device day, but in the canonical America/Los_Angeles zone
+        // (notificationTimeZone) it is still Sep 10 -> accepted; at 07:30Z Sep 11
+        // the device (UTC) day is Sep 11 anyway. Use Tokyo-free case: device in
+        // Honolulu, now 2026-09-11T08:30Z = 22:30 HST Sep 10 (same device day as
+        // 05:00 HST Sep 10) but 01:30 PDT Sep 11 on the canonical calendar.
+        let (store, credentials) = try await Self.persistHome(at: "2026-09-10T16:00:00Z", zone: "Pacific/Honolulu")
+        let deviceSameDayCanonicalNext = await Self.lastKnown(store, credentials, at: "2026-09-11T08:30:00Z", zone: "Pacific/Honolulu")
+        XCTAssertNil(deviceSameDayCanonicalNext, "priorities were projected for the canonical Sep 10; it is Sep 11 there")
+        let bothSameDay = await Self.lastKnown(store, credentials, at: "2026-09-11T05:00:00Z", zone: "Pacific/Honolulu")
+        XCTAssertNotNil(bothSameDay)
+    }
+
+    @MainActor
+    func testDayChangeRetiresTheLastKnownHomeSnapshot() async throws {
+        let (store, credentials) = try await Self.persistHome(at: "2026-09-10T16:00:00Z", zone: "America/Los_Angeles")
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: SequencedFounderTransport([]), snapshotStore: store)
+        let environment = await Self.environment(api: api, at: "2026-09-10T16:00:00Z", zone: "America/Los_Angeles")
+        await environment.reevaluateDailyDriverDay(at: Self.instant("2026-09-11T07:30:00Z"), timeZone: Self.zone("America/Los_Angeles"))
+        let afterRollover = await ProductionHomeAPI(api: api, now: { Self.instant("2026-09-10T23:00:00Z") }, timeZone: { Self.zone("America/Los_Angeles") }).lastKnownHome()
+        XCTAssertNil(afterRollover, "a rollover retires the persisted snapshot, not just the in-memory cache")
+    }
+
+    func testHomeNotificationCalendarStaysCanonicalWhateverTheDeviceZone() async throws {
+        let transport = Self.routed()
+        let api = try await Self.pairedAPI(transport)
+        let home = try await ProductionHomeAPI(api: api, timeZone: { Self.zone("America/Chicago") }).fetchHome()
+        XCTAssertEqual(home.notificationCalendar.timeZone.identifier, "America/Los_Angeles", "briefing/priority schedule never follows travel")
+    }
+
+    // MARK: writes keep canonical dates; only the guard's "today" follows the device
+
+    func testPlainWeighInNamesTheDeviceZoneAndKeepsItsLocalDate() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionCommandOutcomeJSON(result: #"{"status":"committed","weightId":"weight_2026_09_25","weightRevision":1,"checkInId":null,"checkInRevision":null,"analysisId":null,"intendedDate":"2026-09-25","goalIds":[],"continuationWorkItemIds":[]}"#)),
+            .json(200, productionCommandOutcomeJSON(result: #"{"status":"committed","weightId":"weight_2026_09_25","weightRevision":2,"checkInId":"c","checkInRevision":1,"analysisId":null,"intendedDate":"2026-09-25","goalIds":[],"continuationWorkItemIds":[]}"#)),
+        ])
+        let api = try await Self.pairedAPI(transport)
+        let suite = "PhysiqueOS.DailyDriverWeight.\(UUID().uuidString)"
+        let writeAPI = ProductionWeightWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: UserDefaults(suiteName: suite)!))
+        _ = try await writeAPI.submitWeight(localDate: "2026-09-25", value: 175.9, expectedVersion: nil)
+        _ = try await writeAPI.submitMorningCheckIn(localDate: "2026-09-25", value: 175.9, expectedVersion: "1", reconciliationSubmissions: [])
+        let requests = await transport.requests
+        let weight = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])["payload"] as? [String: Any]
+        XCTAssertEqual(weight?["localDate"] as? String, "2026-09-25", "the record's canonical date is exactly what was chosen")
+        XCTAssertEqual(weight?["timeZone"] as? String, DailyDriverLocalDay.currentDeviceTimeZone().identifier)
+        let checkIn = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[2].httpBody)) as? [String: Any])["payload"] as? [String: Any]
+        XCTAssertNil(checkIn?["timeZone"], "the Morning Check-In stays on the Server-owned canonical day")
     }
 }

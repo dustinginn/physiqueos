@@ -88,7 +88,17 @@ struct NativeGoalPhaseContext: Decodable, Sendable {
 struct ProductionHomeAPI: HomeAPI {
     let api: ProductionNativeAPI
     var now: @Sendable () -> Date = { Date() }
-    var calendar = Calendar.current
+    /// The device's current zone, read on every call (never captured once).
+    var timeZone: @Sendable () -> TimeZone = { DailyDriverLocalDay.currentDeviceTimeZone() }
+
+    /// The read carries the device zone. Home's content stays Server-owned in
+    /// the canonical coaching zone (the Server ignores it for Home), but the
+    /// zone partitions the in-memory cache and the persisted last-known
+    /// snapshot, so a snapshot saved in one zone can never be painted in
+    /// another.
+    private var query: [String: String] {
+        ["presentationVersion": "2", "timeZone": timeZone().identifier]
+    }
 
     func fetchHome() async throws -> HomeReadModel {
         // Presentation capability v2 advertises forward-compatible Home
@@ -96,18 +106,26 @@ struct ProductionHomeAPI: HomeAPI {
         // and receives the server's neutral v1 icon fallback; corrected
         // clients receive canonical domain icons such as `pills`.
         let envelope = try await api.readResource(
-            "home", query: Self.query, as: Payload.self
+            "home", query: query, as: Payload.self
         )
         return try Self.readModel(from: envelope)
     }
 
     func lastKnownHome() async -> HomeLastKnownSnapshot? {
-        guard let envelope = await api.lastKnownResource("home", query: Self.query, as: Payload.self),
+        let zone = timeZone()
+        var deviceCalendar = Calendar(identifier: .gregorian)
+        deviceCalendar.timeZone = zone
+        let current = now()
+        guard let envelope = await api.lastKnownResource("home", query: query, as: Payload.self),
               let generatedAt = Self.serverInstant(envelope.generatedAt),
               // Home is a today surface (Today's Focus, briefing slots): a
-              // snapshot from an earlier local day is refused, not shown.
-              calendar.isDate(generatedAt, inSameDayAs: now()),
-              let home = try? Self.readModel(from: envelope)
+              // snapshot is refused unless it was generated on the SAME day
+              // both on the device's current calendar (what the Founder calls
+              // today) and on the Server-owned canonical calendar its
+              // priorities and briefing slots were projected for.
+              deviceCalendar.isDate(generatedAt, inSameDayAs: current),
+              let home = try? Self.readModel(from: envelope),
+              home.notificationCalendar.isDate(generatedAt, inSameDayAs: current)
         else { return nil }
         return HomeLastKnownSnapshot(home: home, generatedAt: envelope.generatedAt, generatedDate: generatedAt)
     }
@@ -118,7 +136,6 @@ struct ProductionHomeAPI: HomeAPI {
         return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 
-    private static let query = ["presentationVersion": "2"]
 
     private static func readModel(from envelope: ProductionResponseEnvelope<Payload>) throws -> HomeReadModel {
         let priorities = envelope.data.todaysFocus.map { $0.readOnlyOccurrence }
@@ -769,6 +786,9 @@ struct ProductionOperatingPlanAPI: OperatingPlanAPI {
 /// selection (the server's `current` is already revision-safe).
 struct ProductionLogAPI: LogAPI {
     let api: ProductionNativeAPI
+    /// Logged Today follows the device's current local day: the read names
+    /// the current zone (also partitioning the cache by zone).
+    var timeZone: @Sendable () -> TimeZone = { DailyDriverLocalDay.currentDeviceTimeZone() }
 
     func refreshLog() async throws -> LogReadModel {
         await api.invalidateReadResources(["evidence-review-queue"])
@@ -776,7 +796,7 @@ struct ProductionLogAPI: LogAPI {
     }
 
     func fetchLog() async throws -> LogReadModel {
-        async let logRead = api.readResource("evidence-review-queue", as: Payload.self)
+        async let logRead = api.readResource("evidence-review-queue", query: ["timeZone": timeZone().identifier], as: Payload.self)
         async let weightRead = api.readResource("weight", query: ["context": "all"], as: WeightPayload.self)
         let payload = try await logRead.data
         let weightPayload = try? await weightRead.data

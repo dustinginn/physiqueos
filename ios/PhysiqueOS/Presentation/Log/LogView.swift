@@ -33,6 +33,15 @@ struct LogView: View {
             }
             await viewModel?.load()
         }
+        // Logged Today is a daily-driver "Today" surface: it reloads when the
+        // local day or zone changes (the environment invalidates the cached
+        // read before publishing the new day) and whenever it is foregrounded
+        // while visible. Before this, a retained Log kept showing the previous
+        // day's rows after midnight until a tab switch or pull to refresh.
+        .onChange(of: environment.dailyDriverDay) { _, _ in
+            Task { await viewModel?.load() }
+        }
+        .refreshesOnForegroundWhenVisible { await viewModel?.load() }
         // While a confirmed review is Processing, refresh on a bounded cadence so the
         // card clears when the Server finishes. `.task` is cancelled when the screen
         // leaves, the app backgrounds (scenePhase in the id), or nothing is processing.

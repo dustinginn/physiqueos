@@ -191,6 +191,10 @@ final class AppEnvironment {
     /// Home observes this generation so a completion performed from an iOS
     /// notification updates the visible row after durable acknowledgement.
     var canonicalPriorityRefreshGeneration = 0
+    /// The daily-driver "Today" (device local day + zone). Published only
+    /// AFTER the day-scoped read caches are invalidated, so every screen that
+    /// reloads because it changed reads the new day. See `DailyDriverLocalDay`.
+    private(set) var dailyDriverDay = DailyDriverLocalDay.resolve(at: Date(), in: .current)
     private let authoritySelectionStore: NativeAuthoritySelectionStore
     private let sandboxHomeAPI: HomeAPI
     private let sandboxGoalsAPI: GoalsAPI
@@ -668,6 +672,23 @@ final class AppEnvironment {
 }
 
 extension AppEnvironment {
+    /// Recomputes the daily-driver day from the system clock and zone (never
+    /// by advancing a cached value). On a change of local date OR zone it
+    /// retires every day-scoped cached read and the last-known Home snapshot,
+    /// then publishes the new day. Returns whether the day changed.
+    @MainActor
+    @discardableResult
+    func reevaluateDailyDriverDay(
+        at instant: Date = Date(),
+        timeZone: TimeZone = DailyDriverLocalDay.currentDeviceTimeZone()
+    ) async -> Bool {
+        let next = DailyDriverLocalDay.resolve(at: instant, in: timeZone)
+        guard next != dailyDriverDay else { return false }
+        await productionNativeAPI.invalidateReadResources(DailyDriverLocalDay.dayScopedReadResources)
+        dailyDriverDay = next
+        return true
+    }
+
     /// Refreshes the server-owned bounded occurrence horizon after a
     /// canonical schedule/reminder edit. This deliberately performs no
     /// recurrence math in Swift: the server projects exact occurrence dates

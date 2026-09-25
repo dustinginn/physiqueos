@@ -71,6 +71,14 @@ struct HomeView: View {
         .onChange(of: environment.canonicalPriorityRefreshGeneration) { _, _ in
             Task { await viewModel?.load() }
         }
+        // A foregrounded Home crossing local midnight or a zone change reloads
+        // from a fresh read (the day-scoped cache was invalidated first).
+        .onChange(of: environment.dailyDriverDay) { _, _ in
+            Task {
+                await viewModel?.load()
+                await syncPriorityNotifications()
+            }
+        }
         .alert("Priority could not be completed", isPresented: Binding(
             get: { completionError != nil },
             set: { if !$0 { completionError = nil } }

@@ -71,8 +71,18 @@ struct PhysiqueOSApp: App {
                 // XCUITest's element queries behind an alert outside the
                 // app's accessibility hierarchy.
                 .onChange(of: scenePhase, initial: true) { _, phase in
+                    // Background -> foreground across local midnight or a zone
+                    // change: a suspended app gets no day-change notification,
+                    // so "Today" is recomputed from the system on every
+                    // activation, under every authority.
+                    if phase == .active { Task { await environment.reevaluateDailyDriverDay() } }
                     guard phase == .active, environment.nativeAuthority == .founderProduction else { return }
                     Task { await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap() }
+                }
+                // Foregrounded across local midnight, a manual clock / DST /
+                // carrier time change, or a zone change while running.
+                .onReceive(DailyDriverDayTrigger.publisher()) { _ in
+                    Task { await environment.reevaluateDailyDriverDay() }
                 }
         }
     }

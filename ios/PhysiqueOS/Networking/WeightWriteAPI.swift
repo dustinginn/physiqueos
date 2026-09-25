@@ -172,7 +172,11 @@ struct ProductionWeightWriteAPI: WeightWriteAPI {
             localDate: localDate,
             value: value,
             expectedVersion: expectedVersion,
-            reconciliationSubmissions: nil
+            reconciliationSubmissions: nil,
+            // A plain weigh-in is dated on the device's local day; naming the
+            // zone lets the Server's future-date guard judge the same day
+            // (travel east of the canonical zone after local midnight).
+            timeZone: DailyDriverLocalDay.currentDeviceTimeZone().identifier
         )
     }
 
@@ -188,7 +192,8 @@ struct ProductionWeightWriteAPI: WeightWriteAPI {
             localDate: localDate,
             value: value,
             expectedVersion: expectedVersion,
-            reconciliationSubmissions: reconciliationSubmissions
+            reconciliationSubmissions: reconciliationSubmissions,
+            timeZone: nil
         )
     }
 
@@ -198,7 +203,8 @@ struct ProductionWeightWriteAPI: WeightWriteAPI {
         localDate: String,
         value: Double,
         expectedVersion: String?,
-        reconciliationSubmissions: [MorningCheckInReconciliationSubmission]?
+        reconciliationSubmissions: [MorningCheckInReconciliationSubmission]?,
+        timeZone: String?
     ) async throws -> WeightSubmitResult {
         try NativeProductWriteGuard.authorize(.morningCheckInAndWeight, in: .founderProduction)
         let signature = ProductionIdempotentSubmission.signature([
@@ -206,7 +212,7 @@ struct ProductionWeightWriteAPI: WeightWriteAPI {
             reconciliationSubmissions.map(signatureFragment) ?? "",
         ])
         let idempotencyKey = idempotencyStore.resolvedKey(scope: scope, signature: signature)
-        let payload = Payload(localDate: localDate, value: value, reconciliationSubmissions: reconciliationSubmissions)
+        let payload = Payload(localDate: localDate, value: value, reconciliationSubmissions: reconciliationSubmissions, timeZone: timeZone)
         let outcome: ProductionCommandOutcome<WeightSubmitResult> = try await api.submitCommand(
             commandType,
             idempotencyKey: idempotencyKey,
@@ -225,6 +231,7 @@ struct ProductionWeightWriteAPI: WeightWriteAPI {
         var localDate: String
         var value: Double
         var reconciliationSubmissions: [MorningCheckInReconciliationSubmission]?
+        var timeZone: String?
     }
 }
 
