@@ -1,82 +1,70 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-25T17:35:00Z",
+  "generated_at_utc": "2026-09-26T17:08:00Z",
   "task": {
-    "id": "claude-healthkit-training-day-cardio-server-deploy-20260925",
-    "title": "Training Day Cardio presentation fix DEPLOYED to production (Server a399916a) \u2014 awaiting Founder on-device acceptance",
+    "id": "claude-healthkit-prospective-cardio-outdoor-walk-acceptance-20260926",
+    "title": "Prospective Cardio Outdoor Walk acceptance PASS — automatic HealthKit pipeline proven end to end",
     "agent": "claude",
-    "status": "awaiting_founder_acceptance"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "native_installed_sha": "00321dcc6dd86a6479dbca5dd27e691c87348cd8",
     "native_installed_build": 60,
-    "native_installed_worktree": "/Users/dustinginn/Developer/PhysiqueOS/native-midweek-v3",
-    "native_installed_branch": "claude/midweek-standard-format-v3",
-    "native_final_candidate_sha": "6a108d25e2a05b63c9561be3aeb9952f4e9dafe1",
-    "server_final_candidate_sha": "a399916ac9b1c9128067f0f77fb7fd05666aa92a",
-    "production_server_sha": "a399916ac9b1c9128067f0f77fb7fd05666aa92a",
-    "production_deployment": "66ee39f6-c4d7-49c8-9012-3de1a77a832c",
-    "live_workout_policy_families": [
-      "cardio",
-      "strength"
-    ],
-    "live_workout_policy_digest": "4e1c59ab2f09bf886cd69207eb22fed3",
-    "native_installed_apple_delivery": "23788859-48c2-4386-adb4-568a3a898adf",
-    "native_installed_founder_acceptance": "Build 60 Strength accepted on device per Founder (Sep23 confirmed PASS, Sep24 candidate PASS)",
-    "native_candidate_note": "6a108d25 is included in Build 60 (release 00321dcc)",
-    "server_candidate_note": "a399916a (Training Day Cardio presentation, Server-only) is deployed; it contains the previously deployed e88b8ef7",
-    "live_workout_policy_version": 4,
+    "production_server_sha": "2a23eee762472081815d9122b97c0f0a9f1b8969",
+    "production_deployment": "14d52e0a-034b-4d9e-949e-b2602c29dbfc",
+    "live_workout_policy_families": ["cardio", "strength"],
     "live_workout_policy_effective_local_date": "2026-09-23",
-    "deferred_cardio_backlog_count": 0,
-    "live_workout_policy_audit_record": "healthkit_workout_activation_audit_c237cca36ea3_replace-families",
-    "live_workout_policy_applied_at_utc": "2026-09-25T15:48:43.485Z",
-    "deferred_cardio_backlog_state": "all four legacy walks reconciled (canonical Cardio walking, generic type); no deferred workout observations remain",
-    "canonical_workouts_total": 9,
-    "canonical_cardio_workouts": 6,
+    "canonical_workouts_total": 10,
+    "canonical_cardio_workouts": 7,
     "canonical_strength_workouts": 3,
-    "training_day_cardio_fix_server_candidate_sha": "a399916ac9b1c9128067f0f77fb7fd05666aa92a",
-    "training_day_cardio_fix_branch": "claude/training-day-healthkit-cardio-20260925",
-    "training_day_cardio_fix_base": "e88b8ef78fa236ce09660997f4084bde069018a7",
-    "training_day_cardio_fix_deployed": true,
-    "native_change_required": false,
-    "production_build_id": "physiqueos-a399916a-20260925",
-    "build61_required": false,
-    "native_build60_unchanged": true
+    "new_prospective_workout_local_date": "2026-09-26",
+    "new_prospective_workout_canonical_type": "outdoor_walking",
+    "native_build61_candidate_parked": "efcb8574",
+    "native_build61_blocker_cleared": true
   },
   "result": {
-    "summary": "Server-only Training Day Cardio presentation candidate a399916a deployed via the guarded two-step procedure (clean fast-forward from e88b8ef7, stamp update, force-rebuild). Deployment 66ee39f6 ACTIVE; web and worker source_commit_hash exact; live/ready healthy; migrations unchanged (14); 0 error logs. Zero-write post-deploy audit vs pre-deploy baseline: policy v4 [cardio,strength] unchanged, all 9 canonical workouts identical, deferred backlog 0, Sep23/Sep24 Activity totals unchanged (782.698 / 914.709 kcal), Strength links/claims unchanged, all 35 strategic digests unchanged. Training Day on production data: Sep21 = two Outdoor Walk + Strength (unchanged), Sep22 duplicates suppressed (unchanged), Sep23 and Sep24 = Walking, Walking, Traditional Strength Training, Sep25 empty (unchanged). Cardio rows open the existing Cardio detail with no Logger/link/claim semantics. Native Build 60 is unchanged and no Build 61 is required. No production data was mutated.",
+    "summary": "The Founder's Sep26 Apple Watch Outdoor Walk was proven, entirely read-only, to have gone through the untouched automatic pipeline end to end: Apple Watch -> HealthKit -> Native -> normal background sync -> Server observation persistence (isIndoorWorkout stored exactly false) -> Cardio family classification -> automatic canonical Cardio workout creation (single source observation, single canonical workout, no duplicates) -> specific canonicalType outdoor_walking -> Training Day presentation as a distinct 'Outdoor Walk' row (not generic Walking) -> Activity accounting (workout energy included exactly once, non-workout calories non-negative, no double count). No manual sync, ingestion replay, reconciliation, or backfill was performed; nothing was deployed or mutated. Historical Sep21-24 controls, Strength links/claims, workout policy, strategic quarantine, migrations, and production health were all reread fresh and found unchanged. Waited under an hour from first check to detection using only bounded read-only polling, no device operation. PASS: prospective Cardio ingestion/canonicalization/type-fidelity accepted; strategic evidence eligibility remains a separate, still-quarantined decision. Because this was the last blocker, Native Build 61 candidate efcb8574 (Performance Phase 2, local-day correctness, approved Active Goal V3 layout) can now move to release preparation under separate Founder authorization.",
     "success": true,
-    "verification_limits": "Rendered phone UI and authenticated HTTP endpoints were not exercised by the agent; the real store query, adapter, day model and session-detail code were run read-only over production data."
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false,
+    "founder_device_operated": false
   },
   "validation": {
-    "deploy": {
-      "status": "passed",
-      "summary": "Deployment 66ee39f6 ACTIVE, web+worker source SHA exact, runtime/log SHA exact, ready healthy, migration state unchanged, zero error logs."
+    "tests": {
+      "status": "not_applicable",
+      "summary": "No code changed in this task; this was a live production acceptance read, not a test-suite run. The classifier/presentation functions exercised are the same already-tested production code paths verified in prior HealthKit lane reports."
+    },
+    "review": {
+      "status": "not_applicable",
+      "summary": "No code shipped in this task. A bug in this task's own one-off audit script (wrong canonical-workout id lookup key) was found and fixed by the author before publishing; corrected output re-verified via a second run showing consistent, cross-checked results (deterministic id re-derivation matched, source observation id confirmed present in canonical provenance)."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Pre vs post read-only audits identical for policy, workouts, deferred backlog, Activity totals, Strength links/claims and all 35 strategic digests."
+      "summary": "Every production interaction was a bounded REPEATABLE READ READ ONLY transaction with an explicit ROLLBACK and a verified transaction_read_only=on fence; only hashed identifiers left the transaction. Three tools used: one new purpose-built script plus the existing, already-accepted --kind audit and --kind workout-audit tools for a wider Sep20-27 regression window."
     }
   },
   "decisions_required": [
-    "Founder on-device acceptance of Training Day Sep21/22/23/24 and Cardio row detail on Build 60 (no app update needed)."
+    "Authorize Native Build 61 preparation from candidate efcb8574 (Performance Phase 2 + local-day correctness + the approved Active Goal V3 layout), now that the prospective Cardio acceptance blocker is cleared.",
+    "Optional, non-blocking: unify Training landing/reporting/library/rollup surfaces with reconciled Cardio (existing backlog, not required for this acceptance)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "The stamp-only apps update deployment was CANCELED and the force-rebuild deployment became ACTIVE, as documented for this procedure.",
-    "Training landing/history/reporting/library counts still omit reconciled Cardio (non-blocking follow-up)."
+    "This task's own first-draft audit script had a key-lookup bug (looked up the canonical workout by the raw observation id instead of the deterministic derived canonical-workout id), which under-reported canonicalization linkage on the first run; found and fixed by the author before publishing, with the corrected, cross-checked result (deterministic id re-derivation plus source-observation-id-in-provenance check) matching the already-correct Training Day/Activity projection that had used the right data all along.",
+    "A same-topic ChatGPT inbox prompt (commit 551a1644, 'verify new prospective Outdoor Walk through automatic HealthKit Cardio pipeline') appeared on main mid-task; not executed by this (Claude/HealthKit-lane) task, which completed the Founder's own Claude-addressed prompt independently."
   ],
   "backlog": [
-    "Founder on-device acceptance of Training Day.",
-    "Prospective Indoor/Outdoor type-fidelity acceptance on the first new post-activation Cardio workout.",
-    "Optional: unify Training landing/reporting/library with reconciled Cardio."
+    "Native Build 61 preparation from efcb8574, pending separate Founder authorization.",
+    "Optional: unify Training landing/reporting/library/rollups with reconciled Cardio.",
+    "Strategic evidence eligibility for Cardio remains a later, separate, not-yet-started project."
   ],
-  "recommended_next_step": "Founder verifies Training Day on device: Sep23/Sep24 = Walking, Walking, Traditional Strength Training; Sep21 unchanged; Sep22 no duplicate walks; tapping a Walking row opens Cardio detail.",
-  "full_report_path": "agent-handoffs/reports/20260925T173500Z-healthkit-training-day-cardio-server-deployed-checkpoint.md",
+  "recommended_next_step": "Founder: verify the new Sep26 'Outdoor Walk' Training Day row on Build 60 per this report's checklist, then decide whether to authorize Native Build 61 preparation from efcb8574 now that this was the last blocker.",
+  "full_report_path": "agent-handoffs/reports/20260926T170800Z-healthkit-prospective-cardio-outdoor-walk-acceptance-PASS.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260925T171500Z-healthkit-training-day-cardio-presentation-diagnostic-and-fix.md",
-    "agent-handoffs/reports/20260925T161800Z-healthkit-cardio-historical-reconciliation-serial.md"
+    "agent-handoffs/reports/20260925T161800Z-healthkit-cardio-historical-reconciliation-serial.md",
+    "agent-handoffs/reports/20260925T173500Z-healthkit-training-day-cardio-server-deployed-checkpoint.md",
+    "agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md"
   ],
   "safety": {
     "contains_secrets": false,

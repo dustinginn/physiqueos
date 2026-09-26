@@ -2,22 +2,20 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Training Day Cardio presentation fix DEPLOYED (`claude-healthkit-training-day-cardio-server-deploy-20260925`)
+- Task: Prospective Cardio Outdoor Walk acceptance PASS (`claude-healthkit-prospective-cardio-outdoor-walk-acceptance-20260926`)
 - Agent: claude
-- Status: awaiting Founder on-device acceptance
-- Generated (UTC): 2026-09-25T17:35:00Z
+- Status: completed — this was the last blocker for Native Build 61
+- Generated (UTC): 2026-09-26T17:08:00Z
 - Success: true
 
-Server-only candidate `a399916ac9b1c9128067f0f77fb7fd05666aa92a` is live in production (deployment `66ee39f6-c4d7-49c8-9012-3de1a77a832c` ACTIVE; web and worker source SHA exact; build id `physiqueos-a399916a-20260925`). Health live/ready, migrations unchanged (14), zero error logs.
+Summary: the Founder recorded a new real Outdoor Walk on Apple Watch specifically to test the prospective Cardio pipeline. Watched it arrive through the untouched automatic path — no manual sync, no ingestion replay, nothing forced — and it worked exactly as designed: HealthKit → Native → normal background sync → Server → classified as Cardio → one new canonical workout created automatically → came out the other end labeled the *specific* type, "Outdoor Walk" (not generic "Walking"), because Apple's Indoor/Outdoor signal was actually present on this one, unlike the four historical walks. Training Day shows it as its own row; Activity's calorie math counts it exactly once, with no double-counting. Waited under an hour from first check to arrival using only read-only polling — no device operation.
 
-Zero-write post-deploy audit matches the pre-deploy baseline: workout policy v4 [cardio, strength], all 9 canonical workouts identical, deferred backlog 0, Sep23/Sep24 Activity totals unchanged, Strength links/claims unchanged, all 35 strategic digests unchanged. No production data was mutated.
+Everything else was re-checked fresh and found unchanged: the four historical Sep23/24 walks (still correctly generic, since their metadata is permanently unrecoverable), Sep21/22 duplicate suppression, Strength links/claims, workout policy `[cardio, strength]`, strategic evidence eligibility (still fully quarantined — this gate does not touch that), production health, and migrations. One thing worth knowing: this task's own first-draft audit script had a small bug in how it cross-referenced the canonical workout — caught and fixed before publishing, with the corrected result double-checked two independent ways.
 
-Training Day on production data: Sep21 = two Outdoor Walk + Strength (unchanged); Sep22 duplicates still suppressed; Sep23 and Sep24 = Walking, Walking, Traditional Strength Training; Sep25 empty. Cardio rows open the existing Cardio detail with no Logger/link/claim semantics.
+**Because this was the last blocker, Native Build 61 (candidate `efcb8574` — Performance Phase 2, local-day correctness, and the approved Active Goal V3 layout) can now move to release preparation, under separate Founder authorization.**
 
-**Native Build 60 is unchanged and no Build 61 is required.**
+Detailed report: `agent-handoffs/reports/20260926T170800Z-healthkit-prospective-cardio-outdoor-walk-acceptance-PASS.md`
 
-Limits: the phone UI and authenticated HTTP endpoints were not exercised by the agent. Next: Founder on-device acceptance.
-
-Detailed report: `agent-handoffs/reports/20260925T173500Z-healthkit-training-day-cardio-server-deployed-checkpoint.md`
+Related: `agent-handoffs/reports/20260925T161800Z-healthkit-cardio-historical-reconciliation-serial.md`, `agent-handoffs/reports/20260925T173500Z-healthkit-training-day-cardio-server-deployed-checkpoint.md`
 
 Protocol: `agent-handoffs/README.md`
