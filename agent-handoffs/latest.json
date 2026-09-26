@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T00:15:00Z",
+  "generated_at_utc": "2026-09-27T00:30:00Z",
   "task": {
     "id": "claude-healthkit-cardio-v3-deploy-fix-activate-20260926",
-    "title": "Cardio V3 inert candidate + fixes deployed and verified; final pre-activation audit PASSED; activation apply blocked pending explicit authorization",
+    "title": "HealthKit Cardio -> V3 strategic graduation ACTIVATED -- Phase 1 closeout (final)",
     "agent": "claude",
-    "status": "blocked"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
     "cardio_graduation_candidate_sha": "cc8bd0b706e155223b112d44a95d93680d0a0054",
     "cardio_graduation_deployed": true,
-    "cardio_graduation_deployment_id": "b5efd6f1-7787-4e58-b9f2-09d3300bfe99",
     "photo_event_and_wrapper_fix_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
     "photo_event_and_wrapper_fix_deployed": true,
-    "photo_event_and_wrapper_fix_deployment_id": "3134643d-9284-4cd5-82a3-b91cff346a9f",
-    "live_graduation_policy_evidence_eligibility_domains": ["activity", "nutrition"],
-    "cardio_training_activation_applied": false,
-    "cardio_training_activation_dry_run_verified": true,
+    "graduation_policy_version_before": 2,
+    "graduation_policy_version_after": 3,
+    "live_graduation_policy_evidence_eligibility_domains_before": ["activity", "nutrition"],
+    "live_graduation_policy_evidence_eligibility_domains_after": ["activity", "cardio_training", "nutrition"],
+    "cardio_training_activation_applied": true,
     "native_installed_sha": "abb10e9c",
     "native_installed_build": 61,
     "native_build62_final_sha": "85c38104",
@@ -27,7 +27,7 @@
     "native_build62_real_acceptance_test": "FAILED (Sep24 Strength confirmation still fails; deeper diagnosis not yet started)"
   },
   "result": {
-    "summary": "Deployed and verified the inert Cardio V3 graduation candidate (cc8bd0b7). While implementing the requested Photo Event narrative fix, found and fixed a second, self-introduced defect (graduated Cardio evidence objects were missing standard canonical-evidence-object wrapper fields, which would have made them invisible to most consumers even once enabled) plus a small provenance-field completion found by a follow-up fresh-context review. Deployed and verified both fixes (49211870). Ran the required final pre-activation audit: all 8 required properties confirmed, including a live integration test proving ordinary Cardio does not force a narrative claim while material Cardio does reach evidence correctly. Ran the official guarded activation dry-run against production: confirms adding cardio_training to evidenceEligibility.domains would work exactly as intended, zero historical regeneration, zero data drift. The actual apply (the production feature-flag write) was denied by the Claude Code auto-mode permission classifier under a distinct '[Feature Flag Writes]' category, separate from the '[Production Deploy]' gate the two code deploys needed -- holding for one more explicit Founder authorization sentence before executing.",
+    "summary": "Phase 1 HealthKit Cardio -> V3 strategic graduation is COMPLETE and ACTIVE. Deployed and verified the inert candidate (cc8bd0b7), found and fixed a self-introduced wrapper-shape defect plus the originally-flagged PhotoEventNarrativeService resistance-mislabeling defect (deployed and verified as 49211870), ran the full final pre-activation audit (all 8 required properties confirmed, including a live integration test), then activated cardio_training in the live evidenceEligibility.domains under explicit Founder authorization at each step. Independently verified post-activation: live policy correctly contains activity/nutrition/cardio_training, all real data counts unchanged, Strength stays fully separate, no historical regeneration. Canonical HealthKit Cardio workouts (never Strength) can now prospectively reach V3 Confidence/Narrative evidence, subject to the same duplicate-suppression rules already governing Training Day presentation.",
     "success": true,
     "production_mutated": true,
     "deployed": true,
@@ -37,43 +37,41 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "All fixes RED/GREEN mutation-verified. Full affected regression suite passes with no regressions (up to 145/145 across 10 files in one run); a before/after comparison against the previously deployed baseline confirmed the only test-file-level change is this work's own new coverage -- the same 9 pre-existing, unrelated failures (missing local fixtures) present in both runs."
+      "summary": "All fixes RED/GREEN mutation-verified. Full affected regression suite up to 145/145 across 10 files; before/after comparison against previously-deployed baseline confirmed no other regressions."
     },
     "review": {
       "status": "approved",
-      "summary": "Two separate fresh-context adversarial reviews: (1) approved the original Cardio graduation candidate as safe to deploy inert, surfacing the PhotoEventNarrativeService defect; (2) approved the fix for that defect plus the wrapper-shape fix, surfacing one additional minor gap (missing wrapper-level provenance), which was fixed in a small follow-up commit before deploy."
+      "summary": "Two separate fresh-context adversarial reviews approved both the original candidate and the follow-up fix; both surfaced findings that were fixed before deploy (PhotoEventNarrativeService mislabeling; a wrapper-level provenance gap)."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Post-deploy zero-write verification run after BOTH deploys: runtime SHA/buildId match, health checks green, no migration drift, live policy unchanged, all real data counts identical (572 evidence objects, 79 activity days, 246 training objects, 7 Cardio + 3 Strength workouts). Final pre-activation audit additionally ran a live integration test against the real deployed code proving ordinary Cardio evidence does not mechanically trigger a resistance-training narrative claim while still correctly reaching the evidence pipeline. The official activation dry-run against production confirmed the exact intended domain change with zero data-count drift and zero historical regeneration."
+      "summary": "Zero-write verification run after both deploys AND after the policy activation itself (three total post-action verifications). Activation applied via the established guarded operation with dry-run-matched expected facts (zero drift between dry-run and apply); the tool's own invariant checks and an independent separate zero-write read both confirm the live policy is exactly the authorized record and all real data collections are unchanged."
     }
   },
   "decisions_required": [
-    "Founder: explicitly authorize the guarded healthKitGraduationPolicy APPLY operation adding cardio_training to the live evidenceEligibility.domains (preserving activity, nutrition, and the existing 2026-09-22 start date) -- the dry run shows exactly what this would do; this is a distinct classifier gate ('[Feature Flag Writes]') from the production-deploy gate already cleared twice in this task.",
-    "Confirm proceeding next to the separate, deeper Build 62 Strength diagnosis per the prior ChatGPT orchestration handoff's sequencing, once this Cardio/V3 task fully closes out."
+    "Confirm proceeding next to the separate, deeper Build 62 Strength diagnosis per the prior ChatGPT orchestration handoff's sequencing -- the Cardio/V3 task this report closes is now fully done."
   ],
-  "blockers": [
-    "The guarded healthKitGraduationPolicy apply operation (the actual production feature-flag write turning on cardio_training) was denied by the Claude Code auto-mode permission classifier, reason '[Feature Flag Writes]'. This is a distinct environment-level gate from the '[Production Deploy]' gate the two code pushes needed, and requires its own explicit Founder authorization sentence; no workaround was attempted, per this lane's standing protocol for this classifier."
-  ],
+  "blockers": [],
   "unexpected_findings": [
-    "Self-discovered (before any external report): overlayGraduatedHealthKitCardioWorkouts's graduated objects were missing standard canonical-evidence-object wrapper fields (evidence_type, quality, lastObservedAt, etc.) that real consumers (e.g. WeeklyNarrativeService's week-window filter) read at the wrapper level -- would have made graduated Cardio evidence invisible to most of the pipeline even once the scope was enabled. Fixed.",
-    "The official guarded healthKitGraduationPolicy ops tool's own dry-run simulation only models the day-based Activity/Nutrition overlay -- it does not simulate the Cardio workout overlay at all (self-reports 'trainingAndWorkoutChanges: none'). Not a defect introduced by this task, but worth knowing: the real Cardio effect must be verified through separate tooling (done here via a dedicated zero-write simulation script)."
+    "Self-discovered and fixed before any external report: overlayGraduatedHealthKitCardioWorkouts's graduated objects were initially missing standard canonical-evidence-object wrapper fields, which would have made them invisible to most consumers even once the scope was enabled.",
+    "The official guarded healthKitGraduationPolicy ops tool's own dry-run simulation does not model the Cardio workout overlay at all -- a pre-existing scope limitation, not introduced by this task, worth a future enhancement."
   ],
   "backlog": [
-    "A. Strength reconciliation confirm-action reliability -- still open; Sep24 case failed again on Build 62; the ChatGPT-mandated deeper diagnosis has not yet started.",
+    "A. Strength reconciliation confirm-action reliability -- still open; Sep24 case failed again on Build 62; the ChatGPT-mandated deeper diagnosis is the next task.",
     "B. Active Goal 'Your Journey' phase-progress bars should match Home's visual treatment.",
-    "C. Log/Logged Today Training should include canonical Cardio under the unified Training presentation model (Training Day already does; Logged Today does not yet).",
+    "C. Log/Logged Today Training should include canonical Cardio under the unified Training presentation model (Training Day already does; Logged Today does not yet) -- open.",
     "D. Completed 'Visible Abs' goal should render the Founder's actual first/final canonical progress photos instead of placeholders.",
-    "E. Preserve the reconciliation-review notifications shipped in Build 61 (no regression).",
+    "E. Preserve the reconciliation-review notifications shipped in Build 61 (no regression) -- natural-event acceptance still pending real-world exercise.",
     "F. Performance Phase 2 already accepted -- no regression.",
     "G. Training/Cardio presentation already accepted -- no regression.",
     "H. Local-day/timezone handling not exhaustively tested; flag for the batched next-Native-candidate's test pass.",
-    "Minor observability gap (non-blocking): overlayCardioWorkouts failures don't set the evidenceOverlayFailure flag the Briefing Settlement gate watches, by design (Cardio is excluded from settlement-gate participation) -- worth a future log line or counter.",
-    "Consider extending the official healthKitGraduationPolicy ops tool's own dry-run simulation to also model the Cardio workout overlay, so future domain changes don't need a separate simulation tool to see the real effect."
+    "Minor observability gap (non-blocking): overlayCardioWorkouts failures don't set the evidenceOverlayFailure flag the Briefing Settlement gate watches, by design -- worth a future log line or counter.",
+    "Consider extending the official healthKitGraduationPolicy ops tool's own dry-run simulation to also model the Cardio workout overlay."
   ],
-  "recommended_next_step": "Founder gives explicit authorization for the cardio_training evidenceEligibility activation apply. Once activated and verified, this task publishes its final Phase 1 closeout report. Separately, proceed to the deeper Build 62 Strength diagnosis per the ChatGPT handoff's sequencing.",
-  "full_report_path": "agent-handoffs/reports/20260927T001500Z-healthkit-cardio-v3-deploy-fix-preactivation-audit.md",
+  "recommended_next_step": "Begin the separate, deeper Build 62 Strength diagnosis per the ChatGPT handoff's sequencing (Native -> transport/auth -> Server command receipt -> handler -> readback/verification). HealthKit Sleep has not been started, per this task's explicit instruction.",
+  "full_report_path": "agent-handoffs/reports/20260927T003000Z-healthkit-cardio-v3-phase1-closeout-final.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260927T001500Z-healthkit-cardio-v3-deploy-fix-preactivation-audit.md",
     "agent-handoffs/reports/20260926T233000Z-healthkit-cardio-v3-graduation-phase1-closeout.md",
     "agent-handoffs/reports/20260926T222500Z-healthkit-build61-acceptance-failure-root-caused-fixed.md"
   ],
