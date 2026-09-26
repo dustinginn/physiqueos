@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-26T03:58:10Z",
+  "generated_at_utc": "2026-09-26T04:13:08Z",
   "task": {
-    "id": "claude-active-goal-v3-content-architecture-round2-20260925",
-    "title": "Active Goal V3 round 2: Coach's Take last, one primary location per fact, dated Confidence, HealthKit intake-completeness engine fix; awaiting Founder content acceptance",
+    "id": "claude-active-goal-v3-round3-final-content-20260925",
+    "title": "Active Goal V3 round 3: display-only Confidence (no detail sheet); final content preview; awaiting Founder content acceptance and release authorization",
     "agent": "claude",
     "status": "partial"
   },
@@ -17,7 +17,7 @@
     "native_build": 60
   },
   "result": {
-    "summary": "Round-2 candidates: Server 2a23eee7 and Native fb4df07d (descendant of c15f0881). Goal page order hero -> journey -> current progress -> guardrail -> training -> turning points -> Coach's Take (last); a quantitative fact appears numerically once on the primary page (proven by a dedupe map on production data; only 8.1% in table+guardrail pill and 10 lb in the canonical V3 thesis repeat, by design); Confidence sheet dated 'As of the Sep 23 Midweek Briefing' from publisher metadata. The Sep 23 Coach's Take 'logged meals' sentence was diagnosed read-only: accurate historical output for pre-graduation MyFitnessPal days (kept verbatim), but a live engine defect (not coverage-aware; would over-claim for the Sep 20-26 Weekly and temper via the wearable item) fixed in the shared V3 engine with cross-cadence tests; no historical briefing regenerated. Nothing deployed; STOP for Founder content acceptance.",
+    "summary": "Round 3 (Native only): on the current-state active Goal, Confidence is display-only (79% Moderate + V3 goal thesis + 'As of the Sep 23 Midweek Briefing' provenance); no chevron, tap target or Confidence detail sheet; detailed V3 evidence stays in the Server contract and is not presented. Native candidate efcb8574 (descendant of c15f0881; only 4 Goal files changed; ConfidenceDetailSheet identical to c15f0881; legacy/completed Goal unchanged). Server unchanged at 2a23eee7 (round-2 validation stands, incl. the shared coverage-aware intake-completeness engine fix). Final production-shaped preview published with dedupe map and no sheet section. Nothing deployed.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,33 +26,30 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server 2a23eee7 full suite 9206 tests, failure set identical to baseline (306 environmental), 50 new tests pass; webpack on exact SHA passes. Native fb4df07d full PhysiqueOSTests 1421/0 on iPhone 17 Pro simulator."
+      "summary": "Native full PhysiqueOSTests 1421/0 on iPhone 17 Pro simulator; new display-only/no-interaction/no-leak tests, mutation-checked. Server byte-identical to 2a23eee7 (round 2: 9206 tests, failure set identical to baseline; webpack pass)."
     },
     "review": {
       "status": "approved",
-      "summary": "Fresh-context Server and Native reviews; one stale-test blocker and all medium/low findings fixed."
+      "summary": "Fresh-context review of the final Native candidate: nothing blocking; all low findings fixed in efcb8574."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "All production reads REPEATABLE READ READ ONLY with explicit rollback; completed Visible Abs digest identical; performance median 611 ms / max 1523 ms (<=3 s)."
+      "summary": "Read-only probe with rollback; currentState identical to round 2; completed Visible Abs digest identical; median 455 ms / max 1.56 s."
     }
   },
   "decisions_required": [
-    "Founder: review agent-handoffs/reports/20260926T035810Z-goal-v3-round2-founder-content-preview.md and approve or list edits.",
-    "After approval: authorize Server 2a23eee7 deploy (includes the shared intake-completeness engine fix ahead of the next Weekly), then Build 61 from fb4df07d after prospective Cardio acceptance."
+    "Founder: approve the final content preview (agent-handoffs/reports/20260926T041308Z-goal-v3-round3-final-content-preview.md) or list edits.",
+    "After approval: authorize Server 2a23eee7 deploy, then Build 61 from Native efcb8574 after prospective Cardio acceptance."
   ],
   "blockers": [],
-  "unexpected_findings": [
-    "The intake-completeness defect also tempered the Energy estimate through the wearable item in HealthKit transition windows; fixed.",
-    "Exactly-half meal-derived windows stay moderate (conservative); confirm intended."
-  ],
+  "unexpected_findings": [],
   "backlog": [
     "V3 guardrail risk phrase missing % unit.",
     "Home DEXA authority filter.",
-    "Optional: render V3 could-raise/could-lower lists in the Goal Confidence sheet."
+    "Confirm exactly-half meal-derived windows stay moderate."
   ],
-  "recommended_next_step": "Founder reviews the round-2 content preview; on approval, authorize the Server 2a23eee7 deploy, then Build 61 from fb4df07d.",
-  "full_report_path": "agent-handoffs/reports/20260926T035810Z-goal-v3-round2-candidates-acceptance.md",
+  "recommended_next_step": "Founder reviews the round-3 final content preview; on approval authorize the Server 2a23eee7 deploy, then Build 61 from efcb8574.",
+  "full_report_path": "agent-handoffs/reports/20260926T041308Z-goal-v3-round3-final-content-acceptance.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
