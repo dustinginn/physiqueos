@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { deriveEnergyExecutionV3, EnergyAmbiguityTypeV3, mealDerivedCoverageV3 } from "./EnergyAmbiguityV3.js";
+import { applyEnergyAmbiguityToRecommendation, deriveEnergyExecutionV3, EnergyAmbiguityTypeV3, mealDerivedCoverageV3 } from "./EnergyAmbiguityV3.js";
+import { composeEnergyStatementV3 } from "../../services/BriefingV3Projection.js";
 import { describeUncertaintyV3, ENERGY_AMBIGUITY_CLAUSES_V3 } from "./AmbiguityVocabularyV3.js";
 import { adaptEnergyObservationsV3 } from "../CadenceEnergyObservationsV3.js";
 import { createEnergyPIObservations } from "../../services/EnergyPIObservationService.js";
@@ -24,6 +25,14 @@ const mealLogDay = (date, kcal = 2400) => ({ ...healthKitDay(date, kcal),
     ambiguity: ["intake_meal_derived_unverified", "intake_meal_capture_flagged_partial"] } });
 const dates = ["2026-09-20", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-26"];
 
+function executionFor(rows) {
+  const piObservations = createEnergyPIObservations({ days: rows,
+    observationWindow: { startDate: dates[0], endDate: dates.at(-1) }, semanticHorizon: "rolling_7_days" });
+  const observations = adaptEnergyObservationsV3({ observations: piObservations, goalContract, artifactId: "weekly-test",
+    evidenceCutoff: "2026-09-27T06:59:59.999Z" });
+  return deriveEnergyExecutionV3({ goalContract, observations });
+}
+
 function intakeAmbiguityFor(rows) {
   const piObservations = createEnergyPIObservations({ days: rows,
     observationWindow: { startDate: dates[0], endDate: dates.at(-1) }, semanticHorizon: "rolling_7_days" });
@@ -43,15 +52,26 @@ describe("Energy intake completeness is coverage-aware (V3)", () => {
     const item = intakeAmbiguityFor([mealLogDay(dates[0]), mealLogDay(dates[1]), ...dates.slice(2).map((date) => healthKitDay(date))]);
     expect(item.reasons).toContain("intake_meal_derived_days_2_of_7");
     expect(item).toMatchObject({ materiality: "low", recommendationEffect: "none" });
-    expect(describeUncertaintyV3(item)).toBe("Calorie totals for 2 of 7 days come from logged meals rather than a confirmed full-day total.");
+    expect(describeUncertaintyV3(item)).toBe("On 2 of the 7 days with calorie totals, the total comes from logged meals rather than a confirmed full-day total.");
     expect(describeUncertaintyV3(item)).not.toBe("Calorie totals come from logged meals rather than a confirmed full-day total.");
+  });
+
+  it("keeps the transition week firm: an immaterial intake limitation never re-enters through the wearable estimate", () => {
+    const transition = executionFor([mealLogDay(dates[0]), mealLogDay(dates[1]), ...dates.slice(2).map((date) => healthKitDay(date))]);
+    const allHealthKit = executionFor(dates.map((date) => healthKitDay(date)));
+    const effect = (execution, type) => execution.ambiguity.find((item) => item.type === type)?.recommendationEffect ?? "none";
+    expect(effect(transition, EnergyAmbiguityTypeV3.WEARABLE_ESTIMATE)).toBe(effect(allHealthKit, EnergyAmbiguityTypeV3.WEARABLE_ESTIMATE));
+    expect(transition.ambiguity.filter((item) => item.recommendationEffect === "temper")).toEqual([]);
+    const recommendation = applyEnergyAmbiguityToRecommendation({ action: "continue_current_strategy" }, transition);
+    expect(recommendation.strength ?? "firm").toBe("firm");
+    expect(composeEnergyStatementV3({ execution: transition, ambiguityText: null }) ?? "").not.toMatch(/directional|logged meals|wearable estimate/);
   });
 
   it("names the share of meal-derived days when they are the majority but not all", () => {
     const item = intakeAmbiguityFor([...dates.slice(0, 4).map((date) => mealLogDay(date)), ...dates.slice(4).map((date) => healthKitDay(date))]);
     expect(item).toMatchObject({ materiality: "moderate", recommendationEffect: "temper" });
     expect(ENERGY_AMBIGUITY_CLAUSES_V3.energy_intake_uncertainty(item))
-      .toBe("calorie totals for 4 of 7 days come from logged meals rather than a confirmed full-day total");
+      .toBe("on 4 of the 7 days with calorie totals, the total comes from logged meals rather than a confirmed full-day total");
   });
 
   it("keeps the established all-days wording and materiality when every day is meal-derived (historical parity)", () => {

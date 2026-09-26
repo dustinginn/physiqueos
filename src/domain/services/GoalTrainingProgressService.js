@@ -97,11 +97,15 @@ function trainingProgressSummary({ state, comparisons, improving, regressing, re
   if (state === "forming") return `${comparisons.length} ${comparisons.length === 1 ? "movement has" : "movements have"} comparable sessions so far; more repeats are needed before training progress can be judged.`;
   const improvingRegions = regions.filter((item) => item.status === "improving").map((item) => item.region);
   const where = improvingRegions.length ? `, led by ${joinWords(improvingRegions)}` : "";
+  const steadyCount = comparisons.length - improving.length - regressing.length;
+  const verb = (count) => (count === 1 ? "is" : "are");
   const lead = improving.length * 2 >= comparisons.length
-    ? `${improving.length} of ${comparisons.length} comparable movements are improving${where}.`
+    ? `${improving.length} of ${comparisons.length} comparable movements ${verb(improving.length)} improving${where}.`
     : regressing.length > improving.length
-      ? `More movements are slipping than improving: ${regressing.length} of ${comparisons.length} are down.`
-      : `Most comparable movements are holding steady; ${improving.length} of ${comparisons.length} are improving${where}.`;
+      ? `More movements are slipping than improving: ${regressing.length} of ${comparisons.length} ${verb(regressing.length)} down.`
+      : steadyCount * 2 > comparisons.length
+        ? `Most comparable movements are holding steady${improving.length ? `; ${improving.length} of ${comparisons.length} ${verb(improving.length)} improving${where}` : ""}.`
+        : `Results are mixed across ${comparisons.length} comparable movements: ${improving.length} improving, ${regressing.length} down.`;
   const slipping = regressing.length && improving.length * 2 >= comparisons.length
     ? ` ${joinWords(regressing.slice(0, 2).map((item) => item.name))} ${regressing.length === 1 ? "is" : "are"} down.` : "";
   return `${lead}${slipping}`;

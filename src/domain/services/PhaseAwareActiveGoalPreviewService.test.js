@@ -44,7 +44,9 @@ describe("phase-aware active goal preview",()=>{
     const transition = result.turningPoints.find((item) => item.date === "2026-08-15");
     expect(transition).toBeDefined();
     expect(transition.body).toMatch(/Establish Maintenance was completed and Lean Mass Build began/);
-    expect(transition.body).toMatch(/The Aug 15 DEXA showed \+0\.8 lb of lean mass from the baseline/);
+    // Aug 15 is the latest scan here, so its +0.8 lb is the composition change and is not repeated.
+    expect(transition.body).toBe("Establish Maintenance was completed and Lean Mass Build began.");
+    expect(result.currentState.composition.change.leanMassLb).toBe(0.8);
     expect(transition.body).not.toMatch(/148\.3/);
     expect(transition.body).not.toMatch(/did not conclusively prove|sufficiently bounded|authoriz/i);
     // Strategy specifics (targets, review cadence) belong to Current Strategy, not the milestone story.

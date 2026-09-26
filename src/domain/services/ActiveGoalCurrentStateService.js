@@ -12,6 +12,8 @@ import { buildMilestoneStory } from "../presentation/milestoneStoryPresentation.
 export const ACTIVE_GOAL_CURRENT_STATE_V1 = "active_goal_current_state_v1";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+// Scans 25-35 days apart read as "in the month" (monthly DEXA cadence).
+const MONTH_SPAN_DAYS = Object.freeze({ min: 25, max: 35 });
 const INACTIVE_DEXA_STATES = new Set(["failed", "superseded", "retracted", "deleted", "inactive", "rejected", "removed"]);
 // Goal-context coaching language: the Goal page explains meaning, never the
 // machinery of updates, evidence accumulation or reviews.
@@ -277,7 +279,10 @@ export function composeGoalTurningPoints({ baseline, sinceBaseline = [], journey
     if (scan) scanDatesUsed.add(scan.date);
     const priorName = prior.phaseName ?? prior.name;
     const activeName = phase.phaseName ?? phase.name;
-    const measured = scan && baseline
+    // When the phase-start scan is also the latest scan, its delta from the
+    // baseline IS the composition table's change, so it is not repeated here.
+    const latest = sinceBaseline.at(-1) ?? null;
+    const measured = scan && baseline && scan.date !== latest?.date
       ? ` The ${formatShortDate(scan.date)} DEXA showed ${signed(scan.leanMassLb - baseline.leanMassLb)} lb of lean mass from the baseline.` : "";
     points.push({ id: `phase_transition|${phase.id ?? phase.phaseId}|${start}`, kind: "phase_transition", date: start,
       title: `${priorName} completed · ${activeName} began`,
@@ -304,10 +309,19 @@ export function composeGoalTurningPoints({ baseline, sinceBaseline = [], journey
         : Math.abs(change) >= materialDelta ? `Lean mass ${change > 0 ? "up" : "down"} since the ${formatShortDate(previous.date)} scan`
           : guardrailAfter ? "Body fat back inside the guardrail" : "Body fat left the guardrail range";
     const days = daysBetween(previous.date, scan.date);
-    const span = days >= 25 && days <= 35 ? "in the month" : `in the ${days} days`;
-    const guardrailClause = guardrailChanged ? `, and body fat moved ${guardrailAfter ? "into" : "out of"} the guardrail range` : "";
-    points.push({ id: `dexa_milestone|${scan.date}`, kind: "dexa_milestone", date: scan.date, title,
-      body: `Lean mass ${change >= 0 ? "rose" : "fell"} ${Math.abs(change).toFixed(1)} lb ${span} since the ${formatShortDate(previous.date)} scan${guardrailClause}.` });
+    const span = days >= MONTH_SPAN_DAYS.min && days <= MONTH_SPAN_DAYS.max ? "in the month" : `in the ${days} ${days === 1 ? "day" : "days"}`;
+    const leanMoved = Math.abs(change) >= 0.05;
+    // Latest scan measured straight from the baseline: its change is the
+    // composition table's, so the body states the milestone without it.
+    const repeatsTable = previous.date === baseline.date && scan.date === sinceBaseline.at(-1)?.date;
+    const guardrailText = guardrailChanged ? `body fat moved ${guardrailAfter ? "into" : "out of"} the guardrail range` : null;
+    const leanText = leanMoved && !repeatsTable
+      ? `Lean mass ${change > 0 ? "rose" : "fell"} ${Math.abs(change).toFixed(1)} lb ${span} since the ${formatShortDate(previous.date)} scan` : null;
+    const body = leanText && guardrailText ? `${leanText}, and ${guardrailText}.`
+      : leanText ? `${leanText}.`
+        : guardrailText ? `On the ${formatShortDate(scan.date)} DEXA, ${guardrailText}.`
+          : repeatsTable ? "The first scan after the goal baseline." : `The ${formatShortDate(scan.date)} DEXA marked this milestone.`;
+    points.push({ id: `dexa_milestone|${scan.date}`, kind: "dexa_milestone", date: scan.date, title, body });
   }
   return Object.freeze(points.sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.title.localeCompare(b.title))
     .slice(-6).map((item) => Object.freeze(item)));
@@ -421,6 +435,16 @@ export function composeActiveGoalCurrentState({ goal, activePhase, journeyStartD
   const guardrailDefinition = resolveBodyFatGuardrailV3({ goal, guardrailTexts })?.guardrail ?? null;
   const cadence = activePhase?.strategicReviewCadence === "monthly" && activePhase?.strategicReviewAnchor === "dexa_body_composition"
     ? "Measured by monthly DEXA" : null;
+  const coachTake = latestBriefing ? projectLatestBriefingCoachTake({ artifact: latestBriefing,
+    assessment: confidenceAssessmentForArtifact(latestBriefing, confidenceHistory), timeZone }) : null;
+  let confidence = composeGoalConfidence(confidencePresentation, { timeZone });
+  // The assessment's own timestamp moves on an authorized regeneration; when
+  // its publishing artifact is the latest briefing, date it the way that
+  // briefing is dated so the Confidence provenance and the Coach's Take agree.
+  if (coachTake && confidence.publishedBy?.artifactId === coachTake.artifactId && confidence.publishedBy.label) {
+    confidence = Object.freeze({ ...confidence, publishedBy: Object.freeze({ ...confidence.publishedBy,
+      publishedOn: coachTake.publishedOn, asOfLabel: `As of the ${formatShortDate(coachTake.publishedOn)} ${confidence.publishedBy.label}` }) });
+  }
   return Object.freeze({
     schemaVersion: ACTIVE_GOAL_CURRENT_STATE_V1,
     asOf: localDate(currentDate, timeZone),
@@ -429,12 +453,11 @@ export function composeActiveGoalCurrentState({ goal, activePhase, journeyStartD
     guardrail,
     phase: activePhase ? Object.freeze({ id: activePhase.phaseId ?? activePhase.id, name: activePhase.phaseName ?? activePhase.name,
       purpose: activePhase.purpose ?? null, startDate: activePhase.startDate ?? null, measurementCadence: cadence }) : null,
-    confidence: composeGoalConfidence(confidencePresentation, { timeZone }),
+    confidence,
     training: trainingProgress,
     turningPoints: composeGoalTurningPoints({ baseline: anchors.baseline, sinceBaseline: anchors.sinceBaseline, journeyStartDate,
       phases, target: goal?.target, guardrail: guardrail ? { ...guardrail, definition: guardrailDefinition } : null }),
-    coachTake: latestBriefing ? projectLatestBriefingCoachTake({ artifact: latestBriefing,
-      assessment: confidenceAssessmentForArtifact(latestBriefing, confidenceHistory), timeZone }) : null,
+    coachTake,
   });
 }
 

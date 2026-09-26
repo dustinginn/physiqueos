@@ -1,3 +1,5 @@
+import { mealDerivedCoverageV3 as mealDerivedCoverage } from "./EnergyAmbiguityV3.js";
+
 // Plain-language realization of structured V3 uncertainty. The vocabulary is
 // keyed by uncertainty type and reason code, never by a particular week or
 // person, so the same structured ambiguity reads the same on every surface.
@@ -6,10 +8,6 @@ const HIGH_INTAKE_CODES = new Set([
   "intake_partial_subtotal", "intake_source_conflict", "intake_totals_missing",
 ]);
 
-function mealDerivedCoverage(reasons = []) {
-  const match = reasons.map((code) => /^intake_meal_derived_days_(\d+)_of_(\d+)$/u.exec(code)).find(Boolean);
-  return match ? { days: Number(match[1]), of: Number(match[2]) } : null;
-}
 
 export const ENERGY_AMBIGUITY_CLAUSES_V3 = Object.freeze({
   energy_intake_uncertainty: (item) => {
@@ -18,7 +16,7 @@ export const ENERGY_AMBIGUITY_CLAUSES_V3 = Object.freeze({
     // the all-days wording applies only when every day is.
     const coverage = mealDerivedCoverage(item.reasons);
     return coverage && coverage.days < coverage.of
-      ? `calorie totals for ${coverage.days} of ${coverage.of} days come from logged meals rather than a confirmed full-day total`
+      ? `on ${coverage.days} of the ${coverage.of} days with calorie totals, the total comes from logged meals rather than a confirmed full-day total`
       : "calorie totals come from logged meals rather than a confirmed full-day total";
   },
   energy_wearable_estimate: () => "active calories are a wearable estimate",

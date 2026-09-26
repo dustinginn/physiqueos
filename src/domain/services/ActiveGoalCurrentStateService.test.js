@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  composeComposition, composeGoalConfidence, composeGoalGuardrail, composeGoalProgress, composeGoalTurningPoints,
+  composeActiveGoalCurrentState, composeComposition, composeGoalConfidence, composeGoalGuardrail, composeGoalProgress, composeGoalTurningPoints,
   findGoalCoachingLanguageViolations, projectLatestBriefingCoachTake, selectAuthoritativeGoalDexaScans,
   selectGoalCompositionAnchors, selectLatestPublishedV3Briefing,
 } from "./ActiveGoalCurrentStateService";
@@ -34,6 +34,9 @@ const goal = { id: "goal-build", type: "build_lean_mass", status: "active", titl
   ],
   currentPhaseId: "p2" };
 const anchorsFor = (scans) => selectGoalCompositionAnchors({ dexaScans: scans, journeyStartDate: JOURNEY_START });
+const composeActiveGoalCurrentStateForTest = (overrides) => composeActiveGoalCurrentState({ goal, activePhase: goal.phases[1],
+  journeyStartDate: JOURNEY_START, phases: goal.phases.map((item) => ({ ...item, phaseName: item.name })), dexaScans: productionScans,
+  timeZone: "America/Los_Angeles", currentDate: new Date("2026-09-26T03:00:00Z"), ...overrides });
 
 describe("Active Goal current state — DEXA authority", () => {
   it("keeps the goal baseline as baseline and makes the latest authoritative DEXA current", () => {
@@ -234,6 +237,19 @@ describe("Active Goal current state — training progress", () => {
     expect(training.trainingDayCount).toBe(1);
   });
 
+  it("never overstates a majority: steady, mixed and singular results read truthfully", () => {
+    const obs = (name, status) => observation(name, "quads", status, status === "regressing" ? -10 : status === "improving" ? 10 : 0);
+    const summary = (list) => composeGoalTrainingProgressToDate({ start: "2026-08-15", today: "2026-09-25", report: { exerciseObservations: list } }).summary;
+    expect(summary([obs("A", "improving"), obs("B", "improving"), obs("C", "improving"), obs("D", "regressing"), obs("E", "regressing"), obs("F", "regressing"), obs("G", "plateauing")]))
+      .toBe("Results are mixed across 7 comparable movements: 3 improving, 3 down.");
+    expect(summary([obs("A", "plateauing"), obs("B", "plateauing"), obs("C", "plateauing"), obs("D", "plateauing"), obs("E", "plateauing")]))
+      .toBe("Most comparable movements are holding steady.");
+    expect(summary([obs("A", "improving"), obs("B", "plateauing"), obs("C", "plateauing"), obs("D", "plateauing")]))
+      .toBe("Most comparable movements are holding steady; 1 of 4 is improving.");
+    expect(summary([obs("A", "regressing"), obs("B", "regressing"), obs("C", "improving")]))
+      .toBe("More movements are slipping than improving: 2 of 3 are down.");
+  });
+
   it("waits honestly when nothing is comparable", () => {
     const training = composeGoalTrainingProgressToDate({ start: "2026-08-15", today: "2026-08-16", report: { exerciseObservations: [] } });
     expect(training).toMatchObject({ state: "waiting_for_evidence", comparableMovementCount: 0 });
@@ -265,6 +281,24 @@ describe("Active Goal current state — turning points", () => {
     for (const fragment of ["147.5", "153.3", "148.3", "+5.8", "8.1%", "7.7%"]) expect(JSON.stringify(result)).not.toContain(fragment);
     expect(JSON.stringify(result)).not.toMatch(/Planned phase review|Goal destination|Future evidence/);
   });
+  it("never repeats the composition table's change when the latest scan follows the baseline or starts the phase", () => {
+    // Viewed while the Aug 15 phase-start scan is the latest: its delta from baseline IS the table's change.
+    const phaseStartLatest = points([jun20, jul18, aug15]);
+    expect(phaseStartLatest.find((item) => item.kind === "phase_transition").body).toBe("Establish Maintenance was completed and Lean Mass Build began.");
+    // Latest scan measured straight from the baseline (no phase-start scan in between).
+    const direct = points([jul18, scan("2026-08-20", 150.1, 12.9, 7.8, 169.9)]);
+    expect(direct.find((item) => item.kind === "dexa_milestone")).toMatchObject({ date: "2026-08-20",
+      title: "Lean mass up since the Jul 18 scan", body: "The first scan after the goal baseline." });
+  });
+
+  it("describes guardrail-only milestones without a zero lean change, and a one-day span in the singular", () => {
+    const guardrailOnly = points([...productionScans, scan("2026-10-10", 153.3, 16.9, 9.7, 173.1)]);
+    const entry = guardrailOnly.find((item) => item.date === "2026-10-10");
+    expect(entry).toMatchObject({ title: "Body fat left the guardrail range", body: "On the Oct 10 DEXA, body fat moved out of the guardrail range." });
+    const nextDay = points([...productionScans, scan("2026-09-13", 155.2, 14.1, 8.1, 176.5)]);
+    expect(nextDay.find((item) => item.date === "2026-09-13").body).toBe("Lean mass rose 1.9 lb in the 1 day since the Sep 12 scan.");
+  });
+
   it("is selective: an immaterial scan does not become a turning point", () => {
     const result = points([...productionScans, scan("2026-10-09", 153.6, 14.3, 8.2, 175.1)]);
     expect(result.map((item) => item.date)).not.toContain("2026-10-09");
@@ -404,6 +438,15 @@ describe("Active Goal preview — production-shaped end to end", () => {
     const serverProse = [state.guardrail.interpretation, state.training?.summary, ...state.turningPoints.map((item) => item.body)].filter(Boolean).join(" ");
     for (const fact of ["5.8", "58%", "4.2", "153.3", "147.5", "14.2", "174.7", "10 lb"]) expect(serverProse).not.toContain(fact);
     expect(state.guardrail.interpretation).not.toContain("8.1");
+  });
+
+  it("dates Confidence like its publishing briefing when that briefing is the latest, so provenance and Coach's Take agree", () => {
+    const { artifact, assessment } = midweekV3Artifact();
+    const regenerated = { ...v3Presentation, originatingArtifactId: artifact.id, publicationTimestamp: "2026-09-25T10:00:00.000Z" };
+    const state = composeActiveGoalCurrentStateForTest({ confidencePresentation: regenerated, latestBriefing: artifact,
+      confidenceHistory: [{ assessmentId: assessment.assessmentId, assessment }] });
+    expect(state.coachTake.publishedOn).toBe("2026-09-23");
+    expect(state.confidence.publishedBy).toMatchObject({ publishedOn: "2026-09-23", asOfLabel: "As of the Sep 23 Midweek Briefing" });
   });
 
   it("dates stored time-relative Confidence text with its publishing briefing", () => {

@@ -102,6 +102,7 @@ export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}
     ambiguity.push(entry(EnergyAmbiguityTypeV3.INTAKE, materiality, intakeCodes,
       idsWithLimitation(energyObservations, "intake_")));
   }
+  const intakeTempers = ambiguity.some((item) => item.type === EnergyAmbiguityTypeV3.INTAKE && item.recommendationEffect === "temper");
   const wearable = energyObservations.filter((item) =>
     item.limitations.includes("active_expenditure_is_wearable_estimated") ||
     item.capabilities.some((measurement) => measurement.metadata?.measurementType === "WEARABLE_ESTIMATE"));
@@ -111,7 +112,9 @@ export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}
   const pairing = byCapability("execution.energy_pairing")[0] ?? null;
   const pairingRatio = pairing
     ? Number(metadataOf(pairing, "execution.energy_pairing").pairing?.pairedCoverageRatio) : NaN;
-  const otherwiseWeak = intakeCodes.length > 0 || (Number.isFinite(pairingRatio) && pairingRatio < 0.85);
+  // An intake limitation judged immaterial (low: a minority of meal-derived
+  // days) must not re-enter through the wearable estimate.
+  const otherwiseWeak = intakeTempers || (Number.isFinite(pairingRatio) && pairingRatio < 0.85);
   if (wearable.length) {
     // Active calories are always a wearable estimate. That alone is context:
     // it becomes decision-relevant when the estimate is also contradicted by the
