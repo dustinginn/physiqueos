@@ -478,11 +478,17 @@ describe("Item 15: Cardio is NOT activated by the combined candidate", () => {
     const names = candidateNames();
     expect(names.length).toBeGreaterThan(0);
     expect(names.filter((name) => /(^|\/)(migrations?|schema)(\/|\.)|\.sql$|prisma|drizzle|knex|ddl|seed/iu.test(name))).toEqual([]);
-    // The only files under a database path are the READ-ONLY graduation reader (and its test) and, for the
-    // Training Day Cardio presentation fix, the READ-ONLY Training navigation read store (SELECT-only; asserted below).
+    // The only files under a database path are the READ-ONLY graduation reader (and its test), for the
+    // Training Day Cardio presentation fix the READ-ONLY Training navigation read store, and for the Active
+    // Goal current state the READ-ONLY active-goal read store (and its test). SELECT-only; asserted below.
     expect(names.filter((name) => /(^|\/)database\//u.test(name)).sort()).toEqual([
       "src/platform/database/HealthKitGraduationReader.js", "src/platform/database/HealthKitGraduationReader.test.js",
+      "src/platform/database/PostgresActiveGoalReadStore.js", "src/platform/database/PostgresActiveGoalReadStore.test.js",
       "src/platform/database/PostgresTrainingNavigationReadStore.js"]);
+    const goalStoreAdded = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", "src/platform/database/PostgresActiveGoalReadStore.js")
+      .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n");
+    expect(goalStoreAdded).toMatch(/SELECT record_id,/u);
+    expect(goalStoreAdded).not.toMatch(/\b(INSERT|UPDATE|DELETE|UPSERT|ALTER|CREATE|DROP|TRUNCATE)\b/iu);
     const storeAdded = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", "src/platform/database/PostgresTrainingNavigationReadStore.js")
       .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n");
     expect(storeAdded).toMatch(/SELECT payload,version FROM/u);
