@@ -2,6 +2,24 @@ import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.j
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
 import { resolveCanonicalGoalPhaseChronology } from "../../domain/services/CanonicalGoalPhaseChronologyService.js";
+import { selectLatestPublishedV3Briefing } from "../../domain/services/ActiveGoalCurrentStateService.js";
+
+// Latest published V3-bound briefing, in Briefing History order (publication
+// instant desc, record id desc). Candidates are bounded to a handful of the
+// newest rows so a failed/in-progress head never hides the published one; the
+// final published/V3 check is the shared domain selector.
+const LATEST_V3_BRIEFING_CANDIDATES_SQL = `SELECT payload,version FROM physiqueos.canonical_briefing_records
+  WHERE owner_user_id=$1 AND collection_name='dailyBriefings'
+    AND payload#>>'{confidencePublication,schemaVersion}'='briefing_confidence_binding_v3'
+    AND payload->>'cadence' IN ('weekly','midweek','monthly','event')
+    AND (payload#>'{briefing,narrativeV3}') IS NOT NULL
+  ORDER BY COALESCE(
+    NULLIF(payload->>'deliveryDate','')::timestamptz,
+    NULLIF(payload->>'generatedAt','')::timestamptz,
+    NULLIF(payload->>'createdAt','')::timestamptz,
+    observed_at,'epoch'::timestamptz
+  ) DESC,record_id DESC
+  LIMIT 5`;
 
 export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplete = null } = {}) {
   if (!pool?.query || !ownerUserId) throw new Error("Active Goal storage requires a PostgreSQL pool and owner.");
@@ -33,7 +51,7 @@ export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplet
         const activePhaseStart = goal
           ? resolveCanonicalGoalPhaseChronology(goal).currentPhase?.startDate ?? "0001-01-01"
           : "0001-01-01";
-        const [users, dexaScans, protocols, phaseStrategies, weightEntries, goalConfidenceSnapshots, goalConfidenceHistory, evidenceRows] = await Promise.all([
+        const [users, dexaScans, protocols, phaseStrategies, weightEntries, goalConfidenceSnapshots, goalConfidenceHistory, evidenceRows, briefingRows] = await Promise.all([
           list("user"),
           list("dexaScans"),
           list("protocols"),
@@ -49,16 +67,18 @@ export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplet
               ORDER BY COALESCE(payload#>>'{payload,observed_at}',payload->>'observed_at'),record_id`,
             [ownerUserId, activePhaseStart],
           ),
+          pool.query(LATEST_V3_BRIEFING_CANDIDATES_SQL, [ownerUserId]),
         ]);
-        queryCount += 1;
-        rowCount += evidenceRows.rows.length;
-        payloadBytes += Buffer.byteLength(JSON.stringify(evidenceRows.rows));
+        queryCount += 2;
+        rowCount += evidenceRows.rows.length + briefingRows.rows.length;
+        payloadBytes += Buffer.byteLength(JSON.stringify(evidenceRows.rows)) + Buffer.byteLength(JSON.stringify(briefingRows.rows));
         return Object.freeze({
           user: users.find((item) => item.id === ownerUserId) ?? users[0] ?? null,
           goal,
           dexaScans,
           protocols,
           canonicalEvidence: evidenceRows.rows.map((row) => Object.freeze({ ...row.payload, version: Number(row.version) })),
+          latestBriefing: selectLatestPublishedV3Briefing(briefingRows.rows.map((row) => ({ ...row.payload, version: Number(row.version) }))),
           store: Object.freeze({
             phaseStrategies,
             weightEntries: canonicalWeightEntries(weightEntries),
@@ -92,7 +112,8 @@ export function createRepositoryActiveGoalReadStore({ repositories, loadRuntime 
         repositories.canonicalEvidence.listCanonicalEvidenceObjects(user?.id),
         loadRuntime(),
       ]);
-      return Object.freeze({ user, goal, dexaScans, protocols, canonicalEvidence, store: runtime });
+      return Object.freeze({ user, goal, dexaScans, protocols, canonicalEvidence, store: runtime,
+        latestBriefing: selectLatestPublishedV3Briefing(runtime?.dailyBriefings ?? []) });
     },
   });
 }

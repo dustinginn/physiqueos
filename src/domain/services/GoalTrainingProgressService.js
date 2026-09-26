@@ -17,6 +17,87 @@ export function createGoalTrainingProgress({ goal, phase, canonicalObjects = [],
   return composeGoalTrainingProgress({ goal, phase, period, report, today, comparabilityBlocks: findComparabilityBlocks(phaseEvidence) });
 }
 
+// Training progress to date for the active phase: the same defensible
+// movement comparisons as the phase review, but over phase start -> today and
+// with no review boundary, so a terminal phase still reports how training is
+// actually moving. The interpretation is Server-owned coaching copy.
+const TRAINING_REGION_BY_CATEGORY = Object.freeze({
+  quads: "lower body", glutes: "lower body", hamstrings: "lower body", calves: "lower body", adductors: "lower body", abductors: "lower body", "lower body": "lower body", legs: "lower body",
+  chest: "upper body", back: "upper body", shoulders: "upper body", lats: "upper body", traps: "upper body", "upper body": "upper body",
+  biceps: "arms", triceps: "arms", forearms: "arms", arms: "arms",
+  core: "core", abs: "core", abdominals: "core",
+});
+
+export function trainingRegionForCategory(category) {
+  return TRAINING_REGION_BY_CATEGORY[String(category ?? "").trim().toLowerCase()] ?? null;
+}
+
+export function createGoalTrainingProgressToDate({ phase, canonicalObjects = [], currentDate = new Date(), timeZone = "UTC" } = {}) {
+  const start = phase?.startedAt ?? phase?.startDate;
+  if (!validDate(start)) return null;
+  const today = localDate(currentDate, timeZone);
+  const phaseEvidence = canonicalObjects.filter((object) => {
+    const date = String(object?.payload?.observed_at ?? object?.observed_at ?? "").slice(0, 10);
+    return date >= start && date <= today;
+  });
+  const report = createTrainingPerformanceIntelligenceReport({ canonicalObjects: phaseEvidence, now: `${today}T12:00:00Z` });
+  return composeGoalTrainingProgressToDate({ start, today, report, sessionCount: new Set(phaseEvidence.map((item) => item?.id ?? item?.payload?.id ?? JSON.stringify(item?.payload ?? item))).size,
+    comparabilityBlocks: findComparabilityBlocks(phaseEvidence) });
+}
+
+export function composeGoalTrainingProgressToDate({ start, today, report, sessionCount = 0, comparabilityBlocks = new Set() } = {}) {
+  const comparisons = (report?.exerciseObservations ?? []).map((item) => toMovementComparison(item, comparabilityBlocks)).filter(Boolean)
+    .map((item) => ({ ...item, region: trainingRegionForCategory(item.muscleGroup) }));
+  const improving = comparisons.filter((item) => item.status === "improving");
+  const regressing = comparisons.filter((item) => item.status === "regressing");
+  const steady = comparisons.filter((item) => ["plateauing", "stable", "steady"].includes(item.status));
+  const state = comparisons.length >= 3 ? "established" : comparisons.length > 0 ? "forming" : "waiting_for_evidence";
+  const regions = ["lower body", "upper body", "arms", "core"].map((region) => {
+    const members = comparisons.filter((item) => item.region === region);
+    if (!members.length) return null;
+    const count = (status) => members.filter((item) => item.status === status).length;
+    const status = count("improving") > count("regressing") && count("improving") * 2 >= members.length ? "improving"
+      : count("regressing") > count("improving") ? "regressing" : "steady";
+    return Object.freeze({ region, status, movementCount: members.length, improvingCount: count("improving"), regressingCount: count("regressing") });
+  }).filter(Boolean);
+  const highlights = [...improving].sort((a, b) => (b.percentChange ?? -Infinity) - (a.percentChange ?? -Infinity)).slice(0, 3)
+    .map((item) => Object.freeze({ name: item.name, region: item.region, status: item.status, percentChange: item.percentChange,
+      currentVolumeLoad: item.currentVolumeLoad, previousVolumeLoad: item.previousVolumeLoad, personalRecord: item.prs.length > 0 }));
+  return Object.freeze({
+    state,
+    periodStart: start,
+    periodEnd: today,
+    sessionCount,
+    comparableMovementCount: comparisons.length,
+    improvingCount: improving.length,
+    steadyCount: steady.length,
+    regressingCount: regressing.length,
+    regions,
+    highlights,
+    regressions: regressing.slice(0, 2).map((item) => Object.freeze({ name: item.name, region: item.region, percentChange: item.percentChange })),
+    summary: trainingProgressSummary({ state, comparisons, improving, regressing, regions }),
+  });
+}
+
+function trainingProgressSummary({ state, comparisons, improving, regressing, regions }) {
+  if (state === "waiting_for_evidence") return "Not enough repeated movements have been logged in this phase to judge training progress yet.";
+  if (state === "forming") return `${comparisons.length} ${comparisons.length === 1 ? "movement has" : "movements have"} comparable sessions so far; more repeats are needed before training progress can be judged.`;
+  const improvingRegions = regions.filter((item) => item.status === "improving").map((item) => item.region);
+  const where = improvingRegions.length ? `, led by ${joinWords(improvingRegions)}` : "";
+  const lead = `${improving.length} of ${comparisons.length} comparable movements are improving${where}.`;
+  const slipping = regressing.length ? ` ${joinWords(regressing.slice(0, 2).map((item) => item.name))} ${regressing.length === 1 ? "is" : "are"} down.` : "";
+  const meaning = improving.length > regressing.length && improving.length * 2 >= comparisons.length
+    ? " Training is progressing in a way that supports adding lean mass."
+    : regressing.length > improving.length ? " More movements are slipping than improving, which works against the build if it continues."
+      : " Training is mostly holding steady rather than progressing.";
+  return `${lead}${slipping}${meaning}`;
+}
+
+function joinWords(values) {
+  if (values.length <= 1) return values.join("");
+  return `${values.slice(0, -1).join(", ")} and ${values.at(-1)}`;
+}
+
 export function resolveGoalTrainingReviewPeriod({ phase } = {}) {
   const start = phase?.startedAt ?? phase?.startDate;
   if (!phase?.id || !validDate(start)) throw new Error("A phase with a valid start date is required.");

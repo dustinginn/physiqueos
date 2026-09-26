@@ -243,6 +243,23 @@ function guardrailResult(evaluation, context) {
   return { satisfied: false, deviation: Infinity };
 }
 
+// Classifies one measured value against a V3 guardrail exactly as the
+// strategic evaluator does (same range test, same severity bands), for read
+// surfaces that must describe the current guardrail position without running
+// a whole interpretation.
+export function evaluateGuardrailMeasurementV3(guardrail, value) {
+  const current = numeric(value);
+  if (!guardrail?.evaluation || current == null) {
+    return { status: "not_assessed", currentValue: null, deviation: null };
+  }
+  const { satisfied, deviation } = guardrailResult(guardrail.evaluation, { current, change: null, absoluteChange: null });
+  const bands = [...(guardrail.severityBands ?? [])]
+    .sort((a, b) => b.minimumDeviation - a.minimumDeviation);
+  const status = satisfied ? "clear" : bands.find((band) =>
+    deviation >= band.minimumDeviation)?.status ?? "breached";
+  return { status, currentValue: current, deviation: round(deviation, 3) };
+}
+
 export function findingMeetsCriterion(finding, criterion) {
   return criterion.acceptedStates.includes(finding?.state ?? finding?.status) &&
     AUTHORITY_ORDER[finding?.authority ?? "contextual"] >= AUTHORITY_ORDER[criterion.minimumAuthority] &&

@@ -1227,7 +1227,7 @@ function resolveGoalGuardrailsV3(goal) {
     .filter(Boolean);
 }
 
-function adaptLegacyGuardrailV3(input) {
+export function adaptLegacyGuardrailV3(input) {
   const text = String(input.text ?? input.description ?? "");
   const bodyFatRange = /body[\s-]*fat/i.test(text) ? parseNumericRange(text) : null;
   if (bodyFatRange) {

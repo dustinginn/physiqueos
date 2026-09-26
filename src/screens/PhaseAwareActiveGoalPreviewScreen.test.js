@@ -17,12 +17,12 @@ describe("PhaseAwareActiveGoalPreviewScreen",()=>{
     expect(findGovernanceLanguageLeaks(source)).toEqual([]);
   });
 
-  it("translates the terminal-phase state into next-checkpoint coaching without graph/lifecycle language, generically", () => {
+  it("renders no fictional goal-review card for a terminal phase, and no graph/lifecycle language", () => {
     expect(source).not.toMatch(/final planned phase/i);
     expect(source).not.toMatch(/terminal phase/i);
     expect(source).not.toMatch(/assumed additional phase/i);
     expect(source).not.toMatch(/Lean Mass Build/);
-    expect(source).toMatch(/Goal review comes next/);
-    expect(source).toMatch(/starting a new phase, adjusting the current plan, or confirming the goal is complete/);
+    expect(source).not.toMatch(/Goal review comes next/);
+    expect(source).not.toMatch(/next review/i);
   });
 });

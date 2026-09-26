@@ -37,7 +37,7 @@ All reads below use `GET /api/v1/native/read/{resource}` unless a different rout
 | Profile/current authority | `/api/v1/native/profile` | core profile + auth boundary | none | Ready |
 | Home | `home` | `CoreNavigationReadService.getHome` | none | Ready |
 | Goals landing | `goals` | `CoreNavigationReadService.getGoals` | none | Ready |
-| Active Goal / Phases / Confidence | `active-goal` | `ActiveGoalReadService.getPreview` | `currentDate` optional; includes canonical `goalId` and `phaseId` | Ready |
+| Active Goal / Phases / Confidence | `active-goal` | `ActiveGoalReadService.getPreview` | `currentDate` optional; includes canonical `goalId` and `phaseId`; additive `currentState` (`active_goal_current_state_v1`, see `docs/ACTIVE_GOAL_CURRENT_STATE_V1.md`) | Ready |
 | Completed Visible Abs Goal | `completed-goal` | `CompletedGoalReadService.getVisibleAbs` | none | Ready |
 | Operating Plan | `operating-plan` | `CoreNavigationReadService.getOperatingPlan` | none | Ready |
 | Priority detail | `priority` | `PriorityNavigationReadService.getPriorityDetail` | `priorityId`; optional exact `occurrenceDate` | Ready |
