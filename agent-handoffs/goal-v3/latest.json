@@ -1,60 +1,60 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-26T02:40:12Z",
+  "generated_at_utc": "2026-09-26T03:18:06Z",
   "task": {
     "id": "claude-active-goal-v3-current-state-coaching-20260925",
-    "title": "Active Goal V3 current-state + coaching projection: code-level diagnosis complete; BLOCKED on Founder authorization for read-only production probes",
+    "title": "Active Goal V3 current state + coaching: Server 0a245c5c + Native efadb35e candidates accepted on production data read-only; AWAITING Founder content acceptance (plain-text preview published)",
     "agent": "claude",
-    "status": "blocked"
+    "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "09f04dc54eb26bfccdd2aeb34b156d8fc7d3f80e",
-    "final_sha": null,
+    "final_sha": "0a245c5c11bd40393b152cbf6b8013a132b6543d",
     "production_server_sha": "09f04dc54eb26bfccdd2aeb34b156d8fc7d3f80e",
     "production_deployment": "e979ee19-44f3-4c7a-ab2b-3c6e4f773349",
     "native_sha": "00321dcc6dd86a6479dbca5dd27e691c87348cd8",
     "native_build": 60
   },
   "result": {
-    "summary": "Authority reverified (prod 09f04dc5 / e979ee19; Native Build 60 00321dcc; c15f0881 unreleased and divergent from the Server history). Code-level root causes proven for the active Build Lean Mass Goal page: Aug15 turning point merges the phase-start scan's lean mass with the latest-minus-baseline delta; payload has no latest-DEXA slot (guardrail uses phase-start/baseline body fat); active-Goal store applies no DEXA supersession filter; V3 goal-context confidence (whyConfidence + rich detail) is computed then dropped, so the stored briefing-relative 'one update' text shows; review/boilerplate copy is hard-coded (Server currentPhaseNarrative, Native 'Goal review comes next' and 'Server-derived'); training progress never computed for the terminal phase; turning points are a fixed list that cannot include later DEXAs; Coach's Take absent. Additive currentState contract designed. The read-only production forensic probe was drafted but not run: the auto-mode permission classifier denied it (and then local source reads) without a Founder chat authorization. No product code changed, no production read of data, no mutation. Worktrees: Server branch claude/active-goal-v3-server-20260925 @ 09f04dc5; Native branch claude/active-goal-v3-current-state-coaching-20260925 @ c15f0881 (no commits yet).",
-    "success": false,
+    "summary": "Proven on production data (read-only, rolled back): active Build Lean Mass goal baseline Jul 18 DEXA 147.5 lb lean / 7.7% BF; latest authoritative Sep 12 DEXA 153.3 lb lean, 14.2 lb fat, 8.1% BF, 174.7 lb; progress +5.8 lb = 58% of 10 lb (4.2 lb left). Root causes: Aug 15 turning point paired that scan's lean mass with the latest-minus-baseline delta (+5.8 instead of +0.8); no current-DEXA slot and guardrail read the Aug 15 scan (page said 7.6% below range; latest is 8.1% inside); unfiltered DEXA revisions; Goal showed the Sep 23 Midweek's movement sentence instead of Confidence V3 whyConfidence; hard-coded review/boilerplate copy; training progress never computed for the terminal phase; fixed turning points; no Coach's Take. Server candidate 0a245c5c adds additive currentState (active_goal_current_state_v1) and corrects Build 60 legacy fields; Native candidate efadb35e (descendant of c15f0881) renders baseline -> latest DEXA -> progress -> guardrail -> training -> latest briefing Coach's Take (Sep 23 Midweek) -> turning points and removes the strategy grid and review cards. Plain-text production-shaped preview published as the Founder content gate. Nothing deployed; STOP for Founder content acceptance, then release authorization.",
+    "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "not_run",
-      "summary": "No code changed yet."
+      "status": "passed",
+      "summary": "Server full unit suite on 0a245c5c: 9192 tests, failure set identical to baseline (306 environmental), 36 new tests pass; production webpack on exact 0a245c5c passes. Native full PhysiqueOSTests on iPhone 17 Pro simulator: 1419 tests, 0 failures."
     },
     "review": {
-      "status": "not_run",
-      "summary": "Implementation not started."
+      "status": "approved",
+      "summary": "Fresh-context adversarial Server and Native reviews: no blocking issues; all medium/low findings fixed in 8586950d/0a245c5c and efadb35e."
     },
     "zero_write_audit": {
-      "status": "not_run",
-      "summary": "Read-only production probe blocked pending Founder authorization; no production data read or written."
+      "status": "passed",
+      "summary": "Three REPEATABLE READ READ ONLY probes with explicit ROLLBACK and marker after rollback; completed Visible Abs goal read-model digest identical baseline vs candidate; no production writes."
     }
   },
   "decisions_required": [
-    "Founder: in chat, authorize read-only zero-write production console probes, local code work/tests/builds in the goal-v3 worktrees, pushing its non-deploy branches, and report publishing for this task (no deploy/TestFlight/production writes)."
+    "Founder: review the plain-text preview (agent-handoffs/reports/20260926T031806Z-goal-v3-founder-content-preview.md) and approve or list content edits.",
+    "After content approval: authorize Server 0a245c5c deployment (Build 60 compatible), then Build 61 from efadb35e after the prospective Cardio acceptance."
   ],
-  "blockers": [
-    "Auto-mode permission classifier blocks production read-only probes (and subsequently local source reads) without a Founder chat sentence."
-  ],
+  "blockers": [],
   "unexpected_findings": [
-    "V3 engine treats the approximately 8-9% body-fat guardrail as a symmetric allowed_range (>=0.5 pt outside = pressured, confidence impact -1); Goal guardrail interpretation must follow that policy.",
-    "Home goal progress shares the unfiltered DEXA progress path (follow-up candidate)."
+    "Live Goal guardrail state was wrong (7.6% below range from the Aug 15 scan) while the latest authoritative DEXA is 8.1% inside the range.",
+    "V3 engine renders 'range of 8-9.' without % in stored whatCouldLowerIt text (shared engine follow-up).",
+    "Sep 23 Midweek What To Watch still cites calorie totals from logged meals (briefing-engine follow-up); shown verbatim on the Goal."
   ],
   "backlog": [
-    "Run Part A forensic probe",
-    "Server currentState projection + tests",
-    "Native rendering on c15f0881 + tests",
-    "Production-shaped acceptance, webpack, fresh-context reviews"
+    "Engine: guardrail risk phrase unit.",
+    "Briefing engine: logged-meals caveat vs HealthKit-graduated days.",
+    "Home goal progress DEXA authority filter.",
+    "Optional: 'As of' line on the Confidence sheet."
   ],
-  "recommended_next_step": "Founder sends the chat authorization; Claude resumes with the Part A production forensic probe.",
-  "full_report_path": "agent-handoffs/reports/20260926T024012Z-goal-v3-diagnostic-blocked.md",
+  "recommended_next_step": "Founder reviews the content preview at agent-handoffs/reports/20260926T031806Z-goal-v3-founder-content-preview.md; on approval, authorize the Server 0a245c5c deploy, then Build 61 from efadb35e.",
+  "full_report_path": "agent-handoffs/reports/20260926T031806Z-goal-v3-candidates-acceptance.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
