@@ -6053,14 +6053,24 @@ final class ActiveGoalCurrentStateTests: XCTestCase {
         let goal = try await activeGoal(activeGoalWithCurrentStateJSON)
         let state = try XCTUnwrap(goal.currentState)
         let hero = try XCTUnwrap(ActiveGoalFormat.heroConfidence(state))
-        XCTAssertFalse(hero.isInteractive)
         XCTAssertEqual(hero.headline, "79% · Moderate")
         XCTAssertEqual(hero.thesis, state.confidence?.summary)
         XCTAssertEqual(hero.provenance, "As of the Sep 23 Midweek Briefing", "provenance comes from publisher metadata")
         XCTAssertEqual(hero.accessibilityLabel,
-                       "Confidence 79% · Moderate. \(state.confidence?.summary ?? ""). As of the Sep 23 Midweek Briefing")
-        // The detailed V3 evidence stays in the contract but never reaches the page.
-        let pageText = [hero.headline, hero.thesis ?? "", hero.provenance ?? ""].joined(separator: " ")
+                       "Confidence 79 percent, Moderate. You are more than halfway to the 10 lb lean-mass goal. The build plan is clearly working. There is enough time to finish ahead of schedule if this level of progress continues. As of the Sep 23 Midweek Briefing.")
+        XCTAssertFalse(hero.accessibilityLabel.contains(".."))
+        var noBand = state
+        noBand.confidence?.band = nil
+        XCTAssertTrue(try XCTUnwrap(ActiveGoalFormat.heroConfidence(noBand)).accessibilityLabel.hasPrefix("Confidence 79 percent. "))
+        // The detailed V3 evidence stays in the contract but never reaches the page:
+        // scan every string the current-state page renders.
+        var rendered = [hero.headline, hero.thesis ?? "", hero.provenance ?? "", state.phase?.purpose ?? "",
+                        state.phase?.measurementCadence ?? "", state.guardrail?.title ?? "", state.guardrail?.interpretation ?? "",
+                        state.training?.summary ?? ""]
+        rendered += state.training?.highlights.map(\.name) ?? []
+        rendered += state.turningPoints.flatMap { [$0.title, $0.body] }
+        rendered += state.coachTake.map { [$0.attribution] + $0.sections.flatMap { [$0.title, $0.text] } } ?? []
+        let pageText = rendered.joined(separator: " ")
         let detail = try XCTUnwrap(goal.confidence.detail, "the Server still serves the detail; it is simply not presented")
         for item in detail.supportingFactors + detail.limitingFactors {
             XCTAssertFalse(pageText.contains(item), "detail item leaked onto the page: \(item)")
@@ -6078,15 +6088,23 @@ final class ActiveGoalCurrentStateTests: XCTestCase {
         let start = try XCTUnwrap(source.range(of: "struct ActiveGoalCurrentStateSections: View {"))
         let end = try XCTUnwrap(source.range(of: "enum ActiveGoalFormat {"))
         let currentState = String(source[start.lowerBound..<end.lowerBound])
-        for forbidden in ["onTapGesture", "chevron.right", ".isButton", "ConfidenceDetailSheet", ".sheet(", "onShowConfidenceDetail", "isShowingConfidenceDetail"] {
+        for forbidden in ["onTapGesture", "chevron", ".isButton", "ConfidenceDetailSheet", ".sheet(", "onShowConfidenceDetail", "isShowingConfidenceDetail"] {
             XCTAssertFalse(currentState.contains(forbidden), "current-state Goal must not contain \(forbidden)")
         }
-        XCTAssertTrue(currentState.contains(".accessibilityAddTraits(.isStaticText)"))
+        // The confidence block itself: static, one element, no control of any kind.
+        let blockStart = try XCTUnwrap(currentState.range(of: "if let confidence = ActiveGoalFormat.heroConfidence(state) {"))
+        let blockEnd = try XCTUnwrap(currentState.range(of: ".accessibilityAddTraits(.isStaticText)"))
+        let block = String(currentState[blockStart.lowerBound..<blockEnd.upperBound])
+        for forbidden in ["Button", "NavigationLink", "gesture", "Gesture", "accessibilityAction", "contentShape"] {
+            XCTAssertFalse(block.contains(forbidden), "confidence block must not contain \(forbidden)")
+        }
+        XCTAssertTrue(block.contains(".accessibilityLabel(confidence.accessibilityLabel)"))
         XCTAssertFalse(String(source[end.lowerBound...]).contains("confidenceSheet"))
         // The legacy (no currentState) layout is unchanged: its sheet remains.
         let legacyStart = try XCTUnwrap(source.range(of: "private struct ActiveGoalDetailContent: View {"))
         let legacy = String(source[legacyStart.lowerBound..<start.lowerBound])
         XCTAssertTrue(legacy.contains("ConfidenceDetailSheet(confidence: goal.confidence.value ?? 0, detail: detail)"))
+        XCTAssertTrue(legacy.contains("isShowingConfidenceDetail = true"), "the legacy hero can still open its sheet")
     }
 
     func testOneMalformedBlockHidesOnlyItsOwnSection() async throws {

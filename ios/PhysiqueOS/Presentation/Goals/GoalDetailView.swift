@@ -818,12 +818,6 @@ enum ActiveGoalFormat {
         return "\(score)% · \(band)"
     }
 
-
-    static func compact(_ value: Double) -> String {
-        value.rounded() == value ? String(Int(value)) : number(value)
-    }
-
-
     static func compositionCaption(_ composition: ActiveGoalCurrentStateReadModel.Composition) -> String {
         if composition.sameAsBaseline { return "\(composition.authority) · goal baseline" }
         return composition.baseline == nil ? "\(composition.authority) · latest scan" : "\(composition.authority) · goal baseline and latest scan"
@@ -852,17 +846,21 @@ enum ActiveGoalFormat {
         let headline: String
         let thesis: String?
         let provenance: String?
-        let isInteractive = false
-        var accessibilityLabel: String {
-            ["Confidence \(headline)", thesis, provenance].compactMap { $0 }.joined(separator: ". ")
-        }
+        let accessibilityLabel: String
     }
 
     static func heroConfidence(_ state: ActiveGoalCurrentStateReadModel) -> HeroConfidence? {
         guard let confidence = state.confidence, let score = confidence.score else { return nil }
         let thesis = confidence.summary.flatMap { $0.isEmpty ? nil : $0 }
         let provenance = confidence.publishedBy?.asOfLabel.flatMap { $0.isEmpty ? nil : $0 }
-        return HeroConfidence(headline: confidenceHeadline(score: score, band: confidence.band), thesis: thesis, provenance: provenance)
+        let band = confidence.band.flatMap { $0.isEmpty ? nil : $0 }
+        let spoken = ["Confidence \(score) percent\(band.map { ", \($0)" } ?? "")", thesis, provenance]
+            .compactMap { $0 }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: ".!?")) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ". ") + "."
+        return HeroConfidence(headline: confidenceHeadline(score: score, band: confidence.band), thesis: thesis,
+                              provenance: provenance, accessibilityLabel: spoken)
     }
 
     /// The pill carries the reading and its status; the scan date is already
