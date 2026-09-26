@@ -1,62 +1,69 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-26T21:08:00Z",
+  "generated_at_utc": "2026-09-26T22:25:00Z",
   "task": {
-    "id": "claude-native-build61-testflight-upload-authorization-20260926",
-    "title": "Build 61 UPLOADED to App Store Connect, processing VALID",
+    "id": "claude-build61-strength-reconciliation-acceptance-failed",
+    "title": "Build 61 Strength reconciliation acceptance FAILED; new root cause proven and corrected fix candidate produced (f72551be)",
     "agent": "claude",
-    "status": "completed"
+    "status": "awaiting_founder_direction"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "native_installed_sha": "00321dcc6dd86a6479dbca5dd27e691c87348cd8",
-    "native_installed_build": 60,
+    "native_installed_sha": "abb10e9c",
+    "native_installed_build": 61,
     "production_server_sha": "524f1882072cb5c17c4fe61f7210f0f7d1c6e67c",
-    "native_build61_final_sha": "abb10e9c",
-    "native_build61_lineage": ["efcb8574", "aa165ca9", "b102d930", "abb10e9c"],
-    "native_build61_archive_path": "~/Library/Developer/Xcode/Archives/2026-09-26/PhysiqueOS 9-26-26, 12.32 PM.xcarchive",
-    "native_build61_delivery_id": "1799d5b8-394e-4e76-b4bc-2faf30d2ed9f",
-    "native_build61_uploaded": true,
-    "native_build61_processing_status": "VALID"
+    "native_fix_candidate_sha": "f72551be",
+    "native_fix_candidate_lineage": ["efcb8574", "aa165ca9", "b102d930", "abb10e9c", "f72551be"],
+    "native_fix_candidate_worktree": "/private/tmp/physiqueos-healthkit-token-refresh-retry-hardening",
+    "native_fix_candidate_branch": "codex/healthkit-token-refresh-retry-hardening",
+    "native_fix_candidate_pushed": false,
+    "sep24_strength_link_status": "candidate",
+    "sep24_strength_link_confidence": 60,
+    "sep24_strength_review_version": 1,
+    "sep24_workout_reconciliation_command_receipts_ever": 0
   },
   "result": {
-    "summary": "Founder explicitly authorized uploading Build 61. Reverified archive identity (bundle id, version 1.0/build 61, team, signature, dSYM) and reran the guarded upload tool's dry run against the corrected canonical archive path -- every gate passed cleanly this time (the auto-mode permission classifier that blocked the dry-run in the prior task did not block it here, given the explicit Founder authorization). Executed the real, confirmed upload via the established physiqueos-asc-upload execute/confirm flow: xcodebuild -exportArchive completed with 'Upload succeeded' / 'EXPORT SUCCEEDED', delivery id 1799d5b8-394e-4e76-b4bc-2faf30d2ed9f, processing state VALID. Independently reverified via a separate, explicit read-only status check: build-status VALID, import-status VALID, is-on-app-store-connect true. No reauthentication was required. No production data mutated, no Server deployed, Sep24 Strength reconciliation not retried or touched, no workout policy or strategic eligibility change, no historical regeneration, no Founder device operated. Build 61's TestFlight lineage (retry-fix hardening plus the new HealthKit workout-reconciliation review notification, both previously tested and reviewed) is now on App Store Connect awaiting the Founder's own TestFlight acceptance.",
+    "summary": "Build 61's own acceptance test of the Sep24 Strength reconciliation confirm FAILED, proving the aa165ca9 fix already shipped in Build 61 did not fix the real, recurring defect -- it targeted the wrong specific mechanism. A direct, bounded, read-only query of the server's own command_receipts ledger for this second real failure again found zero rows for the command at any status, and this time found no 401/token-expiry event anywhere near the failure window either (unlike the first failure), while ordinary unrelated command traffic succeeded fine around it. This proves the write's very first network send can hit a plain, ordinary transport failure orthogonal to token expiry -- a mechanism aa165ca9's 401-scoped retry structurally cannot address. An initial attempt to fix this generically inside the shared submitCommand function broke two pre-existing tests (morning check-in and training-commit both already have their own, more sophisticated verify-then-decide recovery for a lost acknowledgment that a blind low-level retry silently short-circuited); that broad attempt was reverted in full and documented rather than discarded. A corrected fix (f72551be) scopes the retry to exactly the one call site with no existing recovery of its own (resolveWorkoutReconciliation), reusing the same idempotency signature and payload. New regression test proven RED then GREEN; full affected suite 282/282 passing, including the two previously-broken tests now passing again; independent fresh-context review returned APPROVE with no notes. No production data mutated, no release action taken (no new build number, no upload), Sep24 not retried or touched, per the task's explicit scope.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": true,
+    "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Carried forward from the prior report: 281/281 broader affected suites, mutation-tested new notification tests, Release build and release-configuration verifier all passed before this build was archived. No further code changes were made in this upload-only task."
+      "summary": "New regression test reproduces the exact newly-proven failure sequence (no 401, first send drops, second send with the same token succeeds); proven RED on the pre-fix code, GREEN with the fix. Full FounderServerAPITests suite: 282/282 passing, no regressions -- including recovery of the two tests broken by an earlier, too-broad fix attempt that was reverted before finalizing."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "No code changed in this task. The uploaded source lineage (abb10e9c) is the exact, already fresh-context-reviewed candidate from the prior report."
+      "status": "approved",
+      "summary": "Fresh-context adversarial review returned APPROVE with no notes. Independently confirmed the shared submitCommand is byte-identical to aa165ca9; independently confirmed the two previously-broken tests exercise a genuinely different, more sophisticated caller-level recovery pattern that the broad fix would have conflicted with; independently ran the full suite and reproduced RED/GREEN itself, worktree left clean; independently confirmed a .pending outcome on the retry falls through to the same pre-existing, already-documented generic handling, not a new gap; independently checked and ruled out an alternative silent-no-op explanation (a nil-version guard) since it would produce no banner at all, unlike the Founder's reported explicit banner."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "All pre-upload verification steps (auth-check, dry run, post-upload status check) are read-only by the guarded tool's own design; the only mutating action taken was the single authorized upload itself, exactly as authorized."
+      "summary": "The decisive evidence (a direct, parameterized, owner-scoped query of physiqueos.command_receipts and the surrounding server request logs) was gathered inside the same bounded REPEATABLE READ READ ONLY transaction contract used throughout this lane, with an explicit ROLLBACK. No write of any kind was attempted."
     }
   },
   "decisions_required": [
-    "Founder: open TestFlight on the Founder's device and accept/install Build 61 whenever ready, then verify the on-device acceptance checklist for both the retry-resilience fix and the new workout-reconciliation notification."
+    "Founder: authorize a replacement build (new build number) carrying the corrected fix (f72551be) whenever ready -- the same Sep24 review remains a valid, live test case for it.",
+    "No decision needed on retrying Sep24 in this task -- explicitly not requested, respected throughout."
   ],
   "blockers": [],
-  "unexpected_findings": [],
-  "backlog": [
-    "Founder on-device TestFlight acceptance of Build 61.",
-    "Optional, lower priority (carried forward): harden resolveWorkoutReconciliation's .pending-outcome handling to match the established pattern elsewhere in the codebase.",
-    "Optional, lower priority (carried forward): a scheduled, ingestion-independent catch-up sweep for Strength-candidate reassessment.",
-    "The Sep24 Strength reconciliation itself remains unresolved and untouched by this entire release; the Founder's own confirm attempt (once the fixed Build 61 is installed) is the natural next real-world test of the retry-resilience fix."
+  "unexpected_findings": [
+    "The prior diagnosis's 401/token-expiry theory for the FIRST failure is now suspect too, not just insufficient for the second: this second real failure shows no 401 event anywhere near it, meaning the confirm's plain first-send transport-failure mechanism proven here may well have been the true cause of the original incident all along, with the earlier 401 finding being a coincidental, nearby, unrelated periodic token refresh.",
+    "An initial, broader fix attempt (retrying generically inside the shared submitCommand) was caught by the test suite itself before it could ship -- it broke two other features' own deliberate, more sophisticated recovery logic for a lost acknowledgment. Worth remembering as a general lesson for this codebase: a lost-acknowledgment recovery fix belongs at the specific call site that lacks one, not inside the shared low-level transport function, since different callers have deliberately different recovery semantics."
   ],
-  "recommended_next_step": "Founder accepts Build 61 in TestFlight whenever ready; no further HealthKit-lane action is required unless the on-device acceptance surfaces something new.",
-  "full_report_path": "agent-handoffs/reports/20260926T210800Z-healthkit-native-build61-uploaded-valid.md",
+  "backlog": [
+    "Authorize a replacement build (new build number) from f72551be whenever ready.",
+    "Optional, lower priority (carried forward): harden resolveWorkoutReconciliation's .pending-outcome handling to match the established pattern elsewhere in the codebase -- still not the proven cause of either real incident, still a documented follow-up only.",
+    "Optional, lower priority (carried forward): a scheduled, ingestion-independent catch-up sweep for Strength-candidate reassessment."
+  ],
+  "recommended_next_step": "Founder authorizes a replacement build number and release from f72551be whenever ready; the fix is tested, reviewed, and waiting.",
+  "full_report_path": "agent-handoffs/reports/20260926T222500Z-healthkit-build61-acceptance-failure-root-caused-fixed.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260926T203200Z-healthkit-native-build61-archived-upload-blocked.md",
-    "agent-handoffs/reports/20260926T211500Z-healthkit-native-token-refresh-retry-fix-prepared.md"
+    "agent-handoffs/reports/20260926T210800Z-healthkit-native-build61-uploaded-valid.md",
+    "agent-handoffs/reports/20260926T211500Z-healthkit-native-token-refresh-retry-fix-prepared.md",
+    "agent-handoffs/reports/20260926T203200Z-healthkit-native-build61-archived-upload-blocked.md"
   ],
   "safety": {
     "contains_secrets": false,
