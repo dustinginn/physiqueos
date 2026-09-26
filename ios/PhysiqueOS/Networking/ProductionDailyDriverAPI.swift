@@ -823,7 +823,7 @@ struct ProductionLogAPI: LogAPI {
             PendingEvidenceReview(
                 id: review.id, title: review.title, date: review.date,
                 summary: review.summary, likelyDuplicate: review.likelyDuplicate,
-                destination: .evidenceReview(reviewId: review.id)
+                destination: .evidenceReview(reviewId: review.id), kind: review.kind
             )
         }
         var processing = payload.processingEvidenceReviews ?? []
@@ -947,6 +947,7 @@ struct ProductionLogAPI: LogAPI {
         var title: String
         var summary: String
         var likelyDuplicate: Bool
+        var kind: String? = nil
     }
 
 }

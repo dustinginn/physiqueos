@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// The real Stage 1 Log screen — one of the Founder's highest-frequency
 /// daily-driver surfaces. Composition and hierarchy mirror `LogHubScreen.jsx`
@@ -32,19 +33,24 @@ struct LogView: View {
                 viewModelAuthority = environment.nativeAuthority
             }
             await viewModel?.load()
+            await syncWorkoutReconciliationNotifications()
         }
         // Logged Today is a daily-driver "Today" surface: it reloads when the
         // local day or zone changes (the environment invalidates the cached
         // read before publishing the new day) and whenever it is foregrounded
         // while visible. Before this, a retained Log kept showing the previous
         // day's rows after midnight until a tab switch or pull to refresh.
-        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) { await viewModel?.load() }
+        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) {
+            await viewModel?.load()
+            await syncWorkoutReconciliationNotifications()
+        }
         // On a resume that crosses midnight the re-evaluation invalidates and
         // publishes the new day (which reloads above); this closure loads only
         // when its own re-evaluation saw no change. If the root scene's
         // re-evaluation published first, the visible Log may read once more.
         .refreshesOnForegroundWhenVisible {
             if await !environment.reevaluateDailyDriverDay() { await viewModel?.load() }
+            await syncWorkoutReconciliationNotifications()
         }
         // While a confirmed review is Processing, refresh on a bounded cadence so the
         // card clears when the Server finishes. `.task` is cancelled when the screen
@@ -68,7 +74,23 @@ struct LogView: View {
                 await environment.productionNativeAPI.invalidateReadResources(["evidence-review-queue", "weight"])
             }
             await viewModel?.load()
+            await syncWorkoutReconciliationNotifications()
         }
+    }
+
+    /// Reconciles locally-scheduled reconciliation-review notifications
+    /// against the just-loaded canonical Log read. Mirrors `HomeView`'s
+    /// `syncPriorityNotifications` exactly: authorization is requested here
+    /// (a no-op after the Founder's first decision) rather than gated behind
+    /// a separate settings screen, since this is the natural point
+    /// scheduling first becomes possible for this surface too.
+    private func syncWorkoutReconciliationNotifications() async {
+        guard environment.nativeAuthority == .founderProduction,
+              case .loaded(let log) = viewModel?.state
+        else { return }
+        let center = UNUserNotificationCenter.current()
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+        await WorkoutReconciliationReviewReadyNotifier.reconcile(reviews: log.pendingEvidenceReviews, center: center)
     }
 
     @ViewBuilder

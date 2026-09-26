@@ -98,4 +98,11 @@ struct PendingEvidenceReview: Codable, Equatable, Identifiable {
     var summary: String
     var likelyDuplicate: Bool
     var destination: AppDestination
+    /// `"healthkit_workout_reconciliation"` for a Strength-candidate review
+    /// (`projectPendingReviews`'s `presentation.kind`), nil for every other
+    /// pending review type (photo/nutrition/DEXA/generic evidence, which the
+    /// server never tags). The only reliable, already-server-provided way to
+    /// scope the reconciliation-review notifier to exactly this review type
+    /// without re-deriving it from `id`'s internal prefix convention.
+    var kind: String? = nil
 }

@@ -76,6 +76,76 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         ).isEmpty)
     }
 
+    func testWorkoutReconciliationNotificationFiresOnceForANewActionableReviewAndDeepLinksToIt() throws {
+        let review = PendingEvidenceReview(
+            id: "healthkit_workout_reconciliation_abc123",
+            title: "Match Apple Health workout",
+            date: "Thursday, September 24",
+            summary: "1 possible Logger sessions",
+            likelyDuplicate: false,
+            destination: .evidenceReview(reviewId: "healthkit_workout_reconciliation_abc123"),
+            kind: "healthkit_workout_reconciliation"
+        )
+        let requests = WorkoutReconciliationReviewReadyNotifier.requestsForNewReviews(reviews: [review], observedIDs: [])
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(request.identifier, "evidence.reviewReady.healthkit_workout_reconciliation_abc123")
+        XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.evidenceReviewReady)
+        let destinationJSON = try XCTUnwrap(request.content.userInfo["destinationJSON"] as? String)
+        let destinationData = try XCTUnwrap(destinationJSON.data(using: .utf8))
+        XCTAssertEqual(
+            try JSONDecoder().decode(AppDestination.self, from: destinationData),
+            .evidenceReview(reviewId: "healthkit_workout_reconciliation_abc123")
+        )
+    }
+
+    func testWorkoutReconciliationNotificationIsDeduplicatedForAnAlreadyObservedReview() {
+        let review = PendingEvidenceReview(
+            id: "healthkit_workout_reconciliation_abc123", title: "Match Apple Health workout",
+            date: "Thursday, September 24", summary: "1 possible Logger sessions", likelyDuplicate: false,
+            destination: .evidenceReview(reviewId: "healthkit_workout_reconciliation_abc123"),
+            kind: "healthkit_workout_reconciliation"
+        )
+        XCTAssertTrue(WorkoutReconciliationReviewReadyNotifier.requestsForNewReviews(
+            reviews: [review], observedIDs: ["healthkit_workout_reconciliation_abc123"]
+        ).isEmpty, "A repeated reassessment that produces no new review identity must notify nothing.")
+    }
+
+    func testWorkoutReconciliationNotificationNeverFiresForANonReconciliationPendingReview() {
+        let photoReview = PendingEvidenceReview(
+            id: "evidence_review_photo_1", title: "Progress Photos ready to review",
+            date: "Thursday, September 24", summary: "3 photos", likelyDuplicate: false,
+            destination: .evidenceReview(reviewId: "evidence_review_photo_1"), kind: nil
+        )
+        XCTAssertTrue(WorkoutReconciliationReviewReadyNotifier.requestsForNewReviews(
+            reviews: [photoReview], observedIDs: []
+        ).isEmpty, "Only a workout-reconciliation review may produce this notification -- never an unrelated pending review type, and never a canonicalized Cardio workout, which has no review at all.")
+    }
+
+    func testWorkoutReconciliationNotificationOnlyFiresForTheGenuinelyNewReviewInAMixedList() throws {
+        let alreadyObserved = PendingEvidenceReview(
+            id: "healthkit_workout_reconciliation_seen", title: "Match Apple Health workout",
+            date: "Wednesday, September 23", summary: "1 possible Logger sessions", likelyDuplicate: false,
+            destination: .evidenceReview(reviewId: "healthkit_workout_reconciliation_seen"),
+            kind: "healthkit_workout_reconciliation"
+        )
+        let genuinelyNew = PendingEvidenceReview(
+            id: "healthkit_workout_reconciliation_new", title: "Match Apple Health workout",
+            date: "Thursday, September 24", summary: "1 possible Logger sessions", likelyDuplicate: false,
+            destination: .evidenceReview(reviewId: "healthkit_workout_reconciliation_new"),
+            kind: "healthkit_workout_reconciliation"
+        )
+        let unrelated = PendingEvidenceReview(
+            id: "evidence_review_photo_1", title: "Progress Photos ready to review",
+            date: "Thursday, September 24", summary: "3 photos", likelyDuplicate: false,
+            destination: .evidenceReview(reviewId: "evidence_review_photo_1"), kind: nil
+        )
+        let requests = WorkoutReconciliationReviewReadyNotifier.requestsForNewReviews(
+            reviews: [alreadyObserved, genuinelyNew, unrelated], observedIDs: ["healthkit_workout_reconciliation_seen"]
+        )
+        XCTAssertEqual(requests.map(\.identifier), ["evidence.reviewReady.healthkit_workout_reconciliation_new"])
+    }
+
     @MainActor
     func testColdStartBriefingTapWaitsForNavigationConsumerAndPreservesExactIdentity() throws {
         let coordinator = NotificationDeepLinkCoordinator()

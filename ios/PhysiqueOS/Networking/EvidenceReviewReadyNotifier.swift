@@ -215,3 +215,66 @@ enum BriefingReadyNotifier {
         }
     }
 }
+
+/// Notifies the Founder when automatic HealthKit sync/reassessment creates a
+/// new Founder-facing Strength workout-reconciliation review to act on,
+/// instead of relying on discovering it in Pending Review manually. Exactly
+/// `BriefingReadyNotifier`'s pattern (diff the just-loaded list against a
+/// persisted "already observed" id set, notify once per genuinely new id,
+/// deep-link, no server push involved) applied to Log's own
+/// `pendingEvidenceReviews`, scoped to exactly the reconciliation kind:
+///  - deduplicated/idempotent: a repeated reassessment that produces no NEW
+///    review id notifies nothing (the id is already in the observed set);
+///  - never fires for automatically canonicalized Cardio: Cardio never
+///    creates a reconciliation review at all (only an ambiguous/possible
+///    Strength match does), so it can never appear in the list being diffed;
+///  - never fires merely because a candidate was recomputed without a new
+///    review: the diff is against review IDENTITY, not assessment content;
+///  - a resolved review produces no stale repeat notification: Log's
+///    `pendingEvidenceReviews` only ever contains reviews the server itself
+///    still considers pending, so a resolved review drops out of the list
+///    (and therefore out of any future diff) the moment it resolves.
+enum WorkoutReconciliationReviewReadyNotifier {
+    private static let observedKey = "physiqueos.workout-reconciliation-reviews-observed.v1"
+    private static let reconciliationKind = "healthkit_workout_reconciliation"
+
+    @MainActor
+    static func reconcile(
+        reviews: [PendingEvidenceReview],
+        center: UNUserNotificationCenter = .current(),
+        defaults: UserDefaults = .standard
+    ) async {
+        let reconciliationReviews = reviews.filter { $0.kind == reconciliationKind }
+        let currentIDs = Set(reconciliationReviews.map(\.id))
+        guard defaults.object(forKey: observedKey) != nil else {
+            defaults.set(Array(currentIDs).sorted(), forKey: observedKey)
+            return
+        }
+        let observed = Set(defaults.stringArray(forKey: observedKey) ?? [])
+        let requests = requestsForNewReviews(reviews: reconciliationReviews, observedIDs: observed)
+        for request in requests {
+            try? await center.add(request)
+        }
+        defaults.set(Array(observed.union(currentIDs)).sorted(), forKey: observedKey)
+    }
+
+    static func requestsForNewReviews(
+        reviews: [PendingEvidenceReview], observedIDs: Set<String>
+    ) -> [UNNotificationRequest] {
+        reviews.compactMap { review in
+            guard review.kind == reconciliationKind, !observedIDs.contains(review.id),
+                  let destinationData = try? JSONEncoder().encode(review.destination),
+                  let destinationJSON = String(data: destinationData, encoding: .utf8)
+            else { return nil }
+            let content = UNMutableNotificationContent()
+            content.title = "Workout needs review"
+            content.body = "\(review.title) (\(review.date)) — \(review.summary)."
+            content.sound = .default
+            content.categoryIdentifier = PriorityNotificationCategory.evidenceReviewReady
+            content.userInfo = ["destinationJSON": destinationJSON]
+            return UNNotificationRequest(
+                identifier: "evidence.reviewReady.\(review.id)", content: content, trigger: nil
+            )
+        }
+    }
+}
