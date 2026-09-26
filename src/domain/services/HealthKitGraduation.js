@@ -422,17 +422,39 @@ export function overlayGraduatedHealthKitCardioWorkouts({
     timeZone: resolveLocalTimeZone(timeZone),
   });
   if (projected.length === 0) return Object.freeze({ objects: canonicalObjects, applied: Object.freeze([]) });
-  const graduated = projected.map((record) => Object.freeze({
-    ...record,
-    payload: Object.freeze({ ...record.payload, evidenceEligibility: eligibilityOf(purpose) }),
-    healthKitProjection: Object.freeze({
-      version: HEALTHKIT_GRADUATION_PROJECTION_VERSION,
-      purpose,
-      mode: "projected_alone",
-      healthKitCanonicalWorkoutId: record.id,
-      readOnly: true,
-    }),
-  }));
+  const workoutById = new Map(eligible.map((workout) => [workout.id, workout]));
+  // A canonical evidence object's wrapper fields (evidence_type, quality,
+  // lastObservedAt, ...) live OUTSIDE `payload` -- every other consumer in the
+  // Confidence/Narrative pipeline (WeeklyNarrativeService's `within(item.
+  // lastObservedAt)` window filter, PhotoEventNarrativeService's own date-window
+  // count, etc.) reads them from there, not from `payload`, exactly like
+  // `projectActivityDay`/`projectNutrition` above already stamp for the
+  // Activity/Nutrition graduation. `projectPresentedHealthKitCardioTrainingRecords`
+  // (a presentation-only projector with no wrapper concept) returns only
+  // `{id, canonicalId, payload}`, so this is the one place that shape is
+  // completed into a real evidence-object wrapper before it ever joins
+  // `canonicalObjects`.
+  const graduated = projected.map((record) => {
+    const workout = workoutById.get(record.id);
+    return Object.freeze({
+      ...record,
+      evidence_type: "training",
+      createdAt: workout?.createdAt ?? record.payload.observed_at,
+      updatedAt: workout?.updatedAt ?? record.payload.observed_at,
+      firstObservedAt: record.payload.observed_at,
+      lastObservedAt: record.payload.observed_at,
+      quality: { status: "active" },
+      userId: workout?.userId ?? null,
+      payload: Object.freeze({ ...record.payload, evidenceEligibility: eligibilityOf(purpose) }),
+      healthKitProjection: Object.freeze({
+        version: HEALTHKIT_GRADUATION_PROJECTION_VERSION,
+        purpose,
+        mode: "projected_alone",
+        healthKitCanonicalWorkoutId: record.id,
+        readOnly: true,
+      }),
+    });
+  });
   return Object.freeze({
     objects: [...canonicalObjects, ...graduated],
     applied: Object.freeze(graduated.map((record) => ({

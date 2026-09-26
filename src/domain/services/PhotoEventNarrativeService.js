@@ -14,6 +14,7 @@ import {
 } from "./CadenceEnergyAssessmentService";
 import { resolveCommittedPhaseContext } from
   "./FounderPhaseCorrectionService";
+import { isResistanceTrainingSession } from "./TrainingEvidenceClassification.js";
 
 const EVENT_VERSION = "photo_event_v4_0_0";
 
@@ -399,7 +400,17 @@ function confirmedPoseCopy(view){
   return copies[view.poseId]??null;
 }
 function supportingEvidenceSentence(weight,dexa,support={}){const parts=[];if(weight&&!/^No /.test(weight))parts.push("the continued weight trend");if(support.training)parts.push("consistent resistance training");if(support.activity)parts.push("sustained activity through the week");if(support.nutrition)parts.push("the available nutrition record");const reinforcement=parts.length?`${joinNarrative(parts)} ${parts.length===1?"reinforces":"reinforce"} the visual pattern`:`The photos remain the clearest current signal`;const sentence=`${reinforcement}${dexa?", with the latest DEXA serving as the body-composition baseline":""}.`;return sentence.charAt(0).toUpperCase()+sentence.slice(1);}
-export function deriveExecutionSupport(canonicalObjects=[],eventDate){const start=new Date(`${eventDate}T12:00:00Z`);start.setUTCDate(start.getUTCDate()-6);const startKey=start.toISOString().slice(0,10);const recent=canonicalObjects.filter((item)=>item.quality?.status!=="superseded"&&String(item.lastObservedAt).slice(0,10)>=startKey&&String(item.lastObservedAt).slice(0,10)<=eventDate);const count=(types)=>recent.filter((item)=>types.includes(item.evidence_type)&&item.payload?.quality?.status!=="incomplete").length;const training=count(["training"]);const activity=count(["activity_day"]);const nutrition=count(["nutrition"]);return {...(training>=2?{training:"Resistance training was consistent through the week."}:{}),...(activity>=3?{activity:"Activity remained sustained through the week."}:{}),...(nutrition>=3?{nutrition:"The available nutrition record was consistent through the week."}:{})};}
+export function deriveExecutionSupport(canonicalObjects=[],eventDate){const start=new Date(`${eventDate}T12:00:00Z`);start.setUTCDate(start.getUTCDate()-6);const startKey=start.toISOString().slice(0,10);const recent=canonicalObjects.filter((item)=>item.quality?.status!=="superseded"&&String(item.lastObservedAt).slice(0,10)>=startKey&&String(item.lastObservedAt).slice(0,10)<=eventDate);const count=(types)=>recent.filter((item)=>types.includes(item.evidence_type)&&item.payload?.quality?.status!=="incomplete").length;
+  // "Resistance training was consistent" is a specific claim: only evidence
+  // that is actually resistance/strength training (Logger exercises present,
+  // or an explicit strength/resistance/lifting/weights label) may support it --
+  // the same test WeeklyNarrativeService already uses for this exact
+  // distinction. A canonical HealthKit Cardio workout is also `evidence_type:
+  // "training"` (see HealthKitCardioTrainingPresentation.js) but has no
+  // exercises and a Cardio activity label, so it correctly never counts here,
+  // including once Cardio ever becomes strategically eligible.
+  const training=recent.filter((item)=>item.evidence_type==="training"&&item.payload?.quality?.status!=="incomplete"&&isResistanceTrainingSession(item.payload??item)).length;
+  const activity=count(["activity_day"]);const nutrition=count(["nutrition"]);return {...(training>=2?{training:"Resistance training was consistent through the week."}:{}),...(activity>=3?{activity:"Activity remained sustained through the week."}:{}),...(nutrition>=3?{nutrition:"The available nutrition record was consistent through the week."}:{})};}
 function ordinaryEventCopy({goalContext,limitation,milestone}){
   const goalTitle=goalContext?.activeGoal?.title??"";
   const phaseName=goalContext?.activePhase?.name??"";

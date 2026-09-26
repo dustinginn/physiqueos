@@ -75,6 +75,20 @@ describe("Phase 1 Cardio strategic graduation", () => {
     expect(projected.healthKitProjection.readOnly).toBe(true);
   });
 
+  it("stamps the standard canonical-evidence-object WRAPPER fields (evidence_type, quality, lastObservedAt) outside payload -- the same shape overlayGraduatedHealthKitDays already stamps for Activity/Nutrition -- so downstream consumers that read those fields at the top level (not payload) actually see the graduated object", () => {
+    const workout = canonicalWorkout({ n: 1, localDate: "2026-09-23" });
+    const { objects } = overlayGraduatedHealthKitCardioWorkouts({
+      canonicalObjects: [], canonicalWorkouts: [workout], policy: enabledPolicy(), purpose: Purpose.EVIDENCE,
+    });
+    const graduated = objects[0];
+    expect(graduated.evidence_type).toBe("training");
+    expect(graduated.quality).toEqual({ status: "active" });
+    expect(graduated.lastObservedAt).toBe("2026-09-23");
+    expect(graduated.firstObservedAt).toBe("2026-09-23");
+    expect(graduated.userId).toBe(workout.userId);
+    expect(typeof graduated.createdAt).toBe("string");
+  });
+
   it("stays fully quarantined when the evidenceEligibility scope is disabled -- the blanket default", () => {
     const workout = canonicalWorkout({ n: 1 });
     const disabled = resolveHealthKitGraduationPolicy(null);

@@ -30,6 +30,7 @@ import { composePIEditorialParagraph } from "./PIEditorialTranslationService";
 import { createWeeklyTrainingPresentationModel } from "./WeeklyTrainingPresentationService";
 import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
+import { isResistanceTrainingSession } from "./TrainingEvidenceClassification.js";
 import { attachBriefingDependencyManifest } from
   "./BriefingDependencyManifestService";
 
@@ -538,7 +539,6 @@ async function getWeeklyActivityTarget(repositories,userId){
   return version?.evaluationWindows?.find((item)=>item.cadence==="weekly")?.target??DEFAULT_WEEKLY_ACTIVITY_TARGET;
 }
 async function findExisting(repositories,userId,weekId){return repositories.dailyBriefings.getBriefingByEvidenceWindow(userId,weekId);}
-function isResistanceTrainingSession(item={}){return item.evidence_type==="training"&&((item.exercises??[]).length>0||/strength|resistance|lifting|weights?/i.test(item.metadata?.activity_type??""));}
 function isCompleteActivityDay(item={}){return item.evidence_type==="activity_day"&&item.quality?.status!=="incomplete"&&Number.isFinite(Number(item.daily_activity?.move_calories));}
 function isCompleteNutritionDay(item={}){return item.evidence_type==="nutrition"&&item.quality?.status!=="incomplete"&&item.metadata?.completeness!=="incomplete";}
 function displayExerciseName(observation,canonical){if(observation.exercise?.key==="cable_pushdown"&&canonical.some((item)=>(item.payload?.exercises??[]).some((exercise)=>/cable rope pushdowns?/i.test(exercise.name))))return "Cable Rope Pushdowns";return observation.exercise?.name??"Resistance training";}
