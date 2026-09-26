@@ -427,7 +427,15 @@ const RECOGNIZED_AMBIGUITY = new Set([
 ]);
 
 function intakeAmbiguity(evidence) {
-  return (evidence?.ambiguity ?? []).filter((code) => code.startsWith("intake_"));
+  const codes = (evidence?.ambiguity ?? []).filter((code) => code.startsWith("intake_"));
+  // Coverage, not a blanket flag: how many of the window's nutrition days are
+  // meal-derived. A window mixing a few meal-log days with authoritative
+  // full-day totals (e.g. HealthKit-graduated days) must not read as if every
+  // day's calories came from logged meals.
+  const mealDerived = Number(evidence?.byTier?.meal_derived_unverified ?? 0);
+  const days = Number(evidence?.dayCount ?? 0);
+  if (mealDerived > 0 && days > 0) codes.push(`intake_meal_derived_days_${mealDerived}_of_${days}`);
+  return codes;
 }
 
 function activityAmbiguity(evidence) {

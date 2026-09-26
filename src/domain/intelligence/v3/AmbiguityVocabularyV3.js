@@ -6,10 +6,21 @@ const HIGH_INTAKE_CODES = new Set([
   "intake_partial_subtotal", "intake_source_conflict", "intake_totals_missing",
 ]);
 
+function mealDerivedCoverage(reasons = []) {
+  const match = reasons.map((code) => /^intake_meal_derived_days_(\d+)_of_(\d+)$/u.exec(code)).find(Boolean);
+  return match ? { days: Number(match[1]), of: Number(match[2]) } : null;
+}
+
 export const ENERGY_AMBIGUITY_CLAUSES_V3 = Object.freeze({
-  energy_intake_uncertainty: (item) => item.reasons.some((code) => HIGH_INTAKE_CODES.has(code))
-    ? "some days do not have a reliable full-day calorie total"
-    : "calorie totals come from logged meals rather than a confirmed full-day total",
+  energy_intake_uncertainty: (item) => {
+    if (item.reasons.some((code) => HIGH_INTAKE_CODES.has(code))) return "some days do not have a reliable full-day calorie total";
+    // Coverage-aware: name the share of days when only some are meal-derived;
+    // the all-days wording applies only when every day is.
+    const coverage = mealDerivedCoverage(item.reasons);
+    return coverage && coverage.days < coverage.of
+      ? `calorie totals for ${coverage.days} of ${coverage.of} days come from logged meals rather than a confirmed full-day total`
+      : "calorie totals come from logged meals rather than a confirmed full-day total";
+  },
   energy_wearable_estimate: () => "active calories are a wearable estimate",
   energy_pairing_incomplete: (item) => {
     const counts = item.reasons.map((code) => /^paired_days_(\d+)_of_(\d+)$/u.exec(code)).find(Boolean);

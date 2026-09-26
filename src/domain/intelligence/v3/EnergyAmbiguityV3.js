@@ -31,6 +31,13 @@ const HIGH_INTAKE_CODES = new Set([
   "intake_partial_subtotal", "intake_source_conflict", "intake_totals_missing",
 ]);
 
+// `intake_meal_derived_days_<n>_of_<m>`: n of the window's m nutrition days
+// have meal-derived (not full-day asserted) calorie totals.
+export function mealDerivedCoverageV3(codes = []) {
+  const match = codes.map((code) => /^intake_meal_derived_days_(\d+)_of_(\d+)$/u.exec(code)).find(Boolean);
+  return match ? { days: Number(match[1]), of: Number(match[2]) } : null;
+}
+
 export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}) {
   const energyStrategy = goalContract?.strategy?.energyStrategy ?? null;
   const energyObservations = observations.filter((item) => item.capabilities?.some((measurement) =>
@@ -85,8 +92,14 @@ export function deriveEnergyExecutionV3({ goalContract, observations = [] } = {}
     ...item.limitations, ...item.capabilities.flatMap((measurement) => measurement.metadata?.ambiguity ?? []),
   ]).filter((code) => code.startsWith("intake_")));
   if (intakeCodes.length) {
-    ambiguity.push(entry(EnergyAmbiguityTypeV3.INTAKE,
-      intakeCodes.some((code) => HIGH_INTAKE_CODES.has(code)) ? "high" : "moderate", intakeCodes,
+    // Completeness is coverage-aware: when authoritative full-day totals cover
+    // most of the window and only a minority of days are meal-derived, the
+    // intake estimate is not materially uncertain on that account (low: no
+    // tempering, not surfaced). High-severity codes always win.
+    const mealDerived = mealDerivedCoverageV3(intakeCodes);
+    const materiality = intakeCodes.some((code) => HIGH_INTAKE_CODES.has(code)) ? "high"
+      : mealDerived && mealDerived.days * 2 < mealDerived.of ? "low" : "moderate";
+    ambiguity.push(entry(EnergyAmbiguityTypeV3.INTAKE, materiality, intakeCodes,
       idsWithLimitation(energyObservations, "intake_")));
   }
   const wearable = energyObservations.filter((item) =>
