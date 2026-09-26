@@ -2,22 +2,22 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Native confirmation failure root-caused; fix candidate `aa165ca9` prepared and reviewed (`claude-healthkit-strength-postdeploy-confirmation-failure-and-review-notifications-20260926`)
+- Task: Build 61 (retry fix + reconciliation-review notifications) reviewed and archived; upload blocked at a permission gate (`claude-native-build61-finalize-retry-fix-and-review-notifications-20260926`)
 - Agent: claude
 - Status: awaiting Founder direction
-- Generated (UTC): 2026-09-26T21:15:00Z
+- Generated (UTC): 2026-09-26T20:32:00Z
 - Success: true
 
-Summary: the earlier guess ("maybe it was just Refresh Review") was wrong, and the Founder was right to reject it — the real confirm button was used and it genuinely failed. Went back in with a wider log window and a direct check of the server's own command ledger, and got a definitive answer: **the confirm request never reached the server at all, not even once, for the whole two-hour window** — the ledger shows zero entries for it, ever. What did happen: your session's access token had just expired right at that moment; the app correctly noticed and refreshed it in under 200ms — but then never actually got the confirmed request through afterward. Found the exact reason in the code: after a token refresh, the app only gives the write **one** retry — if that one retry hits any ordinary network hiccup, the whole thing quietly gives up with that unhelpful "could not be verified" message, and nothing tries again.
+Summary: built the notification feature you asked for — the app will now tell you when a new workout needs review instead of you having to go find it, reusing the exact same mechanism already used for "your briefing is ready" notifications, nothing new invented. A first independent review incorrectly flagged it as broken, claiming the server never actually sends the piece of information the feature depends on — that turned out to be wrong: the reviewer was looking at a stale, leftover copy of server code bundled inside the Native project's own checkout, not the real server. Settled it for certain by running the actual, live production code against real data — confirmed the real server does send exactly what's needed, right now, today.
 
-Built the fix: one extra safety-net attempt after that retry, reusing the exact same request so it can never double-submit (checked the server's own duplicate-handling code directly to be sure of that). Wrote a test that fails on the old code and passes with the fix, ran the whole surrounding test suite clean (202/202), and got an independent second review back clean as well. This is genuinely new Native code, so — same as always — nothing has been installed anywhere; it's a reviewed, ready candidate sitting on top of the already-approved Build 61 lineage, waiting on your go-ahead for the next Native release.
+Also looked at a smaller, related loose end from the last report and decided, deliberately, not to touch it this time — it wasn't the actual cause of your confirmation problem, and fixing it properly would mean touching a second, unrelated part of the confirm flow, which felt like too much for this pass. Written up clearly as a follow-up instead.
 
-Also found one smaller, unrelated thing worth a note: there's already a better, established way this app handles "still processing, don't know yet" responses in a couple of other places — this one spot doesn't follow that pattern. It wasn't the cause here, just a loose end worth tidying up eventually.
+Bumped the build number, ran everything through its paces (all tests clean, Release build clean), and successfully created the actual Build 61 archive with proper signing. Got as far as verifying the archive itself is valid and ready — but the final verification step got blocked by a safety guardrail in this environment that treats it as a "production deploy" action needing your explicit go-ahead. Stopped there rather than trying to work around it, exactly as I should.
 
-**Your notification requirement is unchanged and still tracked** — nothing was deployed, nothing on your phone was touched, and you were not asked to try the confirmation again.
+**What's needed from you**: permission to run that one verification step (or you can run it yourself), and then — separately — your explicit okay for the actual TestFlight upload once that's confirmed clean.
 
-Detailed report: `agent-handoffs/reports/20260926T211500Z-healthkit-native-token-refresh-retry-fix-prepared.md`
+Detailed report: `agent-handoffs/reports/20260926T203200Z-healthkit-native-build61-archived-upload-blocked.md`
 
-Related: `agent-handoffs/reports/20260926T200000Z-healthkit-strength-postdeploy-failure-and-notification-audit.md`, `agent-handoffs/reports/20260926T191500Z-healthkit-strength-reconciliation-fix-deployed.md`
+Related: `agent-handoffs/reports/20260926T211500Z-healthkit-native-token-refresh-retry-fix-prepared.md`, `agent-handoffs/reports/20260926T200000Z-healthkit-strength-postdeploy-failure-and-notification-audit.md`
 
 Protocol: `agent-handoffs/README.md`
