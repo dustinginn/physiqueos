@@ -8,6 +8,9 @@ import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayReadMod
 import { selectActiveCanonicalNutritionDays } from "./CanonicalNutritionDayService.js";
 import { assessHealthKitCoexistence, HealthKitCanonicalDomain } from "./HealthKitCanonicalDayService.js";
 import { HEALTHKIT_CANONICAL_DAY_COLLECTION } from "./HealthKitEvidenceEligibilityPolicy.js";
+import { HealthKitWorkoutFamily } from "./HealthKitWorkoutService.js";
+import { projectPresentedHealthKitCardioTrainingRecords } from "./HealthKitCardioTrainingPresentation.js";
+import { resolveLocalTimeZone } from "../utils/localDate.js";
 
 // Graduation of accepted HealthKit Activity and Nutrition canonical days into
 // ordinary PhysiqueOS data.
@@ -43,7 +46,7 @@ export const HealthKitGraduationPurpose = Object.freeze({
   EVIDENCE: "evidence",
 });
 
-const SUPPORTED_DOMAINS = Object.freeze(["activity", "nutrition"]);
+const SUPPORTED_DOMAINS = Object.freeze(["activity", "nutrition", "cardio_training"]);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const HEALTHKIT_SOURCE = Object.freeze({ application: "Apple Health", integration: "HealthKit", modality: "direct" });
@@ -353,6 +356,89 @@ function graduateNutritionDay({ objects, day, purpose }) {
     healthKitProjection: projectionMarker(day, purpose, "merged_into_existing"),
   });
   return { objects: objects.map((object) => (object === existing ? mergedObject : object)), mode: "merged_into_existing", coexistence };
+}
+
+/**
+ * Phase 1 Cardio strategic graduation: canonical HealthKit Cardio workouts
+ * (family "cardio" only -- never Strength, which keeps its own separate
+ * reconciliation semantics and stays quarantined here regardless of this
+ * scope) into ordinary Training evidence, under the SAME graduation-policy
+ * architecture as Activity/Nutrition above (fail-closed scope resolution, a
+ * read-time-only overlay, no stored-record flag).
+ *
+ * Deliberately NOT folded into `overlayGraduatedHealthKitDays`/
+ * `assessHealthKitGraduation`: those model a single accumulating "day so
+ * far vs. complete day" per domain+date, gating strategic use on
+ * `coverage === "complete_day"`. A canonical HealthKit workout has no such
+ * partial state -- HealthKit delivers a bounded, already-finished event
+ * (a start and an end already known), and the existing replay-dedup design
+ * means a canonicalized workout is never revised into "more complete"
+ * later. It is settled the moment it exists, so this overlay needs no
+ * settlement-gate participation at all (unlike Activity/Nutrition days,
+ * which the Briefing Evidence Settlement gate explicitly waits on) --
+ * exactly like an ordinary Founder-logged Training evidence object, which
+ * has never been settlement-gated either.
+ *
+ * Reuses `projectPresentedHealthKitCardioTrainingRecords` verbatim (the
+ * same, already-reviewed presentation projector Training Day/History
+ * already use) rather than re-deriving the Training-evidence shape,
+ * per-day grouping, or duplicate suppression against existing
+ * screenshot/Logger evidence -- this overlay only adds the
+ * evidence-eligibility scope check and the strategic-eligibility stamp on
+ * top.
+ *
+ * No Activity/workout double counting in strategic interpretation: this
+ * projects a SEPARATE `evidence_type: "training"` object per workout: it
+ * never touches, merges into, or duplicates the "activity_day" evidence
+ * object Activity/Nutrition graduation above produces, and nothing in the
+ * V3 Confidence/Narrative pipeline sums `active_calories` across "training"
+ * evidence objects into a strategic energy total (see this file's own
+ * `HealthKitGraduationV3Invariance.test.js`-style tests) -- the workout's
+ * telemetry here is descriptive provenance only, exactly like a Logger
+ * session's telemetry is already used for provenance without being
+ * strategically re-summed.
+ */
+export function overlayGraduatedHealthKitCardioWorkouts({
+  canonicalObjects = [],
+  canonicalWorkouts = [],
+  policy = null,
+  purpose = HealthKitGraduationPurpose.PROJECTION,
+  timeZone = null,
+} = {}) {
+  const resolved = policy?.projection ? policy : resolveHealthKitGraduationPolicy(policy);
+  const scope = purpose === HealthKitGraduationPurpose.EVIDENCE ? resolved.evidenceEligibility : resolved.projection;
+  if (!scope.enabled || !scope.domains.includes("cardio_training") || canonicalWorkouts.length === 0) {
+    return Object.freeze({ objects: canonicalObjects, applied: Object.freeze([]) });
+  }
+  const eligible = canonicalWorkouts.filter((workout) => {
+    if (workout?.current?.family !== HealthKitWorkoutFamily.CARDIO) return false;
+    const localDate = workout.localDate ?? workout.current?.localDate ?? null;
+    return isHealthKitGraduationInScope(scope, { domain: "cardio_training", localDate });
+  });
+  if (eligible.length === 0) return Object.freeze({ objects: canonicalObjects, applied: Object.freeze([]) });
+  const projected = projectPresentedHealthKitCardioTrainingRecords({
+    canonicalWorkouts: eligible,
+    existingEvidenceObjects: canonicalObjects,
+    timeZone: resolveLocalTimeZone(timeZone),
+  });
+  if (projected.length === 0) return Object.freeze({ objects: canonicalObjects, applied: Object.freeze([]) });
+  const graduated = projected.map((record) => Object.freeze({
+    ...record,
+    payload: Object.freeze({ ...record.payload, evidenceEligibility: eligibilityOf(purpose) }),
+    healthKitProjection: Object.freeze({
+      version: HEALTHKIT_GRADUATION_PROJECTION_VERSION,
+      purpose,
+      mode: "projected_alone",
+      healthKitCanonicalWorkoutId: record.id,
+      readOnly: true,
+    }),
+  }));
+  return Object.freeze({
+    objects: [...canonicalObjects, ...graduated],
+    applied: Object.freeze(graduated.map((record) => ({
+      domain: "cardio_training", localDate: record.payload.observed_at, mode: "projected_alone", coexistence: null,
+    }))),
+  });
 }
 
 function eligibilityOf(purpose) {

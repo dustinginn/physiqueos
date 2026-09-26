@@ -6,9 +6,11 @@ import {
   HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
   HealthKitGraduationPurpose,
   isHealthKitGraduationInScope,
+  overlayGraduatedHealthKitCardioWorkouts,
   overlayGraduatedHealthKitDays,
   resolveHealthKitGraduationPolicy,
 } from "../../domain/services/HealthKitGraduation.js";
+import { HEALTHKIT_CANONICAL_WORKOUT_COLLECTION_NAME } from "../../domain/services/HealthKitEvidenceEligibilityPolicy.js";
 
 // The read-side seam for graduated HealthKit Activity and Nutrition days.
 //
@@ -123,6 +125,29 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
         return result;
       } catch (error) {
         if (isEvidence) evidenceOverlayFailure = describeReadError(error, "evidence_overlay");
+        onError?.(error);
+        return canonicalObjects;
+      }
+    },
+    /**
+     * Phase 1 Cardio strategic graduation. Deliberately separate from
+     * `overlay()` above and from the `beginRun`/`endRun` snapshot machinery:
+     * a canonical HealthKit workout has no "partial vs. complete day" state
+     * to snapshot coherently across a tick (see `overlayGraduatedHealthKit
+     * CardioWorkouts`'s own doc comment for why), so a fresh read here is
+     * always correct and never needs to participate in settlement-gate
+     * coordination -- exactly like an ordinary Founder-logged Training
+     * evidence object, which is also never settlement-gated.
+     */
+    async overlayCardioWorkouts(canonicalObjects, { purpose = HealthKitGraduationPurpose.PROJECTION, timeZone = null, policyRecord } = {}) {
+      try {
+        const policy = resolveHealthKitGraduationPolicy(policyRecord === undefined ? await lookup() : policyRecord);
+        const scope = purpose === HealthKitGraduationPurpose.EVIDENCE ? policy.evidenceEligibility : policy.projection;
+        if (!scope.enabled || !scope.domains.includes("cardio_training")) return canonicalObjects;
+        const canonicalWorkouts = await store.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION_NAME });
+        const { objects } = overlayGraduatedHealthKitCardioWorkouts({ canonicalObjects, canonicalWorkouts, policy, purpose, timeZone });
+        return objects;
+      } catch (error) {
         onError?.(error);
         return canonicalObjects;
       }

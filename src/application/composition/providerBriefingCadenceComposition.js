@@ -81,10 +81,20 @@ export function createProviderBriefingCadenceRunner({
       // days join it ONLY under the separate evidence-eligibility scope and only
       // as complete days, as read-time objects in this read-only snapshot. The
       // publication and Confidence stores keep the raw runtime.
+      //
+      // Graduated canonical HealthKit Cardio workouts (Phase 1 strategic
+      // graduation) join the SAME snapshot the same way, under their own
+      // independent `cardio_training` evidence-eligibility scope -- chained
+      // after the day-level overlay, never merged into it (workouts have no
+      // "complete day" state and need no settlement-gate participation; see
+      // `overlayGraduatedHealthKitCardioWorkouts`'s doc comment).
       const evidenceRuntime = {
         ...canonicalRuntime,
-        canonicalEvidenceObjects: await healthKitGraduation.overlay(
-          canonicalRuntime.canonicalEvidenceObjects ?? [],
+        canonicalEvidenceObjects: await healthKitGraduation.overlayCardioWorkouts(
+          await healthKitGraduation.overlay(
+            canonicalRuntime.canonicalEvidenceObjects ?? [],
+            { purpose: HealthKitGraduationPurpose.EVIDENCE },
+          ),
           { purpose: HealthKitGraduationPurpose.EVIDENCE },
         ),
       };

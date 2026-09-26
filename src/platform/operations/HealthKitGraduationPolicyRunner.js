@@ -210,7 +210,7 @@ function planPolicy({ policyRecord, current, desired, authorization }) {
   };
   const resolved = resolveHealthKitGraduationPolicy(record);
   if (!resolved.valid) {
-    return { refusal: `The requested graduation policy is not valid (${resolved.invalidReason}): domains must be activity and/or nutrition, with an exact start date and an optional end date on or after it.` };
+    return { refusal: `The requested graduation policy is not valid (${resolved.invalidReason}): domains must be activity, nutrition, and/or cardio_training, with an exact start date and an optional end date on or after it.` };
   }
   const before = stable({ projection: describeScope(current.projection), evidenceEligibility: describeScope(current.evidenceEligibility) });
   const after = stable({ projection: describeScope(resolved.projection), evidenceEligibility: describeScope(resolved.evidenceEligibility) });
