@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-26T20:00:00Z",
+  "generated_at_utc": "2026-09-26T21:15:00Z",
   "task": {
     "id": "claude-healthkit-strength-postdeploy-confirmation-failure-and-review-notifications-20260926",
-    "title": "Postdeploy Strength confirmation failure diagnosed (no new defect proven); reconciliation-review notification architecture audited",
+    "title": "Native confirmation failure root-caused (401-refresh retry has no resilience); fix candidate aa165ca9 prepared and reviewed",
     "agent": "claude",
     "status": "awaiting_founder_direction"
   },
@@ -13,14 +13,19 @@
     "native_installed_build": 60,
     "production_server_sha": "524f1882072cb5c17c4fe61f7210f0f7d1c6e67c",
     "production_deployment": "13d69b55-afd5-4805-b196-0eae1b5b0cea",
-    "native_build61_candidate_parked": "efcb8574d38d7462c3e2ccb0fd0e04ccb936517d",
-    "native_build61_unaffected": true,
+    "native_build61_prior_candidate": "efcb8574d38d7462c3e2ccb0fd0e04ccb936517d",
+    "native_build61_recommended_candidate": "aa165ca9",
+    "native_build61_recommended_candidate_branch": "codex/healthkit-token-refresh-retry-hardening",
+    "native_build61_recommended_candidate_base": "efcb8574d38d7462c3e2ccb0fd0e04ccb936517d",
+    "native_build61_recommended_candidate_worktree": "/private/tmp/physiqueos-healthkit-token-refresh-retry-hardening",
+    "native_build61_recommended_candidate_pushed": false,
     "sep24_strength_link_status": "candidate",
     "sep24_strength_link_confidence": 60,
-    "sep24_strength_review_version": 1
+    "sep24_strength_review_version": 1,
+    "sep24_workout_reconciliation_command_receipts_ever": 0
   },
   "result": {
-    "summary": "Diagnosed the Founder's postdeploy report that the Sep24 Strength confirmation still doesn't work. Found via App Platform request-level telemetry that the postdeploy retry window contains 8 reads of the review-detail screen but zero workout-reconciliation.resolve.v1 command receipts of any outcome -- the confirm command never reached the server's command-processing path. The review and link are byte-identical to before the deploy (version 1, candidate, unconfirmed); the live guard still passes cleanly with no error. No new Server or Native defect was found or proven; the already-deployed timing fix is confirmed intact and unaffected. The best-evidenced explanation is that 'Refresh Review' (a plain reload that never re-attempts the confirm, already flagged as a distinct non-blocking gap in the prior report) was used instead of re-tapping 'Use Logger session 1' -- not a new bug. No fix candidate was produced since no defect was proven; producing one without evidence would be exactly the kind of unevidenced change this lane avoids. Separately, audited the existing Actionable Notifications infrastructure (all local UserNotifications-based, no server push anywhere in the codebase) and found a directly reusable pattern already in production (BriefingReadyNotifier's diff-against-persisted-observed-ids design, called from HomeView.swift after Home's own data load) that fully satisfies every stated requirement (dedup, no-notify-for-auto-canonicalized-Cardio, no-notify-on-mere-recompute, deep-link via the existing AppDestination.evidenceReview type, existing PriorityNotificationCategory.evidenceReviewReady, no server change needed) for a new WorkoutReconciliationReviewReadyNotifier. Reconciliation-review notifications are currently absent. Published a precise, scoped follow-up design rather than implementing new Native code in this task, per the task's own instruction not to expand scope or touch Build61 here. Nothing mutated, deployed, or operated.",
+    "summary": "Superseding the prior report's incorrect 'maybe just Refresh Review' theory, which the Founder explicitly disproved by confirming the real confirm action was used and failed identically. Found decisive server-side evidence: a 401 ACCESS_TOKEN_EXPIRED rejection followed 190ms later by a successful token refresh, and then total silence -- confirmed definitively by a direct, bounded, read-only query of the physiqueos.command_receipts table showing ZERO rows, ever, for workout-reconciliation.resolve.v1 for this owner, and only automatic HealthKit ingestion receipts (instant-completing) in the surrounding two hours. This proves the confirm request never reached the point of being durably tracked server-side at all, ruling out any server-side idempotency/concurrency/stuck-processing defect with certainty. Root cause: Native's submitCommand gives a write command's post-401-refresh retry exactly one attempt; if that single retry hits its own independent transport failure, the write is silently lost with a generic 'could not be verified' message and no further attempt. Prepared an isolated, minimal fix (aa165ca9, based on the efcb8574 lineage) giving that retry one bounded extra attempt on a transport failure, reusing the same idempotency key (verified safe by directly reading the server's atomic ON CONFLICT DO NOTHING command-receipt insert and its per-owner advisory-lock serialization). New regression test proven RED on the original code, GREEN with the fix; full FounderServerAPITests suite 202/202 passing; independent fresh-context review returned APPROVE WITH NOTES, with all residual server-side safety questions it raised subsequently confirmed safe by direct code reading. A secondary, lower-priority code-quality gap was also found (a .pending command outcome is collapsed into the same generic error as a raw transport failure in this one call site, unlike the established pattern elsewhere in the codebase) -- not the cause of this incident, flagged as a follow-up. The Founder's notification requirement is retained unchanged from the prior report. Native is now implicated: aa165ca9 is recommended as the new Build61 candidate in place of plain efcb8574. Not deployed, not uploaded, no device operated, Founder not asked to retry.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -29,40 +34,39 @@
   },
   "validation": {
     "tests": {
-      "status": "not_applicable",
-      "summary": "Read-only diagnosis and architecture audit; no code changed in this task."
+      "status": "passed",
+      "summary": "New regression test reproduces the exact production sequence (401 -> refresh -> first retry drops -> second retry succeeds); proven RED on the original single-retry code, GREEN with the fix. Full FounderServerAPITests.swift suite: 202/202 passing, no regressions, iPhone 17 Pro simulator."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "No code produced in this task to review. The previously deployed fix (524f1882) is unchanged and was independently reviewed in the prior report."
+      "status": "approved_with_notes",
+      "summary": "Fresh-context adversarial review independently confirmed the retry behavior against both original and fixed source, independently verified refreshAccessToken's single-flight coalescing has no race, independently ran the full suite (202/202) and reproduced RED/GREEN itself, confirmed the worktree left clean. Flagged one residual assumption (server-side concurrent-idempotency-key safety) that this report subsequently confirmed directly by reading the server's own command-receipt insert and advisory-lock code -- genuinely safe, not just assumed."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Bounded REPEATABLE READ READ ONLY transaction confirmed the review/link state is byte-identical to the pre-deploy and post-deploy-acceptance snapshots. App Platform structured run logs (operational telemetry only, no credentials or raw bodies) were read to establish that zero workout-reconciliation.resolve.v1 command receipts exist in the postdeploy retry window despite 8 review-detail reads."
+      "summary": "Bounded REPEATABLE READ READ ONLY transaction with verified transaction_read_only=on and explicit ROLLBACK, extended this task to a direct parameterized query of physiqueos.command_receipts (owner-scoped, same read-only contract) -- the decisive evidence that zero receipts of any status exist for this command, ever."
     }
   },
   "decisions_required": [
-    "Founder: retry with the exact 'Use Logger session 1' action (not just 'Refresh Review') whenever convenient -- the review exists and nothing server-side is currently blocking it.",
-    "If that exact retry still visibly fails, capture the precise on-screen error text at that moment for a genuine client-side-evidenced follow-up.",
-    "Whenever Native work is next authorized on efcb8574, implement the proposed WorkoutReconciliationReviewReadyNotifier design -- no server change needed."
+    "Authorize Native work on the aa165ca9-based lineage (or a further-reviewed descendant) whenever Founder is ready -- this both closes the retry-resilience gap and, per the retained requirement, is the natural place to add the proposed reconciliation-review notification.",
+    "No decision needed on retrying the Sep24 Strength confirmation in this task -- explicitly not requested, per the Founder's instruction."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "App Platform's structured run-log telemetry (provider.*_read.complete and native.command.receipt_committed events) is detailed enough to distinguish 'a read happened' from 'a write command was attempted', which was the decisive evidence in this diagnosis and is a genuinely useful tool for future postdeploy acceptance/diagnosis work in this lane.",
-    "The existing BriefingReadyNotifier (Networking/EvidenceReviewReadyNotifier.swift, Native) already solves the exact 'notify once when a server-created item first appears, dedup via persisted observed-ids, deep-link, no server push needed' problem shape for briefings -- it is directly reusable as a template for HealthKit reconciliation-review notifications with no server-side work required."
+    "A direct query of physiqueos.command_receipts -- a table this lane had not previously queried directly -- proved decisively, not just inferentially, that the failed confirm command never reached the server's command-processing layer at all. This is a genuinely useful new diagnostic technique for this lane: when request-level logs show ambiguous silence, the receipt table itself gives a definitive yes/no on whether the server ever durably engaged with a specific write attempt.",
+    "The codebase already has an established, correct pattern for handling a command's '.pending' outcome (HealthKitServerUploader.swift, ProductionEvidenceIntakePipeline.swift) that EvidenceReviewAPI.swift's resolveWorkoutReconciliation does not follow -- a real, independent code-quality gap, though not the cause of this specific incident."
   ],
   "backlog": [
-    "Implement WorkoutReconciliationReviewReadyNotifier per the design in this report, on the efcb8574 lineage or a reviewed descendant, whenever Native work is next authorized.",
-    "Native Build61 preparation from efcb8574, whenever Founder separately authorizes it -- unaffected by this task.",
-    "Optional, lower priority (carried from the prior report): improve Native's error-classification so a definite failure is distinguishable from a genuinely ambiguous one.",
-    "Optional, lower priority (carried from the prior report): a scheduled, ingestion-independent catch-up sweep for Strength-candidate reassessment."
+    "Deploy/release the aa165ca9-based Native fix whenever Native work on Build61 is authorized.",
+    "Implement the proposed WorkoutReconciliationReviewReadyNotifier (from the prior report) on the same lineage -- no server change needed.",
+    "Optional, lower priority: harden resolveWorkoutReconciliation's handling of a .pending outcome to match the established pattern elsewhere in the codebase.",
+    "Optional, lower priority (carried from earlier reports): a scheduled, ingestion-independent catch-up sweep for Strength-candidate reassessment; improve Native's general error-classification clarity."
   ],
-  "recommended_next_step": "Founder retries the exact confirm action on-device; separately, when ready, authorize the scoped notification follow-up as part of the next Native work on the efcb8574 lineage.",
-  "full_report_path": "agent-handoffs/reports/20260926T200000Z-healthkit-strength-postdeploy-failure-and-notification-audit.md",
+  "recommended_next_step": "Founder authorizes Native work on the aa165ca9 lineage whenever ready, bundling the retry-resilience fix and the reconciliation-review notification feature together as the next Build61 preparation.",
+  "full_report_path": "agent-handoffs/reports/20260926T211500Z-healthkit-native-token-refresh-retry-fix-prepared.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260926T200000Z-healthkit-strength-postdeploy-failure-and-notification-audit.md",
     "agent-handoffs/reports/20260926T191500Z-healthkit-strength-reconciliation-fix-deployed.md",
-    "agent-handoffs/reports/20260926T183000Z-healthkit-strength-reconciliation-timing-diagnosed-fixed.md",
-    "agent-handoffs/reports/20260926T170800Z-healthkit-prospective-cardio-outdoor-walk-acceptance-PASS.md"
+    "agent-handoffs/reports/20260926T183000Z-healthkit-strength-reconciliation-timing-diagnosed-fixed.md"
   ],
   "safety": {
     "contains_secrets": false,

@@ -2,20 +2,22 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Postdeploy Strength confirmation failure diagnosed (no new defect proven); reconciliation-review notification architecture audited (`claude-healthkit-strength-postdeploy-confirmation-failure-and-review-notifications-20260926`)
+- Task: Native confirmation failure root-caused; fix candidate `aa165ca9` prepared and reviewed (`claude-healthkit-strength-postdeploy-confirmation-failure-and-review-notifications-20260926`)
 - Agent: claude
 - Status: awaiting Founder direction
-- Generated (UTC): 2026-09-26T20:00:00Z
+- Generated (UTC): 2026-09-26T21:15:00Z
 - Success: true
 
-Summary: checked why the Sep24 Strength confirmation "still doesn't work" after the fix went live. The server's own request logs for that exact window show the review screen was opened and reloaded 8 times — but there's no trace anywhere of an actual confirm request ever being sent. The review itself hasn't changed at all since before the deploy (still waiting, still unconfirmed), and re-checking the exact rule the server would apply right now still shows nothing blocking it. The most likely explanation: "Refresh Review" was tapped again (which — as already noted in the last report — only reloads the screen and never re-sends the actual confirmation), not "Use Logger session 1" itself. That's not a new bug; it's the same known limitation showing up again. No new code was written, because there's no proven defect to fix.
+Summary: the earlier guess ("maybe it was just Refresh Review") was wrong, and the Founder was right to reject it — the real confirm button was used and it genuinely failed. Went back in with a wider log window and a direct check of the server's own command ledger, and got a definitive answer: **the confirm request never reached the server at all, not even once, for the whole two-hour window** — the ledger shows zero entries for it, ever. What did happen: your session's access token had just expired right at that moment; the app correctly noticed and refreshed it in under 200ms — but then never actually got the confirmed request through afterward. Found the exact reason in the code: after a token refresh, the app only gives the write **one** retry — if that one retry hits any ordinary network hiccup, the whole thing quietly gives up with that unhelpful "could not be verified" message, and nothing tries again.
 
-Also did what was asked separately: looked at whether PhysiqueOS could just notify when a workout needs review instead of the Founder having to go find it. Good news — there's already a very close existing feature (the one that notifies "your briefing is ready") built the right way for exactly this shape of problem, no server changes needed at all. Wrote up the exact, ready-to-build design reusing it, but didn't build it in this pass since that's genuinely new Native code that belongs in a future Build, not something to slip in here.
+Built the fix: one extra safety-net attempt after that retry, reusing the exact same request so it can never double-submit (checked the server's own duplicate-handling code directly to be sure of that). Wrote a test that fails on the old code and passes with the fix, ran the whole surrounding test suite clean (202/202), and got an independent second review back clean as well. This is genuinely new Native code, so — same as always — nothing has been installed anywhere; it's a reviewed, ready candidate sitting on top of the already-approved Build 61 lineage, waiting on your go-ahead for the next Native release.
 
-**Next step for Founder**: reopen Pending Review and tap "Use Logger session 1" itself (not just Refresh) — should go through cleanly. If it still doesn't, note the exact error text shown, which would give something concrete to investigate.
+Also found one smaller, unrelated thing worth a note: there's already a better, established way this app handles "still processing, don't know yet" responses in a couple of other places — this one spot doesn't follow that pattern. It wasn't the cause here, just a loose end worth tidying up eventually.
 
-Detailed report: `agent-handoffs/reports/20260926T200000Z-healthkit-strength-postdeploy-failure-and-notification-audit.md`
+**Your notification requirement is unchanged and still tracked** — nothing was deployed, nothing on your phone was touched, and you were not asked to try the confirmation again.
 
-Related: `agent-handoffs/reports/20260926T191500Z-healthkit-strength-reconciliation-fix-deployed.md`, `agent-handoffs/reports/20260926T183000Z-healthkit-strength-reconciliation-timing-diagnosed-fixed.md`
+Detailed report: `agent-handoffs/reports/20260926T211500Z-healthkit-native-token-refresh-retry-fix-prepared.md`
+
+Related: `agent-handoffs/reports/20260926T200000Z-healthkit-strength-postdeploy-failure-and-notification-audit.md`, `agent-handoffs/reports/20260926T191500Z-healthkit-strength-reconciliation-fix-deployed.md`
 
 Protocol: `agent-handoffs/README.md`
