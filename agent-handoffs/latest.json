@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-26T17:08:00Z",
+  "generated_at_utc": "2026-09-26T18:30:00Z",
   "task": {
-    "id": "claude-healthkit-prospective-cardio-outdoor-walk-acceptance-20260926",
-    "title": "Prospective Cardio Outdoor Walk acceptance PASS — automatic HealthKit pipeline proven end to end",
+    "id": "claude-healthkit-strength-reconciliation-new-thread-20260926",
+    "title": "Sep24 Strength reconciliation confirmation defect diagnosed; isolated Server fix prepared and reviewed",
     "agent": "claude",
-    "status": "completed"
+    "status": "awaiting_founder_direction"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -18,13 +18,16 @@
     "canonical_workouts_total": 10,
     "canonical_cardio_workouts": 7,
     "canonical_strength_workouts": 3,
-    "new_prospective_workout_local_date": "2026-09-26",
-    "new_prospective_workout_canonical_type": "outdoor_walking",
-    "native_build61_candidate_parked": "efcb8574",
-    "native_build61_blocker_cleared": true
+    "native_build61_candidate_parked": "efcb8574d38d7462c3e2ccb0fd0e04ccb936517d",
+    "native_build61_unaffected_by_this_fix": true,
+    "strength_reconciliation_fix_candidate_sha": "524f1882072cb5c17c4fe61f7210f0f7d1c6e67c",
+    "strength_reconciliation_fix_branch": "codex/healthkit-strength-reconciliation-timing-fix",
+    "strength_reconciliation_fix_base": "2a23eee762472081815d9122b97c0f0a9f1b8969",
+    "strength_reconciliation_fix_worktree": "/private/tmp/physiqueos-healthkit-strength-reconciliation-timing",
+    "strength_reconciliation_fix_pushed": false
   },
   "result": {
-    "summary": "The Founder's Sep26 Apple Watch Outdoor Walk was proven, entirely read-only, to have gone through the untouched automatic pipeline end to end: Apple Watch -> HealthKit -> Native -> normal background sync -> Server observation persistence (isIndoorWorkout stored exactly false) -> Cardio family classification -> automatic canonical Cardio workout creation (single source observation, single canonical workout, no duplicates) -> specific canonicalType outdoor_walking -> Training Day presentation as a distinct 'Outdoor Walk' row (not generic Walking) -> Activity accounting (workout energy included exactly once, non-workout calories non-negative, no double count). No manual sync, ingestion replay, reconciliation, or backfill was performed; nothing was deployed or mutated. Historical Sep21-24 controls, Strength links/claims, workout policy, strategic quarantine, migrations, and production health were all reread fresh and found unchanged. Waited under an hour from first check to detection using only bounded read-only polling, no device operation. PASS: prospective Cardio ingestion/canonicalization/type-fidelity accepted; strategic evidence eligibility remains a separate, still-quarantined decision. Because this was the last blocker, Native Build 61 candidate efcb8574 (Performance Phase 2, local-day correctness, approved Active Goal V3 layout) can now move to release preparation under separate Founder authorization.",
+    "summary": "Diagnosed, read-only, why the Founder's Sep24 Strength workout confirmation ('Use Logger session 1') failed and 'Refresh Review' never resolved it. Root cause: the server only creates a Founder-facing reconciliation review for a Strength candidate during a HealthKit ingestion batch that itself contains a new workout observation. The Sep24 workout's Logger session committed independently about an hour after the workout ended, but no further HealthKit workout arrived until the unrelated Sep26 Cardio walk two days later -- so the review row was never durably created until then, and any confirm attempt before that point had nothing real to update. Proven via direct production evidence: the review is still version 1 with empty resolution history, its one lifecycle entry is timestamped to the Sep26 Cardio ingestion batch (not Sep24), and the underlying link is still 'candidate', never confirmed. A live, read-only re-run of the production confirmation guard against current data passes cleanly, meaning a fresh retry right now would very likely succeed. Prepared an isolated, minimal Server-only fix (drop the batch-had-workout gate so reassessment runs on every ingestion batch) with a focused regression test proven RED on the original code and GREEN with the fix, no regressions across 350 broader tests, and an independent fresh-context review returning APPROVE WITH NOTES (two non-blocking follow-ups: a future scaling watch-item, and that a fully ingestion-independent scheduled catch-up would be more robust long-term). Not deployed. Native Build61 lineage (efcb8574) is completely unaffected and does not need to wait on this fix.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -33,38 +36,38 @@
   },
   "validation": {
     "tests": {
-      "status": "not_applicable",
-      "summary": "No code changed in this task; this was a live production acceptance read, not a test-suite run. The classifier/presentation functions exercised are the same already-tested production code paths verified in prior HealthKit lane reports."
+      "status": "passed",
+      "summary": "New regression test in HealthKitWorkoutDormantFoundation.test.js reproduces the exact production sequence; proven RED against the original batchHadWorkout gate (candidateLinksCreated: 0 instead of 1, exactly the production symptom) and GREEN with the fix. Broader sweep: 350/350 passing across src/application/native/ and src/application/commands/ (20 files). Two pre-existing, unrelated test failures (regex assertions on an untouched deployment script) confirmed to fail identically on the unmodified baseline."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "No code shipped in this task. A bug in this task's own one-off audit script (wrong canonical-workout id lookup key) was found and fixed by the author before publishing; corrected output re-verified via a second run showing consistent, cross-checked results (deterministic id re-derivation matched, source observation id confirmed present in canonical provenance)."
+      "status": "approved_with_notes",
+      "summary": "Fresh-context adversarial review independently re-derived the exact mechanism (including the ~10ms timestamp coincidence) from the code, independently ran the tests and reproduced the RED/GREEN swap itself, and searched every caller/test of the ingestion path for hidden coupling to the old gate (found none). Verdict: APPROVE WITH NOTES. Two non-blocking follow-ups: the reassessment pass now runs more often and scans the full open-ended workout window (currently negligible cost, a future scaling watch-item); and the fix still depends on some HealthKit batch eventually arriving to trigger the catch-up, so a fully scheduled/ingestion-independent sweep would be more robust long-term but isn't required for this specific defect."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Every production interaction was a bounded REPEATABLE READ READ ONLY transaction with an explicit ROLLBACK and a verified transaction_read_only=on fence; only hashed identifiers left the transaction. Three tools used: one new purpose-built script plus the existing, already-accepted --kind audit and --kind workout-audit tools for a wider Sep20-27 regression window."
+      "summary": "Every production read was a bounded REPEATABLE READ READ ONLY transaction with a verified transaction_read_only=on fence and explicit ROLLBACK. The only 'mutation-adjacent' step was purely in-memory: re-running the production confirmation-allowed guard function against already-fetched data inside the same read-only transaction to see what it would decide right now -- no database write path was called."
     }
   },
   "decisions_required": [
-    "Authorize Native Build 61 preparation from candidate efcb8574 (Performance Phase 2 + local-day correctness + the approved Active Goal V3 layout), now that the prospective Cardio acceptance blocker is cleared.",
-    "Optional, non-blocking: unify Training landing/reporting/library/rollup surfaces with reconciled Cardio (existing backlog, not required for this acceptance)."
+    "Authorize deployment of the prepared Server fix (524f1882) on its own gate, independent of Build61.",
+    "Founder's own choice, not gated by this task: reopen Pending Review and retry 'Use Logger session 1' for the Sep24 Strength workout -- the live guard re-check suggests this should now succeed cleanly."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "This task's own first-draft audit script had a key-lookup bug (looked up the canonical workout by the raw observation id instead of the deterministic derived canonical-workout id), which under-reported canonicalization linkage on the first run; found and fixed by the author before publishing, with the corrected, cross-checked result (deterministic id re-derivation plus source-observation-id-in-provenance check) matching the already-correct Training Day/Activity projection that had used the right data all along.",
-    "A same-topic ChatGPT inbox prompt (commit 551a1644, 'verify new prospective Outdoor Walk through automatic HealthKit Cardio pipeline') appeared on main mid-task; not executed by this (Claude/HealthKit-lane) task, which completed the Founder's own Claude-addressed prompt independently."
+    "The Sep24 Strength reconciliation review's own creation timestamp exactly coincides (within 10ms) with an entirely unrelated HealthKit ingestion event two days later (the Sep26 Cardio walk) -- a direct, provable fingerprint of the timing-gap mechanism, not a coincidence needing separate explanation.",
+    "A secondary, independent Native UX gap was identified (not fixed here, lower priority, not the root cause): 'Refresh Review' only re-fetches and displays current state -- it can never resolve a failed confirm attempt on its own, since it never re-attempts the confirm action itself."
   ],
   "backlog": [
-    "Native Build 61 preparation from efcb8574, pending separate Founder authorization.",
-    "Optional: unify Training landing/reporting/library/rollups with reconciled Cardio.",
-    "Strategic evidence eligibility for Cardio remains a later, separate, not-yet-started project."
+    "Deploy the Strength-reconciliation timing fix (524f1882), own gate.",
+    "Optional, lower priority: improve Native's error-classification so a definite failure is distinguishable from a genuinely ambiguous one, instead of always surfacing 'Refresh required'.",
+    "Optional, lower priority: a scheduled, ingestion-independent catch-up sweep for Strength-candidate reassessment, for full robustness against extended HealthKit sync gaps.",
+    "Native Build61 preparation from efcb8574, whenever Founder separately authorizes it -- unaffected by this fix."
   ],
-  "recommended_next_step": "Founder: verify the new Sep26 'Outdoor Walk' Training Day row on Build 60 per this report's checklist, then decide whether to authorize Native Build 61 preparation from efcb8574 now that this was the last blocker.",
-  "full_report_path": "agent-handoffs/reports/20260926T170800Z-healthkit-prospective-cardio-outdoor-walk-acceptance-PASS.md",
+  "recommended_next_step": "Founder decides whether to authorize deployment of 524f1882 (own gate) and/or to retry the Sep24 Strength confirmation on-device now that the live guard check shows nothing currently blocking it.",
+  "full_report_path": "agent-handoffs/reports/20260926T183000Z-healthkit-strength-reconciliation-timing-diagnosed-fixed.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260925T161800Z-healthkit-cardio-historical-reconciliation-serial.md",
-    "agent-handoffs/reports/20260925T173500Z-healthkit-training-day-cardio-server-deployed-checkpoint.md",
-    "agent-handoffs/reports/20260925T033000Z-healthkit-cardio-graduation-readiness.md"
+    "agent-handoffs/reports/20260926T170800Z-healthkit-prospective-cardio-outdoor-walk-acceptance-PASS.md",
+    "agent-handoffs/reports/20260925T173500Z-healthkit-training-day-cardio-server-deployed-checkpoint.md"
   ],
   "safety": {
     "contains_secrets": false,
