@@ -86,7 +86,7 @@ private struct ActiveGoalDetailContent: View {
             if let state = goal.currentState {
                 // Server-owned current state: starting point → current
                 // authoritative state → progress → guardrail → training →
-                // coaching (latest briefing Coach's Take) → turning points.
+                // turning points → latest briefing Coach's Take (last).
                 ActiveGoalCurrentStateSections(
                     goal: goal,
                     state: state,
@@ -424,7 +424,7 @@ private struct ActiveGoalDetailContent: View {
 
 /// Active Goal rendered from the Server's `active_goal_current_state_v1`.
 /// Hierarchy: starting point → current authoritative state → progress →
-/// guardrail → supporting training → coaching → turning points. Every
+/// guardrail → supporting training → turning points → coaching. Every
 /// sentence shown here is a Server field; Native only formats numbers and
 /// dates and chooses layout.
 struct ActiveGoalCurrentStateSections: View {
@@ -525,7 +525,7 @@ struct ActiveGoalCurrentStateSections: View {
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
-                        if let provenance = confidence.publishedBy?.asOfLabel ?? ActiveGoalFormat.confidenceProvenance(confidence.publishedBy) {
+                        if let provenance = confidence.publishedBy?.asOfLabel {
                             Text(provenance)
                                 .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -598,7 +598,7 @@ struct ActiveGoalCurrentStateSections: View {
                 if let progress = state.progress, let percent = progress.percentComplete {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .firstTextBaseline) {
-                            Text(ActiveGoalFormat.progressHeadline(progress))
+                            Text("Goal progress")
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             Spacer()
@@ -613,6 +613,9 @@ struct ActiveGoalCurrentStateSections: View {
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Goal progress")
+                    .accessibilityValue(["\(percent) percent", ActiveGoalFormat.remainingLabel(progress)].compactMap { $0 }.joined(separator: ", "))
                 }
                 if let cadence = state.phase?.measurementCadence {
                     Text(cadence)
@@ -820,21 +823,11 @@ enum ActiveGoalFormat {
         return "\(score)% · \(band)"
     }
 
-    static func confidenceProvenance(_ publisher: ActiveGoalCurrentStateReadModel.Publisher?) -> String? {
-        guard let label = publisher?.label, let date = publisher?.publishedOn else { return nil }
-        return "From the \(shortDate(date)) \(label)"
-    }
 
     static func compact(_ value: Double) -> String {
         value.rounded() == value ? String(Int(value)) : number(value)
     }
 
-    static func progressLabel(_ progress: ActiveGoalCurrentStateReadModel.Progress) -> String {
-        let target = compact(progress.targetAmount)
-        guard let achieved = progress.achievedAmount else { return "\(target) \(progress.unit) lean-mass target" }
-        guard achieved >= 0 else { return "\(signed(achieved, unit: " \(progress.unit)")) lean mass vs goal baseline" }
-        return "\(number(achieved)) of \(target) \(progress.unit) lean mass gained"
-    }
 
     static func compositionCaption(_ composition: ActiveGoalCurrentStateReadModel.Composition) -> String {
         if composition.sameAsBaseline { return "\(composition.authority) · goal baseline" }
@@ -847,15 +840,11 @@ enum ActiveGoalFormat {
          item.personalRecord == true ? "personal record" : nil].compactMap { $0 }.joined(separator: ", ")
     }
 
-    /// Progress line for the Current Progress section. The lean-mass change
-    /// itself is already in the composition table (and the target in the
-    /// hero), so this states the share and what is left, not the change again.
-    static func progressHeadline(_ progress: ActiveGoalCurrentStateReadModel.Progress) -> String {
-        guard let achieved = progress.achievedAmount else { return "Goal progress" }
-        return achieved < 0 ? progressLabel(progress) : "Goal progress"
-    }
-
+    /// The line under the progress bar. The lean-mass change lives in the
+    /// composition table and the target in the hero, so this states only what
+    /// is left — or that no scan has followed the baseline yet.
     static func remainingLabel(_ progress: ActiveGoalCurrentStateReadModel.Progress) -> String? {
+        if progress.status == "awaiting_follow_up" { return "Awaiting the next DEXA" }
         guard let remaining = progress.remainingAmount else { return nil }
         return remaining <= 0 ? "Target reached" : "\(number(remaining)) \(progress.unit) to go"
     }
@@ -866,13 +855,19 @@ enum ActiveGoalFormat {
         -> (detail: ConfidenceDetail, provenance: String?) {
         guard let asOf = state?.confidence?.publishedBy?.asOfLabel, !asOf.isEmpty else { return (detail, nil) }
         var presented = detail
-        if presented.uncertaintyStatement.trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: ".")) == asOf {
+        let normalize: (String) -> String = {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if normalize(presented.uncertaintyStatement) == normalize(asOf) {
             presented.uncertaintyStatement = ""
         }
-        return (presented, asOf)
+        return (presented, normalize(asOf))
     }
 
+    /// The pill carries the reading and its status; the scan date is already
+    /// the composition table's "Latest" column.
     static func guardrailState(_ guardrail: ActiveGoalCurrentStateReadModel.Guardrail) -> String? {
         guard let measurement = guardrail.measurement, let position = guardrail.position else { return nil }
         let where_: String
@@ -882,7 +877,7 @@ enum ActiveGoalFormat {
         case "above": where_ = "Above range"
         default: return nil
         }
-        return "\(number(measurement.value))% on \(shortDate(measurement.date)) DEXA · \(where_)"
+        return "\(number(measurement.value))% · \(where_)"
     }
 
     static func trainingEyebrow(_ training: ActiveGoalCurrentStateReadModel.Training) -> String {

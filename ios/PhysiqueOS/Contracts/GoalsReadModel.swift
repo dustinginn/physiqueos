@@ -455,14 +455,6 @@ struct ActiveGoalCurrentStateReadModel: Codable, Equatable {
         var asOfLabel: String? = nil
     }
 
-    struct ConfidenceDetailLists: Codable, Equatable {
-        var whatSupportsIt: [String]
-        var whatIsHoldingItBack: [String]
-        var whatCouldRaiseIt: [String]
-        var whatCouldLowerIt: [String]
-        var assumptions: [String]
-    }
-
     struct Confidence: Codable, Equatable {
         var status: String
         var score: Int?
@@ -471,7 +463,6 @@ struct ActiveGoalCurrentStateReadModel: Codable, Equatable {
         var delta: Int?
         var summary: String?
         var publishedBy: Publisher?
-        var detail: ConfidenceDetailLists?
     }
 
     struct TrainingHighlight: Codable, Equatable {
@@ -496,7 +487,7 @@ struct ActiveGoalCurrentStateReadModel: Codable, Equatable {
         var comparableMovementCount: Int
         var improvingCount: Int
         var regressingCount: Int
-        var regions: [TrainingRegion]
+        var regions: [TrainingRegion]? = nil
         var highlights: [TrainingHighlight]
         var summary: String
     }
