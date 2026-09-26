@@ -411,7 +411,6 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       : null;
     const canonicalWorkoutById = new Map(existingCanonicalWorkouts.map((record) => [record.id, record]));
     const workoutLinks = [...existingWorkoutLinks];
-    let batchHadWorkout = false;
     const activationPolicy = resolveHealthKitCanonicalActivationPolicy(activationPolicyRecord);
     const activationSnapshot = activationPolicy.enabled
       ? {
@@ -490,7 +489,6 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
             };
         }
       } else if (observation.observationType === HealthKitObservationType.WORKOUT) {
-        batchHadWorkout = true;
         const classification = classifyHealthKitWorkoutType(observation.measurement.activityType);
         // The effective day is the workout's own start in its own time zone.
         const effectiveLocalDate = deriveHealthKitWorkoutLocalDate({
@@ -754,8 +752,21 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     // Relationship reassessment. Read-mostly and idempotent: it only runs while
     // the separate Workout policy is enabled, only for canonical workouts inside
     // its exact window, and it never touches the Logger session or Evidence.
+    //
+    // Deliberately NOT gated on `batchHadWorkout`: a Strength workout's Logger
+    // match can only become plausible once its Logger session is committed
+    // server-side, which happens on its own, independent submission path with
+    // its own timing -- not necessarily inside the same ingestion batch (or
+    // even the same day) as the HealthKit workout itself. Gating this on the
+    // current batch containing a workout left a real Strength candidate's
+    // reconciliation review uncreated for two full days, until the next
+    // *workout* batch happened to arrive, because no ingestion batch in
+    // between ever re-ran this reassessment. Every other HealthKit ingestion
+    // batch (Activity/Nutrition daily totals) already runs far more often, so
+    // running this reassessment unconditionally closes that gap; it stays
+    // cheap and side-effect-free when nothing has actually changed.
     let workoutRelationships = { assessed: 0, updated: 0, candidateLinksCreated: 0, candidateLinksReleased: 0 };
-    if (batchHadWorkout && workoutPolicy.enabled) {
+    if (workoutPolicy.enabled) {
       workoutRelationships = await reassessWorkoutRelationships({
         context,
         workoutPolicy,

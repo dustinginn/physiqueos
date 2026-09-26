@@ -160,6 +160,33 @@ describe("controlled Workout window (policy enabled)", () => {
     expect(records.snapshot().healthKitWorkoutLinks[0]).toMatchObject({ status: "candidate", loggerSessionCanonicalId: "session-a" });
   });
 
+  it("re-evaluates the link and creates the Founder review on the next batch even when no further workout ever arrives (only Activity/Nutrition syncs)", async () => {
+    // Regression for a real production case: the Logger session committed on its own,
+    // independent submission path shortly after the Apple Watch workout was ingested, but
+    // no NEW Watch workout synced afterward -- only ordinary daily Activity/Nutrition
+    // batches. The Founder review must still appear from one of those, not stay silently
+    // uncreated until some unrelated later workout happens to arrive.
+    const records = store();
+    await ingest(records, [workout()], "b1");
+    expect(records.snapshot().healthKitCanonicalWorkouts[0].linkAssessment).toMatchObject({ outcome: "no_match" });
+    expect(records.snapshot().evidenceReviews ?? []).toEqual([]);
+    await records.put({ ownerUserId: OWNER, collection: "canonicalEvidenceObjects", recordId: "session-a", payload: logger("session-a", "10:04", "11:20", 4560) });
+    const replay = await ingest(records, [activity({ moveCalories: 900 })], "b2");
+    expect(replay.result.workoutRelationships).toMatchObject({ candidateLinksCreated: 1, updated: 1, reconciliationReviewsCreated: 1 });
+    const snapshot = records.snapshot();
+    expect(snapshot.healthKitWorkoutLinks[0]).toMatchObject({ status: "candidate", loggerSessionCanonicalId: "session-a" });
+    expect(snapshot.evidenceReviews).toHaveLength(1);
+    expect(snapshot.evidenceReviews[0]).toMatchObject({
+      reviewKind: "healthkit_workout_reconciliation",
+      status: "pending",
+      candidates: [{ loggerSessionCanonicalId: "session-a" }],
+    });
+    // A further non-workout batch with nothing changed stays idempotent: no new review, no version bump.
+    const review = structuredClone(snapshot.evidenceReviews[0]);
+    await ingest(records, [activity({ moveCalories: 900 })], "b3");
+    expect(records.snapshot().evidenceReviews).toEqual([review]);
+  });
+
   it("never links an ambiguous match and releases a stale candidate when a second session appears", async () => {
     const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
     await ingest(records, [workout()], "b1");
