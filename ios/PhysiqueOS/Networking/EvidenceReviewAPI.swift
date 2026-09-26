@@ -152,12 +152,45 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
             action: action,
             loggerSessionCanonicalId: loggerSessionCanonicalId
         )
-        let outcome: ProductionCommandOutcome<WorkoutReconciliationCommandResult> = try await api.submitCommand(
-            ProductionCommandType.resolveWorkoutReconciliation,
-            idempotencyKey: signature,
-            expectedVersion: expectedVersion,
-            payload: payload
-        )
+        // A real Build 61 attempt (already carrying `submitCommand`'s own
+        // post-401-refresh retry) still lost this exact confirm silently: a
+        // bounded, owner-scoped read of the server's own `command_receipts`
+        // ledger for that attempt's window showed zero rows for this command
+        // at any status, and the surrounding request logs show no 401/token-
+        // expiry event anywhere near it either -- only unrelated command
+        // traffic succeeding around it. The write's very first send hit a
+        // plain, ordinary transport failure with no token expiry involved,
+        // so `submitCommand`'s existing retry (scoped to the 401-refresh
+        // branch only) never had a chance to engage.
+        //
+        // The retry lives HERE, one call site, deliberately NOT inside the
+        // shared `submitCommand`: other callers (training commit, morning
+        // check-in) already have their own, more careful "verify what
+        // actually happened" recovery for a lost acknowledgment -- adding a
+        // blind retry inside `submitCommand` itself would silently short-
+        // circuit that existing, deliberate behavior for every command type,
+        // not just this one. This confirm has no such existing recovery, so
+        // one bounded extra attempt, reusing the exact same idempotency
+        // signature and payload, is the correct fix at this exact scope: the
+        // server's own command-receipt replay is keyed on that identity, so
+        // a genuine duplicate delivery returns the original outcome rather
+        // than creating a second mutation.
+        let outcome: ProductionCommandOutcome<WorkoutReconciliationCommandResult>
+        do {
+            outcome = try await api.submitCommand(
+                ProductionCommandType.resolveWorkoutReconciliation,
+                idempotencyKey: signature,
+                expectedVersion: expectedVersion,
+                payload: payload
+            )
+        } catch ProductionNativeError.networkFailure {
+            outcome = try await api.submitCommand(
+                ProductionCommandType.resolveWorkoutReconciliation,
+                idempotencyKey: signature,
+                expectedVersion: expectedVersion,
+                payload: payload
+            )
+        }
         guard outcome.outcome != .pending, let result = outcome.receipt.result else {
             throw ProductionNativeError.networkFailure
         }

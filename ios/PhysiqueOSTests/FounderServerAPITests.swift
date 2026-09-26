@@ -3176,6 +3176,45 @@ final class FounderServerAPITests: XCTestCase {
             "The bounded extra attempt must reuse the exact same idempotency key so a genuine duplicate delivery replays the original outcome instead of creating a second mutation.")
     }
 
+    /// Regression for the real recurrence of the production case above,
+    /// proven from a live Build 61 attempt (the previous fix was live and did
+    /// not help): a bounded, owner-scoped read of the server's own
+    /// `command_receipts` ledger for the exact failed attempt's window showed
+    /// zero rows of any status for this command, and the surrounding
+    /// request-level logs show no 401/token-expiry event anywhere near that
+    /// window either -- only ordinary, unrelated command traffic succeeding
+    /// around it. The write's very FIRST send hit a plain, ordinary transport
+    /// failure with no token expiry involved at all, and because the earlier
+    /// fix's retry only lived inside the 401-refresh branch, it never
+    /// engaged. The first send must survive the exact same kind of transient
+    /// failure the post-refresh retry already does.
+    func testProductionCommandSurvivesTransientFailureOnTheVeryFirstSendWithNoTokenExpiryInvolved() async throws {
+        let committed = #"{"outcome":"committed","receipt":{"status":"committed","result":{"status":"resolved_confirmed","reviewId":"review-1","revision":2,"resolution":{"action":"confirm","selectedLoggerSessionCanonicalId":"session-a","linkId":"link-1"}},"operationId":null,"commandId":"01911111-1111-7111-8111-111111111114"}}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.networkConnectionLost)),
+            .json(200, committed),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionEvidenceReviewAPI(api: native)
+
+        let result = try await api.resolveWorkoutReconciliation(
+            reviewId: "review-1", expectedVersion: "1", loggerSessionCanonicalId: "session-a"
+        )
+
+        XCTAssertEqual(result.status, "resolved_confirmed")
+        XCTAssertEqual(result.resolution?.linkId, "link-1")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map { $0.url?.path }, [
+            "/api/v1/native/auth/pair",
+            "/api/v1/native/commands",
+            "/api/v1/native/commands",
+        ], "No refresh should ever be triggered when the token was never expired -- only the transport send itself failed.")
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"),
+            "The bounded extra attempt must reuse the exact same idempotency key so a genuine duplicate delivery replays the original outcome instead of creating a second mutation.")
+    }
+
     /// The media route answers an expired 10-minute bearer with a plain 404 (never the
     /// 401 `ACCESS_TOKEN_EXPIRED` problem the JSON routes send), so the generic refresh
     /// never ran and a Retry resent the same stale bearer. Root cause of the first
