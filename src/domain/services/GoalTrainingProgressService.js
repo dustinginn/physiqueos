@@ -90,18 +90,21 @@ export function composeGoalTrainingProgressToDate({ start, today, report, sessio
   });
 }
 
+// What training adds beyond DEXA: the comparable-movement trend and its
+// notable weakness. It never concludes the overall goal thesis.
 function trainingProgressSummary({ state, comparisons, improving, regressing, regions }) {
   if (state === "waiting_for_evidence") return "Not enough repeated movements have been logged in this phase to judge training progress yet.";
   if (state === "forming") return `${comparisons.length} ${comparisons.length === 1 ? "movement has" : "movements have"} comparable sessions so far; more repeats are needed before training progress can be judged.`;
   const improvingRegions = regions.filter((item) => item.status === "improving").map((item) => item.region);
   const where = improvingRegions.length ? `, led by ${joinWords(improvingRegions)}` : "";
-  const lead = `${improving.length} of ${comparisons.length} comparable movements are improving${where}.`;
-  const slipping = regressing.length ? ` ${joinWords(regressing.slice(0, 2).map((item) => item.name))} ${regressing.length === 1 ? "is" : "are"} down.` : "";
-  const meaning = improving.length > regressing.length && improving.length * 2 >= comparisons.length
-    ? " Training is progressing in a way that supports adding lean mass."
-    : regressing.length > improving.length ? " More movements are slipping than improving, which works against the build if it continues."
-      : " Training is mostly holding steady rather than progressing.";
-  return `${lead}${slipping}${meaning}`;
+  const lead = improving.length * 2 >= comparisons.length
+    ? `${improving.length} of ${comparisons.length} comparable movements are improving${where}.`
+    : regressing.length > improving.length
+      ? `More movements are slipping than improving: ${regressing.length} of ${comparisons.length} are down.`
+      : `Most comparable movements are holding steady; ${improving.length} of ${comparisons.length} are improving${where}.`;
+  const slipping = regressing.length && improving.length * 2 >= comparisons.length
+    ? ` ${joinWords(regressing.slice(0, 2).map((item) => item.name))} ${regressing.length === 1 ? "is" : "are"} down.` : "";
+  return `${lead}${slipping}`;
 }
 
 function joinWords(values) {

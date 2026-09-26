@@ -43,10 +43,9 @@ describe("phase-aware active goal preview",()=>{
       goal: terminalGoal, dexaScans: dexaWithPhaseStart, protocols: [energyProtocol], currentDate: new Date("2026-08-20T12:00:00Z") });
     const transition = result.turningPoints.find((item) => item.date === "2026-08-15");
     expect(transition).toBeDefined();
-    expect(transition.body).toMatch(/Establish Maintenance finished/);
-    expect(transition.body).toMatch(/148\.3 lb of lean mass, \+0\.8 lb from the goal baseline/);
-    expect(transition.body).toMatch(/enough to move forward with confidence/);
-    expect(transition.body).toMatch(/focus now shifts to Lean Mass Build/);
+    expect(transition.body).toMatch(/Establish Maintenance was completed and Lean Mass Build began/);
+    expect(transition.body).toMatch(/The Aug 15 DEXA showed \+0\.8 lb of lean mass from the baseline/);
+    expect(transition.body).not.toMatch(/148\.3/);
     expect(transition.body).not.toMatch(/did not conclusively prove|sufficiently bounded|authoriz/i);
     // Strategy specifics (targets, review cadence) belong to Current Strategy, not the milestone story.
     expect(transition.body).not.toMatch(/kcal\/day|monthly|DEXA and body-composition evidence/);

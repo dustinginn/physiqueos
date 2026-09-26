@@ -149,7 +149,8 @@ function nativeConfidencePresentation(value, goalConfidence) {
         limitingFactors: [...goalConfidence.detail.whatIsHoldingItBack],
         movementFactors: [],
         clarifyingFactors: [],
-        uncertaintyStatement: "",
+        // Build 60's sheet shows this line; it dates the stored V3 text.
+        uncertaintyStatement: goalConfidence.publishedBy?.asOfLabel ? `${goalConfidence.publishedBy.asOfLabel}.` : "",
       })
       // A V3 assessment never falls back to legacy explanation text.
       : value.piVersion === "confidence_v3" ? null : confidenceExplanationDetailFromModel(value.goalExplanationModel),

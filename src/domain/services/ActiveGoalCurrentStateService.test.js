@@ -105,18 +105,20 @@ describe("Active Goal current state — guardrail", () => {
     expect(guardrail).toMatchObject({ title: "Maintain approximately 8–9% body fat", label: "8–9% body fat",
       range: { min: 8, max: 9, unit: "%" }, measurement: { value: 8.1, date: "2026-09-12", source: "DEXA" },
       status: "clear", position: "within" });
-    expect(guardrail.interpretation).toMatch(/inside the 8–9% range/);
-    expect(guardrail.interpretation).toMatch(/adding lean mass without pushing body fat out of range/);
-    expect(guardrail.interpretation).not.toMatch(/below/);
+    expect(guardrail.interpretation).toBe("Inside the range, so the guardrail is not limiting the build.");
+    // The pill carries the measurement; the interpretation never restates it or Goal progress.
+    expect(guardrail.interpretation).not.toMatch(/\d/);
+    expect(guardrail.interpretation).not.toMatch(/lean mass|5\.8|58%/i);
   });
 
   it("follows the engine severity bands and consequence policy outside the range", () => {
     const at = (value) => composeGoalGuardrail({ goal, current: { date: "2026-09-12", bodyFatPercent: value }, progress });
     expect(at(7.6)).toMatchObject({ status: "watch", position: "below", deviation: 0.4 });
-    expect(at(7.6).interpretation).toMatch(/0\.4 points below the 8–9% range/);
+    expect(at(7.6).interpretation).toMatch(/^Below the range\./);
     expect(at(7.4)).toMatchObject({ status: "pressured", position: "below" });
     expect(at(9.7)).toMatchObject({ status: "pressured", position: "above" });
     expect(at(9.7).interpretation).toMatch(/further fat gain would work against the build/);
+    for (const value of [7.6, 7.4, 9.7, 10.6, 8.5]) expect(at(value).interpretation).not.toMatch(/\d/);
     expect(at(10.6)).toMatchObject({ status: "breached", position: "above" });
     for (const value of [7.6, 7.4, 9.7, 10.6, 8.5]) expect(findGoalCoachingLanguageViolations(at(value).interpretation)).toEqual([]);
   });
@@ -205,8 +207,9 @@ describe("Active Goal current state — training progress", () => {
       comparableMovementCount: 6, improvingCount: 4, steadyCount: 1, regressingCount: 1 });
     expect(training.highlights.map((item) => item.name)).toEqual(["Hack Squats", "Hip Thrusts", "Shoulder Press Machine"]);
     expect(training.summary).toMatch(/^4 of 6 comparable movements are improving, led by .*lower body/);
-    expect(training.summary).toMatch(/Single-Leg Leg Press is down\./);
-    expect(training.summary).toMatch(/supports adding lean mass/);
+    expect(training.summary).toMatch(/Single-Leg Leg Press is down\.$/);
+    // Training adds only what DEXA cannot: it never re-concludes the goal thesis.
+    expect(training.summary).not.toMatch(/lean mass|goal|DEXA|supports|on track|progressing in a way/i);
     expect(findGoalCoachingLanguageViolations(training.summary)).toEqual([]);
   });
   it("counts live resistance sessions and training days, never raw evidence revisions or other evidence types", () => {
@@ -254,16 +257,20 @@ describe("Active Goal current state — turning points", () => {
     const result = points(productionScans);
     expect(result.map((item) => [item.date, item.kind])).toEqual([
       ["2026-07-18", "dexa_baseline"], ["2026-08-15", "phase_transition"], ["2026-09-12", "dexa_milestone"]]);
-    expect(result[1].body).toMatch(/148\.3 lb of lean mass, \+0\.8 lb from the goal baseline/);
+    expect(result[0].body).toBe("The starting point every later scan is measured against.");
+    expect(result[1].body).toBe("Establish Maintenance was completed and Lean Mass Build began. The Aug 15 DEXA showed +0.8 lb of lean mass from the baseline.");
     expect(result[2]).toMatchObject({ title: "Past halfway to the lean-mass target" });
-    expect(result[2].body).toBe("The Sep 12 DEXA measured 153.3 lb of lean mass, +5.0 lb since the Aug 15 scan and +5.8 lb from the goal baseline. Body fat moved into the 8–9% range at 8.1%.");
+    expect(result[2].body).toBe("Lean mass rose 5.0 lb in the month since the Aug 15 scan, and body fat moved into the guardrail range.");
+    // Not a second composition table: no baseline/current values, cumulative delta or body-fat reading.
+    for (const fragment of ["147.5", "153.3", "148.3", "+5.8", "8.1%", "7.7%"]) expect(JSON.stringify(result)).not.toContain(fragment);
     expect(JSON.stringify(result)).not.toMatch(/Planned phase review|Goal destination|Future evidence/);
   });
   it("is selective: an immaterial scan does not become a turning point", () => {
     const result = points([...productionScans, scan("2026-10-09", 153.6, 14.3, 8.2, 175.1)]);
     expect(result.map((item) => item.date)).not.toContain("2026-10-09");
     const material = points([...productionScans, scan("2026-10-09", 155.1, 14.3, 8.2, 176.6)]);
-    expect(material.at(-1)).toMatchObject({ date: "2026-10-09", title: "Lean mass up 1.8 lb" });
+    expect(material.at(-1)).toMatchObject({ date: "2026-10-09", title: "Lean mass up since the Sep 12 scan",
+      body: "Lean mass rose 1.8 lb in the month since the Sep 12 scan." });
   });
 });
 
@@ -387,8 +394,24 @@ describe("Active Goal preview — production-shaped end to end", () => {
     expect(result.guardrail.observation).toEqual({ relation: "within", label: "8.1% on Sep 12 DEXA — within the 8–9% range" });
     expect(result.guardrail.body).toBe(state.guardrail.interpretation);
     expect(result.evidence.current).toMatchObject({ date: "2026-09-12", leanMass: "153.3 lb", bodyFat: "8.1%" });
-    expect(result.turningPoints.find((item) => item.date === "2026-08-15").body).toMatch(/\+0\.8 lb from the goal baseline/);
+    expect(result.turningPoints.find((item) => item.date === "2026-08-15").body).toMatch(/\+0\.8 lb of lean mass from the baseline/);
     expect(result.journey[1].dates).toBe("Started Aug 15 · Monthly DEXA");
+  });
+
+  it("states each primary quantitative fact once: progress lives in composition/progress, nowhere else in Server-authored prose", () => {
+    const { artifact, assessment } = midweekV3Artifact();
+    const state = compose({ latestBriefing: artifact, store: { goalConfidenceHistory: [{ assessmentId: assessment.assessmentId, assessment }] } }).currentState;
+    const serverProse = [state.guardrail.interpretation, state.training?.summary, ...state.turningPoints.map((item) => item.body)].filter(Boolean).join(" ");
+    for (const fact of ["5.8", "58%", "4.2", "153.3", "147.5", "14.2", "174.7", "10 lb"]) expect(serverProse).not.toContain(fact);
+    expect(state.guardrail.interpretation).not.toContain("8.1");
+  });
+
+  it("dates stored time-relative Confidence text with its publishing briefing", () => {
+    const confidence = composeGoalConfidence(v3Presentation, { timeZone: "America/Los_Angeles" });
+    expect(confidence.publishedBy.asOfLabel).toBe("As of the Sep 23 Midweek Briefing");
+    expect(composeGoalConfidence({ ...v3Presentation, originatingPublisher: "weekly_briefing", publicationTimestamp: "2026-09-27T12:34:05.415Z" },
+      { timeZone: "America/Los_Angeles" }).publishedBy.asOfLabel).toBe("As of the Sep 27 Weekly Briefing");
+    expect(composeGoalConfidence({ ...v3Presentation, publicationTimestamp: null }).publishedBy.asOfLabel).toBeNull();
   });
 
   it("contains no fictional review or process jargon anywhere in the payload", () => {

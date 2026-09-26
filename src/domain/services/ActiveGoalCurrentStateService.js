@@ -166,29 +166,25 @@ export function composeGoalGuardrail({ goal, guardrailTexts = [], current, progr
     status: evaluation.status,
     position,
     deviation: evaluation.deviation,
-    interpretation: describeGuardrailMeaning({ status: evaluation.status, position, value, deviation: evaluation.deviation,
-      range, consequencePolicy: resolved.guardrail.consequencePolicy ?? {}, progress }),
+    interpretation: describeGuardrailMeaning({ status: evaluation.status, position, value,
+      consequencePolicy: resolved.guardrail.consequencePolicy ?? {} }),
   });
 }
 
-function describeGuardrailMeaning({ status, position, value, deviation, range, consequencePolicy, progress }) {
+// One short coaching sentence on what the guardrail position means for the
+// build. It never restates the measurement, the range or lean-mass progress,
+// which the page already shows beside it.
+function describeGuardrailMeaning({ status, position, value, consequencePolicy }) {
   if (status === "not_assessed" || value == null) return null;
-  const measured = `Body fat is ${formatPercent(value)}`;
-  const rangeText = `the ${formatRange(range.min, range.max)} range`;
-  if (status === "clear") {
-    return progress?.achievedAmount > 0
-      ? `${measured}, inside ${rangeText}, while lean mass is up since the goal baseline. The build is adding lean mass without pushing body fat out of range.`
-      : `${measured}, inside ${rangeText}, so the guardrail is not limiting the build.`;
-  }
-  const gap = `${formatNumber(deviation)} ${deviation === 1 ? "point" : "points"} ${position} ${rangeText}`;
+  if (status === "clear") return "Inside the range, so the guardrail is not limiting the build.";
   if (status === "breached") {
     return consequencePolicy.recommendationConstraint === "review"
-      ? `${measured}, ${gap}. That is far enough outside the guardrail to change the approach before pushing the build further.`
-      : `${measured}, ${gap}. That weighs on confidence in the build until it moves back toward the range.`;
+      ? "Far enough outside the range to change the approach before pushing the build further."
+      : "Far enough outside the range to weigh on confidence until it moves back.";
   }
   return position === "above"
-    ? `${measured}, ${gap}. It does not call for a change to the plan on its own, but further fat gain would work against the build.`
-    : `${measured}, ${gap}. It does not call for a change to the plan on its own; the next DEXA should show whether it settles back into range.`;
+    ? "Above the range. Not a reason to change the plan on its own, but further fat gain would work against the build."
+    : "Below the range. Not a reason to change the plan on its own; the next DEXA shows whether it settles back in.";
 }
 
 // ---------------------------------------------------------------------------
@@ -225,13 +221,7 @@ export function composeGoalConfidence(presentation, { timeZone = "UTC" } = {}) {
     assessmentId: presentation.assessmentId ?? null,
     summary,
     summarySource: summary ? (isV3 ? "narrative_v3.why_confidence" : "confidence_v2.goal_surface") : null,
-    publishedBy: Object.freeze({
-      publisherType: presentation.originatingPublisher ?? null,
-      label: PUBLISHER_LABELS[presentation.originatingPublisher] ?? null,
-      artifactId: presentation.originatingArtifactId ?? null,
-      publishedAt,
-      publishedOn: safeLocalDate(publishedAt, timeZone),
-    }),
+    publishedBy: publishedByFor(presentation, publishedAt, timeZone),
     detail: v3Detail ? Object.freeze({
       whatSupportsIt: cleanList([...(v3Detail.whatIncreasedIt ?? []), ...(v3Detail.whatSupportsItNow ?? [])]),
       whatIsHoldingItBack: cleanList(v3Detail.whatIsHoldingItBack),
@@ -239,6 +229,21 @@ export function composeGoalConfidence(presentation, { timeZone = "UTC" } = {}) {
       whatCouldLowerIt: cleanList(v3Detail.whatCouldLowerIt),
       assumptions: cleanList(v3Detail.assumptions),
     }) : null,
+  });
+}
+
+function publishedByFor(presentation, publishedAt, timeZone) {
+  const label = PUBLISHER_LABELS[presentation.originatingPublisher] ?? null;
+  const publishedOn = safeLocalDate(publishedAt, timeZone);
+  return Object.freeze({
+    publisherType: presentation.originatingPublisher ?? null,
+    label,
+    artifactId: presentation.originatingArtifactId ?? null,
+    publishedAt,
+    publishedOn,
+    // Stored V3 text can be time-relative ("… days left"); every surface that
+    // shows it says which assessment it came from.
+    asOfLabel: label && publishedOn ? `As of the ${formatShortDate(publishedOn)} ${label}` : null,
   });
 }
 
@@ -253,9 +258,11 @@ function cleanList(items = []) {
 export function composeGoalTurningPoints({ baseline, sinceBaseline = [], journeyStartDate = null, phases = [], target = null, guardrail = null } = {}) {
   const points = [];
   const guardrailDefinition = guardrail?.definition ?? null;
+  // Turning points orient in time; they never retell the composition table.
+  // Each body carries only what is unique to that milestone.
   if (baseline) {
     points.push({ id: `dexa_baseline|${baseline.date}`, kind: "dexa_baseline", date: baseline.date, title: "Goal baseline DEXA",
-      body: `Lean mass measured ${formatPounds(baseline.leanMassLb)}${baseline.bodyFatPercent != null ? ` at ${formatPercent(baseline.bodyFatPercent)} body fat` : ""}. Progress toward the goal is measured from this scan.` });
+      body: "The starting point every later scan is measured against." });
   }
   if (journeyStartDate && (!baseline || Math.abs(daysBetween(baseline.date, journeyStartDate)) > 7)) {
     points.push({ id: `goal_activated|${journeyStartDate}`, kind: "goal_activated", ...buildMilestoneStory("goal_activated", { date: journeyStartDate }) });
@@ -268,12 +275,13 @@ export function composeGoalTurningPoints({ baseline, sinceBaseline = [], journey
     if (!prior || !DATE_PATTERN.test(start ?? "") || !["active", "completed"].includes(phase.status)) continue;
     const scan = sinceBaseline.filter((item) => item.date <= start && (!baseline || item.date > baseline.date)).at(-1) ?? null;
     if (scan) scanDatesUsed.add(scan.date);
-    points.push({ id: `phase_transition|${phase.id ?? phase.phaseId}|${start}`, kind: "phase_transition", ...buildMilestoneStory("phase_transition", {
-      date: start, priorPhaseName: prior.phaseName ?? prior.name, activePhaseName: phase.phaseName ?? phase.name,
-      measurementDate: scan?.date ?? null, metricLabel: scan ? "lean mass" : null,
-      metricValue: scan ? formatPounds(scan.leanMassLb) : null,
-      changeFromBaseline: scan && baseline ? `${signed(scan.leanMassLb - baseline.leanMassLb)} lb` : null,
-    }) });
+    const priorName = prior.phaseName ?? prior.name;
+    const activeName = phase.phaseName ?? phase.name;
+    const measured = scan && baseline
+      ? ` The ${formatShortDate(scan.date)} DEXA showed ${signed(scan.leanMassLb - baseline.leanMassLb)} lb of lean mass from the baseline.` : "";
+    points.push({ id: `phase_transition|${phase.id ?? phase.phaseId}|${start}`, kind: "phase_transition", date: start,
+      title: `${priorName} completed · ${activeName} began`,
+      body: `${priorName} was completed and ${activeName} began.${measured}` });
   }
   const targetAmount = target?.metric === "lean_mass" && Number(target?.amount) > 0 ? Number(target.amount) : null;
   const materialDelta = Math.max(1, targetAmount ? targetAmount * 0.1 : 1);
@@ -293,12 +301,13 @@ export function composeGoalTurningPoints({ baseline, sinceBaseline = [], journey
     if (Math.abs(change) < materialDelta && !crossed && !guardrailChanged) continue;
     const title = crossed === 1 ? "Lean-mass target reached"
       : crossed === 0.5 ? "Past halfway to the lean-mass target"
-        : Math.abs(change) >= materialDelta ? `Lean mass ${change > 0 ? "up" : "down"} ${formatNumber(Math.abs(change))} lb`
+        : Math.abs(change) >= materialDelta ? `Lean mass ${change > 0 ? "up" : "down"} since the ${formatShortDate(previous.date)} scan`
           : guardrailAfter ? "Body fat back inside the guardrail" : "Body fat left the guardrail range";
-    const guardrailSentence = guardrailChanged
-      ? ` Body fat moved ${guardrailAfter ? "into" : "out of"} the ${guardrail.label.replace(/ body fat$/u, "")} range at ${formatPercent(scan.bodyFatPercent)}.` : "";
+    const days = daysBetween(previous.date, scan.date);
+    const span = days >= 25 && days <= 35 ? "in the month" : `in the ${days} days`;
+    const guardrailClause = guardrailChanged ? `, and body fat moved ${guardrailAfter ? "into" : "out of"} the guardrail range` : "";
     points.push({ id: `dexa_milestone|${scan.date}`, kind: "dexa_milestone", date: scan.date, title,
-      body: `The ${formatShortDate(scan.date)} DEXA measured ${formatPounds(scan.leanMassLb)} of lean mass, ${signed(change)} lb since the ${formatShortDate(previous.date)} scan and ${signed(cumulative)} lb from the goal baseline.${guardrailSentence}` });
+      body: `Lean mass ${change >= 0 ? "rose" : "fell"} ${Math.abs(change).toFixed(1)} lb ${span} since the ${formatShortDate(previous.date)} scan${guardrailClause}.` });
   }
   return Object.freeze(points.sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.title.localeCompare(b.title))
     .slice(-6).map((item) => Object.freeze(item)));
