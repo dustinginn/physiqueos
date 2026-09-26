@@ -1060,15 +1060,40 @@ actor ProductionNativeAPI {
         )
         if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
             let refreshedToken = try await refreshAccessToken()
-            result = try await perform(
-                path: "\(configuration.routeFamily)/commands",
-                method: "POST",
-                body: encoded,
-                bearer: refreshedToken,
-                accept: "application/json",
-                headers: headers,
-                timeoutInterval: timeoutInterval
-            )
+            // The retried send after a token refresh is the write's only
+            // remaining chance: `submitCommand` has no caller-level retry of
+            // its own, so if this exact attempt hits a second, independent
+            // transport failure (a plain dropped connection, unrelated to
+            // the token that was just fixed), the write is silently lost
+            // from the Founder's perspective -- no server-side command
+            // receipt exists to show for it, and no further attempt follows
+            // automatically. One bounded extra attempt, with the SAME
+            // idempotency key and body, is safe to repeat here: the server's
+            // own command-receipt replay is keyed on exactly that identity,
+            // so a genuine duplicate delivery returns the original outcome
+            // rather than creating a second mutation (see the idempotency
+            // contract documented on this function above).
+            do {
+                result = try await perform(
+                    path: "\(configuration.routeFamily)/commands",
+                    method: "POST",
+                    body: encoded,
+                    bearer: refreshedToken,
+                    accept: "application/json",
+                    headers: headers,
+                    timeoutInterval: timeoutInterval
+                )
+            } catch ProductionNativeError.networkFailure {
+                result = try await perform(
+                    path: "\(configuration.routeFamily)/commands",
+                    method: "POST",
+                    body: encoded,
+                    bearer: refreshedToken,
+                    accept: "application/json",
+                    headers: headers,
+                    timeoutInterval: timeoutInterval
+                )
+            }
         }
         try validateHTTP(result.1, data: result.0)
         do {
