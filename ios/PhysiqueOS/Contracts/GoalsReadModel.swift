@@ -452,6 +452,7 @@ struct ActiveGoalCurrentStateReadModel: Codable, Equatable {
     struct Publisher: Codable, Equatable {
         var label: String?
         var publishedOn: String?
+        var asOfLabel: String? = nil
     }
 
     struct ConfidenceDetailLists: Codable, Equatable {

@@ -108,7 +108,8 @@ private struct ActiveGoalDetailContent: View {
         }
         .sheet(isPresented: $isShowingConfidenceDetail) {
             if let detail = goal.confidence.detail {
-                ConfidenceDetailSheet(confidence: goal.confidence.value ?? 0, detail: detail)
+                let presented = ActiveGoalFormat.confidenceSheet(detail: detail, state: goal.currentState)
+                ConfidenceDetailSheet(confidence: goal.confidence.value ?? 0, detail: presented.detail, provenance: presented.provenance)
             }
         }
     }
@@ -437,9 +438,10 @@ struct ActiveGoalCurrentStateSections: View {
 
     /// The page's sections in render order. There is deliberately no
     /// strategy grid, "what's next" review card or legacy evidence-anchor
-    /// section: coaching comes only from the latest briefing's Coach's Take.
+    /// section: coaching comes only from the latest briefing's Coach's Take,
+    /// which closes the page after the factual sections.
     enum Section: String, CaseIterable {
-        case hero, journey, bodyComposition, guardrail, trainingProgress, coachTake, turningPoints
+        case hero, journey, bodyComposition, guardrail, trainingProgress, turningPoints, coachTake
     }
 
     nonisolated static func renderedSections(for state: ActiveGoalCurrentStateReadModel) -> [Section] {
@@ -447,8 +449,8 @@ struct ActiveGoalCurrentStateSections: View {
         if state.composition != nil { sections.append(.bodyComposition) }
         if state.guardrail != nil { sections.append(.guardrail) }
         if state.training != nil { sections.append(.trainingProgress) }
-        if state.coachTake?.sections.isEmpty == false { sections.append(.coachTake) }
         if !state.turningPoints.isEmpty { sections.append(.turningPoints) }
+        if state.coachTake?.sections.isEmpty == false { sections.append(.coachTake) }
         return sections
     }
 
@@ -523,7 +525,7 @@ struct ActiveGoalCurrentStateSections: View {
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
-                        if let provenance = ActiveGoalFormat.confidenceProvenance(confidence.publishedBy) {
+                        if let provenance = confidence.publishedBy?.asOfLabel ?? ActiveGoalFormat.confidenceProvenance(confidence.publishedBy) {
                             Text(provenance)
                                 .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -570,7 +572,7 @@ struct ActiveGoalCurrentStateSections: View {
     // MARK: Where the goal stands — baseline → latest DEXA → progress
 
     private func standing(_ composition: ActiveGoalCurrentStateReadModel.Composition) -> some View {
-        GoalSection(eyebrow: "Where the goal stands", title: "Body Composition") {
+        GoalSection(eyebrow: "Current progress", title: "Body Composition") {
             VStack(alignment: .leading, spacing: 14) {
                 GoalEvidenceCard {
                     VStack(alignment: .leading, spacing: 12) {
@@ -596,7 +598,7 @@ struct ActiveGoalCurrentStateSections: View {
                 if let progress = state.progress, let percent = progress.percentComplete {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .firstTextBaseline) {
-                            Text(ActiveGoalFormat.progressLabel(progress))
+                            Text(ActiveGoalFormat.progressHeadline(progress))
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             Spacer()
@@ -727,24 +729,6 @@ struct ActiveGoalCurrentStateSections: View {
                         }
                     }
                 }
-                if !training.regions.isEmpty {
-                    HStack(spacing: 8) {
-                        ForEach(training.regions) { region in
-                            VStack(spacing: 4) {
-                                Text(region.region.capitalized)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                Text(region.status.capitalized)
-                                    .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
-                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(PhysiqueOSTheme.surfaceMuted)
-                            .clipShape(RoundedRectangle(cornerRadius: 11))
-                        }
-                    }
-                }
             }
         }
     }
@@ -863,10 +847,30 @@ enum ActiveGoalFormat {
          item.personalRecord == true ? "personal record" : nil].compactMap { $0 }.joined(separator: ", ")
     }
 
+    /// Progress line for the Current Progress section. The lean-mass change
+    /// itself is already in the composition table (and the target in the
+    /// hero), so this states the share and what is left, not the change again.
+    static func progressHeadline(_ progress: ActiveGoalCurrentStateReadModel.Progress) -> String {
+        guard let achieved = progress.achievedAmount else { return "Goal progress" }
+        return achieved < 0 ? progressLabel(progress) : "Goal progress"
+    }
+
     static func remainingLabel(_ progress: ActiveGoalCurrentStateReadModel.Progress) -> String? {
         guard let remaining = progress.remainingAmount else { return nil }
-        let target = progress.targetDate.map { " · target \(shortDate($0))" } ?? ""
-        return remaining <= 0 ? "Target reached\(target)" : "\(number(remaining)) \(progress.unit) to go\(target)"
+        return remaining <= 0 ? "Target reached" : "\(number(remaining)) \(progress.unit) to go"
+    }
+
+    /// The Goal's Confidence sheet: the canonical V3 detail, dated by its
+    /// publishing briefing at the top (not repeated as a trailing line).
+    static func confidenceSheet(detail: ConfidenceDetail, state: ActiveGoalCurrentStateReadModel?)
+        -> (detail: ConfidenceDetail, provenance: String?) {
+        guard let asOf = state?.confidence?.publishedBy?.asOfLabel, !asOf.isEmpty else { return (detail, nil) }
+        var presented = detail
+        if presented.uncertaintyStatement.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".")) == asOf {
+            presented.uncertaintyStatement = ""
+        }
+        return (presented, asOf)
     }
 
     static func guardrailState(_ guardrail: ActiveGoalCurrentStateReadModel.Guardrail) -> String? {
