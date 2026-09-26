@@ -88,6 +88,9 @@ struct ActiveGoalReadModel: Codable, Equatable, Identifiable {
     /// `OperatingPlanSandboxStore` already establishes for Training/
     /// Nutrition/Coaching strategy edits.
     var plan: GoalPlanReadModel
+    /// Present only when the Server serves `active_goal_current_state_v1`;
+    /// when present the page renders it instead of the legacy sections.
+    var currentState: ActiveGoalCurrentStateReadModel? = nil
 
     var activePhase: GoalPhaseReadModel? {
         phases.first { $0.id == activePhaseId && $0.status == .active }
@@ -331,4 +334,162 @@ struct CompletedGoalUnlockReadModel: Codable, Equatable {
     var title: String
     var body: String
     var destination: AppDestination
+}
+
+// MARK: - Active Goal current state (`active_goal_current_state_v1`)
+
+/// Server-owned current state of the active Goal. Every fact and every
+/// sentence of interpretation comes from the Server: baseline vs latest
+/// authoritative DEXA, deterministic progress, the V3 guardrail reading,
+/// Confidence V3's goal-level explanation, structured training progress,
+/// selective turning points and the latest published briefing's Coach's
+/// Take. Native renders these fields and composes no coaching of its own.
+struct ActiveGoalCurrentStateReadModel: Codable, Equatable {
+    var schemaVersion: String
+    var asOf: String?
+    var composition: Composition?
+    var progress: Progress?
+    var guardrail: Guardrail?
+    var phase: Phase?
+    var confidence: Confidence?
+    var training: Training?
+    var turningPoints: [GoalTurningPointReadModel]
+    var coachTake: CoachTake?
+
+    struct Scan: Codable, Equatable {
+        var role: String
+        var date: String
+        var leanMassLb: Double
+        var fatMassLb: Double?
+        var bodyFatPercent: Double?
+        var weightLb: Double?
+    }
+
+    struct Change: Codable, Equatable {
+        var leanMassLb: Double?
+        var fatMassLb: Double?
+        var bodyFatPoints: Double?
+        var weightLb: Double?
+    }
+
+    struct Composition: Codable, Equatable {
+        var authority: String
+        var baseline: Scan?
+        var current: Scan
+        var sameAsBaseline: Bool
+        var change: Change?
+    }
+
+    struct Progress: Codable, Equatable {
+        var status: String
+        var unit: String
+        var targetAmount: Double
+        var achievedAmount: Double?
+        var remainingAmount: Double?
+        var percentComplete: Int?
+        var targetDate: String?
+    }
+
+    struct Measurement: Codable, Equatable {
+        var value: Double
+        var date: String
+        var source: String
+    }
+
+    struct Guardrail: Codable, Equatable {
+        var title: String
+        var label: String
+        var measurement: Measurement?
+        var status: String
+        var position: String?
+        var interpretation: String?
+    }
+
+    struct Phase: Codable, Equatable {
+        var id: String?
+        var name: String?
+        var purpose: String?
+        var startDate: String?
+        var measurementCadence: String?
+    }
+
+    struct Publisher: Codable, Equatable {
+        var label: String?
+        var publishedOn: String?
+    }
+
+    struct ConfidenceDetailLists: Codable, Equatable {
+        var whatSupportsIt: [String]
+        var whatIsHoldingItBack: [String]
+        var whatCouldRaiseIt: [String]
+        var whatCouldLowerIt: [String]
+        var assumptions: [String]
+    }
+
+    struct Confidence: Codable, Equatable {
+        var status: String
+        var score: Int?
+        var band: String?
+        var movement: String?
+        var delta: Int?
+        var summary: String?
+        var publishedBy: Publisher?
+        var detail: ConfidenceDetailLists?
+    }
+
+    struct TrainingHighlight: Codable, Equatable, Identifiable {
+        var id: String { name }
+        var name: String
+        var region: String?
+        var percentChange: Double?
+        var personalRecord: Bool?
+    }
+
+    struct TrainingRegion: Codable, Equatable, Identifiable {
+        var id: String { region }
+        var region: String
+        var status: String
+        var movementCount: Int
+    }
+
+    struct Training: Codable, Equatable {
+        var state: String
+        var periodStart: String
+        var periodEnd: String
+        var sessionCount: Int
+        var comparableMovementCount: Int
+        var improvingCount: Int
+        var regressingCount: Int
+        var regions: [TrainingRegion]
+        var highlights: [TrainingHighlight]
+        var summary: String
+    }
+
+    struct CoachSection: Codable, Equatable, Identifiable {
+        var id: String { kind }
+        var kind: String
+        var title: String
+        var text: String
+    }
+
+    struct CoachTake: Codable, Equatable {
+        var artifactId: String
+        var cadence: String
+        var briefingLabel: String
+        var publishedOn: String
+        var attribution: String
+        var sections: [CoachSection]
+    }
+
+    static let supportedSchemaVersion = "active_goal_current_state_v1"
+}
+
+/// Decodes a nested value without letting a malformed or unknown shape fail
+/// the whole Goal payload: an unusable `currentState` falls back to the
+/// legacy sections instead of turning the page into an error.
+struct LenientDecodable<Value: Decodable>: Decodable {
+    let value: Value?
+    init(from decoder: Decoder) throws {
+        value = try? Value(from: decoder)
+    }
 }

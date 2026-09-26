@@ -83,15 +83,28 @@ private struct ActiveGoalDetailContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            hero
-            journey
-            if let phase = goal.activePhase { currentPhase(phase) }
-            whatsNext
-            guardrail
-            evidenceAnchors
-            trainingProgress
-            turningPoints
-            currentStrategy
+            if let state = goal.currentState {
+                // Server-owned current state: starting point → current
+                // authoritative state → progress → guardrail → training →
+                // coaching (latest briefing Coach's Take) → turning points.
+                ActiveGoalCurrentStateSections(
+                    goal: goal,
+                    state: state,
+                    allowsWrites: allowsWrites,
+                    onNavigate: onNavigate,
+                    onShowConfidenceDetail: { isShowingConfidenceDetail = true }
+                )
+            } else {
+                hero
+                journey
+                if let phase = goal.activePhase { currentPhase(phase) }
+                whatsNext
+                guardrail
+                evidenceAnchors
+                trainingProgress
+                turningPoints
+                currentStrategy
+            }
         }
         .sheet(isPresented: $isShowingConfidenceDetail) {
             if let detail = goal.confidence.detail {
@@ -408,6 +421,438 @@ private struct ActiveGoalDetailContent: View {
     }
 }
 
+/// Active Goal rendered from the Server's `active_goal_current_state_v1`.
+/// Hierarchy: starting point → current authoritative state → progress →
+/// guardrail → supporting training → coaching → turning points. Every
+/// sentence shown here is a Server field; Native only formats numbers and
+/// dates and chooses layout.
+struct ActiveGoalCurrentStateSections: View {
+    let goal: ActiveGoalReadModel
+    let state: ActiveGoalCurrentStateReadModel
+    let allowsWrites: Bool
+    let onNavigate: (AppDestination) -> Void
+    let onShowConfidenceDetail: () -> Void
+
+    /// The page's sections in render order. There is deliberately no
+    /// strategy grid, "what's next" review card or legacy evidence-anchor
+    /// section: coaching comes only from the latest briefing's Coach's Take.
+    enum Section: String, CaseIterable {
+        case hero, journey, bodyComposition, guardrail, trainingProgress, coachTake, turningPoints
+    }
+
+    static func renderedSections(for state: ActiveGoalCurrentStateReadModel) -> [Section] {
+        var sections: [Section] = [.hero, .journey]
+        if state.composition != nil { sections.append(.bodyComposition) }
+        if state.guardrail != nil { sections.append(.guardrail) }
+        if state.training != nil { sections.append(.trainingProgress) }
+        if state.coachTake?.sections.isEmpty == false { sections.append(.coachTake) }
+        if !state.turningPoints.isEmpty { sections.append(.turningPoints) }
+        return sections
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Self.renderedSections(for: state), id: \.self) { section in
+                sectionView(section)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sectionView(_ section: Section) -> some View {
+        switch section {
+        case .hero: hero
+        case .journey: journey
+        case .bodyComposition: if let composition = state.composition { standing(composition) }
+        case .guardrail: if let guardrail = state.guardrail { guardrailCard(guardrail) }
+        case .trainingProgress: if let training = state.training { trainingSection(training) }
+        case .coachTake: if let coachTake = state.coachTake { coachTakeSection(coachTake) }
+        case .turningPoints: turningPointsSection
+        }
+    }
+
+    // MARK: Hero — goal, destination, Confidence V3 (goal context + provenance)
+
+    private var hero: some View {
+        GoalAtmosphericCard(tone: .activeGoal, padding: 20, cornerRadius: 30) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(goal.status)
+                            .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                            .foregroundStyle(PhysiqueOSTheme.accent)
+                        Text(goal.title)
+                            .physiqueOSFont(PhysiqueOSTypography.screenTitle)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        Text(goal.objective)
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                    Spacer(minLength: 4)
+                    if allowsWrites {
+                        Button { onNavigate(.goalEdit(goalId: goal.id)) } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(PhysiqueOSTheme.accent)
+                                .frame(width: 40, height: 40)
+                                .background(PhysiqueOSTheme.accent.opacity(0.14))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("Edit Goal")
+                    }
+                }
+                if let confidence = state.confidence, let score = confidence.score {
+                    Divider().overlay(PhysiqueOSTheme.divider)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "gauge.with.dots.needle.33percent")
+                                .foregroundStyle(PhysiqueOSTheme.accent)
+                            Text(ActiveGoalFormat.confidenceHeadline(score: score, band: confidence.band))
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            if goal.confidence.detail != nil {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            }
+                        }
+                        if let summary = confidence.summary, !summary.isEmpty {
+                            Text(summary)
+                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                        if let provenance = ActiveGoalFormat.confidenceProvenance(confidence.publishedBy) {
+                            Text(provenance)
+                                .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
+                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { if goal.confidence.detail != nil { onShowConfidenceDetail() } }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(goal.confidence.detail != nil ? .isButton : [])
+                }
+            }
+        }
+        .padding(.bottom, 12)
+    }
+
+    // MARK: Journey — phases (identity and dates; progress is shown once below)
+
+    private var journey: some View {
+        GoalSection(eyebrow: "The path", title: "Your Journey") {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(goal.orderedPhases) { phase in
+                    Button { onNavigate(phase.destination(goalId: goal.id)) } label: {
+                        GoalPhaseCard(phase: phase, showsProgress: false)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open Phase \(phase.order), \(phase.name), \(phase.status.label)")
+                }
+                if let purpose = state.phase?.purpose, !purpose.isEmpty {
+                    Text(purpose)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .padding(.top, 4)
+                }
+                if let phase = goal.activePhase, allowsWrites,
+                   goal.orderedPhases.contains(where: { $0.order == phase.order + 1 }) {
+                    GoalNavigationButton(title: "Review Phase Transition") {
+                        onNavigate(.goalPhaseTransition(goalId: goal.id, phaseId: phase.id))
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Where the goal stands — baseline → latest DEXA → progress
+
+    private func standing(_ composition: ActiveGoalCurrentStateReadModel.Composition) -> some View {
+        GoalSection(eyebrow: "Where the goal stands", title: "Body Composition") {
+            VStack(alignment: .leading, spacing: 14) {
+                GoalEvidenceCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if let baseline = composition.baseline, !composition.sameAsBaseline {
+                                columnHeader("Baseline", ActiveGoalFormat.shortDate(baseline.date))
+                            }
+                            columnHeader(composition.sameAsBaseline ? "Baseline" : "Latest",
+                                         ActiveGoalFormat.shortDate(composition.current.date))
+                            if composition.change != nil { columnHeader("Change", "") }
+                        }
+                        compositionRow("Lean Mass", composition.baseline?.leanMassLb, composition.current.leanMassLb, composition.change?.leanMassLb, unit: " lb", composition: composition)
+                        compositionRow("Fat Mass", composition.baseline?.fatMassLb, composition.current.fatMassLb, composition.change?.fatMassLb, unit: " lb", composition: composition)
+                        compositionRow("Body Fat", composition.baseline?.bodyFatPercent, composition.current.bodyFatPercent, composition.change?.bodyFatPoints, unit: "%", composition: composition, changeUnit: " pts")
+                        compositionRow("Weight", composition.baseline?.weightLb, composition.current.weightLb, composition.change?.weightLb, unit: " lb", composition: composition)
+                        Text(composition.sameAsBaseline ? "Goal baseline DEXA. No scan has followed it yet." : "\(composition.authority) · goal baseline and latest scan")
+                            .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
+                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    }
+                }
+                if let progress = state.progress, let percent = progress.percentComplete {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(ActiveGoalFormat.progressLabel(progress))
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            Spacer()
+                            Text("\(percent)%")
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                        }
+                        AnimatedProgressBar(value: percent, color: PhysiqueOSTheme.chartSuccess, accessibilityLabel: "Goal progress")
+                        if let remaining = ActiveGoalFormat.remainingLabel(progress) {
+                            Text(remaining)
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
+                }
+                if let cadence = state.phase?.measurementCadence {
+                    Text(cadence)
+                        .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
+            }
+        }
+    }
+
+    private func columnHeader(_ title: String, _ date: String) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text(title)
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Text(date.isEmpty ? " " : date)
+                .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+        }
+        .frame(width: 72, alignment: .trailing)
+    }
+
+    private func compositionRow(_ label: String, _ baseline: Double?, _ current: Double?, _ change: Double?,
+                                unit: String, composition: ActiveGoalCurrentStateReadModel.Composition,
+                                changeUnit: String? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if !composition.sameAsBaseline, composition.baseline != nil {
+                valueCell(ActiveGoalFormat.value(baseline, unit: unit), emphasized: false)
+            }
+            valueCell(ActiveGoalFormat.value(current, unit: unit), emphasized: true)
+            if composition.change != nil {
+                valueCell(ActiveGoalFormat.signed(change, unit: changeUnit ?? unit), emphasized: false)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func valueCell(_ text: String, emphasized: Bool) -> some View {
+        Text(text)
+            .physiqueOSFont(emphasized ? PhysiqueOSTypography.label14Heavy : PhysiqueOSTypography.caption12Semibold)
+            .foregroundStyle(emphasized ? PhysiqueOSTheme.textPrimary : PhysiqueOSTheme.textSecondary)
+            .frame(width: 72, alignment: .trailing)
+    }
+
+    // MARK: Guardrail — latest measurement + Server interpretation
+
+    private func guardrailCard(_ guardrail: ActiveGoalCurrentStateReadModel.Guardrail) -> some View {
+        GoalAtmosphericCard(tone: .guardrail, padding: 20, cornerRadius: 28) {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Guardrail", systemImage: "shield.checkered")
+                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                Text(guardrail.title)
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                if let state = ActiveGoalFormat.guardrailState(guardrail) {
+                    Text(state)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(PhysiqueOSTheme.accent.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+                if let interpretation = guardrail.interpretation, !interpretation.isEmpty {
+                    Text(interpretation)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            }
+        }
+        .padding(.vertical, 12)
+    }
+
+    // MARK: Training progress — structured evidence, Server summary
+
+    private func trainingSection(_ training: ActiveGoalCurrentStateReadModel.Training) -> some View {
+        GoalSection(eyebrow: ActiveGoalFormat.trainingEyebrow(training), title: "Training Progress") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(training.summary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                if !training.highlights.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(training.highlights) { item in
+                            HStack(alignment: .firstTextBaseline) {
+                                Label(item.name, systemImage: item.personalRecord == true ? "trophy.fill" : "chart.line.uptrend.xyaxis")
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                Spacer()
+                                if let change = item.percentChange {
+                                    Text(ActiveGoalFormat.signed(change, unit: "%"))
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                        .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                                }
+                            }
+                        }
+                    }
+                }
+                if !training.regions.isEmpty {
+                    HStack(spacing: 8) {
+                        ForEach(training.regions) { region in
+                            VStack(spacing: 4) {
+                                Text(region.region.capitalized)
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                Text(region.status.capitalized)
+                                    .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
+                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(PhysiqueOSTheme.surfaceMuted)
+                            .clipShape(RoundedRectangle(cornerRadius: 11))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Coaching — latest published briefing's Coach's Take, verbatim
+
+    private func coachTakeSection(_ coachTake: ActiveGoalCurrentStateReadModel.CoachTake) -> some View {
+        GoalSection(eyebrow: "Latest coaching", title: "Coach's Take") {
+            GoalAtmosphericCard(tone: .activeGoal, padding: 18, cornerRadius: 24) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(coachTake.attribution)
+                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                    ForEach(coachTake.sections) { section in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(section.title)
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            Text(section.text)
+                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    GoalNavigationButton(title: "Open \(coachTake.briefingLabel)") {
+                        onNavigate(.briefingDetail(briefingId: coachTake.artifactId))
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Turning points — selective milestones
+
+    private var turningPointsSection: some View {
+        GoalSection(eyebrow: "Major milestones", title: "Evidence Turning Points") {
+            VStack(spacing: 20) {
+                ForEach(state.turningPoints) { item in
+                    HStack(alignment: .top, spacing: 16) {
+                        Rectangle()
+                            .fill(PhysiqueOSTheme.divider)
+                            .frame(width: 2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ActiveGoalFormat.shortDate(item.date))
+                                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                .foregroundStyle(PhysiqueOSTheme.accent)
+                            Text(item.title)
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            Text(item.body)
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Pure formatting for the current-state layout (numbers and dates only —
+/// never interpretation). Unit-tested.
+enum ActiveGoalFormat {
+    static func shortDate(_ isoDate: String) -> String {
+        let parts = isoDate.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3, (1...12).contains(parts[1]) else { return isoDate }
+        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        return "\(months[parts[1] - 1]) \(parts[2])"
+    }
+
+    static func number(_ value: Double) -> String {
+        String(format: "%.1f", value)
+    }
+
+    static func value(_ value: Double?, unit: String) -> String {
+        guard let value else { return "—" }
+        return "\(number(value))\(unit)"
+    }
+
+    static func signed(_ value: Double?, unit: String) -> String {
+        guard let value else { return "—" }
+        let rounded = (value * 10).rounded() / 10
+        return "\(rounded >= 0 ? "+" : "−")\(number(abs(rounded)))\(unit)"
+    }
+
+    static func confidenceHeadline(score: Int, band: String?) -> String {
+        guard let band, !band.isEmpty else { return "\(score)% Confidence" }
+        return "\(score)% · \(band)"
+    }
+
+    static func confidenceProvenance(_ publisher: ActiveGoalCurrentStateReadModel.Publisher?) -> String? {
+        guard let label = publisher?.label, let date = publisher?.publishedOn else { return nil }
+        return "From the \(shortDate(date)) \(label)"
+    }
+
+    static func compact(_ value: Double) -> String {
+        value.rounded() == value ? String(Int(value)) : number(value)
+    }
+
+    static func progressLabel(_ progress: ActiveGoalCurrentStateReadModel.Progress) -> String {
+        let target = compact(progress.targetAmount)
+        guard let achieved = progress.achievedAmount else { return "\(target) \(progress.unit) lean-mass target" }
+        return "\(number(achieved)) of \(target) \(progress.unit) lean mass gained"
+    }
+
+    static func remainingLabel(_ progress: ActiveGoalCurrentStateReadModel.Progress) -> String? {
+        guard let remaining = progress.remainingAmount else { return nil }
+        let target = progress.targetDate.map { " · target \(shortDate($0))" } ?? ""
+        return remaining <= 0 ? "Target reached\(target)" : "\(number(remaining)) \(progress.unit) to go\(target)"
+    }
+
+    static func guardrailState(_ guardrail: ActiveGoalCurrentStateReadModel.Guardrail) -> String? {
+        guard let measurement = guardrail.measurement, let position = guardrail.position else { return nil }
+        let where_ = position == "within" ? "Within range" : position == "below" ? "Below range" : "Above range"
+        return "\(number(measurement.value))% on \(shortDate(measurement.date)) DEXA · \(where_)"
+    }
+
+    static func trainingEyebrow(_ training: ActiveGoalCurrentStateReadModel.Training) -> String {
+        "Since \(shortDate(training.periodStart)) · \(training.sessionCount) logged sessions"
+    }
+}
+
 struct GoalSection<Content: View>: View {
     let eyebrow: String
     let title: String
@@ -457,6 +902,9 @@ struct GoalAccentCard<Content: View>: View {
 
 struct GoalPhaseCard: View {
     let phase: GoalPhaseReadModel
+    /// The current-state layout shows goal progress once, in its own
+    /// section, so phase cards there carry identity and dates only.
+    var showsProgress: Bool = true
 
     private var tint: Color {
         switch phase.status {
@@ -498,14 +946,16 @@ struct GoalPhaseCard: View {
                             .foregroundStyle(PhysiqueOSTheme.textMuted)
                     }
                 }
-                AnimatedProgressBar(value: phase.progress.percentage, color: tint, accessibilityLabel: "Phase progress")
-                HStack(alignment: .firstTextBaseline) {
-                    Text(phase.progress.label)
-                    Spacer()
-                    Text("\(phase.progress.percentage)%")
+                if showsProgress {
+                    AnimatedProgressBar(value: phase.progress.percentage, color: tint, accessibilityLabel: "Phase progress")
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(phase.progress.label)
+                        Spacer()
+                        Text("\(phase.progress.percentage)%")
+                    }
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
     }

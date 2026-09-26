@@ -570,6 +570,10 @@ struct ProductionGoalsAPI: GoalsAPI {
         var evidence: Evidence
         var turningPoints: [GoalTurningPointReadModel]
         var strategy: [Strategy]
+        /// Additive Server contract (`active_goal_current_state_v1`). Decoded
+        /// leniently and schema-gated so an older or malformed block leaves
+        /// the legacy page intact rather than failing the Goal.
+        var currentState: LenientDecodable<ActiveGoalCurrentStateReadModel>?
 
         var model: ActiveGoalReadModel {
             let currentJourney = journey.first { $0.status.lowercased() == "active" }
@@ -664,7 +668,10 @@ struct ProductionGoalsAPI: GoalsAPI {
                     ),
                     timeline: GoalTimelineReadModel(startDate: "", targetDate: nil),
                     successCriteria: [], guardrails: []
-                )
+                ),
+                currentState: currentState?.value.flatMap {
+                    $0.schemaVersion == ActiveGoalCurrentStateReadModel.supportedSchemaVersion ? $0 : nil
+                }
             )
         }
 
