@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-26T03:18:06Z",
+  "generated_at_utc": "2026-09-26T03:58:10Z",
   "task": {
-    "id": "claude-active-goal-v3-current-state-coaching-20260925",
-    "title": "Active Goal V3 current state + coaching: Server 0a245c5c + Native efadb35e candidates accepted on production data read-only; AWAITING Founder content acceptance (plain-text preview published)",
+    "id": "claude-active-goal-v3-content-architecture-round2-20260925",
+    "title": "Active Goal V3 round 2: Coach's Take last, one primary location per fact, dated Confidence, HealthKit intake-completeness engine fix; awaiting Founder content acceptance",
     "agent": "claude",
     "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "09f04dc54eb26bfccdd2aeb34b156d8fc7d3f80e",
-    "final_sha": "0a245c5c11bd40393b152cbf6b8013a132b6543d",
+    "final_sha": "2a23eee762472081815d9122b97c0f0a9f1b8969",
     "production_server_sha": "09f04dc54eb26bfccdd2aeb34b156d8fc7d3f80e",
     "production_deployment": "e979ee19-44f3-4c7a-ab2b-3c6e4f773349",
     "native_sha": "00321dcc6dd86a6479dbca5dd27e691c87348cd8",
     "native_build": 60
   },
   "result": {
-    "summary": "Proven on production data (read-only, rolled back): active Build Lean Mass goal baseline Jul 18 DEXA 147.5 lb lean / 7.7% BF; latest authoritative Sep 12 DEXA 153.3 lb lean, 14.2 lb fat, 8.1% BF, 174.7 lb; progress +5.8 lb = 58% of 10 lb (4.2 lb left). Root causes: Aug 15 turning point paired that scan's lean mass with the latest-minus-baseline delta (+5.8 instead of +0.8); no current-DEXA slot and guardrail read the Aug 15 scan (page said 7.6% below range; latest is 8.1% inside); unfiltered DEXA revisions; Goal showed the Sep 23 Midweek's movement sentence instead of Confidence V3 whyConfidence; hard-coded review/boilerplate copy; training progress never computed for the terminal phase; fixed turning points; no Coach's Take. Server candidate 0a245c5c adds additive currentState (active_goal_current_state_v1) and corrects Build 60 legacy fields; Native candidate efadb35e (descendant of c15f0881) renders baseline -> latest DEXA -> progress -> guardrail -> training -> latest briefing Coach's Take (Sep 23 Midweek) -> turning points and removes the strategy grid and review cards. Plain-text production-shaped preview published as the Founder content gate. Nothing deployed; STOP for Founder content acceptance, then release authorization.",
+    "summary": "Round-2 candidates: Server 2a23eee7 and Native fb4df07d (descendant of c15f0881). Goal page order hero -> journey -> current progress -> guardrail -> training -> turning points -> Coach's Take (last); a quantitative fact appears numerically once on the primary page (proven by a dedupe map on production data; only 8.1% in table+guardrail pill and 10 lb in the canonical V3 thesis repeat, by design); Confidence sheet dated 'As of the Sep 23 Midweek Briefing' from publisher metadata. The Sep 23 Coach's Take 'logged meals' sentence was diagnosed read-only: accurate historical output for pre-graduation MyFitnessPal days (kept verbatim), but a live engine defect (not coverage-aware; would over-claim for the Sep 20-26 Weekly and temper via the wearable item) fixed in the shared V3 engine with cross-cadence tests; no historical briefing regenerated. Nothing deployed; STOP for Founder content acceptance.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,35 +26,33 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server full unit suite on 0a245c5c: 9192 tests, failure set identical to baseline (306 environmental), 36 new tests pass; production webpack on exact 0a245c5c passes. Native full PhysiqueOSTests on iPhone 17 Pro simulator: 1419 tests, 0 failures."
+      "summary": "Server 2a23eee7 full suite 9206 tests, failure set identical to baseline (306 environmental), 50 new tests pass; webpack on exact SHA passes. Native fb4df07d full PhysiqueOSTests 1421/0 on iPhone 17 Pro simulator."
     },
     "review": {
       "status": "approved",
-      "summary": "Fresh-context adversarial Server and Native reviews: no blocking issues; all medium/low findings fixed in 8586950d/0a245c5c and efadb35e."
+      "summary": "Fresh-context Server and Native reviews; one stale-test blocker and all medium/low findings fixed."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Three REPEATABLE READ READ ONLY probes with explicit ROLLBACK and marker after rollback; completed Visible Abs goal read-model digest identical baseline vs candidate; no production writes."
+      "summary": "All production reads REPEATABLE READ READ ONLY with explicit rollback; completed Visible Abs digest identical; performance median 611 ms / max 1523 ms (<=3 s)."
     }
   },
   "decisions_required": [
-    "Founder: review the plain-text preview (agent-handoffs/reports/20260926T031806Z-goal-v3-founder-content-preview.md) and approve or list content edits.",
-    "After content approval: authorize Server 0a245c5c deployment (Build 60 compatible), then Build 61 from efadb35e after the prospective Cardio acceptance."
+    "Founder: review agent-handoffs/reports/20260926T035810Z-goal-v3-round2-founder-content-preview.md and approve or list edits.",
+    "After approval: authorize Server 2a23eee7 deploy (includes the shared intake-completeness engine fix ahead of the next Weekly), then Build 61 from fb4df07d after prospective Cardio acceptance."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Live Goal guardrail state was wrong (7.6% below range from the Aug 15 scan) while the latest authoritative DEXA is 8.1% inside the range.",
-    "V3 engine renders 'range of 8-9.' without % in stored whatCouldLowerIt text (shared engine follow-up).",
-    "Sep 23 Midweek What To Watch still cites calorie totals from logged meals (briefing-engine follow-up); shown verbatim on the Goal."
+    "The intake-completeness defect also tempered the Energy estimate through the wearable item in HealthKit transition windows; fixed.",
+    "Exactly-half meal-derived windows stay moderate (conservative); confirm intended."
   ],
   "backlog": [
-    "Engine: guardrail risk phrase unit.",
-    "Briefing engine: logged-meals caveat vs HealthKit-graduated days.",
-    "Home goal progress DEXA authority filter.",
-    "Optional: 'As of' line on the Confidence sheet."
+    "V3 guardrail risk phrase missing % unit.",
+    "Home DEXA authority filter.",
+    "Optional: render V3 could-raise/could-lower lists in the Goal Confidence sheet."
   ],
-  "recommended_next_step": "Founder reviews the content preview at agent-handoffs/reports/20260926T031806Z-goal-v3-founder-content-preview.md; on approval, authorize the Server 0a245c5c deploy, then Build 61 from efadb35e.",
-  "full_report_path": "agent-handoffs/reports/20260926T031806Z-goal-v3-candidates-acceptance.md",
+  "recommended_next_step": "Founder reviews the round-2 content preview; on approval, authorize the Server 2a23eee7 deploy, then Build 61 from fb4df07d.",
+  "full_report_path": "agent-handoffs/reports/20260926T035810Z-goal-v3-round2-candidates-acceptance.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
