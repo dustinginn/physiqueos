@@ -134,10 +134,13 @@ export function composeGoalProgress({ target, baseline, current }) {
 // Body-fat guardrail: V3 evaluator classification + consequence-policy meaning
 
 export function resolveBodyFatGuardrailV3({ goal, guardrailTexts = [] } = {}) {
+  // Same source precedence as the engine (resolveGoalGuardrailsV3): a configured
+  // V3 array is authoritative and legacy guardrails are not consulted.
   const configured = goal?.v3Guardrails ?? goal?.guardrailsV3;
   if (Array.isArray(configured)) {
-    const match = configured.find((item) => String(item?.metricCapability?.id ?? item?.metricCapability ?? "") === "body_composition.body_fat_percentage");
-    if (match) return { guardrail: match, text: match.text ?? match.displayName ?? null };
+    const match = configured.find((item) => String(item?.metricCapability?.id ?? item?.metricCapability ?? item?.capability ?? "") === "body_composition.body_fat_percentage");
+    return match ? { guardrail: { ...match, metricCapability: match.metricCapability ?? match.capability },
+      text: String(match.text ?? match.displayName ?? match.label ?? "Body-fat guardrail") } : null;
   }
   const legacy = (goal?.guardrails ?? []).filter((item) => item?.accepted !== false)
     .find((item) => /body[\s-]*fat/i.test(String(item?.text ?? item?.description ?? "")));
@@ -227,7 +230,7 @@ export function composeGoalConfidence(presentation, { timeZone = "UTC" } = {}) {
       label: PUBLISHER_LABELS[presentation.originatingPublisher] ?? null,
       artifactId: presentation.originatingArtifactId ?? null,
       publishedAt,
-      publishedOn: publishedAt ? localDate(publishedAt, timeZone) : null,
+      publishedOn: safeLocalDate(publishedAt, timeZone),
     }),
     detail: v3Detail ? Object.freeze({
       whatSupportsIt: cleanList([...(v3Detail.whatIncreasedIt ?? []), ...(v3Detail.whatSupportsItNow ?? [])]),
@@ -307,26 +310,36 @@ export function composeGoalTurningPoints({ baseline, sinceBaseline = [], journey
 const COACH_SECTION_ORDER = ["coachTake", "action", "watch"];
 const COACH_SECTION_TITLES = Object.freeze({ coachTake: "Biggest Takeaway", action: "What To Do", watch: "What To Watch" });
 const NATIVE_BRIEFING_CADENCES = new Set(["weekly", "midweek", "monthly", "event"]);
-const UNPUBLISHED_STATES = new Set(["failed", "in_progress", "generating", "pending", "preview", "claimed"]);
+// Same invalid set as Home's current-published selection, plus unpublished states.
+const UNPUBLISHED_STATES = new Set(["failed", "in_progress", "invalid", "retired", "superseded", "generating", "pending", "preview", "claimed"]);
 
 export function briefingPublicationInstant(artifact) {
   return artifact?.deliveryDate ?? artifact?.generatedAt ?? artifact?.createdAt ?? null;
 }
 
-// Mirrors Briefing History ordering, restricted to published V3-bound
-// artifacts (every publisher is V3 since the V3 activation; frozen V2
-// artifacts carry V2 semantics the Goal must not adopt).
+// The latest published V3-bound briefing (every publisher is V3 since the V3
+// activation; frozen V2 artifacts carry V2 semantics the Goal must not adopt).
+// Like Home's current-published selection, recency is the evidence the
+// briefing covers first (so a regenerated older-week briefing never jumps
+// ahead of newer coaching), then its publication instant.
 export function selectLatestPublishedV3Briefing(artifacts = []) {
   return [...(artifacts ?? [])].filter(isPublishedV3Briefing)
-    .sort((a, b) => instantMs(briefingPublicationInstant(b)) - instantMs(briefingPublicationInstant(a)) ||
+    .sort((a, b) => coverageKey(b).localeCompare(coverageKey(a)) ||
+      instantMs(briefingPublicationInstant(b)) - instantMs(briefingPublicationInstant(a)) ||
       String(b.id).localeCompare(String(a.id)))[0] ?? null;
+}
+
+function coverageKey(artifact) {
+  const end = artifact?.evidenceWindow?.endDate ?? artifact?.evidenceWindow?.date;
+  if (DATE_PATTERN.test(end ?? "")) return end;
+  return String(briefingPublicationInstant(artifact) ?? "").slice(0, 10);
 }
 
 export function isPublishedV3Briefing(artifact) {
   if (!artifact?.briefing || !NATIVE_BRIEFING_CADENCES.has(artifact.cadence) || !isV3BoundArtifact(artifact)) return false;
-  if (artifact.artifactType === "preview" || artifact.preview === true) return false;
-  const states = [artifact.lifecycle?.status, artifact.lifecycle?.generationStatus].map((value) => String(value ?? "").toLowerCase());
-  return !states.some((value) => UNPUBLISHED_STATES.has(value)) && briefingPublicationInstant(artifact) != null;
+  if (artifact.artifactType === "preview" || artifact.preview === true || artifact.lifecycle?.preview === true) return false;
+  const states = [artifact.status, artifact.lifecycle?.status, artifact.lifecycle?.generationStatus].map((value) => String(value ?? "").toLowerCase());
+  return !states.some((value) => UNPUBLISHED_STATES.has(value)) && Number.isFinite(Date.parse(briefingPublicationInstant(artifact) ?? ""));
 }
 
 export function projectLatestBriefingCoachTake({ artifact, assessment = null, timeZone = "UTC" } = {}) {
@@ -350,7 +363,8 @@ export function projectLatestBriefingCoachTake({ artifact, assessment = null, ti
   }
   if (!sections.length) return null;
   const publishedAt = briefingPublicationInstant(artifact);
-  const publishedOn = DATE_PATTERN.test(publishedAt) ? publishedAt : localDate(publishedAt, timeZone);
+  const publishedOn = DATE_PATTERN.test(publishedAt) ? publishedAt : safeLocalDate(publishedAt, timeZone);
+  if (!publishedOn) return null;
   const briefingLabel = briefingDisplayLabel(artifact);
   return Object.freeze({
     artifactId: artifact.id,
@@ -430,6 +444,9 @@ function daysBetween(left, right) { return Math.round((Date.parse(`${right}T00:0
 function formatShortDate(value) {
   if (!DATE_PATTERN.test(value ?? "")) return "";
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
+}
+function safeLocalDate(value, timeZone) {
+  return value && Number.isFinite(Date.parse(value)) ? localDate(value, timeZone) : null;
 }
 function localDate(value, timeZone) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })

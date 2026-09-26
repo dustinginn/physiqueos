@@ -1,4 +1,4 @@
-import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
+import { createTrainingPerformanceIntelligenceReport, getActiveResistanceTrainingSessions } from "./TrainingPerformanceIntelligenceService";
 import { expectedPhaseReviewDate } from "./GoalPhaseTimelineIntegrityService";
 import { resolveTrainingExerciseOccurrenceIdentity } from "../models/trainingExerciseIdentity";
 import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
@@ -36,16 +36,26 @@ export function createGoalTrainingProgressToDate({ phase, canonicalObjects = [],
   const start = phase?.startedAt ?? phase?.startDate;
   if (!validDate(start)) return null;
   const today = localDate(currentDate, timeZone);
+  // Local training day (the user's zone), not the UTC date of observed_at.
+  const dayOf = (value) => {
+    const text = String(value ?? "");
+    if (!text) return "";
+    return /T/.test(text) && Number.isFinite(Date.parse(text)) ? localDate(new Date(text), timeZone) : text.slice(0, 10);
+  };
   const phaseEvidence = canonicalObjects.filter((object) => {
-    const date = String(object?.payload?.observed_at ?? object?.observed_at ?? "").slice(0, 10);
+    const date = dayOf(object?.payload?.observed_at ?? object?.observed_at);
     return date >= start && date <= today;
   });
   const report = createTrainingPerformanceIntelligenceReport({ canonicalObjects: phaseEvidence, now: `${today}T12:00:00Z` });
-  return composeGoalTrainingProgressToDate({ start, today, report, sessionCount: new Set(phaseEvidence.map((item) => item?.id ?? item?.payload?.id ?? JSON.stringify(item?.payload ?? item))).size,
+  // Count only live resistance sessions (the same de-duplicated, non-superseded
+  // set the performance report reads), never raw evidence revisions.
+  const sessions = getActiveResistanceTrainingSessions(phaseEvidence);
+  return composeGoalTrainingProgressToDate({ start, today, report, sessionCount: sessions.length,
+    trainingDayCount: new Set(sessions.map((session) => dayOf(session.observed_at)).filter(Boolean)).size,
     comparabilityBlocks: findComparabilityBlocks(phaseEvidence) });
 }
 
-export function composeGoalTrainingProgressToDate({ start, today, report, sessionCount = 0, comparabilityBlocks = new Set() } = {}) {
+export function composeGoalTrainingProgressToDate({ start, today, report, sessionCount = 0, trainingDayCount = 0, comparabilityBlocks = new Set() } = {}) {
   const comparisons = (report?.exerciseObservations ?? []).map((item) => toMovementComparison(item, comparabilityBlocks)).filter(Boolean)
     .map((item) => ({ ...item, region: trainingRegionForCategory(item.muscleGroup) }));
   const improving = comparisons.filter((item) => item.status === "improving");
@@ -68,6 +78,7 @@ export function composeGoalTrainingProgressToDate({ start, today, report, sessio
     periodStart: start,
     periodEnd: today,
     sessionCount,
+    trainingDayCount,
     comparableMovementCount: comparisons.length,
     improvingCount: improving.length,
     steadyCount: steady.length,

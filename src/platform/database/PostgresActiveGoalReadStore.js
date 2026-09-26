@@ -5,26 +5,27 @@ import { resolveCanonicalGoalPhaseChronology } from "../../domain/services/Canon
 import { selectLatestPublishedV3Briefing } from "../../domain/services/ActiveGoalCurrentStateService.js";
 
 // Latest published V3-bound briefing, in Briefing History order (publication
-// instant desc, record id desc). Step 1 reads only the metadata of a handful of
-// the newest V3 candidates (so a failed/in-progress head never hides the
+// instant desc). Step 1 reads only the metadata of a handful of the newest V3
+// candidates, re-ranked by evidence coverage by the shared selector (so a failed/in-progress head never hides the
 // published one); step 2 loads the single selected artifact in full. The
 // published/V3 decision is the shared domain selector.
 const LATEST_V3_BRIEFING_CANDIDATES_SQL = `SELECT record_id,
     payload->>'id' AS id, payload->>'cadence' AS cadence, payload->>'artifactType' AS "artifactType",
     payload->'preview' AS preview, payload->>'deliveryDate' AS "deliveryDate", payload->>'generatedAt' AS "generatedAt",
-    payload->>'createdAt' AS "createdAt", payload->'lifecycle' AS lifecycle, payload->'confidencePublication' AS "confidencePublication"
+    payload->>'createdAt' AS "createdAt", payload->'lifecycle' AS lifecycle, payload->'confidencePublication' AS "confidencePublication",
+    payload->>'status' AS status, payload->'evidenceWindow' AS "evidenceWindow"
   FROM physiqueos.canonical_briefing_records
   WHERE owner_user_id=$1 AND collection_name='dailyBriefings'
     AND payload#>>'{confidencePublication,schemaVersion}'='briefing_confidence_binding_v3'
     AND payload->>'cadence' IN ('weekly','midweek','monthly','event')
-    AND (payload#>'{briefing,narrativeV3}') IS NOT NULL
+    AND jsonb_typeof(payload#>'{briefing,narrativeV3}')='object'
   ORDER BY COALESCE(
     NULLIF(payload->>'deliveryDate','')::timestamptz,
     NULLIF(payload->>'generatedAt','')::timestamptz,
     NULLIF(payload->>'createdAt','')::timestamptz,
     observed_at,'epoch'::timestamptz
   ) DESC,record_id DESC
-  LIMIT 5`;
+  LIMIT 8`;
 const BRIEFING_ARTIFACT_SQL = `SELECT payload,version FROM physiqueos.canonical_briefing_records
   WHERE owner_user_id=$1 AND collection_name='dailyBriefings' AND record_id=$2`;
 

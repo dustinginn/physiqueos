@@ -36,7 +36,7 @@ describe("PostgresActiveGoalReadStore", () => {
     });
     const store = createPostgresActiveGoalReadStore({ pool: { query }, ownerUserId: "owner" });
     const result = await store.load();
-    const candidates = query.mock.calls.find(([sql]) => sql.includes("canonical_briefing_records") && sql.includes("LIMIT 5"));
+    const candidates = query.mock.calls.find(([sql]) => sql.includes("canonical_briefing_records") && sql.includes("LIMIT 8"));
     expect(candidates[1]).toEqual(["owner"]);
     expect(candidates[0]).toMatch(/owner_user_id=\$1/);
     expect(candidates[0]).toMatch(/briefing_confidence_binding_v3/);

@@ -72,7 +72,7 @@ export function createTrainingPerformanceIntelligenceReport({
   };
 }
 
-function getActiveResistanceTrainingSessions(objects = []) {
+export function getActiveResistanceTrainingSessions(objects = []) {
   const byId = new Map();
 
   objects

@@ -5,7 +5,7 @@ import {
   findGoalCoachingLanguageViolations, projectLatestBriefingCoachTake, selectAuthoritativeGoalDexaScans,
   selectGoalCompositionAnchors, selectLatestPublishedV3Briefing,
 } from "./ActiveGoalCurrentStateService";
-import { composeGoalTrainingProgressToDate, trainingRegionForCategory } from "./GoalTrainingProgressService";
+import { composeGoalTrainingProgressToDate, createGoalTrainingProgressToDate, trainingRegionForCategory } from "./GoalTrainingProgressService";
 import { composePhaseAwareActiveGoalPreview } from "./PhaseAwareActiveGoalPreviewService";
 import { createMidweekEvidenceWindow } from "./BriefingEvidenceWindowService";
 import { composeMidweekBriefingPreview } from "./MidweekBriefingPreviewService";
@@ -121,6 +121,20 @@ describe("Active Goal current state — guardrail", () => {
     for (const value of [7.6, 7.4, 9.7, 10.6, 8.5]) expect(findGoalCoachingLanguageViolations(at(value).interpretation)).toEqual([]);
   });
 
+  it("follows the engine's guardrail source precedence: a configured V3 array is authoritative", () => {
+    const configuredWithoutBodyFat = { ...goal, v3Guardrails: [{ guardrailId: "recovery", metricCapability: "execution.recovery", evaluation: { mode: "minimum", threshold: 0 }, severityBands: [] }] };
+    expect(composeGoalGuardrail({ goal: configuredWithoutBodyFat, current: { date: "2026-09-12", bodyFatPercent: 8.1 } })).toBeNull();
+    const alias = { ...goal, v3Guardrails: [{ guardrailId: "bf", capability: "body_composition.body_fat_percentage", text: "Hold body fat",
+      evaluation: { mode: "allowed_range", allowedRange: { min: 8, max: 9 } }, severityBands: [{ status: "watch", minimumDeviation: 0 }] }] };
+    expect(composeGoalGuardrail({ goal: alias, current: { date: "2026-09-12", bodyFatPercent: 9.4 } })).toMatchObject({ title: "Hold body fat", status: "watch", position: "above" });
+  });
+
+  it("never throws when a configured V3 guardrail carries no text", () => {
+    const configured = { ...goal, v3Guardrails: [{ guardrailId: "bf", metricCapability: "body_composition.body_fat_percentage",
+      evaluation: { mode: "allowed_range", allowedRange: { min: 8, max: 9 } }, severityBands: [{ status: "watch", minimumDeviation: 0 }], consequencePolicy: {} }] };
+    expect(composeGoalGuardrail({ goal: configured, current: { date: "2026-09-12", bodyFatPercent: 8.1 } })).toMatchObject({ status: "clear", title: "Body-fat guardrail" });
+  });
+
   it("reports not assessed without a body-fat measurement", () => {
     expect(composeGoalGuardrail({ goal, current: null })).toMatchObject({ status: "not_assessed", measurement: null, interpretation: null });
   });
@@ -162,6 +176,10 @@ describe("Active Goal current state — Confidence V3", () => {
     expect(composeGoalConfidence(missing).summary).toBeNull();
   });
 
+  it("never throws on an unparseable publication timestamp", () => {
+    expect(composeGoalConfidence({ ...v3Presentation, publicationTimestamp: "garbage" }).publishedBy.publishedOn).toBeNull();
+  });
+
   it("uses the V2 goal-surface explanation only for a V2 assessment", () => {
     const v2 = { status: "canonical", piVersion: "confidence_v2", value: 62, label: "Moderate", presentationExplanation: "The plan is on track.", publicationTimestamp: "2026-09-16T07:04:38.549Z", originatingPublisher: "midweek_briefing" };
     expect(composeGoalConfidence(v2)).toMatchObject({ summary: "The plan is on track.", summarySource: "confidence_v2.goal_surface", detail: null });
@@ -182,8 +200,8 @@ describe("Active Goal current state — training progress", () => {
       observation("Single-Leg Leg Press", "quads", "regressing", -16.5, "moderate"), observation("Spider Curls", "biceps", "improving", 4),
       observation("One-off", "quads", "insufficient_data", 0, "low"),
     ] };
-    const training = composeGoalTrainingProgressToDate({ start: "2026-08-15", today: "2026-09-25", report, sessionCount: 109 });
-    expect(training).toMatchObject({ state: "established", periodStart: "2026-08-15", periodEnd: "2026-09-25", sessionCount: 109,
+    const training = composeGoalTrainingProgressToDate({ start: "2026-08-15", today: "2026-09-25", report, sessionCount: 40, trainingDayCount: 36 });
+    expect(training).toMatchObject({ state: "established", periodStart: "2026-08-15", periodEnd: "2026-09-25", sessionCount: 40, trainingDayCount: 36,
       comparableMovementCount: 6, improvingCount: 4, steadyCount: 1, regressingCount: 1 });
     expect(training.highlights.map((item) => item.name)).toEqual(["Hack Squats", "Hip Thrusts", "Shoulder Press Machine"]);
     expect(training.summary).toMatch(/^4 of 6 comparable movements are improving, led by .*lower body/);
@@ -191,6 +209,28 @@ describe("Active Goal current state — training progress", () => {
     expect(training.summary).toMatch(/supports adding lean mass/);
     expect(findGoalCoachingLanguageViolations(training.summary)).toEqual([]);
   });
+  it("counts live resistance sessions and training days, never raw evidence revisions or other evidence types", () => {
+    const session = (id, date, extra = {}) => ({ id, evidence_type: "training", observed_at: `${date}T17:00:00Z`, session_type: "resistance",
+      exercises: [{ name: "Hack Squats", sets: [{ reps: 8, weight: 200 }] }], ...extra });
+    const objects = [session("s1", "2026-08-20"), session("s1", "2026-08-20"), session("s2", "2026-08-20"), session("s3", "2026-08-22"),
+      { id: "meal", evidence_type: "nutrition", observed_at: "2026-08-21T12:00:00Z" }, { id: "w", evidence_type: "weight", observed_at: "2026-08-21T12:00:00Z" }];
+    const training = createGoalTrainingProgressToDate({ phase: { id: "p2", startDate: "2026-08-15" }, canonicalObjects: objects,
+      currentDate: new Date("2026-09-25T18:00:00Z"), timeZone: "America/Los_Angeles" });
+    expect(training.sessionCount).toBe(3);
+    expect(training.trainingDayCount).toBe(2);
+    expect(training.periodEnd).toBe("2026-09-25");
+  });
+
+  it("assigns sessions to the user's local training day, not the UTC date", () => {
+    const evening = { id: "late", evidence_type: "training", observed_at: "2026-09-26T02:30:00Z", session_type: "resistance",
+      exercises: [{ name: "Hack Squats", sets: [{ reps: 8, weight: 200 }] }] };
+    const training = createGoalTrainingProgressToDate({ phase: { id: "p2", startDate: "2026-08-15" }, canonicalObjects: [evening],
+      currentDate: new Date("2026-09-26T03:00:00Z"), timeZone: "America/Los_Angeles" });
+    expect(training.periodEnd).toBe("2026-09-25");
+    expect(training.sessionCount).toBe(1);
+    expect(training.trainingDayCount).toBe(1);
+  });
+
   it("waits honestly when nothing is comparable", () => {
     const training = composeGoalTrainingProgressToDate({ start: "2026-08-15", today: "2026-08-16", report: { exerciseObservations: [] } });
     expect(training).toMatchObject({ state: "waiting_for_evidence", comparableMovementCount: 0 });
@@ -269,6 +309,28 @@ describe("Active Goal current state — latest published briefing Coach's Take",
     const v2 = { ...weeklyV3Artifact({ id: "weekly-v2" }), confidencePublication: { schemaVersion: "briefing_confidence_binding_v2" } };
     expect(selectLatestPublishedV3Briefing([failed, inProgress, preview, v2, midweek]).id).toBe("midweek-v3");
     expect(selectLatestPublishedV3Briefing([midweek, weeklyV3Artifact()]).id).toBe("weekly-v3");
+  });
+
+  it("excludes superseded, invalid, retired and preview briefings like Home's current-published selection", () => {
+    const valid = weeklyV3Artifact({ id: "weekly-valid", generatedAt: "2026-09-20T12:00:00.000Z" });
+    valid.evidenceWindow = { startDate: "2026-09-13", endDate: "2026-09-19" };
+    const newer = (id, patch) => ({ ...weeklyV3Artifact({ id, generatedAt: "2026-09-28T12:00:00.000Z" }), ...patch });
+    for (const bad of [
+      newer("superseded", { lifecycle: { generationStatus: "superseded" } }),
+      newer("invalid", { status: "invalid" }),
+      newer("retired", { lifecycle: { status: "retired" } }),
+      newer("lifecycle-preview", { lifecycle: { preview: true } }),
+      newer("bad-instant", { generatedAt: "not-a-date" }),
+    ]) expect(selectLatestPublishedV3Briefing([valid, bad]).id).toBe("weekly-valid");
+  });
+
+  it("ranks by the evidence a briefing covers, so a regenerated older-week briefing never replaces newer coaching", () => {
+    const { artifact: midweek } = midweekV3Artifact();
+    const regeneratedOldWeekly = { ...weeklyV3Artifact({ id: "weekly-regen", generatedAt: "2026-09-26T12:00:00.000Z" }),
+      evidenceWindow: { startDate: "2026-09-13", endDate: "2026-09-19" } };
+    expect(selectLatestPublishedV3Briefing([regeneratedOldWeekly, midweek]).id).toBe("midweek-v3");
+    const nextWeekly = weeklyV3Artifact({ id: "weekly-next", generatedAt: "2026-09-27T12:00:00.000Z" });
+    expect(selectLatestPublishedV3Briefing([regeneratedOldWeekly, midweek, nextWeekly]).id).toBe("weekly-next");
   });
 
   it("renders the Midweek Coach's Take exactly as the briefing served it, with provenance", () => {
@@ -354,7 +416,7 @@ describe("Active Goal preview — production-shaped end to end", () => {
   it("hard-codes no Founder identity, date or measurement in product code", () => {
     for (const file of ["./ActiveGoalCurrentStateService.js", "./PhaseAwareActiveGoalPreviewService.js"]) {
       const source = fs.readFileSync(new URL(file, import.meta.url), "utf8");
-      for (const fragment of ["2026-", "153.3", "147.5", "148.3", "8.1%", "user_founder", "6353e12e"]) expect(source).not.toContain(fragment);
+      for (const fragment of ["2026-", "153.3", "147.5", "148.3", "8.1%", "8–9%", "user_founder", "6353e12e"]) expect(source).not.toContain(fragment);
     }
   });
 });

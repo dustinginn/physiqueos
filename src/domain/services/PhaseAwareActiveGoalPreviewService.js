@@ -63,7 +63,8 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
     return { label, active: isActive, summary: summarizeStrategyDomain(label, { caloricIntakeTarget,
       activityExpenditureTarget, monitoringCadence, strategicReviewCadence, strategicReviewAnchor }) };
   });
-  const guardrail = trajectory.overallGoal.sharedGuardrails.find((item) => /8.?9%|body fat/i.test(item)) ?? "Maintain approximately 8–9% body fat.";
+  const guardrail = trajectory.overallGoal.sharedGuardrails.find((item) => /body[\s-]*fat/i.test(item)) ??
+    trajectory.overallGoal.sharedGuardrails[0] ?? "";
   const overallGoalConfidence = resolveActiveGoalConfidencePresentation({
     activeGoal: goal,
     store,
@@ -150,7 +151,8 @@ function nativeConfidencePresentation(value, goalConfidence) {
         clarifyingFactors: [],
         uncertaintyStatement: "",
       })
-      : confidenceExplanationDetailFromModel(value.goalExplanationModel),
+      // A V3 assessment never falls back to legacy explanation text.
+      : value.piVersion === "confidence_v3" ? null : confidenceExplanationDetailFromModel(value.goalExplanationModel),
   });
 }
 
