@@ -82,19 +82,20 @@ private struct ActiveGoalDetailContent: View {
     @State private var isShowingConfidenceDetail = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let state = goal.currentState {
-                // Server-owned current state: starting point → current
-                // authoritative state → progress → guardrail → training →
-                // turning points → latest briefing Coach's Take (last).
-                ActiveGoalCurrentStateSections(
-                    goal: goal,
-                    state: state,
-                    allowsWrites: allowsWrites,
-                    onNavigate: onNavigate,
-                    onShowConfidenceDetail: { isShowingConfidenceDetail = true }
-                )
-            } else {
+        if let state = goal.currentState {
+            // Server-owned current state: starting point → current
+            // authoritative state → progress → guardrail → training →
+            // turning points → latest briefing Coach's Take (last).
+            // Confidence is display-only here: no detail sheet is reachable.
+            ActiveGoalCurrentStateSections(
+                goal: goal,
+                state: state,
+                allowsWrites: allowsWrites,
+                onNavigate: onNavigate
+            )
+        } else {
+            // Legacy layout (payloads without currentState), unchanged.
+            VStack(alignment: .leading, spacing: 0) {
                 hero
                 journey
                 if let phase = goal.activePhase { currentPhase(phase) }
@@ -105,11 +106,10 @@ private struct ActiveGoalDetailContent: View {
                 turningPoints
                 currentStrategy
             }
-        }
-        .sheet(isPresented: $isShowingConfidenceDetail) {
-            if let detail = goal.confidence.detail {
-                let presented = ActiveGoalFormat.confidenceSheet(detail: detail, state: goal.currentState)
-                ConfidenceDetailSheet(confidence: goal.confidence.value ?? 0, detail: presented.detail, provenance: presented.provenance)
+            .sheet(isPresented: $isShowingConfidenceDetail) {
+                if let detail = goal.confidence.detail {
+                    ConfidenceDetailSheet(confidence: goal.confidence.value ?? 0, detail: detail)
+                }
             }
         }
     }
@@ -432,7 +432,6 @@ struct ActiveGoalCurrentStateSections: View {
     let state: ActiveGoalCurrentStateReadModel
     let allowsWrites: Bool
     let onNavigate: (AppDestination) -> Void
-    let onShowConfidenceDetail: () -> Void
     /// Composition columns grow with Dynamic Type.
     @ScaledMetric(relativeTo: .caption) private var columnWidth: CGFloat = 72
 
@@ -505,36 +504,32 @@ struct ActiveGoalCurrentStateSections: View {
                         .accessibilityLabel("Edit Goal")
                     }
                 }
-                if let confidence = state.confidence, let score = confidence.score {
+                if let confidence = ActiveGoalFormat.heroConfidence(state) {
+                    // Display-only: score/band, the V3 goal thesis and its
+                    // provenance. No disclosure, tap target or detail sheet.
                     Divider().overlay(PhysiqueOSTheme.divider)
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: "gauge.with.dots.needle.33percent")
                                 .foregroundStyle(PhysiqueOSTheme.accent)
-                            Text(ActiveGoalFormat.confidenceHeadline(score: score, band: confidence.band))
+                            Text(confidence.headline)
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            if goal.confidence.detail != nil {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            }
                         }
-                        if let summary = confidence.summary, !summary.isEmpty {
-                            Text(summary)
+                        if let thesis = confidence.thesis {
+                            Text(thesis)
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
-                        if let provenance = confidence.publishedBy?.asOfLabel {
+                        if let provenance = confidence.provenance {
                             Text(provenance)
                                 .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
                         }
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture { if goal.confidence.detail != nil { onShowConfidenceDetail() } }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(goal.confidence.detail != nil ? .isButton : [])
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(confidence.accessibilityLabel)
+                    .accessibilityAddTraits(.isStaticText)
                 }
             }
         }
@@ -849,21 +844,25 @@ enum ActiveGoalFormat {
         return remaining <= 0 ? "Target reached" : "\(number(remaining)) \(progress.unit) to go"
     }
 
-    /// The Goal's Confidence sheet: the canonical V3 detail, dated by its
-    /// publishing briefing at the top (not repeated as a trailing line).
-    static func confidenceSheet(detail: ConfidenceDetail, state: ActiveGoalCurrentStateReadModel?)
-        -> (detail: ConfidenceDetail, provenance: String?) {
-        guard let asOf = state?.confidence?.publishedBy?.asOfLabel, !asOf.isEmpty else { return (detail, nil) }
-        var presented = detail
-        let normalize: (String) -> String = {
-            $0.trimmingCharacters(in: .whitespacesAndNewlines)
-                .trimmingCharacters(in: CharacterSet(charactersIn: "."))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+    /// The hero's Confidence on the current-state Goal: display-only score,
+    /// band, the V3 goal thesis and its provenance. The detailed V3 evidence
+    /// (supports/limits/could-raise/could-lower/assumptions) stays in the
+    /// Server contract and is deliberately not presented on the Goal.
+    struct HeroConfidence: Equatable {
+        let headline: String
+        let thesis: String?
+        let provenance: String?
+        let isInteractive = false
+        var accessibilityLabel: String {
+            ["Confidence \(headline)", thesis, provenance].compactMap { $0 }.joined(separator: ". ")
         }
-        if normalize(presented.uncertaintyStatement) == normalize(asOf) {
-            presented.uncertaintyStatement = ""
-        }
-        return (presented, normalize(asOf))
+    }
+
+    static func heroConfidence(_ state: ActiveGoalCurrentStateReadModel) -> HeroConfidence? {
+        guard let confidence = state.confidence, let score = confidence.score else { return nil }
+        let thesis = confidence.summary.flatMap { $0.isEmpty ? nil : $0 }
+        let provenance = confidence.publishedBy?.asOfLabel.flatMap { $0.isEmpty ? nil : $0 }
+        return HeroConfidence(headline: confidenceHeadline(score: score, band: confidence.band), thesis: thesis, provenance: provenance)
     }
 
     /// The pill carries the reading and its status; the scan date is already

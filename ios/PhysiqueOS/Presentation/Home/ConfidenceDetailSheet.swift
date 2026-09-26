@@ -8,10 +8,6 @@ import SwiftUI
 struct ConfidenceDetailSheet: View {
     let confidence: Int
     let detail: ConfidenceDetail
-    /// Which published assessment this detail belongs to (e.g. "As of the
-    /// Sep 23 Midweek Briefing"). Stored V3 text can be time-relative, so a
-    /// surface that knows the publisher shows it at the top of the sheet.
-    var provenance: String? = nil
 
     var body: some View {
         ScrollView {
@@ -23,12 +19,6 @@ struct ConfidenceDetailSheet: View {
                     Text("The evidence currently supporting and limiting the overall trajectory.")
                         .physiqueOSFont(PhysiqueOSTypography.sheetDescription)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    if let provenance, !provenance.isEmpty {
-                        Text(provenance)
-                            .physiqueOSFont(PhysiqueOSTypography.sheetDescription)
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                            .padding(.top, 2)
-                    }
                 }
 
                 Text("Current confidence: \(detail.qualitativeLevel)")

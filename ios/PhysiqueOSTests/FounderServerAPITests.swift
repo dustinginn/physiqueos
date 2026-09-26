@@ -6049,38 +6049,44 @@ final class ActiveGoalCurrentStateTests: XCTestCase {
         XCTAssertEqual(unknown.title, "Build Lean Mass")
     }
 
-    func testConfidenceSheetIsDatedByItsPublishingBriefingFromMetadata() throws {
-        let detail = ConfidenceDetail(qualitativeLevel: "Moderate", supportingFactors: ["4.2 lb remain with 49 days left."],
-                                      limitingFactors: [], clarifyingFactors: [], uncertaintyStatement: "As of the Sep 23 Midweek Briefing.",
-                                      movementFactors: [], summary: "Thesis")
-        var state = ActiveGoalCurrentStateReadModel(schemaVersion: "active_goal_current_state_v1")
-        state.confidence = .init(status: "canonical_v3", score: 79, band: "Moderate", movement: "held", delta: 0, summary: "Thesis",
-                                 publishedBy: .init(label: "Midweek Briefing", publishedOn: "2026-09-23", asOfLabel: "As of the Sep 23 Midweek Briefing"))
-        let presented = ActiveGoalFormat.confidenceSheet(detail: detail, state: state)
-        XCTAssertEqual(presented.provenance, "As of the Sep 23 Midweek Briefing")
-        XCTAssertEqual(presented.detail.uncertaintyStatement, "", "provenance is shown once, at the top")
-        XCTAssertEqual(presented.detail.supportingFactors, detail.supportingFactors, "canonical V3 text is never rewritten")
-        // Another publisher/date comes straight from metadata — nothing is hard-coded.
-        state.confidence?.publishedBy = .init(label: "Weekly Briefing", publishedOn: "2026-09-27", asOfLabel: "As of the Sep 27 Weekly Briefing")
-        XCTAssertEqual(ActiveGoalFormat.confidenceSheet(detail: detail, state: state).provenance, "As of the Sep 27 Weekly Briefing")
-        XCTAssertNil(ActiveGoalFormat.confidenceSheet(detail: detail, state: nil).provenance)
-        var spaced = detail
-        spaced.uncertaintyStatement = " As of the Sep 23 Midweek Briefing . "
-        state.confidence?.publishedBy = .init(label: "Midweek Briefing", publishedOn: "2026-09-23", asOfLabel: "As of the Sep 23 Midweek Briefing")
-        XCTAssertEqual(ActiveGoalFormat.confidenceSheet(detail: spaced, state: state).detail.uncertaintyStatement, "")
-        var genuine = detail
-        genuine.uncertaintyStatement = "Early evidence remains limited."
-        XCTAssertEqual(ActiveGoalFormat.confidenceSheet(detail: genuine, state: state).detail.uncertaintyStatement, "Early evidence remains limited.")
+    func testCurrentStateConfidenceIsDisplayOnlyWithThesisAndProvenance() async throws {
+        let goal = try await activeGoal(activeGoalWithCurrentStateJSON)
+        let state = try XCTUnwrap(goal.currentState)
+        let hero = try XCTUnwrap(ActiveGoalFormat.heroConfidence(state))
+        XCTAssertFalse(hero.isInteractive)
+        XCTAssertEqual(hero.headline, "79% · Moderate")
+        XCTAssertEqual(hero.thesis, state.confidence?.summary)
+        XCTAssertEqual(hero.provenance, "As of the Sep 23 Midweek Briefing", "provenance comes from publisher metadata")
+        XCTAssertEqual(hero.accessibilityLabel,
+                       "Confidence 79% · Moderate. \(state.confidence?.summary ?? ""). As of the Sep 23 Midweek Briefing")
+        // The detailed V3 evidence stays in the contract but never reaches the page.
+        let pageText = [hero.headline, hero.thesis ?? "", hero.provenance ?? ""].joined(separator: " ")
+        let detail = try XCTUnwrap(goal.confidence.detail, "the Server still serves the detail; it is simply not presented")
+        for item in detail.supportingFactors + detail.limitingFactors {
+            XCTAssertFalse(pageText.contains(item), "detail item leaked onto the page: \(item)")
+        }
+        XCTAssertFalse(pageText.contains("days left"))
+        var noScore = state
+        noScore.confidence?.score = nil
+        XCTAssertNil(ActiveGoalFormat.heroConfidence(noScore))
     }
 
-    func testProductionShapedConfidenceSheetIsDatedEndToEnd() async throws {
-        let goal = try await activeGoal(activeGoalWithCurrentStateJSON)
-        let detail = try XCTUnwrap(goal.confidence.detail)
-        XCTAssertEqual(goal.confidence.value, goal.currentState?.confidence?.score)
-        let presented = ActiveGoalFormat.confidenceSheet(detail: detail, state: goal.currentState)
-        XCTAssertEqual(presented.provenance, "As of the Sep 23 Midweek Briefing")
-        XCTAssertEqual(presented.detail.uncertaintyStatement, "")
-        XCTAssertTrue(presented.detail.supportingFactors.contains("4.2 lb remain with 49 days left."), "stored V3 text is shown verbatim, dated by provenance")
+    func testCurrentStateGoalHasNoConfidenceInteractionWhileTheLegacyLayoutKeepsItsSheet() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("PhysiqueOS/Presentation/Goals/GoalDetailView.swift"), encoding: .utf8)
+        let start = try XCTUnwrap(source.range(of: "struct ActiveGoalCurrentStateSections: View {"))
+        let end = try XCTUnwrap(source.range(of: "enum ActiveGoalFormat {"))
+        let currentState = String(source[start.lowerBound..<end.lowerBound])
+        for forbidden in ["onTapGesture", "chevron.right", ".isButton", "ConfidenceDetailSheet", ".sheet(", "onShowConfidenceDetail", "isShowingConfidenceDetail"] {
+            XCTAssertFalse(currentState.contains(forbidden), "current-state Goal must not contain \(forbidden)")
+        }
+        XCTAssertTrue(currentState.contains(".accessibilityAddTraits(.isStaticText)"))
+        XCTAssertFalse(String(source[end.lowerBound...]).contains("confidenceSheet"))
+        // The legacy (no currentState) layout is unchanged: its sheet remains.
+        let legacyStart = try XCTUnwrap(source.range(of: "private struct ActiveGoalDetailContent: View {"))
+        let legacy = String(source[legacyStart.lowerBound..<start.lowerBound])
+        XCTAssertTrue(legacy.contains("ConfidenceDetailSheet(confidence: goal.confidence.value ?? 0, detail: detail)"))
     }
 
     func testOneMalformedBlockHidesOnlyItsOwnSection() async throws {
