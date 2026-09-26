@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-09-26T02:40:12Z",
+  "task": {
+    "id": "claude-active-goal-v3-current-state-coaching-20260925",
+    "title": "Active Goal V3 current-state + coaching projection: code-level diagnosis complete; BLOCKED on Founder authorization for read-only production probes",
+    "agent": "claude",
+    "status": "blocked"
+  },
+  "repository": "dustinginn/physiqueos",
+  "authority": {
+    "base_sha": "09f04dc54eb26bfccdd2aeb34b156d8fc7d3f80e",
+    "final_sha": null,
+    "production_server_sha": "09f04dc54eb26bfccdd2aeb34b156d8fc7d3f80e",
+    "production_deployment": "e979ee19-44f3-4c7a-ab2b-3c6e4f773349",
+    "native_sha": "00321dcc6dd86a6479dbca5dd27e691c87348cd8",
+    "native_build": 60
+  },
+  "result": {
+    "summary": "Authority reverified (prod 09f04dc5 / e979ee19; Native Build 60 00321dcc; c15f0881 unreleased and divergent from the Server history). Code-level root causes proven for the active Build Lean Mass Goal page: Aug15 turning point merges the phase-start scan's lean mass with the latest-minus-baseline delta; payload has no latest-DEXA slot (guardrail uses phase-start/baseline body fat); active-Goal store applies no DEXA supersession filter; V3 goal-context confidence (whyConfidence + rich detail) is computed then dropped, so the stored briefing-relative 'one update' text shows; review/boilerplate copy is hard-coded (Server currentPhaseNarrative, Native 'Goal review comes next' and 'Server-derived'); training progress never computed for the terminal phase; turning points are a fixed list that cannot include later DEXAs; Coach's Take absent. Additive currentState contract designed. The read-only production forensic probe was drafted but not run: the auto-mode permission classifier denied it (and then local source reads) without a Founder chat authorization. No product code changed, no production read of data, no mutation. Worktrees: Server branch claude/active-goal-v3-server-20260925 @ 09f04dc5; Native branch claude/active-goal-v3-current-state-coaching-20260925 @ c15f0881 (no commits yet).",
+    "success": false,
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
+  },
+  "validation": {
+    "tests": {
+      "status": "not_run",
+      "summary": "No code changed yet."
+    },
+    "review": {
+      "status": "not_run",
+      "summary": "Implementation not started."
+    },
+    "zero_write_audit": {
+      "status": "not_run",
+      "summary": "Read-only production probe blocked pending Founder authorization; no production data read or written."
+    }
+  },
+  "decisions_required": [
+    "Founder: in chat, authorize read-only zero-write production console probes, local code work/tests/builds in the goal-v3 worktrees, pushing its non-deploy branches, and report publishing for this task (no deploy/TestFlight/production writes)."
+  ],
+  "blockers": [
+    "Auto-mode permission classifier blocks production read-only probes (and subsequently local source reads) without a Founder chat sentence."
+  ],
+  "unexpected_findings": [
+    "V3 engine treats the approximately 8-9% body-fat guardrail as a symmetric allowed_range (>=0.5 pt outside = pressured, confidence impact -1); Goal guardrail interpretation must follow that policy.",
+    "Home goal progress shares the unfiltered DEXA progress path (follow-up candidate)."
+  ],
+  "backlog": [
+    "Run Part A forensic probe",
+    "Server currentState projection + tests",
+    "Native rendering on c15f0881 + tests",
+    "Production-shaped acceptance, webpack, fresh-context reviews"
+  ],
+  "recommended_next_step": "Founder sends the chat authorization; Claude resumes with the Part A production forensic probe.",
+  "full_report_path": "agent-handoffs/reports/20260926T024012Z-goal-v3-diagnostic-blocked.md",
+  "safety": {
+    "contains_secrets": false,
+    "contains_credentials": false,
+    "contains_production_exports": false,
+    "contains_founder_evidence": false,
+    "safe_for_chatgpt_retrieval": true
+  }
+}
