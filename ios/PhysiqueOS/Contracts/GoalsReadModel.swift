@@ -356,6 +356,42 @@ struct ActiveGoalCurrentStateReadModel: Codable, Equatable {
     var turningPoints: [GoalTurningPointReadModel]
     var coachTake: CoachTake?
 
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, asOf, composition, progress, guardrail, phase, confidence, training, turningPoints, coachTake
+    }
+
+    init(schemaVersion: String, asOf: String? = nil, composition: Composition? = nil, progress: Progress? = nil,
+         guardrail: Guardrail? = nil, phase: Phase? = nil, confidence: Confidence? = nil, training: Training? = nil,
+         turningPoints: [GoalTurningPointReadModel] = [], coachTake: CoachTake? = nil) {
+        self.schemaVersion = schemaVersion
+        self.asOf = asOf
+        self.composition = composition
+        self.progress = progress
+        self.guardrail = guardrail
+        self.phase = phase
+        self.confidence = confidence
+        self.training = training
+        self.turningPoints = turningPoints
+        self.coachTake = coachTake
+    }
+
+    /// Only `schemaVersion` is required. Every block decodes independently,
+    /// so a drifted or malformed block hides only its own section instead
+    /// of dropping the whole current-state page back to the legacy layout.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(String.self, forKey: .schemaVersion)
+        asOf = try? container.decodeIfPresent(String.self, forKey: .asOf)
+        composition = try? container.decodeIfPresent(Composition.self, forKey: .composition)
+        progress = try? container.decodeIfPresent(Progress.self, forKey: .progress)
+        guardrail = try? container.decodeIfPresent(Guardrail.self, forKey: .guardrail)
+        phase = try? container.decodeIfPresent(Phase.self, forKey: .phase)
+        confidence = try? container.decodeIfPresent(Confidence.self, forKey: .confidence)
+        training = try? container.decodeIfPresent(Training.self, forKey: .training)
+        turningPoints = (try? container.decodeIfPresent([GoalTurningPointReadModel].self, forKey: .turningPoints)) ?? []
+        coachTake = try? container.decodeIfPresent(CoachTake.self, forKey: .coachTake)
+    }
+
     struct Scan: Codable, Equatable {
         var role: String
         var date: String
@@ -437,8 +473,7 @@ struct ActiveGoalCurrentStateReadModel: Codable, Equatable {
         var detail: ConfidenceDetailLists?
     }
 
-    struct TrainingHighlight: Codable, Equatable, Identifiable {
-        var id: String { name }
+    struct TrainingHighlight: Codable, Equatable {
         var name: String
         var region: String?
         var percentChange: Double?
@@ -456,7 +491,7 @@ struct ActiveGoalCurrentStateReadModel: Codable, Equatable {
         var state: String
         var periodStart: String
         var periodEnd: String
-        var sessionCount: Int
+        var trainingDayCount: Int
         var comparableMovementCount: Int
         var improvingCount: Int
         var regressingCount: Int

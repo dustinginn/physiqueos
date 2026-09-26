@@ -432,6 +432,8 @@ struct ActiveGoalCurrentStateSections: View {
     let allowsWrites: Bool
     let onNavigate: (AppDestination) -> Void
     let onShowConfidenceDetail: () -> Void
+    /// Composition columns grow with Dynamic Type.
+    @ScaledMetric(relativeTo: .caption) private var columnWidth: CGFloat = 72
 
     /// The page's sections in render order. There is deliberately no
     /// strategy grid, "what's next" review card or legacy evidence-anchor
@@ -440,7 +442,7 @@ struct ActiveGoalCurrentStateSections: View {
         case hero, journey, bodyComposition, guardrail, trainingProgress, coachTake, turningPoints
     }
 
-    static func renderedSections(for state: ActiveGoalCurrentStateReadModel) -> [Section] {
+    nonisolated static func renderedSections(for state: ActiveGoalCurrentStateReadModel) -> [Section] {
         var sections: [Section] = [.hero, .journey]
         if state.composition != nil { sections.append(.bodyComposition) }
         if state.guardrail != nil { sections.append(.guardrail) }
@@ -586,7 +588,7 @@ struct ActiveGoalCurrentStateSections: View {
                         compositionRow("Fat Mass", composition.baseline?.fatMassLb, composition.current.fatMassLb, composition.change?.fatMassLb, unit: " lb", composition: composition)
                         compositionRow("Body Fat", composition.baseline?.bodyFatPercent, composition.current.bodyFatPercent, composition.change?.bodyFatPoints, unit: "%", composition: composition, changeUnit: " pts")
                         compositionRow("Weight", composition.baseline?.weightLb, composition.current.weightLb, composition.change?.weightLb, unit: " lb", composition: composition)
-                        Text(composition.sameAsBaseline ? "Goal baseline DEXA. No scan has followed it yet." : "\(composition.authority) · goal baseline and latest scan")
+                        Text(ActiveGoalFormat.compositionCaption(composition))
                             .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
                             .foregroundStyle(PhysiqueOSTheme.textMuted)
                     }
@@ -628,33 +630,42 @@ struct ActiveGoalCurrentStateSections: View {
                 .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
         }
-        .frame(width: 72, alignment: .trailing)
+        .frame(width: columnWidth, alignment: .trailing)
     }
 
     private func compositionRow(_ label: String, _ baseline: Double?, _ current: Double?, _ change: Double?,
                                 unit: String, composition: ActiveGoalCurrentStateReadModel.Composition,
                                 changeUnit: String? = nil) -> some View {
-        HStack(alignment: .firstTextBaseline) {
+        let showsBaseline = !composition.sameAsBaseline && composition.baseline != nil
+        let baselineText = ActiveGoalFormat.value(baseline, unit: unit)
+        let currentText = ActiveGoalFormat.value(current, unit: unit)
+        let changeText = ActiveGoalFormat.signed(change, unit: changeUnit ?? unit)
+        return HStack(alignment: .firstTextBaseline) {
             Text(label)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if !composition.sameAsBaseline, composition.baseline != nil {
-                valueCell(ActiveGoalFormat.value(baseline, unit: unit), emphasized: false)
+            if showsBaseline {
+                valueCell(baselineText, emphasized: false)
             }
-            valueCell(ActiveGoalFormat.value(current, unit: unit), emphasized: true)
+            valueCell(currentText, emphasized: true)
             if composition.change != nil {
-                valueCell(ActiveGoalFormat.signed(change, unit: changeUnit ?? unit), emphasized: false)
+                valueCell(changeText, emphasized: false)
             }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([label,
+                             showsBaseline ? "baseline \(baselineText)" : nil,
+                             "\(composition.sameAsBaseline ? "baseline" : "latest") \(currentText)",
+                             composition.change != nil ? "change \(changeText)" : nil]
+            .compactMap { $0 }.joined(separator: ", "))
     }
 
     private func valueCell(_ text: String, emphasized: Bool) -> some View {
         Text(text)
             .physiqueOSFont(emphasized ? PhysiqueOSTypography.label14Heavy : PhysiqueOSTypography.caption12Semibold)
             .foregroundStyle(emphasized ? PhysiqueOSTheme.textPrimary : PhysiqueOSTheme.textSecondary)
-            .frame(width: 72, alignment: .trailing)
+            .frame(width: columnWidth, alignment: .trailing)
     }
 
     // MARK: Guardrail — latest measurement + Server interpretation
@@ -669,12 +680,14 @@ struct ActiveGoalCurrentStateSections: View {
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 if let state = ActiveGoalFormat.guardrailState(guardrail) {
+                    let tint = guardrail.status == "clear" ? PhysiqueOSTheme.chartSuccess
+                        : guardrail.status == "watch" ? PhysiqueOSTheme.chartEffort : PhysiqueOSTheme.accent
                     Text(state)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.accent)
+                        .foregroundStyle(tint)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(PhysiqueOSTheme.accent.opacity(0.12))
+                        .background(tint.opacity(0.12))
                         .clipShape(Capsule())
                 }
                 if let interpretation = guardrail.interpretation, !interpretation.isEmpty {
@@ -697,7 +710,7 @@ struct ActiveGoalCurrentStateSections: View {
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 if !training.highlights.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(training.highlights) { item in
+                        ForEach(Array(training.highlights.enumerated()), id: \.offset) { _, item in
                             HStack(alignment: .firstTextBaseline) {
                                 Label(item.name, systemImage: item.personalRecord == true ? "trophy.fill" : "chart.line.uptrend.xyaxis")
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
@@ -709,6 +722,8 @@ struct ActiveGoalCurrentStateSections: View {
                                         .foregroundStyle(PhysiqueOSTheme.chartSuccess)
                                 }
                             }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(ActiveGoalFormat.highlightAccessibilityLabel(item))
                         }
                     }
                 }
@@ -833,7 +848,19 @@ enum ActiveGoalFormat {
     static func progressLabel(_ progress: ActiveGoalCurrentStateReadModel.Progress) -> String {
         let target = compact(progress.targetAmount)
         guard let achieved = progress.achievedAmount else { return "\(target) \(progress.unit) lean-mass target" }
+        guard achieved >= 0 else { return "\(signed(achieved, unit: " \(progress.unit)")) lean mass vs goal baseline" }
         return "\(number(achieved)) of \(target) \(progress.unit) lean mass gained"
+    }
+
+    static func compositionCaption(_ composition: ActiveGoalCurrentStateReadModel.Composition) -> String {
+        if composition.sameAsBaseline { return "\(composition.authority) · goal baseline" }
+        return composition.baseline == nil ? "\(composition.authority) · latest scan" : "\(composition.authority) · goal baseline and latest scan"
+    }
+
+    static func highlightAccessibilityLabel(_ item: ActiveGoalCurrentStateReadModel.TrainingHighlight) -> String {
+        [item.name,
+         item.percentChange.map { signed($0, unit: "%") },
+         item.personalRecord == true ? "personal record" : nil].compactMap { $0 }.joined(separator: ", ")
     }
 
     static func remainingLabel(_ progress: ActiveGoalCurrentStateReadModel.Progress) -> String? {
@@ -844,12 +871,18 @@ enum ActiveGoalFormat {
 
     static func guardrailState(_ guardrail: ActiveGoalCurrentStateReadModel.Guardrail) -> String? {
         guard let measurement = guardrail.measurement, let position = guardrail.position else { return nil }
-        let where_ = position == "within" ? "Within range" : position == "below" ? "Below range" : "Above range"
+        let where_: String
+        switch position {
+        case "within": where_ = "Within range"
+        case "below": where_ = "Below range"
+        case "above": where_ = "Above range"
+        default: return nil
+        }
         return "\(number(measurement.value))% on \(shortDate(measurement.date)) DEXA · \(where_)"
     }
 
     static func trainingEyebrow(_ training: ActiveGoalCurrentStateReadModel.Training) -> String {
-        "Since \(shortDate(training.periodStart)) · \(training.sessionCount) logged sessions"
+        "Since \(shortDate(training.periodStart)) · \(training.trainingDayCount) training \(training.trainingDayCount == 1 ? "day" : "days")"
     }
 }
 
