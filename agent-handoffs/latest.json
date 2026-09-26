@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-26T19:15:00Z",
+  "generated_at_utc": "2026-09-26T20:00:00Z",
   "task": {
-    "id": "claude-healthkit-strength-reconciliation-server-fix-deploy-20260926",
-    "title": "Strength reconciliation timing fix DEPLOYED to production (524f1882)",
+    "id": "claude-healthkit-strength-postdeploy-confirmation-failure-and-review-notifications-20260926",
+    "title": "Postdeploy Strength confirmation failure diagnosed (no new defect proven); reconciliation-review notification architecture audited",
     "agent": "claude",
-    "status": "completed"
+    "status": "awaiting_founder_direction"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -13,55 +13,54 @@
     "native_installed_build": 60,
     "production_server_sha": "524f1882072cb5c17c4fe61f7210f0f7d1c6e67c",
     "production_deployment": "13d69b55-afd5-4805-b196-0eae1b5b0cea",
-    "production_previous_server_sha": "2a23eee762472081815d9122b97c0f0a9f1b8969",
-    "production_previous_deployment": "14d52e0a-034b-4d9e-949e-b2602c29dbfc",
-    "production_build_id": "physiqueos-524f1882-20260926",
-    "live_workout_policy_families": ["cardio", "strength"],
-    "live_workout_policy_effective_local_date": "2026-09-23",
-    "canonical_workouts_total": 10,
-    "canonical_cardio_workouts": 7,
-    "canonical_strength_workouts": 3,
+    "native_build61_candidate_parked": "efcb8574d38d7462c3e2ccb0fd0e04ccb936517d",
+    "native_build61_unaffected": true,
     "sep24_strength_link_status": "candidate",
     "sep24_strength_link_confidence": 60,
-    "native_build61_candidate_parked": "efcb8574d38d7462c3e2ccb0fd0e04ccb936517d",
-    "native_build61_unaffected_by_this_deploy": true
+    "sep24_strength_review_version": 1
   },
   "result": {
-    "summary": "Deployed the reviewed Strength reconciliation timing fix (524f1882, exactly one commit ahead of the prior production authority 2a23eee7, diff limited to the reviewed source fix and its test) via the guarded two-step procedure: fast-forwarded the production branch, stamped web+worker to the new SHA/buildId, force-rebuild deployment 13d69b55 went ACTIVE (9/9), source_commit_hash exact on both components, runtime gitSha confirmed from inside the live app, live/ready healthy (migration 000014 unchanged), zero error logs. A programmatic pre/post zero-write bounded audit diff (window Sep20-27) found every single field identical except the runtime SHA/buildId itself: workout policy, all 10 canonical workouts (including the Sep24 Strength link still exactly 'candidate'/60%/unconfirmed and the two existing confirmed Strength links unchanged), zero duplicate workouts or relationship-integrity violations, the Sep26 prospective Cardio workout's outdoor_walking type and Training Day behavior intact, all Activity/Nutrition canonical days byte-identical, and all 35 strategic digests identical -- no historical briefing/confidence/Goal artifact was regenerated. Nothing was manually confirmed, replayed, or mutated; no Founder device operation; Native Build61 was not prepared or uploaded and its intended lineage (efcb8574) is completely unaffected.",
+    "summary": "Diagnosed the Founder's postdeploy report that the Sep24 Strength confirmation still doesn't work. Found via App Platform request-level telemetry that the postdeploy retry window contains 8 reads of the review-detail screen but zero workout-reconciliation.resolve.v1 command receipts of any outcome -- the confirm command never reached the server's command-processing path. The review and link are byte-identical to before the deploy (version 1, candidate, unconfirmed); the live guard still passes cleanly with no error. No new Server or Native defect was found or proven; the already-deployed timing fix is confirmed intact and unaffected. The best-evidenced explanation is that 'Refresh Review' (a plain reload that never re-attempts the confirm, already flagged as a distinct non-blocking gap in the prior report) was used instead of re-tapping 'Use Logger session 1' -- not a new bug. No fix candidate was produced since no defect was proven; producing one without evidence would be exactly the kind of unevidenced change this lane avoids. Separately, audited the existing Actionable Notifications infrastructure (all local UserNotifications-based, no server push anywhere in the codebase) and found a directly reusable pattern already in production (BriefingReadyNotifier's diff-against-persisted-observed-ids design, called from HomeView.swift after Home's own data load) that fully satisfies every stated requirement (dedup, no-notify-for-auto-canonicalized-Cardio, no-notify-on-mere-recompute, deep-link via the existing AppDestination.evidenceReview type, existing PriorityNotificationCategory.evidenceReviewReady, no server change needed) for a new WorkoutReconciliationReviewReadyNotifier. Reconciliation-review notifications are currently absent. Published a precise, scoped follow-up design rather than implementing new Native code in this task, per the task's own instruction not to expand scope or touch Build61 here. Nothing mutated, deployed, or operated.",
     "success": true,
     "production_mutated": false,
-    "deployed": true,
+    "deployed": false,
     "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
-      "status": "passed",
-      "summary": "Fresh re-run immediately before deploying: 350/350 passing across src/application/native/ and src/application/commands/, no regressions. Production build (full 40-hex PHYSIQUEOS_GIT_SHA/PHYSIQUEOS_BUILD_ID, phase-production-build, npm run build -- --webpack) compiled successfully."
+      "status": "not_applicable",
+      "summary": "Read-only diagnosis and architecture audit; no code changed in this task."
     },
     "review": {
-      "status": "approved_with_notes",
-      "summary": "Deployed SHA is the exact fresh-context-reviewed candidate from the prior diagnosis task (APPROVE WITH NOTES; two non-blocking follow-ups noted there, neither required for this deploy). No further review needed since no code changed beyond that review."
+      "status": "not_applicable",
+      "summary": "No code produced in this task to review. The previously deployed fix (524f1882) is unchanged and was independently reviewed in the prior report."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Pre-deploy (2a23eee7) and post-deploy (524f1882) bounded, owner-scoped, REPEATABLE READ READ ONLY audits (--kind workout-audit and --kind audit, window 2026-09-20 to 2026-09-27) diffed programmatically field-by-field: every value identical except runtime gitSha/buildId. Explicitly confirmed the Sep24 Strength link remains unresolved (candidate, 60%) -- this deploy did not confirm it."
+      "summary": "Bounded REPEATABLE READ READ ONLY transaction confirmed the review/link state is byte-identical to the pre-deploy and post-deploy-acceptance snapshots. App Platform structured run logs (operational telemetry only, no credentials or raw bodies) were read to establish that zero workout-reconciliation.resolve.v1 command receipts exist in the postdeploy retry window despite 8 review-detail reads."
     }
   },
   "decisions_required": [
-    "Founder's own choice, not gated by this task: reopen Pending Review and retry 'Use Logger session 1' for the Sep24 Strength workout now that the fixed code is live -- the underlying review already exists and nothing is currently blocking confirmation.",
-    "Native Build61 preparation from efcb8574 remains its own separate authorization, unaffected by and not required after this deploy."
+    "Founder: retry with the exact 'Use Logger session 1' action (not just 'Refresh Review') whenever convenient -- the review exists and nothing server-side is currently blocking it.",
+    "If that exact retry still visibly fails, capture the precise on-screen error text at that moment for a genuine client-side-evidenced follow-up.",
+    "Whenever Native work is next authorized on efcb8574, implement the proposed WorkoutReconciliationReviewReadyNotifier design -- no server change needed."
   ],
   "blockers": [],
-  "unexpected_findings": [],
-  "backlog": [
-    "Native Build61 preparation from efcb8574, whenever Founder separately authorizes it.",
-    "Optional, lower priority (from the prior review): a scheduled, ingestion-independent catch-up sweep for Strength-candidate reassessment, for full robustness against extended HealthKit sync gaps.",
-    "Optional, lower priority (from the prior review): improve Native's error-classification so a definite failure is distinguishable from a genuinely ambiguous one, instead of always surfacing 'Refresh required'."
+  "unexpected_findings": [
+    "App Platform's structured run-log telemetry (provider.*_read.complete and native.command.receipt_committed events) is detailed enough to distinguish 'a read happened' from 'a write command was attempted', which was the decisive evidence in this diagnosis and is a genuinely useful tool for future postdeploy acceptance/diagnosis work in this lane.",
+    "The existing BriefingReadyNotifier (Networking/EvidenceReviewReadyNotifier.swift, Native) already solves the exact 'notify once when a server-created item first appears, dedup via persisted observed-ids, deep-link, no server push needed' problem shape for briefings -- it is directly reusable as a template for HealthKit reconciliation-review notifications with no server-side work required."
   ],
-  "recommended_next_step": "Founder: retry the Sep24 Strength confirmation on-device whenever convenient (should now succeed cleanly); separately, decide on Build61 timing whenever ready -- it is fully independent of this deploy.",
-  "full_report_path": "agent-handoffs/reports/20260926T191500Z-healthkit-strength-reconciliation-fix-deployed.md",
+  "backlog": [
+    "Implement WorkoutReconciliationReviewReadyNotifier per the design in this report, on the efcb8574 lineage or a reviewed descendant, whenever Native work is next authorized.",
+    "Native Build61 preparation from efcb8574, whenever Founder separately authorizes it -- unaffected by this task.",
+    "Optional, lower priority (carried from the prior report): improve Native's error-classification so a definite failure is distinguishable from a genuinely ambiguous one.",
+    "Optional, lower priority (carried from the prior report): a scheduled, ingestion-independent catch-up sweep for Strength-candidate reassessment."
+  ],
+  "recommended_next_step": "Founder retries the exact confirm action on-device; separately, when ready, authorize the scoped notification follow-up as part of the next Native work on the efcb8574 lineage.",
+  "full_report_path": "agent-handoffs/reports/20260926T200000Z-healthkit-strength-postdeploy-failure-and-notification-audit.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260926T191500Z-healthkit-strength-reconciliation-fix-deployed.md",
     "agent-handoffs/reports/20260926T183000Z-healthkit-strength-reconciliation-timing-diagnosed-fixed.md",
     "agent-handoffs/reports/20260926T170800Z-healthkit-prospective-cardio-outdoor-walk-acceptance-PASS.md"
   ],
