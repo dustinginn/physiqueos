@@ -445,6 +445,7 @@ export function overlayGraduatedHealthKitCardioWorkouts({
       lastObservedAt: record.payload.observed_at,
       quality: { status: "active" },
       userId: workout?.userId ?? null,
+      provenance: workoutProvenanceOf(workout, record.id),
       payload: Object.freeze({ ...record.payload, evidenceEligibility: eligibilityOf(purpose) }),
       healthKitProjection: Object.freeze({
         version: HEALTHKIT_GRADUATION_PROJECTION_VERSION,
@@ -475,6 +476,24 @@ function provenanceOf(day) {
     source_artifact_refs: [],
     healthkit_canonical_day_id: day.id,
     healthkit_canonical_day_revision: Number(day.revision ?? 1),
+    application: "Apple Health",
+    integration: "HealthKit",
+    modality: "direct",
+  };
+}
+
+// Wrapper-level provenance analog of `provenanceOf(day)` above, for a
+// graduated Cardio workout. A read-model display field
+// (`CanonicalReadModel.js`'s `decorateCanonicalPayloadForReadModel`) reads
+// `canonicalObject.provenance` at this same top level; without this the field
+// was silently null for a graduated Cardio workout (degrades gracefully, but
+// exactly the gap `projectActivityDay`/`projectNutrition` don't have).
+function workoutProvenanceOf(workout, workoutId) {
+  return {
+    source_observation_ids: [...(workout?.provenance?.sourceObservationIds ?? [])],
+    source_artifact_refs: [],
+    healthkit_canonical_workout_id: workoutId,
+    healthkit_canonical_workout_revision: Number(workout?.revision ?? 1),
     application: "Apple Health",
     integration: "HealthKit",
     modality: "direct",

@@ -87,6 +87,11 @@ describe("Phase 1 Cardio strategic graduation", () => {
     expect(graduated.firstObservedAt).toBe("2026-09-23");
     expect(graduated.userId).toBe(workout.userId);
     expect(typeof graduated.createdAt).toBe("string");
+    expect(graduated.provenance).toEqual({
+      source_observation_ids: [`obs_1`], source_artifact_refs: [],
+      healthkit_canonical_workout_id: workout.id, healthkit_canonical_workout_revision: 1,
+      application: "Apple Health", integration: "HealthKit", modality: "direct",
+    });
   });
 
   it("stays fully quarantined when the evidenceEligibility scope is disabled -- the blanket default", () => {
