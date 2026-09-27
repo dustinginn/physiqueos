@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T03:17:00Z",
+  "generated_at_utc": "2026-09-27T03:52:00Z",
   "task": {
-    "id": "claude-build63-acceptance-diagnosis-20260927",
-    "title": "Build 63 Founder acceptance diagnosis — 2 fixes prepared, 1 cleared with no code change",
+    "id": "claude-visible-abs-photo-real-root-cause-20260927",
+    "title": "Completed Visible Abs photos -- real root cause found and fixed (corrects prior report)",
     "agent": "claude",
     "status": "completed"
   },
@@ -11,12 +11,13 @@
   "authority": {
     "production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
     "native_build63_final_sha": "1ef837815fc43b70996abd972d1648547db78f46",
-    "native_candidate_sha": "07e096f9",
+    "native_candidate_sha": "104c34ff",
     "native_candidate_branch": "codex/native-batched-candidate-post-build62",
-    "native_candidate_pushed": true
+    "native_candidate_pushed": true,
+    "native_candidate_previous_sha": "07e096f9"
   },
   "result": {
-    "summary": "Diagnosed all three FAILED Build 63 Founder acceptance items with production evidence rather than assumption. Item 2 (Your Journey progress bars): root-caused to ActiveGoalCurrentStateSections.journey -- the actual render path for any goal with server-populated currentState, e.g. the Founder's real 'Build Lean Mass' -- calling GoalPhaseCard with showsProgress:false based on a stale, disproven comment; the existing regression test used a Sandbox fixture lacking currentState so it silently tested the wrong code path. Fixed with a one-line change plus a new RED/GREEN test against the fixture that does have currentState. Item 3 (Completed Visible Abs photos): a zero-write production DB read, reproducing the exact server pipeline (composeCompletedGoalPreview, resolveCompletedGoalPhoto, resolveProgressPhotoMedia, resolveBriefingMedia/resolveNarrativeMedia) line for line, proves both Beginning and Completion photos already resolve to valid /media/<id> hrefs pointing at verified, fully-populated media objects -- no code defect found on either side, so per the explicit 'do not invent new semantics' instruction, nothing was changed; recommending the Founder simply re-check the screen. Item 4 (Strength reconciliation -999): ruled out every app-owned cancellation mechanism findable by code review (no custom URLSession, no explicit cancel, no task racing anywhere in the app) while a zero-write command_receipts read confirms this exact command type has never once landed server-side across two prior independently-shipped fix attempts, while every other command type flows normally in the same windows. Could not fully prove app-owned vs external causation, so per instruction added a diagnostic-only Task.isCancelled capture at the exact catch site instead of a guessed behavioral fix.",
+    "summary": "CORRECTS the prior report's item-3 conclusion. The Founder rechecked the Completed Visible Abs Goal photos on the existing, unmodified Build 63 and confirmed twice, reproducibly, that both Beginning and Completion still show a placeholder. Tracing one layer further than the prior audit found the real cause: every Native /api/v1/native/read/* response passes through a shared envelope() that runs projectNativeMediaReferences() over the whole body, which deletes any href/imageHref key holding a private-evidence media reference and replaces it with a differently-named media:{mediaId,deliveryPath} object. The server's composeCompletedGoalPreview genuinely produces a valid href, but the ACTUAL wire response Native receives never contains that href key at all -- only the renamed media object. Native's CompletedPhoto was still decoding the now-nonexistent href field, so mediaId always computed nil and the tile always fell back to placeholder, 100% reproducibly, independent of network conditions or database validity. Fixed by decoding the real media{mediaId,deliveryPath} shape instead -- the same shape ProductionDEXAAPI's sourceMedia and PhotosAPI's Prior.media already decode successfully today, not a new schema.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -27,38 +28,36 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Full PhysiqueOSTests target: 1446/1446 passing (1445 prior + 1 new). Both new RED/GREEN tests (testCurrentStateJourneyPhaseCardsShowProgressMatchingHomeSinceNoOtherSectionDoes, testPreservesTaskCancellationStateAtCatch) independently confirmed RED before their respective fixes and GREEN after. UI tests: GoalsAcceptanceUITests 1/1, TrainingAcceptanceUITests 12/12 -- no regression to Logged Today Cardio or any other previously-accepted behavior."
+      "summary": "RED verified by actually running it: reverting only the Swift fix (keeping updated tests) made both remaining photo tests fail with nil where a real mediaId was expected, exactly reproducing the Founder's bug. GREEN verified by actually running it after reapplying: full PhysiqueOSTests target, 1445/1445 passing. Two existing tests updated to the real media{mediaId,deliveryPath} fixture shape (they were themselves built on the same wrong href assumption); one test covering URL query-string/fragment parsing deleted as structurally obsolete under the new shape."
     },
     "review": {
       "status": "passed",
-      "summary": "Independent fresh-context review (zero prior context) verified the diff directly against the code: confirmed both GoalPhaseCard call sites and that Journey is the only section on the current-state page that can show per-phase progress; confirmed the Task.isCancelled capture runs before the catch block's only await with no control-flow change and no hidden suspension point; confirmed both new tests build and pass; confirmed git diff --stat touches exactly the 6 described files with no build-number or unrelated change. No issues found."
+      "summary": "Independent fresh-context review verified the root-cause claim against the ACTUAL deployed production commit 2a23eee7 (this Native worktree's own branch predates the server's native-contract subsystem, so the review correctly checked git show 2a23eee7:... instead of the stale local checkout). Confirmed the href-to-media rewrite genuinely applies to completed-goal's response via the shared envelope(), confirmed no other Native code still reads .href on this model, confirmed no naming collision with the two existing MediaDescriptor structs, confirmed the updated/deleted tests are reasonable. No issues found."
+    },
+    "ui_regression": {
+      "status": "passed",
+      "summary": "GoalsAcceptanceUITests 1/1. TrainingAcceptanceUITests: 12/13 on first pass with one flaky failure (testCorrectedEvidenceJourneys, 'app is not running', a Weight History/DEXA flow this diff never touches); reran in isolation and it passed cleanly, confirming simulator flakiness rather than a regression."
     },
     "release_build": {
       "status": "skipped",
-      "summary": "Not run this pass -- free disk space was at/under the 15 GiB STANDING_DISK_SAFETY.md hard floor after clearing the already-uploaded Build 63 archive, and a Release build was judged too disk-risky to force through. Debug build-for-testing succeeded cleanly and the full unit+UI suites above ran against it."
-    },
-    "zero_write_audit": {
-      "status": "passed",
-      "summary": "Two separate zero-write, owner-scoped, ROLLBACK-guaranteed production DB audits (physiqueos.canonical_evidence_records/canonical_briefing_records/canonical_media_objects for the Visible Abs photo pipeline; physiqueos.command_receipts for the Strength reconciliation receipt check), both verified transaction_read_only=on before reading, both rolled back cleanly."
+      "summary": "Same disk-safety constraint as the prior report -- not re-attempted this pass."
     }
   },
   "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "The prior session's Visible Abs photo diagnosis direction (a stale/unresolved briefing href) was disproven on a second, more careful trace: the briefing narrative's raw legacy href IS correctly re-resolved by resolveBriefingMedia/resolveNarrativeMedia before composeCompletedGoalPreview ever sees it. Both photos' server-side data is fully valid right now -- worth remembering as a caution about verifying a fix hypothesis against the FULL real pipeline (including steps that happen upstream of the function you're staring at), not just the function itself."
+    "The prior report's item-3 conclusion (production photo data is fully valid, no code needed) was disproven by the Founder's own recheck. The gap: that audit verified the web-layer function's own output but never traced the additional native-contract-wide media-reference projection applied afterward, on the way to Native. Recorded here as a caution for future diagnoses of this Native production contract: always trace through envelope()/projectNativeMediaReferences(), not just the underlying domain service, since it renames keys wholesale for every native read resource."
   ],
   "backlog": [
-    "Get free disk space back above the 15 GiB floor and run the Release build + verify_release_configuration.py on this exact candidate before treating it as fully release-ready.",
-    "Ask the Founder to simply re-open the Completed Visible Abs Goal screen and confirm whether it already renders correctly -- no code change is indicated by the evidence.",
-    "The next real Strength reconciliation confirm attempt (whenever it naturally happens -- not solicited by this task) will carry the new taskWasCancelledAtCatch signal in the Workout Reconciliation Diagnostics screen; read it before any further speculation on that item.",
-    "A new ChatGPT 'new-thread master context' handoff and a 'physiqueos-master-thread-handoff-v2' remain in the inbox, unread and unacted on by this task, staying scoped exactly to the authorized Build63 acceptance diagnosis as instructed."
+    "Get free disk space back above the 15 GiB floor and run the Release build + verify_release_configuration.py on this candidate before treating it as fully release-ready.",
+    "The next real Strength reconciliation confirm attempt (whenever it naturally happens) will carry the taskWasCancelledAtCatch diagnostic signal -- read it before any further speculation on that item.",
+    "A new ChatGPT 'new-thread master context' handoff and a 'physiqueos-master-thread-handoff-v2' remain in the inbox, unread and unacted on by this task, staying scoped exactly to this diagnosis as instructed."
   ],
-  "recommended_next_step": "Founder (or whoever owns the next Native build) reviews and, if satisfied, authorizes cutting the next TestFlight build from commit 07e096f9 -- after a disk-safety pass allows a full Release-build validation. No further diagnostic work is queued on this candidate unless new acceptance evidence arrives.",
-  "full_report_path": "agent-handoffs/reports/20260927T031700Z-build63-acceptance-diagnosis.md",
+  "recommended_next_step": "Founder confirms the Visible Abs photos now render correctly once this candidate (104c34ff) is eventually installed on a device -- no build has been cut yet per explicit instruction to hold. When ready, cut the next TestFlight build from 104c34ff after a disk-safety pass allows a Release-build validation.",
+  "full_report_path": "agent-handoffs/reports/20260927T035200Z-visible-abs-photo-fix.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260927T023000Z-native-build63-uploaded-valid.md",
-    "agent-handoffs/reports/20260927T020000Z-native-batched-candidate-post-build62-ready.md",
-    "agent-handoffs/reports/20260927T010000Z-healthkit-strength-build62-root-cause-diagnosis.md"
+    "agent-handoffs/reports/20260927T031700Z-build63-acceptance-diagnosis.md",
+    "agent-handoffs/reports/20260927T023000Z-native-build63-uploaded-valid.md"
   ],
   "safety": {
     "contains_secrets": false,

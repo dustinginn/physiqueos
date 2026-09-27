@@ -2,28 +2,24 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Build 63 Founder acceptance diagnosis — 2 fixes prepared, 1 cleared with no code change
+- Task: Completed Visible Abs photos — real root cause found and fixed (corrects prior report)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-27T03:17:00Z
+- Generated (UTC): 2026-09-27T03:52:00Z
 - Success: true
 
-Summary: Diagnosed all three FAILED Build 63 acceptance items with production evidence, not assumption.
+Summary: **This corrects the prior report's item 3 conclusion.** The Founder rechecked the Completed Visible Abs Goal photos on the existing, unmodified Build 63 and confirmed twice, reproducibly, that both photos still show a placeholder — so the prior "the data's fine, just re-check" recommendation was wrong.
 
-**Your Journey progress bars — fixed.** The real "Build Lean Mass" goal renders through a different Native code path than the one the prior fix's own test exercised (the test fixture is missing the field that routes to the real path), and that path was explicitly suppressing progress bars based on a comment that turned out to be wrong. One-line fix, new test proven RED then GREEN.
+Tracing one layer further found the real cause: every Native read response passes through a shared server-side transform that renames any `href`-style field carrying a media reference into a differently-shaped `media: {mediaId, deliveryPath}` object — deleting the original `href` key entirely. Native was still decoding a `href` field that never actually reaches the app on the wire, so the photo tile always fell back to a placeholder, 100% reproducibly, regardless of network conditions or how valid the database data is. Fixed by decoding the real shape — the same one already used successfully elsewhere in the app for other photos.
 
-**Completed Visible Abs photos — no code change.** A careful, zero-write read of production data proves both photos already resolve correctly server-side. Recommend just re-checking the screen before spending more time here.
+Verified RED (reverting the fix reproduces the exact bug in a test) then GREEN (1445/1445 unit tests). Independently reviewed against the actual deployed production server code. Candidate now at commit `104c34ff` on `codex/native-batched-candidate-post-build62`, pushed.
 
-**Strength reconciliation -999 — diagnostic only.** Ruled out every app-owned cancellation cause findable by code review, but a zero-write receipt check shows this exact command has never once landed server-side across two prior fix attempts, while everything else works. Couldn't fully prove app-owned vs. external, so added a `Task.isCancelled` capture at the exact failure point instead of guessing at a fix — it'll answer the question cleanly the next time this happens naturally.
+**Nothing else changed**: no build cut, no build number bumped, no upload, no device operated, no production data mutated, no Strength retry requested — holding exactly as the Founder instructed.
 
-Fresh-context review passed with no issues. Full test suite: 1446/1446 unit, 13/13 UI. Candidate pushed as commit `07e096f9` on `codex/native-batched-candidate-post-build62`. Release build wasn't run this pass — the machine was at the disk-safety floor — so do that before treating this as fully release-ready.
+**Next step is yours**: whenever you're ready, this candidate (`104c34ff`, containing both this fix and the earlier Journey/Strength-diagnostic commit) is what the next TestFlight build should come from — after a disk-safety pass allows a Release-build check first.
 
-**Nothing else changed**: no build cut, no build number bumped, no upload, no device operated, no production data mutated, Sep24 Strength not retried.
+Detailed report: `agent-handoffs/reports/20260927T035200Z-visible-abs-photo-fix.md`
 
-**Next step is yours**: review `07e096f9`; when a disk-safety pass allows a Release-build check, this is ready to become the next TestFlight build whenever authorized.
-
-Detailed report: `agent-handoffs/reports/20260927T031700Z-build63-acceptance-diagnosis.md`
-
-Related: `agent-handoffs/reports/20260927T023000Z-native-build63-uploaded-valid.md`
+Related: `agent-handoffs/reports/20260927T031700Z-build63-acceptance-diagnosis.md`
 
 Protocol: `agent-handoffs/README.md`
