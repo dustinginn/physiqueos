@@ -2,22 +2,24 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Command network transport isolation (reviewed candidate) + oversized read-model payload audit
+- Task: Native Build 66 UPLOADED to App Store Connect, processing VALID
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-27T19:43:21Z
+- Generated (UTC): 2026-09-27T20:33:22Z
 - Success: true
 
-Summary: Two pieces of follow-up from the 9:38 connectivity diagnosis.
+Summary: Build 66 is uploaded and Apple has validated it, confirmed twice independently. It's cut from the exact candidate that isolated command submissions onto their own connection — this task only bumped the build number, no feature changes.
 
-**The actual fix**: command submissions now run on their own dedicated network connection, completely separate from the big screen-load reads that were stalling. That's the real fix for the -999/-1001 pairing — before this, both used the exact same shared connection, so a stuck read could take a confirm down with it. It also now records what protocol and network interface were in play on every attempt, so if this happens again, there's finally something to look at beyond "it said cancelled." Ten new tests (two of them hitting real network endpoints, not mocks), a genuine break-it-and-confirm-it-fails check, full regression (1463 unit + 13 UI tests), and an independent review all came back clean. Pushed as `3b0ccbed`.
+Along the way, the test suite crashed twice in a row. Didn't just retry and hope — checked the machine directly and found it was genuinely overloaded (this shared machine down to about 58 MB of free memory at the time), not something wrong in the code. Once things calmed down, a clean run passed twice with zero crashes, confirming that diagnosis. Fixed two small test-hygiene issues found along the way regardless (a monitor that wasn't cleaning itself up, and one test that depended on reaching the internet, which the rest of this suite never does) — worth keeping even though they weren't the actual cause.
 
-**The payload audit you asked for**: measured, not guessed. The two biggest things Home and Goals pull are fetched with no date limit at all and have grown to 27 MB and 16 MB respectively across this account's history. The cleanest, safest win found: the reviews list that Log, Morning Check-In, and Coaching Updates all pull is 83% already-resolved reviews nobody needs to see — filtering that down would cut it by over 99%. Nothing was implemented; it's a written, prioritized plan for whenever you want to scope that as its own patch.
+Fresh tests all passed (1462 unit + 13 UI), the Release build checked out clean, and the archive was created and signed with no issues — no interactive login was needed anywhere. The upload dry-run passed every gate, and the real upload (which you'd already authorized) went through cleanly.
 
-**Nothing else changed**: no build cut, no build number bumped, no Server code touched, no Strength attempt requested.
+**Nothing else changed**: no production data touched, no Server code touched, no device operated.
 
-Detailed report: `agent-handoffs/reports/20260927T194321Z-command-transport-isolation-and-payload-audit.md`
+**Next step is yours**: accept Build 66 in TestFlight and make your one Strength attempt — that's the whole reason for this build.
 
-Related: `agent-handoffs/reports/20260927T164758Z-strength-build65-connectivity-window-diagnosis.md`
+Detailed report: `agent-handoffs/reports/20260927T203322Z-native-build66-uploaded-valid.md`
+
+Related: `agent-handoffs/reports/20260927T194321Z-command-transport-isolation-and-payload-audit.md`
 
 Protocol: `agent-handoffs/README.md`

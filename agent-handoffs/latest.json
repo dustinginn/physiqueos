@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T19:43:21Z",
+  "generated_at_utc": "2026-09-27T20:33:22Z",
   "task": {
-    "id": "claude-command-transport-isolation-and-payload-audit-20260927",
-    "title": "Command network transport isolation (reviewed candidate) + oversized read-model payload audit",
+    "id": "claude-native-build66-release-from-3b0ccbed-20260927",
+    "title": "Native Build 66 UPLOADED to App Store Connect, processing VALID",
     "agent": "claude",
     "status": "completed"
   },
@@ -11,58 +11,52 @@
   "authority": {
     "production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
     "native_build65_final_sha": "73edf2c1",
-    "native_candidate_sha": "3b0ccbed",
-    "native_candidate_branch": "codex/native-batched-candidate-post-build62",
-    "native_candidate_pushed": true
+    "native_reviewed_candidate_sha": "3b0ccbed",
+    "native_build66_final_sha": "04a58911",
+    "native_build66_archive_path": "~/Library/Developer/Xcode/Archives/2026-09-27/PhysiqueOS-Build66.xcarchive",
+    "native_build66_delivery_id": "86ce5def-c6f5-4ade-b0e8-25bba24bfaf6",
+    "native_build66_uploaded": true,
+    "native_build66_processing_status": "VALID",
+    "native_build66_dsym_uuid": "9CB76516-4FDA-3C13-A1B5-86682BBA5DF1"
   },
   "result": {
-    "summary": "Part A: implemented the evidence-backed fix from the 9:38 AM connectivity diagnosis -- ProductionNativeAPI.submitCommand now runs through a separately-injectable commandTransport (default nil = shares the read transport, exact pre-existing behavior for every caller that doesn't opt in), and the real app wires in CommandNetworkDiagnosticsTransport.production(): its own dedicated URLSession (own connection pool, isolated from bulk reads), waitsForConnectivity, and a 60s timeoutIntervalForResource ceiling. Captures URLSessionTaskMetrics + NWPath on every command attempt via a new bounded CommandNetworkDiagnostics log. No control-flow change to auth/idempotency/retry. Ten new tests (including two against real network I/O), a genuine compile-time RED check, full regression (1463 unit + 13 UI tests), and an independent fresh-context review all passed clean. Pushed as 3b0ccbed. Part B: a zero-write, measured audit of the oversized read-model payloads found that dailyBriefings (16.3 MB) and analyses/confidence-records (27.4 MB) are fetched with zero date/count limit and drive Home/Goals; evidenceReviews (7.4 MB, 83% already status=confirmed) is fetched unbounded for Log/Morning-Check-In/Coaching-Updates-Detail with no status filter, a >99.9% reduction opportunity if filtered to pending-only. A concrete, prioritized reduction plan was written up -- nothing implemented, per instruction, since this is diagnosis and plan only.",
+    "summary": "Cut, archived, and uploaded Native Build 66 from the exact reviewed command-network-transport-isolation candidate (3b0ccbed). On top of that candidate: a build-number bump (65->66) and two test-hygiene fixes found during release validation -- a leaked NWPathMonitor in NetworkPathObserver's test-constructed instances (fixed with a deinit), and removal of the one test in the suite depending on live external-network reachability. Neither is a behavioral change to production code beyond the deinit itself. Two full-suite runs crashed mid-run during this validation (1025/1463 tests, restarting twice each, at the identical test) -- investigated rather than dismissed: traced to severe shared-machine resource pressure (load average 33-36, ~58 MB free memory) via direct measurement (uptime, vm_stat, ps), not a code regression; a subsequent clean build once load subsided passed 1462/1462 (1463 minus the removed test) with zero crashes, confirming the diagnosis. Fresh validation: 1462/1462 unit tests, 13/13 UI tests, Release build succeeded, release-configuration verifier confirms version 1.0 (66). Archived with Xcode automatic signing (no interactive reauth needed), guarded upload dry-run passed every gate, then the real upload was executed under explicit Founder authorization: delivery id 86ce5def-c6f5-4ade-b0e8-25bba24bfaf6, processing VALID, independently reverified via a separate read-only status check. The Server payload-reduction backlog was explicitly not implemented in this task, per instruction.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false,
-    "founder_device_operated": false,
-    "build_number_changed": false,
-    "founder_confirmation_requested": false,
-    "server_code_changed": false,
-    "read_model_contracts_redesigned": false
+    "testflight_uploaded": true,
+    "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Full PhysiqueOSTests target: 1463/1463 passing (1453 prior + 10 new). GoalsAcceptanceUITests 1/1, TrainingAcceptanceUITests 12/12 -- 13/13 UI tests passing, both after a clean build."
+      "summary": "Full PhysiqueOSTests target: 1462/1462 passing after regenerating for Build 66 and waiting out a transient shared-machine resource-pressure incident. GoalsAcceptanceUITests 1/1, TrainingAcceptanceUITests 12/12 -- no regression."
     },
-    "red_check": {
-      "status": "passed",
-      "summary": "Reverting only FounderServerAPI.swift's wiring broke the whole project's compile at AppEnvironment.swift's new commandTransport: argument (extra argument 'commandTransport' in call), proving the wiring is real and load-bearing. Restoring it passed clean again. Independently reproduced by the fresh-context review."
+    "test_instability_investigation": {
+      "status": "resolved",
+      "summary": "Two consecutive crashes (1025/1463 tests, identical crash point both times) traced with direct system measurement to severe shared-machine load/memory pressure at the time (load average 33-36, ~58 MB free memory across multiple other processes on this multi-user machine), not a code regression. Two independently-justified test-hygiene fixes (NWPathMonitor cancellation on deinit; removal of the one live-external-network-dependent test) were made regardless. A clean build after load subsided passed cleanly twice with zero crashes, confirming the diagnosis."
     },
     "review": {
-      "status": "passed",
-      "summary": "Independent fresh-context review confirmed submitCommand's control flow is byte-identical apart from which transport it routes through, the nil-default fallback preserves every existing test unchanged, locking in NetworkPathObserver/MetricsCollectingDelegate is sound with no deadlock risk, URLSession retains its delegate for the task's full lifetime so it cannot be prematurely deallocated, connection-pool isolation is genuinely achieved (two independent URLSession instances -- one being .shared -- are guaranteed separate connection caches), and no unintended changes exist elsewhere. No blocking issues found; two theoretical, explicitly non-blocking observations noted."
-    },
-    "payload_audit": {
-      "status": "measured",
-      "summary": "Zero-write, owner-scoped, ROLLBACK-guaranteed reads of physiqueos.canonical_* tables measured raw collection sizes for the Founder's account: analyses 27.35 MB (411 rows), dailyBriefings 16.31 MB (54 rows), evidenceReviews 7.39 MB (243 rows, 202 already status=confirmed), canonicalEvidenceObjects 2.52 MB (573 rows). Cross-referenced against CoreNavigationReadService.js's actual query predicates to confirm which are fetched with zero date/count/status limit. One open reconciliation gap noted explicitly: the measured figures are raw DB fetch bytes, not confirmed wire response size, since the deployed container has no importable raw source tree to run the actual composition functions against."
+      "status": "not_applicable",
+      "summary": "No new feature/behavioral code in this task beyond the two test-hygiene fixes, which were themselves independently justified and minimal. The candidate itself (3b0ccbed) was already fresh-context reviewed in the immediately prior task."
     }
   },
   "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "analysis_*_images records (training-evidence and goal-evaluation submission images) run 20-354 KB versus ~1.6 KB for a routine analysis record -- strongly suggesting image/binary data embedded directly in confidence-analysis JSONB rather than a media reference, the same class of problem this lane already fixed once for Completed Goal photos. Not confirmed this pass -- flagged for follow-up.",
-    "Summing the unbounded dailyBriefings+analyses fetch (~44 MB) exceeds the observed 4.7 MB max payloadBytes for Home, meaning the composed output likely projects only a slice of what it fetches server-side -- the primary proven cost right now is DB I/O/connection-hold-time rather than a confirmed equivalent wire-size reduction. Needs someone who can run the actual composition code to reconcile."
+    "This is the second time this exact session encountered severe, load-related test-host instability on this shared machine (the first was during Build 64's UI-test bisection). Worth remembering as an ongoing operating condition for this development environment: verify system load/memory directly (uptime, vm_stat) before concluding a crash or flaky failure is a code regression."
   ],
   "backlog": [
-    "Recommended (not implemented): filter evidenceReviews to status=pending for Log/Morning-Check-In/Coaching-Updates-Detail -- measured 7.39 MB -> ~1.7 KB, the single most confidently-justified item in the audit.",
-    "Recommended (not implemented): bound dailyBriefings/analyses to a recent window for Home/Goals -- larger, cross-cutting change needing the composed-output reconciliation resolved first.",
-    "Recommended (not implemented): confirm whether analysis_*_images records embed raw image bytes; if so, migrate to a media-reference model.",
-    "goals.active.build-lean-mass's exact query construction was not traced this pass -- flagged as plausibly sharing the same unbounded-fetch pattern, unconfirmed.",
+    "TestFlight tester-facing availability (beyond ASC processing VALID) is a separate, later Apple-side step not verified by the read-only status tool -- confirm before announcing broad availability if that matters.",
+    "The Founder will personally perform exactly one Strength reconciliation acceptance attempt on Build 66 -- not solicited by this task. No further attempt should be requested by any future automated task until this one's result is known.",
+    "The Server payload-reduction plan from the prior report (agent-handoffs/reports/20260927T194321Z-...) remains unimplemented, as instructed for this task.",
     "Two ChatGPT master-thread-context handoffs remain unread in the inbox, staying scoped exactly to this task as instructed."
   ],
-  "recommended_next_step": "When ready, cut the next TestFlight build from candidate 3b0ccbed (after a disk-safety pass allows a Release-build check). Separately, authorize and scope the Server-side evidenceReviews status filter (item 1 of the payload plan) as its own small, reviewable patch -- it is the clearest, lowest-risk win identified. Do not solicit another Strength attempt; let the next natural attempt validate the transport isolation fix.",
-  "full_report_path": "agent-handoffs/reports/20260927T194321Z-command-transport-isolation-and-payload-audit.md",
+  "recommended_next_step": "Founder accepts Build 66 in TestFlight and performs one Strength reconciliation attempt to validate the command-network-transport-isolation fix; capture and report the Workout Reconciliation Diagnostics and CommandNetworkDiagnostics screens' fields afterward regardless of success or failure.",
+  "full_report_path": "agent-handoffs/reports/20260927T203322Z-native-build66-uploaded-valid.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260927T164758Z-strength-build65-connectivity-window-diagnosis.md",
-    "agent-handoffs/reports/20260927T153736Z-strength-background-assertion-candidate.md"
+    "agent-handoffs/reports/20260927T194321Z-command-transport-isolation-and-payload-audit.md",
+    "agent-handoffs/reports/20260927T164758Z-strength-build65-connectivity-window-diagnosis.md"
   ],
   "safety": {
     "contains_secrets": false,
