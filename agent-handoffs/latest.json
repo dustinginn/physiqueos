@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T22:35:00Z",
+  "generated_at_utc": "2026-09-27T23:45:00Z",
   "task": {
-    "id": "build68-strength-founder-acceptance-and-production-verification-20260927",
-    "title": "Build 68 Strength reconciliation: production verification PASSED, incident closed",
+    "id": "weekly-v3-sep20-26-founder-feedback-diagnosis-20260927",
+    "title": "Shared Briefing Intelligence layer: Weekly Sep 20-26 diagnosis + design proposal (checkpoint)",
     "agent": "claude",
-    "status": "completed"
+    "status": "awaiting_decision"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -18,7 +18,7 @@
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E"
   },
   "result": {
-    "summary": "Founder's 'Match confirmed' independently verified by zero-write production reads: first-ever workout-reconciliation.resolve.v1 receipt (committed, 22:18:01.490 UTC, 64-char SHA-256 hex key, no control chars); review healthkit_workout_reconciliation_36a18cc3 now resolved_confirmed v2 via founder_explicit_selection; exactly one confirmed link and its designed session/workout claim pair; Logger session untouched (v1, last updated Sep 24); strategic eligibility unchanged (quarantined); no duplicates and no unrelated mutation (all other writes are concurrent HealthKit sync). Strength reconciliation incident formally closed.",
+    "summary": "Diagnosis complete and design proposed; implementation not started. Root causes: Weekly V3 keeps one aggregate observation per domain (daily distribution/runs/routine lost), narrative excludes nutrition/activity from hero/Coach's Take and falls to fixed no-change templates under continue_current_strategy, confidence explanation names the top exercise-level coaching candidate (Bicep tie at 133.7, some pre-window), Native renders surfaced:false uncertainty via a materiality==high override. Canonical data does NOT show higher Thu-Sat intake (Thu-Sat mean 2417 vs baseline 2585); it DOES show a late-week multi-domain routine break (no strength Fri/Sat, movement ~halved, no weigh-ins, Fri protein 72 g probable under-log). Proposed: a shared, deterministic Briefing Intelligence layer (briefing_intelligence_v1) on the single V3 prepare path used by all five briefing types, reading canonical daily authorities, with shared baselines/detectors/materiality/restraint, and per-type policies; byte-identical output when absent.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -31,21 +31,26 @@
       "summary": "Two bounded REPEATABLE READ READ ONLY reads, rolled back, success-marker gated at production SHA 49211870; app logs cross-checked."
     }
   },
-  "decisions_required": [],
+  "decisions_required": [
+    "Approve the shared Briefing Intelligence abstraction and phasing (Weekly policy first; then Midweek/Monthly consolidation; then DEXA/Photo).",
+    "Accept re-scoped acceptance case 2: do not claim higher Thu-Sat intake (not in canonical data); surface the evidenced late-week disruption and flag nutrition logging reliability.",
+    "Approve a separate lane for ingestion defects (HealthKit duplicate day totals, partial-day tiering, quarantined HealthKit nutrition feeding the Energy card)."
+  ],
   "blockers": [],
   "unexpected_findings": [
-    "Sep 24 canonical workout bumped to v4 at 22:18:09.538, outside the reconciliation transaction; attributed by exact timing to a concurrent HealthKit ingest (committed 22:18:10.655, 1132 ms). Eligibility unchanged.",
-    "Two read-only training.navigation.session 404s during the window, consistent with the Founder's in-progress Logger session; no writes."
+    "Founder-recalled Thu-Sat intake increase is absent from canonical data; Fri 25 (72 g protein) looks under-logged yet is tiered full_day_asserted/high reliability.",
+    "Tue 22 nutrition totals are a byte-exact copy of Mon 21 (probable HealthKit day-attribution defect).",
+    "A larger Sep 3-6 high-intake/training-gap episode was never surfaced by any briefing.",
+    "Pattern/deviation reasoning is implemented three different ways (Energy variability, Monthly records, Monthly frequency) and ranking at least five ways."
   ],
   "backlog": [
-    "Reconciliation-review notification natural-event acceptance remains pending; the Founder's current Apple Watch strength workout may produce it.",
+    "Native: drop BriefingReadModel materiality==high uncertainty override / honor Server bounded Weekly uncertainty; batch with queued Log-tab Workout Logger item.",
     "Server payload-reduction plan remains unimplemented."
   ],
-  "recommended_next_step": "None required for Strength. Optionally observe whether today's Apple Watch strength workout produces a new reconciliation review and its notification (natural-event acceptance).",
-  "full_report_path": "agent-handoffs/reports/20260927T223500Z-build68-strength-production-verification-closeout.md",
+  "recommended_next_step": "Founder approves (or amends) the three decisions; then implement Phase 1 on codex/weekly-v3-weekly-pattern-narrative with synthetic-period property validation and fresh-context review, targeting the Oct 4 Weekly.",
+  "full_report_path": "agent-handoffs/reports/20260927T234500Z-briefing-intelligence-shared-layer-design.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260927T221600Z-native-build68-uploaded-valid.md",
-    "agent-handoffs/reports/20260927T223500Z-build67-strength-root-cause-idempotency-header.md"
+    "agent-handoffs/reports/20260927T223500Z-build68-strength-production-verification-closeout.md"
   ],
   "safety": {
     "contains_secrets": false,

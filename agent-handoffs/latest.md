@@ -2,16 +2,17 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Build 68 Strength reconciliation: production verification PASSED, incident closed
+- Task: Shared Briefing Intelligence layer — Weekly Sep 20–26 diagnosis + design proposal
 - Agent: claude
-- Status: completed
-- Generated (UTC): 2026-09-27T22:35:00Z
-- Success: true
+- Status: awaiting decision
+- Generated (UTC): 2026-09-27T23:45:00Z
 
-Your "Match confirmed" is real. Production now has the first-ever Strength reconciliation receipt. The Sep 24 review is resolved and confirmed, the Apple Watch workout is linked to your Logger session exactly once, your Logger session itself wasn't touched, and strategic eligibility is unchanged. Every other write in that window was your ongoing HealthKit sync. The Strength incident is closed.
+I've diagnosed every issue you raised and traced each one to a concrete code cause. I've also proposed a shared layer for all five briefing types: it compares each period against your recent routine, ranks what materially characterized it with causal restraint, and feeds that into Confidence, Strategy and Narrative at the right level. No code has been written yet.
 
-Still pending: the reconciliation notification needs a natural new review. Today's Apple Watch strength workout may produce one.
+One important data finding: canonical data does **not** show higher Thu–Sat intake (Thu–Sat averaged ~2,420 kcal against a ~2,585 baseline). It does show a late-week routine break: no training Fri/Sat, movement roughly halved, no weigh-ins, and Friday nutrition that looks under-logged.
 
-Detailed report: `agent-handoffs/reports/20260927T223500Z-build68-strength-production-verification-closeout.md`
+Three decisions needed (see report §7): the architecture and phasing, the re-scoped acceptance case, and a separate lane for the ingestion defects found.
+
+Detailed report: `agent-handoffs/reports/20260927T234500Z-briefing-intelligence-shared-layer-design.md`
 
 Protocol: `agent-handoffs/README.md`
