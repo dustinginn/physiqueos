@@ -2668,6 +2668,94 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(affected.contains("training-day"))
     }
 
+    /// A real Build 64 attempt (2026-09-27) proved this exact submission --
+    /// including its existing retry -- can be cancelled by the OS before it
+    /// ever reaches the server, with the app's own Swift Task never
+    /// cancelled (`taskWasCancelledAtCatch: false`) and zero server-side
+    /// trace of any kind. `resolveWorkoutReconciliation` now runs the whole
+    /// submission under a single background-execution assertion so a brief
+    /// app background/suspension transition doesn't have it torn down.
+    func testWorkoutReconciliationSubmissionRunsUnderABackgroundExecutionAssertionAndEndsExactlyOnceOnSuccess() async throws {
+        final class RecordingScheduler: BackgroundTaskScheduling, @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var beginNames: [String] = []
+            private(set) var endedIdentifiers: [Int] = []
+            private var next = 1
+            func beginTask(named name: String, expirationHandler: @escaping @Sendable () -> Void) -> Int {
+                lock.lock(); defer { lock.unlock() }
+                beginNames.append(name)
+                let id = next; next += 1
+                return id
+            }
+            func endTask(_ identifier: Int) {
+                lock.lock(); defer { lock.unlock() }
+                endedIdentifiers.append(identifier)
+            }
+        }
+        let scheduler = RecordingScheduler()
+        let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_confirmed","reviewId":"review-one","revision":3,"resolution":{"action":"confirm","selectedLoggerSessionCanonicalId":"logger-a","linkId":"link-one"},"strategicEvidenceEligibility":"quarantined"}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, response),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionEvidenceReviewAPI(api: native, backgroundTaskScheduler: scheduler)
+
+        _ = try await api.resolveWorkoutReconciliation(reviewId: "review-one", expectedVersion: "2", loggerSessionCanonicalId: "logger-a")
+
+        XCTAssertEqual(scheduler.beginNames.count, 1, "the submission must run under exactly one background-execution assertion")
+        XCTAssertEqual(scheduler.endedIdentifiers.count, 1, "the assertion must end exactly once on success")
+    }
+
+    /// Reproduces the exact Build 64 evidence: both the original attempt and
+    /// its existing retry fail with a transport error (matching the real
+    /// -999 "cancelled" observed in production), never reaching a server
+    /// response at all -- the background-execution assertion must still end
+    /// exactly once even though the whole submission ultimately throws, and
+    /// both attempts must share the SAME assertion rather than opening a
+    /// second one for the retry.
+    func testWorkoutReconciliationSubmissionEndsTheBackgroundExecutionAssertionExactlyOnceWhenBothAttemptsFail() async throws {
+        final class RecordingScheduler: BackgroundTaskScheduling, @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var beginNames: [String] = []
+            private(set) var endedIdentifiers: [Int] = []
+            private var next = 1
+            func beginTask(named name: String, expirationHandler: @escaping @Sendable () -> Void) -> Int {
+                lock.lock(); defer { lock.unlock() }
+                beginNames.append(name)
+                let id = next; next += 1
+                return id
+            }
+            func endTask(_ identifier: Int) {
+                lock.lock(); defer { lock.unlock() }
+                endedIdentifiers.append(identifier)
+            }
+        }
+        let scheduler = RecordingScheduler()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.cancelled)),
+            .failure(URLError(.cancelled)),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionEvidenceReviewAPI(api: native, backgroundTaskScheduler: scheduler)
+
+        await XCTAssertThrowsErrorAsync(
+            try await api.resolveWorkoutReconciliation(reviewId: "review-one", expectedVersion: "2", loggerSessionCanonicalId: "logger-a")
+        ) { error in
+            guard case ProductionNativeError.networkFailure = error else {
+                return XCTFail("expected .networkFailure, got \(error)")
+            }
+        }
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 3, "the pairing call plus both submission attempts")
+        XCTAssertEqual(scheduler.beginNames.count, 1, "both attempts must happen under the SAME single assertion, not one each")
+        XCTAssertEqual(scheduler.endedIdentifiers.count, 1, "the assertion must still end exactly once even though the whole submission ultimately throws")
+    }
+
     func testWorkoutReconciliationNoMatchOmitsLoggerIdentity() async throws {
         let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_no_match","reviewId":"review-one","revision":3,"resolution":{"action":"no_match","selectedLoggerSessionCanonicalId":null,"linkId":null}}"#)
         let transport = SequencedFounderTransport([

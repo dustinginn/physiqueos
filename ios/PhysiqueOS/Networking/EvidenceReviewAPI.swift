@@ -61,6 +61,7 @@ struct NotAvailableEvidenceReviewAPI: EvidenceReviewAPI {
 /// and disposition use separate canonical commands; no sandbox state is used.
 struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
     let api: ProductionNativeAPI
+    var backgroundTaskScheduler: any BackgroundTaskScheduling = UIKitBackgroundTaskScheduler()
 
     func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel? {
         let envelope = try await api.readResource("evidence-review", query: ["reviewId": reviewId], policy: .reload, as: Payload.self)
@@ -175,26 +176,48 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
         // server's own command-receipt replay is keyed on that identity, so
         // a genuine duplicate delivery returns the original outcome rather
         // than creating a second mutation.
-        let outcome: ProductionCommandOutcome<WorkoutReconciliationCommandResult>
-        do {
-            outcome = try await api.submitCommand(
-                ProductionCommandType.resolveWorkoutReconciliation,
-                idempotencyKey: signature,
-                expectedVersion: expectedVersion,
-                payload: payload
-            )
-        } catch ProductionNativeError.networkFailure {
-            outcome = try await api.submitCommand(
-                ProductionCommandType.resolveWorkoutReconciliation,
-                idempotencyKey: signature,
-                expectedVersion: expectedVersion,
-                payload: payload
-            )
+        // A real Build 64 attempt proved this exact submission -- including
+        // the retry above -- can be cancelled by the OS before it (or its
+        // retry) ever reaches the network at all: a bounded, owner-scoped
+        // read of `command_receipts` showed zero rows for this command at
+        // any status, and the server's own request log shows total silence
+        // for a commands-endpoint request in the whole window, while
+        // `taskWasCancelledAtCatch` on the client proved the app's own Swift
+        // Task was never cancelled. The app has no background-execution
+        // assertion anywhere for an in-flight write, and this is the one
+        // command routinely triggered moments after the app foregrounds from
+        // a push notification -- exactly when a brief, easy-to-miss
+        // backgrounding (a screen lock, a notification banner tap-away) can
+        // have this exact in-flight request torn down by the OS with no
+        // cooperative Swift-Task cancellation involved at all. Wrapping the
+        // whole submission (both the original attempt and its retry) in a
+        // background-execution assertion gives the OS explicit permission to
+        // let it finish across exactly that kind of brief transition.
+        return try await withBackgroundExecutionAssertion(
+            named: "physiqueos.workout-reconciliation.resolve",
+            scheduler: backgroundTaskScheduler
+        ) {
+            let outcome: ProductionCommandOutcome<WorkoutReconciliationCommandResult>
+            do {
+                outcome = try await api.submitCommand(
+                    ProductionCommandType.resolveWorkoutReconciliation,
+                    idempotencyKey: signature,
+                    expectedVersion: expectedVersion,
+                    payload: payload
+                )
+            } catch ProductionNativeError.networkFailure {
+                outcome = try await api.submitCommand(
+                    ProductionCommandType.resolveWorkoutReconciliation,
+                    idempotencyKey: signature,
+                    expectedVersion: expectedVersion,
+                    payload: payload
+                )
+            }
+            guard outcome.outcome != .pending, let result = outcome.receipt.result else {
+                throw ProductionNativeError.networkFailure
+            }
+            return result
         }
-        guard outcome.outcome != .pending, let result = outcome.receipt.result else {
-            throw ProductionNativeError.networkFailure
-        }
-        return result
     }
 
     private struct Payload: Decodable, @unchecked Sendable {
