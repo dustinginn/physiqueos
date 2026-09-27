@@ -128,7 +128,7 @@ struct WorkoutReconciliationDiagnosticsView: View {
                 Text("Succeeded: \(event.succeeded ? "yes" : "no")")
                 if let httpStatusCode = event.httpStatusCode {
                     Text("HTTP status: \(httpStatusCode) · body: \(event.responseBodyByteCount ?? 0) bytes")
-                        .foregroundStyle(PhysiqueOSTheme.destructive)
+                        .foregroundStyle((200..<300).contains(httpStatusCode) ? PhysiqueOSTheme.textPrimary : PhysiqueOSTheme.destructive)
                 } else if event.succeeded {
                     Text("No HTTP response captured despite a successful transport call.")
                         .foregroundStyle(PhysiqueOSTheme.destructive)
