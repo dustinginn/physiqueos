@@ -1,58 +1,58 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T16:09:34Z",
+  "generated_at_utc": "2026-09-27T16:47:58Z",
   "task": {
-    "id": "claude-native-build65-release-from-6773c93e-20260927",
-    "title": "Native Build 65 UPLOADED to App Store Connect, processing VALID",
+    "id": "claude-strength-build65-connectivity-window-diagnosis-20260927",
+    "title": "Build 65 Strength attempt: 9:38 AM window was a client-to-edge network-path stall, not a Server or reconciliation-specific fault",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
-    "native_build64_final_sha": "ae90c947",
-    "native_reviewed_candidate_sha": "6773c93e",
     "native_build65_final_sha": "73edf2c1",
-    "native_build65_archive_path": "~/Library/Developer/Xcode/Archives/2026-09-27/PhysiqueOS-Build65.xcarchive",
     "native_build65_delivery_id": "09b01a60-0031-49ff-addd-361cb84eeb8f",
-    "native_build65_uploaded": true,
-    "native_build65_processing_status": "VALID",
-    "native_build65_dsym_uuid": "78758C75-C365-387C-8247-66AD158025D9"
+    "active_deployment_id": "3134643d-9284-4cd5-82a3-b91cff346a9f"
   },
   "result": {
-    "summary": "Cut, archived, and uploaded Native Build 65 from the exact reviewed, fully-validated Strength background-execution-assertion candidate (6773c93e). Only build-number metadata was changed on top of that candidate (APP_BUILD_NUMBER 64->65, plus the recurring build-number housekeeping test literal) -- confirmed via diff at every step, no feature or behavioral change. Fresh validation after regeneration: 1453/1453 unit tests, 13/13 UI tests. Release build succeeded with the release-configuration verifier confirming version 1.0 (65). Archived with Xcode automatic signing (no interactive reauth needed), guarded upload dry-run passed every gate, then the real upload was executed under explicit Founder authorization: delivery id 09b01a60-0031-49ff-addd-361cb84eeb8f, processing VALID, independently reverified via a separate read-only status check. All Build 64 accepted behavior (Journey, Visible Abs photos, Logged Today Cardio) preserved and reconfirmed by the regression suite.",
+    "summary": "Correlated the Founder's 2026-09-27 ~09:38 America/Los_Angeles (16:38 UTC) Build 65 Strength attempt -- which failed with -999 and taskWasCancelledAtCatch=false while Home/Goals reads timed out with -1001 at the same time -- against the Server's application log, a zero-write command_receipts/security_events read, deployment/restart history, and live DNS/TLS/ingress/latency probes. Findings: the Server served every request it received in the window quickly (max 1.7 s DB time, pool never queued, no errors beyond a routine expired-token 401 followed by a successful refresh), with no deployment or restart since 2026-09-26 22:39 UTC. The Home reads the device reported as timed out DID reach the Server and completed there -- six times in under three minutes (16:38:15, :32, :47, 16:39:17, 16:40:00, 16:40:56), the signature of a client abandoning responses on a 15-second idle timeout and re-requesting. Three HealthKit ingest POSTs from the same device committed at 16:38:16/32/36, and tiny evidence-review reads succeeded at 16:38:39/41 and 16:39:19, bracketing a 30-second and a 41-second gap with zero trace of the reconciliation command anywhere upstream of the application (no receipt, no request log, no security event; still 0 reconciliation receipts all-time). The path is physiqueos.dustinginn.com -> DO App Platform hostname -> Cloudflare edge (HTTP/2, alt-svc h3 advertised; TLS valid to Dec 7; live probes 150-320 ms). Native uses URLSession.shared with no custom configuration, a 15 s idle timeout on both bulk reads and the command POST, and a shared connection pool -- so when a multi-megabyte read connection stalls and idle-times-out (-1001), the in-flight command on the same connection is reported cancelled (-999) with the Swift Task untouched, which is exactly why the Build 65 background-execution assertion (which guards against app suspension, not a dead connection) could not help. The app pulls 4-10 MB Home/Goals/Log/check-in payloads immediately after foregrounding, and every real reconciliation attempt has been made inside that burst. No fix implemented, no build cut, no retry requested, per instruction.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": true,
-    "founder_device_operated": false
+    "testflight_uploaded": false,
+    "founder_device_operated": false,
+    "build_number_changed": false,
+    "founder_confirmation_requested": false,
+    "reconciliation_specific_fix_added": false
   },
   "validation": {
-    "tests": {
+    "zero_write_audit": {
       "status": "passed",
-      "summary": "Full PhysiqueOSTests target: 1453/1453 passing after regenerating for Build 65. GoalsAcceptanceUITests 1/1, TrainingAcceptanceUITests 12/12 -- no regression."
+      "summary": "Owner-scoped, REPEATABLE READ READ ONLY, transaction_read_only=on verified, ROLLBACK-guaranteed read of command_receipts (16:18-16:58 UTC window, same-day by type, all-time reconciliation) and security_events (16:00-17:00 UTC). Application log pulled read-only via doctl apps logs; deployment list and run_restarted log read-only; DNS/TLS/HTTP probes against public health endpoints only."
     },
-    "review": {
-      "status": "not_applicable",
-      "summary": "No new feature/behavioral code in this task -- the candidate itself (6773c93e) was already fresh-context reviewed in the immediately prior task. This task's only diff is build-number metadata, confirmed via git diff to touch exactly CURRENT_PROJECT_VERSION (two build configs, plus the generator constant) and the recurring housekeeping test literal, nothing else."
-    },
-    "disk_safety": {
+    "server_health_in_window": {
       "status": "passed",
-      "summary": "Free space held at 18 GiB (above the 15 GiB hard floor) through the entire Release build, archive, and upload -- no cleanup was needed this pass."
+      "summary": "All reads served; max DB elapsedMs 1744; no elapsedMs >= 3 s anywhere in the retained log; DB pool waitingCount>0 only at 03:24, 14:37, 14:39, 14:43 UTC (never in the window); single boot marker since 22:38 UTC 9/26; run_restarted log empty; ingress unchanged."
     }
   },
   "decisions_required": [],
   "blockers": [],
-  "unexpected_findings": [],
+  "unexpected_findings": [
+    "The device's 'timed out' Home/Goals reads were produced by the Server -- repeatedly -- and never received: the failure lived between the Cloudflare edge and the phone, not at the origin.",
+    "Native's bulk reads (4-10 MB responses) and its 1 KB command POST share one URLSession.shared connection pool and the same 15 s idle timeout; a stalled read connection can and did take the write down with it as a -999.",
+    "alt-svc h3 is advertised by the edge, so iOS may be using HTTP/3/QUIC (UDP) on the phone; whether it was, and on which interface, is not knowable from the Server side -- the one open question this evidence cannot close."
+  ],
   "backlog": [
-    "TestFlight tester-facing availability (beyond ASC processing VALID) is a separate, later Apple-side step not verified by the read-only status tool -- confirm before announcing broad availability if that matters.",
-    "The Founder will personally perform one Strength reconciliation acceptance attempt on Build 65 -- not solicited by this task. No further attempt should be requested by any future automated task until this one's result is known.",
+    "Recommended (not implemented): a dedicated URLSession for command POSTs (waitsForConnectivity, longer resource timeout) so a stalled bulk-read connection cannot cancel a write.",
+    "Recommended (not implemented): shrink/paginate the 4-10 MB Home, Goals, Log and morning-check-in payloads -- the 15 s idle timeout makes every heavy screen fragile on a weak link, not just reconciliation.",
+    "Recommended (not implemented): capture URLSessionTaskMetrics + NWPath (protocol h2/h3, interface, DNS/connect/TLS timings) at failure so the next natural attempt answers the HTTP/3-on-lossy-link question before any opt-out decision.",
+    "No Cloudflare/App Platform edge access logs are reachable via doctl; the Server-side correlation is as far as ingress visibility goes without additional access.",
     "Two ChatGPT master-thread-context handoffs remain unread in the inbox, staying scoped exactly to this task as instructed."
   ],
-  "recommended_next_step": "Founder accepts Build 65 in TestFlight and performs one Strength reconciliation attempt to validate the background-execution-assertion fix; capture and report the Workout Reconciliation Diagnostics screen's taskWasCancelledAtCatch and outcome fields afterward regardless of success or failure.",
-  "full_report_path": "agent-handoffs/reports/20260927T160934Z-native-build65-uploaded-valid.md",
+  "recommended_next_step": "Do not solicit another Strength attempt. When a fix is authorized, prioritize the shared-connection/write-path separation and payload-size reductions (they address every screen's -1001s, not just reconciliation), and add the task-metrics/path capture so the next natural attempt closes the h3/interface question.",
+  "full_report_path": "agent-handoffs/reports/20260927T164758Z-strength-build65-connectivity-window-diagnosis.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260927T153736Z-strength-background-assertion-candidate.md",
+    "agent-handoffs/reports/20260927T160934Z-native-build65-uploaded-valid.md",
     "agent-handoffs/reports/20260927T145034Z-strength-999-below-task-layer-diagnosis.md"
   ],
   "safety": {
