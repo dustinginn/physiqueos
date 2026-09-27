@@ -536,14 +536,16 @@ struct ActiveGoalCurrentStateSections: View {
         .padding(.bottom, 12)
     }
 
-    // MARK: Journey — phases (identity and dates; progress is shown once below)
+    // MARK: Journey — phases, with the same progress-bar treatment as Home.
+    // No other section on this page shows per-phase progress, so it must
+    // render here, matching Home's accepted `PhaseTrajectoryPhaseCard`.
 
     private var journey: some View {
         GoalSection(eyebrow: "The path", title: "Your Journey") {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(goal.orderedPhases) { phase in
                     Button { onNavigate(phase.destination(goalId: goal.id)) } label: {
-                        GoalPhaseCard(phase: phase, showsProgress: false)
+                        GoalPhaseCard(phase: phase)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open Phase \(phase.order), \(phase.name), \(phase.status.label)")
@@ -931,8 +933,6 @@ struct GoalAccentCard<Content: View>: View {
 
 struct GoalPhaseCard: View {
     let phase: GoalPhaseReadModel
-    /// The current-state layout shows goal progress once, in its own
-    /// section, so phase cards there carry identity and dates only.
     var showsProgress: Bool = true
 
     private var tint: Color {

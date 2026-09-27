@@ -48,6 +48,24 @@ final class WorkoutReconciliationDiagnosticsTests: XCTestCase {
         XCTAssertTrue(WorkoutReconciliationDiagnostics.recentEvents(defaults: defaults).isEmpty)
     }
 
+    @MainActor
+    func testPreservesTaskCancellationStateAtCatch() throws {
+        // The -999 "cancelled" case is ambiguous from the underlying NSError
+        // alone: it fires both when the app's OWN enclosing Task was
+        // cancelled (Swift's URLSession bridging cancels the in-flight
+        // request when its owning Task is cancelled) and when the OS cancels
+        // the connection for an external reason. `Task.isCancelled`, read at
+        // the exact catch site, disambiguates the two without guessing.
+        let defaults = freshDefaults("WorkoutReconciliationDiagnosticsTests.taskCancelled")
+        WorkoutReconciliationDiagnostics.record(.init(
+            capturedAt: Date(), stage: "submit_threw", reviewId: "r1", action: "confirm",
+            underlyingErrorDomain: "NSURLErrorDomain", underlyingErrorCode: -999, underlyingErrorDescription: "cancelled",
+            taskWasCancelledAtCatch: true
+        ), defaults: defaults)
+        let event = try XCTUnwrap(WorkoutReconciliationDiagnostics.recentEvents(defaults: defaults).first)
+        XCTAssertEqual(event.taskWasCancelledAtCatch, true)
+    }
+
     func testDescribePreservesNSErrorDomainAndCode() throws {
         let error = NSError(domain: "NSURLErrorDomain", code: -999, userInfo: [NSLocalizedDescriptionKey: "cancelled"])
         let described = WorkoutReconciliationDiagnostics.describe(error)

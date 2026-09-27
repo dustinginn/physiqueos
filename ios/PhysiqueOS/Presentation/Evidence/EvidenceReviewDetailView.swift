@@ -665,12 +665,18 @@ struct EvidenceReviewDetailView: View {
             }
         } catch {
             let underlying = WorkoutReconciliationDiagnostics.describe(error)
+            // Read before anything else in this block: a later `await` (the
+            // verification fetch below) would run under a fresh check of its
+            // own, so this must be the state at the moment the throw was
+            // caught, not after any further suspension.
+            let taskWasCancelledAtCatch = Task.isCancelled
             WorkoutReconciliationDiagnostics.record(.init(
                 capturedAt: Date(), stage: "submit_threw", reviewId: review.id, action: requestedAction,
                 expectedVersion: String(version),
                 outcome: ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) ? "acceptance_uncertain" : "definite_failure",
                 underlyingErrorDomain: underlying.domain, underlyingErrorCode: underlying.code,
-                underlyingErrorDescription: underlying.description
+                underlyingErrorDescription: underlying.description,
+                taskWasCancelledAtCatch: taskWasCancelledAtCatch
             ))
             if ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) {
                 if let refreshed = try? await environment.evidenceReviewAPI.fetchReview(reviewId: review.id) {

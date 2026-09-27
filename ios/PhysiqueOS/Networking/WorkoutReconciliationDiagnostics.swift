@@ -50,6 +50,13 @@ enum WorkoutReconciliationDiagnostics {
         var underlyingErrorCode: Int? = nil
         var underlyingErrorDescription: String? = nil
         var httpStatusCode: Int? = nil
+        /// `Task.isCancelled`, read at the exact `catch` site that produced
+        /// this event. Disambiguates a -999 caused by the app's OWN
+        /// enclosing Task being cancelled (Swift's URLSession bridging
+        /// cancels the in-flight request when its owning Task is cancelled)
+        /// from one caused by something external -- the underlying NSError
+        /// alone cannot tell these apart.
+        var taskWasCancelledAtCatch: Bool? = nil
     }
 
     // Bounded device-local diagnostic history, never read by the confirm

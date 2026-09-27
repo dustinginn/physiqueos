@@ -82,6 +82,10 @@ struct WorkoutReconciliationDiagnosticsView: View {
                     Text("Underlying: \(domain) #\(event.underlyingErrorCode ?? 0) — \(event.underlyingErrorDescription ?? "")")
                         .foregroundStyle(PhysiqueOSTheme.destructive)
                 }
+                if let taskWasCancelledAtCatch = event.taskWasCancelledAtCatch {
+                    Text("App task cancelled at catch: \(taskWasCancelledAtCatch ? "yes" : "no")")
+                        .foregroundStyle(PhysiqueOSTheme.destructive)
+                }
             }
             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
         }

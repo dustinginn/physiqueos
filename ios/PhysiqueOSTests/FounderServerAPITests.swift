@@ -6434,6 +6434,38 @@ final class ActiveGoalCurrentStateTests: XCTestCase {
         XCTAssertTrue(legacy.contains("isShowingConfidenceDetail = true"), "the legacy hero can still open its sheet")
     }
 
+    func testCurrentStateJourneyPhaseCardsShowProgressMatchingHomeSinceNoOtherSectionDoes() async throws {
+        // Every V3-graduated goal (proven live in production) reaches this
+        // exact page: goal.currentState is populated, so ActiveGoalDetailContent
+        // renders ActiveGoalCurrentStateSections, not the legacy layout. Its
+        // own rendered-section list has no section that shows per-phase
+        // progress other than Journey itself.
+        let goal = try await activeGoal(activeGoalWithCurrentStateJSON)
+        let state = try XCTUnwrap(goal.currentState)
+        let sections = ActiveGoalCurrentStateSections.renderedSections(for: state)
+        XCTAssertEqual(sections, [.hero, .journey, .bodyComposition, .guardrail, .trainingProgress, .turningPoints, .coachTake])
+        for other in sections where other != .journey {
+            XCTAssertNotEqual(other.rawValue.lowercased(), "progress", "no section other than Journey exists to show per-phase progress")
+        }
+
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("PhysiqueOS/Presentation/Goals/GoalDetailView.swift"), encoding: .utf8)
+        let sectionsStart = try XCTUnwrap(source.range(of: "struct ActiveGoalCurrentStateSections: View {"))
+        let journeyStart = try XCTUnwrap(source[sectionsStart.lowerBound...].range(of: "private var journey: some View {"))
+        let standingStart = try XCTUnwrap(source[journeyStart.upperBound...].range(of: "private func standing("))
+        let journey = String(source[journeyStart.lowerBound..<standingStart.lowerBound])
+
+        // The real production current-state page must render its phase cards
+        // with Home's exact accepted progress-bar treatment, not the
+        // suppressed showsProgress:false path: nothing else on this page ever
+        // shows per-phase progress, so hiding it here leaves it nowhere.
+        XCTAssertTrue(journey.contains("GoalPhaseCard(phase: phase)"),
+                      "current-state Your Journey must render phase cards with the default (shown) progress treatment")
+        XCTAssertFalse(journey.contains("showsProgress: false"),
+                       "current-state Your Journey must not suppress the shared progress-bar treatment")
+    }
+
     func testOneMalformedBlockHidesOnlyItsOwnSection() async throws {
         let goal = try await activeGoal(activeGoalWithOneMalformedBlockJSON)
         let state = try XCTUnwrap(goal.currentState)
