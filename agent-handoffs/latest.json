@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T04:58:52Z",
+  "generated_at_utc": "2026-09-27T06:47:58Z",
   "task": {
-    "id": "claude-candidate-release-readiness-20260927",
-    "title": "Combined candidate 104c34ff -- release-readiness validation complete",
+    "id": "claude-native-build64-release-from-104c34ff-20260927",
+    "title": "Native Build 64 UPLOADED to App Store Connect, processing VALID",
     "agent": "claude",
     "status": "completed"
   },
@@ -11,45 +11,54 @@
   "authority": {
     "production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
     "native_build63_final_sha": "1ef837815fc43b70996abd972d1648547db78f46",
-    "native_candidate_sha": "104c34ff",
-    "native_candidate_branch": "codex/native-batched-candidate-post-build62",
-    "native_candidate_pushed": true,
-    "native_candidate_build_number_unchanged": true,
-    "native_candidate_build_number": 63
+    "native_release_ready_candidate_sha": "104c34ff",
+    "native_build64_final_sha": "ae90c947",
+    "native_build64_archive_path": "~/Library/Developer/Xcode/Archives/2026-09-26/PhysiqueOS-Build64.xcarchive",
+    "native_build64_delivery_id": "e8bc8d29-9edb-4289-9071-6008cb7716df",
+    "native_build64_uploaded": true,
+    "native_build64_processing_status": "VALID",
+    "native_build64_dsym_uuid": "32472CFC-AC95-3D10-9666-93E9ED3381DC"
   },
   "result": {
-    "summary": "Ran the release-readiness validation the Founder requested on the combined candidate ending at 104c34ff (Journey progress-bar fix + Strength Task.isCancelled diagnostic + Completed Visible Abs Goal photo media-shape fix, all on top of Build 63's exact source). Reclaimed only regenerable disk space per STANDING_DISK_SAFETY.md (two already-superseded pre-Build63 archives at CFBundleVersion 61/62, regenerable DerivedData module caches, stale already-reported xcresult bundles) to clear the 15 GiB hard floor, without touching simulator runtimes, other worktrees, or anything non-Xcode. Ran the Release build (xcodebuild build -configuration Release -destination generic/platform=iOS): succeeded. Ran Scripts/verify_release_configuration.py: confirmed version 1.0 (63) unchanged. Ran the full unit suite: 1445/1445 passing. Ran the Goals+Training UI regression suite: 13/13 passing (the prior report's one flaky simulator failure did not recur). No build number was bumped, nothing was archived for upload, nothing was uploaded, no Founder device was operated, and no Strength reconciliation attempt was requested -- exactly as instructed.",
+    "summary": "Cut, archived, and uploaded Native Build 64 from the exact release-ready candidate (104c34ff), which batches the already-reviewed Your Journey progress-bar fix, the Strength taskWasCancelledAtCatch diagnostic, and the Completed Visible Abs Goal real-media-shape photo fix. Only build-number metadata was changed on top of that candidate (APP_BUILD_NUMBER 63->64, plus the recurring build-number housekeeping test literal) -- confirmed via diff at every step, no feature or behavioral change. Fresh validation after regeneration: 1445/1445 unit tests, 13/13 UI tests (after resolving a self-inflicted stale-simulator-install artifact from this task's own bisection process, confirmed with real evidence not to be a code regression). Release build succeeded with the release-configuration verifier confirming version 1.0 (64). Archived with Xcode automatic signing (no interactive reauth needed), guarded upload dry-run passed every gate, then the real upload was executed under explicit Founder authorization: delivery id e8bc8d29-9edb-4289-9071-6008cb7716df, processing VALID, independently reverified via a separate read-only status check.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false,
-    "founder_device_operated": false,
-    "build_number_changed": false
+    "testflight_uploaded": true,
+    "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Full PhysiqueOSTests target: 1445/1445 passing. GoalsAcceptanceUITests 1/1, TrainingAcceptanceUITests 12/12 -- 13/13 UI tests passing, no regression."
+      "summary": "Full PhysiqueOSTests target: 1445/1445 passing after regenerating for Build 64. GoalsAcceptanceUITests 1/1, TrainingAcceptanceUITests 12/12 passing on the confirmed-clean final run -- no regression."
     },
-    "release_build": {
-      "status": "passed",
-      "summary": "xcodebuild build -configuration Release -destination 'generic/platform=iOS': BUILD SUCCEEDED. Scripts/verify_release_configuration.py: 'release configuration verified: version 1.0 (63), AppIcon, HealthKit capability declarations, exempt encryption' -- build number confirmed unchanged."
+    "review": {
+      "status": "not_applicable",
+      "summary": "No new feature/behavioral code in this task -- the candidate itself (104c34ff) was already fresh-context reviewed twice in prior tasks. This task's only diff is build-number metadata, confirmed via git diff to touch exactly CURRENT_PROJECT_VERSION (two build configs, plus the generator constant) and the recurring housekeeping test literal, nothing else."
     },
-    "disk_safety": {
-      "status": "passed",
-      "summary": "Free space was at the 15 GiB hard floor. Reclaimed only regenerable space: two already-superseded pre-Build63 archives (CFBundleVersion 61 and 62, both confirmed via their own Info.plist before deletion), DerivedData ModuleCache.noindex and SDKExplicitPrecompiledModules, and two stale already-reported xcresult bundles. Nothing else touched. Disk held steady at 15 GiB through the full Release build and both test suites."
+    "flaky_test_investigation": {
+      "status": "resolved",
+      "summary": "TrainingAcceptanceUITests.testReportingJourneys initially failed 5 times in a row on this exact candidate with extreme runtime inflation, while passing cleanly and quickly on every other commit in the lineage including under equally severe shared-machine load. Root cause found with direct evidence: a stale simulator app install from this task's own rapid repeated commit-switching during bisection, not a code regression. A full simulator erase + fresh install resolved it immediately, confirmed by two subsequent clean full-suite passes."
+    },
+    "zero_write_audit": {
+      "status": "not_applicable",
+      "summary": "This task made no production Server reads or writes -- entirely a Native build/archive/upload task. The only external-system action was the explicitly authorized App Store Connect upload itself, independently reverified read-only afterward."
     }
   },
   "decisions_required": [],
   "blockers": [],
-  "unexpected_findings": [],
+  "unexpected_findings": [
+    "A UI test flakiness investigation during this task consumed significant validation time and required rebooting/erasing the simulator to resolve -- worth remembering that repeatedly switching git commits in the same worktree/simulator during a bisection can itself corrupt the installed-app state and produce false regression signals; always uninstall/erase before trusting a bisection result on a UI test."
+  ],
   "backlog": [
-    "The next real Strength reconciliation confirm attempt (whenever it naturally happens, not solicited by this task) will carry the taskWasCancelledAtCatch diagnostic signal -- read it before any further speculation on that item.",
+    "TestFlight tester-facing availability (beyond ASC processing VALID) is a separate, later Apple-side step not verified by the read-only status tool -- confirm before announcing broad availability if that matters.",
+    "The next real Strength reconciliation confirm attempt (whenever it naturally happens, not solicited) will carry the taskWasCancelledAtCatch diagnostic signal -- read it before any further speculation on that item.",
     "Two ChatGPT master-thread-context handoffs remain unread in the inbox, staying scoped exactly to this task as instructed."
   ],
-  "recommended_next_step": "Candidate 104c34ff is fully release-validated and ready to become the next TestFlight build's source whenever the Founder authorizes cutting one. No further engineering validation is queued on it.",
-  "full_report_path": "agent-handoffs/reports/20260927T045852Z-candidate-release-readiness.md",
+  "recommended_next_step": "Founder accepts Build 64 in TestFlight and exercises the full acceptance scope (Journey, Completed Visible Abs photos, Logged Today Cardio; if a Strength reconciliation confirm is separately authorized in the future, capture the new taskWasCancelledAtCatch diagnostic afterward).",
+  "full_report_path": "agent-handoffs/reports/20260927T064758Z-native-build64-uploaded-valid.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260927T045852Z-candidate-release-readiness.md",
     "agent-handoffs/reports/20260927T035200Z-visible-abs-photo-fix.md",
     "agent-handoffs/reports/20260927T031700Z-build63-acceptance-diagnosis.md"
   ],
