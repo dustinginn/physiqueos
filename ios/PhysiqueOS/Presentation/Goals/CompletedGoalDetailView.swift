@@ -91,19 +91,17 @@ struct CompletedGoalDetailContent: View {
             VStack(spacing: 12) {
                 ForEach(goal.photos) { photo in
                     VStack(alignment: .leading, spacing: 8) {
-                        ZStack {
-                            LinearGradient(
-                                colors: [PhysiqueOSTheme.surfaceAccent, PhysiqueOSTheme.surfaceMuted],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            Image(systemName: photo.systemImage)
-                                .font(.system(size: 54, weight: .light))
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .aspectRatio(3 / 4, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        // The real canonical Founder progress photo, via the
+                        // same authenticated authority every other Progress
+                        // Photos surface already uses -- never a second,
+                        // divergent photo-selection mechanism. A missing
+                        // mediaId (no photo for this role, or an older
+                        // payload) safely falls back to the placeholder.
+                        ProgressPhotoTile(
+                            roleLabel: photo.label,
+                            source: photo.mediaId.map { .authenticatedProduction(mediaId: $0) } ?? .placeholder,
+                            showsRoleLabel: false
+                        )
                         Text(photo.label)
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)

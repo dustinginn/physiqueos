@@ -547,12 +547,29 @@ struct ProductionGoalsAPI: GoalsAPI {
         var completion: CompletedPhoto?
         func rows(goalId: String) -> [CompletedGoalPhotoReadModel] {
             [
-                beginning.map { CompletedGoalPhotoReadModel(id: $0.evidenceId ?? "\(goalId)-beginning", label: "Beginning", date: $0.date, systemImage: "person.crop.rectangle") },
-                completion.map { CompletedGoalPhotoReadModel(id: $0.evidenceId ?? "\(goalId)-completion", label: "Completion", date: $0.date, systemImage: "person.crop.rectangle.fill") },
+                beginning.map { CompletedGoalPhotoReadModel(id: $0.evidenceId ?? "\(goalId)-beginning", label: "Beginning", date: $0.date, systemImage: "person.crop.rectangle", mediaId: $0.mediaId) },
+                completion.map { CompletedGoalPhotoReadModel(id: $0.evidenceId ?? "\(goalId)-completion", label: "Completion", date: $0.date, systemImage: "person.crop.rectangle.fill", mediaId: $0.mediaId) },
             ].compactMap { $0 }
         }
     }
-    private struct CompletedPhoto: Decodable { var date: String; var evidenceId: String? }
+    private struct CompletedPhoto: Decodable {
+        var date: String
+        var evidenceId: String?
+        var href: String?
+        /// The real canonical progress-photo authority: `href` is the same
+        /// `/api/private-evidence/media/<mediaId>` URL Founder Production's
+        /// existing authenticated photo store already knows how to load
+        /// (`CompletedGoalPreviewService.js`'s `privateEvidenceUrl` embeds it
+        /// there for exactly this purpose) -- extracting it here reuses that
+        /// existing identifier rather than inventing a second one.
+        /// `evidenceId` is a different identity (which evidence record, not
+        /// which media blob) and is never a valid substitute.
+        var mediaId: String? {
+            guard let href, href.contains("/media/") else { return nil }
+            let id = href.split(separator: "/").last.map(String.init) ?? ""
+            return id.isEmpty ? nil : id
+        }
+    }
     private struct CompletedComposition: Decodable {
         var date: String?; var bodyFat: String; var leanMass: String; var fatMass: String; var weight: String; var narrative: String
     }

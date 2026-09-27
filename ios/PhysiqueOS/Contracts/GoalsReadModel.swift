@@ -318,6 +318,13 @@ struct CompletedGoalPhotoReadModel: Codable, Equatable, Identifiable {
     var label: String
     var date: String
     var systemImage: String
+    /// The real canonical Founder progress photo backing this card (Beginning
+    /// or Completion), via the same Founder Production authenticated photo
+    /// authority `ProgressPhotoTile`/`PhotosReadModel` already use -- never a
+    /// second, divergent photo-selection mechanism. `nil` (a photo genuinely
+    /// missing, or an older payload predating this field) safely falls back
+    /// to the existing `systemImage` placeholder.
+    var mediaId: String? = nil
 }
 
 struct CompletedGoalCompositionReadModel: Codable, Equatable {
