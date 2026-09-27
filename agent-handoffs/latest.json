@@ -1,59 +1,50 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T21:51:56Z",
+  "generated_at_utc": "2026-09-27T22:35:00Z",
   "task": {
-    "id": "claude-native-build67-release-from-bd45edd6-20260927",
-    "title": "Native Build 67 UPLOADED to App Store Connect, processing VALID",
+    "id": "build67-strength-http200-then-empty400-diagnosis-20260927",
+    "title": "Build 67 Strength: root cause proven - reconciliation sends an illegal Idempotency-Key header",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
-    "native_build66_final_sha": "04a58911",
-    "native_reviewed_candidate_sha": "bd45edd6",
     "native_build67_final_sha": "8359bdcb",
-    "native_build67_archive_path": "~/Library/Developer/Xcode/Archives/2026-09-27/PhysiqueOS-Build67.xcarchive",
-    "native_build67_delivery_id": "b29815a1-0d52-4cb1-80d4-b7c3976a0e51",
-    "native_build67_uploaded": true,
-    "native_build67_processing_status": "VALID",
-    "native_build67_dsym_uuid": "2580A1AC-DE8E-3F04-849F-3FA2E77FB1B6"
+    "native_reviewed_candidate_sha": "dc7763e5"
   },
   "result": {
-    "summary": "Cut, archived, and uploaded Native Build 67 from the exact reviewed Command-Network-Diagnostics candidate (bd45edd6) with a build-number-only change -- no feature or behavioral change. This build carries the HTTP status code + response body size capture on every command attempt, and its display in Workout Reconciliation Diagnostics' new third section. Fresh validation: 1464/1464 unit tests, 13/13 UI tests, Release build succeeded, release-configuration verifier confirms version 1.0 (67). Archived with Xcode automatic signing, guarded upload dry-run passed every gate, real upload executed under Founder authorization: delivery id b29815a1-0d52-4cb1-80d4-b7c3976a0e51, processing VALID, independently reverified via a separate read-only status check.",
+    "summary": "Event B (400, 0 bytes) was the Founder's workout-reconciliation confirm, rejected at Cloudflare's edge because Native sent its raw idempotency signature (components joined with U+001F) as the Idempotency-Key header; the edge returns an empty 400 for any header containing 0x1F (reproduced read-only, response carries only cf-ray), which validateHTTP maps to server(nil). Event A (200, 2,578 bytes) was HealthKit ingest traffic sharing the same dedicated command transport; production has 7 HealthKit receipts and 0 reconciliation receipts in the window and 0 reconciliation receipts ever. No resubmission occurred. No production mutation: the Sep 24 review is still pending, version 1, resolution null. Fix dc7763e5 sends SHA-256 hex of the same signature (content-deterministic, inside the server's [A-Za-z0-9._:/-]{16,200} grammar); RED on Build 67 source, GREEN 1465/1465; fresh-context review PASS.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": true,
+    "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Full PhysiqueOSTests target: 1464/1464 passing (1462 pre-existing + 2 new from the reviewed candidate). GoalsAcceptanceUITests + TrainingAcceptanceUITests: 13/13 passing, no regression."
+      "summary": "RED on 8359bdcb (header with \\u{1F}); GREEN 1465/1465 unit tests. UI tests not re-run (production-only write path)."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "No new feature/behavioral code in this task beyond build-number metadata. The candidate itself (bd45edd6) was already fresh-context reviewed and one cosmetic issue fixed in the immediately prior task."
+      "status": "passed",
+      "summary": "Fresh-context review PASS: only caller with the defect, idempotency semantics preserved, test asserts on the real outgoing request, FounderServerAPITests 216/216."
     }
   },
   "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "A full-scheme test invocation piped through `tail -60` accidentally discarded the unit-test target's output, showing only the UI target's summary. Caught before treating it as validation and re-ran the unit target explicitly with output captured to a file. Worth remembering: never pipe a long-running xcodebuild invocation through `tail` when the full pass/fail summary matters -- redirect to a file and grep it instead."
+    "The defect has existed since the reconciliation flow was introduced (2d79f0b0): no build could ever have committed this command. Earlier builds' -999 failures are most likely the HTTP/2 manifestation of the same invalid header (edge stream reset), not proven."
   ],
   "backlog": [
-    "TestFlight tester-facing availability (beyond ASC processing VALID) is a separate, later Apple-side step not verified by the read-only status tool.",
-    "The Founder will personally perform exactly one Strength reconciliation acceptance attempt on Build 67 and capture the newly visible Command Network Diagnostics fields (HTTP status, body size, protocol, interface, timings) -- their own plan, not solicited by this task. No further attempt or workaround should be implemented by any future automated task until this evidence exists.",
-    "The exact infrastructure mechanism behind the prior server(nil) response (something ahead of the Next.js application) remains unconfirmed -- the new diagnostics in this build are what should finally make it identifiable.",
-    "The Server-side payload-reduction plan from an earlier report remains unimplemented."
+    "Residual risk (reviewer): server-side validation of this command has never run in production; the first post-release confirm is its first real exercise - verify a receipt appears.",
+    "Server payload-reduction plan remains unimplemented."
   ],
-  "recommended_next_step": "Founder accepts Build 67 in TestFlight, performs one Strength reconciliation attempt, and captures the Command Network Diagnostics screen's fields (HTTP status, body size, protocol, interface, timings) alongside the existing Workout Reconciliation Diagnostics and Underlying Network Errors sections, regardless of success or failure.",
-  "full_report_path": "agent-handoffs/reports/20260927T215156Z-native-build67-uploaded-valid.md",
+  "recommended_next_step": "On authorization, cut the next TestFlight build from dc7763e5 (build-number-only bump); one Founder confirm should then yield a real workout-reconciliation.resolve.v1 receipt.",
+  "full_report_path": "agent-handoffs/reports/20260927T223500Z-build67-strength-root-cause-idempotency-header.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260927T211048Z-build66-server-nil-root-cause-and-diagnostics-fix.md",
-    "agent-handoffs/reports/20260927T205304Z-build66-strength-1-37pm-diagnostics-gap-explained.md",
-    "agent-handoffs/reports/20260927T203322Z-native-build66-uploaded-valid.md"
+    "agent-handoffs/reports/20260927T215156Z-native-build67-uploaded-valid.md",
+    "agent-handoffs/reports/20260927T211048Z-build66-server-nil-root-cause-and-diagnostics-fix.md"
   ],
   "safety": {
     "contains_secrets": false,
