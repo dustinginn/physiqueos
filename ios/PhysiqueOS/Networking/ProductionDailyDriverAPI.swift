@@ -555,26 +555,29 @@ struct ProductionGoalsAPI: GoalsAPI {
     private struct CompletedPhoto: Decodable {
         var date: String
         var evidenceId: String?
-        var href: String?
-        /// The real canonical progress-photo authority: `href` is the same
-        /// `/api/private-evidence/media/<mediaId>` URL Founder Production's
-        /// existing authenticated photo store already knows how to load
-        /// (`CompletedGoalPreviewService.js`'s `privateEvidenceUrl` embeds it
-        /// there for exactly this purpose) -- extracting it here reuses that
-        /// existing identifier rather than inventing a second one.
-        /// `evidenceId` is a different identity (which evidence record, not
-        /// which media blob) and is never a valid substitute.
-        var mediaId: String? {
-            // `URLComponents` (not naive string splitting) so a query string
-            // or fragment after the id -- neither of which the server's own
-            // `privateEvidenceUrl` currently ever sends, but a wire string is
-            // never trusted to stay that way -- can never be appended into a
-            // corrupted id; it fails safe to nil (the existing placeholder)
-            // instead.
-            guard let href, let path = URLComponents(string: href)?.path, path.contains("/media/") else { return nil }
-            let id = path.split(separator: "/").last.map(String.init) ?? ""
-            return id.isEmpty ? nil : id
-        }
+        /// The real canonical progress-photo authority: the shared Native
+        /// production contract envelope (`NativeProductionContractService.js`'s
+        /// `envelope()`, via `nativeMediaProjection.js`'s
+        /// `projectNativeMediaReferences`) rewrites every `href`/`imageHref`
+        /// field carrying a private-evidence media reference into a `media:
+        /// { mediaId, deliveryPath }` object on the wire -- the ORIGINAL
+        /// `href` key never reaches Native at all. This is the SAME shape
+        /// `DEXAAPI`'s `sourceMedia` and `PhotosAPI`'s `Prior.media` already
+        /// decode. A prior version of this type decoded a `href` field that
+        /// the wire response never actually contains (`composeCompletedGoalPreview`'s
+        /// own `href` is real, but only before this contract-wide projection
+        /// runs), so `mediaId` always resolved to nil and Beginning/Completion
+        /// rendered as placeholders even though the server's underlying photo
+        /// and media-catalog data were completely valid -- proven by a
+        /// zero-write production read that reproduced the pre-projection
+        /// pipeline and found a correct `/api/private-evidence/media/<id>`
+        /// href with a verified, fully-populated media object behind it.
+        var media: MediaDescriptor?
+        var mediaId: String? { media?.mediaId }
+    }
+    private struct MediaDescriptor: Decodable {
+        var mediaId: String
+        var deliveryPath: String
     }
     private struct CompletedComposition: Decodable {
         var date: String?; var bodyFat: String; var leanMass: String; var fatMass: String; var weight: String; var narrative: String

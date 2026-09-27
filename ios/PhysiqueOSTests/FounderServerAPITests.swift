@@ -1162,12 +1162,16 @@ final class FounderServerAPITests: XCTestCase {
 
     /// The reported defect: Beginning/Completion transformation cards
     /// rendered a placeholder even for a goal with real canonical photos.
-    /// `href` is the same `/api/private-evidence/media/<mediaId>` URL the
-    /// existing authenticated Progress Photos authority already knows how
-    /// to load (`CompletedGoalPreviewService.js`'s `privateEvidenceUrl`) --
-    /// Native must extract and reuse that identifier, never invent a new one.
+    /// Root cause: `NativeProductionContractService.js`'s `envelope()`
+    /// (via `nativeMediaProjection.js`'s `projectNativeMediaReferences`)
+    /// rewrites every `href`/`imageHref` field on EVERY native read response
+    /// into a `media: { mediaId, deliveryPath }` object -- the original
+    /// `href` key never reaches Native. A prior version of this fixture (and
+    /// of `CompletedPhoto` itself) assumed the web layer's raw `href` string
+    /// survives onto the wire unchanged; it does not, for any native
+    /// resource, and this is the real, actual wire shape Native receives.
     func testProductionCompletedGoalPhotosResolveRealMediaIdsFromTheExistingPrivateEvidenceAuthority() async throws {
-        let completedGoalWithPhotosJSON = productionEnvelope(resource: "completed-goal", data: #"{"goalId":"goal-visible-abs","status":"completed","preview":{"readOnly":true,"canonicalGoalId":"goal-visible-abs","supportingGoalIds":[]},"hero":{"title":"Visible Abs at Rest","status":"Completed","dates":"May 20 → Jul 18","achievement":"7.7% Body Fat"},"recap":"Server recap","highlights":[],"photos":{"beginning":{"date":"2026-05-20","href":"/api/private-evidence/media/media_beginning_1"},"completion":{"date":"2026-07-18","href":"/api/private-evidence/media/media_completion_1","evidenceId":"evidence_completion_1"},"historyHref":"/progress/photos"},"finalComposition":{"scanId":"scan-canonical","date":"2026-07-18","bodyFat":"7.7%","leanMass":"147.5 lb","fatMass":"12.3 lb","weight":"159.8 lb","narrative":"Server conclusion","briefingHref":null},"achievedBy":[],"unlocked":null}"#)
+        let completedGoalWithPhotosJSON = productionEnvelope(resource: "completed-goal", data: #"{"goalId":"goal-visible-abs","status":"completed","preview":{"readOnly":true,"canonicalGoalId":"goal-visible-abs","supportingGoalIds":[]},"hero":{"title":"Visible Abs at Rest","status":"Completed","dates":"May 20 → Jul 18","achievement":"7.7% Body Fat"},"recap":"Server recap","highlights":[],"photos":{"beginning":{"date":"2026-05-20","media":{"mediaId":"media_beginning_1","deliveryPath":"/api/v1/native/media/media_beginning_1"}},"completion":{"date":"2026-07-18","media":{"mediaId":"media_completion_1","deliveryPath":"/api/v1/native/media/media_completion_1"},"evidenceId":"evidence_completion_1"},"historyHref":"/progress/photos"},"finalComposition":{"scanId":"scan-canonical","date":"2026-07-18","bodyFat":"7.7%","leanMass":"147.5 lb","fatMass":"12.3 lb","weight":"159.8 lb","narrative":"Server conclusion","briefingHref":null},"achievedBy":[],"unlocked":null}"#)
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(200, productionCompletedGoalsHubJSON),
@@ -1187,12 +1191,13 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertNotEqual(completion.id, completion.mediaId)
     }
 
-    /// Missing-photo fallback stays safe: a null photo, a photo with no
-    /// `href` at all, and an `href` that isn't the `/media/<id>` shape (an
-    /// older/legacy raw-path form) must all resolve to a nil mediaId --
+    /// Missing-photo fallback stays safe: a null photo and a photo with no
+    /// `media` object at all (the shape `projectNativeMediaReferences`
+    /// produces when nothing in that entry was recognized as a private
+    /// media reference) must both resolve to a nil mediaId --
     /// ProgressPhotoTile's own placeholder, never a crash or a bogus id.
     func testProductionCompletedGoalPhotosFallBackSafelyWhenNoRealMediaIdIsAvailable() async throws {
-        let completedGoalWithLegacyPhotoJSON = productionEnvelope(resource: "completed-goal", data: #"{"goalId":"goal-visible-abs","status":"completed","preview":{"readOnly":true,"canonicalGoalId":"goal-visible-abs","supportingGoalIds":[]},"hero":{"title":"Visible Abs at Rest","status":"Completed","dates":"May 20 → Jul 18","achievement":"7.7% Body Fat"},"recap":"Server recap","highlights":[],"photos":{"beginning":{"date":"2026-05-20","href":"/api/private-evidence/legacy/raw-path.jpg"},"completion":null,"historyHref":"/progress/photos"},"finalComposition":{"scanId":"scan-canonical","date":"2026-07-18","bodyFat":"7.7%","leanMass":"147.5 lb","fatMass":"12.3 lb","weight":"159.8 lb","narrative":"Server conclusion","briefingHref":null},"achievedBy":[],"unlocked":null}"#)
+        let completedGoalWithLegacyPhotoJSON = productionEnvelope(resource: "completed-goal", data: #"{"goalId":"goal-visible-abs","status":"completed","preview":{"readOnly":true,"canonicalGoalId":"goal-visible-abs","supportingGoalIds":[]},"hero":{"title":"Visible Abs at Rest","status":"Completed","dates":"May 20 → Jul 18","achievement":"7.7% Body Fat"},"recap":"Server recap","highlights":[],"photos":{"beginning":{"date":"2026-05-20"},"completion":null,"historyHref":"/progress/photos"},"finalComposition":{"scanId":"scan-canonical","date":"2026-07-18","bodyFat":"7.7%","leanMass":"147.5 lb","fatMass":"12.3 lb","weight":"159.8 lb","narrative":"Server conclusion","briefingHref":null},"achievedBy":[],"unlocked":null}"#)
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
             .json(200, productionCompletedGoalsHubJSON),
@@ -1205,32 +1210,7 @@ final class FounderServerAPITests: XCTestCase {
         let completed = try XCTUnwrap(detail?.completed)
         XCTAssertEqual(completed.photos.count, 1, "The null completion photo produces no row at all, exactly as before this change.")
         let beginning = try XCTUnwrap(completed.photos.first)
-        XCTAssertNil(beginning.mediaId, "A legacy raw-path href (not the /media/<id> shape) must fall back to the placeholder, never a bogus id.")
-    }
-
-    /// The server's own `privateEvidenceUrl` never appends a query string or
-    /// fragment after the media id today, but a wire string is never trusted
-    /// to stay that way: a naive "take the last path segment" parse would
-    /// silently corrupt the id (`"abc123?exp=..."`) instead of failing safe.
-    func testProductionCompletedGoalPhotosMediaIdExtractionIgnoresQueryStringsAndFragments() async throws {
-        let completedGoalWithDecoratedHrefJSON = productionEnvelope(resource: "completed-goal", data: #"{"goalId":"goal-visible-abs","status":"completed","preview":{"readOnly":true,"canonicalGoalId":"goal-visible-abs","supportingGoalIds":[]},"hero":{"title":"Visible Abs at Rest","status":"Completed","dates":"May 20 → Jul 18","achievement":"7.7% Body Fat"},"recap":"Server recap","highlights":[],"photos":{"beginning":{"date":"2026-05-20","href":"/api/private-evidence/media/media_beginning_1?exp=12345&sig=abc"},"completion":{"date":"2026-07-18","href":"/api/private-evidence/media/media_completion_1/"},"historyHref":"/progress/photos"},"finalComposition":{"scanId":"scan-canonical","date":"2026-07-18","bodyFat":"7.7%","leanMass":"147.5 lb","fatMass":"12.3 lb","weight":"159.8 lb","narrative":"Server conclusion","briefingHref":null},"achievedBy":[],"unlocked":null}"#)
-        let transport = SequencedFounderTransport([
-            .json(200, sessionJSON(access: "a", refresh: "r")),
-            .json(200, productionCompletedGoalsHubJSON),
-            .json(200, completedGoalWithDecoratedHrefJSON),
-        ])
-        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
-        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
-
-        let detail = try await ProductionGoalsAPI(api: native).fetchGoalDetail(goalId: "goal-visible-abs")
-        let completed = try XCTUnwrap(detail?.completed)
-        let beginning = try XCTUnwrap(completed.photos.first { $0.label == "Beginning" })
-        XCTAssertEqual(beginning.mediaId, "media_beginning_1", "A query string after the id must never be appended into a corrupted id.")
-        // Swift's `split(separator:)` omits empty subsequences by default, so
-        // a trailing slash's empty final segment is skipped and the real id
-        // is still recovered -- strictly safer than losing a real photo.
-        let completion = try XCTUnwrap(completed.photos.first { $0.label == "Completion" })
-        XCTAssertEqual(completion.mediaId, "media_completion_1", "A trailing slash must not lose a real, otherwise-well-formed media id.")
+        XCTAssertNil(beginning.mediaId, "A photo entry with no media descriptor at all must fall back to the placeholder, never a bogus id.")
     }
 
     func testProductionOperatingPlanAndPriorityUseCanonicalReadsAndVersionedCompletion() async throws {
