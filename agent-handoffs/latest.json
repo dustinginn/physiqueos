@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T23:45:00Z",
+  "generated_at_utc": "2026-09-28T01:30:00Z",
   "task": {
     "id": "weekly-v3-sep20-26-founder-feedback-diagnosis-20260927",
-    "title": "Shared Briefing Intelligence layer: Weekly Sep 20-26 diagnosis + design proposal (checkpoint)",
+    "title": "Briefing Intelligence: real Sep 20-26 preview for Founder review (candidate 2a193138, not deployed)",
     "agent": "claude",
-    "status": "awaiting_decision"
+    "status": "awaiting_founder_review"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -15,10 +15,12 @@
     "native_build68_final_sha": "537f538b",
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
-    "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E"
+    "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
+    "server_candidate_sha": "2a193138",
+    "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative"
   },
   "result": {
-    "summary": "Diagnosis complete and design proposed; implementation not started. Root causes: Weekly V3 keeps one aggregate observation per domain (daily distribution/runs/routine lost), narrative excludes nutrition/activity from hero/Coach's Take and falls to fixed no-change templates under continue_current_strategy, confidence explanation names the top exercise-level coaching candidate (Bicep tie at 133.7, some pre-window), Native renders surfaced:false uncertainty via a materiality==high override. Canonical data does NOT show higher Thu-Sat intake (Thu-Sat mean 2417 vs baseline 2585); it DOES show a late-week multi-domain routine break (no strength Fri/Sat, movement ~halved, no weigh-ins, Fri protein 72 g probable under-log). Proposed: a shared, deterministic Briefing Intelligence layer (briefing_intelligence_v1) on the single V3 prepare path used by all five briefing types, reading canonical daily authorities, with shared baselines/detectors/materiality/restraint, and per-type policies; byte-identical output when absent.",
+    "summary": "Shared Briefing Intelligence layer (briefing_intelligence_v1) implemented on the single V3 prepare path with per-type policies; Weekly wired. Real Sep 20-26 canonical evidence replayed offline through the candidate (harness proven bit-exact on production code). Candidate hero: late-week routine change (no training/weigh-ins Fri-Sat, activity well below usual Thu-Sat), second multi-day training break in five weeks; goal-level Confidence (DEXA anchor, no exercise); nutrition Thu-Sat reported as incomplete logs, not as higher intake; no generic Still Unresolved. Confidence 79 hold and recommendation unchanged. 42 new tests incl. 360+ synthetic periods; full repo 0 new failures; three fresh-context review rounds, all findings fixed.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,31 +28,40 @@
     "founder_device_operated": false
   },
   "validation": {
-    "production_verification": {
+    "tests": {
       "status": "passed",
-      "summary": "Two bounded REPEATABLE READ READ ONLY reads, rolled back, success-marker gated at production SHA 49211870; app logs cross-checked."
+      "summary": "42 Briefing Intelligence tests; full repo unit suite 8955/9263 vs production 8913/9221, 0 new failures (303 identical environmental)."
+    },
+    "review": {
+      "status": "passed_with_fixes_applied",
+      "summary": "Round 1 FAIL (b61468d4) -> fixed ad487612; Round 2 PASS-WITH-FIXES -> fixed 2617e94c; Round 3 PASS-WITH-FIXES -> fixed 2a193138."
+    },
+    "replay_fidelity": {
+      "status": "passed",
+      "summary": "Production code on the offline harness reproduces stored assessment b2428ffe bit-exactly."
     }
   },
   "decisions_required": [
-    "Approve the shared Briefing Intelligence abstraction and phasing (Weekly policy first; then Midweek/Monthly consolidation; then DEXA/Photo).",
-    "Accept re-scoped acceptance case 2: do not claim higher Thu-Sat intake (not in canonical data); surface the evidenced late-week disruption and flag nutrition logging reliability.",
-    "Approve a separate lane for ingestion defects (HealthKit duplicate day totals, partial-day tiering, quarantined HealthKit nutrition feeding the Energy card)."
+    "Founder reviews the real-data preview copy and the structured reasoning.",
+    "If accepted: separately authorize Server deploy of 2a193138 (next Weekly Oct 4 would be the first live run).",
+    "Whether to regenerate the published Sep 20-26 Weekly (not done; requires separate authorization)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Founder-recalled Thu-Sat intake increase is absent from canonical data; Fri 25 (72 g protein) looks under-logged yet is tiered full_day_asserted/high reliability.",
-    "Tue 22 nutrition totals are a byte-exact copy of Mon 21 (probable HealthKit day-attribution defect).",
-    "A larger Sep 3-6 high-intake/training-gap episode was never surfaced by any briefing.",
-    "Pattern/deviation reasoning is implemented three different ways (Energy variability, Monthly records, Monthly frequency) and ranking at least five ways."
+    "Canonical data does not show higher Thu-Sat intake; those days carry implausible protein profiles and are reported as incomplete logs.",
+    "Synthetic validation exposed three real engine weaknesses (rest days as missed training, single spike as run, weigh-ins headlining) - fixed."
   ],
   "backlog": [
-    "Native: drop BriefingReadModel materiality==high uncertainty override / honor Server bounded Weekly uncertainty; batch with queued Log-tab Workout Logger item.",
-    "Server payload-reduction plan remains unimplemented."
+    "Phase 2: wire Midweek/Monthly; fold EnergyVariabilityV3 and MonthlyEvidenceIntelligenceV3 silos into the shared detectors.",
+    "Phase 3: DEXA/Photo preceding-execution context.",
+    "Native hardening: drop BriefingReadModel materiality==high override (batch with Log-tab item).",
+    "Ingestion lane: HealthKit near-duplicate day totals; implausible-profile days tiered full_day_asserted; quarantined HK nutrition in Energy card.",
+    "Presentation: hero headline equals Biggest Takeaway (existing mapping)."
   ],
-  "recommended_next_step": "Founder approves (or amends) the three decisions; then implement Phase 1 on codex/weekly-v3-weekly-pattern-narrative with synthetic-period property validation and fresh-context review, targeting the Oct 4 Weekly.",
-  "full_report_path": "agent-handoffs/reports/20260927T234500Z-briefing-intelligence-shared-layer-design.md",
+  "recommended_next_step": "Founder reviews the preview; deploy 2a193138 only under separate explicit authorization.",
+  "full_report_path": "agent-handoffs/reports/20260928T013000Z-briefing-intelligence-sep20-26-preview.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260927T223500Z-build68-strength-production-verification-closeout.md"
+    "agent-handoffs/reports/20260927T234500Z-briefing-intelligence-shared-layer-design.md"
   ],
   "safety": {
     "contains_secrets": false,
