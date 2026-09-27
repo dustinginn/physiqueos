@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T15:37:36Z",
+  "generated_at_utc": "2026-09-27T16:09:34Z",
   "task": {
-    "id": "claude-strength-background-assertion-candidate-20260927",
-    "title": "Strength reconciliation: background-execution-assertion fix -- reviewed candidate ready",
+    "id": "claude-native-build65-release-from-6773c93e-20260927",
+    "title": "Native Build 65 UPLOADED to App Store Connect, processing VALID",
     "agent": "claude",
     "status": "completed"
   },
@@ -11,49 +11,49 @@
   "authority": {
     "production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
     "native_build64_final_sha": "ae90c947",
-    "native_build64_delivery_id": "e8bc8d29-9edb-4289-9071-6008cb7716df",
-    "native_candidate_sha": "6773c93e",
-    "native_candidate_branch": "codex/native-batched-candidate-post-build62",
-    "native_candidate_pushed": true
+    "native_reviewed_candidate_sha": "6773c93e",
+    "native_build65_final_sha": "73edf2c1",
+    "native_build65_archive_path": "~/Library/Developer/Xcode/Archives/2026-09-27/PhysiqueOS-Build65.xcarchive",
+    "native_build65_delivery_id": "09b01a60-0031-49ff-addd-361cb84eeb8f",
+    "native_build65_uploaded": true,
+    "native_build65_processing_status": "VALID",
+    "native_build65_dsym_uuid": "78758C75-C365-387C-8247-66AD158025D9"
   },
   "result": {
-    "summary": "Implemented the recommended next fix from the prior below-Task-layer diagnosis: protects ProductionEvidenceReviewAPI.resolveWorkoutReconciliation's whole submission (the original attempt and its existing, unchanged retry) with an iOS background-execution assertion (UIApplication.begin/endBackgroundTask, abstracted behind a testable BackgroundTaskScheduling protocol), so a brief app background/suspension transition can no longer have the in-flight request torn down by the OS before it finishes or fails cleanly. No retry logic was added or changed, per explicit instruction. The assertion ends exactly once regardless of ordering (success, thrown error, Task cancellation, or the OS expiration handler firing), guarded by a BackgroundTaskEndGuard against double-ending or leaking. Six new unit tests cover the wrapper's lifecycle in isolation, including a genuine RED check that caught and fixed a real bug in the test itself (a weak-self capture that made a fake expiration callback a silent no-op). Two new integration tests reproduce the exact Build 64 evidence end-to-end. Full regression: 1453/1453 unit tests, 13/13 UI tests. Independently fresh-context reviewed with no issues found, including independent re-execution of all 8 new tests. No build number bumped, no archive, no upload, no Founder confirmation attempt requested.",
+    "summary": "Cut, archived, and uploaded Native Build 65 from the exact reviewed, fully-validated Strength background-execution-assertion candidate (6773c93e). Only build-number metadata was changed on top of that candidate (APP_BUILD_NUMBER 64->65, plus the recurring build-number housekeeping test literal) -- confirmed via diff at every step, no feature or behavioral change. Fresh validation after regeneration: 1453/1453 unit tests, 13/13 UI tests. Release build succeeded with the release-configuration verifier confirming version 1.0 (65). Archived with Xcode automatic signing (no interactive reauth needed), guarded upload dry-run passed every gate, then the real upload was executed under explicit Founder authorization: delivery id 09b01a60-0031-49ff-addd-361cb84eeb8f, processing VALID, independently reverified via a separate read-only status check. All Build 64 accepted behavior (Journey, Visible Abs photos, Logged Today Cardio) preserved and reconfirmed by the regression suite.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false,
-    "founder_device_operated": false,
-    "build_number_changed": false,
-    "founder_confirmation_requested": false,
-    "blind_retry_added": false
+    "testflight_uploaded": true,
+    "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Full PhysiqueOSTests target: 1453/1453 passing (1445 prior + 8 new: 6 isolated lifecycle tests + 2 end-to-end integration tests). GoalsAcceptanceUITests 1/1, TrainingAcceptanceUITests 12/12 -- 13/13 UI tests passing, no regression. All runs after a clean build."
-    },
-    "red_green": {
-      "status": "passed",
-      "summary": "Deliberately broke the BackgroundTaskEndGuard double-end guard and reran the relevant test: it initially still passed due to a real bug in the test (a weak-self capture in the fake scheduler making a late expiration callback a silent no-op) -- found and fixed the actual cause (changed the capture to a deliberate strong one, correct because the scheduler is the sole holder of that closure for exactly as long as the assertion is open). After that fix, breaking the guard produced a genuine failure ([1, 1] instead of [1]), and restoring it passed cleanly again."
+      "summary": "Full PhysiqueOSTests target: 1453/1453 passing after regenerating for Build 65. GoalsAcceptanceUITests 1/1, TrainingAcceptanceUITests 12/12 -- no regression."
     },
     "review": {
+      "status": "not_applicable",
+      "summary": "No new feature/behavioral code in this task -- the candidate itself (6773c93e) was already fresh-context reviewed in the immediately prior task. This task's only diff is build-number metadata, confirmed via git diff to touch exactly CURRENT_PROJECT_VERSION (two build configs, plus the generator constant) and the recurring housekeeping test literal, nothing else."
+    },
+    "disk_safety": {
       "status": "passed",
-      "summary": "Independent fresh-context review (zero prior context) verified the diff directly against the code and independently re-ran all 8 new tests in the simulator. Confirmed correct locking with no deadlock risk on every path, no real retain-cycle risk from the strong-self capture, correct defer coverage of every exit path including Task cancellation, and that wrapping both the original attempt and its retry in a SINGLE assertion (not one each) is the right design since splitting them would reopen the exact vulnerability gap this fix targets. Confirmed no unintended changes elsewhere, including verifying the large project.pbxproj diff is purely positional file-ID renumbering from adding two new files, not any structural change. No issues found."
+      "summary": "Free space held at 18 GiB (above the 15 GiB hard floor) through the entire Release build, archive, and upload -- no cleanup was needed this pass."
     }
   },
   "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [],
   "backlog": [
-    "This fix targets the leading, most evidence-consistent hypothesis but cannot guarantee the next real attempt succeeds -- a genuine external network-path disruption at the same moment remains possible and is unaffected by this change.",
-    "When ready, cut the next TestFlight build from 6773c93e -- no Founder confirmation attempt should be requested to test this specifically; let it be validated by whatever the Founder's next natural Strength reconciliation attempt is.",
+    "TestFlight tester-facing availability (beyond ASC processing VALID) is a separate, later Apple-side step not verified by the read-only status tool -- confirm before announcing broad availability if that matters.",
+    "The Founder will personally perform one Strength reconciliation acceptance attempt on Build 65 -- not solicited by this task. No further attempt should be requested by any future automated task until this one's result is known.",
     "Two ChatGPT master-thread-context handoffs remain unread in the inbox, staying scoped exactly to this task as instructed."
   ],
-  "recommended_next_step": "When separately authorized, cut the next TestFlight build from candidate 6773c93e (after a disk-safety pass allows a Release-build check). Do not solicit another Strength reconciliation attempt to validate this fix -- read the taskWasCancelledAtCatch and background-assertion behavior from whatever the Founder's next natural attempt turns out to be.",
-  "full_report_path": "agent-handoffs/reports/20260927T153736Z-strength-background-assertion-candidate.md",
+  "recommended_next_step": "Founder accepts Build 65 in TestFlight and performs one Strength reconciliation attempt to validate the background-execution-assertion fix; capture and report the Workout Reconciliation Diagnostics screen's taskWasCancelledAtCatch and outcome fields afterward regardless of success or failure.",
+  "full_report_path": "agent-handoffs/reports/20260927T160934Z-native-build65-uploaded-valid.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260927T145034Z-strength-999-below-task-layer-diagnosis.md",
-    "agent-handoffs/reports/20260927T064758Z-native-build64-uploaded-valid.md"
+    "agent-handoffs/reports/20260927T153736Z-strength-background-assertion-candidate.md",
+    "agent-handoffs/reports/20260927T145034Z-strength-999-below-task-layer-diagnosis.md"
   ],
   "safety": {
     "contains_secrets": false,

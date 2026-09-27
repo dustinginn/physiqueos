@@ -2,22 +2,22 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Strength reconciliation — background-execution-assertion fix, reviewed candidate ready
+- Task: Native Build 65 UPLOADED to App Store Connect, processing VALID
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-27T15:37:36Z
+- Generated (UTC): 2026-09-27T16:09:34Z
 - Success: true
 
-Summary: Built the fix the last diagnosis pointed to — the workout-reconciliation confirm now runs under an iOS background-execution assertion, so a brief app background/suspension transition can't have it torn down mid-request anymore. No new retry logic; this only protects the existing submission's lifecycle.
+Summary: Build 65 is uploaded and Apple has validated it, confirmed twice independently. It's cut from the exact Strength background-execution-assertion candidate that was already reviewed and tested — this task only bumped the build number and re-ran fresh validation, no feature changes at all.
 
-Took this seriously on testing: 6 new tests cover the assertion's lifecycle in isolation, and along the way a deliberate "break it and see if the test catches it" check found a real bug in my own test (a weak reference that let a fake callback silently do nothing) — fixed that, then confirmed the test genuinely fails when the guard is broken and passes when it's fixed. Two more tests reproduce the exact Build 64 failure end-to-end. Full suite: 1453 unit + 13 UI tests passing. An independent review re-ran everything itself and found no issues.
+Fresh tests all passed (1453 unit + 13 UI), the Release build checked out clean, and the archive was created and signed with no issues — no interactive login was needed anywhere. The upload dry-run passed every gate, and the real upload (which you'd already authorized) went through cleanly on the first try.
 
-**Nothing else changed**: no build cut, no build number bumped, no upload, no Founder confirmation requested — this fix should be validated by whatever your next natural Strength attempt turns out to be, not a special ask.
+**Nothing else changed**: no production data touched, no Server deployed, no device operated.
 
-**Next step is yours**: when ready, this candidate (`6773c93e`) is what the next TestFlight build should come from.
+**Next step is yours**: accept Build 65 in TestFlight and perform your one Strength reconciliation acceptance attempt — that's the whole reason for this build. Whatever the result, the Workout Reconciliation Diagnostics screen will have the evidence.
 
-Detailed report: `agent-handoffs/reports/20260927T153736Z-strength-background-assertion-candidate.md`
+Detailed report: `agent-handoffs/reports/20260927T160934Z-native-build65-uploaded-valid.md`
 
-Related: `agent-handoffs/reports/20260927T145034Z-strength-999-below-task-layer-diagnosis.md`
+Related: `agent-handoffs/reports/20260927T153736Z-strength-background-assertion-candidate.md`
 
 Protocol: `agent-handoffs/README.md`
