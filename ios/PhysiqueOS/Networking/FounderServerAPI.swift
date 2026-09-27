@@ -1014,7 +1014,14 @@ actor ProductionNativeAPI {
         if let bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
         for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
         do { return try await transport.data(for: request) }
-        catch { throw ProductionNativeError.networkFailure }
+        catch {
+            // Diagnostic-only: captures the identity `.networkFailure` below
+            // discards (genuine connection failure vs. cooperative task
+            // cancellation vs. timeout vs. an ATS/certificate problem) purely
+            // for later reading. Changes nothing about what is thrown or when.
+            NetworkFailureDiagnostics.record(path: path, error: error)
+            throw ProductionNativeError.networkFailure
+        }
     }
 
     /// Founder Production's one command dispatch endpoint

@@ -370,6 +370,7 @@ private struct ProductionFounderConnectionView: View {
     @State private var weight: ProductionResponseEnvelope<FounderProductionWeightSummary>?
     @State private var message: String?
     @State private var showingNotificationDiagnostics = false
+    @State private var showingWorkoutReconciliationDiagnostics = false
 
     var body: some View {
         ScrollView {
@@ -387,6 +388,11 @@ private struct ProductionFounderConnectionView: View {
 
                 Button("Notification diagnostics") { showingNotificationDiagnostics = true }
                     .accessibilityIdentifier("founder.notifications.diagnostics")
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+
+                Button("Workout reconciliation diagnostics") { showingWorkoutReconciliationDiagnostics = true }
+                    .accessibilityIdentifier("founder.workoutReconciliation.diagnostics")
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     .foregroundStyle(PhysiqueOSTheme.accent)
 
@@ -468,6 +474,9 @@ private struct ProductionFounderConnectionView: View {
         .background(PhysiqueOSTheme.background)
         .sheet(isPresented: $showingNotificationDiagnostics) {
             NotificationDiagnosticsView()
+        }
+        .sheet(isPresented: $showingWorkoutReconciliationDiagnostics) {
+            WorkoutReconciliationDiagnosticsView()
         }
         .task {
             isConnected = (try? await environment.productionNativeAPI.hasStoredSession()) == true

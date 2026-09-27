@@ -603,15 +603,40 @@ struct EvidenceReviewDetailView: View {
         review: EvidenceReviewDetailReadModel,
         loggerSessionCanonicalId: String?
     ) async {
-        guard let version = review.version else { return }
         let requestedAction = loggerSessionCanonicalId == nil ? "no_match" : "confirm"
+        // Diagnostic-only, additive: makes a previously-silent guard failure
+        // observable (no retry, no behavior change beyond surfacing state
+        // the Founder can see instead of a dead button), and records each
+        // stage so the NEXT real attempt is self-diagnosing rather than
+        // needing another round of speculation. See
+        // WorkoutReconciliationDiagnostics's own doc comment for why.
+        guard let version = review.version else {
+            WorkoutReconciliationDiagnostics.record(.init(
+                capturedAt: Date(), stage: "guard_check_failed", reviewId: review.id, action: requestedAction,
+                rawVersionValue: nil, rawVersionType: "nil"
+            ))
+            actionState = .failed("This review's version could not be read. Refresh before trying again.")
+            return
+        }
+        WorkoutReconciliationDiagnostics.record(.init(
+            capturedAt: Date(), stage: "guard_check_passed", reviewId: review.id, action: requestedAction,
+            rawVersionValue: String(version), rawVersionType: "Int", expectedVersion: String(version)
+        ))
         actionState = .confirming(loggerSessionCanonicalId == nil ? "Recording no match…" : "Confirming workout match…")
+        WorkoutReconciliationDiagnostics.record(.init(
+            capturedAt: Date(), stage: "submit_attempt", reviewId: review.id, action: requestedAction,
+            expectedVersion: String(version)
+        ))
         do {
             let result = try await environment.evidenceReviewAPI.resolveWorkoutReconciliation(
                 reviewId: review.id,
                 expectedVersion: String(version),
                 loggerSessionCanonicalId: loggerSessionCanonicalId
             )
+            WorkoutReconciliationDiagnostics.record(.init(
+                capturedAt: Date(), stage: "submit_result", reviewId: review.id, action: requestedAction,
+                expectedVersion: String(version), outcome: "submitCommand_returned"
+            ))
             await environment.productionNativeAPI.invalidateReadResources([
                 "evidence-review", "evidence-review-queue", "training-landing", "training-day",
             ])
@@ -636,6 +661,13 @@ struct EvidenceReviewDetailView: View {
                 actionState = .refreshRequired("The reconciliation may have been accepted, but its exact outcome could not be verified. Refresh before making another change.")
             }
         } catch {
+            let underlying = WorkoutReconciliationDiagnostics.describe(error)
+            WorkoutReconciliationDiagnostics.record(.init(
+                capturedAt: Date(), stage: "submit_threw", reviewId: review.id, action: requestedAction,
+                expectedVersion: String(version), outcome: String(describing: error),
+                underlyingErrorDomain: underlying.domain, underlyingErrorCode: underlying.code,
+                underlyingErrorDescription: underlying.description
+            ))
             if ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) {
                 if let refreshed = try? await environment.evidenceReviewAPI.fetchReview(reviewId: review.id) {
                     state = .loaded(refreshed)
