@@ -69,6 +69,14 @@ final class NetworkPathObserver: NetworkPathProviding, @unchecked Sendable {
         monitor.start(queue: DispatchQueue(label: "physiqueos.network-path-observer"))
     }
 
+    /// `.shared` is a permanent, process-wide singleton and this never runs
+    /// for it in practice -- but a test-constructed instance (a fresh
+    /// `NetworkPathObserver()`, not `.shared`) must not leak a live monitor
+    /// and its dedicated queue past the scope that created it.
+    deinit {
+        monitor.cancel()
+    }
+
     func currentSnapshot() -> NetworkPathSnapshot {
         lock.lock(); defer { lock.unlock() }
         return latest
