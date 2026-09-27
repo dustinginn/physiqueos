@@ -2,24 +2,20 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Native Build 66 UPLOADED to App Store Connect, processing VALID
+- Task: Build 66 1:37 PM Strength attempt: server correlation + why no Command Network Diagnostics entry appeared
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-27T20:33:22Z
+- Generated (UTC): 2026-09-27T20:53:04Z
 - Success: true
 
-Summary: Build 66 is uploaded and Apple has validated it, confirmed twice independently. It's cut from the exact candidate that isolated command submissions onto their own connection — this task only bumped the build number, no feature changes.
+Summary: Two things are now confirmed with direct evidence. First, the 1:37 PM reconciliation attempt never reached the Server at all — zero `command_receipts` rows for this command, ever, for this account, and zero trace of any kind in the application logs for the full hour around the attempt. Second, `CommandNetworkDiagnostics` (Build 66's new command-transport diagnostic) is correctly wired into the reconciliation path in code, but has no UI screen anywhere in the app — a real, separate gap.
 
-Along the way, the test suite crashed twice in a row. Didn't just retry and hope — checked the machine directly and found it was genuinely overloaded (this shared machine down to about 58 MB of free memory at the time), not something wrong in the code. Once things calmed down, a clean run passed twice with zero crashes, confirming that diagnosis. Fixed two small test-hygiene issues found along the way regardless (a monitor that wasn't cleaning itself up, and one test that depended on reaching the internet, which the rest of this suite never does) — worth keeping even though they weren't the actual cause.
+Tracing every throw site in the shipped `04a58911` source shows every network-layer failure path unconditionally logs to the existing "Underlying Network Errors" diagnostic before rethrowing, and that diagnostic's storage has no bug that could hide an entry — since none appeared, none of those paths fired. That points to something failing *before* any network call was attempted, most likely a local JSON-encode step that's currently invisible to any diagnostic. `WorkoutReconciliationDiagnosticsView` does render a full error-identity line for this exact event that would confirm this directly — not requesting it be looked up, just noting it's already there if convenient.
 
-Fresh tests all passed (1462 unit + 13 UI), the Release build checked out clean, and the archive was created and signed with no issues — no interactive login was needed anywhere. The upload dry-run passed every gate, and the real upload (which you'd already authorized) went through cleanly.
+**Nothing else changed**: no fix implemented, no build cut, no Strength attempt or diagnostics search requested.
 
-**Nothing else changed**: no production data touched, no Server code touched, no device operated.
+Detailed report: `agent-handoffs/reports/20260927T205304Z-build66-strength-1-37pm-diagnostics-gap-explained.md`
 
-**Next step is yours**: accept Build 66 in TestFlight and make your one Strength attempt — that's the whole reason for this build.
-
-Detailed report: `agent-handoffs/reports/20260927T203322Z-native-build66-uploaded-valid.md`
-
-Related: `agent-handoffs/reports/20260927T194321Z-command-transport-isolation-and-payload-audit.md`
+Related: `agent-handoffs/reports/20260927T203322Z-native-build66-uploaded-valid.md`, `agent-handoffs/reports/20260927T194321Z-command-transport-isolation-and-payload-audit.md`, `agent-handoffs/reports/20260927T164758Z-strength-build65-connectivity-window-diagnosis.md`
 
 Protocol: `agent-handoffs/README.md`
