@@ -142,6 +142,7 @@ app_files = [
     ("SharedUI", "ConfidenceRing.swift"),
     ("SharedUI", "ProgressPhotoTile.swift"),
     ("SharedUI", "AnimatedProgressBar.swift"),
+    ("SharedUI", "PhaseProgressPresentation.swift"),
     ("SharedUI", "MetricRow.swift"),
     ("SharedUI", "Typography.swift"),
     ("SharedUI", "PlusJakartaSans.swift"),
@@ -401,6 +402,7 @@ test_files = [
 
 ui_test_files = [
     ("PhysiqueOSUITests", "TrainingAcceptanceUITests.swift"),
+    ("PhysiqueOSUITests", "GoalsAcceptanceUITests.swift"),
 ]
 
 BUNDLE_ID_APP = "com.physiqueos.native.dev"

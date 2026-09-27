@@ -1715,6 +1715,117 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertFalse(log.hasPendingEvidenceReviews)
     }
 
+    private func trainingDaySession(id: String, activityType: String, title: String, kind: String) -> String {
+        #"{"id":"\#(id)","activityType":"\#(activityType)","title":"\#(title)","kind":"\#(kind)","exerciseCount":0,"bodyAreas":[],"durationSeconds":1200,"distance":1.6,"distanceUnit":"mi","activeCalories":95,"detail":"\#(title)","destination":{"id":"training.session","parameters":{"sessionId":"\#(id)"}}}"#
+    }
+
+    private func trainingDayJSON(date: String, sessions: [String], strengthSessions: Int, hasWalking: Bool, hasCardio: Bool) -> String {
+        let sessionCount = sessions.count
+        return productionEnvelope(resource: "training-day", data: #"{"date":"\#(date)","label":"\#(date)","summary":{"bodyAreas":[],"sessionCount":\#(sessionCount),"strengthSessions":\#(strengthSessions),"exerciseCount":0,"hasWalking":\#(hasWalking),"hasCardio":\#(hasCardio)},"sessions":[\#(sessions.joined(separator: ","))]}"#)
+    }
+
+    /// The exact reported defect: a canonical HealthKit Cardio workout (an
+    /// Outdoor Walk) is correctly present in Training Day/detail, but
+    /// Logged Today's server-computed Training row -- keyed entirely off a
+    /// Training Logger session, by LoggedTodayService.js's own documented
+    /// design -- has no Logger session to anchor to and stays "Nothing
+    /// logged yet". Native must fill this in from the same canonical/
+    /// presented workout authority Training Day itself already reads,
+    /// without inventing a fake Logger session.
+    func testProductionLoggedTodayTrainingShowsCanonicalCardioWhenNoLoggerSessionExists() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-26","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[]}"#),
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+                "training-day": trainingDayJSON(date: "2026-09-26", sessions: [trainingDaySession(id: "session_walk_1", activityType: "Outdoor Walk", title: "Outdoor Walk", kind: "walking")], strengthSessions: 0, hasWalking: true, hasCardio: false),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+
+        let trainingRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
+        XCTAssertEqual(trainingRow.summary, "Outdoor Walk")
+        XCTAssertEqual(trainingRow.destination, .trainingDay(date: "2026-09-26"))
+        // Strength Logger semantics are untouched: no Logger session, link, or claim identity is fabricated -- this is a read-only presentation enrichment.
+        let nutritionRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .nutrition })
+        XCTAssertEqual(nutritionRow.summary, "Nothing logged yet", "Only the Training row is enriched; unrelated rows are untouched.")
+    }
+
+    func testProductionLoggedTodayTrainingSummarizesMultipleCardioSessionsWithoutFabricatingASingleSessionIdentity() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-26","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[]}"#),
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+                "training-day": trainingDayJSON(date: "2026-09-26", sessions: [
+                    trainingDaySession(id: "session_walk_1", activityType: "Outdoor Walk", title: "Outdoor Walk", kind: "walking"),
+                    trainingDaySession(id: "session_cycle_1", activityType: "Cycling", title: "Outdoor Cycle", kind: "cardio"),
+                ], strengthSessions: 0, hasWalking: true, hasCardio: true),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+
+        let trainingRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
+        XCTAssertEqual(trainingRow.summary, "2 Cardio sessions")
+        XCTAssertEqual(trainingRow.destination, .trainingDay(date: "2026-09-26"), "Multiple sessions link to the day, never one arbitrarily chosen session.")
+    }
+
+    /// A genuine Strength Logger day (the server's Training row already has
+    /// a real recordId) must never be second-guessed or overwritten by the
+    /// Cardio enrichment, even when the same day also has canonical Cardio
+    /// -- the mixed case is correctly served by leaving the server's own
+    /// Strength summary exactly as sent.
+    func testProductionLoggedTodayTrainingNeverOverwritesARealLoggerStrengthRowEvenWithCardioTheSameDay() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-26","loggedToday":{"rows":[{"id":"training","summary":"Upper Body","context":null,"recordId":"session_strength_1"},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[]}"#),
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+
+        let trainingRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
+        XCTAssertEqual(trainingRow.summary, "Upper Body")
+        XCTAssertEqual(trainingRow.destination, .trainingSession(sessionId: "session_strength_1"))
+        // "training-day" is deliberately absent from byResource above: a real
+        // Logger row must never even trigger the extra read.
+        let requests = await transport.requests
+        XCTAssertFalse(requests.contains { $0.url?.path.contains("training-day") == true }, "A real Logger Strength row must not trigger the Cardio-enrichment read at all.")
+    }
+
+    /// Reader-only, degrades safely: if the supplementary Training Day read
+    /// fails (or the day is truly empty of both Logger and Cardio activity),
+    /// the honest "Nothing logged yet" is preserved rather than surfacing an
+    /// error or a fabricated summary.
+    func testProductionLoggedTodayTrainingStaysHonestWhenTrainingDayReadFailsOrIsEmpty() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-26","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[]}"#),
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+                // No "training-day" entry -- the supplementary read fails (URLError.badServerResponse).
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+
+        let trainingRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
+        XCTAssertEqual(trainingRow.summary, "Nothing logged yet")
+        XCTAssertNil(trainingRow.destination)
+    }
+
     func testProductionLogSeparatesAcceptedProcessingFromActionableReviewsAndLoggedDurability() async throws {
         let processingJSON = productionEnvelope(
             resource: "evidence-review-queue",

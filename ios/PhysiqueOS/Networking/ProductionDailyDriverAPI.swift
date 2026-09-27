@@ -819,6 +819,37 @@ struct ProductionLogAPI: LogAPI {
         }
         rows.append(Self.weightRow(weightPayload, localDate: payload.localDate))
 
+        // `evidence-review-queue`'s Training row is keyed entirely off a
+        // Training Logger session (`LoggedTodayService.js`'s own documented,
+        // deliberate design -- a canonicalized HealthKit Cardio workout has
+        // no Logger session to anchor a row to, and inventing one would be
+        // fabricating identity that doesn't exist). That leaves an honest
+        // "Nothing logged yet" for a day with real canonical Cardio and
+        // nothing else, even though Training Day already presents it
+        // correctly. Rather than inventing a new server contract or a
+        // second, parallel Cardio-only count, this reuses the exact same
+        // canonical/presented workout authority Training Day itself already
+        // reads (`fetchTrainingDay`, unchanged), exactly like this
+        // function's own Weight row above already synthesizes a row locally
+        // from a second, already-existing read rather than a wire field the
+        // server doesn't send for this purpose. Only runs when the
+        // server-reported Training row is genuinely empty (no recordId --
+        // i.e. no Logger Strength session exists), so a real Strength day,
+        // including one that also has Cardio, is never touched.
+        if let trainingIndex = rows.firstIndex(where: { $0.kind == .training }),
+           payload.loggedToday.rows.first(where: { $0.id == .training })?.recordId == nil,
+           let trainingDay = try? await ProductionTrainingAPI(api: api).fetchTrainingDay(date: payload.localDate),
+           trainingDay.summary.strengthSessions == 0 {
+            let cardioSessions = trainingDay.sessions.filter { $0.kind != .strength }
+            if let onlySession = cardioSessions.count == 1 ? cardioSessions.first : nil {
+                rows[trainingIndex].summary = onlySession.title
+                rows[trainingIndex].destination = .trainingDay(date: payload.localDate)
+            } else if cardioSessions.count > 1 {
+                rows[trainingIndex].summary = "\(cardioSessions.count) Cardio sessions"
+                rows[trainingIndex].destination = .trainingDay(date: payload.localDate)
+            }
+        }
+
         var pending = payload.pendingEvidenceReviews.map { review in
             PendingEvidenceReview(
                 id: review.id, title: review.title, date: review.date,

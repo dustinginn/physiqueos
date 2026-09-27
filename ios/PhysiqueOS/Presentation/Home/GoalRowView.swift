@@ -246,13 +246,10 @@ private struct PhaseTrajectoryPhaseCard: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             } else if let percentage = phase.clampedProgressPercentage {
-                AnimatedProgressBar(value: percentage, color: accent, accessibilityLabel: "\(phase.phaseName) progress")
-                if let label = phase.presentationLabel {
-                    Text(label)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
+                PhaseProgressPresentation(
+                    percentage: percentage, color: accent, label: phase.presentationLabel,
+                    accessibilityLabel: "\(phase.phaseName) progress"
+                )
                 if isOutcome {
                     Text(phase.progressStatus == "awaiting_follow_up" ? "Awaiting next DEXA" : "DEXA measurements anchor progress")
                         .font(.system(size: 11, weight: .medium))

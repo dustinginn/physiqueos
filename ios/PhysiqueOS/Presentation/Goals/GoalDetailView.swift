@@ -976,14 +976,10 @@ struct GoalPhaseCard: View {
                     }
                 }
                 if showsProgress {
-                    AnimatedProgressBar(value: phase.progress.percentage, color: tint, accessibilityLabel: "Phase progress")
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(phase.progress.label)
-                        Spacer()
-                        Text("\(phase.progress.percentage)%")
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    PhaseProgressPresentation(
+                        percentage: phase.progress.percentage, color: tint, label: phase.progress.label,
+                        accessibilityLabel: "Phase progress"
+                    )
                 }
             }
         }
