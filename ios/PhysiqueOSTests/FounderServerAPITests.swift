@@ -2668,6 +2668,49 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(affected.contains("training-day"))
     }
 
+    /// Build 67's Command Network Diagnostics showed this confirm receiving an
+    /// empty-bodied HTTP 400 from Cloudflare's edge -- never reaching the app
+    /// -- because the raw content signature (joined with U+001F) was sent as
+    /// the `Idempotency-Key` header. A control character is illegal in an HTTP
+    /// field value, and the server's own contract
+    /// (`src/contracts/v1/command.js`) accepts only `[A-Za-z0-9._:/-]{16,200}`.
+    /// The key must satisfy that grammar in both the header and the body
+    /// metadata, while staying content-deterministic for safe replay.
+    func testWorkoutReconciliationIdempotencyKeyIsHeaderSafeAndMatchesTheServerGrammar() async throws {
+        let reviewId = "healthkit_workout_reconciliation_36a18cc3ea586489ca963abd1f04300ce23b9eb0"
+        let loggerId = "logger_session_canonical_0123456789abcdef0123456789abcdef"
+        let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_confirmed","reviewId":"healthkit_workout_reconciliation_36a18cc3ea586489ca963abd1f04300ce23b9eb0","revision":2,"resolution":{"action":"confirm","selectedLoggerSessionCanonicalId":"logger_session_canonical_0123456789abcdef0123456789abcdef","linkId":"link-one"}}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, response),
+            .json(200, response),
+            .json(200, response),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionEvidenceReviewAPI(api: native)
+
+        try await api.resolveWorkoutReconciliation(reviewId: reviewId, expectedVersion: "1", loggerSessionCanonicalId: loggerId)
+        try await api.resolveWorkoutReconciliation(reviewId: reviewId, expectedVersion: "1", loggerSessionCanonicalId: loggerId)
+        try await api.resolveWorkoutReconciliation(reviewId: reviewId, expectedVersion: "2", loggerSessionCanonicalId: loggerId)
+
+        let requests = await transport.requests
+        let serverGrammar = try NSRegularExpression(pattern: #"^[A-Za-z0-9._:/-]{16,200}$"#)
+        func matchesServerGrammar(_ value: String) -> Bool {
+            serverGrammar.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) != nil
+        }
+        let header = try XCTUnwrap(requests[1].value(forHTTPHeaderField: "Idempotency-Key"))
+        XCTAssertTrue(matchesServerGrammar(header), "Idempotency-Key header \(header.debugDescription) violates the server's [A-Za-z0-9._:/-]{16,200} contract")
+        XCTAssertFalse(header.unicodeScalars.contains { $0.properties.generalCategory == .control }, "an HTTP field value must never contain a control character")
+
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        let metadata = try XCTUnwrap(json["metadata"] as? [String: Any])
+        XCTAssertEqual(metadata["idempotencyKey"] as? String, header, "body metadata must carry the same key the header does")
+
+        XCTAssertEqual(requests[2].value(forHTTPHeaderField: "Idempotency-Key"), header, "an identical confirm must replay under the same key")
+        XCTAssertNotEqual(requests[3].value(forHTTPHeaderField: "Idempotency-Key"), header, "a different expected version is a different logical write")
+    }
+
     /// A real Build 64 attempt (2026-09-27) proved this exact submission --
     /// including its existing retry -- can be cancelled by the OS before it
     /// ever reaches the server, with the app's own Swift Task never

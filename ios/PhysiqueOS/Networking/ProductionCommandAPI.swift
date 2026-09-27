@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// The bounded production Native write allowlist
@@ -248,6 +249,18 @@ enum ProductionIdempotentSubmission {
     /// incidental fields like a freshly-generated command id.
     static func signature(_ components: [String]) -> String {
         components.joined(separator: "\u{1F}")
+    }
+
+    /// A content-deterministic idempotency key for a `signature`: the same
+    /// logical write always yields the same key (safe replay across retries
+    /// and relaunches), a different write a different one. A signature
+    /// itself must never go on the wire -- its U+001F separator is illegal
+    /// in an HTTP field value (Cloudflare answers an empty 400 before the
+    /// request reaches the app) and outside the server's
+    /// `[A-Za-z0-9._:/-]{16,200}` key grammar. Lowercase SHA-256 hex (64
+    /// characters) satisfies both.
+    static func deterministicKey(forSignature signature: String) -> String {
+        SHA256.hash(data: Data(signature.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     /// Reuses `previousKey` when this attempt's `signature` matches the

@@ -148,6 +148,7 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
             action,
             loggerSessionCanonicalId ?? "-",
         ])
+        let idempotencyKey = ProductionIdempotentSubmission.deterministicKey(forSignature: signature)
         let payload = WorkoutReconciliationResolutionPayload(
             reviewId: reviewId,
             action: action,
@@ -201,14 +202,14 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
             do {
                 outcome = try await api.submitCommand(
                     ProductionCommandType.resolveWorkoutReconciliation,
-                    idempotencyKey: signature,
+                    idempotencyKey: idempotencyKey,
                     expectedVersion: expectedVersion,
                     payload: payload
                 )
             } catch ProductionNativeError.networkFailure {
                 outcome = try await api.submitCommand(
                     ProductionCommandType.resolveWorkoutReconciliation,
-                    idempotencyKey: signature,
+                    idempotencyKey: idempotencyKey,
                     expectedVersion: expectedVersion,
                     payload: payload
                 )
