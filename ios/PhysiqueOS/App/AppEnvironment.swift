@@ -564,6 +564,7 @@ final class AppEnvironment {
         briefingSandboxStore: BriefingSandboxStore = BriefingSandboxStore(),
         founderServerAPI: FounderServerAPI = FounderServerAPI(),
         productionNativeAPI: ProductionNativeAPI = ProductionNativeAPI(
+            commandTransport: CommandNetworkDiagnosticsTransport.production(),
             snapshotStore: .applicationSupport(namespace: "founder-production")
         ),
         founderPhotoMediaStore: FounderPhotoMediaStore? = nil,

@@ -2756,6 +2756,60 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(scheduler.endedIdentifiers.count, 1, "the assertion must still end exactly once even though the whole submission ultimately throws")
     }
 
+    /// A real Build 65 attempt proved bulk reads and command submissions
+    /// sharing one connection pool let a stalled read take a write down with
+    /// it. `ProductionNativeAPI.submitCommand` must route through a
+    /// separately-injectable `commandTransport`, while every read (and
+    /// pairing itself) keeps using the ordinary `transport` -- proven here by
+    /// giving each its OWN independent mock and checking neither one sees
+    /// the other's requests.
+    private struct MinimalCommandPayload: Encodable { let value: String }
+
+    func testSubmitCommandUsesTheCommandTransportWhilePairingAndReadsUseTheReadTransport() async throws {
+        let readTransport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r"))])
+        let commandResponse = productionCommandOutcomeJSON(result: #"{"ok":true}"#)
+        let commandTransport = SequencedFounderTransport([.json(200, commandResponse)])
+        let native = ProductionNativeAPI(
+            baseURL: testOrigin, credentialStore: MemoryCredentialStore(),
+            transport: readTransport, commandTransport: commandTransport
+        )
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        struct Result: Decodable, Sendable { let ok: Bool }
+        let outcome: ProductionCommandOutcome<Result> = try await native.submitCommand(
+            "test.command.v1", idempotencyKey: "idem-1", payload: MinimalCommandPayload(value: "x")
+        )
+        XCTAssertEqual(outcome.receipt.result?.ok, true)
+
+        let readRequests = await readTransport.requests
+        let commandRequests = await commandTransport.requests
+        XCTAssertEqual(readRequests.count, 1, "pairing only -- the command must not touch the read transport")
+        XCTAssertEqual(commandRequests.count, 1, "the command only -- pairing must not touch the command transport")
+        XCTAssertTrue(commandRequests[0].url?.path.hasSuffix("/commands") ?? false)
+        XCTAssertTrue(readRequests[0].url?.path.hasSuffix("/auth/pair") ?? false)
+    }
+
+    /// When `commandTransport` isn't explicitly provided, it must default to
+    /// the same `transport` reads use -- the exact pre-existing behavior,
+    /// preserved for every caller (including every OTHER test in this file)
+    /// that doesn't opt into a separate one.
+    func testSubmitCommandDefaultsToSharingTheReadTransportWhenNoSeparateOneIsGiven() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionCommandOutcomeJSON(result: #"{"ok":true}"#)),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        struct Result: Decodable, Sendable { let ok: Bool }
+        let outcome: ProductionCommandOutcome<Result> = try await native.submitCommand(
+            "test.command.v1", idempotencyKey: "idem-1", payload: MinimalCommandPayload(value: "x")
+        )
+        XCTAssertEqual(outcome.receipt.result?.ok, true)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 2, "both the pairing call and the command landed on the single shared transport")
+    }
+
     func testWorkoutReconciliationNoMatchOmitsLoggerIdentity() async throws {
         let response = productionCommandOutcomeJSON(result: #"{"status":"resolved_no_match","reviewId":"review-one","revision":3,"resolution":{"action":"no_match","selectedLoggerSessionCanonicalId":null,"linkId":null}}"#)
         let transport = SequencedFounderTransport([

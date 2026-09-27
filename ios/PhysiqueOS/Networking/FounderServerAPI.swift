@@ -377,6 +377,10 @@ actor ProductionNativeAPI {
     private let baseURL: URL
     private let credentialStore: FounderRefreshCredentialStore
     private let transport: FounderHTTPTransport
+    /// Used by `submitCommand` only -- every other call site (`readResource`,
+    /// `readMedia`, auth) keeps using `transport`. See the doc comment on
+    /// `CommandNetworkDiagnosticsTransport` for why commands get their own.
+    private let commandTransport: FounderHTTPTransport
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -418,6 +422,13 @@ actor ProductionNativeAPI {
         baseURL: URL? = nil,
         credentialStore: FounderRefreshCredentialStore? = nil,
         transport: FounderHTTPTransport = URLSessionFounderHTTPTransport(),
+        // `nil` means "commands share the read transport" -- the exact
+        // pre-existing behavior, unchanged for every caller that doesn't
+        // explicitly opt into a separate one (including every existing
+        // test). `AppEnvironment` opts the real app into
+        // `CommandNetworkDiagnosticsTransport.production()`, an isolated
+        // session, for exactly the reason documented on that type.
+        commandTransport: FounderHTTPTransport? = nil,
         snapshotStore: ProductionReadSnapshotStore? = nil
     ) {
         precondition(configuration == .founderProduction, "ProductionNativeAPI requires Founder Production authority.")
@@ -425,6 +436,7 @@ actor ProductionNativeAPI {
         self.baseURL = baseURL ?? configuration.baseURL
         self.credentialStore = credentialStore ?? KeychainFounderCredentialStore(namespace: configuration.credentialNamespace)
         self.transport = transport
+        self.commandTransport = commandTransport ?? transport
         self.snapshotStore = snapshotStore
     }
 
@@ -994,7 +1006,10 @@ actor ProductionNativeAPI {
         bearer: String?,
         accept: String,
         headers: [String: String] = [:],
-        timeoutInterval: TimeInterval = 15
+        timeoutInterval: TimeInterval = 15,
+        // `nil` uses `transport` (every read call site). `submitCommand`
+        // passes `commandTransport` explicitly.
+        overrideTransport: FounderHTTPTransport? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         let endpoint = baseURL.appending(path: path)
         guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
@@ -1013,7 +1028,7 @@ actor ProductionNativeAPI {
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         if let bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
         for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
-        do { return try await transport.data(for: request) }
+        do { return try await (overrideTransport ?? transport).data(for: request) }
         catch {
             // Diagnostic-only: captures the identity `.networkFailure` below
             // discards (genuine connection failure vs. cooperative task
@@ -1063,7 +1078,8 @@ actor ProductionNativeAPI {
             bearer: token,
             accept: "application/json",
             headers: headers,
-            timeoutInterval: timeoutInterval
+            timeoutInterval: timeoutInterval,
+            overrideTransport: commandTransport
         )
         if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
             let refreshedToken = try await refreshAccessToken()
@@ -1088,7 +1104,8 @@ actor ProductionNativeAPI {
                     bearer: refreshedToken,
                     accept: "application/json",
                     headers: headers,
-                    timeoutInterval: timeoutInterval
+                    timeoutInterval: timeoutInterval,
+                    overrideTransport: commandTransport
                 )
             } catch ProductionNativeError.networkFailure {
                 result = try await perform(
@@ -1098,7 +1115,8 @@ actor ProductionNativeAPI {
                     bearer: refreshedToken,
                     accept: "application/json",
                     headers: headers,
-                    timeoutInterval: timeoutInterval
+                    timeoutInterval: timeoutInterval,
+                    overrideTransport: commandTransport
                 )
             }
         }
