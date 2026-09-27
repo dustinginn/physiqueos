@@ -317,13 +317,16 @@ struct CompletedGoalPhotoReadModel: Codable, Equatable, Identifiable {
     var id: String
     var label: String
     var date: String
+    /// No longer rendered directly by `CompletedGoalDetailView` (which now
+    /// renders through `ProgressPhotoTile`, owning its own placeholder icon)
+    /// -- kept only for wire-decode backward compatibility.
     var systemImage: String
     /// The real canonical Founder progress photo backing this card (Beginning
     /// or Completion), via the same Founder Production authenticated photo
     /// authority `ProgressPhotoTile`/`PhotosReadModel` already use -- never a
     /// second, divergent photo-selection mechanism. `nil` (a photo genuinely
     /// missing, or an older payload predating this field) safely falls back
-    /// to the existing `systemImage` placeholder.
+    /// to `ProgressPhotoTile`'s own placeholder.
     var mediaId: String? = nil
 }
 

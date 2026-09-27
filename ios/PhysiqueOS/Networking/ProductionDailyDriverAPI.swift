@@ -565,8 +565,14 @@ struct ProductionGoalsAPI: GoalsAPI {
         /// `evidenceId` is a different identity (which evidence record, not
         /// which media blob) and is never a valid substitute.
         var mediaId: String? {
-            guard let href, href.contains("/media/") else { return nil }
-            let id = href.split(separator: "/").last.map(String.init) ?? ""
+            // `URLComponents` (not naive string splitting) so a query string
+            // or fragment after the id -- neither of which the server's own
+            // `privateEvidenceUrl` currently ever sends, but a wire string is
+            // never trusted to stay that way -- can never be appended into a
+            // corrupted id; it fails safe to nil (the existing placeholder)
+            // instead.
+            guard let href, let path = URLComponents(string: href)?.path, path.contains("/media/") else { return nil }
+            let id = path.split(separator: "/").last.map(String.init) ?? ""
             return id.isEmpty ? nil : id
         }
     }
@@ -857,7 +863,15 @@ struct ProductionLogAPI: LogAPI {
            payload.loggedToday.rows.first(where: { $0.id == .training })?.recordId == nil,
            let trainingDay = try? await ProductionTrainingAPI(api: api).fetchTrainingDay(date: payload.localDate),
            trainingDay.summary.strengthSessions == 0 {
-            let cardioSessions = trainingDay.sessions.filter { $0.kind != .strength }
+            // `.walking`/`.cardio` only -- the actual HealthKit Cardio family
+            // (`TrainingSessionKind`, `TrainingReadService.js`'s own
+            // `classifySession`). `.other` is a distinct, non-Strength,
+            // non-Cardio classification (e.g. a typed session with no
+            // matching activity-type keyword) -- out of this task's scope,
+            // and labeling it "Cardio" would be a factually wrong summary,
+            // not merely an omission. A day with only `.other` sessions
+            // stays the server's own honest "Nothing logged yet".
+            let cardioSessions = trainingDay.sessions.filter { $0.kind == .walking || $0.kind == .cardio }
             if let onlySession = cardioSessions.count == 1 ? cardioSessions.first : nil {
                 rows[trainingIndex].summary = onlySession.title
                 rows[trainingIndex].destination = .trainingDay(date: payload.localDate)

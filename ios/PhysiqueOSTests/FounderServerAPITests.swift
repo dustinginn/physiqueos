@@ -1208,6 +1208,31 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertNil(beginning.mediaId, "A legacy raw-path href (not the /media/<id> shape) must fall back to the placeholder, never a bogus id.")
     }
 
+    /// The server's own `privateEvidenceUrl` never appends a query string or
+    /// fragment after the media id today, but a wire string is never trusted
+    /// to stay that way: a naive "take the last path segment" parse would
+    /// silently corrupt the id (`"abc123?exp=..."`) instead of failing safe.
+    func testProductionCompletedGoalPhotosMediaIdExtractionIgnoresQueryStringsAndFragments() async throws {
+        let completedGoalWithDecoratedHrefJSON = productionEnvelope(resource: "completed-goal", data: #"{"goalId":"goal-visible-abs","status":"completed","preview":{"readOnly":true,"canonicalGoalId":"goal-visible-abs","supportingGoalIds":[]},"hero":{"title":"Visible Abs at Rest","status":"Completed","dates":"May 20 → Jul 18","achievement":"7.7% Body Fat"},"recap":"Server recap","highlights":[],"photos":{"beginning":{"date":"2026-05-20","href":"/api/private-evidence/media/media_beginning_1?exp=12345&sig=abc"},"completion":{"date":"2026-07-18","href":"/api/private-evidence/media/media_completion_1/"},"historyHref":"/progress/photos"},"finalComposition":{"scanId":"scan-canonical","date":"2026-07-18","bodyFat":"7.7%","leanMass":"147.5 lb","fatMass":"12.3 lb","weight":"159.8 lb","narrative":"Server conclusion","briefingHref":null},"achievedBy":[],"unlocked":null}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionCompletedGoalsHubJSON),
+            .json(200, completedGoalWithDecoratedHrefJSON),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let detail = try await ProductionGoalsAPI(api: native).fetchGoalDetail(goalId: "goal-visible-abs")
+        let completed = try XCTUnwrap(detail?.completed)
+        let beginning = try XCTUnwrap(completed.photos.first { $0.label == "Beginning" })
+        XCTAssertEqual(beginning.mediaId, "media_beginning_1", "A query string after the id must never be appended into a corrupted id.")
+        // Swift's `split(separator:)` omits empty subsequences by default, so
+        // a trailing slash's empty final segment is skipped and the real id
+        // is still recovered -- strictly safer than losing a real photo.
+        let completion = try XCTUnwrap(completed.photos.first { $0.label == "Completion" })
+        XCTAssertEqual(completion.mediaId, "media_completion_1", "A trailing slash must not lose a real, otherwise-well-formed media id.")
+    }
+
     func testProductionOperatingPlanAndPriorityUseCanonicalReadsAndVersionedCompletion() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
@@ -1822,6 +1847,34 @@ final class FounderServerAPITests: XCTestCase {
         let trainingRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
         XCTAssertEqual(trainingRow.summary, "2 Cardio sessions")
         XCTAssertEqual(trainingRow.destination, .trainingDay(date: "2026-09-26"), "Multiple sessions link to the day, never one arbitrarily chosen session.")
+    }
+
+    /// `.other` (TrainingSessionKind's fourth case, e.g. a typed session with
+    /// no matching activity-type keyword) is a distinct, non-Strength,
+    /// non-Cardio classification -- calling it "Cardio" would be a factually
+    /// wrong label, not merely an honest gap. A day with only `.other`
+    /// sessions must stay the server's own "Nothing logged yet" exactly as
+    /// before this feature existed.
+    func testProductionLoggedTodayTrainingNeverLabelsNonCardioOtherSessionsAsCardio() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-26","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[]}"#),
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+                "training-day": trainingDayJSON(date: "2026-09-26", sessions: [
+                    trainingDaySession(id: "session_other_1", activityType: "Yoga", title: "Yoga", kind: "other"),
+                    trainingDaySession(id: "session_other_2", activityType: "Rowing Machine", title: "Rowing Machine", kind: "other"),
+                ], strengthSessions: 0, hasWalking: false, hasCardio: false),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+
+        let trainingRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
+        XCTAssertEqual(trainingRow.summary, "Nothing logged yet", "Two .other sessions must never be mislabeled '2 Cardio sessions'.")
+        XCTAssertNil(trainingRow.destination)
     }
 
     /// A genuine Strength Logger day (the server's Training row already has

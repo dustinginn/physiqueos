@@ -22,8 +22,16 @@ struct PhaseProgressPresentation: View {
         VStack(alignment: .leading, spacing: 8) {
             AnimatedProgressBar(value: percentage, color: color, accessibilityLabel: accessibilityLabel)
             if let label {
+                // Home's own original font for this label -- deliberately the
+                // raw System font (matching every other sibling text in that
+                // already-accepted card), not the `physiqueOSFont` design-
+                // token family Goal Detail's OWN prior redundant percentage
+                // row happened to use. This component is Home's treatment
+                // moving to Goal Detail, not the reverse, so Home must render
+                // byte-identically to before, and Goal Detail now genuinely
+                // matches it rather than gaining a new, different font.
                 Text(label)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
