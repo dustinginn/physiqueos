@@ -29,6 +29,30 @@ final class CommandNetworkDiagnosticsTests: XCTestCase {
         XCTAssertEqual(event.isReusedConnection, true)
         XCTAssertEqual(event.transactionCount, 1)
         XCTAssertEqual(event.totalMs, 246)
+        XCTAssertNil(event.httpStatusCode, "omitted by default -- callers that never received a response don't claim one")
+        XCTAssertNil(event.responseBodyByteCount)
+    }
+
+    /// A `succeeded: true` transport-layer outcome does not mean the
+    /// application's own route handler ever ran -- it only means
+    /// `URLSession` didn't throw. A response that reached the device from
+    /// something ahead of the application (a platform/edge layer) with an
+    /// unexpected status and no matching structured body is exactly what
+    /// this field exists to distinguish from a genuine application-level
+    /// 4xx/5xx, which `NetworkFailureDiagnostics`'s "succeeded" boolean
+    /// alone cannot.
+    func testMakeEventCarriesHTTPStatusCodeAndResponseBodyByteCountWhenGiven() {
+        let event = CommandNetworkDiagnostics.makeEvent(
+            capturedAt: Date(timeIntervalSince1970: 1_000),
+            path: "/api/v1/native/commands",
+            succeeded: true,
+            pathSnapshot: .unavailable,
+            transaction: nil,
+            httpStatusCode: 429,
+            responseBodyByteCount: 13
+        )
+        XCTAssertEqual(event.httpStatusCode, 429)
+        XCTAssertEqual(event.responseBodyByteCount, 13)
     }
 
     func testMakeEventWithNoTransactionStillRecordsThePathSnapshot() {
@@ -119,6 +143,61 @@ final class CommandNetworkDiagnosticsTransportTests: XCTestCase {
         XCTAssertEqual(event.path, "/api/v1/native/commands")
         XCTAssertEqual(event.capturedAt, Date(timeIntervalSince1970: 42))
         XCTAssertEqual(event.networkInterface, "wifi")
+    }
+
+    /// Synthesizes an HTTP response with a caller-chosen status code and body
+    /// entirely locally -- no socket, no external dependency -- so the
+    /// transport's "a real response came back, but with an unexpected
+    /// status and no matching body" case (exactly what a 2026-09-27
+    /// zero-write production correlation showed happened to a real Build 66
+    /// reconciliation attempt: a genuine, non-2xx HTTP response reaching the
+    /// device that never touched the application's own route handler) is
+    /// reproducible deterministically. The desired response is encoded in
+    /// the request URL itself rather than shared mutable state, so this
+    /// stub carries no state of its own and is safe under parallel test
+    /// execution.
+    private final class StubHTTPURLProtocol: URLProtocol {
+        override class func canInit(with request: URLRequest) -> Bool {
+            request.url?.host == "stub.physiqueos.test"
+        }
+
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+        override func startLoading() {
+            let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
+            let statusCode = Int(components?.queryItems?.first(where: { $0.name == "status" })?.value ?? "") ?? 200
+            let body = components?.queryItems?.first(where: { $0.name == "body" })?.value ?? ""
+            let response = HTTPURLResponse(url: request.url!, statusCode: statusCode, httpVersion: "HTTP/1.1", headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(body.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+
+        override func stopLoading() {}
+    }
+
+    func testRecordsHTTPStatusCodeAndResponseBodyByteCountOnASuccessfulTransportCallEvenWhenTheStatusIsNot2xx() async throws {
+        let recorder = EventRecorder()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubHTTPURLProtocol.self]
+        let transport = CommandNetworkDiagnosticsTransport(
+            session: URLSession(configuration: configuration),
+            pathProvider: FixedPathProvider(snapshot: .init(status: "satisfied", interface: "wifi", isConstrained: false, isExpensive: false)),
+            now: { Date(timeIntervalSince1970: 99) },
+            recordEvent: { recorder.append($0) }
+        )
+        let request = URLRequest(url: URL(string: "https://stub.physiqueos.test/api/v1/native/commands?status=429&body=rate-limited")!)
+
+        let (data, response) = try await transport.data(for: request)
+        XCTAssertEqual(response.statusCode, 429)
+        XCTAssertEqual(data, Data("rate-limited".utf8))
+
+        let recorded = recorder.recorded
+        XCTAssertEqual(recorded.count, 1)
+        let event = try XCTUnwrap(recorded.first)
+        XCTAssertTrue(event.succeeded, "no URLSession exception was thrown -- a non-2xx response is still a successful transport call")
+        XCTAssertEqual(event.httpStatusCode, 429)
+        XCTAssertEqual(event.responseBodyByteCount, "rate-limited".utf8.count)
     }
 
     // A prior version of this test made a real, external HTTPS request

@@ -10,6 +10,7 @@ struct WorkoutReconciliationDiagnosticsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var reconciliationEvents: [WorkoutReconciliationDiagnostics.Event] = []
     @State private var networkFailureEvents: [NetworkFailureDiagnostics.Event] = []
+    @State private var commandNetworkEvents: [CommandNetworkDiagnostics.Event] = []
 
     var body: some View {
         NavigationStack {
@@ -38,6 +39,19 @@ struct WorkoutReconciliationDiagnosticsView: View {
                             networkFailureRow(event)
                         }
                     }
+                    section("Command network diagnostics (\(commandNetworkEvents.count))") {
+                        Text("Protocol, interface, and connection-phase timings for every command submission's own dedicated connection, success or failure — captured even when the response came back with a non-2xx status this app never logged.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        if commandNetworkEvents.isEmpty {
+                            Text("No command network diagnostics recorded on this device yet.")
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                        ForEach(Array(commandNetworkEvents.enumerated()), id: \.offset) { _, event in
+                            commandNetworkRow(event)
+                        }
+                    }
                 }
                 .padding(16)
             }
@@ -57,6 +71,7 @@ struct WorkoutReconciliationDiagnosticsView: View {
     @MainActor private func capture() {
         reconciliationEvents = WorkoutReconciliationDiagnostics.recentEvents()
         networkFailureEvents = NetworkFailureDiagnostics.recentEvents()
+        commandNetworkEvents = CommandNetworkDiagnostics.recentEvents()
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -99,6 +114,34 @@ struct WorkoutReconciliationDiagnosticsView: View {
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text("\(event.errorDomain) #\(event.errorCode)")
                 Text(event.errorDescription).textSelection(.enabled)
+            }
+            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+        }
+    }
+
+    private func commandNetworkRow(_ event: CommandNetworkDiagnostics.Event) -> some View {
+        CardContainer(padding: .sm) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(event.path) · \(event.capturedAt.formatted())")
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text("Succeeded: \(event.succeeded ? "yes" : "no")")
+                if let httpStatusCode = event.httpStatusCode {
+                    Text("HTTP status: \(httpStatusCode) · body: \(event.responseBodyByteCount ?? 0) bytes")
+                        .foregroundStyle(PhysiqueOSTheme.destructive)
+                } else if event.succeeded {
+                    Text("No HTTP response captured despite a successful transport call.")
+                        .foregroundStyle(PhysiqueOSTheme.destructive)
+                }
+                if let interface = event.networkInterface, let status = event.pathStatus {
+                    Text("Path: \(status) · \(interface)")
+                }
+                if let protocolName = event.protocolName {
+                    Text("Protocol: \(protocolName) · reused: \(event.isReusedConnection == true ? "yes" : "no") · multipath: \(event.isMultipath == true ? "yes" : "no")")
+                }
+                if let totalMs = event.totalMs {
+                    Text("Total: \(Int(totalMs))ms (connect \(Int(event.connectMs ?? 0))ms, TLS \(Int(event.secureConnectionMs ?? 0))ms, response \(Int(event.responseMs ?? 0))ms)")
+                }
             }
             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
         }

@@ -130,6 +130,22 @@ enum CommandNetworkDiagnostics {
         var requestMs: Double? = nil
         var responseMs: Double? = nil
         var totalMs: Double? = nil
+        /// The real HTTP status this attempt's `URLSession` call actually
+        /// received, whenever one was received at all. `succeeded` alone
+        /// cannot distinguish "the app's own server returned a 4xx/5xx
+        /// business error" from "something ahead of the application
+        /// returned an unexpected response" -- both are `succeeded: true`
+        /// at this transport layer (no `URLSession` exception was thrown),
+        /// but only the status code and body size can tell them apart from
+        /// a device-side capture. `nil` only when the request never
+        /// produced a response at all (a genuine `URLSession` exception).
+        var httpStatusCode: Int? = nil
+        /// The response body's byte count for the same reason: our own
+        /// application always returns a structured JSON problem body on
+        /// failure (never empty), so an unexpectedly small or absent body
+        /// on a non-2xx status is itself evidence the response did not
+        /// come from the application route handler.
+        var responseBodyByteCount: Int? = nil
     }
 
     private static let eventKey = "physiqueos.command-network.diagnostic-events.v1"
@@ -161,7 +177,9 @@ enum CommandNetworkDiagnostics {
         path: String,
         succeeded: Bool,
         pathSnapshot: NetworkPathSnapshot,
-        transaction: TransactionTimings?
+        transaction: TransactionTimings?,
+        httpStatusCode: Int? = nil,
+        responseBodyByteCount: Int? = nil
     ) -> Event {
         Event(
             capturedAt: capturedAt, path: path, succeeded: succeeded,
@@ -171,7 +189,8 @@ enum CommandNetworkDiagnostics {
             isMultipath: transaction?.isMultipath, transactionCount: transaction?.transactionCount ?? 0,
             domainLookupMs: transaction?.domainLookupMs, connectMs: transaction?.connectMs,
             secureConnectionMs: transaction?.secureConnectionMs, requestMs: transaction?.requestMs,
-            responseMs: transaction?.responseMs, totalMs: transaction?.totalMs
+            responseMs: transaction?.responseMs, totalMs: transaction?.totalMs,
+            httpStatusCode: httpStatusCode, responseBodyByteCount: responseBodyByteCount
         )
     }
 
@@ -285,20 +304,28 @@ struct CommandNetworkDiagnosticsTransport: FounderHTTPTransport {
         let path = request.url?.path ?? ""
         do {
             let (data, response) = try await session.data(for: request, delegate: delegate)
-            record(path: path, succeeded: true, delegate: delegate)
-            guard let httpResponse = response as? HTTPURLResponse else { throw FounderServerError.invalidResponse }
+            let httpResponse = response as? HTTPURLResponse
+            record(
+                path: path, succeeded: true, delegate: delegate,
+                httpStatusCode: httpResponse?.statusCode, responseBodyByteCount: data.count
+            )
+            guard let httpResponse else { throw FounderServerError.invalidResponse }
             return (data, httpResponse)
         } catch {
-            record(path: path, succeeded: false, delegate: delegate)
+            record(path: path, succeeded: false, delegate: delegate, httpStatusCode: nil, responseBodyByteCount: nil)
             throw error
         }
     }
 
-    private func record(path: String, succeeded: Bool, delegate: MetricsCollectingDelegate) {
+    private func record(
+        path: String, succeeded: Bool, delegate: MetricsCollectingDelegate,
+        httpStatusCode: Int?, responseBodyByteCount: Int?
+    ) {
         let event = CommandNetworkDiagnostics.makeEvent(
             capturedAt: now(), path: path, succeeded: succeeded,
             pathSnapshot: pathProvider.currentSnapshot(),
-            transaction: CommandNetworkDiagnostics.TransactionTimings(metrics: delegate.metrics)
+            transaction: CommandNetworkDiagnostics.TransactionTimings(metrics: delegate.metrics),
+            httpStatusCode: httpStatusCode, responseBodyByteCount: responseBodyByteCount
         )
         recordEvent(event)
     }
