@@ -3215,6 +3215,41 @@ final class FounderServerAPITests: XCTestCase {
             "The bounded extra attempt must reuse the exact same idempotency key so a genuine duplicate delivery replays the original outcome instead of creating a second mutation.")
     }
 
+    /// Proves the production line, not just the diagnostic type in isolation:
+    /// `FounderServerAPI.perform(...)`'s real catch block must actually call
+    /// `NetworkFailureDiagnostics.record` before converting to
+    /// `.networkFailure` -- a future refactor that dropped that one line
+    /// would otherwise pass every other test in this file while silently
+    /// leaving the next real Founder attempt with no evidence at all.
+    func testPerformRecordsTheUnderlyingErrorBeforeCollapsingToNetworkFailure() async throws {
+        NetworkFailureDiagnostics.clear()
+        defer { NetworkFailureDiagnostics.clear() }
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.cancelled)),
+            .failure(URLError(.cancelled)),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionEvidenceReviewAPI(api: native)
+
+        do {
+            _ = try await api.resolveWorkoutReconciliation(
+                reviewId: "review-1", expectedVersion: "1", loggerSessionCanonicalId: "session-a"
+            )
+            XCTFail("Expected the command to throw after two cancelled sends.")
+        } catch {
+            // Expected -- the assertion below is on what got recorded, not on this error's type.
+        }
+
+        let events = NetworkFailureDiagnostics.recentEvents()
+        XCTAssertFalse(events.isEmpty, "perform()'s catch block must record the underlying error before throwing .networkFailure.")
+        let event = try XCTUnwrap(events.first)
+        XCTAssertTrue(event.path.hasSuffix("/commands"), "Expected the command-dispatch path, got \(event.path).")
+        XCTAssertEqual(event.errorDomain, URLError.errorDomain)
+        XCTAssertEqual(event.errorCode, URLError.cancelled.rawValue)
+    }
+
     /// The media route answers an expired 10-minute bearer with a plain 404 (never the
     /// 401 `ACCESS_TOKEN_EXPIRED` problem the JSON routes send), so the generic refresh
     /// never ran and a Retry resent the same stale bearer. Root cause of the first

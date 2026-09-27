@@ -559,7 +559,10 @@ struct EvidenceReviewDetailView: View {
     }
 
     private func saveMeasurements(review: EvidenceReviewDetailReadModel, item: EvidenceReviewDetailItem) async {
-        guard let version = review.version else { return }
+        guard let version = review.version else {
+            actionState = .failed("This review's version could not be read. Refresh before trying again.")
+            return
+        }
         actionState = .savingMeasurements
         let measurements = DEXAScanMeasurements(
             measuredAt: (measurementTexts["measuredAt"] ?? "").isEmpty ? nil : measurementTexts["measuredAt"],
@@ -664,7 +667,8 @@ struct EvidenceReviewDetailView: View {
             let underlying = WorkoutReconciliationDiagnostics.describe(error)
             WorkoutReconciliationDiagnostics.record(.init(
                 capturedAt: Date(), stage: "submit_threw", reviewId: review.id, action: requestedAction,
-                expectedVersion: String(version), outcome: String(describing: error),
+                expectedVersion: String(version),
+                outcome: ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error) ? "acceptance_uncertain" : "definite_failure",
                 underlyingErrorDomain: underlying.domain, underlyingErrorCode: underlying.code,
                 underlyingErrorDescription: underlying.description
             ))
@@ -728,7 +732,10 @@ struct EvidenceReviewDetailView: View {
     }
 
     private func confirm(review: EvidenceReviewDetailReadModel) async {
-        guard let version = review.version else { return }
+        guard let version = review.version else {
+            actionState = .failed("This review's version could not be read. Refresh before trying again.")
+            return
+        }
         let domain = Self.domain(for: review)
         let confirmationStartedAt = ContinuousClock.now
         actionState = .confirming("Confirming…")
@@ -909,7 +916,10 @@ struct EvidenceReviewDetailView: View {
     }
 
     private func dismissReview(review: EvidenceReviewDetailReadModel) async {
-        guard let version = review.version else { return }
+        guard let version = review.version else {
+            actionState = .failed("This review's version could not be read. Refresh before trying again.")
+            return
+        }
         actionState = .dismissing
         do {
             try await environment.evidenceIntakePipeline.dismissReview(
