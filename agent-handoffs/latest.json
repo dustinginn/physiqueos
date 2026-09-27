@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T14:50:34Z",
+  "generated_at_utc": "2026-09-27T15:37:36Z",
   "task": {
-    "id": "claude-strength-build64-below-task-layer-diagnosis-20260927",
-    "title": "Strength reconciliation -999: root cause isolated below the Swift Task layer",
+    "id": "claude-strength-background-assertion-candidate-20260927",
+    "title": "Strength reconciliation: background-execution-assertion fix -- reviewed candidate ready",
     "agent": "claude",
     "status": "completed"
   },
@@ -11,44 +11,49 @@
   "authority": {
     "production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
     "native_build64_final_sha": "ae90c947",
-    "native_build64_delivery_id": "e8bc8d29-9edb-4289-9071-6008cb7716df"
+    "native_build64_delivery_id": "e8bc8d29-9edb-4289-9071-6008cb7716df",
+    "native_candidate_sha": "6773c93e",
+    "native_candidate_branch": "codex/native-batched-candidate-post-build62",
+    "native_candidate_pushed": true
   },
   "result": {
-    "summary": "Build 64 Strength reconciliation acceptance failed again (Journey and Visible Abs photos now PASS on Build 64, Logged Today Cardio remains PASS -- Strength is the only remaining failed item). The new taskWasCancelledAtCatch diagnostic decisively shows Task.isCancelled was false at the exact catch site for the 2026-09-27 ~07:36 America/Los_Angeles confirm attempt, ruling out the SwiftUI/Swift-Task-cancellation theory with direct evidence. Correlated the exact attempt against the Server via two zero-write reads: command_receipts shows zero rows of any kind for this command type, ever, and in the tight window around the attempt the only receipts are two unrelated automatic HealthKit background-sync commands. The Server's own structured request/read log (pulled read-only) shows the app foregrounding (auth refresh + a burst of screen reads) at 14:34:39 UTC, the Founder opening the reconciliation review twice at 14:36:07 and 14:36:09 UTC, and then a 78-second total gap in server activity with zero trace of any commands-endpoint request before the next successful read at 14:37:27 UTC. security_events also shows zero rows in the window. Combined with a re-confirmed code read (no custom URLSession, no explicit cancellation, no session invalidation, no TaskGroup/race patterns anywhere in the app) and the discovery that the app has NO background-task-assertion (beginBackgroundTask/performExpiringActivity) anywhere for in-flight write requests, the most likely root cause consistent with every piece of evidence is that iOS cancelled the in-flight URLSessionTask at the OS level when the app was briefly backgrounded or interrupted during the confirm attempt -- a scenario made more likely because this exact command is characteristically triggered from a screen reached via a push notification tap, shortly after opening the app, unlike every other command type that succeeds reliably. No fix was implemented and no build was cut, per explicit instruction; a concrete next-candidate recommendation (wrap the command submission in a background-task assertion) is offered for whenever a fix is separately authorized.",
+    "summary": "Implemented the recommended next fix from the prior below-Task-layer diagnosis: protects ProductionEvidenceReviewAPI.resolveWorkoutReconciliation's whole submission (the original attempt and its existing, unchanged retry) with an iOS background-execution assertion (UIApplication.begin/endBackgroundTask, abstracted behind a testable BackgroundTaskScheduling protocol), so a brief app background/suspension transition can no longer have the in-flight request torn down by the OS before it finishes or fails cleanly. No retry logic was added or changed, per explicit instruction. The assertion ends exactly once regardless of ordering (success, thrown error, Task cancellation, or the OS expiration handler firing), guarded by a BackgroundTaskEndGuard against double-ending or leaking. Six new unit tests cover the wrapper's lifecycle in isolation, including a genuine RED check that caught and fixed a real bug in the test itself (a weak-self capture that made a fake expiration callback a silent no-op). Two new integration tests reproduce the exact Build 64 evidence end-to-end. Full regression: 1453/1453 unit tests, 13/13 UI tests. Independently fresh-context reviewed with no issues found, including independent re-execution of all 8 new tests. No build number bumped, no archive, no upload, no Founder confirmation attempt requested.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
     "founder_device_operated": false,
     "build_number_changed": false,
-    "founder_confirmation_requested": false
+    "founder_confirmation_requested": false,
+    "blind_retry_added": false
   },
   "validation": {
-    "zero_write_audit": {
+    "tests": {
       "status": "passed",
-      "summary": "Two additional zero-write, owner-scoped, ROLLBACK-guaranteed production reads (command_receipts tight-window correlation plus a broader same-day/4-day activity comparison; security_events/sessions/devices check), both verified transaction_read_only=on before reading, both rolled back cleanly. Also pulled the Server's own structured runtime request/read log read-only via doctl apps logs (no database access, no mutation)."
+      "summary": "Full PhysiqueOSTests target: 1453/1453 passing (1445 prior + 8 new: 6 isolated lifecycle tests + 2 end-to-end integration tests). GoalsAcceptanceUITests 1/1, TrainingAcceptanceUITests 12/12 -- 13/13 UI tests passing, no regression. All runs after a clean build."
     },
-    "code_review": {
+    "red_green": {
       "status": "passed",
-      "summary": "Re-confirmed via direct code read that FounderServerAPI.swift's transport layer is unchanged since the prior diagnosis: plain URLSession.shared.data(for:) with no custom delegate/configuration, zero session invalidation calls, zero TaskGroup/race patterns anywhere in the app. Confirmed a genuinely new finding this pass: zero beginBackgroundTask/UIBackgroundTaskIdentifier/ProcessInfo.performExpiringActivity usage anywhere in the codebase, meaning no in-flight write request has any protection against the app backgrounding mid-request."
+      "summary": "Deliberately broke the BackgroundTaskEndGuard double-end guard and reran the relevant test: it initially still passed due to a real bug in the test (a weak-self capture in the fake scheduler making a late expiration callback a silent no-op) -- found and fixed the actual cause (changed the capture to a deliberate strong one, correct because the scheduler is the sole holder of that closure for exactly as long as the assertion is open). After that fix, breaking the guard produced a genuine failure ([1, 1] instead of [1]), and restoring it passed cleanly again."
+    },
+    "review": {
+      "status": "passed",
+      "summary": "Independent fresh-context review (zero prior context) verified the diff directly against the code and independently re-ran all 8 new tests in the simulator. Confirmed correct locking with no deadlock risk on every path, no real retain-cycle risk from the strong-self capture, correct defer coverage of every exit path including Task cancellation, and that wrapping both the original attempt and its retry in a SINGLE assertion (not one each) is the right design since splitting them would reopen the exact vulnerability gap this fix targets. Confirmed no unintended changes elsewhere, including verifying the large project.pbxproj diff is purely positional file-ID renumbering from adding two new files, not any structural change. No issues found."
     }
   },
   "decisions_required": [],
   "blockers": [],
-  "unexpected_findings": [
-    "The app has zero background-task-assertion coverage anywhere for in-flight network write requests -- a real, previously-unnoticed architectural gap, not specific to reconciliation, though reconciliation's notification-driven trigger pattern makes it the command most likely to be affected in practice.",
-    "The Server's own structured runtime logs (via doctl apps logs) turned out to be a genuinely new, decisive correlation source beyond command_receipts -- they show successful reads (evidence-review-detail) immediately before the gap and prove the app's own command-logging path works clearly when a command DOES arrive, making the total silence for the reconciliation attempt unambiguous rather than merely absence-of-evidence."
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Recommended next Native candidate: wrap the workout-reconciliation command submission (and any other write command reachable from a just-foregrounded/notification-driven screen) in a background-task assertion for the duration of the network call. Not implemented in this task -- offered for whenever separately authorized.",
-    "The reconciliation review's exact canonical_evidence_records collection_name/table was not located in this pass (searches under 'evidenceReviews' and an unfiltered collection search both returned empty) -- a minor, non-blocking gap; the core diagnosis did not depend on it.",
+    "This fix targets the leading, most evidence-consistent hypothesis but cannot guarantee the next real attempt succeeds -- a genuine external network-path disruption at the same moment remains possible and is unaffected by this change.",
+    "When ready, cut the next TestFlight build from 6773c93e -- no Founder confirmation attempt should be requested to test this specifically; let it be validated by whatever the Founder's next natural Strength reconciliation attempt is.",
     "Two ChatGPT master-thread-context handoffs remain unread in the inbox, staying scoped exactly to this task as instructed."
   ],
-  "recommended_next_step": "Do not request another Founder confirmation attempt. When ready, authorize the background-task-assertion fix as the next Strength candidate, with the same RED/GREEN + fresh-context-review standard already used in this lane.",
-  "full_report_path": "agent-handoffs/reports/20260927T145034Z-strength-999-below-task-layer-diagnosis.md",
+  "recommended_next_step": "When separately authorized, cut the next TestFlight build from candidate 6773c93e (after a disk-safety pass allows a Release-build check). Do not solicit another Strength reconciliation attempt to validate this fix -- read the taskWasCancelledAtCatch and background-assertion behavior from whatever the Founder's next natural attempt turns out to be.",
+  "full_report_path": "agent-handoffs/reports/20260927T153736Z-strength-background-assertion-candidate.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260927T064758Z-native-build64-uploaded-valid.md",
-    "agent-handoffs/reports/20260927T031700Z-build63-acceptance-diagnosis.md"
+    "agent-handoffs/reports/20260927T145034Z-strength-999-below-task-layer-diagnosis.md",
+    "agent-handoffs/reports/20260927T064758Z-native-build64-uploaded-valid.md"
   ],
   "safety": {
     "contains_secrets": false,

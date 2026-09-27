@@ -2,22 +2,22 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Strength reconciliation -999 — root cause isolated below the Swift Task layer
+- Task: Strength reconciliation — background-execution-assertion fix, reviewed candidate ready
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-27T14:50:34Z
+- Generated (UTC): 2026-09-27T15:37:36Z
 - Success: true
 
-Summary: Good news first — Your Journey progress bars and the real Visible Abs photos both now pass on Build 64, alongside Logged Today Cardio. Strength reconciliation is the only item still failing.
+Summary: Built the fix the last diagnosis pointed to — the workout-reconciliation confirm now runs under an iOS background-execution assertion, so a brief app background/suspension transition can't have it torn down mid-request anymore. No new retry logic; this only protects the existing submission's lifecycle.
 
-The new diagnostic did its job: `Task.isCancelled` was `false` at the exact failure point, which rules out the Swift-concurrency cancellation theory directly rather than by guesswork. Correlating that exact attempt against the server (zero-write reads plus the server's own request logs) shows the request never arrived at the server at all — not a receipt, not a log line, nothing — while the app was clearly foregrounding and reading normally seconds earlier. Combined with confirming (again) that there's no custom networking code that could cancel this on the app's own, the failure is squarely in the OS/network layer, before the request ever left the device.
+Took this seriously on testing: 6 new tests cover the assertion's lifecycle in isolation, and along the way a deliberate "break it and see if the test catches it" check found a real bug in my own test (a weak reference that let a fake callback silently do nothing) — fixed that, then confirmed the test genuinely fails when the guard is broken and passes when it's fixed. Two more tests reproduce the exact Build 64 failure end-to-end. Full suite: 1453 unit + 13 UI tests passing. An independent review re-ran everything itself and found no issues.
 
-The most likely explanation, consistent with everything found: the app has no background-task protection anywhere for in-flight write requests, and this is the one command that's characteristically triggered right after opening the app from a notification — exactly when a brief interruption (screen lock, a tap away, a call) is easy to miss and, unprotected, can get the in-flight request killed by iOS.
+**Nothing else changed**: no build cut, no build number bumped, no upload, no Founder confirmation requested — this fix should be validated by whatever your next natural Strength attempt turns out to be, not a special ask.
 
-**Nothing was changed and nothing was cut**: no fix implemented, no build, no Founder confirmation requested. A concrete next step (wrap the command in a background-task assertion) is written up and ready whenever you want to authorize it.
+**Next step is yours**: when ready, this candidate (`6773c93e`) is what the next TestFlight build should come from.
 
-Detailed report: `agent-handoffs/reports/20260927T145034Z-strength-999-below-task-layer-diagnosis.md`
+Detailed report: `agent-handoffs/reports/20260927T153736Z-strength-background-assertion-candidate.md`
 
-Related: `agent-handoffs/reports/20260927T064758Z-native-build64-uploaded-valid.md`
+Related: `agent-handoffs/reports/20260927T145034Z-strength-999-below-task-layer-diagnosis.md`
 
 Protocol: `agent-handoffs/README.md`
