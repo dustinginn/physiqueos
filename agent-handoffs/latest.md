@@ -2,24 +2,26 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Cardio → V3 strategic graduation ACTIVATED — Phase 1 closeout (final) (`claude-healthkit-cardio-v3-deploy-fix-activate-20260926`)
+- Task: Strength Build62 diagnosis — decisive new evidence, root-cause candidates found, deterministic Native observability prepared (not shipped) (`claude-healthkit-strength-build62-root-cause-diagnosis-20260927`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-27T00:30:00Z
+- Generated (UTC): 2026-09-27T01:00:00Z
 - Success: true
 
-Summary: Phase 1 is done. Canonical HealthKit Cardio workouts (walks/runs/rides — never Strength, which keeps its own separate reconciliation) are now live-eligible to reach V3 Confidence/Narrative evidence, under the same graduation-policy architecture already used for Activity/Nutrition.
+Summary: Now that Cardio/V3 is fully closed out (see the related report), continued the deeper Strength Build62 diagnosis. A bounded, all-time zero-write server audit proved the exact command this flow sends has **never once** produced a receipt for this account — while everything else (HealthKit sync, training commits, check-ins) flows normally through the same period. That rules out ordinary flakiness as the reason two separate, independently-reviewed network-retry fixes both failed real acceptance.
 
-Along the way, found and fixed a bug in my own prior work (graduated Cardio evidence was missing standard fields that would have made it invisible to most consumers) and the originally-flagged Photo Event narrative mislabeling bug (a Cardio-only week could have falsely claimed "resistance training was consistent"). Both fixed, tested, independently reviewed twice, and deployed. Ran the full pre-activation audit — all 8 required properties confirmed, including a live test proving ordinary Cardio doesn't force a false narrative claim while material Cardio does correctly reach evidence.
+Also found the pending review's identity has quietly churned: the record the Founder has been tapping was recreated by a background reassessment two days after the actual workout, and a separate, adjacent-date review was auto-confirmed by the system, not by the Founder.
 
-Activated `cardio_training` in the live policy under your explicit authorization, then independently reverified: live policy correct, zero data drift, Strength stays fully separate, no historical artifact touched.
+Reading the real Native source turned up two concrete architectural gaps that would explain everything observed: a silent button-tap guard that could fail with zero feedback, and a network-error handler that throws away whether a failure was a real connection drop, a cancelled task, a timeout, or something else — making it impossible to tell from server logs alone which one is happening.
 
-**Still open** (unrelated to this task, explicitly not resolved here): the Sep 24 Strength confirmation failure on Build 62, the Logged Today Cardio Native presentation gap, and real-world exercise of the reconciliation-review notifications.
+Per the standing instruction not to ship another guess, built (but did not ship) deterministic on-device diagnostics instead — so the *next* real attempt tells us definitively what happened, readable in-app without needing a device connected to a computer. Reviewed twice, tested (212/212 passing), not archived, not uploaded, no build bump.
 
-**Next step**: the deeper Build 62 Strength diagnosis, per the standing sequencing. HealthKit Sleep has not been started.
+**Preserved throughout**: Sep24/Sep26 case untouched, not retried, no production mutation, no device operated.
 
-Detailed report: `agent-handoffs/reports/20260927T003000Z-healthkit-cardio-v3-phase1-closeout-final.md`
+**Next step**: fold this instrumentation into the next batched Native build (per the standing A–H list) under its own separate authorization — do not ask the Founder to retry Strength confirmation again until that build exists.
 
-Related: `agent-handoffs/reports/20260927T001500Z-healthkit-cardio-v3-deploy-fix-preactivation-audit.md`, `agent-handoffs/reports/20260926T233000Z-healthkit-cardio-v3-graduation-phase1-closeout.md`
+Detailed report: `agent-handoffs/reports/20260927T010000Z-healthkit-strength-build62-root-cause-diagnosis.md`
+
+Related: `agent-handoffs/reports/20260927T003000Z-healthkit-cardio-v3-phase1-closeout-final.md`, `agent-handoffs/reports/20260927T001500Z-healthkit-cardio-v3-deploy-fix-preactivation-audit.md`
 
 Protocol: `agent-handoffs/README.md`

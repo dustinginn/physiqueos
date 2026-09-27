@@ -1,78 +1,80 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-27T00:30:00Z",
+  "generated_at_utc": "2026-09-27T01:00:00Z",
   "task": {
-    "id": "claude-healthkit-cardio-v3-deploy-fix-activate-20260926",
-    "title": "HealthKit Cardio -> V3 strategic graduation ACTIVATED -- Phase 1 closeout (final)",
+    "id": "claude-healthkit-strength-build62-root-cause-diagnosis-20260927",
+    "title": "Strength Build62 diagnosis: decisive new evidence, root-cause candidates found, deterministic Native observability prepared (not shipped)",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
-    "cardio_graduation_candidate_sha": "cc8bd0b706e155223b112d44a95d93680d0a0054",
-    "cardio_graduation_deployed": true,
-    "photo_event_and_wrapper_fix_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
-    "photo_event_and_wrapper_fix_deployed": true,
-    "graduation_policy_version_before": 2,
-    "graduation_policy_version_after": 3,
-    "live_graduation_policy_evidence_eligibility_domains_before": ["activity", "nutrition"],
-    "live_graduation_policy_evidence_eligibility_domains_after": ["activity", "cardio_training", "nutrition"],
-    "cardio_training_activation_applied": true,
     "native_installed_sha": "abb10e9c",
     "native_installed_build": 61,
     "native_build62_final_sha": "85c38104",
     "native_build62_uploaded": true,
     "native_build62_processing_status": "VALID",
-    "native_build62_real_acceptance_test": "FAILED (Sep24 Strength confirmation still fails; deeper diagnosis not yet started)"
+    "native_build62_real_acceptance_test": "FAILED (Sep24/Sep26 Strength confirmation still fails)",
+    "strength_diagnosis_worktree": "/private/tmp/physiqueos-healthkit-token-refresh-retry-hardening",
+    "strength_diagnosis_branch": "codex/strength-build62-diagnostic-instrumentation",
+    "strength_diagnosis_head_sha": "933ab25fcc9eb65261ab69cdd66b74f73503827d",
+    "strength_diagnosis_base_sha": "85c38104",
+    "strength_diagnosis_pushed": false,
+    "strength_diagnosis_built_into_archive": false,
+    "cardio_v3_task_status": "completed_see_related_report",
+    "workout_reconciliation_review_current_pending_id": "healthkit_workout_reconciliation_36a18cc3ea586489ca963abd1f04300ce23b9eb0",
+    "workout_reconciliation_review_current_pending_local_date": "2026-09-24",
+    "workout_reconciliation_review_sibling_auto_confirmed_id": "healthkit_workout_reconciliation_85abbdbec5947c275c677d09fdcb6b8b004908aa",
+    "workout_reconciliation_review_sibling_auto_confirmed_local_date": "2026-09-23"
   },
   "result": {
-    "summary": "Phase 1 HealthKit Cardio -> V3 strategic graduation is COMPLETE and ACTIVE. Deployed and verified the inert candidate (cc8bd0b7), found and fixed a self-introduced wrapper-shape defect plus the originally-flagged PhotoEventNarrativeService resistance-mislabeling defect (deployed and verified as 49211870), ran the full final pre-activation audit (all 8 required properties confirmed, including a live integration test), then activated cardio_training in the live evidenceEligibility.domains under explicit Founder authorization at each step. Independently verified post-activation: live policy correctly contains activity/nutrition/cardio_training, all real data counts unchanged, Strength stays fully separate, no historical regeneration. Canonical HealthKit Cardio workouts (never Strength) can now prospectively reach V3 Confidence/Narrative evidence, subject to the same duplicate-suppression rules already governing Training Day presentation.",
+    "summary": "Continued the Build62 Strength diagnosis (Step 2 of the standing ChatGPT sequencing) now that Cardio/V3 (see related report) is complete. A bounded, all-time, zero-write server audit proved workout-reconciliation.resolve.v1 has NEVER produced a single command_receipts row for this account, while every other command type flowed normally through the same period -- ruling out ordinary transport/auth flakiness as the mechanism (explains why two independent, independently-reviewed retry fixes both failed real acceptance). Precise ID-based inspection also found the pending review's identity has churned: the actual current pending review (localDate 2026-09-24, 60% match, matches the Founder's screenshot) was only created by an ingestion-reassessment batch on 2026-09-26, two days after the workout; a separate, adjacent-date review was auto-confirmed by a system matcher, not the Founder. A static read of the real Build62 Native source surfaced two concrete architectural weaknesses that would be indistinguishable from server telemetry alone: a silent early-return guard with no error surfaced, and a blanket error-catch that discards whether a failure was a genuine connection failure, a task cancellation, a timeout, or something else. Per the explicit instruction not to ship another speculative retry, deterministic Native observability was designed, implemented, tested, and fresh-context reviewed (two rounds) instead -- ready as a candidate for the future batched Native build, not archived or uploaded.",
     "success": true,
-    "production_mutated": true,
-    "deployed": true,
+    "production_mutated": false,
+    "deployed": false,
     "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "All fixes RED/GREEN mutation-verified. Full affected regression suite up to 145/145 across 10 files; before/after comparison against previously-deployed baseline confirmed no other regressions."
+      "summary": "Whole app target builds clean. Scoped test run of new diagnostic-type tests plus the complete pre-existing FounderServerAPITests suite: 212/212 passing, zero failures, including all four pre-existing WorkoutReconciliation* API-layer tests -- confirms the perform() instrumentation is purely additive."
     },
     "review": {
       "status": "approved",
-      "summary": "Two separate fresh-context adversarial reviews approved both the original candidate and the follow-up fix; both surfaced findings that were fixed before deploy (PhotoEventNarrativeService mislabeling; a wrapper-level provenance gap)."
+      "summary": "Two rounds of fresh-context adversarial review. First round approved the instrumentation as safe (verified: no control-flow/retry/thrown-type change, actor-isolation correctness, no PII/token leak, correct pbxproj wiring) with two moderate follow-ups (3 sibling silent guards untouched; no test proved the real perform() catch line fires) and two low-severity notes. Both moderate follow-ups fixed in a second commit and reverified: 212/212 passing after fixes."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Zero-write verification run after both deploys AND after the policy activation itself (three total post-action verifications). Activation applied via the established guarded operation with dry-run-matched expected facts (zero drift between dry-run and apply); the tool's own invariant checks and an independent separate zero-write read both confirm the live policy is exactly the authorized record and all real data collections are unchanged."
+      "summary": "Bounded, zero-write, rolled-back production audit searched command_receipts across the account's ENTIRE history (not a narrow window) for the exact command type: zero rows, ever. Cross-checked against 4 days of all-other-command-type activity (276 HealthKit ingestion batches, training-session commits, check-ins, priority completions), all committed normally in the same window. Also read the exact evidence-review records by precise ID (not substring match) to establish the review-identity-churn finding."
     }
   },
   "decisions_required": [
-    "Confirm proceeding next to the separate, deeper Build 62 Strength diagnosis per the prior ChatGPT orchestration handoff's sequencing -- the Cardio/V3 task this report closes is now fully done."
+    "None blocking. For awareness: the diagnostic instrumentation prepared here should be included in the next coherent batched Native candidate (items A-H); the Founder's next real Strength confirmation attempt against that build will be the first with genuine Native-side diagnostic evidence (readable via a new in-app 'Workout Reconciliation Diagnostics' screen) rather than requiring more server-side forensic guesswork."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Self-discovered and fixed before any external report: overlayGraduatedHealthKitCardioWorkouts's graduated objects were initially missing standard canonical-evidence-object wrapper fields, which would have made them invisible to most consumers even once the scope was enabled.",
-    "The official guarded healthKitGraduationPolicy ops tool's own dry-run simulation does not model the Cardio workout overlay at all -- a pre-existing scope limitation, not introduced by this task, worth a future enhancement."
+    "The pending Strength reconciliation review's identity has churned: the record the Founder has been attempting to confirm (localDate 2026-09-24, matches the Founder's screenshot) was recreated by an ingestion-reassessment batch on 2026-09-26, two days after the underlying workout -- a distinct, adjacent-date review (localDate 2026-09-23) was separately auto-confirmed by a system matcher, not by the Founder.",
+    "workout-reconciliation.resolve.v1 has zero command_receipts rows across the account's entire history -- not just around the recent failures -- while every other command type flows normally, decisively ruling out generic transport/auth flakiness as the shared mechanism behind both prior fix attempts' failures."
   ],
   "backlog": [
-    "A. Strength reconciliation confirm-action reliability -- still open; Sep24 case failed again on Build 62; the ChatGPT-mandated deeper diagnosis is the next task.",
+    "A. Strength reconciliation confirm-action reliability -- diagnosis materially advanced this task; a genuinely decisive test requires the prepared instrumentation to ship in a future build and a real Founder attempt against it.",
     "B. Active Goal 'Your Journey' phase-progress bars should match Home's visual treatment.",
-    "C. Log/Logged Today Training should include canonical Cardio under the unified Training presentation model (Training Day already does; Logged Today does not yet) -- open.",
+    "C. Log/Logged Today Training should include canonical Cardio under the unified Training presentation model.",
     "D. Completed 'Visible Abs' goal should render the Founder's actual first/final canonical progress photos instead of placeholders.",
     "E. Preserve the reconciliation-review notifications shipped in Build 61 (no regression) -- natural-event acceptance still pending real-world exercise.",
     "F. Performance Phase 2 already accepted -- no regression.",
     "G. Training/Cardio presentation already accepted -- no regression.",
     "H. Local-day/timezone handling not exhaustively tested; flag for the batched next-Native-candidate's test pass.",
-    "Minor observability gap (non-blocking): overlayCardioWorkouts failures don't set the evidenceOverlayFailure flag the Briefing Settlement gate watches, by design -- worth a future log line or counter.",
-    "Consider extending the official healthKitGraduationPolicy ops tool's own dry-run simulation to also model the Cardio workout overlay."
+    "The three sibling silent-guard flows (DEXA correction, generic confirm, dismiss) now surface .failed(...) instead of a dead button -- same pattern fixed, verify no UX regression once shipped.",
+    "Theoretical, currently-inert query-string leak surface in NetworkFailureDiagnostics documented but not structurally enforced -- worth hardening if any future perform() call site ever carries sensitive query data."
   ],
-  "recommended_next_step": "Begin the separate, deeper Build 62 Strength diagnosis per the ChatGPT handoff's sequencing (Native -> transport/auth -> Server command receipt -> handler -> readback/verification). HealthKit Sleep has not been started, per this task's explicit instruction.",
-  "full_report_path": "agent-handoffs/reports/20260927T003000Z-healthkit-cardio-v3-phase1-closeout-final.md",
+  "recommended_next_step": "Fold this diagnosis and its prepared instrumentation into the single coherent next Native candidate batching items A-H, under its own separate authorization. Do not ask the Founder to retry the Sep24/Sep26 Strength confirmation again until that instrumented build is in hand.",
+  "full_report_path": "agent-handoffs/reports/20260927T010000Z-healthkit-strength-build62-root-cause-diagnosis.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260927T003000Z-healthkit-cardio-v3-phase1-closeout-final.md",
     "agent-handoffs/reports/20260927T001500Z-healthkit-cardio-v3-deploy-fix-preactivation-audit.md",
-    "agent-handoffs/reports/20260926T233000Z-healthkit-cardio-v3-graduation-phase1-closeout.md",
     "agent-handoffs/reports/20260926T222500Z-healthkit-build61-acceptance-failure-root-caused-fixed.md"
   ],
   "safety": {
