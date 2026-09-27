@@ -37,6 +37,9 @@ export function realizePeriodCharacterizationV3({ intelligence, goalLabel, nextE
   const { result, told } = heroResult(lead, units);
   const span = lead.span;
   const days = lead.kind === "routine_shift" || lead.kind === "value_run" || lead.kind === "routine_gap" ? span.days : null;
+  const spanDays = span.days;
+  const stretch = spanDays >= 7 ? "one week" : `${numberWord(spanDays)} ${spanDays === 1 ? "day" : "days"}`;
+  const stretchIs = spanDays >= 7 || spanDays === 1 ? "is" : "are";
   const recurrence = tone === "break" && lead.recurrence?.count > 0 ? lead.recurrence : null;
   const weeks = recurrence ? Math.round(((recurrence.lookbackDays ?? 28) + windowDays(intelligence)) / 7) : null;
   const goalContext = `in the context of ${goalLabel}`;
@@ -58,17 +61,21 @@ export function realizePeriodCharacterizationV3({ intelligence, goalLabel, nextE
       : "Watch whether next week holds its routine; one stretch like this is noise, a repeat would be a pattern.";
     coach = recurrence
       ? `${upperFirst(numberWord(recurrence.count + 1))} breaks like this in ${numberWord(weeks)} weeks are worth noticing, though not yet a reason to change the plan; the next week or two will show whether it is becoming a habit.`
-      : "A short break like this rarely matters on its own; what matters is how quickly the usual routine comes back.";
+      : spanDays <= 4
+        ? "A short break like this rarely matters on its own; what matters is how quickly the usual routine comes back."
+        : "A stretch like this matters less than how quickly the usual routine comes back.";
   } else if (tone === "increase") {
-    meaning = `One week of higher ${subject} is small ${goalContext}.`;
-    watch = `Watch whether ${subject} settles back toward your usual next week; a second week like this would be a pattern.`;
-    coach = `If the extra ${subject} was deliberate, keep an eye on how recovery holds up; if not, ease back toward your usual range.`;
+    meaning = `${upperFirst(stretch)} of higher ${subject} ${stretchIs} small ${goalContext}.`;
+    watch = `Watch whether ${subject} settles back toward your usual next week; a repeat would be a pattern.`;
+    coach = subject === "intake"
+      ? "Whether that matters depends on the plan, not on your usual; the Energy view shows how intake compares with the target."
+      : `If the extra ${subject} was deliberate, keep an eye on how recovery holds up; if not, ease back toward your usual range.`;
   } else if (tone === "variable") {
     meaning = `A more variable week is small ${goalContext}.`;
     watch = "Watch whether next week is steadier; a second uneven week would be a pattern.";
     coach = "An uneven week happens; what matters is settling back into a steady rhythm.";
   } else {
-    meaning = `A week that did not follow the usual routine is small ${goalContext}.`;
+    meaning = `${upperFirst(stretch)} off the usual routine ${stretchIs} small ${goalContext}.`;
     watch = "Watch whether next week follows the usual routine; a second week like this would be a pattern.";
     coach = "Weeks like this happen; what matters is getting back to a steady routine.";
   }
@@ -83,9 +90,11 @@ export function realizePeriodCharacterizationV3({ intelligence, goalLabel, nextE
     action,
     watch,
     coachTake: `${coach}${reliabilityNote}`,
-    confidencePeriod: tone === "break" && days ? `a ${numberWord(days)}-day break in routine` : "one week off the usual routine",
+    confidencePeriod: tone === "break"
+      ? (days && days <= 4 ? `a ${numberWord(days)}-day break in routine` : "a stretch below the usual routine")
+      : `${stretch} off the usual routine`,
     nextEvidenceName,
-    reliabilityIds: reliabilityWithin(intelligence.reliability ?? [], span).map((item) => item.id),
+    reliabilityIds: mostSpecificPerDate(reliabilityWithin(intelligence.reliability ?? [], span)).map((item) => item.id),
     toldPatternIds: told.flatMap((item) => item.sourceIds ?? [item.id]),
   };
 }
@@ -94,6 +103,7 @@ export function realizePeriodCharacterizationV3({ intelligence, goalLabel, nextE
 
 function heroResult(lead, units) {
   const clauses = units.map((unit) => ({ unit, text: clauseFor(unit) })).filter((item) => item.text);
+  if (!clauses.length) throw new Error("No realizable clause for this characterization.");
   if (lead.kind !== "routine_shift") {
     const first = clauses[0];
     return { result: `${upperFirst(first.text)}.`, told: [first.unit] };
@@ -126,22 +136,21 @@ function clauseFor(item) {
 
 function composeAction({ tone, told, intelligence }) {
   const keep = "Keep the current setup in place.";
-  if (tone === "increase") {
-    return told.some((item) => item.domain === "nutrition")
-      ? `Bring intake back toward your usual range this week. ${keep}`
-      : `No adjustment is needed. ${keep}`;
-  }
-  if (tone !== "break") return `Aim for a steadier routine this week. ${keep}`;
+  // Intake is judged against the plan's targets (the Energy view), never
+  // against the person's usual — a surplus plan may ask for more.
+  const intakeTold = told.some((item) => item.domain === "nutrition");
+  const intakeLine = intakeTold ? " Keep intake on plan." : "";
+  if (tone === "increase") return intakeTold ? `Keep intake on plan this week. ${keep}` : `No adjustment is needed. ${keep}`;
+  if (tone !== "break") return `Aim for a steadier routine this week.${intakeLine} ${keep}`;
   const weighInRate = intelligence.baselines?.find((item) => item.signal === "body.weigh_in")?.rate ?? 0;
   const targets = [];
   const has = (domain) => told.some((item) => item.domain === domain || item.gapDomains?.includes(domain));
   if (has("training")) targets.push("training rhythm");
-  if (has("nutrition")) targets.push("intake range");
   if (has("activity")) targets.push("activity level");
   if (has("body")) targets.push(weighInRate >= 0.85 ? "daily weigh-ins" : "weigh-in habit");
   return targets.length
-    ? `Get back to your usual ${list(targets)} this week. ${keep}`
-    : `Return to your usual routine this week. ${keep}`;
+    ? `Get back to your usual ${list(targets)} this week.${intakeLine} ${keep}`
+    : `Return to your usual routine this week.${intakeLine} ${keep}`;
 }
 
 // ---------------------------------------------------------------- reliability
@@ -153,7 +162,7 @@ const RELIABILITY_PHRASE = {
 };
 
 function composeReliabilityNote(findings, span) {
-  const within = reliabilityWithin(findings, span);
+  const within = mostSpecificPerDate(reliabilityWithin(findings, span));
   if (!within.length) return "";
   const byKind = new Map();
   for (const item of within) byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), item.date]);
@@ -165,6 +174,18 @@ function composeReliabilityNote(findings, span) {
   });
   const count = new Set(within.map((item) => item.date)).size;
   return ` ${upperFirst(list(parts))}, so this recap does not read intake on ${count === 1 ? "that day" : "those days"} either way.`;
+}
+
+const RELIABILITY_SPECIFICITY = ["duplicate_day_totals", "implausible_macro_profile", "partial_day"];
+
+function mostSpecificPerDate(findings) {
+  const byDate = new Map();
+  for (const item of findings) {
+    const current = byDate.get(item.date);
+    const rank = (value) => { const index = RELIABILITY_SPECIFICITY.indexOf(value?.kind); return index < 0 ? 99 : index; };
+    if (!current || rank(item) < rank(current)) byDate.set(item.date, item);
+  }
+  return [...byDate.values()];
 }
 
 function reliabilityWithin(findings, span) {

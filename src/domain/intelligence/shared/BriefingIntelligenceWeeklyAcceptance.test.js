@@ -52,7 +52,7 @@ describe("Shared Briefing Intelligence through the Weekly V3 pipeline", () => {
       const prepared = await weekly(generateSyntheticPeriod({ seed, scenario: "late_disruption" }));
       const { composition, periodCharacterization } = prepared.narrativePlan;
       expect(periodCharacterization.realized).toBe(true);
-      expect(composition.headline).toMatch(/^Late in the week the usual routine changed: /u);
+      expect(composition.headline).toMatch(/^(?:Late in the week the usual routine changed: |Activity (?:well )?below your usual )/u);
       expect(composition.headline).not.toMatch(/Nothing here calls for a change/u);
       expect(composition.coachTake).not.toMatch(/Nothing needs fixing right now/u);
       expect(composition.sections.action).toMatch(/Keep the current setup in place\.$/u);

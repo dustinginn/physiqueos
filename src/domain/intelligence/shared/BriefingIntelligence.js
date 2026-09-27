@@ -319,7 +319,11 @@ function detectRoutineShifts({ patterns, window, settings }) {
   const spanned = patterns.filter((item) => [BriefingPatternKind.VALUE_RUN, BriefingPatternKind.ROUTINE_GAP].includes(item.kind));
   const groups = [];
   for (const item of [...spanned].sort((left, right) => left.span.startDate.localeCompare(right.span.startDate))) {
-    const group = groups.find((candidate) => spansTouch(candidate.span, item.span));
+    // Members must share days (not merely touch), and one signal contributes
+    // one member: "intake below early, above late" is two findings, never one
+    // routine shift.
+    const group = groups.find((candidate) => spansOverlap(candidate.span, item.span) &&
+      !candidate.members.some((member) => signalGroup(member.signal) === signalGroup(item.signal)));
     if (group) {
       group.members.push(item);
       group.span = { startDate: minDate(group.span.startDate, item.span.startDate),
@@ -328,8 +332,11 @@ function detectRoutineShifts({ patterns, window, settings }) {
       groups.push({ span: { ...item.span }, members: [item] });
     }
   }
+  // A routine shift needs at least two behavior domains changing together;
+  // a measurement habit (weigh-ins) can join one but never makes one.
   return groups
-    .filter((group) => new Set(group.members.map((item) => item.domain)).size >= 2)
+    .filter((group) => new Set(group.members.map((item) => item.domain)
+      .filter((domain) => !settings.supportingOnlyDomains.includes(domain))).size >= 2)
     .map((group) => {
       const domains = [...new Set(group.members.map((item) => item.domain))].sort();
       const days = dateRange(group.span.startDate, group.span.endDate).length;
@@ -460,18 +467,18 @@ function selectCharacterization(ranked, settings, byId = new Map()) {
   for (const item of ranked) {
     if (item.materiality < settings.minMateriality) continue;
     if (told.has(item.id)) continue;
-    if (item.signal && toldSignals.has(item.signal)) continue;
+    if (item.signal && toldSignals.has(signalGroup(item.signal))) continue;
     // Measurement habits (weigh-ins) can support a routine shift but never
     // characterize a period on their own.
     if (item.kind !== BriefingPatternKind.ROUTINE_SHIFT && settings.supportingOnlyDomains.includes(item.domain)) continue;
     if (item.kind === BriefingPatternKind.FREQUENCY_CHANGE &&
         selected.some((other) => other.signals?.includes(item.signal) || other.signal === item.signal)) continue;
     selected.push(item);
-    if (item.signal) toldSignals.add(item.signal);
+    if (item.signal) toldSignals.add(signalGroup(item.signal));
     for (const member of item.members ?? []) {
       told.add(member);
       const signal = byId.get(member)?.signal;
-      if (signal) toldSignals.add(signal);
+      if (signal) toldSignals.add(signalGroup(signal));
     }
     if (selected.length >= settings.maxCharacterization) break;
   }
@@ -561,8 +568,14 @@ function periodPosition(span, window) {
   return "middle";
 }
 
-function spansTouch(left, right) {
-  return !(shiftDate(left.endDate, 1) < right.startDate || shiftDate(right.endDate, 1) < left.startDate);
+function spansOverlap(left, right) {
+  return !(left.endDate < right.startDate || right.endDate < left.startDate);
+}
+
+// One wearable is one source: movement and exercise minutes are one signal
+// family for grouping and selection.
+function signalGroup(signal) {
+  return String(signal ?? "").startsWith("activity.") ? "activity" : String(signal ?? "");
 }
 
 function median(values) {

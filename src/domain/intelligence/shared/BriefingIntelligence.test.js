@@ -138,20 +138,29 @@ describe("Briefing Intelligence — properties across generated periods", () => 
     }
   });
 
-  it("a multi-domain late-week disruption leads the characterization as one co-occurring routine shift", () => {
+  it("a late-week disruption leads the characterization; it is a routine shift when training was expected too", () => {
+    let shifts = 0;
     for (const { truth, intelligence } of byScenario("late_disruption")) {
       const lead = intelligence.characterization[0];
-      expect(lead?.kind, `seed ${truth.seed}`).toBe(BriefingPatternKind.ROUTINE_SHIFT);
-      expect(lead.position).toBe("late");
-      expect(lead.domains).toContain("activity");
+      expect(lead, `seed ${truth.seed}`).toBeTruthy();
       expect(lead.span.endDate).toBe(truth.window.endDate);
-      // Training is part of the shift exactly when the routine expected sessions
-      // on the disrupted days — a scheduled rest day is not a missed session.
+      // Training joins exactly when the routine expected sessions on the
+      // disrupted days — a scheduled rest day is not a missed session, and a
+      // shift needs two behavior domains (weigh-ins only support one).
       const baseline = intelligence.baselines.find((item) => item.signal === "training.session");
       const expectedMissed = truth.perturbed.reduce((sum, date) =>
         sum + baseline.weekdayRates[new Date(`${date}T12:00:00Z`).getUTCDay()], 0);
-      if (expectedMissed >= 2) expect(lead.domains).toContain("training");
+      if (expectedMissed >= 2) {
+        expect(lead.kind, `seed ${truth.seed}`).toBe(BriefingPatternKind.ROUTINE_SHIFT);
+        expect(lead.domains).toEqual(expect.arrayContaining(["activity", "training"]));
+        expect(lead.position).toBe("late");
+        shifts += 1;
+      } else if (lead.kind !== BriefingPatternKind.ROUTINE_SHIFT) {
+        expect(["activity", "training"], `seed ${truth.seed}`).toContain(lead.domain);
+      }
     }
+    // Non-vacuous: several generated weeks disrupt expected training days.
+    expect(shifts).toBeGreaterThanOrEqual(5);
   });
 
   it("wearable noise without a sustained change does not become a characterization", () => {

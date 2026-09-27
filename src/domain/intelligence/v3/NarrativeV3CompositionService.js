@@ -79,7 +79,7 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   // evaluation keeps its own allocation.
   context.period = briefingIntelligence && context.useRecurringSectionPlan &&
       interpretation.recommendation.action === "continue_current_strategy"
-    ? realizePeriodCharacterizationV3({
+    ? safelyRealizePeriod({
       intelligence: briefingIntelligence,
       goalLabel: goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel ?? "goal",
       nextEvidenceName: nextEvidenceName(context),
@@ -471,6 +471,12 @@ function allocateNarrativeSections(context) {
       watch: watchText, coachTake: coachText },
     allocations,
   };
+}
+
+// Enrichment never fails a briefing: an unrealizable characterization falls
+// back to the prior recurring allocation.
+function safelyRealizePeriod(input) {
+  try { return realizePeriodCharacterizationV3(input); } catch { return null; }
 }
 
 // The period's own character leads when the plan holds: the week is

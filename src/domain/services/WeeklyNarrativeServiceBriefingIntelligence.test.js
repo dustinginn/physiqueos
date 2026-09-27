@@ -58,7 +58,7 @@ describe("Weekly hands its already-read canonical evidence to the shared Briefin
     expect(last.periodEvidence.canonicalObjects).toBe(canonicalObjects);
   });
 
-  it("two concurrent generations each publish with their own evidence (no shared state)", async () => {
+  it("separate generations never share evidence: each publishes exactly the objects it read", async () => {
     const first = setup();
     const second = setup();
     await Promise.all([

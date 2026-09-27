@@ -111,6 +111,47 @@ describe("recap language across lead kinds, directions and spans", () => {
   });
 });
 
+describe("second-review fixes", () => {
+  it("a routine shift joins overlapping days, one member per signal family, and needs two behavior domains", () => {
+    for (const { name, intelligence } of realized) {
+      const byId = new Map(intelligence.patterns.map((item) => [item.id, item]));
+      for (const shift of intelligence.patterns.filter((item) => item.kind === BriefingPatternKind.ROUTINE_SHIFT)) {
+        const members = shift.members.map((id) => byId.get(id));
+        const families = members.map((item) => item.signal.startsWith("activity.") ? "activity" : item.signal);
+        expect(new Set(families).size, name).toBe(families.length);
+        expect(new Set(members.map((item) => item.domain).filter((domain) => domain !== "body")).size, name).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it("intake is advised against the plan, never against the person's usual", () => {
+    for (const { name, period } of realized) {
+      expect(period.action, name).not.toMatch(/usual intake|intake range|intake back toward your usual/u);
+      if (/intake/iu.test(period.result)) expect(period.action, name).toMatch(/Keep intake on plan/u);
+    }
+  });
+
+  it("span words match the lead's span", () => {
+    for (const { name, period, intelligence } of realized) {
+      const spanDays = intelligence.characterization[0].span.days;
+      const all = [period.meaning, period.watch, period.coachTake].join(" ");
+      if (spanDays < 7) expect(all, name).not.toMatch(/\b(?:One|one) week\b|second week/u);
+      if (spanDays > 4) expect(all, name).not.toMatch(/\bshort break\b/u);
+    }
+  });
+
+  it("the reliability note names each day once", () => {
+    const period = generateSyntheticPeriod({ seed: 5, scenario: "late_disruption" });
+    const last = period.days.at(-1);
+    last.nutrition.protein = Math.round(last.nutrition.protein * 0.25);
+    last.nutrition.completeness = "partial";
+    const text = realize(intelligenceFor(period.days, period.truth.window)).coachTake;
+    const note = text.slice(text.search(/The nutrition log/u));
+    const weekday = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(`${last.date}T12:00:00Z`).getUTCDay()];
+    expect(note.split(weekday).length - 1).toBe(1);
+  });
+});
+
 describe("shared-layer fixes", () => {
   it("one finding per signal: opposite-direction findings on intake never lead together", () => {
     for (const { name, intelligence } of realized) {
@@ -165,7 +206,7 @@ describe("briefing policies can express their role", () => {
       for (const item of intelligence.characterization) expect(allowed.has(item.kind)).toBe(true);
       if (intelligence.characterization.some((item) => item.kind === BriefingPatternKind.ROUTINE_SHIFT)) shifts += 1;
     }
-    expect(shifts).toBeGreaterThan(4);
+    expect(shifts).toBeGreaterThanOrEqual(3);
   });
 
   it("DEXA and Photo characterize a preceding-execution window, never beyond the event date", () => {
