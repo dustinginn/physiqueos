@@ -481,15 +481,22 @@ function allocatePeriodCharacterization(context) {
   const period = context.period;
   context.energyAmbiguityText = translateEnergyAmbiguityForCoaching(context);
   context.resultOperatingSignal = null;
+  // Decision-relevant uncertainty keeps its place in Watch; the period's own
+  // forward watch takes Watch only when nothing more important needs it.
+  const { interpretation } = context;
+  context.periodOwnsWatch = !interpretation.uncertaintyProfile.some((item) =>
+    item.domain !== "energy" && shouldSurfaceUncertainty(item, interpretation));
+  const watch = context.periodOwnsWatch ? period.watch : recurringNextCheck(context);
   return {
     mode: "recurring_period_characterization",
     content: { result: period.result, meaning: period.meaning, action: period.action,
-      watch: period.watch, coachTake: period.coachTake },
+      watch, coachTake: period.coachTake },
     allocations: {
       result: allocation("recent_change_worth_knowing", period.leadId, { scope: "period" }),
       meaning: allocation("goal_relative_implication", "goal_implication"),
       action: allocation("current_coaching_action", "recommendation"),
-      watch: allocation("specific_bounded_attention", `${period.leadId}|persistence`),
+      watch: allocation("specific_bounded_attention",
+        context.periodOwnsWatch ? `${period.leadId}|persistence` : "next_assessment"),
       confidence: allocation("goal_outlook_movement", "confidence_movement"),
       coachTake: allocation("highest_value_remaining_coaching_point", `${period.leadId}|coaching`,
         { allocationReason: "period_characterization",
@@ -1249,6 +1256,9 @@ function resolveUncertaintySurfacing(item, interpretation, context) {
     return { surfaced: false, suppressionReason: "low_materiality_no_recommendation_effect" };
   }
   if (shouldSurfaceUncertainty(item, interpretation)) {
+    // When the period recap owns Watch, this uncertainty was not stated there;
+    // record that honestly rather than claiming it was surfaced.
+    if (context.periodOwnsWatch) return { surfaced: false, suppressionReason: "watch_allocated_to_period_characterization" };
     return { surfaced: true, surfacedIn: "watch", suppressionReason: null };
   }
   return { surfaced: false, suppressionReason: legacySuppressionReason(item, interpretation) };

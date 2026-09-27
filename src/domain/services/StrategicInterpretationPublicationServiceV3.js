@@ -47,7 +47,8 @@ export function createStrategicInterpretationPublicationServiceV3({
     });
     const observations = mergeObservations(supersession.observations, additional);
     const prior = priorV3Context(normalized.previousCanonicalAssessment);
-    const briefingIntelligence = resolveBriefingIntelligence(normalized);
+    const { intelligence: briefingIntelligence, failure: briefingIntelligenceFailure } =
+      resolveBriefingIntelligence(normalized);
     const outputs = runConfidenceNarrativeV3({
       goalContract: production.goalContract,
       observations,
@@ -96,6 +97,9 @@ export function createStrategicInterpretationPublicationServiceV3({
           STRATEGIC_INTERPRETATION_PUBLICATION_V3_VERSION,
         ...(briefingIntelligence
           ? { briefingIntelligenceVersion: BRIEFING_INTELLIGENCE_VERSION }
+          : {}),
+        ...(briefingIntelligenceFailure
+          ? { briefingIntelligenceUnavailable: briefingIntelligenceFailure }
           : {}),
         ...(supersession.superseded.length
           ? { supersededStaleObservations: supersession.superseded.map((item) => ({ ...item })) }
@@ -208,22 +212,40 @@ function normalize(request, now) {
 // publisher. A publisher opts in by supplying the canonical evidence it
 // already read (after its own HealthKit overlay) as `periodEvidence`; its
 // briefing type selects the policy. Without both, V3 runs exactly as before.
+//
+// Enrichment only: a failure here never fails the publication. It degrades to
+// the prior V3 behavior and is recorded on the lineage for diagnosis.
 function resolveBriefingIntelligence(normalized) {
   const evidence = normalized.periodEvidence;
   const policy = resolveBriefingIntelligencePolicy(normalized.cadenceOrEventType);
-  const window = evidence?.window;
-  if (!evidence || !policy || !window?.startDate || !window?.endDate) return null;
-  const startDate = shiftIsoDate(window.startDate, -policy.baselineDays);
-  const days = buildBriefingPeriodDays({
-    canonicalObjects: evidence.canonicalObjects ?? [],
-    weightEntries: evidence.weightEntries ?? [],
-    dexaScans: evidence.dexaScans ?? [],
-    timeZone: evidence.timeZone ?? "America/Los_Angeles",
-    startDate,
-    endDate: window.endDate,
-  });
-  return createBriefingIntelligence({ window: { startDate: window.startDate, endDate: window.endDate },
-    days, policy });
+  if (!evidence || !policy) return { intelligence: null, failure: null };
+  try {
+    const window = resolveIntelligenceWindow(evidence.window, policy);
+    if (!window) return { intelligence: null, failure: "period_window_unavailable" };
+    const startDate = shiftIsoDate(window.startDate, -policy.baselineDays);
+    const days = buildBriefingPeriodDays({
+      canonicalObjects: evidence.canonicalObjects ?? [],
+      weightEntries: evidence.weightEntries ?? [],
+      dexaScans: evidence.dexaScans ?? [],
+      timeZone: evidence.timeZone ?? "America/Los_Angeles",
+      startDate,
+      endDate: window.endDate,
+    });
+    return { intelligence: createBriefingIntelligence({ window, days, policy }), failure: null };
+  } catch (error) {
+    return { intelligence: null, failure: String(error?.code ?? "briefing_intelligence_error").slice(0, 80) };
+  }
+}
+
+// A briefing either characterizes its own window (recurring cadences) or the
+// execution that preceded an event (DEXA/Photo: `contextWindowDays` before the
+// event date, never including a day after it).
+function resolveIntelligenceWindow(window, policy) {
+  if (!window?.endDate) return null;
+  if (policy.contextWindowDays) {
+    return { startDate: shiftIsoDate(window.endDate, -(policy.contextWindowDays - 1)), endDate: window.endDate };
+  }
+  return window.startDate ? { startDate: window.startDate, endDate: window.endDate } : null;
 }
 
 function shiftIsoDate(date, days) {

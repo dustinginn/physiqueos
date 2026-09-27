@@ -101,7 +101,7 @@ describe("Shared Briefing Intelligence through the Weekly V3 pipeline", () => {
       last.nutrition.protein = Math.round(last.nutrition.protein * 0.3);
       const prepared = await weekly(period);
       const coach = prepared.narrativePlan.composition.coachTake;
-      expect(coach).toMatch(/look incomplete, so intake on (?:that day|those days) is not counted either way\./u);
+      expect(coach).toMatch(/nutrition logs? for [^,]+ (?:looks|look) incomplete \(protein far below your usual\), so this recap does not read intake on (?:that day|those days) either way\./u);
       const all = [...Object.values(prepared.narrativePlan.composition.sections), coach].join(" ");
       expect(all).not.toMatch(/\b(?:ate|eating|intake) (?:more|less|higher|lower)\b/iu);
     }

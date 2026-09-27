@@ -1,14 +1,24 @@
 // Realizes the shared Briefing Intelligence characterization as recurring
-// narrative sections. Every sentence is built from the structured findings
-// (pattern kind, domain, direction, span, recurrence, reliability) — never
-// from copy written for a particular period. Wearable measures are described
-// directionally, never with estimated precision, and nothing here attributes
-// a cause: a routine shift says only what changed together.
+// narrative sections. Every sentence is chosen from the structured findings —
+// the lead's kind, the direction of its members (a break, an increase, a mixed
+// or a more variable week), its span, evidenced recurrence, reliability
+// findings and the person's own habits — never from copy written for a
+// particular period. Wearable measures are described directionally, nothing
+// attributes a cause, and nothing assumes progress the evidence has not shown.
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven"];
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const ORDINALS = ["zeroth", "first", "second", "third", "fourth", "fifth", "sixth"];
 const DOMAIN_ORDER = { training: 0, nutrition: 1, activity: 2, body: 3 };
 const POSITION_PHRASE = { late: "Late in the week", early: "Early in the week", middle: "Midweek", whole: "All week" };
+const HEADLINE_BUDGET = 160;
+const LABELS = {
+  "nutrition.calories": "intake",
+  "activity.active_kcal": "activity",
+  "activity.exercise_minutes": "activity",
+  "training.session": "training",
+  "body.weigh_in": "weigh-ins",
+};
 
 export function realizePeriodCharacterizationV3({ intelligence, goalLabel, nextEvidenceName }) {
   if (intelligence?.policy?.cadence !== "weekly") return null;
@@ -18,48 +28,162 @@ export function realizePeriodCharacterizationV3({ intelligence, goalLabel, nextE
   const members = lead.kind === "routine_shift"
     ? (lead.members ?? []).map((id) => patternsById.get(id)).filter(Boolean)
     : [lead];
-  const ordered = [...members].sort((left, right) =>
+  const units = mergeSameDayGaps(mergeActivity(members)).sort((left, right) =>
     (DOMAIN_ORDER[left.domain] ?? 9) - (DOMAIN_ORDER[right.domain] ?? 9) ||
-    right.materiality - left.materiality);
-  const clauses = mergeSameDayGaps(ordered).map(memberClause).filter(Boolean);
-  if (!clauses.length) return null;
+    (right.materiality ?? 0) - (left.materiality ?? 0));
+  if (!units.length) return null;
+
+  const tone = toneOf(units);
+  const { result, told } = heroResult(lead, units);
   const span = lead.span;
-  const reliability = reliabilityWithin(intelligence.reliability ?? [], span);
-  const result = shortenToBudget(lead.kind === "routine_shift"
-    ? `${POSITION_PHRASE[lead.position] ?? "This week"} the usual routine changed: ${list(clauses.slice(0, 3))}.`
-    : `${upperFirst(clauses[0])}.`);
-  const dayCount = lead.kind === "routine_shift" ? span.days : null;
-  const recurrence = lead.recurrence?.count > 0 ? lead.recurrence : null;
-  const offRoutine = dayCount ? `${upperFirst(numberWord(dayCount))} off-routine ${dayCount === 1 ? "day is" : "days are"}` :
-    "A change like this is";
-  const weeks = numberWord(Math.round(daysBetween(intelligence.horizon.baselineWindow.startDate,
-    intelligence.horizon.window.endDate) / 7));
-  const occurrence = recurrence ? ordinal(recurrence.count + 1) : null;
-  const recurringWhat = recurrence ? recurrenceNoun(recurrence) : null;
-  const meaning = recurrence
-    ? `${offRoutine} small against your progress toward ${goalLabel}, but this is the ${occurrence} ${recurringWhat} in the last ${weeks} weeks.`
-    : `${offRoutine} small against your progress toward ${goalLabel} and do not change the plan on ${dayCount === 1 ? "its" : "their"} own.`;
-  const restore = restorationTargets(ordered);
-  const action = restore.length
-    ? `Get back to your usual ${list(restore)} this week. Keep the current setup in place.`
-    : "Return to your usual routine this week. Keep the current setup in place.";
-  const watch = recurrence
-    ? `Watch whether next week holds its routine; a ${ordinal(recurrence.count + 2)} ${recurringWhat} would be a pattern worth planning around.`
-    : `Watch whether next week holds its routine; one stretch like this is noise, a repeat would be a pattern.`;
-  const reliabilityNote = reliability.length
-    ? ` Nutrition logs for ${dayPhrase(reliability.map((item) => item.date), "and")} look incomplete, so intake on ${reliability.length === 1 ? "that day" : "those days"} is not counted either way.`
-    : "";
-  const coachTake = `A few days off the usual routine will not undo the progress, and none of it calls for changing the plan; the goal is to keep it a one-off.${reliabilityNote}`;
-  const confidencePeriod = dayCount
-    ? `a ${numberWord(dayCount)}-day break in routine`
-    : "this week's change";
+  const days = lead.kind === "routine_shift" || lead.kind === "value_run" || lead.kind === "routine_gap" ? span.days : null;
+  const recurrence = tone === "break" && lead.recurrence?.count > 0 ? lead.recurrence : null;
+  const weeks = recurrence ? Math.round(((recurrence.lookbackDays ?? 28) + windowDays(intelligence)) / 7) : null;
+  const goalContext = `in the context of ${goalLabel}`;
+  const subject = labelOf(told[0] ?? units[0]);
+
+  let meaning;
+  let watch;
+  let coach;
+  if (tone === "break") {
+    const plural = Boolean(days && days > 1);
+    const offRoutine = days
+      ? `${upperFirst(numberWord(days))} off-routine ${plural ? "days are" : "day is"}`
+      : "A week below the usual routine is";
+    meaning = recurrence
+      ? `${offRoutine} small ${goalContext}, but this is the ${ordinal(recurrence.count + 1)} multi-day training break in the last ${numberWord(weeks)} weeks.`
+      : `${offRoutine} small ${goalContext} and ${plural ? "do" : "does"} not change the plan on ${plural ? "their" : "its"} own.`;
+    watch = recurrence
+      ? `Watch whether next week holds its routine; a ${ordinal(recurrence.count + 2)} multi-day training break would be a pattern worth planning around.`
+      : "Watch whether next week holds its routine; one stretch like this is noise, a repeat would be a pattern.";
+    coach = recurrence
+      ? `${upperFirst(numberWord(recurrence.count + 1))} breaks like this in ${numberWord(weeks)} weeks are worth noticing, though not yet a reason to change the plan; the next week or two will show whether it is becoming a habit.`
+      : "A short break like this rarely matters on its own; what matters is how quickly the usual routine comes back.";
+  } else if (tone === "increase") {
+    meaning = `One week of higher ${subject} is small ${goalContext}.`;
+    watch = `Watch whether ${subject} settles back toward your usual next week; a second week like this would be a pattern.`;
+    coach = `If the extra ${subject} was deliberate, keep an eye on how recovery holds up; if not, ease back toward your usual range.`;
+  } else if (tone === "variable") {
+    meaning = `A more variable week is small ${goalContext}.`;
+    watch = "Watch whether next week is steadier; a second uneven week would be a pattern.";
+    coach = "An uneven week happens; what matters is settling back into a steady rhythm.";
+  } else {
+    meaning = `A week that did not follow the usual routine is small ${goalContext}.`;
+    watch = "Watch whether next week follows the usual routine; a second week like this would be a pattern.";
+    coach = "Weeks like this happen; what matters is getting back to a steady routine.";
+  }
+
+  const action = composeAction({ tone, told, intelligence });
+  const reliabilityNote = composeReliabilityNote(intelligence.reliability ?? [], span);
   return {
     leadId: lead.id,
-    result, meaning, action, watch, coachTake,
-    confidencePeriod,
+    tone,
+    result,
+    meaning,
+    action,
+    watch,
+    coachTake: `${coach}${reliabilityNote}`,
+    confidencePeriod: tone === "break" && days ? `a ${numberWord(days)}-day break in routine` : "one week off the usual routine",
     nextEvidenceName,
-    reliabilityIds: reliability.map((item) => item.id),
+    reliabilityIds: reliabilityWithin(intelligence.reliability ?? [], span).map((item) => item.id),
+    toldPatternIds: told.flatMap((item) => item.sourceIds ?? [item.id]),
   };
+}
+
+// ---------------------------------------------------------------- hero
+
+function heroResult(lead, units) {
+  const clauses = units.map((unit) => ({ unit, text: clauseFor(unit) })).filter((item) => item.text);
+  if (lead.kind !== "routine_shift") {
+    const first = clauses[0];
+    return { result: `${upperFirst(first.text)}.`, told: [first.unit] };
+  }
+  const prefix = `${POSITION_PHRASE[lead.position] ?? "This week"} the usual routine changed: `;
+  // Whole clauses only, most important first, within the headline budget —
+  // never a clause cut in half.
+  const kept = [];
+  for (const clause of clauses) {
+    const candidate = `${prefix}${list([...kept, clause].map((item) => item.text))}.`;
+    if (candidate.length <= HEADLINE_BUDGET || kept.length === 0) kept.push(clause);
+  }
+  return { result: `${prefix}${list(kept.map((item) => item.text))}.`, told: kept.map((item) => item.unit) };
+}
+
+function clauseFor(item) {
+  const days = dayPhrase(item.dates?.length ? item.dates : [item.span.startDate, item.span.endDate],
+    item.kind === "routine_gap" ? "or" : "and");
+  if (item.kind === "routine_gap") return `no ${(item.gapLabels ?? [labelOf(item)]).join(" or ")} ${days}`;
+  if (item.kind === "value_run") return `${labelOf(item)} ${directionWord(item)} your usual ${days}`;
+  if (item.kind === "level_shift") return `${labelOf(item)} ${directionWord(item)} your usual for most of the week`;
+  if (item.kind === "frequency_change") {
+    return `${item.magnitude.observed} training ${item.magnitude.observed === 1 ? "day" : "days"} against a usual ${Math.round(item.magnitude.expected)}`;
+  }
+  if (item.kind === "dispersion_change") return `${labelOf(item)} swinging more than usual`;
+  return null;
+}
+
+// ---------------------------------------------------------------- action
+
+function composeAction({ tone, told, intelligence }) {
+  const keep = "Keep the current setup in place.";
+  if (tone === "increase") {
+    return told.some((item) => item.domain === "nutrition")
+      ? `Bring intake back toward your usual range this week. ${keep}`
+      : `No adjustment is needed. ${keep}`;
+  }
+  if (tone !== "break") return `Aim for a steadier routine this week. ${keep}`;
+  const weighInRate = intelligence.baselines?.find((item) => item.signal === "body.weigh_in")?.rate ?? 0;
+  const targets = [];
+  const has = (domain) => told.some((item) => item.domain === domain || item.gapDomains?.includes(domain));
+  if (has("training")) targets.push("training rhythm");
+  if (has("nutrition")) targets.push("intake range");
+  if (has("activity")) targets.push("activity level");
+  if (has("body")) targets.push(weighInRate >= 0.85 ? "daily weigh-ins" : "weigh-in habit");
+  return targets.length
+    ? `Get back to your usual ${list(targets)} this week. ${keep}`
+    : `Return to your usual routine this week. ${keep}`;
+}
+
+// ---------------------------------------------------------------- reliability
+
+const RELIABILITY_PHRASE = {
+  implausible_macro_profile: { one: "looks incomplete (protein far below your usual)", many: "look incomplete (protein far below your usual)" },
+  duplicate_day_totals: { one: "repeats the previous day's totals", many: "repeat the previous day's totals" },
+  partial_day: { one: "covers only part of the day", many: "cover only part of the day" },
+};
+
+function composeReliabilityNote(findings, span) {
+  const within = reliabilityWithin(findings, span);
+  if (!within.length) return "";
+  const byKind = new Map();
+  for (const item of within) byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), item.date]);
+  const parts = [...byKind.entries()].map(([kind, dates]) => {
+    const phrase = RELIABILITY_PHRASE[kind] ?? { one: "looks unreliable", many: "look unreliable" };
+    return dates.length === 1
+      ? `the nutrition log for ${dayPhrase(dates, "and")} ${phrase.one}`
+      : `the nutrition logs for ${dayPhrase(dates, "and")} ${phrase.many}`;
+  });
+  const count = new Set(within.map((item) => item.date)).size;
+  return ` ${upperFirst(list(parts))}, so this recap does not read intake on ${count === 1 ? "that day" : "those days"} either way.`;
+}
+
+function reliabilityWithin(findings, span) {
+  return findings.filter((item) => item.date >= span.startDate && item.date <= span.endDate &&
+    item.effect === "excluded_from_behavior");
+}
+
+// ---------------------------------------------------------------- units
+
+// One wearable is one source: movement and exercise minutes read as a single
+// "activity" clause, carried by whichever finding is more material.
+function mergeActivity(members) {
+  const activity = members.filter((item) => item.domain === "activity");
+  if (activity.length <= 1) return members;
+  const strongest = [...activity].sort((left, right) => (right.materiality ?? 0) - (left.materiality ?? 0))[0];
+  const dates = [...new Set(activity.filter((item) => item.direction === strongest.direction)
+    .flatMap((item) => item.dates ?? []))].sort();
+  return [...members.filter((item) => item.domain !== "activity"),
+    { ...strongest, dates, sourceIds: activity.map((item) => item.id) }];
 }
 
 // Routine gaps on exactly the same days read as one clause
@@ -69,49 +193,28 @@ function mergeSameDayGaps(members) {
   for (const item of members) {
     const twin = item.kind === "routine_gap" && merged.find((other) => other.kind === "routine_gap" &&
       other.dates.join() === item.dates.join());
-    if (twin) twin.gapLabels.push(gapLabel(item));
-    else merged.push(item.kind === "routine_gap" ? { ...item, gapLabels: [gapLabel(item)] } : item);
+    if (twin) {
+      twin.gapLabels.push(labelOf(item));
+      twin.gapDomains.push(item.domain);
+      twin.sourceIds.push(item.id);
+    } else if (item.kind === "routine_gap") {
+      merged.push({ ...item, gapLabels: [labelOf(item)], gapDomains: [item.domain], sourceIds: [item.id] });
+    } else {
+      merged.push(item);
+    }
   }
   return merged;
 }
 
-function gapLabel(item) {
-  return item.domain === "training" ? "training" : item.domain === "body" ? "weigh-ins" : label(item);
+function toneOf(units) {
+  const directions = new Set(units.map((item) => item.kind === "dispersion_change" ? "variable" : item.direction));
+  if ([...directions].every((value) => value === "below" || value === "absent")) return "break";
+  if ([...directions].every((value) => value === "above")) return "increase";
+  if ([...directions].every((value) => value === "variable" || value === "more_variable")) return "variable";
+  return "mixed";
 }
 
-function memberClause(item) {
-  const days = dayPhrase(item.dates?.length ? item.dates : [item.span.startDate, item.span.endDate],
-    item.kind === "routine_gap" ? "or" : "through");
-  if (item.kind === "routine_gap") {
-    return `no ${(item.gapLabels ?? [gapLabel(item)]).join(" or ")} ${days}`;
-  }
-  if (item.kind === "value_run") {
-    return `${label(item)} ${directionWord(item)} your usual ${days}`;
-  }
-  if (item.kind === "level_shift") {
-    return `${label(item)} ${directionWord(item)} your usual all week`;
-  }
-  if (item.kind === "frequency_change") {
-    return `${item.magnitude.observed} training ${item.magnitude.observed === 1 ? "day" : "days"} against a usual ${Math.round(item.magnitude.expected)}`;
-  }
-  if (item.kind === "dispersion_change") return `${label(item)} swinging more than usual`;
-  return null;
-}
-
-function recurrenceNoun(recurrence) {
-  const signals = new Set((recurrence.priorSpans ?? []).map((item) => item.signal));
-  return signals.size === 1 && signals.has("training.session") ? "multi-day training break" : "break in routine";
-}
-
-function label(item) {
-  return {
-    "nutrition.calories": "intake",
-    "activity.active_kcal": "movement",
-    "activity.exercise_minutes": "activity",
-    "training.session": "training",
-    "body.weigh_in": "weigh-ins",
-  }[item.signal] ?? item.domain;
-}
+function labelOf(item) { return LABELS[item.signal] ?? item.domain; }
 
 function directionWord(item) {
   const ratio = Number(item.magnitude?.ratioToBaseline);
@@ -120,26 +223,15 @@ function directionWord(item) {
   return item.direction;
 }
 
-function restorationTargets(members) {
-  const targets = [];
-  if (members.some((item) => item.domain === "training")) targets.push("training rhythm");
-  if (members.some((item) => item.domain === "body")) targets.push("daily weigh-ins");
-  if (!targets.length && members.some((item) => item.domain === "nutrition")) targets.push("intake range");
-  return targets;
-}
-
-function reliabilityWithin(findings, span) {
-  return findings.filter((item) => item.date >= span.startDate && item.date <= span.endDate &&
-    item.effect === "excluded_from_behavior");
-}
+// ---------------------------------------------------------------- words
 
 function dayPhrase(dates, joiner) {
   const unique = [...new Set(dates)].sort();
   const names = unique.map(weekday);
   if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} ${joiner === "through" ? "and" : joiner} ${names[1]}`;
-  if (consecutive(unique) && joiner !== "or") return `${names[0]} through ${names.at(-1)}`;
-  return `${names.slice(0, -1).join(", ")}, ${joiner === "through" ? "and" : joiner} ${names.at(-1)}`;
+  if (names.length === 2) return `${names[0]} ${joiner} ${names[1]}`;
+  if (consecutive(unique)) return `${names[0]} through ${names.at(-1)}`;
+  return `${names.slice(0, -1).join(", ")}, ${joiner} ${names.at(-1)}`;
 }
 
 function consecutive(dates) {
@@ -147,30 +239,19 @@ function consecutive(dates) {
     Date.parse(`${date}T12:00:00Z`) - Date.parse(`${dates[index - 1]}T12:00:00Z`) === 86400000);
 }
 
-function weekday(date) {
-  return WEEKDAYS[new Date(`${date}T12:00:00.000Z`).getUTCDay()];
-}
-
-function numberWord(value) { return NUMBER_WORDS[value] ?? String(value); }
-
-function ordinal(value) {
-  return ["zeroth", "first", "second", "third", "fourth", "fifth", "sixth"][value] ?? `${value}th`;
-}
-
-function daysBetween(startDate, endDate) {
+function windowDays(intelligence) {
+  const { startDate, endDate } = intelligence.horizon.window;
   return (Date.parse(`${endDate}T12:00:00Z`) - Date.parse(`${startDate}T12:00:00Z`)) / 86400000 + 1;
 }
+
+function weekday(date) { return WEEKDAYS[new Date(`${date}T12:00:00.000Z`).getUTCDay()]; }
+function numberWord(value) { return NUMBER_WORDS[value] ?? String(value); }
+function ordinal(value) { return ORDINALS[value] ?? `${value}th`; }
 
 function list(items) {
   if (items.length <= 1) return items[0] ?? "";
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
-}
-
-function shortenToBudget(text, budget = 160) {
-  if (text.length <= budget) return text;
-  const withoutLast = text.replace(/,? and [^,]+\.$/u, ".").replace(/, ([^,]+)\.$/u, " and $1.");
-  return withoutLast.length <= budget ? withoutLast : `${text.slice(0, budget - 1).replace(/[\s,;:]+\S*$/u, "")}.`;
 }
 
 function upperFirst(value) {

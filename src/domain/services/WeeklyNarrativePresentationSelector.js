@@ -113,12 +113,16 @@ export function selectCanonicalV3WeeklyPresentation({
 } = {}) {
   const sections = narrativeV3?.sections ?? {};
   const uncertainty = Array.isArray(narrativeV3?.uncertainty) ? narrativeV3.uncertainty : [];
+  // Completeness reflects the full uncertainty profile, not only the bounded
+  // presentable list (older artifacts carry no separate audit list).
+  const uncertaintyAudit = Array.isArray(narrativeV3?.uncertaintyAudit)
+    ? narrativeV3.uncertaintyAudit : uncertainty;
   const energyText = text(narrativeV3?.energy?.statement);
   return Object.freeze({
     schemaVersion: WEEKLY_CANONICAL_V3_SELECTOR_VERSION,
     presentationModel: "canonical_narrative_v3",
     assessmentId,
-    completeness: uncertainty.some((item) => item.surfaced || item.materiality === "high")
+    completeness: uncertaintyAudit.some((item) => item.surfaced || item.materiality === "high")
       ? "partial" : "available",
     limitations: uncertainty,
     hero: {

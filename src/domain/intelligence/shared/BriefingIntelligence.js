@@ -97,8 +97,13 @@ export function createBriefingIntelligence({ window, days = [], policy = {} } = 
   const baselineDates = dateRange(baselineWindow.startDate, baselineWindow.endDate);
   const dayAt = (date) => byDate.get(date) ?? { date };
 
-  const reliability = detectReliabilityFindings({ windowDates, baselineDates, dayAt, settings });
-  const unreliable = new Set(reliability.map((item) => `${item.domain}|${item.date}`));
+  // Reliability is judged on baseline and window days alike: an unreliable
+  // baseline day would otherwise bias the very routine it is compared against.
+  const allReliability = detectReliabilityFindings({ windowDates: [...baselineDates, ...windowDates],
+    baselineDates, dayAt, settings });
+  const unreliable = new Set(allReliability.map((item) => `${item.domain}|${item.date}`));
+  const reliability = allReliability.filter((item) => item.date >= window.startDate);
+  const baselineUnreliableDays = allReliability.length - reliability.length;
 
   const baselines = [];
   const patterns = [];
@@ -151,19 +156,25 @@ export function createBriefingIntelligence({ window, days = [], policy = {} } = 
       happened: (date) => occurred(dayAt(date), signal), settings }));
   }
 
+  // A policy detects its building blocks (`detectKinds`) but characterizes the
+  // period only with `admissibleKinds`: e.g. a routine shift is built from
+  // runs and gaps even where runs and gaps alone may not characterize.
+  const detectable = new Set(settings.detectKinds ?? Object.values(BriefingPatternKind));
   const admissible = new Set(settings.admissibleKinds);
-  const behavior = patterns.filter((item) => admissible.has(item.kind));
-  const segments = admissible.has(BriefingPatternKind.ROUTINE_SHIFT)
+  const behavior = patterns.filter((item) => detectable.has(item.kind))
+    .map((item) => ({ ...item, materiality: round(materiality(item, settings), 2) }));
+  const segments = detectable.has(BriefingPatternKind.ROUTINE_SHIFT) || admissible.has(BriefingPatternKind.ROUTINE_SHIFT)
     ? detectRoutineShifts({ patterns: behavior, window, settings }) : [];
-  const recurrence = detectRecurrence({ segments, baselineDates, dayAt, observable, settings, byDate });
+  const recurrence = detectRecurrence({ segments, baselineDates, dayAt, observable, settings, window });
+  const byId = new Map(behavior.map((item) => [item.id, item]));
   for (const segment of segments) {
     const similar = recurrence.get(segment.id);
     if (similar) segment.recurrence = similar;
+    segment.materiality = round(shiftMateriality(segment, byId, settings), 2);
   }
   const ranked = [...segments, ...behavior]
-    .map((item) => ({ ...item, materiality: round(materiality(item, settings), 2) }))
     .sort((left, right) => right.materiality - left.materiality || left.id.localeCompare(right.id));
-  const characterization = selectCharacterization(ranked, settings);
+  const characterization = selectCharacterization(ranked.filter((item) => admissible.has(item.kind)), settings, byId);
 
   return deepFreeze({
     schemaVersion: BRIEFING_INTELLIGENCE_VERSION,
@@ -174,7 +185,9 @@ export function createBriefingIntelligence({ window, days = [], policy = {} } = 
     patterns: ranked,
     characterization,
     reliability,
-    limitations,
+    limitations: baselineUnreliableDays
+      ? [...limitations, { reason: "unreliable_baseline_days_excluded", count: baselineUnreliableDays }]
+      : limitations,
   });
 }
 
@@ -339,22 +352,27 @@ function detectRoutineShifts({ patterns, window, settings }) {
 // Did a comparable multi-domain break already happen inside the baseline?
 // Detected with the same machinery over each earlier week-length slice, so a
 // recurrence is evidence, never an assumption.
-function detectRecurrence({ segments, baselineDates, dayAt, observable, settings }) {
+// Only within `recurrenceLookbackDays`, and never the current break itself:
+// a gap that runs into the window's first day is the same episode, not an
+// earlier one.
+function detectRecurrence({ segments, baselineDates, dayAt, observable, settings, window }) {
   const result = new Map();
   if (!segments.length || baselineDates.length < 14) return result;
   const trainingRate = rateOf(baselineDates, dayAt, observable, "training.session");
-  const found = [];
-  if (trainingRate > 0) {
-    const happened = (date) => occurred(dayAt(date), "training.session");
-    const weekdayRate = weekdayRates(baselineDates.filter(observable), happened, trainingRate);
-    for (const gap of detectRoutineGaps({ signal: "training.session", spec: OCCURRENCE_SIGNALS["training.session"],
-      weekdayRate, windowDates: baselineDates, observable, happened, settings })) {
-      found.push({ startDate: gap.span.startDate, endDate: gap.span.endDate, signal: gap.signal });
-    }
-  }
+  if (!(trainingRate > 0)) return result;
+  const happened = (date) => occurred(dayAt(date), "training.session");
+  const weekdayRate = weekdayRates(baselineDates.filter(observable), happened, trainingRate);
+  const scan = baselineDates.slice(-Math.max(7, settings.recurrenceLookbackDays));
+  const dayBefore = shiftDate(window.startDate, -1);
+  const found = detectRoutineGaps({ signal: "training.session", spec: OCCURRENCE_SIGNALS["training.session"],
+    weekdayRate, windowDates: scan, observable, happened, settings })
+    .map((gap) => ({ startDate: gap.span.startDate, endDate: gap.span.endDate, signal: gap.signal }));
   for (const segment of segments) {
-    if (!segment.signals.includes("training.session") || !found.length) continue;
-    result.set(segment.id, { priorSpans: found.slice(-2), count: found.length });
+    if (!segment.signals.includes("training.session")) continue;
+    const prior = found.filter((gap) => !(gap.endDate === dayBefore && segment.span.startDate === window.startDate &&
+      !happened(window.startDate)));
+    if (prior.length) result.set(segment.id, { priorSpans: prior.slice(-2), count: prior.length,
+      lookbackDays: scan.length });
   }
   return result;
 }
@@ -398,11 +416,7 @@ function detectReliabilityFindings({ windowDates, baselineDates, dayAt, settings
 
 function materiality(item, settings) {
   const weight = (domain) => settings.domainWeights[domain] ?? 0.5;
-  if (item.kind === BriefingPatternKind.ROUTINE_SHIFT) {
-    const recurrence = item.recurrence ? 0.5 : 0;
-    return 2 + item.domains.reduce((sum, domain) => sum + weight(domain), 0) +
-      Math.min(1, item.span.days / 3) + recurrence;
-  }
+  if (item.kind === BriefingPatternKind.ROUTINE_SHIFT) return item.materiality ?? 0;
   const w = weight(item.domain) * (item.measurementType === "wearable_estimate" ? 0.85 : 1);
   if (item.kind === BriefingPatternKind.VALUE_RUN) {
     return w * (1 + Math.min(2, item.magnitude.minZ / settings.deviationZ)) * Math.min(1.5, item.support.days / 2);
@@ -424,21 +438,41 @@ function materiality(item, settings) {
   return 0;
 }
 
-// Keep the few most material, non-redundant findings. A member already told
-// by its routine shift is not repeated on its own.
-function selectCharacterization(ranked, settings) {
+// A shift is as material as its strongest member, strengthened by each
+// co-occurring domain (supporting-only measurement habits add least) and by
+// evidenced recurrence — never a fixed floor that lets weak members lead.
+function shiftMateriality(segment, byId, settings) {
+  const members = segment.members.map((id) => byId.get(id)).filter(Boolean)
+    .sort((left, right) => right.materiality - left.materiality);
+  if (!members.length) return 0;
+  const supporting = (item) => settings.supportingOnlyDomains.includes(item.domain) ? 0.25 : 0.5;
+  const rest = members.slice(1).reduce((sum, item) => sum + supporting(item) * item.materiality, 0);
+  return members[0].materiality + rest + (segment.recurrence ? 0.5 : 0);
+}
+
+// Keep the few most material, non-redundant findings: one finding per signal
+// (so "below all week" and "above Sun–Mon" never lead together), and a
+// signal already told by a routine shift is not repeated on its own.
+function selectCharacterization(ranked, settings, byId = new Map()) {
   const told = new Set();
+  const toldSignals = new Set();
   const selected = [];
   for (const item of ranked) {
     if (item.materiality < settings.minMateriality) continue;
     if (told.has(item.id)) continue;
+    if (item.signal && toldSignals.has(item.signal)) continue;
     // Measurement habits (weigh-ins) can support a routine shift but never
     // characterize a period on their own.
     if (item.kind !== BriefingPatternKind.ROUTINE_SHIFT && settings.supportingOnlyDomains.includes(item.domain)) continue;
     if (item.kind === BriefingPatternKind.FREQUENCY_CHANGE &&
         selected.some((other) => other.signals?.includes(item.signal) || other.signal === item.signal)) continue;
     selected.push(item);
-    for (const member of item.members ?? []) told.add(member);
+    if (item.signal) toldSignals.add(item.signal);
+    for (const member of item.members ?? []) {
+      told.add(member);
+      const signal = byId.get(member)?.signal;
+      if (signal) toldSignals.add(signal);
+    }
     if (selected.length >= settings.maxCharacterization) break;
   }
   return selected;
