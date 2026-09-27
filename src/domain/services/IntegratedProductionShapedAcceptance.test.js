@@ -361,18 +361,20 @@ describe("Item 3: Confidence is concrete and never uses an undefined update phra
   const confidenceText = (result) => result.narrativePlan.composition.sections.confidence;
   const UNDEFINED_REFERENT = /\b(?:one|an|this|the) (?:update|signal|evidence item)\b|\ban evidence item\b/iu;
 
-  it.each(Object.entries(scenarios()))("%s: the hold explanation names its concrete subject (or states plainly that nothing changed)", (_name, result) => {
+  // Founder rule (2026-09-27): Goal Confidence is explained at goal level. A
+  // single movement/exercise result is the wrong abstraction for the goal
+  // outlook, so it is never named here — the hold names what anchors the
+  // outlook (or states plainly that nothing changed), never a generic referent.
+  it.each(Object.entries(scenarios()))("%s: the hold explanation is goal-level and never names a single movement", (_name, result) => {
     const text = confidenceText(result);
     expect(text).toMatch(/Confidence holds\./u);
     expect(text).not.toMatch(UNDEFINED_REFERENT);
     expect(findNarrativeV3VoiceViolations(text)).toEqual([]);
-    const labels = movementLabels(result);
-    if (labels.length) {
-      expect(text.toLowerCase()).toContain(labels[0].toLowerCase());
-      expect(text).toMatch(/’s recent result does not move the overall goal outlook by itself/u);
-    } else {
-      expect(text).toMatch(/Confidence holds\. (?:Nothing new changes the outlook for the goal|This check-in does not change the outlook for reaching the goal)\./u);
+    for (const label of movementLabels(result)) {
+      expect(text.toLowerCase()).not.toContain(label.toLowerCase());
     }
+    expect(text).not.toMatch(/’s recent result/u);
+    expect(text).toMatch(/Confidence holds\. (?:The last [^,]+ still anchors the outlook, and (?:nothing in this check-in changes it|[^.]+ is not enough evidence to change it)|Nothing new changes the outlook for the goal|This check-in does not change the outlook for reaching the goal)\./u);
   });
 
   it("the deterministic voice guard rejects the retired generic phrasing outright", () => {

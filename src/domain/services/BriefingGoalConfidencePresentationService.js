@@ -293,6 +293,15 @@ export function applyNarrativeV3ToBriefingArtifact({
     candidate.briefing.prioritiesThroughSunday = [sections.action, sections.watch]
       .filter(Boolean);
   } else if (publicationType === "weekly") {
+    // Bounded Weekly uncertainty contract (as Midweek's): only uncertainty the
+    // narrative actually surfaced, and not already carried by a module, is
+    // presentable. The complete profile stays on the artifact for audit, so
+    // no uncertainty is lost — it is simply never a generic
+    // "still unresolved" block.
+    candidate.briefing.narrativeV3.uncertaintyAudit = canonical.uncertainty;
+    candidate.briefing.narrativeV3.uncertainty = canonical.uncertainty
+      .filter((item) => item.surfaced === true && item.surfacedIn !== "module")
+      .slice(0, 2);
     const weekly = candidate.briefing.weeklyNarrative ?? {};
     weekly.summary = canonical.summary;
     weekly.primaryStory = sections.result ?? canonical.summary;

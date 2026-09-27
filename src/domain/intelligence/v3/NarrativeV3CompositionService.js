@@ -5,6 +5,7 @@ import {
   naturalizeUserFacingNarrativeProjection,
   naturalizeUserFacingNarrativeText,
 } from "../../services/UserFacingObjectLanguageService.js";
+import { realizePeriodCharacterizationV3 } from "./PeriodCharacterizationLanguageV3.js";
 
 const FIRST_PERSON_SINGULAR = new Set(["i", "me", "my", "mine", "myself", "i'm", "i’m", "i’ve", "i've", "i’d", "i'd", "i’ll", "i'll"]);
 const RAW_ENGINE_LANGUAGE = [
@@ -32,7 +33,7 @@ export const NARRATIVE_V3_SECTION_PURPOSES = deepFreeze({
   coachTake: "highest_value_remaining_coaching_point",
 });
 
-export function composeNarrativeV3({ goalContract, interpretation, confidence, surface, priorNarrativePlan = null, evaluatedAt }) {
+export function composeNarrativeV3({ goalContract, interpretation, confidence, surface, priorNarrativePlan = null, evaluatedAt, briefingIntelligence = null }) {
   const primaryObjective = interpretation.objectiveFindings.find((item) => item.priority === "primary") ??
     interpretation.objectiveFindings[0] ?? null;
   const context = narrativeContext(goalContract, interpretation, primaryObjective);
@@ -73,6 +74,16 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   context.specificCoachingObservations =
     interpretation.coachingObservationSelection?.selected ?? [];
   context.reconciliationTensions = interpretation.crossDomainSynthesis?.tensions ?? [];
+  // Shared Briefing Intelligence: what characterized the period, realized at
+  // period level. It only speaks when the plan holds; a decision-changing
+  // evaluation keeps its own allocation.
+  context.period = briefingIntelligence && context.useRecurringSectionPlan &&
+      interpretation.recommendation.action === "continue_current_strategy"
+    ? realizePeriodCharacterizationV3({
+      intelligence: briefingIntelligence,
+      goalLabel: goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel ?? "goal",
+      nextEvidenceName: nextEvidenceName(context),
+    }) : null;
   context.sectionPlan = allocateNarrativeSections(context);
   const primaryConfidenceSnapshot = { percentage: confidence.currentPercentage, delta: confidence.delta, movement: confidence.movement };
   const casingOptions = {
@@ -179,6 +190,14 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
       status: item.status,
     })),
     uncertaintyTypes: uncertaintyTypes,
+    ...(briefingIntelligence ? { periodCharacterization: {
+      schemaVersion: briefingIntelligence.schemaVersion,
+      realized: Boolean(context.period),
+      leadId: context.period?.leadId ?? null,
+      items: briefingIntelligence.characterization.map((item) => ({
+        id: item.id, kind: item.kind, materiality: item.materiality })),
+      reliabilityIds: briefingIntelligence.reliability.map((item) => item.id),
+    } } : {}),
     questionTransitions: interpretation.questionTransitions,
     recommendation: interpretation.recommendation,
     nextEvidencePurpose: interpretation.nextCoachingQuestion?.evidencePurpose ?? null,
@@ -352,6 +371,7 @@ function allocateNarrativeSections(context) {
   if (!context.useRecurringSectionPlan) {
     return { mode: "event_focused", content: {}, allocations: eventAllocations() };
   }
+  if (context.period) return allocatePeriodCharacterization(context);
   const [resultObservation, secondObservation] =
     distinctObservationSubjects(context.specificCoachingObservations);
   const energySignal = context.operatingSignals.find((item) =>
@@ -450,6 +470,31 @@ function allocateNarrativeSections(context) {
     content: { result: resultText, meaning: meaningText, action: actionText,
       watch: watchText, coachTake: coachText },
     allocations,
+  };
+}
+
+// The period's own character leads when the plan holds: the week is
+// recapped from the ranked shared-intelligence findings, and the remaining
+// sections keep their distinct purposes (goal meaning, action, forward watch,
+// coaching emphasis). Energy ambiguity still speaks through its module.
+function allocatePeriodCharacterization(context) {
+  const period = context.period;
+  context.energyAmbiguityText = translateEnergyAmbiguityForCoaching(context);
+  context.resultOperatingSignal = null;
+  return {
+    mode: "recurring_period_characterization",
+    content: { result: period.result, meaning: period.meaning, action: period.action,
+      watch: period.watch, coachTake: period.coachTake },
+    allocations: {
+      result: allocation("recent_change_worth_knowing", period.leadId, { scope: "period" }),
+      meaning: allocation("goal_relative_implication", "goal_implication"),
+      action: allocation("current_coaching_action", "recommendation"),
+      watch: allocation("specific_bounded_attention", `${period.leadId}|persistence`),
+      confidence: allocation("goal_outlook_movement", "confidence_movement"),
+      coachTake: allocation("highest_value_remaining_coaching_point", `${period.leadId}|coaching`,
+        { allocationReason: "period_characterization",
+          ...(period.reliabilityIds.length ? { reliabilityIds: period.reliabilityIds } : {}) }),
+    },
   };
 }
 
@@ -1051,18 +1096,21 @@ function composeConfidenceBriefing(context) {
     return { heading, body: `Confidence fell because ${reason}. ${interpretation.recommendation.action === "pause_and_investigate" ? "Address that first before pushing ahead." : "The next useful check needs to show that the outlook is improving."}` };
   }
   if (confidence.delta === 0) {
-    const specific = context.specificCoachingObservations[0];
-    // The concrete evidence that mattered, named directly — never a generic
-    // stand-in noun like "update"/"signal"/"evidence item"/"movement" with no
-    // referent. Phrased direction-neutrally: the candidate here may be a
-    // positive milestone or a plateau worth watching, and this is only ever
-    // Confidence's own reason, never a restatement of the hero or a module.
-    const evidenceLabel = specific ? coachingSubject(specific.subjectLabel) : null;
-    return { heading, body: evidenceLabel
-      ? `Confidence holds. ${evidenceLabel}’s recent result does not move the overall goal outlook by itself; the rest of the evidence still needs to confirm the trend before confidence can shift.`
-      : confidence.projectionPolicy.mode === "continuity_hold" ?
-        "Confidence holds. Nothing new changes the outlook for the goal." :
-        "Confidence holds. This check-in does not change the outlook for reaching the goal." };
+    // Goal Confidence is explained at goal level only: what anchors the
+    // outlook and whether the period's evidence is strong enough to move it.
+    // A single exercise or movement result is never the explanation — it lives
+    // in Training detail, not in the goal outlook.
+    const anchor = context.objective?.freshness === "carried_forward" &&
+      context.nextEvidence.namedFromBinding
+      ? `The last ${context.nextEvidence.displayName} still anchors the outlook` : null;
+    if (anchor) {
+      return { heading, body: context.period
+        ? `Confidence holds. ${anchor}, and ${context.period.confidencePeriod} is not enough evidence to change it.`
+        : `Confidence holds. ${anchor}, and nothing in this check-in changes it.` };
+    }
+    return { heading, body: confidence.projectionPolicy.mode === "continuity_hold" ?
+      "Confidence holds. Nothing new changes the outlook for the goal." :
+      "Confidence holds. This check-in does not change the outlook for reaching the goal." };
   }
   if (confidence.projectionPolicy.mode === "execution_update") {
     return { heading, body: `Confidence moved up because consistent execution is supporting the goal. ${interpretation.strategyEffectiveness.feasibility === "demonstrated" ? `The plan is working; ${nextEvidenceName(context)} still needs to confirm that progress continued.` : "The next useful result still needs to show that the effort is delivering."}` };

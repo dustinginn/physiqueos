@@ -9,6 +9,12 @@ import { runConfidenceNarrativeV3 } from
   "../intelligence/v3/ConfidenceNarrativeV3Pipeline";
 import { createPhaseReviewArtifactPackage } from
   "./PhaseReviewArtifactService";
+import { BRIEFING_INTELLIGENCE_VERSION, createBriefingIntelligence } from
+  "../intelligence/shared/BriefingIntelligence.js";
+import { resolveBriefingIntelligencePolicy } from
+  "../intelligence/shared/BriefingIntelligencePolicies.js";
+import { buildBriefingPeriodDays } from
+  "../intelligence/shared/BriefingPeriodEvidence.js";
 
 export const STRATEGIC_INTERPRETATION_PUBLICATION_V3_VERSION =
   "strategic_interpretation_publication_v3";
@@ -41,6 +47,7 @@ export function createStrategicInterpretationPublicationServiceV3({
     });
     const observations = mergeObservations(supersession.observations, additional);
     const prior = priorV3Context(normalized.previousCanonicalAssessment);
+    const briefingIntelligence = resolveBriefingIntelligence(normalized);
     const outputs = runConfidenceNarrativeV3({
       goalContract: production.goalContract,
       observations,
@@ -55,6 +62,7 @@ export function createStrategicInterpretationPublicationServiceV3({
         materialSemanticChange: normalized.materialSemanticChange,
       },
       surface: normalized.surface,
+      ...(briefingIntelligence ? { briefingIntelligence } : {}),
     });
     const assessment = createCanonicalConfidenceAssessmentV3({
       goalId: normalized.goal.id,
@@ -86,6 +94,9 @@ export function createStrategicInterpretationPublicationServiceV3({
         ...normalized.sourceLineage,
         strategicPublicationVersion:
           STRATEGIC_INTERPRETATION_PUBLICATION_V3_VERSION,
+        ...(briefingIntelligence
+          ? { briefingIntelligenceVersion: BRIEFING_INTELLIGENCE_VERSION }
+          : {}),
         ...(supersession.superseded.length
           ? { supersededStaleObservations: supersession.superseded.map((item) => ({ ...item })) }
           : {}),
@@ -127,7 +138,7 @@ export function createStrategicInterpretationPublicationServiceV3({
       evidenceWindowClosed: normalized.evidenceWindowClosed,
     });
     return Object.freeze({ normalized, authorization, assessment, artifact,
-      goalContract: production.goalContract, observations,
+      goalContract: production.goalContract, observations, briefingIntelligence,
       supersededObservations: supersession.superseded, ...outputs });
   }
 
@@ -191,6 +202,34 @@ function normalize(request, now) {
       request.previousCanonicalAssessment?.briefingArtifactId ?? null,
     replacementAuthorized: request.replacementAuthorized === true,
   };
+}
+
+// The one shared Briefing Intelligence insertion point for every V3
+// publisher. A publisher opts in by supplying the canonical evidence it
+// already read (after its own HealthKit overlay) as `periodEvidence`; its
+// briefing type selects the policy. Without both, V3 runs exactly as before.
+function resolveBriefingIntelligence(normalized) {
+  const evidence = normalized.periodEvidence;
+  const policy = resolveBriefingIntelligencePolicy(normalized.cadenceOrEventType);
+  const window = evidence?.window;
+  if (!evidence || !policy || !window?.startDate || !window?.endDate) return null;
+  const startDate = shiftIsoDate(window.startDate, -policy.baselineDays);
+  const days = buildBriefingPeriodDays({
+    canonicalObjects: evidence.canonicalObjects ?? [],
+    weightEntries: evidence.weightEntries ?? [],
+    dexaScans: evidence.dexaScans ?? [],
+    timeZone: evidence.timeZone ?? "America/Los_Angeles",
+    startDate,
+    endDate: window.endDate,
+  });
+  return createBriefingIntelligence({ window: { startDate: window.startDate, endDate: window.endDate },
+    days, policy });
+}
+
+function shiftIsoDate(date, days) {
+  const value = new Date(`${date}T12:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
 }
 
 function priorV3Context(assessment) {

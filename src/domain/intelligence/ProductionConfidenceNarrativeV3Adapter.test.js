@@ -473,14 +473,16 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
       .toBe("continue_current_strategy");
     // Part A hero scoping: the Result is holistic ("measurable training
     // progress ... Training is still moving"), and an incidental movement PR
-    // is never the thesis. The concrete movement is still named, but only
-    // by Confidence, which must name its subject rather than a generic update.
+    // is never the thesis. Nor is it the Goal Confidence explanation: the
+    // goal outlook is explained at goal level (Founder rule, 2026-09-27).
     expect(midweek.narrativePlan.composition.finalNarrative)
       .toMatch(/Training is still moving/isu);
     expect(midweek.narrativePlan.composition.finalNarrative)
       .not.toMatch(/^\s*Iso-lateral high rows/iu);
-    expect(midweek.narrativePlan.composition.finalNarrative)
-      .toMatch(/Confidence[\s\S]*Iso-lateral high rows/iu);
+    expect(midweek.narrativePlan.composition.sections.confidence)
+      .not.toMatch(/Iso-lateral high rows/iu);
+    expect(midweek.narrativePlan.composition.sections.confidence)
+      .toMatch(/^Confidence · \d+% .\nConfidence holds\./u);
     expect(midweek.narrativePlan.composition.finalNarrative)
       .not.toMatch(/energy|calorie|estimate alone|direct result|operating evidence/iu);
     expect(midweek.narrativePlan.composition.coachTake)

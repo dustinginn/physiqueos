@@ -21,7 +21,7 @@ export function createPICadenceBriefingLifecycleService({
   });
   return Object.freeze({
     async publish({ cadence, operation, artifact, activeGoal, activePhase,
-      operatingState, piEnvelope = null, reason,
+      operatingState, piEnvelope = null, periodEvidence = null, reason,
       replacementAuthorized = false } = {}) {
       if (!activeGoal?.id || !activePhase?.id || !artifact?.evidenceWindow?.id) {
         return typed("unsupported_context",
@@ -57,6 +57,7 @@ export function createPICadenceBriefingLifecycleService({
             evidenceCutoff: cutoff,
           }),
         previousCanonicalAssessment: current.assessment,
+        ...(periodEvidence ? { periodEvidence } : {}),
         evidenceCutoff: cutoff,
         finalizedAt: now().toISOString(),
         idempotencyKey: operation === "regenerate"

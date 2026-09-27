@@ -120,6 +120,7 @@ export async function prepareWeeklyV3({
   piEnvelope,
   store = buildWeeklyStore(),
   goalOverride = null,
+  periodEvidence = null,
 } = {}) {
   const { goal: fixtureGoal, phase } = currentGoalAndPhase();
   const goal = goalOverride ?? fixtureGoal;
@@ -142,6 +143,7 @@ export async function prepareWeeklyV3({
       goalContract, phase, artifact, piEnvelope, evidenceCutoff: WEEKLY_SEP13_19.evidenceCutoff,
     }),
     previousCanonicalAssessment: syntheticPredecessor(),
+    ...(periodEvidence ? { periodEvidence } : {}),
     evidenceCutoff: WEEKLY_SEP13_19.evidenceCutoff,
     finalizedAt: WEEKLY_SEP13_19.generatedAt,
     idempotencyKey: `confidence_v3|weekly|${artifact.id}`,

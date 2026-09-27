@@ -219,10 +219,16 @@ describe("Sep 13–19 Weekly: corrected V3 forensic replay", () => {
 
   it("gives structured uncertainty Server-provided text and no duplicated food/activity actions", async () => {
     const { prepared } = await corrected();
-    const uncertainty = prepared.artifact.briefing.narrativeV3.uncertainty;
+    // The complete uncertainty profile is kept for audit; the presentable
+    // Weekly list is bounded to what the narrative actually surfaced (no
+    // generic "still unresolved" block).
+    const uncertainty = prepared.artifact.briefing.narrativeV3.uncertaintyAudit;
     expect(uncertainty.every((item) => typeof item.text === "string" && item.text.length > 10)).toBe(true);
     const energy = uncertainty.filter((item) => item.domain === "energy");
     expect(energy.length).toBeGreaterThanOrEqual(4);
+    const presentable = prepared.artifact.briefing.narrativeV3.uncertainty;
+    expect(presentable.length).toBeLessThanOrEqual(2);
+    expect(presentable.every((item) => item.surfaced === true && item.surfacedIn !== "module")).toBe(true);
     const served = createWeeklyBriefingScreenPresentation(
       (await adaptWeeklyArtifactForPresentation({ artifact: prepared.artifact })).briefing.weeklyNarrative);
     // Energy's title is the first sentence of its own factual statement —

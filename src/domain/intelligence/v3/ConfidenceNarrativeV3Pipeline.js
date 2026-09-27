@@ -13,6 +13,7 @@ export function runConfidenceNarrativeV3({
   priorNarrativePlan = null,
   evaluationContext,
   surface,
+  briefingIntelligence = null,
 }) {
   const eligibility = selectStrategicallyEligibleEvidenceV3({
     goalContract,
@@ -40,6 +41,7 @@ export function runConfidenceNarrativeV3({
     surface,
     priorNarrativePlan,
     evaluatedAt: evaluationContext.evaluatedAt,
+    ...(briefingIntelligence ? { briefingIntelligence } : {}),
   });
   const semantic = {
     schemaVersion: V3_SCHEMA.calibrationResult,
