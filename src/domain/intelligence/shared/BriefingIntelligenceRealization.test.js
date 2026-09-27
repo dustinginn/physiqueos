@@ -128,6 +128,8 @@ describe("second-review fixes", () => {
     for (const { name, period } of realized) {
       expect(period.action, name).not.toMatch(/usual intake|intake range|intake back toward your usual/u);
       if (/intake/iu.test(period.result)) expect(period.action, name).toMatch(/Keep intake on plan/u);
+      expect(period.watch, name).not.toMatch(/intake settles back toward your usual/u);
+      if (/^Intake /u.test(period.result)) expect(period.action, name).not.toMatch(/usual routine/u);
     }
   });
 

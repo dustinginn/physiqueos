@@ -66,7 +66,9 @@ export function realizePeriodCharacterizationV3({ intelligence, goalLabel, nextE
         : "A stretch like this matters less than how quickly the usual routine comes back.";
   } else if (tone === "increase") {
     meaning = `${upperFirst(stretch)} of higher ${subject} ${stretchIs} small ${goalContext}.`;
-    watch = `Watch whether ${subject} settles back toward your usual next week; a repeat would be a pattern.`;
+    watch = subject === "intake"
+      ? "Watch how intake compares with the plan next week; a repeat would be a pattern."
+      : `Watch whether ${subject} settles back toward your usual next week; a repeat would be a pattern.`;
     coach = subject === "intake"
       ? "Whether that matters depends on the plan, not on your usual; the Energy view shows how intake compares with the target."
       : `If the extra ${subject} was deliberate, keep an eye on how recovery holds up; if not, ease back toward your usual range.`;
@@ -140,6 +142,8 @@ function composeAction({ tone, told, intelligence }) {
   // against the person's usual — a surplus plan may ask for more.
   const intakeTold = told.some((item) => item.domain === "nutrition");
   const intakeLine = intakeTold ? " Keep intake on plan." : "";
+  const intakeOnly = intakeTold && told.every((item) => item.domain === "nutrition");
+  if (intakeOnly) return `Keep intake on plan this week. ${keep}`;
   if (tone === "increase") return intakeTold ? `Keep intake on plan this week. ${keep}` : `No adjustment is needed. ${keep}`;
   if (tone !== "break") return `Aim for a steadier routine this week.${intakeLine} ${keep}`;
   const weighInRate = intelligence.baselines?.find((item) => item.signal === "body.weigh_in")?.rate ?? 0;
