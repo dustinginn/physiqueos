@@ -2,20 +2,22 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Build 65 Strength attempt — the 9:38 AM window was a client↔edge network-path stall, not a Server or reconciliation-specific fault
+- Task: Command network transport isolation (reviewed candidate) + oversized read-model payload audit
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-27T16:47:58Z
+- Generated (UTC): 2026-09-27T19:43:21Z
 - Success: true
 
-Summary: You were right to reframe this. The Server was healthy the whole time: every request it received in the 9:38 window was served in under two seconds, the database pool never queued, and nothing had been deployed or restarted since yesterday evening. The Home reads your phone reported as "timed out" actually reached the Server and completed — six separate times in three minutes — which means the responses were leaving the origin and stalling on the way to the phone; the app kept re-requesting because it never got them. Meanwhile the reconciliation command left no trace anywhere upstream of the application — no receipt, no request log, no security event.
+Summary: Two pieces of follow-up from the 9:38 connectivity diagnosis.
 
-The reason it shows up as "cancelled" rather than "timed out": the app's big screen loads (Home and Goals are 4–5 MB each, Log and check-in are 9–10 MB) and its tiny confirm request share one connection pool with the same 15-second idle timeout. When a stalled bulk-read connection times out, the confirm riding on the same connection is reported cancelled — with the app's own task untouched, which is exactly why the Build 65 background-execution assertion couldn't help. Every real reconciliation attempt on record has happened in that same just-opened-the-app burst.
+**The actual fix**: command submissions now run on their own dedicated network connection, completely separate from the big screen-load reads that were stalling. That's the real fix for the -999/-1001 pairing — before this, both used the exact same shared connection, so a stuck read could take a confirm down with it. It also now records what protocol and network interface were in play on every attempt, so if this happens again, there's finally something to look at beyond "it said cancelled." Ten new tests (two of them hitting real network endpoints, not mocks), a genuine break-it-and-confirm-it-fails check, full regression (1463 unit + 13 UI tests), and an independent review all came back clean. Pushed as `3b0ccbed`.
 
-**Nothing was changed**: no fix, no build, no retry requested. The report lays out what would actually help (separating the write path from bulk reads, shrinking those payloads, and capturing which protocol/interface the phone was on at failure) for whenever you want to authorize it.
+**The payload audit you asked for**: measured, not guessed. The two biggest things Home and Goals pull are fetched with no date limit at all and have grown to 27 MB and 16 MB respectively across this account's history. The cleanest, safest win found: the reviews list that Log, Morning Check-In, and Coaching Updates all pull is 83% already-resolved reviews nobody needs to see — filtering that down would cut it by over 99%. Nothing was implemented; it's a written, prioritized plan for whenever you want to scope that as its own patch.
 
-Detailed report: `agent-handoffs/reports/20260927T164758Z-strength-build65-connectivity-window-diagnosis.md`
+**Nothing else changed**: no build cut, no build number bumped, no Server code touched, no Strength attempt requested.
 
-Related: `agent-handoffs/reports/20260927T160934Z-native-build65-uploaded-valid.md`
+Detailed report: `agent-handoffs/reports/20260927T194321Z-command-transport-isolation-and-payload-audit.md`
+
+Related: `agent-handoffs/reports/20260927T164758Z-strength-build65-connectivity-window-diagnosis.md`
 
 Protocol: `agent-handoffs/README.md`
