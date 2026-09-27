@@ -2,24 +2,22 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Completed Visible Abs photos — real root cause found and fixed (corrects prior report)
+- Task: Combined candidate `104c34ff` — release-readiness validation complete
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-27T03:52:00Z
+- Generated (UTC): 2026-09-27T04:58:52Z
 - Success: true
 
-Summary: **This corrects the prior report's item 3 conclusion.** The Founder rechecked the Completed Visible Abs Goal photos on the existing, unmodified Build 63 and confirmed twice, reproducibly, that both photos still show a placeholder — so the prior "the data's fine, just re-check" recommendation was wrong.
+Summary: Ran the release-readiness validation you asked for on the combined candidate (Journey fix, Strength diagnostic, Visible Abs photo fix — all on top of Build 63).
 
-Tracing one layer further found the real cause: every Native read response passes through a shared server-side transform that renames any `href`-style field carrying a media reference into a differently-shaped `media: {mediaId, deliveryPath}` object — deleting the original `href` key entirely. Native was still decoding a `href` field that never actually reaches the app on the wire, so the photo tile always fell back to a placeholder, 100% reproducibly, regardless of network conditions or how valid the database data is. Fixed by decoding the real shape — the same one already used successfully elsewhere in the app for other photos.
+Cleared the disk-safety floor by removing only regenerable things: two already-superseded pre-Build63 archives, some Xcode module caches, and a couple of stale test-result bundles already reported on — nothing else touched. Then ran the Release build (succeeded), the release-configuration verifier (confirms build number is still 63, unchanged), the full unit suite (1445/1445 passing), and the Goals + Training UI regression suite (13/13 passing, no flakes this time).
 
-Verified RED (reverting the fix reproduces the exact bug in a test) then GREEN (1445/1445 unit tests). Independently reviewed against the actual deployed production server code. Candidate now at commit `104c34ff` on `codex/native-batched-candidate-post-build62`, pushed.
+**Nothing else changed**: no build number bump, no archive for upload, no TestFlight upload, no device operated, no Strength reconciliation attempt requested.
 
-**Nothing else changed**: no build cut, no build number bumped, no upload, no device operated, no production data mutated, no Strength retry requested — holding exactly as the Founder instructed.
+**Next step is yours**: `104c34ff` is fully release-validated and ready to become the next TestFlight build's source whenever you authorize cutting one.
 
-**Next step is yours**: whenever you're ready, this candidate (`104c34ff`, containing both this fix and the earlier Journey/Strength-diagnostic commit) is what the next TestFlight build should come from — after a disk-safety pass allows a Release-build check first.
+Detailed report: `agent-handoffs/reports/20260927T045852Z-candidate-release-readiness.md`
 
-Detailed report: `agent-handoffs/reports/20260927T035200Z-visible-abs-photo-fix.md`
-
-Related: `agent-handoffs/reports/20260927T031700Z-build63-acceptance-diagnosis.md`
+Related: `agent-handoffs/reports/20260927T035200Z-visible-abs-photo-fix.md`
 
 Protocol: `agent-handoffs/README.md`
