@@ -251,6 +251,12 @@ export function createPhotoEventNarrativeService({
           context: { ...publicationContext, confidenceDomainStates },
           reason: reason ?? `Confirmed Photo Event ${session.id}.`,
           replacementAuthorized,
+          periodEvidence: {
+            window: { startDate: session.captureDate, endDate: session.captureDate },
+            timeZone: "America/Los_Angeles",
+            canonicalObjects: inputs.canonicalObjects ?? [], weightEntries: inputs.weights ?? [],
+            dexaScans: inputs.dexaScans ?? [],
+          },
         });
         if (!result.committed && result.status !== "matched") return {
           status: "blocked",

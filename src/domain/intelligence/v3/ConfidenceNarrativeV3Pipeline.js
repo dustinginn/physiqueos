@@ -41,7 +41,9 @@ export function runConfidenceNarrativeV3({
     surface,
     priorNarrativePlan,
     evaluatedAt: evaluationContext.evaluatedAt,
-    ...(briefingIntelligence ? { briefingIntelligence } : {}),
+    // The shared evidence picture also reads the eligible observations (for
+    // example, qualitative photo comparisons) alongside period intelligence.
+    ...(briefingIntelligence ? { briefingIntelligence, observations: eligibility.eligibleObservations } : {}),
   });
   const semantic = {
     schemaVersion: V3_SCHEMA.calibrationResult,

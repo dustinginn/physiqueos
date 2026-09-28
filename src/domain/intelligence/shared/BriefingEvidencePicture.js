@@ -199,10 +199,15 @@ function canonicalPaceVerdict(weeklyRate, expectation, { expectedWeeklyRange: [l
   return "flat";
 }
 
-function assessBodyComposition({ goalFacts, window }) {
+function assessBodyComposition({ goalFacts, window, intelligence }) {
   const composition = goalFacts.composition;
   if (!composition?.available) return unavailable(D.BODY_COMPOSITION, "no_composition_measurement");
-  const fresh = window && composition.measuredAt >= window.startDate && composition.measuredAt <= window.endDate;
+  // For an event briefing the window is the lead-up; only a measurement on
+  // the event date itself is new. For a recurring briefing, any measurement
+  // in its window is.
+  const eventBriefing = Boolean(intelligence?.policy?.contextWindowDays);
+  const fresh = window && (eventBriefing ? composition.measuredAt === window.endDate
+    : composition.measuredAt >= window.startDate && composition.measuredAt <= window.endDate);
   const ageDays = window ? daysBetween(composition.measuredAt, window.endDate) : null;
   const facts = { ...composition, newThisPeriod: Boolean(fresh), ageDays };
   const polarity = composition.state === "progressed" ? "supportive" :
@@ -384,6 +389,15 @@ function assessVisualChange({ goalFacts, window }) {
   const visual = goalFacts.visual;
   if (!visual?.available) return unavailable(D.VISUAL, "no_photo_comparison");
   const fresh = window && visual.capturedAt >= window.startDate && visual.capturedAt <= window.endDate;
+  // A comparison whose amount of change the producer did not measure: the
+  // photos lead a Photo briefing as the reason for it, never with an
+  // invented magnitude, and never deepen it.
+  if (!["visible", "subtle", "none"].includes(visual.change)) {
+    const facts = { ...visual, newThisPeriod: Boolean(fresh), magnitude: "not_measured" };
+    return assessed(D.VISUAL, "compared_magnitude_not_measured", "neutral", facts, [
+      insight(D.VISUAL, "visual_comparison", fresh ? InsightRole.OUTCOME : InsightRole.CONTEXT, "neutral", fresh ? 1.4 : 0.6, facts),
+    ]);
+  }
   const strength = { visible: 3.0, subtle: 1.6, none: 0.8 }[visual.change] ?? 0.8;
   const facts = { ...visual, newThisPeriod: Boolean(fresh) };
   return assessed(D.VISUAL, visual.change ?? "compared", "neutral", facts, [

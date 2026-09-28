@@ -30,7 +30,7 @@ const HERO_BUDGET = 160;
 
 // `words` carries the Goal Contract's own vocabulary (the outcome check's
 // name, the primary measure, the guardrail) — the core never names them.
-export function goalFactsFromInterpretationV3({ interpretation, confidence, window, words = {} }) {
+export function goalFactsFromInterpretationV3({ interpretation, confidence, window, words = {}, observations = [] }) {
   const objectives = interpretation?.objectiveFindings ?? [];
   const primary = objectives.find((item) => item.priority === "primary") ?? objectives[0] ?? null;
   // The goal's primary outcome measure is what an outcome check reports on.
@@ -56,10 +56,27 @@ export function goalFactsFromInterpretationV3({ interpretation, confidence, wind
     } : null,
     energy: Object.keys(energy).length ? energy : null,
     trainingMilestones: trainingMilestones(interpretation, window),
+    visual: visualComparison(observations, window),
     outlook: confidence ? { percentage: confidence.currentPercentage, delta: confidence.delta,
       primaryObjectiveState: primary?.state ?? null } : null,
     strategy: interpretation?.recommendation ? { action: interpretation.recommendation.action } : null,
   };
+}
+
+// A qualitative photo comparison in the period: that the photos were
+// compared, how many poses, and whether a comparable prior set existed. The
+// canonical producer records observations, not an amount of change, so
+// `change` stays null — the engine never invents one.
+function visualComparison(observations, window) {
+  const photos = (observations ?? []).filter((item) => item?.sourceType === "canonical_photo_observation" &&
+    window && String(item.observedAt).slice(0, 10) <= window.endDate &&
+    String(item.observedAt).slice(0, 10) >= window.startDate);
+  const latest = photos.sort((left, right) => String(right.observedAt).localeCompare(String(left.observedAt)))[0];
+  if (!latest) return null;
+  const change = ["visible", "subtle", "none"].includes(latest.measurement?.metadata?.visualChange)
+    ? latest.measurement.metadata.visualChange : null;
+  return { available: true, capturedAt: String(latest.observedAt).slice(0, 10), change,
+    comparable: latest.quality?.status === "adequate", source: "canonical_photo_observation" };
 }
 
 // One milestone per lift, in the period, ranked by how big the step was.
@@ -100,33 +117,101 @@ function rankMilestone(item) {
   return (item.relativeGain ?? 0) * 10 + concrete + (item.score ?? 0) / 1000;
 }
 
-// ---------------------------------------------------------------- weekly
+// ---------------------------------------------------------------- briefings
 
-// The insight kinds this realizer can phrase. Synthesis keeps any other kind
-// (a future Sleep finding) out of the selection with a reason until a phrase
-// for it exists here.
-export const WEEKLY_REALIZABLE_KINDS = Object.freeze(new Set(["training_progress", "weight_trend", "routine_break",
+// The insight kinds these realizers can phrase. Synthesis keeps any other
+// kind (a future Sleep finding) out of the selection with a reason until a
+// phrase for it exists here.
+export const BRIEFING_REALIZABLE_KINDS = Object.freeze(new Set(["training_progress", "weight_trend", "routine_break",
   "composition_result", "guardrail_status", "intake_vs_plan", "activity_change", "training_frequency",
-  "activity_on_plan", "routine_steady", "nutrition_unclear", "visual_change"]));
+  "activity_on_plan", "routine_steady", "nutrition_unclear", "visual_change", "visual_comparison"]));
+export const WEEKLY_REALIZABLE_KINDS = BRIEFING_REALIZABLE_KINDS;
 
-// The Weekly written to its section contract (shared/BriefingSectionContracts):
-// a short headline for what kind of week it was, an evidence-rich recap, the
+// How each briefing type speaks about its own horizon. The intelligence and
+// the section roles are shared; only the period's words differ.
+const PERIOD_WORDS = Object.freeze({
+  weekly: { noun: "week", this: "this week", thisPoss: "this week's", next: "next week", inThis: "in this week",
+    steady: "A steady week", strongTraining: "Strong training week", stepTail: "this week", leverWhen: "this week",
+    usual: "This week held to its usual pattern.", midNoun: "midweek",
+    positions: { late: "late in the week", early: "early in the week", middle: "midweek", whole: "for most of the week" },
+    parts: { late: "the end of the week", early: "the start of the week", middle: "the middle of the week" } },
+  midweek: { noun: "week", this: "so far this week", thisPoss: "this week's", next: "the rest of the week", inThis: "so far",
+    steady: "Steady so far", strongTraining: "Strong training so far", stepTail: "for the rest of the week",
+    leverWhen: "for the rest of the week", usual: "The week so far is holding to its usual pattern.", midNoun: "stretch",
+    recapLead: "So far this week, ", partial: true,
+    positions: { late: "in the last day or two", early: "at the start of the week", middle: "so far", whole: "so far this week" },
+    parts: {} },
+  monthly: { calendarDates: true, noun: "month", this: "this month", thisPoss: "this month's", next: "next month", inThis: "in this month",
+    steady: "A steady month", strongTraining: "Strong training month", stepTail: "over the coming weeks",
+    leverWhen: "over the coming weeks", usual: "This month held to its usual pattern.", midNoun: "mid-month",
+    positions: { late: "late in the month", early: "early in the month", middle: "mid-month", whole: "for most of the month" },
+    parts: { late: "the end of the month", early: "the start of the month", middle: "the middle of the month" } },
+  outcomeCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before the scan", thisPoss: "the lead-up's", next: "the next few weeks",
+    inThis: "in the lead-up to the scan", steady: "A steady lead-up", strongTraining: "Strong training before the scan",
+    stepTail: "over the next few weeks", leverWhen: "from here", usual: "The weeks before the scan held to their usual pattern.",
+    midNoun: "stretch", context: "in the weeks before the scan", before: "before the scan",
+    positions: { late: "just before the scan", early: "early in the lead-up", middle: "midway through the lead-up",
+      whole: "through most of the lead-up" }, parts: {} },
+  visualCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before these photos", thisPoss: "the lead-up's", next: "the next few weeks",
+    inThis: "in the lead-up to these photos", steady: "A steady lead-up", strongTraining: "Strong training before these photos",
+    stepTail: "over the next few weeks", leverWhen: "from here", usual: "The weeks before these photos held to their usual pattern.",
+    midNoun: "stretch", context: "in the weeks before these photos", before: "before these photos",
+    positions: { late: "just before these photos", early: "early in the lead-up", middle: "midway through the lead-up",
+      whole: "through most of the lead-up" }, parts: {} },
+});
+
+// The period words for the briefing being realized. Realization is
+// synchronous and deterministic; the words are set for the duration of one
+// call and restored afterwards.
+let P = PERIOD_WORDS.weekly;
+
+// A briefing written to its section contract (shared/BriefingSectionContracts):
+// a short headline for what kind of period it was, an evidence-rich recap, the
 // goal meaning, the coach's read, what to carry into execution, the next
-// steps and what decides next week. Each section consumes a different facet
-// of the same synthesis, so the briefing progresses rather than repeating
-// its top facts.
-export function realizeHolisticWeeklyV3({ synthesis, picture, goalLabel, goalPolicy }) {
+// steps and what decides next. Each section consumes a different facet of the
+// same synthesis, so the briefing progresses rather than repeating its top
+// facts. The briefing type sets the horizon's words, the section list and the
+// budgets; the intelligence is the same.
+export function realizeHolisticBriefingV3({ cadence = "weekly", synthesis, picture, goalLabel, goalPolicy, goalProgress = null }) {
   if (!synthesis?.selected?.length) return null;
-  const contract = resolveSectionContract("weekly", synthesis);
+  const previous = P;
+  P = periodWords(cadence, synthesis);
+  try {
+    return realize({ cadence, synthesis, picture, goalLabel, goalPolicy, goalProgress });
+  } finally {
+    P = previous;
+  }
+}
+
+// Event briefings are keyed by what leads them (the goal's outcome measure,
+// or a visual comparison), never by a scan or source name.
+function periodWords(cadence, synthesis) {
+  if (PERIOD_WORDS[cadence]) return PERIOD_WORDS[cadence];
+  const lead = resolveSectionContract(cadence, synthesis)?.leadDomain;
+  if (lead === ROLES.outcome) return PERIOD_WORDS.outcomeCheck;
+  if (lead === ROLES.visual) return PERIOD_WORDS.visualCheck;
+  return PERIOD_WORDS.weekly;
+}
+
+export function realizeHolisticWeeklyV3(args) {
+  return realizeHolisticBriefingV3({ ...args, cadence: "weekly" });
+}
+
+function realize({ cadence, synthesis, picture, goalLabel, goalPolicy, goalProgress }) {
+  const contract = resolveSectionContract(cadence, synthesis);
+  const has = (role) => contract.sections.includes(role);
   const facts = { ...pictureFacts(picture), direction: goalPolicy?.weightExpectation?.direction ?? null,
-    sparse: (picture?.domains ?? []).filter((item) => ["insufficient", "unavailable"].includes(item.status)).length >= 4 };
+    sparse: (picture?.domains ?? []).filter((item) => ["insufficient", "unavailable"].includes(item.status)).length >= 4,
+    goalProgress, event: Boolean(contract.leadDomain), leadDomain: contract.leadDomain ?? null };
   const lead = leadInsights(synthesis, contract);
   const steps = planSteps(synthesis);
   const discriminators = watchItems({ synthesis, facts });
   const { text: headline, ids: headlineIds } = headlineSentence(lead, facts, contract.headline);
   const recap = recapSentence(lead, facts);
-  const implication = implicationSentence({ synthesis, facts, goalLabel, lead });
-  const takeaway = takeawaySentence({ lead, synthesis, steps });
+  const implication = has(SectionRole.MEANING) ? implicationSentence({ synthesis, facts, goalLabel, lead }) : null;
+  const baseTakeaway = takeawaySentence({ lead, synthesis, steps });
+  // A partial window reads as a first read, never as a finished period.
+  const takeaway = P.partial ? `Early read: ${lowerFirst(baseTakeaway)}` : baseTakeaway;
   const coachTake = coachingSentences({ synthesis, lead, facts, steps, contract });
   const action = actionSentence(synthesis, steps);
   const watch = watchSentence(discriminators);
@@ -137,7 +222,7 @@ export function realizeHolisticWeeklyV3({ synthesis, picture, goalLabel, goalPol
     [SectionRole.TAKEAWAY]: takeaway, [SectionRole.COACHING]: coachTake, [SectionRole.ACTION]: action,
     [SectionRole.WATCH]: watch };
   return {
-    headline, result: takeaway, meaning: `${recap} ${implication}`, action, watch, coachTake,
+    cadence, headline, result: takeaway, meaning: implication ? `${recap} ${implication}` : recap, action, watch, coachTake,
     recap, implication,
     confidenceBody,
     heroIds: lead.map((item) => item.id),
@@ -153,12 +238,12 @@ export function realizeHolisticWeeklyV3({ synthesis, picture, goalLabel, goalPol
 // ---- headline: what kind of week it was, in a few words and no numbers.
 
 const LEAD_PHRASE = {
-  training_progress: (f) => (f.milestoneCount >= 2 ? "Strong training week" : "A new best in training"),
+  training_progress: (f) => (f.milestoneCount >= 2 ? P.strongTraining : "A new best in training"),
   // Only reached for a canonical-range steady trend (the only supportive one).
   weight_trend: (f) => (f.verdict !== "steady" ? null : f.movement === "flat" ? "Weight holding steady" : "Weight on the phase's pace"),
   composition_result: (f) => `New ${f.eventName} shows progress`,
-  routine_steady: () => "A steady week",
-  activity_on_plan: () => "A steady week",
+  routine_steady: () => P.steady,
+  activity_on_plan: () => P.steady,
   intake_vs_plan: () => "Intake on target",
   visual_change: (f) => (f.change === "visible" ? "New photos show visible change" : "New photos show subtle change"),
 };
@@ -175,11 +260,15 @@ function concernPhrase(item, standalone = false) {
     case "routine_break": {
       const quiet = f.direction === "break";
       // (headline character only)
-      const phrase = { late: quiet ? "a quiet finish" : "an off-routine finish", early: quiet ? "a slow start" : "an off-routine start",
-        middle: quiet ? "a quiet midweek" : "an off-routine midweek" }[f.position] ?? (quiet ? "a quiet stretch" : "an off-routine stretch");
-      return standalone && ["late", "early"].includes(f.position) ? `${phrase} to the week` : phrase;
+      // A partial window or an event's lead-up has no "finish" of its own.
+      const bounded = !P.partial && !P.context;
+      const phrase = bounded ? { late: quiet ? "a quiet finish" : "an off-routine finish", early: quiet ? "a slow start" : "an off-routine start",
+        middle: quiet ? `a quiet ${P.midNoun}` : `an off-routine ${P.midNoun}` }[f.position] : null;
+      const fallback = quiet ? "a quiet stretch" : "an off-routine stretch";
+      if (!phrase) return standalone ? `${upperFirst(fallback)} ${P.this}` : `${fallback} ${P.this}`;
+      return standalone && ["late", "early"].includes(f.position) ? `${phrase} to the ${P.noun}` : phrase;
     }
-    case "training_frequency": return f.missedAll ? `no training logged${standalone ? " this week" : ""}` : "fewer sessions than usual";
+    case "training_frequency": return f.missedAll ? `no training logged${standalone ? ` ${P.this}` : ""}` : "fewer sessions than usual";
     case "guardrail_status": return f.status === "breached" ? `${f.label} past its limit` : `${f.label} near its limit`;
     // A standing result is not this week's news.
     case "composition_result": return f.newThisPeriod ? `${f.label} ${Number(f.change) > 0 ? "up" : "down"} on the ${f.eventName}`
@@ -219,6 +308,17 @@ function headlineSentence(lead, facts, budget) {
   const concerns = phrases.filter((entry) => entry.concern);
   const options = [];
   const option = (text, ...entries) => options.push({ text, ids: entries.map((entry) => entry.item.id) });
+  // An outcome-led briefing (an outcome check, a photo comparison) always
+  // leads with the result it exists for; a concern joins it only if both fit.
+  const outcome = facts.leadDomain ? lead.find((item) => item.domain === facts.leadDomain) : null;
+  if (outcome) {
+    const own = outcome.polarity === "concern" ? upperFirst(concernPhrase(outcome, true))
+      : outcome.kind === "visual_comparison" ? "New photos, compared with the last set"
+        : LEAD_PHRASE[outcome.kind]?.(outcome.facts ?? {}) ?? null;
+    const other = concerns.find((entry) => entry.item !== outcome);
+    if (own && other) option(`${own}, but ${other.concern}.`, { item: outcome }, other);
+    if (own) option(`${own}.`, { item: outcome });
+  }
   if (leads[0] && concerns[0]) option(`${leads[0].lead}, but ${concerns[0].concern}.`, leads[0], concerns[0]);
   if (concerns[0] && concerns[1]) option(`${upperFirst(concernPhrase(concerns[0].item, true))}, with ${concernNoun(concerns[1].item)}.`, concerns[0], concerns[1]);
   // A concern is never dropped for a shorter all-good headline.
@@ -234,22 +334,33 @@ function headlineSentence(lead, facts, budget) {
         : f.movement === f.expectedDirection ? "Weight moving in the goal's direction." : null;
     if (phrase) options.push({ text: phrase, ids: [neutralWeight.id] });
   }
-  options.push({ text: "A steady week.", ids: [] });
+  // A photo comparison without a measured amount of change: say the photos
+  // were compared, nothing more.
+  const comparison = lead.find((item) => item.kind === "visual_comparison");
+  if (comparison && !leads.length && !concerns.length) options.push({ text: "New photos, compared with the last set.", ids: [comparison.id] });
+  options.push({ text: `${P.steady}.`, ids: [] });
   const fits = ({ text }) => text.split(/\s+/u).length <= budget.maxWords && text.length <= budget.maxChars && !/\d/u.test(text);
-  return options.find(fits) ?? { text: "A steady week.", ids: [] };
+  return options.find(fits) ?? { text: `${P.steady}.`, ids: [] };
 }
 
 // ---- recap: what happened, with the concrete numbers.
 
 function recapSentence(lead, facts) {
   const clauses = lead.map((item) => ({ item, text: clauseFor(item, facts) })).filter((entry) => entry.text);
-  if (!clauses.length) return "This week held to its usual pattern.";
-  const [first, second] = clauses;
-  const joined = !second ? upperFirst(first.text) :
-    first.item.polarity === "supportive" && second.item.polarity === "concern"
-      ? `${upperFirst(first.text)}, but ${second.text}` : `${upperFirst(first.text)}, and ${second.text}`;
-  const sentence = `${joined}.`;
-  return sentence.length <= HERO_BUDGET ? sentence : `${upperFirst(first.text)}.`;
+  if (!clauses.length) return P.usual;
+  // An event's outcome leads; what came before it is placed in the lead-up.
+  const outcomeFirst = P.context && ["composition_result", "visual_change", "visual_comparison"].includes(clauses[0].item.kind);
+  const dated = new Set(["routine_break", "activity_change", "training_frequency"]);
+  const texts = clauses.map((entry, index) => (outcomeFirst && index > 0 && !dated.has(entry.item.kind)
+    ? `${P.context}, ${entry.text}` : entry.text));
+  const joiner = (index) => (clauses[index - 1].item.polarity === "supportive" && clauses[index].item.polarity === "concern"
+    ? ", but " : clauses.length > 2 && index === clauses.length - 1 ? ", and " : clauses.length > 2 ? ", " : ", and ");
+  let body = texts[0];
+  for (let index = 1; index < texts.length; index += 1) body += `${joiner(index)}${texts[index]}`;
+  const sentence = P.recapLead ? `${P.recapLead}${body}.` : `${upperFirst(body)}.`;
+  const budget = HERO_BUDGET * (clauses.length > 2 ? 1.5 : 1);
+  if (sentence.length <= budget) return sentence;
+  return P.recapLead ? `${P.recapLead}${texts[0]}.` : `${upperFirst(texts[0])}.`;
 }
 
 // ---- takeaway: the coach's read of the whole picture — what is going well
@@ -263,7 +374,9 @@ function recapSentence(lead, facts) {
 const GOING_WELL = {
   [ClaimScope.PERFORMANCE]: () => "the performance gains are real",
   [ClaimScope.MEASUREMENT]: (f, kind) => (kind === "visual_change" ? `the photos show ${f.change === "visible" ? "a visible" : "a subtle"} change`
-    : `the new ${f.eventName} shows ${f.label} moving the right way`),
+    : kind === "visual_comparison" ? null
+      : P.context && f.newThisPeriod ? "the measured result moves the goal forward"
+        : `the new ${f.eventName} shows ${f.label} moving the right way`),
   [ClaimScope.TRAJECTORY]: (f) => (f.verdict === "steady" ? "the scale is where the phase expects it" : null),
   [ClaimScope.EXECUTION]: (f, kind) => ({ routine_steady: "the routine held", activity_on_plan: "the routine held",
     intake_vs_plan: "intake stayed where it needs to be" }[kind] ?? null),
@@ -283,21 +396,25 @@ function prioritiesPhrase(item) {
         flat: "a flat scale is worth a few more weeks before changing anything" }[f.verdict] ?? null;
     case "routine_break": {
       const prior = f.recurrence?.priorSpans?.length;
-      const part = { late: "the end of the week", early: "the start of the week", middle: "the middle of the week" }[f.position] ??
-        "the usual weekly rhythm";
+      const part = P.parts[f.position] ?? "the usual weekly rhythm";
+      // Across a month, a one-off stretch and a persistent one mean different things.
+      if (item.temporal === "one_off") return `one ${f.direction === "break" ? "quiet" : "off-routine"} stretch in an otherwise steady ${P.noun} isn't a pattern`;
+      if (item.temporal === "persistent") return `the routine was off for most of the ${P.noun}, so rebuilding it matters more than any single week`;
       if (f.direction !== "break") return prior ? `${part} is worth protecting; the routine has drifted like this before`
         : "an off-routine stretch like this is easy to reset";
       return prior ? `the part to protect is ${part}, where the routine has slipped before`
         : "a short slip like this is easy to recover from";
     }
-    case "training_frequency": return f.missedAll ? "a single missed week is easy to absorb; the next one is the one that counts"
-      : "the missed sessions are easy to absorb if next week runs as usual";
+    case "training_frequency":
+      if (P.partial) return "there is still time to get the usual sessions in";
+      return f.missedAll ? `a single missed ${P.noun} is easy to absorb; the next one is the one that counts`
+        : `the missed sessions are easy to absorb if ${P.next} runs as usual`;
     // Direction-neutral (a guardrail may be a ceiling or a floor), and
     // consistent with a keep-to-target step.
     case "guardrail_status": return f.status === "breached" ? "the priority now is getting back within range, and hitting the targets consistently is the way there"
       : `holding ${f.label} steady comes before anything else right now`;
     case "composition_result": return `the ${f.eventName} result is the thing to turn around`;
-    case "intake_vs_plan": return "the food side is the lever this week";
+    case "intake_vs_plan": return `the food side is the lever ${P.leverWhen}`;
     case "activity_change": return f.direction === "below" ? "activity is worth bringing back up" : null;
     case "visual_change": return "the photos need more time to show change";
     default: return null;
@@ -318,14 +435,28 @@ function takeawaySentence({ lead, synthesis, steps }) {
     (["guardrail_status", "composition_result", "training_frequency"].includes(item.kind) && item.polarity === "concern"));
   const working = lead.map((item) => (item.polarity === "supportive" && !serious ? workingPhrase(item) : null)).filter(Boolean);
   // Priorities come only from real concerns; a neutral finding is not a problem.
-  const priorities = [...new Set(lead.map((item) => (item.polarity === "concern" ? priority(item) : null)).filter(Boolean))];
+  // In an event's lead-up, execution is context: priorities come only from
+  // the outcome, the guardrail or a weight risk.
+  const contextOnly = new Set(["routine_break", "activity_change", "training_frequency", "intake_vs_plan"]);
+  const priorities = [...new Set(lead.map((item) => (item.polarity === "concern" && !(P.context && contextOnly.has(item.kind))
+    ? priority(item) : null)).filter(Boolean))];
+  // An event: the result, then where the lead-up sits — context for the
+  // result, never a reason by itself to change course.
+  const eventResult = lead.some((item) => [ROLES.outcome, ROLES.visual].includes(item.domain) && item.facts?.newThisPeriod);
+  if (P.context && eventResult && working.length && !priorities.length) {
+    const leadUp = lead.find((item) => contextOnly.has(item.kind) && item.polarity === "concern");
+    const noun = leadUp ? { routine_break: leadUp.facts?.direction === "break" ? "quiet stretch" : "off-routine stretch",
+      training_frequency: "missed sessions", intake_vs_plan: "intake miss", activity_change: "activity dip" }[leadUp.kind] : null;
+    return noun ? `${upperFirst(working[0])}; the ${noun} ${P.before} is context, not a reason to change course.`
+      : `${upperFirst(working[0])}, and nothing ${P.before} argues for changing course.`;
+  }
   if (working.length && priorities.length) return `${upperFirst(working[0])}; ${priorities[0]}.`;
   if (priorities.length) return `${upperFirst(priorities[0])}${priorities[1] ? `; ${priorities[1]}` : ""}.`;
   if (working.length > 1) return `${upperFirst(working[0])}, and ${working[1]}.`;
   if (working.length) return `${upperFirst(working[0])}, and that is the part to keep.`;
   return synthesis.selected.some((item) => item.polarity === "concern")
     ? "Nothing here needs a change yet; the next few weeks will say more."
-    : "Nothing in this week calls for a different approach.";
+    : `Nothing ${P.inThis} calls for a different approach.`;
 }
 
 function clauseFor(item, facts) {
@@ -339,12 +470,15 @@ function clauseFor(item, facts) {
     case "routine_break":
       return f.direction === "break"
         ? `the routine slipped ${positionPhrase(f.position)}`
-        : `the week ran off its usual routine ${positionPhrase(f.position)}`;
+        : `${P.context ? "the routine" : `the ${P.noun}`} ran off its usual pattern ${positionPhrase(f.position)}`;
     case "composition_result":
       return `${f.newThisPeriod ? "the new" : `the ${dateWords(f.measuredAt)}`} ${f.eventName} ${compositionPhrase(f)}`;
     case "visual_change":
       return { visible: "the new photos show a visible change", subtle: "the new photos show a subtle change",
         none: "the new photos look much like the last set" }[f.change] ?? null;
+    case "visual_comparison":
+      return f.comparable ? "the new photos were compared pose by pose with the last comparable set"
+        : "the new photos set a baseline for later comparisons";
     case "guardrail_status":
       return f.status === "breached" ? `${f.label} is past its limit` : `${f.label} is close to its limit`;
     case "intake_vs_plan":
@@ -352,7 +486,7 @@ function clauseFor(item, facts) {
     case "activity_change":
       return f.direction === "below" ? `activity dropped off ${dayRange(f.dates)}` : `activity picked up ${dayRange(f.dates)}`;
     case "training_frequency":
-      if (f.missedAll) return "no training sessions were logged this week";
+      if (f.missedAll) return `no training sessions were logged ${P.this}`;
       if (f.missedDates) return `training was missed ${dayRange(f.missedDates)}`;
       return f.direction === "below" ? "there were fewer training days than usual" : "there were more training days than usual";
     case "activity_on_plan":
@@ -375,6 +509,13 @@ function implicationSentence({ synthesis, facts, goalLabel, lead }) {
   const risk = synthesis.selected.find((item) => item.role === "risk");
   const weight = synthesis.selected.find((item) => item.kind === "weight_trend");
   const compositionTold = lead.some((item) => item.domain === ROLES.outcome);
+  // An outcome-led briefing (an outcome check): the result was just told, so its meaning
+  // is where it puts the goal, and where the guardrail stands.
+  if (compositionTold && composition?.newThisPeriod && composition.polarity !== "concern" && !risk) {
+    const guardrail = facts.guardrail ? `, with ${facts.guardrail.label} at ${guardrailValue(facts)}` : "";
+    const progress = facts.goalProgress ? stripFinalPeriod(facts.goalProgress) : `That result sets the direction for ${goalLabel}`;
+    return `${progress}${guardrail}.`;
+  }
   const scan = composition && !compositionTold
     ? `The ${dateWords(composition.measuredAt)} ${composition.eventName} ${compositionPhrase(composition)}${facts.guardrail ? ` with ${facts.guardrail.label} at ${guardrailValue(facts)}` : ""}`
     : null;
@@ -387,7 +528,7 @@ function implicationSentence({ synthesis, facts, goalLabel, lead }) {
   const stableGoal = facts.direction === "stable";
   const fastWithGoal = ["rapid", "accelerating"].includes(verdict);
   if (!composition) {
-    return risk ? `That is the part to keep an eye on for ${goalLabel}.` : `Nothing this week changes the direction of ${goalLabel}.`;
+    return risk ? `That is the part to keep an eye on for ${goalLabel}.` : `Nothing ${P.this} changes the direction of ${goalLabel}.`;
   }
   if (composition.polarity === "concern" || risk?.kind === "composition_result") {
     return read(`; the scale can't show whether ${composition.label} has turned back, and ${next} will.`,
@@ -454,7 +595,8 @@ function coachingSentences({ synthesis, lead, facts, steps, contract }) {
     if (item.kind === "routine_break") {
       const prior = item.facts.recurrence?.priorSpans?.at(-1);
       const stretch = item.facts.direction === "break" ? "quiet" : "off-routine";
-      const covered = steps.some((step) => step.source?.id === item.id);
+      // An event's lead-up gets no "way back" tip: it is context for the result.
+      const covered = Boolean(P.context) || steps.some((step) => step.source?.id === item.id);
       parts.push(`${upperFirst(clauseFor(item, facts))}${prior ? `, and a similar ${stretch} stretch came in ${monthPart(prior.startDate)}` : ""}${covered ? "" : "; the usual days and times are the easiest way back"}.`);
     } else if (item.kind === "weight_trend" && item.facts.verdict === "steady" && item.facts.movement !== "flat") {
       parts.push(`${upperFirst(clauseFor(item, facts))}, in the direction the goal wants.`);
@@ -465,7 +607,9 @@ function coachingSentences({ synthesis, lead, facts, steps, contract }) {
       parts.push(`${upperFirst(clauseFor(item, facts))}; aim for the target most days rather than making up for it on one.`);
     } else {
       const clause = clauseFor(item, facts);
-      if (clause) parts.push(`${upperFirst(clause)}.`);
+      // Placed in an event's lead-up when the clause carries no time of its own.
+      if (clause) parts.push(P.context && !["activity_change", "training_frequency"].includes(item.kind)
+        ? `${upperFirst(P.context)}, ${clause}.` : `${upperFirst(clause)}.`);
     }
   }
   for (const item of synthesis.limitations) parts.push(limitationSentence(item));
@@ -475,7 +619,7 @@ function coachingSentences({ synthesis, lead, facts, steps, contract }) {
     const step = steps[0];
     parts.push(step ? step.focus ?? executionTip(step, facts)
       : facts.sparse ? "Logging a little more each day from here on will make the next check clearer."
-        : synthesis.selected.every((item) => item.polarity !== "concern") ? "Keep logging the same way; it is what makes weeks like this easy to read."
+        : synthesis.selected.every((item) => item.polarity !== "concern") ? "Keep logging the same way; it keeps the picture easy to read."
         : "Nothing here needs a change yet.");
   }
   return parts.slice(0, contract.coaching?.maxSentences ?? 3).join(" ");
@@ -494,7 +638,7 @@ function executionTip(step, facts) {
     case "composition_result": case "guardrail_status":
       return `Steady, ordinary days until the next ${facts.composition?.eventName ?? "check"} make its reading easier to trust.`;
     case "intake_vs_plan": return "Aim for the target most days rather than making up for it on one.";
-    default: return "One adjustment this week is enough.";
+    default: return `One adjustment ${P.stepTail} is enough.`;
   }
 }
 
@@ -562,17 +706,20 @@ function planSteps(synthesis) {
   } else if (outcomeRisk) {
     steps.push({ source: outcomeRisk, text: "keep intake at the plan's target and training on its usual rhythm" });
   }
-  const trainingGap = (routine && routine.facts.missed?.some((gap) => gap.domain === "training")) || missedTraining;
+  // An event's lead-up is context for the result, not a list of things to
+  // redo: only risks produce steps there.
+  const leadUp = Boolean(P.context);
+  const trainingGap = !leadUp && ((routine && routine.facts.missed?.some((gap) => gap.domain === "training")) || missedTraining);
   if (trainingGap && !outcomeRisk) steps.push({ source: missedTraining ?? routine, text: "get the usual training rhythm back" });
   // An intake step never pushes the scale further the way it is already
   // moving too fast, nor away from steady for a maintenance goal.
   const pushesScale = anyWeight && intakePush === anyWeight.facts.movement &&
     (anyWeight.facts.verdict !== "steady" || anyWeight.facts.expectedDirection === "stable");
-  if (intake && !weightRisk && !outcomeRisk && !intakeContradictsScale && !pushesScale) {
+  if (intake && !leadUp && !weightRisk && !outcomeRisk && !intakeContradictsScale && !pushesScale) {
     steps.push({ source: intake, text: intakePush === "up" ? "bring intake up to the plan's target"
       : "bring intake back down to the plan's target" });
   }
-  if (routine && !trainingGap && !outcomeRisk) steps.push({ source: routine, text: "settle back into the usual routine" });
+  if (routine && !leadUp && !trainingGap && !outcomeRisk) steps.push({ source: routine, text: "settle back into the usual routine" });
   return steps.slice(0, risk ? 2 : 1);
 }
 
@@ -581,7 +728,7 @@ function actionSentence(synthesis, steps) {
   // Beside a risk, say the rest stays; otherwise the step stands alone.
   const risk = synthesis.selected.some((item) => item.role === "risk");
   const tail = risk ? " The rest of the setup stays as it is." : "";
-  return `${upperFirst(steps[0].text)}${steps[1] ? ` and ${steps[1].text}` : ""} this week.${tail}`;
+  return `${upperFirst(steps[0].text)}${steps[1] ? ` and ${steps[1].text}` : ""} ${P.stepTail}.${tail}`;
 }
 
 // What decides next week, each item tied to the insight it discriminates.
@@ -611,7 +758,10 @@ function watchItems({ synthesis, facts }) {
   }
   const missedTraining = synthesis.selected.find((item) => item.kind === "training_frequency" && item.facts.direction === "below");
   if (missedTraining && !routine) items.push({ source: missedTraining, text: "whether the usual training days come back" });
-  if (routine) {
+  if (routine && P.context) {
+    // Past lead-up dates are never something to "get back"; watch the rhythm ahead.
+    items.push({ source: routine, text: `whether the usual training rhythm holds over ${P.next}` });
+  } else if (routine) {
     const training = routine.facts.missed?.find((gap) => gap.domain === "training")?.dates;
     const dates = training?.length ? training : routine.facts.affectedDates;
     items.push({ source: routine, text: training?.length
@@ -624,7 +774,7 @@ function watchItems({ synthesis, facts }) {
 }
 
 function watchSentence(items) {
-  if (!items.length) return "Watch that the usual rhythm holds next week.";
+  if (!items.length) return `Watch that the usual rhythm holds ${P.next}.`;
   return items.length === 1 ? `Watch ${items[0].text}.` : `Watch ${items[0].text} and ${items[1].text}.`;
 }
 
@@ -645,13 +795,13 @@ function confidenceSentence({ synthesis, facts }) {
   // A guardrail reading comes from that same measurement, so it is part of
   // the level it set, not a separate pending signal.
   if (["composition_result", "guardrail_status"].includes(risk?.kind)) {
-    return `Confidence holds at the level ${event} set, and nothing this week moves it either way.`;
+    return `Confidence holds at the level ${event} set, and nothing ${P.this} moves it either way.`;
   }
   const period = risk
     ? `${riskNoun(risk)} is worth watching but hasn't changed it yet`
     : supportive.length
-      ? `this week's weight trend fits it${disruption ? `; ${few} ${disruption.facts.direction === "break" ? "isn't" : "aren't"} enough to change that` : ""}`
-      : disruption ? `${few} ${disruption.facts.direction === "break" ? "isn't" : "aren't"} enough to change it` : "nothing this week changes it";
+      ? `${P.thisPoss} weight trend fits it${disruption ? `; ${few} ${disruption.facts.direction === "break" ? "isn't" : "aren't"} enough to change that` : ""}`
+      : disruption ? `${few} ${disruption.facts.direction === "break" ? "isn't" : "aren't"} enough to change it` : `nothing ${P.this} changes it`;
   const scan = facts.composition.newThisPeriod ? `${upperFirst(event)} sets` : `${upperFirst(event)} still sets`;
   return `Confidence holds. ${scan} the outlook, and ${period}.`;
 }
@@ -667,7 +817,7 @@ function riskNoun(item) {
     return item.facts.status === "breached" ? `${item.facts.label} past its limit` : `${item.facts.label} edging toward its limit`;
   }
   if (item.kind === "composition_result") return `the ${item.facts.eventName} result`;
-  return "this week's change";
+  return `${P.thisPoss} change`;
 }
 
 // Described, not judged: a pace is called fast only against a canonical
@@ -715,13 +865,15 @@ function compositionPhrase(f) {
 function guardrailValue(facts) { return `${formatNumber(facts.guardrail.value)}${facts.guardrail.unit === "%" ? "%" : ` ${facts.guardrail.unit ?? ""}`}`; }
 
 function positionPhrase(position) {
-  return { late: "late in the week", early: "early in the week", middle: "midweek", whole: "for most of the week" }[position] ?? "this week";
+  return P.positions[position] ?? P.this;
 }
 
 function dayRange(dates) {
   const unique = [...new Set(dates ?? [])].sort();
   if (!unique.length) return "some days";
-  const names = unique.map((date) => WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()]);
+  // Weekdays name days within a week; a month or an event's lead-up needs
+  // calendar dates.
+  const names = unique.map((date) => (P.calendarDates ? dateWords(date) : WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()]));
   if (names.length === 1) return names[0];
   if (names.length === 2) return `${names[0]} and ${names[1]}`;
   const consecutive = unique.every((date, index) => index === 0 ||
@@ -748,4 +900,5 @@ function formatNumber(value) {
 
 function numberWord(value) { return NUMBER_WORDS[value] ?? String(value); }
 function lowerFirst(value) { return value ? `${value[0].toLocaleLowerCase("en-US")}${value.slice(1)}` : value; }
+function stripFinalPeriod(value) { return String(value ?? "").replace(/[.!]\s*$/u, ""); }
 function upperFirst(value) { return value ? `${value[0].toLocaleUpperCase("en-US")}${value.slice(1)}` : value; }

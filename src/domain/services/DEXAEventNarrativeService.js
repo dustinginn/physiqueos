@@ -666,6 +666,13 @@ export function createDEXAEventNarrativeService({
         context,
         reason: reason ?? `Confirmed DEXA Event ${scan.id}.`,
         replacementAuthorized,
+        periodEvidence: {
+          window: { startDate: dateKey(scan.measuredAt), endDate: dateKey(scan.measuredAt) },
+          timeZone: context?.timeZone ?? "America/Los_Angeles",
+          canonicalObjects: canonical,
+          weightEntries: await (repositories.weights?.listWeightEntries?.(userId) ?? []),
+          dexaScans: scans,
+        },
       });
       if (result.committed || result.status === "matched") return result.artifact;
       const error = new Error(

@@ -294,18 +294,30 @@ async function prepareMonthlyOccurrence({
     evidenceFixture: narrative.evidenceFixture,
     currentConfidence: current.assessment.currentPercentage ?? null,
   });
+  // Shared Briefing Intelligence reads the full canonical evidence (the
+  // Monthly policy's 56-day baseline reaches before the window); the Monthly
+  // cross-source intelligence above keeps feeding Confidence as evidence.
+  const [periodCanonicalObjects, periodWeights, periodDexaScans] = await Promise.all([
+    repositories.canonicalEvidence?.listCanonicalEvidenceObjects?.(userId) ?? [],
+    repositories.weights?.listWeightEntries?.(userId) ?? [],
+    repositories.dexaScans?.listDEXAScans?.(userId) ?? [],
+  ]);
+  const periodEvidence = { window: { startDate: window.startDate, endDate: window.endDate }, timeZone,
+    canonicalObjects: periodCanonicalObjects, weightEntries: periodWeights, dexaScans: periodDexaScans };
   return {
     artifact, activePhase, baseline, current, existing, generatedAt, goal,
-    piEnvelope, monthlyIntelligence,
+    piEnvelope, monthlyIntelligence, periodEvidence,
     userId, window,
   };
 }
 
-async function publishMonthlyOccurrence({
+// Exported for zero-write dry-run previews (`dryRun: true` uses
+// finalizer.preview and never commits).
+export async function publishMonthlyOccurrence({
   prepared, publicationService, now, operation, reason, dryRun = false,
 }) {
   const { artifact, activePhase, baseline, current, existing, generatedAt,
-    goal, piEnvelope, monthlyIntelligence, userId, window } = prepared;
+    goal, piEnvelope, monthlyIntelligence, periodEvidence = null, userId, window } = prepared;
   const replacement = operation === "regenerate";
   const replacedAssessmentId = replacement
     ? existing?.confidencePublication?.assessmentId ?? null : null;
@@ -362,6 +374,7 @@ async function publishMonthlyOccurrence({
       }),
     ],
     previousCanonicalAssessment: confidencePredecessor,
+    ...(periodEvidence ? { periodEvidence } : {}),
     evidenceCutoff: window.cutoff, finalizedAt: generatedAt,
     idempotencyKey: replacement
       ? `confidence_v3|monthly|${artifact.id}|correction|${correctionIdentity}`

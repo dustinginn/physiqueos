@@ -38,7 +38,9 @@ export const BRIEFING_INTELLIGENCE_POLICIES = Object.freeze({
     admissibleKinds: [Kind.LEVEL_SHIFT, Kind.FREQUENCY_CHANGE, Kind.DISPERSION_CHANGE, Kind.ROUTINE_SHIFT],
     narrativeRole: "persistence_and_change",
     // Highest density: trajectory, persistence vs one-offs, strategy fit.
-    narrative: Object.freeze({ maxInsights: 5, maxLimitations: 2, floor: 0.7, heroInsights: 2,
+    // A lower floor than Weekly: across a month, steady multi-week facts
+    // (the routine held, activity stayed usual) are worth saying.
+    narrative: Object.freeze({ maxInsights: 5, maxLimitations: 2, floor: 0.5, heroInsights: 3,
       purpose: "multi_week_synthesis_and_strategy_fit", persistence: true, watchDiscriminators: 2 }),
   }),
   // Execution context in the 28 days preceding an authoritative outcome;
@@ -57,7 +59,8 @@ export const BRIEFING_INTELLIGENCE_POLICIES = Object.freeze({
     narrativeRole: "preceding_execution_context",
     // Depth scales with how much the visual evidence actually changed.
     narrative: Object.freeze({ maxInsights: 2, maxLimitations: 1, floor: 0.9, heroInsights: 1,
-      purpose: "visual_change_with_corroboration", scaleWithOutcome: { domain: "visual_change", extraInsights: 2 },
+      purpose: "visual_change_with_corroboration", leadDomain: "visual_change",
+      scaleWithOutcome: { domain: "visual_change", extraInsights: 2 },
       watchDiscriminators: 1 }),
   }),
 });

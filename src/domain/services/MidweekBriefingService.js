@@ -291,6 +291,11 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
             operatingState: resolveOperatingStateFromGoalPhase({ goal, phase: activePhase })?.value ??
               goal?.operatingState?.value ?? goal?.operatingState,
             piEnvelope: authoritative,
+            // The shared Briefing Intelligence reads the same canonical
+            // evidence this Midweek already read (Midweek policy: partial
+            // window, lightest budget).
+            periodEvidence: { window: { startDate: window.startDate, endDate: window.endDate }, timeZone,
+              canonicalObjects, weightEntries: weights, dexaScans },
             reason,
           });
           if (result.committed || result.status === "matched") {
@@ -371,7 +376,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
         return { status: "prepared", artifact, existing,
           sharedFinalizer: true, reason, activeGoal: captured.activeGoal,
           activePhase: captured.activePhase, piEnvelope: captured.piEnvelope,
-          operatingState: captured.operatingState };
+          operatingState: captured.operatingState, periodEvidence: captured.periodEvidence ?? null };
       }
       const confidence = resolveActiveGoalConfidencePresentation({
         activeGoal: goal,
@@ -423,6 +428,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
             resolveOperatingStateFromGoalPhase({ goal: prepared.activeGoal, phase: prepared.activePhase })?.value ??
             prepared.activeGoal?.operatingState?.value,
           piEnvelope: prepared.piEnvelope ?? null, reason: prepared.reason,
+          ...(prepared.periodEvidence ? { periodEvidence: prepared.periodEvidence } : {}),
           replacementAuthorized: true,
         });
         return result.committed ? { ...result, status: "regenerated" } : result;

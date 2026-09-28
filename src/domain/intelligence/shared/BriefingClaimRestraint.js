@@ -35,6 +35,7 @@ const SCOPE_BY_KIND = Object.freeze({
   composition_result: ClaimScope.MEASUREMENT,
   guardrail_status: ClaimScope.MEASUREMENT,
   visual_change: ClaimScope.MEASUREMENT,
+  visual_comparison: ClaimScope.MEASUREMENT,
   weight_trend: ClaimScope.TRAJECTORY,
   routine_break: ClaimScope.EXECUTION,
   routine_steady: ClaimScope.EXECUTION,

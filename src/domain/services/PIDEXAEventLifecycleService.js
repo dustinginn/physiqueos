@@ -18,7 +18,7 @@ export function createPIDEXAEventLifecycleService({ publicationService,
   });
   return Object.freeze({
     async publish({ operation = "create", artifact, scan, priorScan, context, reason,
-      replacementAuthorized = false } = {}) {
+      replacementAuthorized = false, periodEvidence = null } = {}) {
       const goal = context?.activeGoal;
       const phase = context?.activePhase;
       if (!goal?.id || !phase?.id || !scan?.id) return typed("not_eligible",
@@ -46,6 +46,9 @@ export function createPIDEXAEventLifecycleService({ publicationService,
           adaptCanonicalDexaScans({ goalContract, phase,
             scans: [priorScan, scan].filter(Boolean), cutoff }),
         previousCanonicalAssessment: current.assessment,
+        // Shared Briefing Intelligence over the execution before the scan
+        // (DEXA policy: outcome-led, preceding execution as context).
+        ...(periodEvidence ? { periodEvidence } : {}),
         evidenceCutoff: cutoff, finalizedAt: now().toISOString(),
         idempotencyKey: `confidence_v3|dexa|${artifact.id}`,
         expectedPriorAssessmentId: current.assessment.id,

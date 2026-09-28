@@ -70,10 +70,14 @@ export const SECTION_CONTRACTS = Object.freeze({
     maxWords: 230,
   }),
   // Least copy: what is emerging so far and the next step; no forced arc.
+  // No goal-meaning or multi-sentence coaching section: an early read, one
+  // execution line, the step and what to watch.
   midweek: Object.freeze({
-    cadence: "midweek", sections: [R.HEADLINE, R.RECAP, R.ACTION, R.WATCH],
+    cadence: "midweek", sections: [R.HEADLINE, R.RECAP, R.TAKEAWAY, R.COACHING, R.ACTION, R.WATCH],
     headline: { ...HEADLINE, maxWords: 8 }, recap: { maxInsights: 1, quantities: true, tense: "so_far" },
-    maxWords: 90,
+    takeaway: { quantities: false, newInsights: false },
+    coaching: { maxSentences: 1 },
+    maxWords: 120,
   }),
   // Room for multi-week synthesis and persistence, still one job per section.
   monthly: Object.freeze({
@@ -94,11 +98,13 @@ export const SECTION_CONTRACTS = Object.freeze({
   }),
   // Visual-result-led; depth scales with how much the photos actually show.
   photo: Object.freeze({
-    cadence: "photo", sections: [R.HEADLINE, R.RECAP, R.MEANING, R.ACTION, R.WATCH], headline: HEADLINE,
+    cadence: "photo", sections: [R.HEADLINE, R.RECAP, R.MEANING, R.TAKEAWAY, R.COACHING, R.ACTION, R.WATCH], headline: HEADLINE,
     leadDomain: "visual_change", recap: { maxInsights: 1, quantities: true },
-    scaleWithOutcome: { domain: "visual_change", minimumStrength: 2.5, addSections: [R.TAKEAWAY, R.COACHING] },
+    // A measured, strong visual change earns a second recap insight and more
+    // execution context; without one the Photo stays short.
+    scaleWithOutcome: { domain: "visual_change", minimumStrength: 2.5, recapInsights: 2, coachingSentences: 3 },
     takeaway: { quantities: false, newInsights: false },
-    coaching: { maxSentences: 2 },
+    coaching: { maxSentences: 1 },
     maxWords: 150,
   }),
 });
@@ -113,9 +119,8 @@ export function resolveSectionContract(cadence, synthesis) {
   const strong = synthesis?.selected?.some((item) => item.domain === scale.domain &&
     item.role === "outcome" && item.strength >= scale.minimumStrength);
   if (!strong) return base;
-  const sections = [...base.sections];
-  for (const role of scale.addSections) if (!sections.includes(role)) sections.splice(sections.indexOf(R.ACTION), 0, role);
-  return { ...base, sections, maxWords: Math.round(base.maxWords * 1.6) };
+  return { ...base, recap: { ...base.recap, maxInsights: scale.recapInsights },
+    coaching: { ...base.coaching, maxSentences: scale.coachingSentences }, maxWords: Math.round(base.maxWords * 1.6) };
 }
 
 // The headline insights: what moved the goal forward, then what held it back

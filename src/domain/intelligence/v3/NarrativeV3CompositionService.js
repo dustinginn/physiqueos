@@ -5,7 +5,7 @@ import {
   naturalizeUserFacingNarrativeProjection,
   naturalizeUserFacingNarrativeText,
 } from "../../services/UserFacingObjectLanguageService.js";
-import { goalFactsFromInterpretationV3, realizeHolisticWeeklyV3, WEEKLY_REALIZABLE_KINDS } from "./HolisticNarrativeV3.js";
+import { goalFactsFromInterpretationV3, realizeHolisticBriefingV3, BRIEFING_REALIZABLE_KINDS } from "./HolisticNarrativeV3.js";
 import { auditClaimRestraint, hasAuthoritativeCausalSupport } from "../shared/BriefingClaimRestraint.js";
 import { buildEvidencePicture } from "../shared/BriefingEvidencePicture.js";
 import { synthesizeBriefing } from "../shared/BriefingHolisticSynthesis.js";
@@ -38,7 +38,7 @@ export const NARRATIVE_V3_SECTION_PURPOSES = deepFreeze({
   coachTake: "highest_value_remaining_coaching_point",
 });
 
-export function composeNarrativeV3({ goalContract, interpretation, confidence, surface, priorNarrativePlan = null, evaluatedAt, briefingIntelligence = null }) {
+export function composeNarrativeV3({ goalContract, interpretation, confidence, surface, priorNarrativePlan = null, evaluatedAt, briefingIntelligence = null, observations = [] }) {
   const primaryObjective = interpretation.objectiveFindings.find((item) => item.priority === "primary") ??
     interpretation.objectiveFindings[0] ?? null;
   const context = narrativeContext(goalContract, interpretation, primaryObjective);
@@ -79,19 +79,25 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   context.specificCoachingObservations =
     interpretation.coachingObservationSelection?.selected ?? [];
   context.reconciliationTensions = interpretation.crossDomainSynthesis?.tensions ?? [];
-  // Holistic synthesis over the shared Briefing Intelligence: every
-  // goal-relevant domain is assessed, then a complementary set is chosen for
-  // this briefing's own information budget. It writes the recap only when the
-  // plan holds; a decision-changing evaluation keeps its own allocation.
-  context.holistic = briefingIntelligence && context.useRecurringSectionPlan
-    ? safelySynthesize({ briefingIntelligence, goalContract, interpretation, confidence, words: {
+  // Holistic synthesis over the shared Briefing Intelligence, for every
+  // briefing type that supplies it (recurring cadences and event checks):
+  // every goal-relevant domain is assessed, then a complementary set is chosen
+  // for this briefing's own information budget and written to its own section
+  // contract. It writes the briefing only when the plan holds; a
+  // decision-changing evaluation keeps its own allocation.
+  context.holistic = briefingIntelligence
+    ? safelySynthesize({ briefingIntelligence, goalContract, interpretation, confidence, observations, words: {
       outcomeEventName: context.nextEvidence.displayName,
       outcomeLabel: objectiveLabel(context),
       guardrailLabel: context.primaryGuardrail ? guardrailLabel(goalContract, context.primaryGuardrail) : null,
+      goalProgress: goalProgressSentence(context),
     } }) : null;
   context.period = context.holistic?.realized &&
       interpretation.recommendation.action === "continue_current_strategy"
     ? context.holistic.realized : null;
+  // An event briefing realized from the shared synthesis uses the same
+  // section plan as the recurring briefings.
+  if (context.period) context.useRecurringSectionPlan = true;
   context.sectionPlan = allocateNarrativeSections(context);
   const primaryConfidenceSnapshot = { percentage: confidence.currentPercentage, delta: confidence.delta, movement: confidence.movement };
   const casingOptions = {
@@ -494,19 +500,20 @@ function allocateNarrativeSections(context) {
 
 // Enrichment never fails a briefing: an unrealizable characterization falls
 // back to the prior recurring allocation.
-function safelySynthesize({ briefingIntelligence, goalContract, interpretation, confidence, words }) {
+function safelySynthesize({ briefingIntelligence, goalContract, interpretation, confidence, observations = [], words }) {
   try {
     const goalPolicy = resolveGoalEvidencePolicy(goalContract);
-    const goalFacts = goalFactsFromInterpretationV3({ interpretation, confidence,
-      window: briefingIntelligence.horizon.window, words });
+    const window = briefingIntelligence.horizon.window;
+    const goalFacts = goalFactsFromInterpretationV3({ interpretation, confidence, window, words, observations });
     const picture = buildEvidencePicture({ intelligence: briefingIntelligence, goalPolicy, goalFacts });
     const policy = resolveBriefingIntelligencePolicy(briefingIntelligence.policy.cadence);
     const budget = resolveNarrativeBudget(policy, picture);
     if (!budget) return null;
-    const synthesis = synthesizeBriefing({ picture, budget,
-      realizableKinds: policy.cadence === "weekly" ? WEEKLY_REALIZABLE_KINDS : null });
-    const realized = policy.cadence === "weekly" ? realizeHolisticWeeklyV3({ synthesis, picture, goalPolicy,
-      goalLabel: goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel ?? "the goal" }) : null;
+    const synthesis = synthesizeBriefing({ picture, budget, realizableKinds: BRIEFING_REALIZABLE_KINDS });
+    // One realizer, configured by the briefing type's section contract.
+    const realized = realizeHolisticBriefingV3({ cadence: policy.cadence, synthesis, picture, goalPolicy,
+      goalLabel: goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel ?? "the goal",
+      goalProgress: words.goalProgress ?? null });
     return { goalPolicy, picture, synthesis, realized };
   } catch (error) {
     // Synthesis never blocks a briefing: the prior composition path runs, and
@@ -795,6 +802,9 @@ function formatCompactPercent(value) {
 
 function composeResult(context) {
   const { interpretation, objective } = context;
+  // A realized period speaks from its own evidence even before the outcome
+  // measure can be judged.
+  if (context.period) return context.sectionPlan.content.result;
   if (!objective || objective.state === "not_assessed") {
     return "There is not enough reliable evidence yet to judge the result.";
   }
@@ -1022,6 +1032,7 @@ function composeWatchFallback(context) {
 
 function composeCoachTake(context) {
   const { interpretation, objective, strategyWords, primaryGuardrail } = context;
+  if (context.period) return context.sectionPlan.content.coachTake;
   if (!objective || objective.state === "not_assessed") {
     return "Hold the plan steady for now. The next useful result needs to be clean enough to guide a decision.";
   }

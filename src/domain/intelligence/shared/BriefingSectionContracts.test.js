@@ -199,8 +199,9 @@ describe("section contracts scale across briefing types without duplicating copy
   it("Midweek uses fewer sections than Weekly; Monthly may carry more evidence", () => {
     const { midweek, weekly: week, monthly } = SECTION_CONTRACTS;
     expect(midweek.sections.length).toBeLessThan(week.sections.length);
-    expect(midweek.sections).not.toContain(SectionRole.TAKEAWAY);
-    expect(midweek.sections).not.toContain(SectionRole.COACHING);
+    // No goal-meaning section and one line of coaching: an early read only.
+    expect(midweek.sections).not.toContain(SectionRole.MEANING);
+    expect(midweek.coaching.maxSentences).toBe(1);
     expect(midweek.headline.maxWords).toBeLessThanOrEqual(week.headline.maxWords);
     expect(midweek.maxWords).toBeLessThan(week.maxWords);
     expect(monthly.recap.maxInsights).toBeGreaterThan(week.recap.maxInsights);
@@ -234,9 +235,10 @@ describe("section contracts scale across briefing types without duplicating copy
     const strongContract = resolveSectionContract("photo", strong);
     const subtleContract = resolveSectionContract("photo", subtle);
     expect(leadInsights(strong, strongContract)[0].domain).toBe("visual_change");
-    expect(strongContract.sections.length).toBeGreaterThan(subtleContract.sections.length);
-    expect(strongContract.sections).toContain(SectionRole.TAKEAWAY);
-    expect(subtleContract.sections).not.toContain(SectionRole.TAKEAWAY);
+    // Depth, not section count, scales with a measured strong visual change.
+    expect(strongContract.recap.maxInsights).toBeGreaterThan(subtleContract.recap.maxInsights);
+    expect(strongContract.coaching.maxSentences).toBeGreaterThan(subtleContract.coaching.maxSentences);
+    expect(strongContract.maxWords).toBeGreaterThan(subtleContract.maxWords);
   });
 
   it("the redundancy audit catches a restated Hero, a repeated quantity and a recap posing as an action", () => {

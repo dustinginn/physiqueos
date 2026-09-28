@@ -298,7 +298,7 @@ function weeklyBoundToGoal(goal, phase) {
 export const DEXA_SCAN_ID = "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12";
 export const DEXA_PRIOR_SCAN_ID = "dexa_submission_20260815181333895_review_pdf_1_2026_08_15";
 
-export async function prepareDexaV3({ withPriorWeekly = false } = {}) {
+export async function prepareDexaV3({ withPriorWeekly = false, periodEvidence = null } = {}) {
   const goal = structuredClone(strategyAuthority.goal);
   const phase = resolveCommittedPhaseContext(goal, { asOf: "2026-09-13" }).activePhase;
   const scan = dexaScans.find((item) => item.id === DEXA_SCAN_ID);
@@ -317,6 +317,7 @@ export async function prepareDexaV3({ withPriorWeekly = false } = {}) {
       goalContract, phase, scans: [prior, scan], cutoff,
     }),
     previousCanonicalAssessment: eventPredecessor({ goal, phase, sourceCutoff: "2026-08-16T06:59:59.999Z" }),
+    ...(periodEvidence ? { periodEvidence } : {}),
     evidenceCutoff: cutoff, finalizedAt: "2026-09-13T06:28:58.012Z",
     idempotencyKey: "golden|dexa", sourceLineage: { reason: "golden_forensic_replay" },
     evaluationType: "event_evidence_boundary", surface: "dexa_event_briefing",
@@ -335,7 +336,7 @@ export async function prepareDexaV3({ withPriorWeekly = false } = {}) {
   return { prepared, artifact: composed, stored: dexaEventArtifact };
 }
 
-export async function preparePhotoV3({ structured = false, withPriorWeekly = false } = {}) {
+export async function preparePhotoV3({ structured = false, withPriorWeekly = false, periodEvidence = null } = {}) {
   const goal = structuredClone(strategyAuthority.goal);
   const phase = resolveCommittedPhaseContext(goal, { asOf: "2026-09-19" }).activePhase;
   const narrative = structuredClone(photoEventArtifact.briefing.photoEventNarrative);
@@ -355,6 +356,7 @@ export async function preparePhotoV3({ structured = false, withPriorWeekly = fal
       goalContract, phase, store: { photoAnalyses: [{ ...session, interpretation }] }, cutoff,
     }),
     previousCanonicalAssessment: eventPredecessor({ goal, phase, sourceCutoff: "2026-09-16T06:59:59.999Z" }),
+    ...(periodEvidence ? { periodEvidence } : {}),
     evidenceCutoff: cutoff, finalizedAt: "2026-09-20T17:51:47.391Z",
     idempotencyKey: "golden|photo", sourceLineage: { reason: "golden_forensic_replay" },
     evaluationType: "event_evidence_boundary", surface: "photo_event_briefing", qualifyingPhotoEvent: true,

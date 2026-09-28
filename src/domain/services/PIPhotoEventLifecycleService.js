@@ -26,7 +26,7 @@ export function createPIPhotoEventLifecycleService({ publicationService,
   return Object.freeze({
     async publish({ operation = "create", confidenceMode = "publish-successor",
       artifact, session, context, reason,
-      replacementAuthorized = false } = {}) {
+      replacementAuthorized = false, periodEvidence = null } = {}) {
       const goal = context?.activeGoal;
       const phase = context?.activePhase;
       const narrative = artifact?.briefing?.photoEventNarrative;
@@ -83,6 +83,9 @@ export function createPIPhotoEventLifecycleService({ publicationService,
             store: { photoAnalyses: [{ ...session, interpretation: withStructuredPhotoObservationsV3(narrative) }] },
             cutoff }),
         previousCanonicalAssessment: current.assessment,
+        // Shared Briefing Intelligence over the execution before the photos
+        // (Photo policy: visual-led, depth proportional to visual change).
+        ...(periodEvidence ? { periodEvidence } : {}),
         evidenceCutoff: cutoff, finalizedAt: now().toISOString(),
         idempotencyKey: `confidence_v3|photo|${artifact.id}`,
         expectedPriorAssessmentId: current.assessment.id,
