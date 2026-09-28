@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-28T09:00:00Z",
+  "generated_at_utc": "2026-09-28T10:00:00Z",
   "task": {
-    "id": "briefing-intelligence-final-measurement-causality-restraint-20260927",
-    "title": "Briefing Intelligence: measurement is not causation across V3 - real Sep 20-26 preview; release-ready (candidate 6abbed64, not deployed)",
+    "id": "briefing-intelligence-cross-briefing-realizer-wiring-20260928",
+    "title": "Briefing Intelligence: Midweek, Monthly, DEXA, Photo wired to the shared engine - one real preview per type for acceptance (candidate f563e1eb, not deployed)",
     "agent": "claude",
-    "status": "release_ready_awaiting_authorization"
+    "status": "previews_ready_awaiting_acceptance"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -16,11 +16,11 @@
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "6abbed64",
+    "server_candidate_sha": "f563e1eb",
     "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative"
   },
   "result": {
-    "summary": "Measurement-not-causation applied across V3 realization (composition strategy meaning/result/action/coach take/watch/Confidence body and detail, surface projection, Confidence explanation presentation, ambiguity vocabulary, Photo interpreter copy/prompt, Active Goal next-DEXA lines): DEXA-demonstrated progress is stated as measured progress and compatibility with staying the course, never 'the plan is working'. Claim audit recorded on every V3 narrative (claimRestraint.issues, held empty by tests). Real Sep 20-26: only Confidence detail 'why' changed ('The measured progress in lean mass is real.'); Confidence 79/delta 0 and continue_current_strategy unchanged; audit empty.",
+    "summary": "One shared engine (evidence picture -> holistic synthesis -> briefing policy/budget/section contract -> one realizer with role-keyed per-type words) now serves Midweek, Monthly, DEXA and Photo as well as Weekly. Real zero-write previews: Midweek Sep 20-22 ('Strong training so far.', early read, 59 words), Monthly Aug 2026 dry run ('Strong training month.', 3-insight multi-week recap), DEXA Sep 12 ('New DEXA shows progress.', outcome-led, lead-up is context), Photo Sep 19 ('New photos, compared with the last set.'). Confidence/recommendation identical with and without the engine on every type; claim audits empty; Weekly byte-identical to 6abbed64. Photo production gap: no canonical visual-magnitude producer; visible/subtle/none paths shown on a synthetic fixture.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -30,35 +30,36 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "New MeasurementCausalityRestraint suite (factual DEXA wording, no effectiveness on any V3 surface, unchanged Confidence/recommendation, causal-support marker distinguishable, source template scan, empty recorded audits); 134 Briefing Intelligence tests; full repo 9063/9371 vs baseline 8913/9221, 0 new failures."
+      "summary": "Shared BI 157/157 incl. new cross-type realization suite + publication-independence suite; full repo 9089/9397, same 303 environmental failures as baseline, 0 new; Weekly 720 synthetic + real Sep 20-26 identical to 6abbed64."
     },
     "review": {
       "status": "passed_with_fixes_applied",
-      "summary": "Round 1 (1d5dfefa) FAIL: reachable 'plan delivered a standout result' + throwing invariant - fixed in 559e9b09; Round 2 (559e9b09) PASS-WITH-FIXES, no High, no causal claim reachable from V3 production across 260 test files + 22-run sweep - wording fixes in 6abbed64."
+      "summary": "Three fresh-context rounds; final verification of 10a7f166 PASS-WITH-FIXES, no High; all fixes in cc2cb267/f563e1eb with tests."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Offline harness bit-exact on production code; Sep 20-26 preview green on 6abbed64."
+      "summary": "Real services with in-memory write-refusing repositories over the local read-only export; Monthly via publishMonthlyOccurrence dryRun."
     }
   },
   "decisions_required": [
-    "Authorize Server deploy of 6abbed64 (not done).",
-    "Optional: weight-pace policy (declare a signed expectedWeeklyRange on the accepted Phase Expected Trajectory).",
-    "Whether to regenerate the published Sep 20-26 Weekly (stored artifacts keep their original wording until then)."
+    "Accept or refine the Midweek, Monthly, DEXA and Photo previews.",
+    "Then authorize Server deploy of f563e1eb (supersedes undeployed 6abbed64)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Stored artifacts (e.g. Sep 19 Photo) still carry 'The plan is working.' until the next publication or an authorized regeneration; they are served as stored by design."
+    "Canonical photo producer records no visual-change magnitude, so visual-depth scaling is unreachable in production until a producer exists.",
+    "Monthly cross-source intelligence (MonthlyEvidenceIntelligenceV3) remains a separate Confidence input; consolidation is a follow-on."
   ],
   "backlog": [
-    "Legacy V2-only causal phrasing (DailyBriefingService, MonthlyNarrativeCompositionService, PINarrativeAssessmentService, SyntheticDEXAV2PreviewService, two legacy screens) - out of V3 scope.",
-    "Wire accepted Phase Expected Trajectory weightTrajectory into Weekly goal facts if a canonical range is declared.",
-    "Phase 2 realizers (Midweek/Monthly/DEXA/Photo) on the shared section contracts; Phase 3 Sleep (separate authorization).",
-    "Queued Native Log-tab -> active Workout Logger item remains approved for the next consolidated Native build."
+    "Consolidate MonthlyEvidenceIntelligenceV3/Energy reliability into the shared picture.",
+    "Canonical photo visual-magnitude producer.",
+    "Composer guard pre-check for non-period watch and Confidence body.",
+    "After acceptance: Sep 27 Strength reconciliation-review notification failure; Logged Today strength+cardio together; Native Log-tab -> active Workout Logger (next consolidated Native build)."
   ],
-  "recommended_next_step": "Founder/ChatGPT authorization to deploy 6abbed64.",
-  "full_report_path": "agent-handoffs/reports/20260928T090000Z-briefing-intelligence-measurement-causality-restraint-release-ready.md",
+  "recommended_next_step": "Founder/ChatGPT acceptance of the four previews, then deploy authorization for f563e1eb.",
+  "full_report_path": "agent-handoffs/reports/20260928T100000Z-briefing-intelligence-cross-briefing-previews.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260928T090000Z-briefing-intelligence-measurement-causality-restraint-release-ready.md",
     "agent-handoffs/reports/20260928T070000Z-briefing-intelligence-final-semantic-restraint-sep20-26-preview.md",
     "agent-handoffs/reports/20260928T050000Z-briefing-intelligence-section-contracts-sep20-26-preview.md"
   ],
