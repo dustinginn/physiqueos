@@ -753,8 +753,20 @@ describe("the scale's pace is judged only by a canonical authority", () => {
       const weight = picture.domains.find((item) => item.domain === "body_trajectory");
       const label = `${goalType}/${kind}#${seed}`;
       expect(weight.insights[0]?.polarity ?? "neutral", label).not.toBe("supportive");
-      expect(textOf(realized), label).not.toMatch(/direction the goal needs|on the phase's pace|moving more than a steady phase/u);
+      // Direction may be stated; the pace is never praised or faulted.
+      expect(textOf(realized), label).not.toMatch(/Weight moving the right way|exactly the kind of week|on the phase's pace|moving more than|drifted|settle back/u);
     }
+  });
+
+  it("a canonical range is signed and read along the goal's direction", () => {
+    const state = (goalType) => weekly.filter((item) => item.kind === "canonical_pace_fast" && item.goalType === goalType)
+      .map((item) => item.picture.domains.find((d) => d.domain === "body_trajectory")).filter((d) => d.status === "assessed");
+    // A fat-loss week dropping faster than its (negative) range is fast, not the wrong way.
+    for (const d of state("lose_fat")) {
+      expect(d.facts.movement).toBe("down");
+      expect(["rapid", "quick"]).toContain(d.state);
+    }
+    for (const d of state("build_lean_mass")) expect(["rapid", "quick"]).toContain(d.state);
   });
 
   it("acceleration is the trend speeding up beyond its own noise, never a steady climb", () => {

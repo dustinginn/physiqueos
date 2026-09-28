@@ -179,6 +179,8 @@ function weightVerdict({ weeklyRate, recentPace, earlierPace, paceChangeNoise, r
   return expectation.direction === "stable" ? "drifting" : "steady";
 }
 
+// A canonical range is signed lb/week (negative for loss), as the phase
+// declares it. Everything is compared along the goal's direction.
 function canonicalPaceVerdict(weeklyRate, expectation, { expectedWeeklyRange: [low, high], cautionWeeklyRate }) {
   if (expectation.direction === "stable") {
     if (weeklyRate >= low && weeklyRate <= high) return "steady";
@@ -186,8 +188,8 @@ function canonicalPaceVerdict(weeklyRate, expectation, { expectedWeeklyRange: [l
   }
   const sign = expectation.direction === "up" ? 1 : -1;
   const pace = sign * weeklyRate;
-  const [typicalLow, typicalHigh] = sign > 0 ? [low, high] : [-high, -low];
-  if (cautionWeeklyRate != null && pace >= sign * cautionWeeklyRate) return "rapid";
+  const [typicalLow, typicalHigh] = [sign * low, sign * high].sort((left, right) => left - right);
+  if (cautionWeeklyRate != null && pace >= Math.abs(cautionWeeklyRate)) return "rapid";
   if (pace > typicalHigh) return "quick";
   if (pace >= typicalLow) return "steady";
   if (pace <= -PACE.movementThresholdLbPerWeek) return "wrong_direction";

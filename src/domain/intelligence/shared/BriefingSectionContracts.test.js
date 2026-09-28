@@ -85,12 +85,6 @@ describe("the headline is a short synthesis; the hero paragraph carries the evid
     }
   });
 
-  it("headline and recap are generated from the same lead insights", () => {
-    for (const { label, synthesis, realized } of weekly) {
-      expect(realized.sectionPlan.sections.headline.insightIds, label).toEqual(realized.sectionPlan.sections.recap.insightIds);
-      expect(realized.heroIds).toEqual(leadInsights(synthesis, contract).map((item) => item.id));
-    }
-  });
 });
 
 describe("Biggest Takeaway interprets; it never restates the Hero", () => {
@@ -221,7 +215,7 @@ describe("section contracts scale across briefing types without duplicating copy
             steps: synthesis.selected.filter((item) => item.polarity !== "supportive").slice(0, 1).map((source) => ({ source })) });
           const label = `${cadence}/${kind}#${seed}`;
           expect(Object.keys(plan.sections).sort(), label).toEqual([...sectionContract.sections].sort());
-          expect(auditSectionPlan(plan), label).toEqual({ ok: true, issues: [] });
+          expect(auditSectionPlan(plan, synthesis), label).toEqual({ ok: true, issues: [] });
           expect(plan.sections.recap.insightIds.length).toBeLessThanOrEqual(sectionContract.recap.maxInsights);
         }
       }
@@ -265,5 +259,78 @@ describe("historical immutability", () => {
     const narrative = deepFreeze(structuredClone(stored.briefing.narrativeV3));
     expect(projectV3Hero(narrative).headline).toBe(stored.briefing.narrativeV3.summary);
     expect(projectV3CoachInsight(narrative).biggestWin).toBe(stored.briefing.narrativeV3.sections.result);
+  });
+});
+
+describe("neutral findings are described, never framed as problems or praise", () => {
+  it("'but' in the recap only ever introduces a real concern", () => {
+    for (const { label, synthesis, realized } of weekly) {
+      if (!/, but /u.test(realized.recap)) continue;
+      const second = synthesis.selected.find((item) => item.id === realized.heroIds[1]);
+      expect(second?.polarity, `${label}: ${realized.recap}`).toBe("concern");
+    }
+  });
+
+  it("a neutral lead finding never becomes a headline concern or a takeaway priority", () => {
+    let checked = 0;
+    for (const { label, synthesis, realized } of weekly) {
+      const neutral = synthesis.selected.filter((item) => realized.heroIds.includes(item.id) && item.polarity === "neutral");
+      for (const item of neutral) {
+        checked += 1;
+        expect(realized.headlineIds, label).not.toContain(item.id);
+        if (item.kind === "weight_trend") expect(`${realized.headline} ${realized.result}`, label).not.toMatch(/drift|settle back|rein in|the scale went/u);
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+  });
+
+  it("a week with no concern is never hedged as if something were wrong", () => {
+    for (const { label, synthesis, realized } of weekly) {
+      if (synthesis.selected.some((item) => item.polarity === "concern")) continue;
+      expect(realized.result, label).not.toMatch(/\byet\b|needs a change/u);
+    }
+  });
+});
+
+describe("hand-built pictures exercise paths the generator rarely reaches", () => {
+  const insight = (domain, kind, role, polarity, facts = {}) => ({ id: `${domain}|${kind}`, domain, kind, role, polarity, strength: 2, facts });
+  const picture = (items) => ({ schemaVersion: "test", goalType: "build_lean_mass", window: { startDate: "2026-09-20", endDate: "2026-09-26" },
+    outlook: { percentage: 70, delta: 0 }, strategy: { action: "continue_current_strategy" },
+    domains: items.map((item) => ({ domain: item.domain, weight: 1, status: "assessed", state: "x", polarity: item.polarity, facts: {}, insights: [item] })) });
+  const realize = (items) => {
+    const p = picture(items);
+    const synthesis = synthesizeBriefing({ picture: p, budget: { maxInsights: 3, maxLimitations: 1, floor: 0.5, heroInsights: 2 },
+      realizableKinds: WEEKLY_REALIZABLE_KINDS });
+    return realizeHolisticWeeklyV3({ synthesis, picture: p, goalLabel: "the goal", goalPolicy: { weightExpectation: { direction: "up" } } });
+  };
+
+  it("two supportive leads read as a headline with a noun phrase after 'with'", () => {
+    const realized = realize([
+      insight("training", "training_progress", "progress", "supportive", { milestoneCount: 3, example: null }),
+      insight("routine", "routine_steady", "execution", "supportive"),
+    ]);
+    expect(realized.headline).toBe("Strong training week, with a steady routine.");
+    expect(realized.result).not.toMatch(/\byet\b/u);
+    expect(realized.sectionAudit.text.issues).toEqual([]);
+  });
+});
+
+describe("the plan audit can fail", () => {
+  it("reports a reused capacity, a takeaway that adds an insight, an unconsidered insight and an unmarked empty section", () => {
+    const plan = { cadence: "weekly", order: ["headline", "recap", "takeaway", "coaching", "action"], leadIds: ["a|x"], sections: {
+      headline: { role: "headline", facet: "character", insightIds: ["a|x"] },
+      recap: { role: "recap", facet: "evidence", insightIds: ["a|x"] },
+      takeaway: { role: "takeaway", facet: "interpretation", insightIds: ["a|x", "b|y"] },
+      coaching: { role: "coaching", facet: "evidence", insightIds: ["a|x"] },
+      action: { role: "action", facet: "commitment", insightIds: [] },
+    } };
+    const synthesis = { selected: [{ id: "a|x" }], limitations: [], context: [], omitted: [] };
+    const { ok, issues } = auditSectionPlan(plan, synthesis);
+    expect(ok).toBe(false);
+    const text = issues.join(" | ");
+    expect(text).toMatch(/coaching: a\|x already used as evidence/u);
+    expect(text).toMatch(/takeaway: introduces b\|y the recap did not tell/u);
+    expect(text).toMatch(/b\|y is not in the synthesis/u);
+    expect(text).toMatch(/action: no material and not marked minimal/u);
   });
 });

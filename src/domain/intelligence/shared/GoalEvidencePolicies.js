@@ -54,7 +54,8 @@ export const WEIGHT_PACE_AUTHORITY = deepFreeze({
   accelerationMinimumRelativeIncrease: 0.5,
 });
 
-// A canonical expected weekly range for the scale, when the accepted Phase
+// A canonical expected weekly range for the scale (signed lb/week: negative
+// for loss), when the accepted Phase
 // Expected Trajectory declares one; otherwise null (the engine then never
 // judges pace in absolute terms). The consumer is ready, but the Weekly
 // prepare path does not yet pass the accepted trajectory's

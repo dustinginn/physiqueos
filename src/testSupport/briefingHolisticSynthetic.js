@@ -51,7 +51,12 @@ const ACCELERATION = { weight_rapid_guardrail: 2.2, risk_routine_progress: 2.2 }
 
 // Situations with a canonical expected weekly range on the accepted phase
 // trajectory (the only authority for judging pace in absolute terms).
-const CANONICAL_PACE = { canonical_pace_fast: { expectedWeeklyRange: { min: 0.25, max: 0.75 }, cautionWeeklyRate: 1.25 } };
+// Signed lb/week, per goal direction.
+const CANONICAL_PACE = { canonical_pace_fast: {
+  up: { expectedWeeklyRange: { min: 0.25, max: 0.75 }, cautionWeeklyRate: 1.25 },
+  down: { expectedWeeklyRange: { min: -0.75, max: -0.25 }, cautionWeeklyRate: -1.25 },
+  stable: { expectedWeeklyRange: { min: -0.25, max: 0.25 }, cautionWeeklyRate: 1.0 },
+} };
 
 export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "build_lean_mass" }) {
   const random = mulberry32(seed * 31 + HOLISTIC_KINDS.indexOf(kind) * 977 + HOLISTIC_GOAL_TYPES.indexOf(goalType) * 61 + 7);
@@ -136,7 +141,7 @@ export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "b
         activity: { state: "on_plan", observed: 800, target: 800 } },
       trainingMilestones: milestones,
       visual,
-      weightTrajectory: CANONICAL_PACE[kind] ?? { direction: "goal_and_guardrail_aware", universalWeeklyRate: null },
+      weightTrajectory: CANONICAL_PACE[kind]?.[direction] ?? { direction: "goal_and_guardrail_aware", universalWeeklyRate: null },
       outlook: { percentage: 79, delta: 0 },
       strategy: { action: "continue_current_strategy" },
     },
