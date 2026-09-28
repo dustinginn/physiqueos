@@ -151,7 +151,7 @@ export function realizeHolisticWeeklyV3({ synthesis, picture, goalLabel, goalPol
 // ---- headline: what kind of week it was, in a few words and no numbers.
 
 const LEAD_PHRASE = {
-  training_progress: () => "Strong training week",
+  training_progress: (f) => (f.milestoneCount >= 2 ? "Strong training week" : "A new best in training"),
   // Only reached for a canonical-range steady trend (the only supportive one).
   weight_trend: (f) => (f.verdict !== "steady" ? null : f.movement === "flat" ? "Weight holding steady" : "Weight on the phase's pace"),
   composition_result: (f) => `New ${f.eventName} shows progress`,
@@ -179,7 +179,9 @@ function concernPhrase(item, standalone = false) {
     }
     case "training_frequency": return f.missedAll ? `no training logged${standalone ? " this week" : ""}` : "fewer sessions than usual";
     case "guardrail_status": return f.status === "breached" ? `${f.label} past its limit` : `${f.label} near its limit`;
-    case "composition_result": return `${f.label} ${Number(f.change) > 0 ? "up" : "down"} on the ${f.eventName}`;
+    // A standing result is not this week's news.
+    case "composition_result": return f.newThisPeriod ? `${f.label} ${Number(f.change) > 0 ? "up" : "down"} on the ${f.eventName}`
+      : `${f.label} still ${Number(f.change) > 0 ? "up" : "down"} since the last ${f.eventName}`;
     case "intake_vs_plan": return "intake off target";
     case "activity_change": return f.direction === "below" ? "activity dipped" : "activity ran high";
     case "visual_change": return "little visible change";
@@ -272,8 +274,9 @@ function prioritiesPhrase(item) {
       return prior ? `the part to protect is ${part}, where the routine has slipped before`
         : "a short slip like this is easy to recover from";
     }
-    case "training_frequency": return "getting sessions back in matters more than anything else";
-    case "guardrail_status": return `${f.label} is the number to protect now`;
+    case "training_frequency": return f.missedAll ? "a single missed week is easy to absorb; the next one is the one that counts"
+      : "the missed sessions are easy to absorb if next week runs as usual";
+    case "guardrail_status": return `holding ${f.label} steady comes before anything else right now`;
     case "composition_result": return `the ${f.eventName} result is the thing to turn around`;
     case "intake_vs_plan": return "the food side is the lever this week";
     case "activity_change": return f.direction === "below" ? "activity is worth bringing back up" : null;
@@ -300,7 +303,7 @@ function takeawaySentence({ lead, synthesis, steps }) {
   if (working.length && priorities.length) return `${upperFirst(working[0])}; ${priorities[0]}.`;
   if (priorities.length) return `${upperFirst(priorities[0])}${priorities[1] ? `, and ${priorities[1]}` : ""}.`;
   if (working.length > 1) return `${upperFirst(working[0])}, and ${working[1]}.`;
-  if (working.length) return `${upperFirst(working[0])}, and nothing else in the week pulls against it.`;
+  if (working.length) return `${upperFirst(working[0])}, and that is the part to keep.`;
   return synthesis.selected.some((item) => item.polarity === "concern")
     ? "Nothing here needs a change yet; the next few weeks will say more."
     : "Nothing in this week calls for a different approach.";
@@ -391,8 +394,8 @@ function implicationSentence({ synthesis, facts, goalLabel, lead }) {
       `the scale is moving faster than the pace the phase sets; ${next} will show whether ${composition.label} is holding.`);
   }
   if (weight && stableGoal && verdict === "drifting") {
-    return read(`; with the scale moving a little, ${next} will show whether ${composition.label} is holding.`,
-      `with the scale moving a little, ${next} will show whether ${composition.label} is holding.`);
+    return read(`; the scale has moved ${movement === "down" ? "down" : "up"} a bit, and ${next} will show whether ${composition.label} is holding.`,
+      `the scale has moved ${movement === "down" ? "down" : "up"} a bit; ${next} will show whether ${composition.label} is holding.`);
   }
   if (weight && !stableGoal && ["steady", "quick"].includes(verdict) && movement !== "flat") {
     // Refers back to the scale only when the recap just told it.
@@ -405,7 +408,7 @@ function implicationSentence({ synthesis, facts, goalLabel, lead }) {
     return read(`; with the scale holding steady, ${next} will show whether ${composition.label} is still moving.`,
       `with the scale holding steady, ${next} will show whether ${composition.label} is still moving.`);
   }
-  return read(", and nothing this week points away from that.", "nothing else this week points away from that result.");
+  return read(", and that remains the picture to build on.", "that result remains the picture to build on.");
 }
 
 // ---- coaching: what to carry into execution — a supporting example, the
@@ -416,7 +419,14 @@ function coachingSentences({ synthesis, lead, facts, steps, contract }) {
   const parts = [];
   const leadIds = new Set(lead.map((item) => item.id));
   const progress = synthesis.selected.find((item) => item.kind === "training_progress");
-  if (progress?.facts?.example) parts.push(`Keep pushing the same lifts; ${exampleClause(progress.facts.example)}.`);
+  // "Keep pushing" only when nothing about the goal's outcome or guardrail is
+  // in question; otherwise the example is stated as it happened.
+  const outcomeConcern = synthesis.selected.some((item) => item.role === "risk" ||
+    (["composition_result", "guardrail_status"].includes(item.kind) && item.polarity === "concern"));
+  if (progress?.facts?.example) {
+    parts.push(outcomeConcern ? `${upperFirst(exampleClause(progress.facts.example))}.`
+      : `Keep pushing the same lifts; ${exampleClause(progress.facts.example)}.`);
+  }
   for (const item of synthesis.selected) {
     // The outcome measure is told by the meaning; never again here.
     if (leadIds.has(item.id) || item.kind === "training_progress" || item.domain === ROLES.outcome) continue;
@@ -458,10 +468,10 @@ function executionTip(step, facts) {
       ? "Steady days on the plan's numbers do more here than any big correction."
       : "Hitting the plan's numbers every day matters more here than any one big day.";
     case "training_frequency": case "routine_break":
-      return /training/u.test(step.text) ? "Even shorter sessions count; the point is getting back into the rhythm."
+      return /training/u.test(step.text) ? "Even a shorter session on a usual day counts."
         : "The usual days and times are the easiest way back.";
     case "composition_result": case "guardrail_status":
-      return `Consistency between now and the next ${facts.composition?.eventName ?? "check"} is what makes that result readable.`;
+      return `Steady, ordinary days until the next ${facts.composition?.eventName ?? "check"} make its reading easier to trust.`;
     case "intake_vs_plan": return "Aim for the target most days rather than making up for it on one.";
     default: return "One adjustment this week is enough.";
   }
@@ -566,7 +576,7 @@ function watchItems({ synthesis, facts }) {
     items.push({ source: outcomeRisk, text: `where ${outcomeRisk.facts.label} lands at the next check` });
   }
   if (verdict) {
-    const text = ["quick", "rapid", "drifting"].includes(verdict) && facts.direction === "stable"
+    const text = ["quick", "rapid"].includes(verdict) && facts.direction === "stable"
       ? "whether the weekly weight average levels off"
       : verdict === "accelerating" ? "whether the weekly weight average settles back to its earlier pace"
         : ["quick", "rapid"].includes(verdict) && movement !== "flat"

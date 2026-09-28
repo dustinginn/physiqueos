@@ -122,7 +122,7 @@ function assessBodyTrajectory({ days, window, goalPolicy, goalFacts }) {
     point.date >= shiftDate(window.startDate, -7));
   const priorAverage = priorWindow.length >= 3 ? round(mean(priorWindow.map((point) => point.y)), 1) : null;
   const expectation = goalPolicy.weightExpectation;
-  const canonicalPace = canonicalWeightPace(goalFacts?.weightTrajectory);
+  const canonicalPace = canonicalWeightPace(goalFacts?.weightTrajectory, expectation?.direction ?? null);
   const verdict = weightVerdict({ weeklyRate, recentPace, earlierPace, paceChangeNoise, residual, expectation, canonicalPace });
   const facts = { weeklyRate, recentPace, earlierPace, paceChangeNoise, windowAverage, priorWeekAverage: priorAverage,
     volatility: round(residual, 2), weighIns: points.length, spanDays: daysBetween(points[0].date, points.at(-1).date) + 1,
@@ -135,7 +135,10 @@ function assessBodyTrajectory({ days, window, goalPolicy, goalFacts }) {
   // Only a canonical expected range can endorse a pace. Without one, a steady
   // trend in the goal's direction is described, not praised (neutral), and a
   // maintenance drift is a movement to describe, not a verdict.
-  const polarity = risk ? "concern" : verdict === "steady" && canonicalPace ? "supportive" : "neutral";
+  // A canonical "quick" is a real (if mild) concern: the phase set a pace
+  // and the scale is past it.
+  const polarity = risk || (verdict === "quick" && canonicalPace) ? "concern"
+    : verdict === "steady" && canonicalPace ? "supportive" : "neutral";
   // A goal with no weight expectation keeps the trend as background only.
   if (verdict === "not_goal_relevant") {
     return assessed(D.BODY_TRAJECTORY, verdict, "neutral", facts, [

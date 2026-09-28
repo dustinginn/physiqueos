@@ -578,8 +578,8 @@ describe("sections agree with each other", () => {
       [/Steady days on the plan's numbers/u, /at or below the plan's target/u],
       [/Hitting the plan's numbers every day/u, /reaches the plan's target/u],
       [/Log meals as they happen/u, /every meal gets logged/u],
-      [/Even shorter sessions count/u, /training rhythm back/u],
-      [/makes that result readable/u, /Keep intake at the plan's target and training/u],
+      [/Even a shorter session on a usual day counts/u, /training rhythm back/u],
+      [/make its reading easier to trust/u, /Keep intake at the plan's target and training/u],
       [/Aim for the target most days/u, /[Bb]ring intake/u],
       [/^The usual days and times/u, /[Ss]ettle back/u],
     ];
@@ -758,13 +758,23 @@ describe("the scale's pace is judged only by a canonical authority", () => {
     }
   });
 
+  it("a range whose sign disagrees with the goal's direction is never used as an authority", () => {
+    expect(canonicalWeightPace({ expectedWeeklyRange: { min: 0.5, max: 1.5 } }, "down")).toBeNull();
+    expect(canonicalWeightPace({ expectedWeeklyRange: { min: -0.75, max: -0.25 } }, "up")).toBeNull();
+    expect(canonicalWeightPace({ expectedWeeklyRange: { min: 0.1, max: 0.5 } }, "stable")).toBeNull();
+    expect(canonicalWeightPace({ expectedWeeklyRange: { min: -0.75, max: -0.25 } }, "down")).not.toBeNull();
+    expect(canonicalWeightPace({ direction: "goal_and_guardrail_aware", universalWeeklyRate: null }, "up")).toBeNull();
+  });
+
   it("a canonical range is signed and read along the goal's direction", () => {
     const state = (goalType) => weekly.filter((item) => item.kind === "canonical_pace_fast" && item.goalType === goalType)
       .map((item) => item.picture.domains.find((d) => d.domain === "body_trajectory")).filter((d) => d.status === "assessed");
     // A fat-loss week dropping faster than its (negative) range is fast, not the wrong way.
+    expect(state("lose_fat").length).toBeGreaterThan(5);
     for (const d of state("lose_fat")) {
       expect(d.facts.movement).toBe("down");
       expect(["rapid", "quick"]).toContain(d.state);
+      expect(d.polarity).toBe("concern");
     }
     for (const d of state("build_lean_mass")) expect(["rapid", "quick"]).toContain(d.state);
   });

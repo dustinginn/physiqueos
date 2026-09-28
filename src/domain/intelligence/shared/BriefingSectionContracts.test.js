@@ -284,6 +284,21 @@ describe("neutral findings are described, never framed as problems or praise", (
     expect(checked).toBeGreaterThan(50);
   });
 
+  it("a standing result is never headlined as this week's news", () => {
+    for (const { label, synthesis, realized } of weekly) {
+      const composition = synthesis.selected.find((item) => item.kind === "composition_result" && realized.headlineIds.includes(item.id));
+      if (composition && !composition.facts.newThisPeriod) expect(realized.headline, label).toMatch(/still .* since the last/u);
+    }
+  });
+
+  it("the example lift is 'kept pushing' only when the goal's outcome and guardrail are not in question", () => {
+    for (const { label, synthesis, realized } of weekly) {
+      const outcomeConcern = synthesis.selected.some((item) => item.role === "risk" ||
+        (["composition_result", "guardrail_status"].includes(item.kind) && item.polarity === "concern"));
+      if (outcomeConcern) expect(realized.coachTake, label).not.toMatch(/Keep pushing/u);
+    }
+  });
+
   it("a week with no concern is never hedged as if something were wrong", () => {
     for (const { label, synthesis, realized } of weekly) {
       if (synthesis.selected.some((item) => item.polarity === "concern")) continue;

@@ -222,13 +222,16 @@ function contentWords(text) {
     .filter((word) => word.length > 2 && !STOP.has(word)));
 }
 
-export function contentOverlap(left, right) {
+// Share of the shorter text's content words that the other also uses. Two
+// short sentences on one topic naturally share a word or two, so fewer than
+// three shared content words never counts as a paraphrase.
+export function contentOverlap(left, right, { minimumShared = 3 } = {}) {
   const a = contentWords(left);
   const b = contentWords(right);
   if (!a.size || !b.size) return 0;
   let shared = 0;
   for (const word of a) if (b.has(word)) shared += 1;
-  return shared / Math.min(a.size, b.size);
+  return shared < minimumShared ? 0 : shared / Math.min(a.size, b.size);
 }
 
 // Semantic non-redundancy of the written sections: the headline stays short

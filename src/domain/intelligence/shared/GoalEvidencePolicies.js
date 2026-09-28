@@ -62,11 +62,16 @@ export const WEIGHT_PACE_AUTHORITY = deepFreeze({
 // `weightTrajectory` through goal facts (follow-on wiring); every accepted
 // record today declares `universalWeeklyRate: null`, so production behavior
 // is the same either way.
-export function canonicalWeightPace(weightTrajectory) {
+export function canonicalWeightPace(weightTrajectory, direction = null) {
   const range = weightTrajectory?.expectedWeeklyRange;
   const low = Number(range?.min ?? range?.[0]);
   const high = Number(range?.max ?? range?.[1]);
   if (!Number.isFinite(low) || !Number.isFinite(high) || low > high) return null;
+  // A range whose sign disagrees with the goal's direction is not a usable
+  // authority (an unsigned loss range, say): never read, never guessed at.
+  if (direction === "up" && !(low >= 0 && high > 0)) return null;
+  if (direction === "down" && !(high <= 0 && low < 0)) return null;
+  if (direction === "stable" && !(low <= 0 && high >= 0)) return null;
   const caution = Number(weightTrajectory.cautionWeeklyRate);
   return { expectedWeeklyRange: [low, high], cautionWeeklyRate: Number.isFinite(caution) ? caution : null,
     authority: "phase_expected_trajectory" };
