@@ -13,6 +13,12 @@
 // actionable implication is better observability going forward; guidance
 // never implies the past period can be repaired unless an explicit
 // retroactive-correction action exists for it.
+//
+// Where it acts: realizers phrase "going well" by claim scope and write
+// limitation guidance prospectively; `auditClaimRestraint` is a diagnostic
+// backstop recorded with the narrative (and enforced by tests), not a
+// production gate. `causalSupport` / `retroactiveCorrection` are the fields a
+// future authoritative producer would set; nothing emits them today.
 
 export const ClaimScope = Object.freeze({
   PERFORMANCE: "performance",
@@ -43,18 +49,28 @@ export function claimScopeOf(item) {
 
 // Effectiveness/causal language: an intervention "working", paying off,
 // producing or driving an outcome.
+const APOSTROPHE = "['\u2019]";
+const AGENT = "(?:training|lifting|plan|approach|program|programme|strategy|routine|setup|work|it|this|that)";
+
 export const EFFECTIVENESS_LANGUAGE = new RegExp([
-  "\\b(?:is|are|was|were|'s|'re)\\s+(?:clearly\\s+|really\\s+|definitely\\s+)?working\\b",
-  "\\bpaying off\\b", "\\bdoing (?:its|their) job\\b", "\\bdoing what it should\\b",
-  "\\b(?:approach|plan|program|programme|strategy|training|routine)\\s+(?:is\\s+|has been\\s+)?(?:effective|succeeding)\\b",
-  "\\b(?:building|built|adding|added)\\s+(?:lean\\s+)?(?:muscle|mass)\\b",
-  "\\b(?:driv(?:e|es|ing)|produc(?:e|es|ing)|caus(?:e|es|ing))\\s+(?:the\\s+)?(?:gain|gains|result|results|progress|change)\\b",
-  "\\bresponsible for\\b", "\\bthanks to\\b", "\\bresult(?:s|ed)? in\\b", "\\bleads? to\\b",
+  // "the training is working", "the plan works", "it has been working", "training's working"
+  `\\b${AGENT}(?:${APOSTROPHE}s|\\s+(?:is|are|was|were|has been|have been))?\\s+(?:clearly\\s+|really\\s+|definitely\\s+)?(?:working|works|worked)\\b`,
+  `\\b${AGENT}\\s+(?:is\\s+|has been\\s+)?(?:effective|succeeding|proving effective|paying off|pays off|paid off|paying dividends|delivering results|doing (?:its|the) job)\\b`,
+  "\\b(?:paying off|pays off|paid off|paying dividends|delivering results|doing (?:its|their) job|doing what it should)\\b",
+  // the intervention producing the outcome
+  `\\b${AGENT}\\s+(?:is\\s+|was\\s+)?(?:building|adding|putting on)\\s+(?:lean\\s+)?(?:muscle|mass)\\b`,
+  "\\b(?:dr(?:ive|ives|iving|ove)|produc(?:e|es|ed|ing)|caus(?:e|es|ed|ing))\\s+(?:the\\s+|this\\s+|those\\s+)?(?:gains?|results?|progress|change|lean[- ]mass)\\b",
+  "\\b(?:thanks to|responsible for|because of)\\s+(?:the\\s+)?(?:training|lifting|plan|program|programme|routine|approach)\\b",
+  "\\b(?:result(?:s|ed)? in|leads? to|led to)\\s+(?:the\\s+|more\\s+)?(?:gains?|lean|muscle|fat loss|progress)\\b",
+  // normative-causal: a week "is what the goal needs"
+  "\\bthe kind of week the goal needs\\b",
 ].join("|"), "iu");
 
-// Guidance that implies the past period can still be repaired.
+// Guidance that implies the past period can still be repaired — not
+// prospective guidance ("from here on", "going forward", "next week").
+const PAST = "(?:those|that|these|the missing|the past|this week's|last week's|the week's|monday's|tuesday's|wednesday's|thursday's|friday's|saturday's|sunday's|(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\\s+through\\s+\\w+)?)";
 export const RETROACTIVE_REPAIR_LANGUAGE = new RegExp([
-  "\\b(?:logging|log|fill(?:ing)? in|complet(?:e|ing)|fix(?:ing)?|correct(?:ing)?|updat(?:e|ing))\\s+(?:those|that|these|the missing|the past)\\s+(?:days?|logs?|entries|meals?|week)\\b",
+  `\\b(?:logging|log|fill(?:ing)? in|complet(?:e|ing)|fix(?:ing)?|correct(?:ing)?|updat(?:e|ing)(?:\\s+the\\s+log\\s+for)?|add(?:ing)?)\\s+${PAST}(?:\\s+(?:days?|logs?|entries|meals?|week))?\\b(?![^.;]*\\b(?:going forward|from here on|from now on)\\b)`,
   "\\bgo back and\\b", "\\bbackfill",
 ].join("|"), "iu");
 

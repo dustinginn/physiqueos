@@ -262,7 +262,7 @@ function recapSentence(lead, facts) {
 // "working" (causing the outcome) without authoritative causal support.
 const GOING_WELL = {
   [ClaimScope.PERFORMANCE]: () => "the performance gains are real",
-  [ClaimScope.MEASUREMENT]: (f, kind) => (kind === "visual_change" ? "the photos line up with the direction"
+  [ClaimScope.MEASUREMENT]: (f, kind) => (kind === "visual_change" ? "the photos line up with the goal's direction"
     : `the new ${f.eventName} shows ${f.label} moving the right way`),
   [ClaimScope.TRAJECTORY]: (f) => (f.verdict === "steady" ? "the scale is where the phase expects it" : null),
   [ClaimScope.EXECUTION]: (f, kind) => ({ routine_steady: "the routine held", activity_on_plan: "the routine held",
@@ -589,7 +589,6 @@ function watchItems({ synthesis, facts }) {
   const items = [];
   const weight = synthesis.selected.find((item) => item.kind === "weight_trend") ?? facts.weightInsight;
   const routine = synthesis.selected.find((item) => item.kind === "routine_break");
-  const limitation = synthesis.limitations[0];
   const outcomeRisk = synthesis.selected.find((item) => item.role === "risk" && ["composition_result", "guardrail_status"].includes(item.kind));
   // A trend the goal does not judge, or one lost in noise, is nothing to watch.
   const verdict = ["not_goal_relevant", "too_noisy"].includes(weight?.facts?.verdict) ? null : weight?.facts?.verdict;
@@ -619,7 +618,8 @@ function watchItems({ synthesis, facts }) {
       ? `whether ${dayRange(dates)} ${dates.length === 1 ? "gets its" : "get their"} usual training back`
       : `whether the usual routine returns on ${dayRange(dates)}` });
   }
-  if (limitation) items.push({ source: limitation, text: "whether food logging fills back in" });
+  // A limitation's forward guidance lives in What To Do ("from here on"); the
+  // watch does not repeat it.
   return items.slice(0, synthesis.budget.watchDiscriminators ?? 1);
 }
 
@@ -634,8 +634,9 @@ function confidenceSentence({ synthesis, facts }) {
   const holds = synthesis.relations?.confidence?.delta === 0;
   if (!holds || !facts.composition) return null;
   const risk = synthesis.selected.find((item) => item.role === "risk");
-  const supportive = synthesis.selected.filter((item) => item.polarity === "supportive" &&
-    ["training_progress", "weight_trend"].includes(item.kind));
+  // Exercise performance never sits beside the outlook: only goal-level
+  // evidence (a canonically on-pace scale) may be said to fit it.
+  const supportive = synthesis.selected.filter((item) => item.polarity === "supportive" && item.kind === "weight_trend");
   const disruption = synthesis.selected.find((item) => item.kind === "routine_break");
   const few = disruption?.facts?.direction === "break" ? "a short break in routine" : "a few off-routine days";
   const event = facts.composition.newThisPeriod ? `the new ${facts.composition.eventName}`

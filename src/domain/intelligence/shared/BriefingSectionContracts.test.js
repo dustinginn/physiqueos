@@ -489,3 +489,42 @@ describe("claim restraint: performance is not proof of effectiveness; logging gu
       coaching: "Complete logs from here on will make the next check clearer." })).toEqual([]);
   });
 });
+
+describe("claim-restraint language detection", () => {
+  it("catches effectiveness and causal phrasing in its common tenses and forms", () => {
+    for (const text of ["The training is clearly working.", "The plan works.", "The training worked.", "It has been working.",
+      "The training’s working.", "The approach is proving effective.", "The training drove the gains.", "That produced the gains.",
+      "The plan is paying off.", "The lifting is paying dividends.", "The program is delivering results.",
+      "The training is building muscle.", "This is exactly the kind of week the goal needs.", "The routine is doing its job.",
+      "The new DEXA says the approach is working."]) {
+      expect(text).toMatch(EFFECTIVENESS_LANGUAGE);
+    }
+  });
+
+  it("does not flag ordinary non-causal wording", () => {
+    for (const text of ["Thanks to steady logging, the picture is clear.", "Missed logs result in a thinner picture.",
+      "It rarely leads to a setback.", "You were working late.", "Adding mass is the goal.",
+      "Nothing this week changes the direction of building lean mass.", "The performance gains are real.",
+      "Training kept moving forward, with new bests on seven lifts.", "Keep pushing the same lifts."]) {
+      expect(text).not.toMatch(EFFECTIVENESS_LANGUAGE);
+    }
+  });
+
+  it("catches repair-the-past logging guidance but not prospective guidance", () => {
+    for (const text of ["Fill in Thursday's log.", "Add the missing meals.", "Log Thursday through Saturday fully.",
+      "Complete the week's logs.", "Updating the log for those days will help.", "Logging those days fully will make next week clearer."]) {
+      expect(text).toMatch(RETROACTIVE_REPAIR_LANGUAGE);
+    }
+    for (const text of ["Log that day going forward.", "Complete logs from here on will make the next check clearer.",
+      "Logging a little more each day from here on will make the next check clearer.",
+      "A fresh log each day from here on keeps the next check honest.", "Watch whether food logs are complete next week."]) {
+      expect(text).not.toMatch(RETROACTIVE_REPAIR_LANGUAGE);
+    }
+  });
+
+  it("Goal Confidence never names training performance beside the outlook", () => {
+    for (const { label, realized } of weekly) {
+      if (realized.confidenceBody) expect(realized.confidenceBody, label).not.toMatch(/\btraining\b|\blifts?\b|\bbests?\b/iu);
+    }
+  });
+});
