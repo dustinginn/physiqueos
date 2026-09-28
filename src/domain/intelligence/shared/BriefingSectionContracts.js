@@ -79,13 +79,16 @@ export const SECTION_CONTRACTS = Object.freeze({
     coaching: { maxSentences: 1 },
     maxWords: 120,
   }),
-  // Room for multi-week synthesis and persistence, still one job per section.
+  // The review of the month: the hero opens it (character, no numbers — the
+  // numbers live in the domain modules below it), and the review contract
+  // (REVIEW_CONTRACTS.monthly) gives the rest of the month its editorial room.
   monthly: Object.freeze({
     cadence: "monthly", sections: FULL, headline: HEADLINE,
-    recap: { maxInsights: 3, quantities: true },
+    recap: { maxInsights: 3, quantities: false },
     takeaway: { quantities: false, newInsights: false },
-    coaching: { maxSentences: 4 },
+    coaching: { maxSentences: 3 },
     maxWords: 320,
+    review: "monthly",
   }),
   // Outcome-led: the headline and recap lead with the new result; the
   // supporting sections add preceding execution, interpretation and next steps.
@@ -108,6 +111,130 @@ export const SECTION_CONTRACTS = Object.freeze({
     maxWords: 150,
   }),
 });
+
+// A review contract: the editorial modules a multi-week briefing may render
+// below its opening, in display order, each earned by evidence in the shared
+// picture and each with one job. A module with nothing earned is left out —
+// never padded. Confidence is deliberately compact however rich the body is:
+// the body carries the month's explanation.
+export const ReviewModule = Object.freeze({
+  OPENING: "opening",
+  STRATEGY: "strategy",
+  TRAINING: "training",
+  ENERGY: "energy",
+  TRAJECTORY: "trajectory",
+  EXECUTION: "execution",
+  OTHER: "other",
+  AHEAD: "ahead",
+});
+
+export const ReviewModuleFacet = Object.freeze({
+  [ReviewModule.OPENING]: "what defined the period and what it means for the goal",
+  [ReviewModule.STRATEGY]: "the coach's synthesis: what continues, what changes, what is still uncertain",
+  [ReviewModule.TRAINING]: "performance progression, its persistence and the training rhythm",
+  [ReviewModule.ENERGY]: "intake against the plan, its reliability, and expenditure with humility",
+  [ReviewModule.TRAJECTORY]: "body composition, the guardrail and the scale across the period",
+  [ReviewModule.EXECUTION]: "routine and activity patterns: persistent versus one-off",
+  [ReviewModule.OTHER]: "other goal-relevant evidence (photos, recovery) when it earns space",
+  [ReviewModule.AHEAD]: "priorities, the next evidence and what to watch in the coming period",
+});
+
+export const REVIEW_CONTRACTS = Object.freeze({
+  monthly: Object.freeze({
+    cadence: "monthly",
+    modules: Object.freeze([ReviewModule.OPENING, ReviewModule.STRATEGY, ReviewModule.TRAINING, ReviewModule.ENERGY,
+      ReviewModule.TRAJECTORY, ReviewModule.EXECUTION, ReviewModule.OTHER, ReviewModule.AHEAD]),
+    // Per-module prose budget (sentences, words); data fields (chips, lift
+    // stats, the energy bars) are not prose and are not counted.
+    budgets: Object.freeze({
+      [ReviewModule.OPENING]: { maxSentences: 3, maxWords: 75 },
+      [ReviewModule.STRATEGY]: { maxSentences: 4, maxWords: 90 },
+      [ReviewModule.TRAINING]: { maxSentences: 5, maxWords: 110 },
+      [ReviewModule.ENERGY]: { maxSentences: 5, maxWords: 110 },
+      [ReviewModule.TRAJECTORY]: { maxSentences: 5, maxWords: 110 },
+      [ReviewModule.EXECUTION]: { maxSentences: 5, maxWords: 110 },
+      [ReviewModule.OTHER]: { maxSentences: 3, maxWords: 70 },
+      [ReviewModule.AHEAD]: { maxSentences: 7, maxWords: 130 },
+    }),
+    maxWords: 760,
+    confidence: Object.freeze({ maxSentences: 2, maxWords: 35 }),
+  }),
+});
+
+export function resolveReviewContract(cadence) {
+  return REVIEW_CONTRACTS[SECTION_CONTRACTS[cadence]?.review] ?? null;
+}
+
+// Review checks, deterministic: every module stays in its budget; a specific
+// quantity is stated in one module's prose only (data fields excepted); no two
+// modules mostly say the same thing; Confidence stays compact; claim restraint
+// holds on every word of prose.
+export function auditReview(review, contract, { overlapCeiling = 0.5, claimSupport = undefined } = {}) {
+  const issues = [];
+  const prose = (module) => [module.title, ...(module.paragraphs ?? []), ...(module.items ?? []).map((item) => item.text)]
+    .filter(Boolean).join(" ");
+  const texts = Object.fromEntries(review.modules.map((module) => [module.role, prose(module)]));
+  issues.push(...auditClaimRestraint({ ...texts, confidence: review.confidence }, claimSupport));
+  let totalWords = 0;
+  for (const module of review.modules) {
+    const budget = contract.budgets[module.role];
+    if (!contract.modules.includes(module.role)) issues.push(`${module.role}: not in the review contract`);
+    if (!module.earnedBy?.length) issues.push(`${module.role}: rendered without evidence that earns it`);
+    const words = countWords(texts[module.role]);
+    totalWords += words;
+    if (budget && words > budget.maxWords) issues.push(`${module.role}: ${words} words`);
+    if (budget && countSentences(texts[module.role]) > budget.maxSentences) issues.push(`${module.role}: too many sentences`);
+  }
+  if (contract.maxWords && totalWords > contract.maxWords) issues.push(`review: ${totalWords} words`);
+  const owners = new Map();
+  for (const module of review.modules) {
+    for (const quantity of new Set(reviewQuantities(texts[module.role]))) {
+      if (owners.has(quantity) && owners.get(quantity) !== module.role) issues.push(`${module.role}: repeats "${quantity}" from ${owners.get(quantity)}`);
+      else owners.set(quantity, module.role);
+    }
+  }
+  const roles = review.modules.map((module) => module.role);
+  for (let left = 0; left < roles.length; left += 1) {
+    for (let right = left + 1; right < roles.length; right += 1) {
+      const value = contentOverlap(texts[roles[left]], texts[roles[right]]);
+      if (value > overlapCeiling) issues.push(`${roles[left]} and ${roles[right]} mostly say the same thing (${value.toFixed(2)})`);
+    }
+  }
+  if (review.confidence) {
+    const words = countWords(review.confidence);
+    if (words > contract.confidence.maxWords) issues.push(`confidence: ${words} words`);
+    if (countSentences(review.confidence) > contract.confidence.maxSentences) issues.push("confidence: too many sentences");
+  }
+  return { ok: issues.length === 0, issues, totalWords,
+    moduleWords: Object.fromEntries(roles.map((role) => [role, countWords(texts[role])])) };
+}
+
+// Compact Confidence for a rich briefing: the goal-level reason in at most the
+// budget's sentences and words, whole sentences only.
+export function compactConfidence(text, { maxSentences = 2, maxWords = 35 } = {}) {
+  const sentences = String(text ?? "").replace(/\s+/gu, " ").trim().split(/(?<=[.!?])\s+(?=[A-Z0-9"“])/u).filter(Boolean);
+  const kept = [];
+  for (const sentence of sentences) {
+    const next = [...kept, sentence.trim()];
+    if (next.length > maxSentences || countWords(next.join(" ")) > maxWords) break;
+    kept.push(sentence.trim());
+  }
+  return kept.length ? kept.join(" ") : (sentences[0]?.trim() ?? null);
+}
+
+// A stated quantity with its unit and the word after it ("21 training",
+// "2,796 calories"), calendar dates excluded, so two different facts that
+// share a number are not mistaken for a repeat.
+function reviewQuantities(text) {
+  const withoutDates = String(text ?? "").replace(new RegExp(`\\b(?:${MONTHS}) \\d{1,2}(?: through \\d{1,2}| and \\d{1,2})?\\b`, "gu"), "");
+  // With a unit the number and unit are the fact ("5 lb"); without one the
+  // word after it says what was counted.
+  return [...withoutDates.matchAll(/\b(\d[\d,]*(?:\.\d+)?)(?:\s?(lb|%|g|kg)\b|(?:\s+(?:of\s+)?([a-z-]+))?)/gu)]
+    .map((match) => (match[2] ? `${match[1]} ${match[2]}` : `${match[1]} ${match[3] ?? ""}`.trim()));
+}
+
+function countWords(text) { return String(text ?? "").split(/\s+/u).filter(Boolean).length; }
+function countSentences(text) { return (String(text ?? "").match(/[.!?](?:\s|$)/gu) ?? []).length; }
 
 // The contract a briefing actually gets for this synthesis: Photo gains its
 // interpretation and execution sections only when the visual result is strong.

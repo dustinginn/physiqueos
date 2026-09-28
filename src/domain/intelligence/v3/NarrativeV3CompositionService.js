@@ -558,6 +558,8 @@ function summarizeHolistic(briefingIntelligence, context) {
     budget: holistic?.synthesis ? { purpose: holistic.synthesis.budget.purpose, maxInsights: holistic.synthesis.budget.maxInsights } : null,
     sectionPlan: holistic?.realized?.sectionPlan ?? null,
     sectionAudit: holistic?.realized?.sectionAudit ?? null,
+    // A review briefing's editorial modules, only when the period was used.
+    ...(context.period?.review ? { review: context.period.review } : {}),
   };
 }
 

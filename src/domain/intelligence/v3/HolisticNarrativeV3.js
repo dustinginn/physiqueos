@@ -14,8 +14,8 @@
 // never used to explain Goal Confidence.
 
 import { EVIDENCE_DOMAIN_ROLES as ROLES } from "../shared/GoalEvidencePolicies.js";
-import { SectionRole, allocateSections, auditSectionPlan, auditSectionTexts, leadInsights,
-  resolveSectionContract } from "../shared/BriefingSectionContracts.js";
+import { ReviewModule, SectionRole, allocateSections, auditReview, auditSectionPlan, auditSectionTexts, leadInsights,
+  resolveReviewContract, resolveSectionContract } from "../shared/BriefingSectionContracts.js";
 import { ClaimScope, claimScopeOf, claimSupport } from "../shared/BriefingClaimRestraint.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
@@ -147,7 +147,7 @@ const PERIOD_WORDS = Object.freeze({
     recapLead: "So far this week, ", partial: true,
     positions: { late: "in the last day or two", early: "at the start of the week", middle: "midway through", whole: "most days" },
     parts: {} },
-  monthly: { calendarDates: true, noun: "month", this: "this month", thisPoss: "this month's", next: "the coming month", inThis: "in this month",
+  monthly: { calendarDates: true, review: true, noun: "month", this: "this month", thisPoss: "this month's", next: "the coming month", inThis: "in this month",
     logTip: "Keep logging the same way; it keeps the picture easy to read.", ahead: "over the coming weeks",
     steady: "A steady month", strongTraining: "Strong training month", stepTail: "over the coming weeks",
     leverWhen: "over the coming weeks", usual: "This month held to its usual pattern.", midNoun: "mid-month",
@@ -208,20 +208,32 @@ export function realizeHolisticWeeklyV3(args) {
 
 function realize({ cadence, synthesis, picture, goalLabel, goalPolicy, goalProgress }) {
   const contract = resolveSectionContract(cadence, synthesis);
+  const reviewContract = contract.review ? resolveReviewContract(cadence) : null;
+  // A review is read after its period: it names the month rather than
+  // calling it "this month" (restored with the rest of the period words).
+  const bounds = periodBounds(picture?.window);
+  if (reviewContract && bounds) P = { ...P, this: `in ${bounds.monthName}`, inThis: `in ${bounds.monthName}` };
   const has = (role) => contract.sections.includes(role);
   const facts = { ...pictureFacts(picture), direction: goalPolicy?.weightExpectation?.direction ?? null,
     sparse: (picture?.domains ?? []).filter((item) => ["insufficient", "unavailable"].includes(item.status)).length >= 4,
-    goalProgress, event: Boolean(contract.leadDomain), leadDomain: contract.leadDomain ?? null };
+    goalProgress, event: Boolean(contract.leadDomain), leadDomain: contract.leadDomain ?? null,
+    period: periodBounds(picture?.window),
+    trainingDomain: picture?.domains?.find((item) => item.domain === "training")?.facts ?? null };
   const lead = leadInsights(synthesis, contract);
   const steps = planSteps(synthesis);
   const discriminators = watchItems({ synthesis, facts });
   const { text: headline, ids: headlineIds } = headlineSentence(lead, facts, contract.headline);
-  const recap = recapSentence(lead, facts);
+  // A review opens with the period's character; its numbers live in the
+  // domain modules below the opening.
+  const recap = reviewContract ? openingSentence(lead, facts) : recapSentence(lead, facts);
   const implication = has(SectionRole.MEANING) ? implicationSentence({ synthesis, facts, goalLabel, lead }) : null;
   const baseTakeaway = takeawaySentence({ lead, synthesis, steps });
   // A partial window reads as a first read, never as a finished period.
   const takeaway = P.partial ? `Early read: ${lowerFirst(baseTakeaway)}` : baseTakeaway;
-  const coachTake = coachingSentences({ synthesis, lead, facts, steps, contract });
+  // In a review, execution detail lives in the domain modules; the coach's
+  // take is the strategy synthesis of the whole period.
+  const coachTake = reviewContract ? strategySentences({ synthesis, facts, steps, implication })
+    : coachingSentences({ synthesis, lead, facts, steps, contract });
   const action = actionSentence(synthesis, steps);
   const watch = watchSentence(discriminators);
   const sectionPlan = allocateSections({ synthesis, contract, steps, discriminators });
@@ -230,10 +242,14 @@ function realize({ cadence, synthesis, picture, goalLabel, goalPolicy, goalProgr
     [SectionRole.CONFIDENCE]: confidenceBody,
     [SectionRole.TAKEAWAY]: takeaway, [SectionRole.COACHING]: coachTake, [SectionRole.ACTION]: action,
     [SectionRole.WATCH]: watch };
+  const meaning = implication ? `${recap} ${implication}` : recap;
+  const review = reviewContract ? realizeReview({ reviewContract, synthesis, picture, facts, steps, discriminators,
+    opening: meaning, strategy: coachTake, confidenceBody }) : null;
   return {
-    cadence, headline, result: takeaway, meaning: implication ? `${recap} ${implication}` : recap, action, watch, coachTake,
+    cadence, headline, result: takeaway, meaning, action, watch, coachTake,
     recap, implication,
     confidenceBody,
+    ...(review ? { review } : {}),
     heroIds: lead.map((item) => item.id),
     headlineIds,
     selectedIds: synthesis.selected.map((item) => item.id),
@@ -250,7 +266,8 @@ const LEAD_PHRASE = {
   training_progress: (f) => (f.milestoneCount >= 2 ? P.strongTraining : "A new best in training"),
   // Only reached for a canonical-range steady trend (the only supportive one).
   weight_trend: (f) => (f.verdict !== "steady" ? null : f.movement === "flat" ? "Weight holding steady" : "Weight on the phase's pace"),
-  composition_result: (f) => `New ${f.eventName} shows progress`,
+  // A review names the result, not the scan's novelty.
+  composition_result: (f) => (P.review ? "Real measured progress" : `New ${f.eventName} shows progress`),
   routine_steady: () => P.steady,
   activity_on_plan: () => P.steady,
   intake_vs_plan: () => "Intake on target",
@@ -269,6 +286,8 @@ function concernPhrase(item, standalone = false) {
         flat: "the scale held flat" }[f.verdict] ?? null;
     case "routine_break": {
       const quiet = f.direction === "break";
+      // Several stretches in a review period are told as such, not by the first one's position.
+      if (P.review && (f.shifts?.length ?? 0) >= 2) return `${numberWord(f.shifts.length)} off-routine stretches`;
       // (headline character only)
       // A partial window or an event's lead-up has no "finish" of its own.
       const bounded = !P.partial && !P.context;
@@ -395,7 +414,8 @@ const GOING_WELL = {
   [ClaimScope.MEASUREMENT]: (f, kind) => (kind === "visual_change" ? `the photos show ${f.change === "visible" ? "a visible" : "a subtle"} change`
     : kind === "visual_comparison" ? null
       : P.outcomeLed && f.newThisPeriod ? "the measured result moves the goal forward"
-        : `the new ${f.eventName} shows ${f.label} moving the right way`),
+        : P.review && f.measuredAt ? `the ${dateWords(f.measuredAt)} ${f.eventName} shows ${f.label} moving the right way`
+          : `the new ${f.eventName} shows ${f.label} moving the right way`),
   [ClaimScope.TRAJECTORY]: (f) => (f.verdict === "steady" ? "the scale is where the phase expects it" : null),
   [ClaimScope.EXECUTION]: (f, kind) => ({ routine_steady: "the routine held", activity_on_plan: "the routine held",
     intake_vs_plan: "intake stayed where it needs to be" }[kind] ?? null),
@@ -417,6 +437,9 @@ function prioritiesPhrase(item) {
       const prior = f.recurrence?.priorSpans?.length;
       const part = P.parts[f.position] ?? "the usual weekly rhythm";
       // Across a month, a one-off stretch and a persistent one mean different things.
+      if (P.review && (f.shifts?.length ?? 0) >= 2 && item.temporal !== "persistent") {
+        return `${numberWord(f.shifts.length)} short off-routine stretches aren't a pattern yet, but they are the part to keep an eye on`;
+      }
       if (item.temporal === "one_off") return `one ${f.direction === "break" ? "quiet" : "off-routine"} stretch in an otherwise steady ${P.noun} isn't a pattern`;
       if (item.temporal === "persistent") return `the routine was off for most of the ${P.noun}, so rebuilding it matters more than any single week`;
       if (f.direction !== "break") return prior ? `${part} is worth protecting; the routine has drifted like this before`
@@ -541,7 +564,9 @@ function implicationSentence({ synthesis, facts, goalLabel, lead }) {
     const progress = facts.goalProgress ? stripFinalPeriod(facts.goalProgress) : `That result sets the direction for ${goalLabel}`;
     return `${progress}${guardrail}.`;
   }
-  const scan = composition && !compositionTold
+  // A review tells the standing measurement in its own module, not here.
+  const ownModule = P.review && composition && (composition.newThisPeriod || composition.ageDays <= 45);
+  const scan = composition && !compositionTold && !ownModule
     ? `The ${dateWords(composition.measuredAt)} ${composition.eventName} ${compositionPhrase(composition)}${facts.guardrail ? ` with ${facts.guardrail.label} at ${guardrailValue(facts)}` : ""}`
     : null;
   const next = composition ? `the next ${composition.eventName}` : null;
@@ -819,7 +844,8 @@ function confidenceSentence({ synthesis, facts }) {
   const supportive = synthesis.selected.filter((item) => item.polarity === "supportive" && item.kind === "weight_trend");
   const disruption = synthesis.selected.find((item) => item.kind === "routine_break");
   const few = disruption?.facts?.direction === "break" ? "a short break in routine" : "a few off-routine days";
-  const event = facts.composition.newThisPeriod ? `the new ${facts.composition.eventName}`
+  // A review names its measurement by date: "new" means little a month on.
+  const event = facts.composition.newThisPeriod && !P.review ? `the new ${facts.composition.eventName}`
     : `the ${dateWords(facts.composition.measuredAt)} ${facts.composition.eventName}`;
   // When the risk is the outlook-setting result itself, say so once.
   // A guardrail reading comes from that same measurement, so it is part of
@@ -871,6 +897,406 @@ function weightClause(f) {
     default: return null;
   }
 }
+
+// ---------------------------------------------------------------- review
+//
+// A review (the Monthly) opens like the other briefings, then gives the
+// period editorial room: one module per job (shared/BriefingSectionContracts
+// REVIEW_CONTRACTS), each written from the shared picture's own domain
+// assessment and each rendered only when that assessment earns it. Every
+// module records what earned it or why it was left out. The numbers live in
+// the domain modules; the opening, the strategy and the Confidence line stay
+// short and goal-level.
+
+// The period's calendar bounds: a window that ends before its month does is a
+// month-to-date read, and says so rather than implying the month is done.
+function periodBounds(window) {
+  if (!window?.startDate || !window?.endDate) return null;
+  const [year, month] = window.startDate.split("-").map(Number);
+  const monthEnd = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  const days = Math.round((Date.parse(`${window.endDate}T12:00:00Z`) - Date.parse(`${window.startDate}T12:00:00Z`)) / 86400000) + 1;
+  // Only a calendar month is named; any other span is "the month".
+  const calendar = window.startDate.endsWith("-01") && window.endDate <= monthEnd;
+  return { ...window, monthName: calendar ? MONTHS[month - 1] : null, nextMonth: calendar ? MONTHS[month % 12] : null,
+    monthEnd: calendar ? monthEnd : window.endDate, days,
+    toDate: calendar && window.endDate < monthEnd, remainingDays: calendar ? Math.round((Date.parse(`${monthEnd}T12:00:00Z`) -
+      Date.parse(`${window.endDate}T12:00:00Z`)) / 86400000) : 0 };
+}
+
+// Opening: what defined the period, as character (no numbers), in one sentence.
+function openingSentence(lead, facts) {
+  const rank = { supportive: 0, neutral: 1, concern: 2 };
+  const phrases = [...lead].sort((left, right) => (rank[left.polarity] ?? 1) - (rank[right.polarity] ?? 1))
+    .map((item) => openingPhrase(item, facts)).filter(Boolean);
+  const month = facts.period?.monthName ?? `The ${P.noun}`;
+  if (!phrases.length) return `${month} held to its usual pattern.`;
+  return `${month} brought ${listPhrase(phrases)}.`;
+}
+
+function openingPhrase(item, facts) {
+  const f = item.facts ?? {};
+  const soFar = facts.period?.toDate ? " so far" : "";
+  switch (item.kind) {
+    case "composition_result": {
+      const scan = `the ${dateWords(f.measuredAt)} ${f.eventName}`;
+      if (item.polarity === "supportive") return `measured progress in ${f.label} on ${scan}`;
+      if (item.polarity === "concern") return `${scan} showing ${f.label} going the wrong way`;
+      return `${scan} with ${f.label} holding`;
+    }
+    case "training_progress": {
+      if (f.milestoneCount <= 1) return "a new training best";
+      const t = trainingFactsOf(item, facts);
+      if (t && t.bestBlocks >= t.blocks) return `new training bests in every week${soFar}`;
+      if (t && t.bestBlocks >= 2) return "new training bests across most of the month";
+      return "one strong week of new training bests";
+    }
+    case "weight_trend":
+      if (f.movement === "flat") return "a steady scale";
+      if (item.polarity === "concern") return concernNoun(item);
+      return f.movement === (facts.direction === "down" ? "down" : "up") ? `a steady ${f.movement === "up" ? "climb" : "drop"} on the scale`
+        : `the scale moving ${f.movement}`;
+    case "routine_break": {
+      const count = f.shifts?.length ?? 1;
+      if (item.temporal === "persistent") return "a routine that was off for much of the month";
+      return count >= 2 ? `${numberWord(count)} short off-routine stretches` : "one short off-routine stretch";
+    }
+    case "training_frequency": return f.missedAll ? "no logged training"
+      : f.direction === "below" ? "fewer training days than usual" : "more training days than usual";
+    case "activity_change": return f.direction === "below" ? "a few days of lower activity" : "a few days of higher activity";
+    case "intake_vs_plan": return f.state === "on_plan" ? "intake on target" : "intake off target";
+    case "guardrail_status": return `${f.label} ${f.status === "breached" ? "past" : "near"} its limit`;
+    case "visual_change": case "visual_comparison": return "new progress photos";
+    default: return null;
+  }
+}
+
+// Strategy: what the combined period means, whether it argues for a change
+// (the recommendation's own call, said in plain words), and what it cannot
+// settle. Number-free; the modules carry the numbers.
+function strategySentences({ synthesis, facts, steps, implication = null }) {
+  const selected = synthesis.selected;
+  const outcome = selected.find((item) => item.kind === "composition_result" && item.facts?.newThisPeriod);
+  const progress = selected.find((item) => item.kind === "training_progress");
+  const routine = selected.find((item) => item.kind === "routine_break");
+  const risk = selected.find((item) => item.role === "risk");
+  const gains = [outcome?.polarity === "supportive" ? "the measured result moved the goal forward" : null,
+    progress ? "training kept progressing" : null].filter(Boolean);
+  const misses = routine ? (routine.temporal === "persistent" ? "the routine was off for much of the month, and that is the part to rebuild"
+    : "the missed days came in short runs rather than a steady slide") : null;
+  const first = gains.length ? `Put together, ${listPhrase(gains)}${misses ? `; ${misses}` : ", and nothing in the month pulled against it"}.`
+    : misses ? `${upperFirst(misses)}.` : `Put together, it was a quiet ${P.noun} on every front.`;
+  const call = risk ? `The one thing to act on is ${riskFocus(risk)}; the rest of the setup stays as it is.`
+    : steps.length ? "Nothing in the month argues for changing the plan; what to tighten is execution, not strategy."
+      : "Nothing in the month argues for changing the plan.";
+  const weight = selected.find((item) => item.kind === "weight_trend" && item.facts?.movement !== "flat") ??
+    (facts.weightInsight?.facts?.movement !== "flat" ? facts.weightInsight : null);
+  // Said once: the opening's goal meaning may already have posed it.
+  const posed = /can't (?:say|show) how much/u.test(implication ?? "");
+  const open = facts.composition && weight && !posed
+    ? `What the month can't settle is how much of the scale's ${weight.facts.movement === "up" ? "climb" : "drop"} is ${facts.composition.label}.` : null;
+  const gaps = synthesis.limitations.some((item) => item.domain === "nutrition")
+    ? "Intake is the least certain part of the picture, because the food log has gaps." : null;
+  return [first, call, open, gaps].filter(Boolean).join(" ");
+}
+
+function riskFocus(item) {
+  if (item.kind === "weight_trend") return "the scale's pace";
+  if (item.kind === "guardrail_status") return `${item.facts.label} against its limit`;
+  if (item.kind === "composition_result") return "the measured result";
+  return "the part that slipped";
+}
+
+function realizeReview({ reviewContract, synthesis, picture, facts, steps, discriminators, opening, strategy, confidenceBody }) {
+  const domain = (name) => picture?.domains?.find((item) => item.domain === name) ?? null;
+  const period = facts.period;
+  const modules = [];
+  const omitted = [];
+  const add = (module) => modules.push(module);
+  const skip = (role, reason) => omitted.push({ role, reason });
+  add({ role: ReviewModule.OPENING, earnedBy: synthesis.selected.map((item) => item.id), paragraphs: [opening],
+    highlights: openingHighlights({ picture, facts }) });
+  add({ role: ReviewModule.STRATEGY, earnedBy: synthesis.selected.map((item) => item.id), paragraphs: [strategy] });
+  const training = trainingModule(domain("training"), period, facts);
+  if (training) add(training); else skip(ReviewModule.TRAINING, domain("training")?.state ?? "unavailable");
+  const energy = energyModule(domain("nutrition"), domain("activity"), period);
+  if (energy) add(energy); else skip(ReviewModule.ENERGY, domain("nutrition")?.state ?? "unavailable");
+  const trajectory = trajectoryModule(facts, domain(ROLES.trajectory));
+  if (trajectory) add(trajectory); else skip(ReviewModule.TRAJECTORY, facts.composition ? "no_current_measurement" : "no_composition_measurement");
+  const execution = executionModule(domain("routine"), domain("activity"), period);
+  if (execution) add(execution); else skip(ReviewModule.EXECUTION, "no_routine_or_activity_pattern");
+  const other = otherModule(domain(ROLES.visual), domain("recovery"));
+  if (other) add(other); else skip(ReviewModule.OTHER, [domain(ROLES.visual)?.state, domain("recovery")?.state].filter(Boolean).join("+") || "unavailable");
+  add(aheadModule({ synthesis, facts, steps, discriminators, period, energy, opening }));
+  const order = new Map(reviewContract.modules.map((role, index) => [role, index]));
+  modules.sort((left, right) => order.get(left.role) - order.get(right.role));
+  const review = { schemaVersion: "briefing_review_v1", cadence: reviewContract.cadence,
+    period: period ? { startDate: period.startDate, endDate: period.endDate, monthEnd: period.monthEnd,
+      toDate: period.toDate, remainingDays: period.remainingDays } : null,
+    modules, omitted, confidence: confidenceBody ?? null };
+  return { ...review, audit: auditReview(review, reviewContract, { claimSupport: claimSupport(synthesis) }) };
+}
+
+function trainingFactsOf(item, facts) {
+  return item?.domain === "training" ? facts.trainingDomain ?? null : null;
+}
+
+// At-a-glance data for the opening: one value per domain that earned the
+// month's story. Data, not prose — the modules below explain each.
+function openingHighlights({ picture, facts }) {
+  const chips = [];
+  const composition = facts.composition;
+  if (composition && Number.isFinite(Number(composition.change)) && (composition.newThisPeriod || composition.ageDays <= 45)) {
+    chips.push({ label: upperFirst(composition.label), value: `${Number(composition.change) > 0 ? "+" : ""}${formatNumber(composition.change)} ${composition.unit ?? ""}`.trim(),
+      detail: `${dateWords(composition.measuredAt)} ${composition.eventName}${composition.comparisonAt ? `, since ${dateWords(composition.comparisonAt)}` : ""}`,
+      icon: "baseline", tone: "evidence" });
+  }
+  const training = picture?.domains?.find((item) => item.domain === "training");
+  if (training?.status === "assessed" && training.facts.milestoneCount) {
+    chips.push({ label: "Training", value: `${training.facts.milestoneCount} new ${training.facts.milestoneCount === 1 ? "best" : "bests"}`,
+      detail: `${training.facts.trainingDays} training days`, icon: "training", tone: "training" });
+  }
+  const weight = picture?.domains?.find((item) => item.domain === ROLES.trajectory);
+  if (weight?.status === "assessed" && Number.isFinite(weight.facts.weeklyRate) && !["too_noisy", "not_goal_relevant"].includes(weight.state)) {
+    const rate = Math.round(Math.abs(weight.facts.weeklyRate) * 10) / 10;
+    chips.push({ label: "Scale weight", value: weight.facts.movement === "flat" ? "Steady" : `${weight.facts.weeklyRate > 0 ? "+" : "−"}${formatNumber(rate)} lb/week`,
+      detail: `${numberWord(Math.round((weight.facts.rateSpanDays ?? 28) / 7))}-week trend`, icon: "weight", tone: "primary" });
+  }
+  return chips.slice(0, 3);
+}
+
+function trainingModule(training, period, facts) {
+  if (training?.status !== "assessed") return null;
+  const f = training.facts;
+  if (!f.trainingDays && !f.milestoneCount) return null;
+  const soFar = period?.toDate ? " so far" : "";
+  const through = period?.toDate ? ` through ${dateWords(period.endDate)}` : "";
+  const everyWeek = f.bestBlocks >= f.blocks;
+  const title = f.milestoneCount >= 2
+    ? everyWeek ? `Progress ran through every week${soFar}.` : f.bestBlocks >= 2 ? "Progress was spread across the month."
+      : "Most of the progress came in one strong week."
+    : f.milestoneCount === 1 ? "One lift set a new best." : "Training kept its rhythm.";
+  const paragraphs = [];
+  if (f.milestoneCount >= 2) {
+    const spread = everyWeek ? `they landed in every week${soFar} rather than in one good week`
+      : f.bestBlocks >= 2 ? `they landed in ${numberWord(f.bestBlocks)} of the ${numberWord(f.blocks)} weeks rather than in one good week`
+        : "they all came in the same week";
+    paragraphs.push(`New bests came on ${f.milestoneCount} lifts${through}, and ${spread}.`);
+  } else if (f.milestoneCount === 1) {
+    paragraphs.push(`${upperFirst(exampleClause(f.milestones[0]))}.`);
+  }
+  if (f.trainingDays) {
+    const usual = Number(f.usualTrainingDays);
+    const rhythm = Number.isFinite(usual) && f.trainingDays < usual - 2 ? ", a few fewer than your usual rhythm"
+      : Number.isFinite(usual) && f.trainingDays > usual + 2 ? ", more than your usual rhythm" : ", in line with your usual rhythm";
+    const missedNote = f.missedDates?.length ? "; the missed days sit inside the off-routine stretches told below" : "";
+    paragraphs.push(`There were ${f.trainingDays} training days${rhythm}${missedNote}.`);
+  }
+  // A steady rhythm with no finding is still the month's training record: the
+  // domain's own assessment earns it.
+  const earnedBy = training.insights.length ? training.insights.map((item) => item.id) : [`training|assessed:${training.state}`];
+  return { role: ReviewModule.TRAINING, earnedBy, title, paragraphs,
+    // Performance illustrates training; it is never the goal's measure.
+    interpretation: facts.composition ? `Between checks, performance is the clearest read on training: it shows the work moving forward, while ${facts.composition.label} itself is only measured by the ${facts.composition.eventName}.` : null,
+    stats: (f.milestones ?? []).slice(0, 3).map(statOf) };
+}
+
+function statOf(milestone) {
+  const date = milestone.observedAt ? dateWords(String(milestone.observedAt).slice(0, 10)) : null;
+  if (milestone.metric === "reps_at_load" && milestone.load != null) {
+    return { label: milestone.subjectLabel, value: `${milestone.currentValue} reps at ${milestone.load} lb`,
+      detail: [`up from ${milestone.previousValue} reps`, date].filter(Boolean).join(" · ") };
+  }
+  if (milestone.metric === "heaviest_load") {
+    return { label: milestone.subjectLabel, value: `${milestone.currentValue} ${milestone.unit ?? "lb"}`,
+      detail: [`up from ${milestone.previousValue} ${milestone.unit ?? "lb"}`, date].filter(Boolean).join(" · ") };
+  }
+  return { label: milestone.subjectLabel, value: milestone.relativeGain != null ? `+${Math.round(milestone.relativeGain * 100)}%` : "New best",
+    detail: [milestone.relativeGain != null ? "more work than the session before" : null, date].filter(Boolean).join(" · ") };
+}
+
+function energyModule(nutrition, activity, period) {
+  if (nutrition?.status !== "assessed" || (nutrition.facts.loggedDays ?? 0) < 7) return null;
+  const f = nutrition.facts;
+  const readable = f.reliableDays >= 7 && Number.isFinite(f.reliableIntakeAverage);
+  const gap = readable && f.intakeTarget ? f.reliableIntakeAverage / f.intakeTarget - 1 : null;
+  const title = gap == null ? "Food was logged across the month."
+    : gap >= 0.05 ? "Intake ran above the plan's target on the readable days."
+      : gap <= -0.05 ? "Intake ran below the plan's target on the readable days." : "Intake stayed close to the plan's target.";
+  const days = period?.days ?? f.loggedDays;
+  const logged = f.loggedDays >= days ? `all ${days} days` : `${f.loggedDays} of ${days} days`;
+  const allReadable = f.reliableDays >= f.loggedDays;
+  const paragraphs = [`Food was logged on ${logged}${period?.toDate ? ` through ${dateWords(period.endDate)}` : ""}, ${allReadable
+    ? "every one complete enough to read" : `and ${f.reliableDays} were complete enough to read`}.`];
+  if (readable) {
+    const protein = Number.isFinite(f.reliableProteinAverage) ? `, and protein held around ${f.reliableProteinAverage} g${Number.isFinite(f.usualProtein) &&
+      Math.abs(f.reliableProteinAverage - f.usualProtein) <= 0.08 * f.usualProtein ? ", in line with your usual" : ""}` : "";
+    paragraphs.push(`${allReadable ? "Intake" : "On those days intake"} averaged about ${thousands(Math.round(f.reliableIntakeAverage / 50) * 50)} calories${f.intakeTarget ? ` against a ${thousands(f.intakeTarget)} target` : ""}${protein}.`);
+  }
+  if (f.unreliableDates?.length) {
+    paragraphs.push(`${upperFirst(dateList(f.unreliableDates))} ${f.unreliableDates.length === 1 ? "was" : "were"} too patchy to read and ${f.unreliableDates.length === 1 ? "is" : "are"} left out of that average.`);
+  }
+  const wearable = activity?.facts?.measurement === "wearable_estimate";
+  const earnedBy = nutrition.insights.length ? nutrition.insights.map((item) => item.id) : [`nutrition|assessed:${nutrition.state}`];
+  return { role: ReviewModule.ENERGY, earnedBy, title, paragraphs,
+    interpretation: wearable ? "Expenditure is a wearable estimate, so read the weekly balance as directional; the scale's trend is the steadier read of where intake sits against the work." : null };
+}
+
+function trajectoryModule(facts, trajectory) {
+  const c = facts.composition;
+  if (!c || !(c.newThisPeriod || c.ageDays <= 45)) return null;
+  const change = Number(c.change);
+  const moved = Number.isFinite(change) && change !== 0 ? `${c.label} ${change > 0 ? "up" : "down"} ${formatNumber(Math.abs(change))} ${c.unit ?? ""}`.trim()
+    : `${c.label} holding`;
+  const guard = facts.guardrail ? { clear: `${facts.guardrail.label} stayed inside its limit`, watch: `${facts.guardrail.label} is close to its limit`,
+    pressured: `${facts.guardrail.label} is pressing on its limit`, breached: `${facts.guardrail.label} is past its limit` }[facts.guardrail.status] ?? null : null;
+  const paragraphs = [`It measured ${moved}${c.comparisonAt ? ` since ${dateWords(c.comparisonAt)}` : ""}${guard ? `, and ${guard}` : ""}.`];
+  const w = trajectory?.status === "assessed" ? trajectory.facts : null;
+  if (w && Number.isFinite(w.firstWeekAverage) && Number.isFinite(w.lastWeekAverage) && w.movement !== "flat") {
+    paragraphs.push(`On the scale, the weekly average went from about ${formatNumber(Math.round(w.firstWeekAverage))} lb in the first week to about ${formatNumber(Math.round(w.lastWeekAverage))} lb in the latest, roughly ${formatNumber(Math.round(Math.abs(w.weeklyRate) * 10) / 10)} lb a week over the last ${numberWord(Math.round((w.rateSpanDays ?? 28) / 7))} weeks.`);
+    paragraphs.push(`The scale can't tell ${c.label} apart from other weight, so it adds pace, not a verdict.`);
+  } else if (w && w.movement === "flat") {
+    paragraphs.push("The scale held steady across the month; it adds pace, not a verdict.");
+  }
+  return { role: ReviewModule.TRAJECTORY, earnedBy: [`${ROLES.outcome}|composition_result`, ...(w ? [`${ROLES.trajectory}|weight_trend`] : [])],
+    title: c.newThisPeriod ? `The ${dateWords(c.measuredAt)} ${c.eventName} is the new reference point.` : `The ${dateWords(c.measuredAt)} ${c.eventName} still sets the reference point.`,
+    paragraphs, interpretation: c.newThisPeriod ? `The next ${c.eventName} will be compared with this one.` : null,
+    measuredAt: c.measuredAt };
+}
+
+const MISSED_NOUN = { training: "training", body: "weigh-ins", nutrition: "food logging" };
+
+const SHIFT_WORDS = {
+  training: { missed: "training stopped", lower: "training ran light" },
+  activity: { lower: "the wearable showed less activity", higher: "the wearable showed more activity" },
+  nutrition: { higher: "calories ran above usual", lower: "calories ran below usual", missed: "food logging stopped" },
+  body: { missed: "weigh-ins stopped" },
+};
+
+function executionModule(routine, activity, period) {
+  const shifts = routine?.status === "assessed" ? routine.facts.shifts ?? [] : [];
+  if (!shifts.length) return null;
+  const items = shifts.map((shift) => {
+    // Misses on the same days are told together ("training and weigh-ins stopped …").
+    const missedGroups = new Map();
+    for (const member of shift.missed) {
+      const key = member.dates.join(",");
+      missedGroups.set(key, [...(missedGroups.get(key) ?? []), member]);
+    }
+    const parts = [...shift.higher.map((m) => [[m], "higher"]), ...shift.lower.map((m) => [[m], "lower"]),
+      ...[...missedGroups.values()].map((members) => [members, "missed"])]
+      .sort((left, right) => left[0][0].dates[0].localeCompare(right[0][0].dates[0]))
+      .map(([members, kind]) => {
+        if (kind === "missed") {
+          const nouns = members.map((member) => MISSED_NOUN[member.domain]).filter(Boolean);
+          return nouns.length ? `${listPhrase(nouns)} stopped ${dateList(members[0].dates)}` : null;
+        }
+        const words = SHIFT_WORDS[members[0].domain]?.[kind];
+        return words ? `${words} ${dateList(members[0].dates)}` : null;
+      })
+      .filter(Boolean);
+    const open = shift.reachesPeriodEnd
+      ? period?.toDate ? " It runs up to the latest complete day, so whether it has passed isn't known yet."
+        : ` It ran to the end of the ${P.noun}, so the first days of ${period?.nextMonth ?? `the next ${P.noun}`} will show whether it has passed.`
+      : "";
+    return { label: dateList(shift.affectedDates.length ? shift.affectedDates : [shift.span.startDate, shift.span.endDate]),
+      title: shift.position === "late" ? `Late-${P.noun} stretch` : shift.position === "early" ? `Early-${P.noun} stretch` : `Mid-${P.noun} stretch`,
+      text: `${upperFirst(listPhrase(parts))}.${open}` };
+  });
+  const extent = new Set(shifts.flatMap((shift) => shift.affectedDates)).size;
+  const days = period?.days ?? extent;
+  const persistent = extent >= days / 2;
+  const outside = activity?.facts?.planState === "on_plan" ? ", and wearable activity stayed at its usual level" : "";
+  const summary = extent >= days ? `The routine was off for every day ${period?.toDate ? "so far" : `of the ${P.noun}`}.` : persistent
+    ? `Together they cover ${numberWord(extent)} days, so the routine was off for much of the ${P.noun}.`
+    : `Together they cover ${numberWord(extent)} days; outside them the routine held${outside}.`;
+  return { role: ReviewModule.EXECUTION, earnedBy: routine.insights.map((item) => item.id),
+    title: shifts.length >= 2 ? `${upperFirst(numberWord(shifts.length))} short stretches, not a pattern.` : persistent ? "The routine was off for much of the month." : "One short stretch, not a pattern.",
+    items, paragraphs: [summary], persistence: persistent ? "persistent" : shifts.length >= 2 ? "recurring_short" : "one_off" };
+}
+
+// Photos and recovery earn a module only with their own evidence; recovery is
+// a declared slot (Sleep enters through its assessor, no change here).
+function otherModule(visual, recovery) {
+  const paragraphs = [];
+  const earnedBy = [];
+  const photo = visual?.status === "assessed" ? visual.insights[0] : null;
+  if (photo?.facts?.newThisPeriod) {
+    paragraphs.push(clauseFor(photo, {}) ? `${upperFirst(clauseFor(photo, {}))}.` : null);
+    earnedBy.push(photo.id);
+  }
+  if (recovery?.status === "assessed" && recovery.insights?.length) {
+    for (const item of recovery.insights) { const clause = clauseFor(item, {}); if (clause) { paragraphs.push(`${upperFirst(clause)}.`); earnedBy.push(item.id); } }
+  }
+  const text = paragraphs.filter(Boolean);
+  if (!text.length) return null;
+  return { role: ReviewModule.OTHER, earnedBy, title: photo ? "Progress photos" : "Recovery", paragraphs: text };
+}
+
+function aheadModule({ synthesis, facts, steps, discriminators, period, energy, opening }) {
+  const next = period?.nextMonth ?? `the next ${P.noun}`;
+  const items = [];
+  if (steps[0]) items.push({ label: "Priority", value: upperFirst(steps[0].text), text: monthTip(steps[0], facts) });
+  if (synthesis.selected.some((item) => item.kind === "training_progress")) {
+    items.push({ label: "Training", value: "Keep the progression going", text: "Build on the lifts that moved; repeating a best matters as much as beating it." });
+  }
+  if (synthesis.limitations.some((item) => item.domain === "nutrition") && energy) {
+    items.push({ label: "Logging", value: "Log every meal", text: `Complete logs from here on make intake the easiest part of ${next} to read.` });
+  }
+  const watch = discriminators.find((item) => item.source?.kind === "weight_trend");
+  if (watch) items.push({ label: "Watch", value: upperFirst(watch.text), text: "It shows the pace between scans; a single weigh-in never does." });
+  const c = facts.composition;
+  if (c) {
+    // When the opening already posed the next check's question, point back to it.
+    const posed = new RegExp(`next ${c.eventName}`, "u").test(opening ?? "");
+    items.push({ label: "Next evidence", value: `The next ${c.eventName}`,
+      text: posed ? "It is the check that settles the question above."
+        : `It measures what the scale can't: ${c.label}${facts.guardrail ? `, and ${facts.guardrail.label} against its limit` : ""}.` });
+  }
+  const thesis = steps.length ? `${upperFirst(next)}'s job is to keep the progress going on a steadier rhythm.`
+    : `${upperFirst(next)}'s job is to keep doing what is already moving the goal.`;
+  return { role: ReviewModule.AHEAD, earnedBy: [...steps.map((step) => step.source?.id), ...discriminators.map((item) => item.source?.id)].filter(Boolean).length
+    ? [...steps.map((step) => step.source?.id), ...discriminators.map((item) => item.source?.id)].filter(Boolean) : ["recommendation"],
+  title: `${upperFirst(next)} ahead`, paragraphs: [thesis], items };
+}
+
+// How to carry a step across a month (the Weekly's tips are day-scale).
+function monthTip(step, facts) {
+  if (step.mismatch) return "Logging meals as they happen, every day of the month ahead, is what makes the next read clean.";
+  switch (step.source?.kind) {
+    case "weight_trend": return "A month of steady days on the plan's numbers does more than any single correction.";
+    case "training_frequency": case "routine_break": return "Protecting the usual training days matters more than any single big week.";
+    case "composition_result": case "guardrail_status":
+      return `Steady, ordinary weeks until the next ${facts.composition?.eventName ?? "check"} make its reading easier to trust.`;
+    case "intake_vs_plan": return "Hitting the target on most days across the month counts for more than any single day.";
+    default: return "One adjustment, held for the month, is enough.";
+  }
+}
+
+function listPhrase(parts) {
+  if (parts.length <= 1) return parts[0] ?? "";
+  if (parts.length === 2) return parts.some((part) => / and /u.test(part)) ? `${parts[0]}, and ${parts[1]}` : `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
+}
+
+// Calendar dates, runs compressed: "September 6, September 22, and September 24 through 26".
+function dateList(dates) {
+  const unique = [...new Set(dates ?? [])].sort();
+  const runs = [];
+  for (const date of unique) {
+    const last = runs.at(-1);
+    if (last && Date.parse(`${date}T12:00:00Z`) - Date.parse(`${last.at(-1)}T12:00:00Z`) === 86400000) last.push(date);
+    else runs.push([date]);
+  }
+  const words = runs.map((run) => {
+    if (run.length === 1) return dateWords(run[0]);
+    const sameMonth = run[0].slice(0, 7) === run.at(-1).slice(0, 7);
+    const end = sameMonth ? String(Number(run.at(-1).slice(8))) : dateWords(run.at(-1));
+    return run.length === 2 ? `${dateWords(run[0])} and ${sameMonth ? end : dateWords(run[1])}` : `${dateWords(run[0])} through ${end}`;
+  });
+  return listPhrase(words);
+}
+
+function thousands(value) { return Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 }); }
 
 // ---------------------------------------------------------------- words
 

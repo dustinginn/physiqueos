@@ -119,6 +119,15 @@ function assessBodyTrajectory({ days, window, goalPolicy, goalFacts }) {
   const paceChangeNoise = recentHalf && earlierHalf
     ? round(Math.sqrt(recentHalf.standardError ** 2 + earlierHalf.standardError ** 2), 2) : null;
   const windowAverage = round(mean(inWindow.map((point) => point.y)), 1);
+  // The period's first and latest seven days, for a multi-week briefing that
+  // tells where the scale started and where it stands (each needs three
+  // weigh-ins to count).
+  const weekAverage = (from, to) => {
+    const list = inWindow.filter((point) => point.date >= from && point.date <= to);
+    return list.length >= 3 ? round(mean(list.map((point) => point.y)), 1) : null;
+  };
+  const firstWeekAverage = window ? weekAverage(window.startDate, shiftDate(window.startDate, 6)) : null;
+  const lastWeekAverage = window ? weekAverage(shiftDate(window.endDate, -6), window.endDate) : null;
   const priorWindow = points.filter((point) => window && point.date < window.startDate &&
     point.date >= shiftDate(window.startDate, -7));
   const priorAverage = priorWindow.length >= 3 ? round(mean(priorWindow.map((point) => point.y)), 1) : null;
@@ -126,6 +135,7 @@ function assessBodyTrajectory({ days, window, goalPolicy, goalFacts }) {
   const canonicalPace = canonicalWeightPace(goalFacts?.weightTrajectory, expectation?.direction ?? null);
   const verdict = weightVerdict({ weeklyRate, recentPace, earlierPace, paceChangeNoise, residual, expectation, canonicalPace });
   const facts = { weeklyRate, recentPace, earlierPace, paceChangeNoise, windowAverage, priorWeekAverage: priorAverage,
+    firstWeekAverage, lastWeekAverage,
     volatility: round(residual, 2), weighIns: points.length, spanDays: daysBetween(points[0].date, points.at(-1).date) + 1,
     rateSpanDays: daysBetween(points[0].date, points.at(-1).date) + 1, rateMethod: "theil_sen",
     movement: weeklyRate >= PACE.movementThresholdLbPerWeek ? "up" : weeklyRate <= -PACE.movementThresholdLbPerWeek ? "down" : "flat",
@@ -253,8 +263,14 @@ function assessTraining({ goalFacts, windowDays, patterns, intelligence }) {
   const milestones = [...(goalFacts.trainingMilestones ?? [])];
   const gaps = patterns.filter((item) => item.domain === "training" &&
     [BriefingPatternKind.ROUTINE_GAP, BriefingPatternKind.FREQUENCY_CHANGE].includes(item.kind));
+  // Persistence across a multi-week period: in how many of its seven-day
+  // blocks a best landed (a month of steady progress, or one good week).
+  const blockOf = (date) => Math.floor(daysBetween(windowDays[0]?.date ?? date, date) / 7);
+  const blocks = Math.max(1, Math.ceil(windowDays.length / 7));
+  const bestBlocks = new Set(milestones.map((item) => blockOf(String(item.observedAt).slice(0, 10)))).size;
   const facts = { sessions, trainingDays, usualTrainingDays: usualDays, milestoneCount: milestones.length,
-    milestones: milestones.slice(0, 3), rhythmFindings: gaps.map((item) => item.id) };
+    milestones: milestones.slice(0, 3), rhythmFindings: gaps.map((item) => item.id), blocks, bestBlocks,
+    missedDates: [...new Set(gaps.filter((item) => item.kind === BriefingPatternKind.ROUTINE_GAP).flatMap((item) => item.dates ?? []))].sort() };
   const insights = [];
   if (milestones.length) {
     insights.push(insight(D.TRAINING, "training_progress", InsightRole.PROGRESS, "supportive",
@@ -300,6 +316,9 @@ function assessNutrition({ goalFacts, windowDays, reliability, intelligence }) {
   const facts = { loggedDays: logged.length, reliableDays: reliable.length, unreliableDates,
     intakeState: intake?.state ?? null, intakeAverage: intake?.observed ?? null, intakeTarget: intake?.target ?? null,
     reliableProteinAverage: reliable.length ? round(mean(reliable.map((day) => day.nutrition.protein).filter(Number.isFinite)), 0) : null,
+    // Intake over the readable days only: the one intake figure a briefing
+    // may state when some days are unreadable.
+    reliableIntakeAverage: reliable.length ? round(mean(reliable.map((day) => day.nutrition.calories)), 0) : null,
     usualProtein: proteinBaseline.length ? round(median(proteinBaseline), 0) : null };
   const insights = [];
   // The plan-relative intake average is computed upstream over every logged
@@ -350,7 +369,7 @@ function assessActivity({ goalFacts, windowDays, patterns }) {
 
 // Routine: disruptions, continuity and recurrence, across domains. One
 // signal among several — never automatically the whole story.
-function assessRoutine({ characterization, patterns }) {
+function assessRoutine({ characterization, patterns, window }) {
   const shift = characterization.find((item) => item.kind === BriefingPatternKind.ROUTINE_SHIFT);
   if (!shift) {
     return assessed(D.ROUTINE, "steady", "supportive", { shifts: 0 }, [
@@ -367,13 +386,31 @@ function assessRoutine({ characterization, patterns }) {
       .map((item) => ({ domain: item.domain, dates: item.dates })),
     lower: members.filter((item) => item.kind === BriefingPatternKind.VALUE_RUN && item.direction === "below")
       .map((item) => ({ domain: item.domain, dates: item.dates })),
-    patternId: shift.id, relatedDomains: members.map((item) => item.domain) };
+    patternId: shift.id, relatedDomains: members.map((item) => item.domain),
+    // Every routine shift in the period, in date order: a multi-week briefing
+    // tells one stretch from several, and whether the latest one is still
+    // running at the period's end.
+    shifts: characterization.filter((item) => item.kind === BriefingPatternKind.ROUTINE_SHIFT)
+      .map((item) => describeShift(item, byId, window))
+      .sort((left, right) => left.span.startDate.localeCompare(right.span.startDate)) };
   return assessed(D.ROUTINE, direction === "break" ? "interrupted" : "changed", "concern", facts, [
     // A break tells the rhythm of the domains it spans — missed sessions, an
     // activity dip — never their progress.
     insight(D.ROUTINE, "routine_break", InsightRole.EXECUTION, "concern", Math.min(3, shift.materiality / 2), facts,
       { coversKinds: ["activity_change", "training_frequency", "activity_on_plan"] }),
   ]);
+}
+
+function describeShift(shift, byId, window) {
+  const members = (shift.members ?? []).map((id) => byId.get(id)).filter(Boolean);
+  const dates = [...new Set(members.flatMap((item) => item.dates ?? []))].sort();
+  return { id: shift.id, span: shift.span, position: shift.position, domains: shift.domains,
+    extentDays: dates.length, affectedDates: dates, reachesPeriodEnd: Boolean(window && shift.span?.endDate === window.endDate),
+    missed: members.filter((item) => item.kind === BriefingPatternKind.ROUTINE_GAP).map((item) => ({ domain: item.domain, dates: item.dates })),
+    lower: members.filter((item) => item.kind === BriefingPatternKind.VALUE_RUN && item.direction === "below")
+      .map((item) => ({ domain: item.domain, dates: item.dates })),
+    higher: members.filter((item) => item.kind === BriefingPatternKind.VALUE_RUN && item.direction === "above")
+      .map((item) => ({ domain: item.domain, dates: item.dates })) };
 }
 
 // Recovery/Sleep: a declared slot. It reports what it has and fabricates

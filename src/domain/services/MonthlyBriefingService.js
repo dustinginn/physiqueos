@@ -10,6 +10,7 @@ import {
 } from "../intelligence/MonthlyEvidenceIntelligenceProductionV3.js";
 import { adaptCadenceEvidenceObservationsV3 } from
   "../intelligence/ProductionConfidenceNarrativeV3Adapter";
+import { applyMonthlyReviewToArtifact } from "./MonthlyReviewPresentationService.js";
 import { applyNarrativeV3ToBriefingArtifact,
   createBriefingGoalConfidenceBlockFromV3 } from
   "./BriefingGoalConfidencePresentationService";
@@ -216,7 +217,8 @@ export function createMonthlyBriefingService({
   return Object.freeze(service);
 }
 
-async function prepareMonthlyOccurrence({
+// Exported for zero-write previews (the caller supplies the window).
+export async function prepareMonthlyOccurrence({
   repositories, publicationService, userId, timeZone, window, artifactId,
   generatedAt, existing,
 }) {
@@ -423,6 +425,9 @@ export async function publishMonthlyOccurrence({
       if (candidate.briefing.monthlyPresentation?.hero) {
         candidate.briefing.monthlyPresentation.hero.confidence = block;
       }
+      // The Monthly review from the shared Briefing Intelligence, when the
+      // period was realized; otherwise the Monthly is exactly as before.
+      applyMonthlyReviewToArtifact({ artifact: candidate, narrativePlan: outputs.narrativePlan, confidenceBlock: block });
       return { artifact: candidate };
     },
   };

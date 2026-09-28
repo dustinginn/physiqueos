@@ -17,14 +17,18 @@ export default async function MonthlyBriefingArtifactPage({ params }) {
   const compatiblePresentation = projectPersistedMonthlyPresentationForRendering(
     artifact.briefing.monthlyPresentation
   );
+  // A Monthly review carries its compact Confidence line in the stored
+  // artifact; it is rendered as stored, never re-expanded here.
   const presentation = {
     ...compatiblePresentation,
     hero: {
       ...compatiblePresentation.hero,
-      confidence: projectConfidenceExplanationForSurface(
-        compatiblePresentation.hero?.confidence,
-        { assessment: confidenceAssessment, surface: "monthly" }
-      ),
+      confidence: artifact.briefing.monthlyReviewV3
+        ? compatiblePresentation.hero?.confidence
+        : projectConfidenceExplanationForSurface(
+          compatiblePresentation.hero?.confidence,
+          { assessment: confidenceAssessment, surface: "monthly" }
+        ),
     },
   };
   const reconciliation = createBriefingReconciliationPresentation({
