@@ -670,7 +670,8 @@ export function createDEXAEventNarrativeService({
           window: { startDate: dateKey(scan.measuredAt), endDate: dateKey(scan.measuredAt) },
           timeZone: context?.timeZone ?? "America/Los_Angeles",
           canonicalObjects: canonical,
-          weightEntries: await (repositories.weights?.listWeightEntries?.(userId) ?? []),
+          // Enrichment only: a failed read never blocks the DEXA publication.
+          weightEntries: await Promise.resolve(repositories.weights?.listWeightEntries?.(userId) ?? []).catch(() => []),
           dexaScans: scans,
         },
       });

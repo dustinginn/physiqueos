@@ -68,14 +68,18 @@ export function goalFactsFromInterpretationV3({ interpretation, confidence, wind
 // canonical producer records observations, not an amount of change, so
 // `change` stays null — the engine never invents one.
 function visualComparison(observations, window) {
+  // One day of tolerance past the window: an evening capture in a
+  // westward time zone carries the next UTC date.
+  const endTolerance = window ? new Date(Date.parse(`${window.endDate}T12:00:00Z`) + 86400000).toISOString().slice(0, 10) : null;
   const photos = (observations ?? []).filter((item) => item?.sourceType === "canonical_photo_observation" &&
-    window && String(item.observedAt).slice(0, 10) <= window.endDate &&
+    window && String(item.observedAt).slice(0, 10) <= endTolerance &&
     String(item.observedAt).slice(0, 10) >= window.startDate);
   const latest = photos.sort((left, right) => String(right.observedAt).localeCompare(String(left.observedAt)))[0];
   if (!latest) return null;
   const change = ["visible", "subtle", "none"].includes(latest.measurement?.metadata?.visualChange)
     ? latest.measurement.metadata.visualChange : null;
-  return { available: true, capturedAt: String(latest.observedAt).slice(0, 10), change,
+  const observed = String(latest.observedAt).slice(0, 10);
+  return { available: true, capturedAt: observed > window.endDate ? window.endDate : observed, change,
     comparable: latest.quality?.status === "adequate", source: "canonical_photo_observation" };
 }
 
@@ -146,11 +150,11 @@ const PERIOD_WORDS = Object.freeze({
     leverWhen: "over the coming weeks", usual: "This month held to its usual pattern.", midNoun: "mid-month",
     positions: { late: "late in the month", early: "early in the month", middle: "mid-month", whole: "for most of the month" },
     parts: { late: "the end of the month", early: "the start of the month", middle: "the middle of the month" } },
-  outcomeCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before the scan", thisPoss: "the lead-up's", next: "the next few weeks",
-    inThis: "in the lead-up to the scan", steady: "A steady lead-up", strongTraining: "Strong training before the scan",
-    stepTail: "over the next few weeks", leverWhen: "from here", usual: "The weeks before the scan held to their usual pattern.",
-    midNoun: "stretch", context: "in the weeks before the scan", before: "before the scan",
-    positions: { late: "just before the scan", early: "early in the lead-up", middle: "midway through the lead-up",
+  outcomeCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before this check", thisPoss: "the lead-up's", next: "the next few weeks",
+    inThis: "in the lead-up to this check", steady: "A steady lead-up", strongTraining: "Strong training before this check",
+    stepTail: "over the next few weeks", leverWhen: "from here", usual: "The weeks before this check held to their usual pattern.",
+    midNoun: "stretch", context: "in the weeks before this check", before: "before this check", outcomeLed: true,
+    positions: { late: "just before this check", early: "early in the lead-up", middle: "midway through the lead-up",
       whole: "through most of the lead-up" }, parts: {} },
   visualCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before these photos", thisPoss: "the lead-up's", next: "the next few weeks",
     inThis: "in the lead-up to these photos", steady: "A steady lead-up", strongTraining: "Strong training before these photos",
@@ -245,7 +249,8 @@ const LEAD_PHRASE = {
   routine_steady: () => P.steady,
   activity_on_plan: () => P.steady,
   intake_vs_plan: () => "Intake on target",
-  visual_change: (f) => (f.change === "visible" ? "New photos show visible change" : "New photos show subtle change"),
+  visual_change: (f) => ({ visible: "New photos show visible change", subtle: "New photos show subtle change",
+    none: "New photos, little visible change" }[f.change] ?? null),
 };
 
 // `standalone` phrases lead a headline on their own.
@@ -313,7 +318,7 @@ function headlineSentence(lead, facts, budget) {
   const outcome = facts.leadDomain ? lead.find((item) => item.domain === facts.leadDomain) : null;
   if (outcome) {
     const own = outcome.polarity === "concern" ? upperFirst(concernPhrase(outcome, true))
-      : outcome.kind === "visual_comparison" ? "New photos, compared with the last set"
+      : outcome.kind === "visual_comparison" ? (outcome.facts?.comparable ? "New photos, compared with the last set" : "New photos set a baseline")
         : LEAD_PHRASE[outcome.kind]?.(outcome.facts ?? {}) ?? null;
     const other = concerns.find((entry) => entry.item !== outcome);
     if (own && other) option(`${own}, but ${other.concern}.`, { item: outcome }, other);
@@ -337,7 +342,9 @@ function headlineSentence(lead, facts, budget) {
   // A photo comparison without a measured amount of change: say the photos
   // were compared, nothing more.
   const comparison = lead.find((item) => item.kind === "visual_comparison");
-  if (comparison && !leads.length && !concerns.length) options.push({ text: "New photos, compared with the last set.", ids: [comparison.id] });
+  if (comparison && !leads.length && !concerns.length) {
+    options.push({ text: comparison.facts?.comparable ? "New photos, compared with the last set." : "New photos set a baseline.", ids: [comparison.id] });
+  }
   options.push({ text: `${P.steady}.`, ids: [] });
   const fits = ({ text }) => text.split(/\s+/u).length <= budget.maxWords && text.length <= budget.maxChars && !/\d/u.test(text);
   return options.find(fits) ?? { text: `${P.steady}.`, ids: [] };
@@ -350,17 +357,23 @@ function recapSentence(lead, facts) {
   if (!clauses.length) return P.usual;
   // An event's outcome leads; what came before it is placed in the lead-up.
   const outcomeFirst = P.context && ["composition_result", "visual_change", "visual_comparison"].includes(clauses[0].item.kind);
-  const dated = new Set(["routine_break", "activity_change", "training_frequency"]);
+  // Clauses that carry their own time (a stretch's dates, a measurement's own
+  // "new" or date) are never re-placed in the lead-up.
+  const dated = new Set(["routine_break", "activity_change", "training_frequency", "composition_result", "guardrail_status"]);
   const texts = clauses.map((entry, index) => (outcomeFirst && index > 0 && !dated.has(entry.item.kind)
     ? `${P.context}, ${entry.text}` : entry.text));
   const joiner = (index) => (clauses[index - 1].item.polarity === "supportive" && clauses[index].item.polarity === "concern"
     ? ", but " : clauses.length > 2 && index === clauses.length - 1 ? ", and " : clauses.length > 2 ? ", " : ", and ");
   let body = texts[0];
   for (let index = 1; index < texts.length; index += 1) body += `${joiner(index)}${texts[index]}`;
-  const sentence = P.recapLead ? `${P.recapLead}${body}.` : `${upperFirst(body)}.`;
+  // "So far this week" places only what happened in the partial window; a
+  // multi-week trend or a standing measurement carries its own time.
+  const ownTime = new Set(["weight_trend", "guardrail_status", "composition_result"]);
+  const recapLead = P.recapLead && !ownTime.has(clauses[0].item.kind) ? P.recapLead : null;
+  const sentence = recapLead ? `${recapLead}${body}.` : `${upperFirst(body)}.`;
   const budget = HERO_BUDGET * (clauses.length > 2 ? 1.5 : 1);
   if (sentence.length <= budget) return sentence;
-  return P.recapLead ? `${P.recapLead}${texts[0]}.` : `${upperFirst(texts[0])}.`;
+  return recapLead ? `${recapLead}${texts[0]}.` : `${upperFirst(texts[0])}.`;
 }
 
 // ---- takeaway: the coach's read of the whole picture — what is going well
@@ -375,7 +388,7 @@ const GOING_WELL = {
   [ClaimScope.PERFORMANCE]: () => "the performance gains are real",
   [ClaimScope.MEASUREMENT]: (f, kind) => (kind === "visual_change" ? `the photos show ${f.change === "visible" ? "a visible" : "a subtle"} change`
     : kind === "visual_comparison" ? null
-      : P.context && f.newThisPeriod ? "the measured result moves the goal forward"
+      : P.outcomeLed && f.newThisPeriod ? "the measured result moves the goal forward"
         : `the new ${f.eventName} shows ${f.label} moving the right way`),
   [ClaimScope.TRAJECTORY]: (f) => (f.verdict === "steady" ? "the scale is where the phase expects it" : null),
   [ClaimScope.EXECUTION]: (f, kind) => ({ routine_steady: "the routine held", activity_on_plan: "the routine held",
@@ -433,7 +446,11 @@ function takeawaySentence({ lead, synthesis, steps }) {
   // training performance may still be credited beside a routine slip.
   const serious = lead.some((item) => item.role === "risk" ||
     (["guardrail_status", "composition_result", "training_frequency"].includes(item.kind) && item.polarity === "concern"));
-  const working = lead.map((item) => (item.polarity === "supportive" && !serious ? workingPhrase(item) : null)).filter(Boolean);
+  // In a photo briefing a measurement beside the photos is corroborating
+  // context the recap already told; the read does not restate it.
+  const corroborating = (item) => P.context && !P.outcomeLed && claimScopeOf(item) === ClaimScope.MEASUREMENT;
+  const working = lead.map((item) => (item.polarity === "supportive" && !serious && !corroborating(item)
+    ? workingPhrase(item) : null)).filter(Boolean);
   // Priorities come only from real concerns; a neutral finding is not a problem.
   // In an event's lead-up, execution is context: priorities come only from
   // the outcome, the guardrail or a weight risk.

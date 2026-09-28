@@ -95,6 +95,13 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   context.period = context.holistic?.realized &&
       interpretation.recommendation.action === "continue_current_strategy"
     ? context.holistic.realized : null;
+  // A realized period is used only if it already satisfies the composer's own
+  // invariants (hero budget, distinct sections); otherwise the prior path runs
+  // and the rejection is recorded — never a failed publication.
+  if (context.period && !periodPassesComposerChecks(context.period)) {
+    context.holistic = { ...context.holistic, failureCode: "holistic_realization_rejected" };
+    context.period = null;
+  }
   // An event briefing realized from the shared synthesis uses the same
   // section plan as the recurring briefings.
   if (context.period) context.useRecurringSectionPlan = true;
@@ -268,6 +275,18 @@ function assertNarrativeV3Voice(value) {
 // LLM check.
 const HERO_HEADLINE_MAX_CHARS = 160;
 const HERO_BODY_MAX_SENTENCES = 2;
+
+function periodPassesComposerChecks(period) {
+  if (!period.headline || period.headline.length > HERO_HEADLINE_MAX_CHARS) return false;
+  if (countSentences(period.meaning) > HERO_BODY_MAX_SENTENCES) return false;
+  const sections = [period.result, period.meaning, period.action, period.watch, period.coachTake].filter(Boolean);
+  for (let left = 0; left < sections.length; left += 1) {
+    for (let right = left + 1; right < sections.length; right += 1) {
+      if (isSemanticallyEquivalent(sections[left], sections[right])) return false;
+    }
+  }
+  return true;
+}
 
 function assertHeroOutputBudget({ headline, meaning }) {
   if (headline && headline.length > HERO_HEADLINE_MAX_CHARS) {

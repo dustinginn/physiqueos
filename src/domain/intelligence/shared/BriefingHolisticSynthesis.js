@@ -120,9 +120,13 @@ function marginalValue(item, selected, covered, budget) {
   let value = item.value;
   const sameDomain = selected.some((other) => other.domain === item.domain);
   const dominant = item.role === InsightRole.RISK && item.strength >= 2.4;
-  // One insight per domain, whatever the briefing's budget; only a dominant
-  // risk may add a second.
-  if (sameDomain && !dominant) return 0;
+  // One insight per domain; only a dominant risk may add a second — or, when
+  // the briefing's horizon allows it (Monthly), a second insight in a
+  // different capacity (training progress beside a training-rhythm change).
+  const complementary = budget.complementarySameDomain &&
+    selected.every((other) => other.domain !== item.domain || other.role !== item.role);
+  if (sameDomain && !dominant && !complementary) return 0;
+  if (sameDomain && !dominant) value *= 0.6;
   if (covered.has(item.kind) && item.role !== InsightRole.RISK) value *= 0.3;
   // Two facts of the same kind from different domains still complement each
   // other (training progress and a weight trend); only a light penalty.

@@ -224,7 +224,7 @@ export function computeMidweekEnergyObservations({ activityDays, includeInsuffic
   return { observations, current, comparison };
 }
 
-export async function prepareMidweekV3({ withPriorWeekly = true, energyObservations } = {}) {
+export async function prepareMidweekV3({ withPriorWeekly = true, energyObservations, periodEvidence = null } = {}) {
   const { goal, phase } = currentGoalAndPhase();
   const artifact = structuredClone(midweekV2);
   const observations = energyObservations ?? computeMidweekEnergyObservations().observations;
@@ -244,6 +244,7 @@ export async function prepareMidweekV3({ withPriorWeekly = true, energyObservati
       evidenceCutoff: MIDWEEK_SEP13_15.evidenceCutoff,
     }),
     previousCanonicalAssessment: syntheticPredecessor({ sourceCutoff: "2026-09-13T06:59:59.999Z" }),
+    ...(periodEvidence ? { periodEvidence } : {}),
     evidenceCutoff: MIDWEEK_SEP13_15.evidenceCutoff,
     finalizedAt: MIDWEEK_SEP13_15.generatedAt,
     idempotencyKey: `confidence_v3|midweek|${artifact.id}`,

@@ -41,7 +41,8 @@ export const BRIEFING_INTELLIGENCE_POLICIES = Object.freeze({
     // A lower floor than Weekly: across a month, steady multi-week facts
     // (the routine held, activity stayed usual) are worth saying.
     narrative: Object.freeze({ maxInsights: 5, maxLimitations: 2, floor: 0.5, heroInsights: 3,
-      purpose: "multi_week_synthesis_and_strategy_fit", persistence: true, watchDiscriminators: 2 }),
+      purpose: "multi_week_synthesis_and_strategy_fit", persistence: true, complementarySameDomain: true,
+      watchDiscriminators: 2 }),
   }),
   // Execution context in the 28 days preceding an authoritative outcome;
   // never a cause of it.

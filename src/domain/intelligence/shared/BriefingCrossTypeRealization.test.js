@@ -125,8 +125,14 @@ describe("every briefing type realizes from the same shared engine", () => {
 
 describe("Midweek: light, partial and provisional", () => {
   it("speaks of the week so far, never as a finished week", () => {
-    for (const { label, realized } of of("midweek")) {
-      expect(realized.meaning, label).toMatch(/^(?:So far this week, |The week so far )/u);
+    for (const { label, synthesis, realized } of of("midweek")) {
+      // "So far this week" places only in-window facts; a multi-week trend or
+      // a standing measurement carries its own time.
+      const first = synthesis.selected.find((item) => item.id === realized.heroIds[0]);
+      if (first && !["weight_trend", "guardrail_status", "composition_result"].includes(first.kind)) {
+        expect(realized.meaning, label).toMatch(/^(?:So far this week, |The week so far )/u);
+      }
+      expect(realized.meaning, label).not.toMatch(/So far this week, (?:your weight|body fat|lean mass|the [A-Z][a-z]+ \d)/u);
       expect(realized.result, label).toMatch(/^Early read: /u);
       expect(texts(realized).join(" "), label).not.toMatch(/This week held|a quiet finish|to the week\b|Strong training week|next week runs/u);
       expect(realized.headline.split(/\s+/u).length).toBeLessThanOrEqual(SECTION_CONTRACTS.midweek.headline.maxWords);
@@ -161,11 +167,20 @@ describe("Monthly: multi-week synthesis, not four Weeklies", () => {
     expect(oneOffs).toBeGreaterThan(0);
   });
 
-  it("one insight per domain, with every goal-relevant domain considered", () => {
+  it("a domain may speak twice across a month only in two different capacities, with every domain considered", () => {
     for (const { label, synthesis, picture } of of("monthly")) {
+      const seen = new Set();
+      for (const item of synthesis.selected.filter((entry) => entry.role !== "risk")) {
+        const key = `${item.domain}|${item.role}`;
+        expect(seen.has(key), label).toBe(false);
+        seen.add(key);
+      }
+      expect(synthesis.considered.length).toBe(picture.domains.length);
+    }
+    // Weekly keeps one per domain.
+    for (const { label, synthesis } of of("weekly")) {
       const domains = synthesis.selected.filter((item) => item.role !== "risk").map((item) => item.domain);
       expect(new Set(domains).size, label).toBe(domains.length);
-      expect(synthesis.considered.length).toBe(picture.domains.length);
     }
   });
 });
@@ -213,6 +228,15 @@ describe("Photo: visual-led, depth proportional to visual change, no invented fa
     for (const contract of unmeasured) expect(contract.maxWords).toBe(SECTION_CONTRACTS.photo.maxWords);
   });
 
+  it("a first photo set is a baseline, never 'compared with the last set'", () => {
+    for (const goalType of GOALS) for (const seed of SEEDS) {
+      const { realized, label } = realize({ seed, kind: "strong_training", goalType, cadence: "photo",
+        visual: { available: true, capturedAt: "2026-09-19", change: null, comparable: false } });
+      expect(realized.headline, label).toBe("New photos set a baseline.");
+      expect(`${realized.headline} ${realized.meaning}`).not.toMatch(/compared/u);
+    }
+  });
+
   it("an unmeasured comparison never claims how much the photos changed", () => {
     for (const { label, realized } of visualCases(null)) {
       expect(texts(realized).join(" "), label).not.toMatch(/visible change|subtle change|look much like|little visible change/u);
@@ -224,7 +248,8 @@ describe("Photo: visual-led, depth proportional to visual change, no invented fa
     for (const { label, realized } of visualCases("none")) {
       const text = texts(realized).join(" ");
       expect(text, label).toMatch(/look much like the last set|little visible change/u);
-      expect(text).not.toMatch(/visible change\b(?! in)/u);
+      // "Little visible change" is the honest read; a claimed visible change is not.
+      expect(text).not.toMatch(/(?<!little )visible change/u);
     }
   });
 });
