@@ -525,7 +525,7 @@ function expectWeightStep(action, risk, synthesis, label) {
   const intake = synthesis.selected.find((item) => item.kind === "intake_vs_plan" && item.polarity !== "supportive");
   const onTarget = synthesis.selected.some((item) => item.kind === "intake_vs_plan" && item.polarity === "supportive");
   const push = intake ? (/under|below/u.test(intake.facts.state) ? "up" : "down") : null;
-  if ((push && push === risk.facts.movement) || (onTarget && risk.facts.movement === "down")) {
+  if ((push && push === risk.facts.movement) || onTarget) {
     expect(action, label).toMatch(/^Make sure every meal gets logged/u);
     return;
   }
@@ -680,6 +680,17 @@ describe("the food log is checked whenever logged intake and the scale disagree"
     const realized = realize({ verdict: "quick", movement: "down", expectedDirection: "stable" }, "above_plan", "stable");
     expect(realized.action).toMatch(/^Make sure every meal gets logged/u);
     expect(realized.action).not.toMatch(/bring intake/iu);
+  });
+
+  it("intake on target while the scale climbs too fast", () => {
+    const realized = realize({ verdict: "rapid", movement: "up", expectedDirection: "up" }, "on_plan");
+    expect(realized.action).toMatch(/^Make sure every meal gets logged/u);
+  });
+
+  it("the coach take never points back at something it did not name", () => {
+    for (const { kind, seed, goalType, realized } of weekly) {
+      if (realized) expect(realized.coachTake, `${goalType}/${kind}#${seed}`).not.toMatch(/Nothing about (?:that|it|this)\b/u);
+    }
   });
 
   it("a wrong-way trend is focused on direction, not pace", () => {

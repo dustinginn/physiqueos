@@ -278,7 +278,7 @@ function coachSentences({ synthesis, told, facts, steps }) {
           ? `A similar ${stretch} stretch came in ${monthPart(prior.startDate)}; the useful move is simply to pick the rhythm back up.`
           : `${clause}, and a similar ${stretch} stretch came in ${monthPart(prior.startDate)}; the useful move is simply to pick the rhythm back up.`
         : introduced
-          ? "Nothing about that needs fixing; just pick the rhythm back up."
+          ? `Nothing about those ${stretch} days needs fixing; just pick the rhythm back up.`
           : `${clause}; nothing about a few ${stretch} days needs fixing, so just pick the rhythm back up.`);
     } else if (!told.has(item.id)) {
       const clause = clauseFor(item, facts);
@@ -358,7 +358,7 @@ function planSteps(synthesis) {
   // the scale moves too fast downward (or the mirror), or intake on target
   // while the scale falls the wrong way.
   const intakeContradictsScale = Boolean((intake && weight && intakePush === weight.facts.movement) ||
-    (intakeOnTarget && weightRisk && weightRisk.facts.movement === "down"));
+    (intakeOnTarget && weightRisk));
   const logCheck = { text: "make sure every meal gets logged",
     focus: "The logged intake and the scale point different ways, so the food log is the first thing to check." };
   const steps = [];
