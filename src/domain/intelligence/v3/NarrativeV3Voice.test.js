@@ -60,7 +60,7 @@ describe("Narrative V3 positive coaching requirements", () => {
         result: expect.stringMatching(/^This is a huge win\./u),
         meaning: expect.stringMatching(/measured progress in .* is real/iu),
         action: expect.stringMatching(/^Stay the course\./u),
-        watch: expect.stringMatching(/next DEXA.*progress measured so far is already on record/iu),
+        watch: expect.stringMatching(/next DEXA.*continues/iu),
         confidence: expect.stringMatching(/Confidence jumped.*standout result/iu),
       },
       coachTake: expect.stringMatching(/exactly what this build needed/iu),

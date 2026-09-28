@@ -59,7 +59,7 @@ describe("shared canonical V3 strategic publication", () => {
       whatCouldRaiseIt: expect.arrayContaining([
         expect.stringMatching(/next DEXA/iu),
       ]),
-      nextEvidence: expect.stringMatching(/progress measured so far is already on record/iu),
+      nextEvidence: expect.stringMatching(/about whether .* continues/iu),
       coachTake: expect.stringMatching(/exactly what this build needed/iu),
       goal: { id: fixtures.dexa.goalContract.goalId,
         label: "the 10 lb lean-mass goal" },

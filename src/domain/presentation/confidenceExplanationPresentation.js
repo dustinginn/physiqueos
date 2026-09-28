@@ -69,7 +69,7 @@ const FACTOR_PRESENTATION = Object.freeze({
   },
   strategy_directionally_supported: {
     role: "support", semanticToken: "strategy_supported",
-    text: "The current plan is moving in the right direction, but it needs more time.", priority: 14,
+    text: "Results are moving in the right direction, but they need more time.", priority: 14,
   },
   objective_uncertain: {
     role: "limit", semanticToken: "objective_uncertain",
@@ -518,7 +518,7 @@ function explainMovement(assessment, supportingFactors, limitingFactors,
   let text;
   if (assessment.movement === "increase") {
     const strengthenedBy = supportingFactors[0]?.text ??
-      "The latest results gave us more reason to trust the plan.";
+      "The latest results gave us more reason to trust the direction.";
     text = `Confidence increased from ${prior}% to ${current}%. ${strengthenedBy}`;
   } else if (assessment.movement === "decrease") {
     const weakenedBy = limitingFactors[0]?.text ??

@@ -19,14 +19,14 @@ import {
 // recorded from the pristine production base (895935bd); re-recorded for the
 // Founder-authorized measurement-not-causation restraint
 // (briefing-intelligence-final-measurement-causality-restraint-20260927),
-// which changes only the causal sentences ("the plan is clearly working", "not
-// whether the plan works. That question has been answered") to measured-
-// progress wording. Confidence (76) and the recommendation are unchanged and
+// which changes only the causal sentences ("the plan is clearly working",
+// "the plan delivered a standout result", "not whether the plan works. That
+// question has been answered", "Don't change it") to measured-progress wording. Confidence (76) and the recommendation are unchanged and
 // still asserted below. Structured fields are additive.
-const BASE_DEXA_TEXT_SHA256 = "8c784f17e8af72ab13d7d43dc54f97f9677bcc0cc41122fa89adfc074bac9651";
-const BASE_PHOTO_TEXT_SHA256 = "8c784f17e8af72ab13d7d43dc54f97f9677bcc0cc41122fa89adfc074bac9651";
+const BASE_DEXA_TEXT_SHA256 = "5edd6afa0a816d6a9b9e3f6f4e18e9d246d0467d1f8c5bc1076550b87120d972";
+const BASE_PHOTO_TEXT_SHA256 = "5edd6afa0a816d6a9b9e3f6f4e18e9d246d0467d1f8c5bc1076550b87120d972";
 // The same events published with a prior Weekly in the store (production's normal shape).
-const BASE_WITH_PRIOR_WEEKLY_TEXT_SHA256 = "c040d6790947d0e5bf347f1a9fb3a8bd558c908905601e6d7b079e12087ab6ba";
+const BASE_WITH_PRIOR_WEEKLY_TEXT_SHA256 = "ee205a16ec6552ffb0f3bf1f3c19fdf717762c795c70612a08fb7f397b2ba061";
 // The accepted Sep 19 Photo artifact's stored V3 text (a stored artifact is served, never rebuilt).
 const ACCEPTED_SEP19_PHOTO_TEXT_SHA256 = "a139d9834a66e550998d7fb21f95254ed1707096b25d6f91eaa5cd834aab5791";
 

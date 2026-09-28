@@ -53,6 +53,31 @@ describe("an authoritative outcome measurement speaks to what changed, not what 
   });
 });
 
+describe("the Confidence body credits the measurement, not the plan", () => {
+  it("a standout DEXA jump says what was measured", async () => {
+    const { artifact } = await prepareDexaV3();
+    const text = narrativeTexts(artifact.briefing.narrativeV3).join(" ");
+    expect(text).toMatch(/measured a standout result/u);
+    expect(text).not.toMatch(/plan delivered|already answered|question has been answered|Don't change it/u);
+  });
+
+  it("every composed V3 narrative records an empty claim-restraint audit", async () => {
+    const paired = runConfidenceNarrativeV3(createPairedCalibrationFixtures().dexa);
+    expect(paired.narrativePlan.claimRestraint).toEqual({ schemaVersion: "narrative_claim_restraint_v1", issues: [] });
+  });
+
+  it("detects delivered/appears/answered forms of causal overreach", () => {
+    for (const text of ["Confidence jumped because the plan delivered a standout result.",
+      "The current strategy appears to be working.", "The DEXA already answered the big question."]) {
+      expect(text).toMatch(EFFECTIVENESS_LANGUAGE);
+    }
+    for (const text of ["Confidence jumped because the DEXA measured a standout result.",
+      "The next DEXA will show whether the progress continues."]) {
+      expect(text).not.toMatch(EFFECTIVENESS_LANGUAGE);
+    }
+  });
+});
+
 describe("explicit causal support is distinguishable from measurement", () => {
   it("demonstrated feasibility is not causal support; an explicit authoritative marker would be", () => {
     expect(hasAuthoritativeCausalSupport({ strategyEffectiveness: { feasibility: "demonstrated" } })).toBe(false);

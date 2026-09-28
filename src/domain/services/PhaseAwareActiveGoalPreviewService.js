@@ -100,7 +100,7 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
       progress: active.progress.presentationLabel, review: phaseNarrative.review,
       evidence: phaseNarrative.evidence, readiness: phaseNarrative.readiness,
       color: active.presentationTone },
-    next: upcoming ? { title: upcoming.phaseName, goal: trajectory.overallGoal.targetDescription, outcome: "The next DEXA will show whether this phase is working.", lead: "Day-to-day evidence — weight, training, and energy — shows how things are trending in between.", guardrail } : null,
+    next: upcoming ? { title: upcoming.phaseName, goal: trajectory.overallGoal.targetDescription, outcome: "The next DEXA will show whether the progress continues.", lead: "Day-to-day evidence — weight, training, and energy — shows how things are trending in between.", guardrail } : null,
     readiness: upcoming ? ["The current phase objective is sufficiently resolved.", "Goal and guardrail evidence support the next planned phase.", "The plan for the next phase will build on what's learned here."] : [],
     guardrail: { title: guardrail.replace(/[.]$/u, ""), scope: "Applies across every phase", body: currentState.guardrail?.interpretation ?? "DEXA remains authoritative for body composition. Scale weight provides context between scans, but does not replace it.", observation: guardrailObservation },
     evidence: {

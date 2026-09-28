@@ -162,7 +162,7 @@ describe("Narrative V3 briefing section intelligence", () => {
         result: expect.stringMatching(/^This is a huge win/u),
         meaning: expect.stringMatching(/more than halfway.*measured progress in .* is real/isu),
         action: expect.stringMatching(/^Stay the course/u),
-        watch: expect.stringMatching(/next DEXA.*progress measured so far is already on record/isu),
+        watch: expect.stringMatching(/next DEXA.*continues/isu),
       },
       coachTake: expect.stringMatching(/exactly what this build needed/iu),
     });

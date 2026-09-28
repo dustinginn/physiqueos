@@ -16,8 +16,9 @@
 //
 // Where it acts: realizers phrase "going well" by claim scope and write
 // limitation guidance prospectively; `auditClaimRestraint` is a diagnostic
-// backstop recorded with the narrative (and enforced by tests), not a
-// production gate. `causalSupport` / `retroactiveCorrection` are the fields a
+// recorded with the narrative (Weekly section audit; V3 narrative
+// `claimRestraint.issues`) and held empty by tests over every template — not a
+// production gate, since audited text can include upstream summaries. `causalSupport` / `retroactiveCorrection` are the fields a
 // future authoritative producer would set; nothing emits them today.
 
 export const ClaimScope = Object.freeze({
@@ -70,6 +71,11 @@ export const EFFECTIVENESS_LANGUAGE = new RegExp([
   "\\bfuel(?:s|ed|led|ing|ling)? (?:the\\s+)?(?:lean[- ]mass\\s+)?gains?\\b",
   // normative-causal: a week "is what the goal needs"
   "\\bthe kind of week the goal needs\\b",
+  // "the plan delivered a standout result", "appears to be working",
+  // "already answered the (big) question"
+  `\\b${AGENT}\\s+(?:has\\s+|have\\s+)?(?:delivered|delivers|delivering)\\b`,
+  "\\b(?:appears?|seems?|looks?)\\s+(?:to be\\s+)?working\\b",
+  "\\b(?:already\\s+)?answered the (?:big\\s+)?question\\b",
 ].join("|"), "iu");
 
 // Guidance that implies the past period can still be repaired — not

@@ -125,7 +125,10 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   const finalNarrative = paragraphs.join("\n\n");
   assertDistinctSectionComposition({ context, sections, coachTake });
   assertNarrativeV3Voice(`${finalNarrative}\n${coachTake}\n${JSON.stringify(confidenceDeepExplanation)}`);
-  assertNarrativeV3ClaimRestraint({ interpretation, texts: { narrative: finalNarrative, coachTake,
+  // Recorded with the narrative (and held empty by tests over every
+  // composer template); never a publication gate, since audited text can
+  // include upstream observation summaries this composer did not write.
+  const claimRestraintIssues = findNarrativeV3ClaimRestraintIssues({ interpretation, texts: { narrative: finalNarrative, coachTake,
     confidenceBody: confidenceBriefing.body, confidenceDetail: JSON.stringify(confidenceDeepExplanation) } });
 
   const uncertaintyTypes = interpretation.uncertaintyProfile.map((item) => {
@@ -203,6 +206,7 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
     })),
     uncertaintyTypes: uncertaintyTypes,
     ...(briefingIntelligence ? { holisticSynthesis: summarizeHolistic(briefingIntelligence, context) } : {}),
+    claimRestraint: { schemaVersion: "narrative_claim_restraint_v1", issues: claimRestraintIssues },
     questionTransitions: interpretation.questionTransitions,
     recommendation: interpretation.recommendation,
     nextEvidencePurpose: interpretation.nextCoachingQuestion?.evidencePurpose ?? null,
@@ -242,10 +246,9 @@ export function findNarrativeV3VoiceViolations(value) {
 // carries explicit authoritative causal support — which no evidence in the
 // model provides today. An outcome check proves what changed, not what
 // caused it.
-function assertNarrativeV3ClaimRestraint({ interpretation, texts }) {
-  const issues = auditClaimRestraint(texts, { effectiveness: hasAuthoritativeCausalSupport(interpretation),
+export function findNarrativeV3ClaimRestraintIssues({ interpretation, texts }) {
+  return auditClaimRestraint(texts, { effectiveness: hasAuthoritativeCausalSupport(interpretation),
     retroactiveCorrection: true });
-  if (issues.length) throw new Error(`Narrative V3 claim restraint failed: ${issues.join("; ")}`);
 }
 
 function assertNarrativeV3Voice(value) {
@@ -650,7 +653,7 @@ function recurringMeaning(context, { resultObservation, operatingSignal }) {
   }
   if (context.interpretation.strategyEffectiveness.feasibility === "demonstrated") {
     return context.recentEventFollowup
-      ? `${upperFirst(context.priorEventName)} already answered the big question; this update is about keeping the productive conditions in place.`
+      ? `${upperFirst(context.priorEventName)} already measured the big result; this update is about keeping conditions steady.`
       : "The goal remains on course, and this check-in does not change that.";
   }
   return null;
@@ -969,7 +972,7 @@ function composeAction(context) {
   }
   if (action === "review_strategy") return "Review the plan before continuing unchanged. The new result is meaningful enough to require a real adjustment.";
   if (action === "transition_goal") return "The goal has been reached. Lock in the result and choose the next target before extending the current plan.";
-  if (action === "transition_phase") return `Move into ${goalContract.phase.nextPhaseLabel ?? "the next planned phase"}. The current phase reached what it set out to.`;
+  if (action === "transition_phase") return `Move into ${goalContract.phase.nextPhaseLabel ?? "the next planned phase"}. The current phase reached what it set out to do.`;
   if (action === "continue_with_guardrail_monitoring") {
     const names = naturalList(consequentialGuardrails.map((item) => guardrailLabel(goalContract, item)));
     return `Keep what is going well, but tighten attention around ${names}.${reconsideration}`;
@@ -997,11 +1000,10 @@ function composeWatchFallback(context) {
 
   if (purpose === "confirm_persistence") {
     if (context.recentEventFollowup) return `${upperFirst(nextEvidenceName(context))} will show whether ${objectivePhrase} continues${guardrailPhrase}.`;
-    const contrast = interpretation.strategyEffectiveness.feasibility === "demonstrated" ?
-      // The measured progress is on record; what caused it is not a question
-      // an outcome check answers (shared/BriefingClaimRestraint).
-      "; the progress measured so far is already on record" : "";
-    return `${upperFirst(nextEvidenceName(context))} ${nextEvidenceVerb(context)} about whether ${objectivePhrase} continues${guardrailPhrase}${contrast}.`;
+    // No "not whether the plan works — that question has been answered": an
+    // outcome check never settles what caused the change
+    // (shared/BriefingClaimRestraint).
+    return `${upperFirst(nextEvidenceName(context))} ${nextEvidenceVerb(context)} about whether ${objectivePhrase} continues${guardrailPhrase}.`;
   }
   if (purpose === "establish_feasibility") return `${upperFirst(nextEvidenceName(context))} should show whether ${objectiveLabel(context)} is moving in the right direction under ${strategyLabel(context)}.`;
   if (purpose === "resolve_contradiction") return `${upperFirst(nextEvidenceName(context))} should resolve whether the latest setback is a real change or a one-off result.`;
@@ -1057,9 +1059,9 @@ function composeCoachTake(context) {
 
   if (interpretation.coachingAffect.intensity === "strong" && interpretation.strategyEffectiveness.feasibility === "demonstrated") {
     const fraction = confidenceTrajectory(context)?.fractionAchieved;
-    const position = fraction > 0.5 && fraction < 1 ? "The goal is more than halfway there on measured progress." : "The measured progress is clearly on track.";
+    const position = fraction > 0.5 && fraction < 1 ? "Measured progress puts the goal more than halfway there." : "The measured progress is on track.";
     const phase = context.goalContract.vocabulary?.phase?.contextName ?? "this phase";
-    return `This is exactly what ${phase} needed: ${lowerFirst(stripPeriod(objectiveMovement(context, { includeComparison: false })))}${guardrail ? `, with ${guardrail}.` : "."} ${position} Don't change it. ${stripPeriod(execute)} and use ${nextEvidenceName(context)} to see whether ${continuationPhrase(context)} continues.`;
+    return `This is exactly what ${phase} needed: ${lowerFirst(stripPeriod(objectiveMovement(context, { includeComparison: false })))}${guardrail ? `, with ${guardrail}.` : "."} ${position} Nothing here calls for a change. ${stripPeriod(execute)} and use ${nextEvidenceName(context)} to see whether ${continuationPhrase(context)} continues.`;
   }
   if (interpretation.strategyEffectiveness.feasibility === "demonstrated") {
     const acceptedResult = objective.freshness === "carried_forward" ?
@@ -1198,7 +1200,7 @@ function composeConfidenceBriefing(context) {
       trajectory?.deadlineContributionApplicable && trajectory.scheduleState === "at_risk" ?
         "There is still uncertainty about finishing within the remaining time if progress slows." : null;
   return { heading, body: [
-    `${opening} because ${strong ? "the plan delivered a standout result" : "the outlook improved"}${result ? `: ${lowerFirst(result)}${guardrail ? `, with ${guardrail}` : ""}` : ""}.`,
+    `${opening} because ${strong ? `the ${context.nextEvidence.displayName} measured a standout result` : "the outlook improved"}${result ? `: ${lowerFirst(result)}${guardrail ? `, with ${guardrail}` : ""}` : ""}.`,
     progress,
     time,
   ].filter(Boolean).join(" ") };

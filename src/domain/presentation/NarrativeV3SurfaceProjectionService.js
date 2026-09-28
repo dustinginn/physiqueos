@@ -204,8 +204,8 @@ function projectActiveGoal(context) {
     "demonstrated"
     // Measured progress supports staying the course; it does not prove the
     // plan caused it (shared/BriefingClaimRestraint).
-    ? `The measured progress supports staying the course with ${strategy}, and current training still supports it too.`
-    : `${upperFirst(strategy)} still needs a clear outcome before it should be treated as proven.`;
+    ? `The measured progress supports staying the course with ${strategy}, and current training does too.`
+    : `${upperFirst(strategy)} still needs a clear outcome before the direction is settled.`;
   const guardrailSentence = guardrail?.finding.status === "clear"
     ? `${upperFirst(guardrail.label)} remains inside the ${guardrail.range} guardrail.`
     : guardrail ? `${upperFirst(guardrail.label)} is the main limit to watch right now.`
@@ -295,7 +295,7 @@ function projectMonthly(context, monthlyIntelligence = null) {
     {
       label: "Goal trajectory",
       title: progress,
-      body: `${upperFirst(strategyName(goalContract))} has produced a clear result, and the Goal remains in progress.`,
+      body: `The Goal shows a clear measured result under ${strategyName(goalContract)}, and remains in progress.`,
       tone: "baseline",
     },
     trainingSummary ? {
