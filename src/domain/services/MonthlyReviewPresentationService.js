@@ -48,13 +48,16 @@ export function applyMonthlyReviewToArtifact({ artifact, narrativePlan, confiden
   const rebuilt = energy ? rebuildEnergy(presentation.energy, review.period, energy.excludedDates) : null;
   if (energy && rebuilt) {
     presentation.energy = { ...presentation.energy, ...rebuilt, eyebrow: presentation.energy.eyebrow ?? "Energy Evolution",
+      // The phase's own name; the legacy positional index ("· Phase 1") does
+      // not follow the goal's phase order.
+      phaseLabel: presentation.energy.phaseLabel ? String(presentation.energy.phaseLabel).replace(/\s*·\s*Phase \d+$/u, "") : null,
       title: energy.title, summary: energy.paragraphs.join(" "), whyItMatters: energy.interpretation ?? null };
   } else delete presentation.energy;
 
   const trajectory = module("trajectory");
   const themes = [];
   if (trajectory && !trajectory.scaleOnly) {
-    presentation.newBaseline = { eyebrow: presentation.newBaseline?.eyebrow ?? "New Baseline",
+    presentation.newBaseline = { eyebrow: trajectory.standing ? "Standing Measurement" : presentation.newBaseline?.eyebrow ?? "New Baseline",
       title: trajectory.title, summary: trajectory.paragraphs.join(" "), callout: trajectory.interpretation ?? null,
       facts: measurementFacts(presentation.newBaseline?.facts, trajectory) };
   } else delete presentation.newBaseline;
@@ -69,8 +72,10 @@ export function applyMonthlyReviewToArtifact({ artifact, narrativePlan, confiden
     themes.push({ label: "Pattern", title: execution.title, body: execution.paragraphs.join(" "), tone: "routine-pattern" });
   }
   if (themes.length) {
+    // The heading names what the card holds, without restating the opening.
     presentation.changes = { eyebrow: presentation.changes?.eyebrow ?? "What Changed",
-      title: execution?.title ?? trajectory?.title, themes };
+      title: execution && trajectory?.scaleOnly ? "The routine and the scale, across the month."
+        : execution ? "Where the routine slipped." : trajectory.title, themes };
   } else delete presentation.changes;
 
   // Dated moments are told inside their own modules; a separate timeline
@@ -130,11 +135,16 @@ function rebuildEnergy(energy, period, excludedDates = []) {
   const blocks = [];
   for (let index = 0; index * 7 < inWindow.length; index += 1) blocks.push(inWindow.slice(index * 7, index * 7 + 7));
   const weekly = blocks.map((block, index) => {
+    // A week needs three readable days to stand as a weekly average.
     const read = block.filter((day) => readable.includes(day));
+    if (read.length < 3) {
+      return { id: `week-${index + 1}`, label: `${shortDate(block[0].date)}–${shortDate(block.at(-1).date)}`,
+        synthetic: false, observedCount: read.length, previewCount: 0, missing: true };
+    }
     return { id: `week-${index + 1}`, label: `${shortDate(block[0].date)}–${shortDate(block.at(-1).date)}`,
-      ...(read.length ? { intake: avg(read, "intake"), expenditure: avg(read, "expenditure"),
-        balance: avg(read, "intake") - avg(read, "expenditure") } : {}),
-      synthetic: false, observedCount: read.length, previewCount: 0, missing: read.length === 0 };
+      intake: avg(read, "intake"), expenditure: avg(read, "expenditure"),
+      balance: avg(read, "intake") - avg(read, "expenditure"),
+      synthetic: false, observedCount: read.length, previewCount: 0, missing: false };
   });
   const intake = avg(readable, "intake");
   const expenditure = avg(readable, "expenditure");

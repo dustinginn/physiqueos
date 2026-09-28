@@ -224,9 +224,13 @@ export function compactConfidence(text, { maxSentences = 2, maxWords = 35 } = {}
   // boundary inside the budget, so the cap always holds.
   const first = sentences[0]?.trim();
   if (!first) return null;
+  // Never a sentence cut mid-thought: the movement clause alone ("Confidence
+  // jumped", before "because …") or, failing that, the first clause.
   const head = first.split(/\s+/u).slice(0, maxWords).join(" ");
   const cut = Math.max(head.lastIndexOf(","), head.lastIndexOf(";"), head.lastIndexOf(":"));
-  return `${(cut > 0 ? head.slice(0, cut) : head).replace(/[,;:]$/u, "")}.`;
+  if (cut > 0) return `${head.slice(0, cut)}.`;
+  const movement = /^(.+?)\s+because\b/u.exec(first)?.[1];
+  return movement && movement.split(/\s+/u).length <= maxWords ? `${movement}.` : `${first.split(/\s+/u).slice(0, 3).join(" ").replace(/[,;:.]$/u, "")}.`;
 }
 
 // A stated quantity with its unit and the word after it ("21 training",

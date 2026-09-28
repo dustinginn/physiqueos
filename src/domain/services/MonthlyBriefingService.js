@@ -427,9 +427,10 @@ export async function publishMonthlyOccurrence({
       }
       // The Monthly review from the shared Briefing Intelligence, when the
       // period was realized; otherwise the Monthly is exactly as before.
-      // A correction of an existing Monthly keeps the format it was first
-      // published in.
-      if (!replacement) {
+      // A correction keeps the format the Monthly was first published in:
+      // the review for a new Monthly or one that already carried it, the
+      // legacy format for one published before it.
+      if (!replacement || existing?.briefing?.monthlyReviewV3) {
         applyMonthlyReviewToArtifact({ artifact: candidate, narrativePlan: outputs.narrativePlan, confidenceBlock: block });
       }
       return { artifact: candidate };

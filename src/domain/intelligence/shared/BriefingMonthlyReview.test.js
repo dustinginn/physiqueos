@@ -237,6 +237,9 @@ describe("Monthly review: rich where the month earns it", () => {
     const compact = compactConfidence(one, REVIEW_CONTRACTS.monthly.confidence);
     expect(words(compact)).toBeLessThanOrEqual(REVIEW_CONTRACTS.monthly.confidence.maxWords);
     expect(compact).toMatch(/^Confidence jumped because .*\.$/u);
+    // Without a clause boundary it keeps the movement clause, never a cut mid-thought.
+    const noClause = "Confidence jumped because the check measured a standout result across many measures that all pointed the same way through the whole period and then some more words to go well past the limit that the compact Confidence line is allowed to use in a review";
+    expect(compactConfidence(noClause, REVIEW_CONTRACTS.monthly.confidence)).toBe("Confidence jumped.");
   });
 
   it("is deterministic, and only the Monthly has a review", () => {

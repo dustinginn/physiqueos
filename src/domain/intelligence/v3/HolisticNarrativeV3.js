@@ -1175,7 +1175,7 @@ function trajectoryModule(facts, trajectory) {
   return { role: ReviewModule.TRAJECTORY, earnedBy: [`${ROLES.outcome}|composition_result`, ...(w ? [`${ROLES.trajectory}|weight_trend`] : [])],
     title: c.newThisPeriod ? `The ${dateWords(c.measuredAt)} ${c.eventName} is the new reference point.` : `The ${dateWords(c.measuredAt)} ${c.eventName} still sets the reference point.`,
     paragraphs, interpretation: c.newThisPeriod ? `The next ${c.eventName} will be compared with this one.` : null,
-    measuredAt: c.measuredAt,
+    measuredAt: c.measuredAt, standing: !c.newThisPeriod,
     // The measurement's own values, as data for the card's metric grid.
     grid: [
       Number.isFinite(Number(c.currentValue)) ? { label: upperFirst(c.label), value: `${formatNumber(c.currentValue)} ${c.unit ?? ""}`.trim() } : null,
@@ -1194,7 +1194,11 @@ function scaleModule(facts, trajectory) {
   if (Number.isFinite(w.firstWeekAverage) && Number.isFinite(w.lastWeekAverage) && w.movement !== "flat") {
     paragraphs.push(`The weekly average went from about ${formatNumber(Math.round(w.firstWeekAverage))} lb in the first week to about ${formatNumber(Math.round(w.lastWeekAverage))} lb in the latest, roughly ${formatNumber(Math.round(Math.abs(w.weeklyRate) * 10) / 10)} lb a week on the recent trend.`);
   } else if (w.movement !== "flat") return null;
-  paragraphs.push("Without a recent body-composition measurement, the scale adds pace, not a verdict on what the weight is made of.");
+  // An older measurement still stands behind the outlook; the scale adds
+  // pace since then.
+  const c = facts.composition;
+  paragraphs.push(c?.measuredAt ? `Since the ${dateWords(c.measuredAt)} ${c.eventName}, the scale adds pace, not a verdict on what the weight is made of.`
+    : "Without a body-composition measurement, the scale adds pace, not a verdict on what the weight is made of.");
   const title = w.movement === "flat" ? "The scale held steady." : `The scale kept ${w.movement === "up" ? "climbing" : "dropping"}.`;
   return { role: ReviewModule.TRAJECTORY, earnedBy: [`${ROLES.trajectory}|weight_trend`], title, paragraphs, scaleOnly: true };
 }

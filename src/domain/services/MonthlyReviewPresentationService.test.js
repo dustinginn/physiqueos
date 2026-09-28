@@ -76,6 +76,8 @@ describe("Monthly review presentation", () => {
       if (excluded.has(day.date)) expect(day.missing).toBe(true);
     }
     expect(presentation.energy.eyebrow).toBe("Energy Evolution");
+    // A week with fewer than three readable days is not shown as a weekly average.
+    for (const week of presentation.energy.weekly) if (week.observedCount < 3) expect(week.missing).toBe(true);
     // Clients key What Changed and Month Ahead cards by tone: each is unique.
     const changeTones = presentation.changes?.themes.map((item) => item.tone) ?? [];
     expect(new Set(changeTones).size).toBe(changeTones.length);
@@ -128,5 +130,13 @@ describe("Monthly review presentation", () => {
     const plan = { holisticSynthesis: { review: realized.review }, composition: { headline: realized.headline }, confidenceBriefing: {} };
     const artifact = applyMonthlyReviewToArtifact({ artifact: legacyArtifact("never"), narrativePlan: plan, confidenceBlock: block });
     expect(artifact.briefing.monthlyPresentation.hero.period).toBe("September 1–19 · Delivered October 1");
+  });
+});
+
+describe("Monthly review publication gate", () => {
+  it("a correction keeps the format the Monthly was first published in", async () => {
+    const fs = await import("node:fs");
+    const source = fs.readFileSync(new URL("./MonthlyBriefingService.js", import.meta.url), "utf8");
+    expect(source).toMatch(/if \(!replacement \|\| existing\?\.briefing\?\.monthlyReviewV3\) \{\s*applyMonthlyReviewToArtifact/u);
   });
 });
