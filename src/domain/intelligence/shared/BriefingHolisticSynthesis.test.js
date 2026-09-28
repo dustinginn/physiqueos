@@ -581,7 +581,7 @@ describe("sections agree with each other", () => {
       [/Even shorter sessions count/u, /training rhythm back/u],
       [/makes that result readable/u, /Keep intake at the plan's target and training/u],
       [/Aim for the target most days/u, /[Bb]ring intake/u],
-      [/usual days and times/u, /[Ss]ettle back/u],
+      [/^The usual days and times/u, /[Ss]ettle back/u],
     ];
     let focused = 0;
     for (const { kind, seed, goalType, synthesis, realized } of weekly) {
@@ -745,6 +745,16 @@ describe("the scale's pace is judged only by a canonical authority", () => {
       if (weight.state === "rapid") expect(realized.recap).toMatch(/faster than the pace the phase sets/u);
     }
     expect(cases.some((item) => item.picture.domains.find((d) => d.domain === "body_trajectory").state === "rapid")).toBe(true);
+  });
+
+  it("without a canonical range a pace is described, never endorsed", () => {
+    for (const { kind, seed, goalType, scenario, picture, realized } of weekly) {
+      if (canonicalWeightPace(scenario.goalFacts.weightTrajectory)) continue;
+      const weight = picture.domains.find((item) => item.domain === "body_trajectory");
+      const label = `${goalType}/${kind}#${seed}`;
+      expect(weight.insights[0]?.polarity ?? "neutral", label).not.toBe("supportive");
+      expect(textOf(realized), label).not.toMatch(/direction the goal needs|on the phase's pace|moving more than a steady phase/u);
+    }
   });
 
   it("acceleration is the trend speeding up beyond its own noise, never a steady climb", () => {

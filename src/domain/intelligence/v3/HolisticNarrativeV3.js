@@ -121,7 +121,7 @@ export function realizeHolisticWeeklyV3({ synthesis, picture, goalLabel, goalPol
   const lead = leadInsights(synthesis, contract);
   const steps = planSteps(synthesis);
   const discriminators = watchItems({ synthesis, facts });
-  const headline = headlineSentence(lead, facts, contract.headline);
+  const { text: headline, ids: headlineIds } = headlineSentence(lead, facts, contract.headline);
   const recap = recapSentence(lead, facts);
   const implication = implicationSentence({ synthesis, facts, goalLabel, lead });
   const takeaway = takeawaySentence({ lead, synthesis, steps });
@@ -137,10 +137,11 @@ export function realizeHolisticWeeklyV3({ synthesis, picture, goalLabel, goalPol
     recap, implication,
     confidenceBody: confidenceSentence({ synthesis, facts }),
     heroIds: lead.map((item) => item.id),
+    headlineIds,
     selectedIds: synthesis.selected.map((item) => item.id),
     limitationIds: synthesis.limitations.map((item) => item.id),
     sectionPlan,
-    sectionAudit: { plan: auditSectionPlan(sectionPlan), text: auditSectionTexts(texts, contract) },
+    sectionAudit: { plan: auditSectionPlan(sectionPlan, synthesis), text: auditSectionTexts(texts, contract) },
   };
 }
 
@@ -148,7 +149,8 @@ export function realizeHolisticWeeklyV3({ synthesis, picture, goalLabel, goalPol
 
 const LEAD_PHRASE = {
   training_progress: () => "Strong training week",
-  weight_trend: (f) => (f.verdict !== "steady" ? null : f.movement === "flat" ? "Weight holding steady" : "Weight moving the right way"),
+  // Only reached for a canonical-range steady trend (the only supportive one).
+  weight_trend: (f) => (f.verdict !== "steady" ? null : f.movement === "flat" ? "Weight holding steady" : "Weight on the phase's pace"),
   composition_result: (f) => `New ${f.eventName} shows progress`,
   routine_steady: () => "A steady week",
   activity_on_plan: () => "A steady week",
@@ -167,13 +169,14 @@ function concernPhrase(item, standalone = false) {
         flat: "the scale held flat" }[f.verdict] ?? null;
     case "routine_break": {
       const quiet = f.direction === "break";
+      // (headline character only)
       const phrase = { late: quiet ? "a quiet finish" : "an off-routine finish", early: quiet ? "a slow start" : "an off-routine start",
         middle: quiet ? "a quiet midweek" : "an off-routine midweek" }[f.position] ?? (quiet ? "a quiet stretch" : "an off-routine stretch");
       return standalone && ["late", "early"].includes(f.position) ? `${phrase} to the week` : phrase;
     }
     case "training_frequency": return f.missedAll ? `no training logged${standalone ? " this week" : ""}` : "fewer sessions than usual";
     case "guardrail_status": return f.status === "breached" ? `${f.label} past its limit` : `${f.label} near its limit`;
-    case "composition_result": return `the ${f.eventName} went the wrong way`;
+    case "composition_result": return `${f.label} ${Number(f.change) > 0 ? "up" : "down"} on the ${f.eventName}`;
     case "intake_vs_plan": return "intake off target";
     case "activity_change": return f.direction === "below" ? "activity dipped" : "activity ran high";
     case "visual_change": return "little visible change";
@@ -189,23 +192,33 @@ function concernNoun(item) {
       quick: "the scale moving quickly", wrong_direction: "the scale going the wrong way", drifting: "the scale drifting",
       flat: "the scale flat" }[f.verdict] ?? "the scale moving";
   }
-  if (item.kind === "composition_result") return `a ${f.eventName} that went the wrong way`;
   return concernPhrase(item);
 }
+
+// Supporting leads as noun phrases, for "…, with …".
+const LEAD_NOUN = {
+  training_progress: () => "strong training", weight_trend: (f) => (f.movement === "flat" ? "the scale steady" : "the scale on pace"),
+  composition_result: (f) => `a ${f.eventName} showing progress`, routine_steady: () => "a steady routine",
+  activity_on_plan: () => "a steady routine", intake_vs_plan: () => "intake on target",
+  visual_change: () => "visible change in the photos",
+};
 
 function headlineSentence(lead, facts, budget) {
   const phrases = lead.map((item) => ({ item, lead: item.polarity === "supportive" ? LEAD_PHRASE[item.kind]?.(item.facts ?? {}) : null,
     concern: item.polarity !== "supportive" ? concernPhrase(item) : null })).filter((entry) => entry.lead || entry.concern);
-  const [first, second] = phrases;
+  const leads = phrases.filter((entry) => entry.lead);
+  const concerns = phrases.filter((entry) => entry.concern);
   const options = [];
-  if (first?.lead && second?.concern) options.push(`${first.lead}, but ${second.concern}.`);
-  if (first?.lead && second?.lead) options.push(`${first.lead}, with ${lowerFirst(second.lead)}.`);
-  if (first?.concern && second?.concern) options.push(`${upperFirst(concernPhrase(first.item, true))}, with ${concernNoun(second.item)}.`);
-  if (first?.lead) options.push(`${first.lead}.`);
-  if (first?.concern) options.push(`${upperFirst(concernPhrase(first.item, true))}.`);
-  options.push("A steady week.");
-  const fits = (text) => text.split(/\s+/u).length <= budget.maxWords && text.length <= budget.maxChars && !/\d/u.test(text);
-  return options.find(fits) ?? "A steady week.";
+  const option = (text, ...entries) => options.push({ text, ids: entries.map((entry) => entry.item.id) });
+  if (leads[0] && concerns[0]) option(`${leads[0].lead}, but ${concerns[0].concern}.`, leads[0], concerns[0]);
+  if (concerns[0] && concerns[1]) option(`${upperFirst(concernPhrase(concerns[0].item, true))}, with ${concernNoun(concerns[1].item)}.`, concerns[0], concerns[1]);
+  // A concern is never dropped for a shorter all-good headline.
+  if (concerns[0]) option(`${upperFirst(concernPhrase(concerns[0].item, true))}.`, concerns[0]);
+  if (leads[0] && leads[1]) option(`${leads[0].lead}, with ${LEAD_NOUN[leads[1].item.kind]?.(leads[1].item.facts ?? {}) ?? "more to build on"}.`, leads[0], leads[1]);
+  if (leads[0]) option(`${leads[0].lead}.`, leads[0]);
+  options.push({ text: "A steady week.", ids: [] });
+  const fits = ({ text }) => text.split(/\s+/u).length <= budget.maxWords && text.length <= budget.maxChars && !/\d/u.test(text);
+  return options.find(fits) ?? { text: "A steady week.", ids: [] };
 }
 
 // ---- recap: what happened, with the concrete numbers.
@@ -228,7 +241,7 @@ function workingPhrase(item) {
   const f = item.facts ?? {};
   switch (item.kind) {
     case "training_progress": return "the training is working and doesn't need changing";
-    case "weight_trend": return f.verdict === "steady" ? "quiet, consistent weeks like this are how the goal gets built" : null;
+    case "weight_trend": return f.verdict === "steady" ? "this is exactly the kind of week the goal needs" : null;
     case "composition_result": return `the new ${f.eventName} says the approach is working`;
     case "routine_steady": case "activity_on_plan": return "the routine is doing its job";
     case "intake_vs_plan": return "intake is where it needs to be";
@@ -264,21 +277,26 @@ function prioritiesPhrase(item) {
   }
 }
 
+// Praise only when nothing in the lead is a concern of risk strength or a
+// break in training or routine; otherwise the read leads with the priority.
 function takeawaySentence({ lead, synthesis, steps }) {
   // When the logged intake and the scale disagree, the priority is the log
   // itself — never "correcting" intake against the scale.
   const mismatch = steps.find((step) => step.mismatch);
   const priority = (item) => (mismatch && ["intake_vs_plan", "weight_trend"].includes(item.kind)
     ? "the scale and the food log don't agree yet, so the log is the first thing to check" : prioritiesPhrase(item));
-  const working = lead.map((item) => (item.polarity === "supportive" ? workingPhrase(item) : null)).filter(Boolean);
+  const serious = lead.some((item) => item.role === "risk" ||
+    ["training_frequency", "routine_break", "guardrail_status", "composition_result"].includes(item.kind) && item.polarity === "concern");
+  const working = lead.map((item) => (item.polarity === "supportive" && (!serious || item.kind === "training_progress")
+    ? workingPhrase(item) : null)).filter(Boolean);
   const priorities = [...new Set(lead.map((item) => (item.polarity !== "supportive" ? priority(item) : null)).filter(Boolean))];
   if (working.length && priorities.length) return `${upperFirst(working[0])}; ${priorities[0]}.`;
   if (priorities.length) return `${upperFirst(priorities[0])}${priorities[1] ? `, and ${priorities[1]}` : ""}.`;
   if (working.length > 1) return `${upperFirst(working[0])}, and ${working[1]}.`;
-  if (working.length) return `${upperFirst(working[0])}; more of the same is exactly right.`;
+  if (working.length) return `${upperFirst(working[0])}; nothing calls for a different approach.`;
   return synthesis.selected.some((item) => item.polarity !== "supportive")
     ? "Nothing here needs a change yet; the next few weeks will say more."
-    : "Nothing about this week needs changing; more of the same is exactly right.";
+    : "The goal moves on ordinary weeks like this one; nothing calls for a different approach.";
 }
 
 function clauseFor(item, facts) {
@@ -299,7 +317,7 @@ function clauseFor(item, facts) {
       return { visible: "the new photos show a visible change", subtle: "the new photos show a subtle change",
         none: "the new photos look much like the last set" }[f.change] ?? null;
     case "guardrail_status":
-      return f.status === "breached" ? `${f.label} is past its limit` : `${f.label} is closer to its limit than it should be`;
+      return f.status === "breached" ? `${f.label} is past its limit` : `${f.label} is close to its limit`;
     case "intake_vs_plan":
       return f.state === "on_plan" ? "intake stayed on target" : `intake ran ${/over|above/u.test(f.state) ? "above" : "below"} target`;
     case "activity_change":
@@ -361,14 +379,20 @@ function implicationSentence({ synthesis, facts, goalLabel, lead }) {
     return read(`; ${next} will show ${question}.`, `${next} will show ${question}.`);
   }
   if (risk) return read(`; ${next} is the check that settles it.`, `${next} is the check that settles it.`);
-  if (weight && stableGoal && ["quick", "drifting"].includes(verdict)) {
-    return read(`; the scale is moving more than a steady phase usually does, and ${next} will show whether ${composition.label} is holding.`,
-      `the scale is moving more than a steady phase usually does; ${next} will show whether ${composition.label} is holding.`);
+  if (weight && stableGoal && verdict === "quick") {
+    return read(`; the scale is moving faster than the pace the phase sets, and ${next} will show whether ${composition.label} is holding.`,
+      `the scale is moving faster than the pace the phase sets; ${next} will show whether ${composition.label} is holding.`);
+  }
+  if (weight && stableGoal && verdict === "drifting") {
+    return read(`; with the scale moving a little, ${next} will show whether ${composition.label} is holding.`,
+      `with the scale moving a little, ${next} will show whether ${composition.label} is holding.`);
   }
   if (weight && !stableGoal && ["steady", "quick"].includes(verdict) && movement !== "flat") {
-    const change = movement === "up" ? "recent gain" : "recent drop";
-    return read(`; the scale alone can't say how much of the ${change} is ${composition.label}, and ${next} will.`,
-      `the scale alone can't say how much of the ${change} is ${composition.label}; ${next} will.`);
+    // Refers back to the scale only when the recap just told it.
+    const told = lead.some((item) => item.kind === "weight_trend");
+    const change = told ? (movement === "up" ? "this gain" : "this drop") : (movement === "up" ? "any gain on the scale" : "any drop on the scale");
+    return read(`; the scale alone can't say how much of ${change} is ${composition.label}, and ${next} will.`,
+      `the scale alone can't say how much of ${change} is ${composition.label}; ${next} will.`);
   }
   if (weight && verdict === "flat") {
     return read(`; with the scale holding steady, ${next} will show whether ${composition.label} is still moving.`,
@@ -392,9 +416,11 @@ function coachingSentences({ synthesis, lead, facts, steps, contract }) {
     if (item.kind === "routine_break") {
       const prior = item.facts.recurrence?.priorSpans?.at(-1);
       const stretch = item.facts.direction === "break" ? "quiet" : "off-routine";
-      parts.push(`${upperFirst(clauseFor(item, facts))}${prior ? `, and a similar ${stretch} stretch came in ${monthPart(prior.startDate)}` : ""}.`);
+      parts.push(`${upperFirst(clauseFor(item, facts))}${prior ? `, and a similar ${stretch} stretch came in ${monthPart(prior.startDate)}` : ""}; the usual days and times are the easiest way back.`);
     } else if (item.kind === "weight_trend" && item.facts.verdict === "steady" && item.facts.movement !== "flat") {
-      parts.push(`${upperFirst(clauseFor(item, facts))}, the direction the goal needs.`);
+      parts.push(`${upperFirst(clauseFor(item, facts))}, in the direction the goal wants.`);
+    } else if (item.kind === "intake_vs_plan" && item.polarity !== "supportive") {
+      parts.push(`${upperFirst(clauseFor(item, facts))}; aim for the target most days rather than making up for it on one.`);
     } else {
       const clause = clauseFor(item, facts);
       if (clause) parts.push(`${upperFirst(clause)}.`);
@@ -406,7 +432,7 @@ function coachingSentences({ synthesis, lead, facts, steps, contract }) {
     // dressed up as something — a steady week stays short.
     const step = steps[0];
     parts.push(step ? step.focus ?? executionTip(step, facts)
-      : synthesis.selected.every((item) => item.polarity === "supportive") ? "Same days, same numbers next week."
+      : synthesis.selected.every((item) => item.polarity !== "concern") ? "Keep logging the same way; it is what makes weeks like this easy to read."
         : "Nothing here needs a change yet.");
   }
   return parts.slice(0, contract.coaching?.maxSentences ?? 3).join(" ");
@@ -506,9 +532,10 @@ function planSteps(synthesis) {
 
 function actionSentence(synthesis, steps) {
   if (!steps.length) return "Keep the current setup in place.";
+  // Beside a risk, say the rest stays; otherwise the step stands alone.
   const risk = synthesis.selected.some((item) => item.role === "risk");
-  const tail = risk ? "The rest of the setup stays as it is." : "Keep the current setup in place.";
-  return `${upperFirst(steps[0].text)}${steps[1] ? ` and ${steps[1].text}` : ""} this week. ${tail}`;
+  const tail = risk ? " The rest of the setup stays as it is." : "";
+  return `${upperFirst(steps[0].text)}${steps[1] ? ` and ${steps[1].text}` : ""} this week.${tail}`;
 }
 
 // What decides next week, each item tied to the insight it discriminates.
@@ -609,7 +636,7 @@ function weightClause(f) {
   switch (f.verdict) {
     case "steady": return `your weight has been ${rising ? "rising" : "falling"} ${pace}`;
     case "accelerating": return `your weight ${rising ? "gain" : "loss"} picked up to about ${formatNumber(Math.round(Math.abs(Number(f.recentPace)) * 10) / 10)} lb a week over the last two weeks`;
-    case "drifting": return `your weight has drifted ${rising ? "up" : "down"} ${pace}`;
+    case "drifting": return `your weight has moved ${rising ? "up" : "down"} ${pace}`;
     case "quick": return `your weight is ${rising ? "climbing" : "dropping"} a little faster than the pace the phase sets, ${pace}`;
     case "rapid": return `your weight is ${rising ? "climbing" : "dropping"} well faster than the pace the phase sets, ${pace}`;
     case "flat": return "your weight held steady";

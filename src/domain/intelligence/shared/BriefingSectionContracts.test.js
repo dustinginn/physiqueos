@@ -59,6 +59,32 @@ describe("the headline is a short synthesis; the hero paragraph carries the evid
     expect(richer).toBeGreaterThan(weekly.length / 3);
   });
 
+  it("the headline never drops a concern in the lead for a shorter all-good line", () => {
+    let checked = 0;
+    for (const { label, synthesis, realized } of weekly) {
+      const concerns = synthesis.selected.filter((item) => realized.heroIds.includes(item.id) && item.polarity === "concern");
+      if (!concerns.length) continue;
+      checked += 1;
+      expect(concerns.some((item) => realized.headlineIds.includes(item.id)), `${label}: ${realized.headline}`).toBe(true);
+    }
+    expect(checked).toBeGreaterThan(100);
+  });
+
+  it("headline phrases read as English: a noun phrase after 'with', never a stray capital or a sentence fragment", () => {
+    for (const { label, realized } of weekly) {
+      expect(realized.headline, label).not.toMatch(/, with [A-Z]|with strong training week|, and [a-z]+ off target/u);
+      expect(realized.headline).not.toMatch(/\s{2,}|,\s*\./u);
+    }
+  });
+
+  it("the hero paragraph refers back to the scale only when the recap told it", () => {
+    for (const { label, realized } of weekly) {
+      expect(`${realized.headline} ${realized.meaning} ${realized.result} ${realized.coachTake} ${realized.action} ${realized.watch}`, label)
+        .not.toMatch(/\b(?:the|a|this) (?:the|a|any|this|that)\b/iu);
+      if (/how much of this (?:gain|drop)/u.test(realized.meaning)) expect(realized.recap, label).toMatch(/your weight/iu);
+    }
+  });
+
   it("headline and recap are generated from the same lead insights", () => {
     for (const { label, synthesis, realized } of weekly) {
       expect(realized.sectionPlan.sections.headline.insightIds, label).toEqual(realized.sectionPlan.sections.recap.insightIds);
@@ -80,12 +106,18 @@ describe("Biggest Takeaway interprets; it never restates the Hero", () => {
     }
   });
 
-  it("consumes the lead insights as interpretation, not as evidence again", () => {
-    for (const { label, realized } of weekly) {
-      const { sections } = realized.sectionPlan;
-      expect(sections.takeaway.facet, label).toBe("interpretation");
-      expect(sections.takeaway.insightIds).toEqual(sections.recap.insightIds);
+  it("never praises a week whose lead carries a risk or a break in training or routine", () => {
+    const PRAISE = /exactly the kind of week the goal needs|goal moves on ordinary weeks|how the goal gets built/u;
+    let checked = 0;
+    for (const { label, synthesis, realized } of weekly) {
+      const lead = synthesis.selected.filter((item) => realized.heroIds.includes(item.id));
+      const serious = lead.some((item) => item.role === "risk" ||
+        (["training_frequency", "routine_break", "guardrail_status", "composition_result"].includes(item.kind) && item.polarity === "concern"));
+      if (!serious) continue;
+      checked += 1;
+      expect(realized.result, label).not.toMatch(PRAISE);
     }
+    expect(checked).toBeGreaterThan(100);
   });
 
   it("the served projection maps headline, hero paragraph and Biggest Takeaway to different text", () => {
@@ -141,14 +173,19 @@ describe("the briefing progresses: every section adds something", () => {
     }
   });
 
-  it("a stable week stays short: no manufactured contrast or filler", () => {
+  it("a stable week stays short: no manufactured contrast, no invented step, no repeated reassurance", () => {
+    let checked = 0;
     for (const { label, synthesis, realized } of weekly.filter((item) => item.kind === "stable_all")) {
-      if (synthesis.selected.every((item) => item.polarity === "supportive")) {
-        expect(realized.headline, label).not.toMatch(/\bbut\b/u);
-        expect(words(realized.coachTake), label).toBeLessThanOrEqual(25);
-        expect(realized.action).toBe("Keep the current setup in place.");
-      }
+      if (synthesis.selected.some((item) => item.polarity === "concern")) continue;
+      checked += 1;
+      expect(realized.headline, label).not.toMatch(/\bbut\b/u);
+      expect(words(realized.coachTake), label).toBeLessThanOrEqual(25);
+      expect(realized.sectionPlan.sections.action.insightIds).toEqual([]);
+      // "No change" is said once as the read, once as the commitment — What
+      // To Do adds execution, not a third reassurance.
+      expect(realized.coachTake).not.toMatch(/nothing (?:needs|calls)|more of the same|same numbers/iu);
     }
+    expect(checked).toBeGreaterThan(20);
   });
 
   it("is deterministic and never mutates its inputs", () => {

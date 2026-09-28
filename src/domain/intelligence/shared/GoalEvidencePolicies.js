@@ -56,7 +56,11 @@ export const WEIGHT_PACE_AUTHORITY = deepFreeze({
 
 // A canonical expected weekly range for the scale, when the accepted Phase
 // Expected Trajectory declares one; otherwise null (the engine then never
-// judges pace in absolute terms).
+// judges pace in absolute terms). The consumer is ready, but the Weekly
+// prepare path does not yet pass the accepted trajectory's
+// `weightTrajectory` through goal facts (follow-on wiring); every accepted
+// record today declares `universalWeeklyRate: null`, so production behavior
+// is the same either way.
 export function canonicalWeightPace(weightTrajectory) {
   const range = weightTrajectory?.expectedWeeklyRange;
   const low = Number(range?.min ?? range?.[0]);

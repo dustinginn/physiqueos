@@ -52,7 +52,7 @@ const R = SectionRole;
 export const DISTINCT_SECTION_PAIRS = Object.freeze([
   [R.HEADLINE, R.TAKEAWAY], [R.RECAP, R.TAKEAWAY], [R.MEANING, R.TAKEAWAY], [R.TAKEAWAY, R.COACHING],
   [R.TAKEAWAY, R.ACTION], [R.RECAP, R.COACHING], [R.MEANING, R.COACHING], [R.COACHING, R.ACTION],
-  [R.MEANING, R.WATCH], [R.COACHING, R.WATCH], [R.HEADLINE, R.COACHING],
+  [R.MEANING, R.WATCH], [R.COACHING, R.WATCH], [R.HEADLINE, R.COACHING], [R.CONFIDENCE, R.TAKEAWAY],
 ]);
 const HEADLINE = Object.freeze({ maxWords: 10, maxChars: 72, quantities: false });
 const FULL = [R.HEADLINE, R.RECAP, R.MEANING, R.CONFIDENCE, R.TAKEAWAY, R.COACHING, R.ACTION, R.WATCH];
@@ -123,7 +123,9 @@ export function leadInsights(synthesis, contract, count = contract?.recap?.maxIn
   const selected = synthesis?.selected ?? [];
   const lead = contract?.leadDomain ? selected.find((item) => item.domain === contract.leadDomain) : null;
   const supportive = selected.filter((item) => item.polarity === "supportive" && item !== lead);
-  const concern = selected.filter((item) => item.polarity !== "supportive" && item !== lead);
+  // A real concern outranks a merely neutral finding for the second slot.
+  const concern = [...selected.filter((item) => item.polarity === "concern" && item !== lead),
+    ...selected.filter((item) => !["supportive", "concern"].includes(item.polarity) && item !== lead)];
   const picked = [lead, supportive[0], concern[0]].filter(Boolean);
   for (const item of selected) if (picked.length < count && !picked.includes(item)) picked.push(item);
   return picked.slice(0, count);
@@ -161,27 +163,42 @@ export function allocateSections({ synthesis, contract, steps = [], discriminato
   return { cadence: contract.cadence, order: [...contract.sections], leadIds, sections };
 }
 
-// Structural non-redundancy: no insight is used twice in the same capacity,
-// and every section after the first adds an insight or a capacity not used
-// before it.
-export function auditSectionPlan(plan) {
+// Structural contract checks on an allocation: no insight used twice in the
+// same capacity; the takeaway interprets only what the recap told (no new
+// insights); a section with material names it, one without is marked minimal;
+// the action commits only to what the synthesis selected.
+export function auditSectionPlan(plan, synthesis = null) {
   const issues = [];
   const seen = new Set();
-  const seenIds = new Set();
-  const seenFacets = new Set();
   for (const role of plan.order) {
     const section = plan.sections[role];
-    let adds = false;
     for (const id of section.insightIds) {
       const key = `${id}|${section.facet}`;
       if (seen.has(key)) issues.push(`${role}: ${id} already used as ${section.facet}`);
       seen.add(key);
-      if (!seenIds.has(id)) adds = true;
     }
-    if (!seenFacets.has(section.facet)) adds = true;
-    if (!adds && role !== plan.order[0]) issues.push(`${role}: adds nothing new`);
-    for (const id of section.insightIds) seenIds.add(id);
-    seenFacets.add(section.facet);
+    if (!section.insightIds.length && !section.minimal && ![R.CONFIDENCE, R.MEANING].includes(role)) {
+      issues.push(`${role}: no material and not marked minimal`);
+    }
+  }
+  const recap = new Set(plan.sections[R.RECAP]?.insightIds ?? []);
+  for (const id of plan.sections[R.TAKEAWAY]?.insightIds ?? []) {
+    if (!recap.has(id)) issues.push(`takeaway: introduces ${id} the recap did not tell`);
+  }
+  if (synthesis) {
+    // Everything the synthesis considered: a watch may follow an assessed
+    // finding that was not selected for the recap (the scale is always watched).
+    const known = new Set([...(synthesis.selected ?? []), ...(synthesis.limitations ?? []), ...(synthesis.context ?? []),
+      ...(synthesis.omitted ?? [])].map((item) => item.id));
+    const watchOnly = new Set((synthesis.omitted ?? []).map((item) => item.id));
+    for (const role of plan.order.filter((item) => item !== R.WATCH)) {
+      for (const id of plan.sections[role].insightIds) {
+        if (watchOnly.has(id) && role !== R.COACHING) issues.push(`${role}: uses ${id}, which synthesis left out`);
+      }
+    }
+    for (const role of plan.order) {
+      for (const id of plan.sections[role].insightIds) if (!known.has(id)) issues.push(`${role}: ${id} is not in the synthesis`);
+    }
   }
   return { ok: issues.length === 0, issues };
 }

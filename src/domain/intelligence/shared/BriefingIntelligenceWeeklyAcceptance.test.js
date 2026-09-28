@@ -56,7 +56,7 @@ describe("Shared Briefing Intelligence through the Weekly V3 pipeline", () => {
         ["body_trajectory", "body_composition", "guardrail", "training", "nutrition", "activity", "routine", "recovery"]));
       expect(composition.headline).not.toMatch(/Nothing here calls for a change/u);
       expect(composition.coachTake).not.toMatch(/Nothing needs fixing right now/u);
-      expect(composition.sections.action).toMatch(/Keep the current setup in place\.$/u);
+      expect(composition.sections.action).toMatch(/(?:this week\.|Keep the current setup in place\.)(?: The rest of the setup stays as it is\.)?$/u);
       expect(composition.sections.watch).toMatch(/^Watch /u);
       expect(composition.headline.length).toBeLessThanOrEqual(160);
       expect(findNarrativeV3VoiceViolations(Object.values(composition.sections).join("\n") + composition.coachTake)).toEqual([]);

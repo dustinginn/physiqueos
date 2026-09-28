@@ -132,7 +132,10 @@ function assessBodyTrajectory({ days, window, goalPolicy, goalFacts }) {
     paceAuthority: canonicalPace ? canonicalPace.authority : "personal_trend_relative",
     note: "scale_weight_does_not_identify_lean_or_fat_mass" };
   const risk = ["rapid", "wrong_direction", "accelerating"].includes(verdict);
-  const polarity = verdict === "steady" ? "supportive" : risk || verdict === "drifting" ? "concern" : "neutral";
+  // Only a canonical expected range can endorse a pace. Without one, a steady
+  // trend in the goal's direction is described, not praised (neutral), and a
+  // maintenance drift is a movement to describe, not a verdict.
+  const polarity = risk ? "concern" : verdict === "steady" && canonicalPace ? "supportive" : "neutral";
   // A goal with no weight expectation keeps the trend as background only.
   if (verdict === "not_goal_relevant") {
     return assessed(D.BODY_TRAJECTORY, verdict, "neutral", facts, [
@@ -156,11 +159,16 @@ function weightVerdict({ weeklyRate, recentPace, earlierPace, paceChangeNoise, r
   const move = PACE.movementThresholdLbPerWeek;
   if (Math.abs(weeklyRate) < move && residual > 1.5) return "too_noisy";
   if (canonicalPace) return canonicalPaceVerdict(weeklyRate, expectation, canonicalPace);
-  if (expectation.direction === "stable") return Math.abs(weeklyRate) < move ? "steady" : "drifting";
-  const sign = expectation.direction === "up" ? 1 : -1;
+  // For a maintenance goal the trend's own direction is the one whose
+  // speeding up matters.
+  const sign = expectation.direction === "stable" ? Math.sign(weeklyRate) || 1 : expectation.direction === "up" ? 1 : -1;
   const along = sign * weeklyRate;
-  if (along <= -move) return "wrong_direction";
-  if (along < move) return "flat";
+  if (expectation.direction !== "stable") {
+    if (along <= -move) return "wrong_direction";
+    if (along < move) return "flat";
+  } else if (Math.abs(weeklyRate) < move) {
+    return "steady";
+  }
   const recent = recentPace == null ? null : sign * recentPace;
   const earlier = earlierPace == null ? null : sign * earlierPace;
   // Speeding up: a real increase over the earlier pace, larger than the noise
@@ -168,7 +176,7 @@ function weightVerdict({ weeklyRate, recentPace, earlierPace, paceChangeNoise, r
   if (recent != null && earlier != null && recent >= move * 2 &&
       recent - earlier >= Math.max(PACE.accelerationMinimumIncreaseLbPerWeek,
         PACE.accelerationMinimumRelativeIncrease * Math.abs(earlier), 2 * (paceChangeNoise ?? Infinity))) return "accelerating";
-  return "steady";
+  return expectation.direction === "stable" ? "drifting" : "steady";
 }
 
 function canonicalPaceVerdict(weeklyRate, expectation, { expectedWeeklyRange: [low, high], cautionWeeklyRate }) {
