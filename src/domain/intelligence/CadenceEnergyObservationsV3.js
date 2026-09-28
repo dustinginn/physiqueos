@@ -478,7 +478,7 @@ function describeActivity({ activeAverage, plan, activityEvidence }) {
   const against = plan
     ? `, ${Math.abs(plan.deviation)} kcal/day ${plan.deviation < 0 ? "below" : plan.deviation > 0 ? "above" : "at"} the ${plan.targetValue} kcal/day target`
     : "";
-  return `Active calories averaged ${round(activeAverage, 0)} kcal/day${against} (wearable estimate${activityEvidence?.weakestReliability === "moderate" ? " read from screenshots" : ""}).`;
+  return `Active calories averaged ${round(activeAverage, 0)} kcal/day${against} (wearable estimate${activityEvidence?.weakestReliability === "moderate" ? " taken from screenshots" : ""}).`;
 }
 
 function describeBasis(evidence) {

@@ -198,7 +198,7 @@ function createGoalAwareEditorial({
 
   if (semanticGoalType === "fat_loss") {
     return {
-      summary: "This week gave us a clearer read on how the cut is progressing.",
+      summary: "This week gave a clearer picture of how the cut is progressing.",
       heroTitle: "The cut stayed on track this week.",
       heroBody: "Your weight, training, calorie intake, and body composition still point in the same direction.",
       opening: "This week, the useful question is whether you are getting leaner without giving up training quality.",
@@ -217,7 +217,7 @@ function createGoalAwareEditorial({
     const calibration = context?.activePhase?.name === "Establish Maintenance"
       && context?.operatingState?.value === "calibration";
     return {
-      summary: calibration ? "We are getting closer to understanding how much food will support stable weight and stronger training." : "This week gave us a clearer read on your muscle-building phase.",
+      summary: calibration ? "We are getting closer to understanding how much food will support stable weight and stronger training." : "This week gave a clearer picture of your muscle-building phase.",
       heroTitle: piEditorial?.title ?? (calibration ? "Keep finding the intake that supports training without moving weight too quickly." : "Training and nutrition frame this week."),
       heroBody: calibration
         ? `Your calorie balance was ${direction}, and ${coverage}. ${training}. That helps us tune the plan, but it is too early to claim new muscle.`
@@ -279,7 +279,7 @@ function renderWeeklyPISelection(selection) {
   if (candidate.editorialTemplateKey === "weekly_direct_recovery") {
     return {
       title: "Recovery deserves attention this week.",
-      body: "Your recovery markers changed enough to affect how we should read training and nutrition.",
+      body: "Your recovery markers changed enough to affect how training and nutrition should be judged.",
       opening: "The way you recovered this week adds important context to your training response.",
       synthesis: "Keep training and nutrition steady enough to see whether the recovery change persists.",
     };
@@ -322,7 +322,7 @@ function renderWeeklyPISelection(selection) {
     } : null;
   }
   return {
-    title: "Training, weight, and nutrition need to be read together.",
+    title: "Training, weight, and nutrition need to be judged together.",
     body: "The clearest conclusion comes from how those parts moved together, not from any one number.",
     opening: "Your week makes more sense when training, weight, and nutrition are viewed together.",
     synthesis: "Keep each measure in its proper role and use the overall pattern to guide the week ahead.",

@@ -58,6 +58,14 @@ const CANONICAL_PACE = { canonical_pace_fast: {
   stable: { expectedWeeklyRange: { min: -0.25, max: 0.25 }, cautionWeeklyRate: 1.0 },
 } };
 
+// A genuinely incomplete food log: a fraction of the day recorded, few
+// entries, no full-day assertion. (An unusual but complete day is behavior.)
+function incompleteLog(day) {
+  day.nutrition.calories = Math.round(day.nutrition.calories * 0.35);
+  day.nutrition.protein = Math.round(day.nutrition.protein * 0.3);
+  day.nutrition.evidence = { artifacts: [], observations: [], entries: 2, fullDayAsserted: false };
+}
+
 export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "build_lean_mass" }) {
   const random = mulberry32(seed * 31 + HOLISTIC_KINDS.indexOf(kind) * 977 + HOLISTIC_GOAL_TYPES.indexOf(goalType) * 61 + 7);
   const horizon = HORIZON[cadence];
@@ -87,11 +95,11 @@ export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "b
     for (const day of windowDays) day.training = { sessions: 0 };
   }
   if (kind === "unreliable_nutrition") {
-    for (const day of windowDays.slice(-3)) if (day.nutrition) day.nutrition.protein = Math.round(day.nutrition.protein * 0.3);
+    for (const day of windowDays.slice(-3)) if (day.nutrition) incompleteLog(day);
   }
   if (kind === "single_unreliable_day") {
     const day = windowDays[Math.floor(random() * windowDays.length)];
-    if (day.nutrition) day.nutrition.protein = Math.round(day.nutrition.protein * 0.3);
+    if (day.nutrition) incompleteLog(day);
   }
   if (kind === "sparse") {
     for (const day of period.days) {

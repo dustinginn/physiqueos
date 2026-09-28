@@ -140,7 +140,9 @@ function rebuildEnergy(energy, period, excludedDates = []) {
   const expenditure = avg(readable, "expenditure");
   const balance = intake - expenditure;
   return {
-    phaseDates: `${shortDate(period.startDate)}–${shortDate(period.endDate)}`,
+    // The days the card actually covers: the month, or the active phase's part
+    // of it when the phase began inside the month.
+    phaseDates: `${shortDate(inWindow[0].date)}–${shortDate(inWindow.at(-1).date)}`,
     summaryMetrics: [
       { label: "Avg intake", value: intake, suffix: "kcal", tone: "intake" },
       { label: "Avg expenditure", value: expenditure, suffix: "kcal", tone: "expenditure" },

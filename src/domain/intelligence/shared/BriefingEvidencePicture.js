@@ -75,6 +75,7 @@ function pictureContext({ intelligence, goalPolicy, goalFacts }) {
     patterns: intelligence?.patterns ?? [],
     characterization: intelligence?.characterization ?? [],
     reliability: (intelligence?.reliability ?? []).filter((item) => inWindow(item.date)),
+    anomalies: (intelligence?.anomalies ?? []).filter((item) => inWindow(item.date)),
   };
 }
 
@@ -306,7 +307,7 @@ function assessTraining({ goalFacts, windowDays, patterns, intelligence }) {
 
 // Nutrition against the plan's own targets, with protein and logging
 // reliability. Unreliable days constrain every nutrition claim.
-function assessNutrition({ goalFacts, windowDays, reliability, intelligence }) {
+function assessNutrition({ goalFacts, windowDays, reliability, anomalies = [], intelligence }) {
   const logged = windowDays.filter((day) => Number.isFinite(day?.nutrition?.calories));
   if (!logged.length) return unavailable(D.NUTRITION, "no_nutrition_logged");
   const unreliableDates = [...new Set(reliability.filter((item) => item.domain === "nutrition").map((item) => item.date))].sort();
@@ -317,8 +318,15 @@ function assessNutrition({ goalFacts, windowDays, reliability, intelligence }) {
   const facts = { loggedDays: logged.length, reliableDays: reliable.length, unreliableDates,
     intakeState: intake?.state ?? null, intakeAverage: intake?.observed ?? null, intakeTarget: intake?.target ?? null,
     reliableProteinAverage: reliable.length ? round(mean(reliable.map((day) => day.nutrition.protein).filter(Number.isFinite)), 0) : null,
-    // Intake over the readable days only: the one intake figure a briefing
-    // may state when some days are unreadable.
+    // Why each excluded day could not be used (completeness evidence only).
+    exclusions: reliability.filter((item) => item.domain === "nutrition")
+      .map((item) => ({ date: item.date, kind: item.kind, sameSourceAs: item.evidence?.sameSourceAs ?? null }))
+      .sort((left, right) => left.date.localeCompare(right.date)),
+    // Unusual days on usable records: behavior, kept in every average.
+    lowProteinDates: [...new Set(anomalies.filter((item) => item.domain === "nutrition" && item.kind === "low_protein").map((item) => item.date))].sort(),
+    repeatedDates: [...new Set(anomalies.filter((item) => item.domain === "nutrition" && item.kind === "repeated_day_totals").map((item) => item.date))].sort(),
+    // Intake over the usable days only: the one intake figure a briefing
+    // may state when some days cannot be used.
     reliableIntakeAverage: reliable.length ? round(mean(reliable.map((day) => day.nutrition.calories)), 0) : null,
     // The plan-relative state over the readable days, with the same
     // tolerance the V3 energy observations use: the one intake verdict a

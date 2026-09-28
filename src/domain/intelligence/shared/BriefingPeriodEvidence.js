@@ -48,7 +48,8 @@ export function buildBriefingPeriodDays({
     const row = energyByDate.get(date);
     // Macros come from the record whose authoritative calories are the day's.
     if (calories != null && row?.calorieIntake != null && Math.abs(calories - row.calorieIntake) > 0.5) continue;
-    macrosByDate.set(date, { protein: finite(totals.protein_g), carbs: finite(totals.carbs_g), fat: finite(totals.fat_g) });
+    macrosByDate.set(date, { protein: finite(totals.protein_g), carbs: finite(totals.carbs_g), fat: finite(totals.fat_g),
+      evidence: nutritionEvidenceOf(item) });
   }
 
   const minutesByDate = new Map();
@@ -95,6 +96,10 @@ export function buildBriefingPeriodDays({
         carbs: macros.carbs ?? null,
         fat: macros.fat ?? null,
         completeness: row?.nutritionCompleteness === "partial" ? "partial" : row?.nutritionCompleteness ?? "unknown",
+        // What the day's record rests on: its source artifacts or device
+        // observations, how many food entries it lists, and whether the
+        // source asserts a full day. Completeness is judged from this.
+        evidence: macros.evidence ?? null,
       },
       activity: activeKcal == null ? null : { activeKcal, exerciseMinutes: minutesByDate.get(date) ?? null },
       training: { sessions: sessionsByDate.get(date)?.size ?? 0 },
@@ -103,6 +108,20 @@ export function buildBriefingPeriodDays({
       recovery: null,
     };
   });
+}
+
+function nutritionEvidenceOf(item) {
+  const payload = payloadOf(item);
+  const provenance = payload.provenance ?? item.provenance ?? {};
+  const meals = Array.isArray(payload.meals) ? payload.meals : [];
+  const entries = meals.reduce((sum, meal) => sum + (Array.isArray(meal?.foods) ? meal.foods.length : 0), 0);
+  const tier = resolveNutritionDayAuthority(item).assertion?.tier ?? null;
+  return {
+    artifacts: [...new Set([...(payload.source?.source_artifact_refs ?? []), ...(provenance.source_artifact_refs ?? [])])].sort(),
+    observations: [...new Set(provenance.source_observation_ids ?? [])].sort(),
+    entries: meals.length ? entries : null,
+    fullDayAsserted: tier === "full_day_asserted" || payload.metadata?.coverage === "complete_day",
+  };
 }
 
 function weightInPounds(entry) {

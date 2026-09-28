@@ -135,33 +135,33 @@ export const WEEKLY_REALIZABLE_KINDS = BRIEFING_REALIZABLE_KINDS;
 // the section roles are shared; only the period's words differ.
 const PERIOD_WORDS = Object.freeze({
   weekly: { noun: "week", this: "this week", thisPoss: "this week's", next: "next week", inThis: "in this week",
-    logTip: "Keep logging the same way; it is what makes weeks like this easy to read.", ahead: "next week",
+    logTip: "Keep logging the same way; that is what makes a week like this clear.", ahead: "next week",
     steady: "A steady week", strongTraining: "Strong training week", stepTail: "this week", leverWhen: "this week",
     usual: "This week held to its usual pattern.", midNoun: "midweek",
     positions: { late: "late in the week", early: "early in the week", middle: "midweek", whole: "for most of the week" },
     parts: { late: "the end of the week", early: "the start of the week", middle: "the middle of the week" } },
   midweek: { noun: "week", this: "so far this week", thisPoss: "this week's", next: "the rest of the week", inThis: "so far",
-    logTip: "Keep logging the same way; it keeps the week easy to read.", ahead: "for the rest of the week",
+    logTip: "Keep logging the same way; it keeps the week clear.", ahead: "for the rest of the week",
     steady: "Steady so far", strongTraining: "Strong training so far", stepTail: "for the rest of the week",
     leverWhen: "for the rest of the week", usual: "The week so far is holding to its usual pattern.", midNoun: "stretch",
     recapLead: "So far this week, ", partial: true,
     positions: { late: "in the last day or two", early: "at the start of the week", middle: "midway through", whole: "most days" },
     parts: {} },
   monthly: { calendarDates: true, review: true, noun: "month", this: "this month", thisPoss: "this month's", next: "the coming month", inThis: "in this month",
-    logTip: "Keep logging the same way; it keeps the picture easy to read.", ahead: "over the coming weeks",
+    logTip: "Keep logging the same way; it keeps the picture clear.", ahead: "over the coming weeks",
     steady: "A steady month", strongTraining: "Strong training month", stepTail: "over the coming weeks",
     leverWhen: "over the coming weeks", usual: "This month held to its usual pattern.", midNoun: "mid-month",
     positions: { late: "late in the month", early: "early in the month", middle: "mid-month", whole: "for most of the month" },
     parts: { late: "the end of the month", early: "the start of the month", middle: "the middle of the month" } },
   outcomeCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before this check",
-    logTip: "Keep logging the same way; it keeps the picture easy to read.", ahead: "over the next few weeks", thisPoss: "the lead-up's", next: "the next few weeks",
+    logTip: "Keep logging the same way; it keeps the picture clear.", ahead: "over the next few weeks", thisPoss: "the lead-up's", next: "the next few weeks",
     inThis: "in the lead-up to this check", steady: "A steady lead-up", strongTraining: "Strong training before this check",
     stepTail: "over the next few weeks", leverWhen: "from here", usual: "The weeks before this check held to their usual pattern.",
     midNoun: "stretch", context: "in the weeks before this check", before: "before this check", outcomeLed: true,
     positions: { late: "just before this check", early: "early in the lead-up", middle: "midway through the lead-up",
       whole: "through most of the lead-up" }, parts: {} },
   visualCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before these photos",
-    logTip: "Keep logging the same way; it keeps the picture easy to read.", ahead: "over the next few weeks", thisPoss: "the lead-up's", next: "the next few weeks",
+    logTip: "Keep logging the same way; it keeps the picture clear.", ahead: "over the next few weeks", thisPoss: "the lead-up's", next: "the next few weeks",
     inThis: "in the lead-up to these photos", steady: "A steady lead-up", strongTraining: "Strong training before these photos",
     stepTail: "over the next few weeks", leverWhen: "from here", usual: "The weeks before these photos held to their usual pattern.",
     midNoun: "stretch", context: "in the weeks before these photos", before: "before these photos",
@@ -230,7 +230,7 @@ function realize({ cadence, synthesis, picture, goalLabel, goalPolicy, goalProgr
   const implication = has(SectionRole.MEANING) ? implicationSentence({ synthesis, facts, goalLabel, lead }) : null;
   const baseTakeaway = takeawaySentence({ lead, synthesis, steps });
   // A partial window reads as a first read, never as a finished period.
-  const takeaway = P.partial ? `Early read: ${lowerFirst(baseTakeaway)}` : baseTakeaway;
+  const takeaway = P.partial ? `Early days, but ${lowerFirst(baseTakeaway)}` : baseTakeaway;
   // In a review, execution detail lives in the domain modules; the coach's
   // take is the strategy synthesis of the whole period.
   const coachTake = reviewContract ? strategySentences({ synthesis, facts, steps, implication })
@@ -690,7 +690,7 @@ function executionTip(step, facts) {
       return /training/u.test(step.text) ? "Even a shorter session on a usual day counts."
         : "The usual days and times are the easiest way back.";
     case "composition_result": case "guardrail_status":
-      return `Steady, ordinary days until the next ${facts.composition?.eventName ?? "check"} make its reading easier to trust.`;
+      return `Steady, ordinary days until the next ${facts.composition?.eventName ?? "check"} make its result easier to trust.`;
     case "intake_vs_plan": return "Aim for the target most days rather than making up for it on one.";
     default: return `One adjustment ${P.stepTail} is enough.`;
   }
@@ -716,12 +716,12 @@ function exampleClause(example) {
 // all there is.
 function limitationSentence(item) {
   const byKind = item.facts?.datesByKind ?? {};
-  const patchy = [...(byKind.implausible_macro_profile ?? []), ...(byKind.partial_day ?? [])].sort();
-  if (patchy.length) {
-    return `${dayRange(patchy)}${patchy.length === 1 ? "'s food log was" : "'s food logs were"} too patchy to read; complete logs from here on will make the next check clearer.`;
+  const incomplete = [...(byKind.partial_day ?? []), ...(byKind.sparse_day ?? [])].sort();
+  if (incomplete.length) {
+    return `${dayRange(incomplete)}${incomplete.length === 1 ? "'s food log was" : "'s food logs were"} incomplete, so ${incomplete.length === 1 ? "it isn't" : "they aren't"} counted; complete logs from here on will make the next check clearer.`;
   }
-  const copied = byKind.duplicate_day_totals ?? item.facts?.dates ?? [];
-  return `${dayRange(copied)}'s food log looks copied from the day before; a fresh log each day from here on keeps the next check honest.`;
+  const reused = byKind.duplicate_source_evidence ?? item.facts?.dates ?? [];
+  return `${dayRange(reused)}'s record repeats another day's screenshots, so it isn't counted; a fresh log each day from here on keeps the next check honest.`;
 }
 
 // The next steps (two when a risk needs its own), then the standing
@@ -1006,7 +1006,7 @@ function strategySentences({ synthesis, facts, steps, implication = null }) {
   const open = facts.composition && weight && !posed
     ? `What the month can't settle is how much of the scale's ${weight.facts.movement === "up" ? "climb" : "drop"} is ${facts.composition.label}.` : null;
   const gaps = synthesis.limitations.some((item) => item.domain === "nutrition")
-    ? "Intake is the least certain part of the picture, because some logged days were too incomplete to read." : null;
+    ? "Intake is the least certain part of the picture, because some logged days couldn't be used." : null;
   return [first, call, open, gaps].filter(Boolean).join(" ");
 }
 
@@ -1058,9 +1058,9 @@ function changesModule({ picture, facts, synthesis, trajectory, energy, reviewCo
   if (training?.status === "assessed" && (training.facts.milestoneCount || training.facts.trainingDays)) {
     const f = training.facts;
     themes.push({ tone: "training", title: "Training", earnedBy: `training|assessed:${training.state}`,
-      value: f.milestoneCount >= 2 ? (f.bestBlocks >= 2 ? "Performance stayed the clearest read." : "Performance moved in one burst.")
+      value: f.milestoneCount >= 2 ? (f.bestBlocks >= 2 ? "Performance stayed the clearest indicator." : "Performance moved in one burst.")
         : f.milestoneCount === 1 ? "Performance produced one clear step." : "Training held its rhythm.",
-      text: "Between checks, training is the earliest read on progress: it shows the work moving forward, not what the body is made of." });
+      text: "Between checks, training is the earliest sign of progress: it shows the work moving forward, not what the body is made of." });
   }
   if (energy) {
     const state = energy.intakeState;
@@ -1071,8 +1071,8 @@ function changesModule({ picture, facts, synthesis, trajectory, energy, reviewCo
         : state === "on_plan" ? "Intake held to the plan." : "Logging set the limit on what calories can show.",
       text: [state === "above_plan" && climbing ? "With the scale already climbing, the calorie number is the one to tighten, not to raise."
         : state === "below_plan" && weight?.movement === "down" && facts.direction === "up" ? "With the scale drifting down, calories are the lever to raise."
-          : state === "on_plan" ? "Holding the target is what lets the scale and the next measurement be read cleanly." : null,
-      energy.excludedDates?.length ? "Days too incomplete to read limit how sure that picture is." : null].filter(Boolean).join(" ") ||
+          : state === "on_plan" ? "Holding the target is what lets the scale and the next measurement be judged cleanly." : null,
+      energy.excludedDates?.length ? "A day that couldn't be used limits how sure that picture is." : null].filter(Boolean).join(" ") ||
         "Intake is judged against the plan's target, never against the wearable." });
   }
   const w = domain(ROLES.trajectory);
@@ -1249,7 +1249,7 @@ function trainingModule(training, period, facts, shifts = []) {
       ? everyWeek || f.bestBlocks >= 2 ? `Progress that lands week after week reflects the program rather than one good session, so it is the pattern ${period?.nextMonth ?? "the coming month"} needs to keep.`
         : `Progress that lands in a single week can be one good stretch; ${period?.nextMonth ?? "the coming month"} needs to show it repeats.`
       : f.milestoneCount === 1 ? "One clear step is a start; repeating it is what turns it into a trend."
-        : "A steady rhythm keeps the next measurement easy to read.",
+        : "A steady rhythm keeps the next measurement straightforward to compare.",
     stats: (f.milestones ?? []).slice(0, 3).map(statOf) };
 }
 
@@ -1270,29 +1270,47 @@ function statOf(milestone) {
 function energyModule(nutrition, activity, period) {
   if (nutrition?.status !== "assessed" || (nutrition.facts.loggedDays ?? 0) < 7) return null;
   const f = nutrition.facts;
-  const readable = f.reliableDays >= 7 && Number.isFinite(f.reliableIntakeAverage);
-  // The plan-relative verdict is the shared picture's (readable days, V3 tolerance).
-  const state = readable ? f.readableIntakeState : null;
+  const usable = f.reliableDays >= 7 && Number.isFinite(f.reliableIntakeAverage);
+  // The plan-relative verdict is the shared picture's (usable days, V3 tolerance).
+  const state = usable ? f.readableIntakeState : null;
   const title = !state ? "Food was logged across the month."
-    : state === "above_plan" ? "Intake ran above the plan's target on the readable days."
-      : state === "below_plan" ? "Intake ran below the plan's target on the readable days." : "Intake stayed close to the plan's target.";
+    : state === "above_plan" ? "Intake ran above the plan's target."
+      : state === "below_plan" ? "Intake ran below the plan's target." : "Intake stayed close to the plan's target.";
   const days = period?.days ?? f.loggedDays;
   const logged = f.loggedDays >= days ? `all ${days} days` : `${f.loggedDays} of ${days} days`;
-  const allReadable = f.reliableDays >= f.loggedDays;
-  const paragraphs = [`Food was logged on ${logged}${period?.toDate ? ` through ${dateWords(period.endDate)}` : ""}, ${allReadable
-    ? "every one complete enough to read" : `and ${f.reliableDays} were complete enough to read`}.`];
-  if (readable) {
-    const protein = Number.isFinite(f.reliableProteinAverage) ? `, and protein held around ${f.reliableProteinAverage} g${Number.isFinite(f.usualProtein) &&
+  const excluded = f.unreliableDates ?? [];
+  const counted = excluded.length === 0 ? "and every day counts toward the averages"
+    : excluded.length <= 2 ? `and every day but ${dateList(excluded)} counts toward the averages`
+      : `and ${f.reliableDays} of them count toward the averages`;
+  const paragraphs = [`Food was logged on ${logged}${period?.toDate ? ` through ${dateWords(period.endDate)}` : ""}, ${counted}.`];
+  if (usable) {
+    const protein = Number.isFinite(f.reliableProteinAverage) ? `, and protein averaged around ${f.reliableProteinAverage} g${Number.isFinite(f.usualProtein) &&
       Math.abs(f.reliableProteinAverage - f.usualProtein) <= 0.08 * f.usualProtein ? ", close to your usual" : ""}` : "";
-    paragraphs.push(`${allReadable ? "Intake" : "On those days intake"} averaged about ${thousands(Math.round(f.reliableIntakeAverage / 50) * 50)} calories${f.intakeTarget ? ` against a ${thousands(f.intakeTarget)} target` : ""}${protein}.`);
+    paragraphs.push(`Intake averaged about ${thousands(Math.round(f.reliableIntakeAverage / 50) * 50)} calories${f.intakeTarget ? ` against a ${thousands(f.intakeTarget)} target` : ""}${protein}.`);
   }
-  if (f.unreliableDates?.length) {
-    paragraphs.push(`${upperFirst(dateList(f.unreliableDates))} ${f.unreliableDates.length === 1 ? "was" : "were"} too patchy to read and ${f.unreliableDates.length === 1 ? "is" : "are"} left out of that average.`);
+  // Unusual days stay in the averages; a clear run of them is behavior worth saying.
+  if ((f.lowProteinDates ?? []).length >= 2) {
+    paragraphs.push(`Protein ran well below your usual on ${dateList(f.lowProteinDates)}, even on days when total intake was normal or high.`);
   }
+  for (const reason of exclusionReasons(f.exclusions ?? [])) paragraphs.push(reason);
   const wearable = activity?.facts?.measurement === "wearable_estimate";
   const earnedBy = nutrition.insights.length ? nutrition.insights.map((item) => item.id) : [`nutrition|assessed:${nutrition.state}`];
-  return { role: ReviewModule.ENERGY, earnedBy, title, paragraphs, intakeState: state, excludedDates: f.unreliableDates ?? [],
-    interpretation: wearable ? "Expenditure is a wearable estimate, so read the weekly balance as directional; the scale's trend is the steadier read of where intake sits against the work." : null };
+  return { role: ReviewModule.ENERGY, earnedBy, title, paragraphs, intakeState: state, excludedDates: excluded,
+    interpretation: wearable ? "Expenditure is a wearable estimate, so treat the weekly balance as a rough guide; the scale's trend gives a better sense of where intake sits against the work." : null };
+}
+
+// Why a day is left out, said plainly and only from completeness evidence.
+function exclusionReasons(exclusions) {
+  const byKind = (kind) => exclusions.filter((item) => item.kind === kind);
+  const out = [];
+  for (const item of byKind("duplicate_source_evidence")) {
+    out.push(`${upperFirst(dateWords(item.date))}'s record repeats ${item.sameSourceAs ? `${dateWords(item.sameSourceAs)}'s` : "another day's"} screenshots, so it is left out of the averages.`);
+  }
+  const partial = byKind("partial_day").map((item) => item.date);
+  if (partial.length) out.push(`${upperFirst(dateList(partial))} ${partial.length === 1 ? "was" : "were"} only partly logged, so ${partial.length === 1 ? "it is" : "they are"} left out of the averages.`);
+  const sparse = byKind("sparse_day").map((item) => item.date);
+  if (sparse.length) out.push(`${upperFirst(dateList(sparse))} ${sparse.length === 1 ? "has" : "have"} too few entries to stand for a whole day, so ${sparse.length === 1 ? "it is" : "they are"} left out of the averages.`);
+  return out;
 }
 
 function trajectoryModule(facts, trajectory, opening = "") {
@@ -1352,10 +1370,15 @@ function aheadModule({ synthesis, facts, steps, discriminators, period, energy, 
   const offTarget = ["above_plan", "below_plan"].includes(energy?.intakeState) && !againstScale;
   const unreadable = synthesis.limitations.some((item) => item.domain === "nutrition") && energy;
   if (intakeStep || offTarget || unreadable) {
+    // The logging advice answers the actual reason a day couldn't be used.
+    const kinds = new Set((domain("nutrition")?.facts?.exclusions ?? []).map((item) => item.kind));
+    const reusedOnly = kinds.size > 0 && [...kinds].every((kind) => kind === "duplicate_source_evidence");
     const value = intakeStep ? upperFirst(intakeStep.text)
-      : offTarget ? `Bring intake ${energy.intakeState === "above_plan" ? "back down" : "up"} to the target` : "Log complete days";
+      : offTarget ? `Bring intake ${energy.intakeState === "above_plan" ? "back down" : "up"} to the target`
+        : reusedOnly ? "Send each day's own log" : "Log complete days";
     const text = [intakeStep ? monthTip(intakeStep, facts) : offTarget ? "Hit the target on most days rather than making up for it on one." : null,
-      unreadable ? `A complete log every day makes intake the easiest part of ${next} to read.` : null].filter(Boolean).join(" ");
+      unreadable ? (reusedOnly ? `A fresh record for each day keeps ${next}'s intake accurate.` : `A complete log every day makes intake the easiest part of ${next} to judge.`) : null]
+      .filter(Boolean).join(" ");
     items.push({ label: "Calories", tone: "energy", value, text });
   }
   const watch = discriminators.find((item) => item.source?.kind === "weight_trend");
@@ -1398,12 +1421,12 @@ function aheadModule({ synthesis, facts, steps, discriminators, period, energy, 
 
 // How to carry a step across a month (the Weekly's tips are day-scale).
 function monthTip(step, facts) {
-  if (step.mismatch) return "Logging meals as they happen, every day of the month ahead, is what makes the next read clean.";
+  if (step.mismatch) return "Logging meals as they happen, every day of the month ahead, gives the next check clean numbers.";
   switch (step.source?.kind) {
     case "weight_trend": return "A month of steady days on the plan's numbers does more than any single correction.";
     case "training_frequency": case "routine_break": return "Protecting the usual training days matters more than any single big week.";
     case "composition_result": case "guardrail_status":
-      return `Steady, ordinary weeks until the next ${facts.composition?.eventName ?? "check"} make its reading easier to trust.`;
+      return `Steady, ordinary weeks until the next ${facts.composition?.eventName ?? "check"} make its result easier to trust.`;
     case "intake_vs_plan": return "Hitting the target on most days across the month counts for more than any single day.";
     default: return "One adjustment, held for the month, is enough.";
   }

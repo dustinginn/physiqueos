@@ -195,7 +195,7 @@ describe("Narrative V3 remaining surface shadow projections", () => {
     expect(monthly.training.title).toContain("Leg press set a new session-volume best");
     expect(monthly.training.summary).toContain("Pull-ups set a new session-volume best");
     expect(monthly.training.interpretation).toContain("strong month of training");
-    expect(monthly.energy.title).toBe("Energy was a little hard to read this month.");
+    expect(monthly.energy.title).toBe("Energy was a little hard to judge this month.");
     expect(monthly.energy.summary).toContain("higher early in the month");
     expect(monthly.energy.summary).not.toMatch(/paired|derived estimate|calibration|wearable/iu);
     expect(monthly.changes.themes.map((item) => item.label))

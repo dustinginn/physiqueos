@@ -22,6 +22,7 @@
 // capacity. Each briefing type lists only the sections it needs.
 
 import { auditClaimRestraint } from "./BriefingClaimRestraint.js";
+import { findAnalyticalReadJargon } from "./BriefingLanguage.js";
 
 export const SectionRole = Object.freeze({
   HEADLINE: "headline",
@@ -151,7 +152,7 @@ export const REVIEW_CONTRACTS = Object.freeze({
     budgets: Object.freeze({
       [ReviewModule.OPENING]: { maxSentences: 3, maxWords: 75 },
       [ReviewModule.TRAINING]: { maxSentences: 5, maxWords: 110 },
-      [ReviewModule.ENERGY]: { maxSentences: 5, maxWords: 110 },
+      [ReviewModule.ENERGY]: { maxSentences: 6, maxWords: 130 },
       [ReviewModule.TRAJECTORY]: { maxSentences: 5, maxWords: 100 },
       [ReviewModule.CHANGES]: { maxSentences: 14, maxWords: 230 },
       [ReviewModule.MOMENTS]: { maxSentences: 12, maxWords: 190 },
@@ -179,6 +180,10 @@ export function auditReview(review, contract, { overlapCeiling = 0.5, claimSuppo
     .filter(Boolean).join(" ");
   const texts = Object.fromEntries(review.modules.map((module) => [module.role, prose(module)]));
   issues.push(...auditClaimRestraint({ ...texts, confidence: review.confidence }, claimSupport));
+  for (const [role, text] of Object.entries({ ...texts, confidence: review.confidence })) {
+    const jargon = findAnalyticalReadJargon(text);
+    if (jargon) issues.push(`${role}: analytical jargon "${jargon}"`);
+  }
   let totalWords = 0;
   for (const module of review.modules) {
     const budget = contract.budgets[module.role];
@@ -403,6 +408,10 @@ export function contentOverlap(left, right, { minimumShared = 3 } = {}) {
 export function auditSectionTexts(texts, contract, { overlapCeiling = 0.6, claimSupport = undefined } = {}) {
   // Claim restraint first: effectiveness and repair-the-past language.
   const issues = [...auditClaimRestraint(texts, claimSupport)];
+  for (const [role, text] of Object.entries(texts)) {
+    const jargon = findAnalyticalReadJargon(text);
+    if (jargon) issues.push(`${role}: analytical jargon "${jargon}"`);
+  }
   const headline = texts[R.HEADLINE];
   if (headline) {
     const words = headline.split(/\s+/u).filter(Boolean).length;

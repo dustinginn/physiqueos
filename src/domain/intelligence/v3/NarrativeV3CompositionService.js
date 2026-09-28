@@ -1040,7 +1040,7 @@ function composeWatchFallback(context) {
   if (purpose === "resolve_contradiction") return `${upperFirst(nextEvidenceName(context))} should resolve whether the latest setback is a real change or a one-off result.`;
   if (purpose === "assess_guardrail") return `${upperFirst(nextEvidenceName(context))} should show whether ${naturalList(context.consequentialGuardrails.map((item) => guardrailLabel(context.goalContract, item)))} ${context.consequentialGuardrails.length > 1 ? "are" : "is"} back where ${context.consequentialGuardrails.length > 1 ? "they need" : "it needs"} to be.`;
   if (purpose === "improve_measurement_quality") return "A cleaner, more complete measurement is the next useful step.";
-  if (purpose === "improve_attribution") return "Keep the plan stable long enough for the next result to give a clearer read on the change.";
+  if (purpose === "improve_attribution") return "Keep the plan stable long enough for the next result to show more clearly change.";
   if (purpose === "establish_phase_readiness") return `${upperFirst(nextEvidenceName(context))} should show whether this phase has earned the planned transition.`;
   if (purpose === "update_forecast") return `${upperFirst(nextEvidenceName(context))} should update how quickly the goal is likely to arrive.`;
 

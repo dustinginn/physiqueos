@@ -582,7 +582,7 @@ function surfaceSummary({ assessment, evidenceContextNote, historicalContext,
   const nextDexa = nextDecisiveEvidence.some((item) => item.semanticToken === "follow_up_dexa");
   if (surface === "photo_event" && historicalContext?.matchedOnly) {
     const date = formatDate(historicalContext.eventDate ?? assessment.sourceCutoff);
-    return `These photos gave us a visual checkpoint for ${date}, but they were not used to change confidence. This reflects what we knew at that point in time and does not replace today's reading.`;
+    return `These photos gave us a visual checkpoint for ${date}, but they were not used to change confidence. This reflects what we knew at that point in time and does not replace today's assessment.`;
   }
   if (surface === "dexa_event") {
     const date = formatDate(historicalContext?.eventDate ?? assessment.sourceCutoff);
@@ -635,7 +635,7 @@ function surfaceSummary({ assessment, evidenceContextNote, historicalContext,
 
 function historicalContextText(context) {
   if (!context?.matchedOnly) return "This explanation reflects what was known at that point in time.";
-  return "This historical reading does not replace today's confidence.";
+  return "This historical result does not replace today's confidence.";
 }
 
 function factorTokens(model) {

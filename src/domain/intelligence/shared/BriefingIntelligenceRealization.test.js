@@ -91,7 +91,12 @@ describe("shared-layer fixes", () => {
   it("unreliable baseline days are excluded from the routine they would bias", () => {
     const period = generateSyntheticPeriod({ seed: 4, scenario: "stable" });
     const baselineDays = period.days.filter((day) => day.date < period.truth.window.startDate);
-    for (const day of baselineDays.slice(3, 6)) day.nutrition.protein = Math.round(day.nutrition.protein * 0.25);
+    // Genuinely incomplete logs (a fraction of the day, few entries, no
+    // full-day assertion) — not merely unusual days.
+    for (const day of baselineDays.slice(3, 6)) {
+      day.nutrition = { ...day.nutrition, calories: Math.round(day.nutrition.calories * 0.3), protein: Math.round(day.nutrition.protein * 0.25),
+        evidence: { artifacts: [], observations: [], entries: 2, fullDayAsserted: false } };
+    }
     const intelligence = intelligenceFor(period.days, period.truth.window);
     expect(intelligence.limitations).toContainEqual({ reason: "unreliable_baseline_days_excluded", count: 3 });
     expect(intelligence.baselines.find((item) => item.signal === "nutrition.calories").n).toBe(baselineDays.length - 3);

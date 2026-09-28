@@ -120,7 +120,7 @@ export function composeDEXAEventNarrative({ scan, priorScan, phaseBaselineScan =
         : `You lost ${format(fatLost)} lb of fat, which accounts for most of the ${format(Math.abs(headline.weight.delta))} lb change in your DEXA weight. Most of that fat loss came from your trunk.`,
       leanMass: numericalThresholdComplete
         ? `Measured lean tissue ${leanChangePhrase} since the last scan, so the latest interval did not show lean-tissue loss. ${fullCutLeanConclusion} Hydration, glycogen, food mass, preparation, and true tissue change still qualify the exact reading without reversing its measured direction.`
-        : `Measured lean tissue ${leanChangePhrase}. DEXA lean-tissue readings can reflect glycogen, hydration, food mass, scan preparation, and true tissue change, so this result should be interpreted alongside training performance, recovery, and consistently prepared scans.`,
+        : `Measured lean tissue ${leanChangePhrase}. DEXA lean-tissue measurements can reflect glycogen, hydration, food mass, scan preparation, and true tissue change, so this result should be interpreted alongside training performance, recovery, and consistently prepared scans.`,
       regional: `You lost ${format(Math.abs(trunkFatChange))} lb of trunk fat and ${format(Math.abs(regionalFat.find((item) => item.region === "android")?.delta ?? 0))} lb of android fat. Your measured lean-tissue change was concentrated in the limbs, while the android region stayed ${describeStable(regionalLean.find((item) => item.region === "android")?.delta)}.`,
       supportingEvidence: supportingText,
       stoodOut: numericalThresholdComplete
@@ -252,7 +252,7 @@ function composeFirstDEXAEventNarrative({
     coachInsight: {
       biggestWin: "You now have a measured starting point for every future comparison.",
       protect: "Prepare for future scans the same way so small changes are easier to trust.",
-      watch: "Let the next comparable DEXA establish the direction instead of reading progress into one scan.",
+      watch: "Let the next comparable DEXA establish the direction instead of drawing conclusions from one scan.",
       next: "Keep the current plan steady until a later comparison gives us a reason to change it.",
     },
     goalCompletionHandoff: null,
@@ -802,7 +802,7 @@ function supportingEvidenceNarrative(support) {
   if (support.trainingDays) signals.push("training stayed productive");
   if (support.nutritionDays) signals.push("nutrition remained consistent enough to support the phase");
   if (support.photoSessions) signals.push("recent photos showed the same tightening pattern");
-  if (!signals.length) return "This scan comes from an earlier part of your journey, so the lean-tissue reading deserves context rather than an alarming conclusion.";
+  if (!signals.length) return "This scan comes from an earlier part of your journey, so the lean-tissue result deserves context rather than an alarming conclusion.";
   return `The scan matches the broader journey: ${joinNatural(signals)}.`;
 }
 function regionalComparison(region, prior, current, field) { const previous = mass(prior.regionalAssessment?.[region]?.[field]); const value = mass(current.regionalAssessment?.[region]?.[field]); return previous === null || value === null ? null : { region, label: title(region), previous, current: value, delta: rounded(value - previous), unit: "lb" }; }

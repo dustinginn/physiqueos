@@ -387,10 +387,10 @@ describe("hand-built pictures exercise paths the generator rarely reaches", () =
     const realized = realize([
       insight("routine", "routine_steady", "execution", "supportive"),
       { ...insight("nutrition", "nutrition_unclear", "limitation", "neutral", { dates: ["2026-09-24", "2026-09-25"],
-        datesByKind: { implausible_macro_profile: ["2026-09-24", "2026-09-25"] }, kinds: ["implausible_macro_profile"] }),
+        datesByKind: { partial_day: ["2026-09-24", "2026-09-25"] }, kinds: ["partial_day"] }),
         strength: 2.2, limits: ["nutrition"] },
     ]);
-    expect(realized.coachTake).toMatch(/too patchy to read; complete logs from here on/u);
+    expect(realized.coachTake).toMatch(/were incomplete, so they aren't counted; complete logs from here on/u);
     expect(realized.watch).not.toMatch(/log|fill/iu);
   });
 
@@ -487,7 +487,7 @@ describe("claim restraint: performance is not proof of effectiveness; logging gu
     for (const { label, realized } of weekly) {
       for (const text of sectionsOf(realized)) {
         expect(text, label).not.toMatch(RETROACTIVE_REPAIR_LANGUAGE);
-        if (/too patchy to read|looks copied/u.test(text)) {
+        if (/aren't counted|isn't counted/u.test(text)) {
           checked += 1;
           expect(text, label).toMatch(/from here on/u);
         }

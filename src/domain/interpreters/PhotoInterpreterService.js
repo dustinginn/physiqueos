@@ -190,7 +190,7 @@ export function getSystemPrompt() {
     "Never sound like an anatomy textbook, image captioning model, bodybuilding forum, or radiology report.",
     "Write for humans. Stability is useful evidence. Prefer: largely unchanged; definition appears comparable; no meaningful visible difference is apparent. Use possible or may only for genuinely subtle differences.",
     "Use evidence-to-confidence-to-strategy-to-goal language. Do not jump from observation directly to advice.",
-    "PhotoInterpreter exists to interpret reality. Confidence qualifies the interpretation; confidence must not suppress an otherwise well-supported coach read.",
+    "PhotoInterpreter exists to interpret reality. Confidence qualifies the interpretation; confidence must not suppress an otherwise well-supported coaching assessment.",
     "Think like a careful coach: first ask whether the photos are comparable, then whether any difference is large enough to characterize, then describe direction, then qualify certainty.",
     "Communicate trends with restraint: beginning to, appears to, emerging, suggests, supports, modestly increases confidence.",
     "End coach briefing by stating what PhysiqueOS will watch in the next comparison.",
@@ -217,7 +217,7 @@ export function getSystemPrompt() {
     "After forming the overall conclusion, do a second pass for the most important visual evidence supporting that conclusion.",
     "In that final observation pass, ask: what are the 3-6 most meaningful visual changes that explain why I reached this conclusion?",
     "Do not merely summarize. Observe the physique.",
-    "Do not stop at labels like leaner, maintained, or better conditioned. Describe what visually creates that read.",
+    "Do not stop at labels like leaner, maintained, or better conditioned. Describe what visually creates that impression.",
     "Do not list everything. Select the strongest details a physique coach would naturally point out, and give enough detail that the user can see what you saw.",
     "If evidence is strong and changes are meaningful, provide richer interpretation. If evidence is weak, stay concise.",
     "Observation depth should scale with evidence quality. Do not artificially shorten high-confidence interpretations.",
@@ -230,7 +230,7 @@ export function getSystemPrompt() {
     "When a region is unchanged, explain what that means visually. For example: chest does not appear larger, but the borders are cleaner because body fat appears lower while muscle is maintained.",
     "Prefer comparative language: shows clearer separation, borders are easier to distinguish, abdomen is flatter, transition between muscle groups is cleaner, waist is tighter, shoulder-to-waist ratio is stronger.",
     "Do not confuse no dramatic regional change with no meaningful regional observations. Subtle changes like clearer upper-ab separation, stronger linea alba, flatter lower abdomen, or sharper chest borders can be meaningful evidence.",
-    "Explain broad conclusions with specific evidence. Instead of only saying better conditioning, explain which visual details create that read.",
+    "Explain broad conclusions with specific evidence. Instead of only saying better conditioning, explain which visual details create that impression.",
     "Regional analysis should explain why the overall conclusion was reached. Regional analysis should not decide by itself whether progress occurred.",
     "Distinguish no meaningful regional change from meaningful overall physique improvement. They are not the same conclusion.",
     "Multiple small improvements can combine into meaningful overall progress over time: slightly tighter waist, flatter abdomen, maintained shoulders, maintained chest, cleaner proportions, and better overall shape.",
@@ -334,9 +334,9 @@ export function getUserPrompt({
         suggested_priorities:
           "Do not create unnecessary work. If evidence is weak, recommend continuing the current plan and collecting another comparable photo set.",
         trajectory_classification:
-          "Classify evidence as supporting, neutral, or contradictory only after the visual read. Goal context cannot turn ambiguous photos into directional evidence.",
+          "Classify evidence as supporting, neutral, or contradictory only after the visual assessment. Goal context cannot turn ambiguous photos into directional evidence.",
         overall_physique_first:
-          "Before judging individual regions, decide whether an experienced coach would say the overall physique appears meaningfully improved from silhouette, proportions, leanness, symmetry, and body shape. Preserve this overall read even when some regions remain uncertain.",
+          "Before judging individual regions, decide whether an experienced coach would say the overall physique appears meaningfully improved from silhouette, proportions, leanness, symmetry, and body shape. Preserve this overall impression even when some regions remain uncertain.",
         conditioning_layer:
           "Evaluate conditioning separately from silhouette and separately from individual muscle regions. Ask whether the newer photo looks leaner, harder, sharper, more defined, or less soft overall.",
         muscle_retention:
@@ -1034,7 +1034,7 @@ function sanitizeInterpreterValue(value) {
     .replace(/\bcurrent training and nutrition\b/gi, "current strategy")
     .replace(/\btraining and nutrition plan\b/gi, "current strategy")
     .replace(/\bcorroborate\b/gi, "confirm")
-    .replace(/\bcomprehensive assessment\b/gi, "clearer read")
+    .replace(/\bcomprehensive assessment\b/gi, "clearer picture")
     .replace(/\bmodifications\b/gi, "adjustments")
     .replace(/\bmagnitude of visual changes\b/gi, "amount of visual change")
     .replace(
@@ -1086,11 +1086,11 @@ function sanitizeInterpreterValue(value) {
       /\bonly (\d+) days elapsed, limiting visible change expectation\b/gi,
       "these photos are only $1 days apart, so only subtle visual changes would be expected"
     )
-    .replace(/\boverall visual assessment\b/gi, "overall read")
-    .replace(/\bfull assessment\b/gi, "full read")
+    .replace(/\boverall visual assessment\b/gi, "overall picture")
+    .replace(/\bfull assessment\b/gi, "full picture")
     .replace(
       /\bonly front view available; side and back views would improve analysis\b/gi,
-      "only the front view is available; side and back views would give a fuller read"
+      "only the front view is available; side and back views would give a fuller picture"
     )
     .replace(
       /\bpose is unknown in metadata; not standard front-relaxed\b/gi,
@@ -1098,7 +1098,7 @@ function sanitizeInterpreterValue(value) {
     )
     .replace(/\bpose mismatch limits comparability\b/gi, "because the poses differ, it is harder to compare confidently")
     .replace(/\bview-only match limits comparability\b/gi, "because only the view matches, it is harder to compare confidently")
-    .replace(/\bassessment clarity (?:is )?reduced\b/gi, "the read is less clear")
+    .replace(/\bassessment clarity (?:is )?reduced\b/gi, "the picture is less clear")
     .replace(
       /\bunknown pose details reduce ability to assess ([^.]+)\b/gi,
       "because pose details are unknown, it is harder to judge $1 confidently"
@@ -1152,7 +1152,7 @@ export function applyReasoningGuardrails(output) {
       global_shape_analysis:
         `${daysText}, the overall rear silhouette looks subtly tighter rather than meaningfully bigger or smaller.`,
       proportional_analysis:
-        "The shoulder-to-waist and back-width-to-waist read appears slightly cleaner because the waist looks tighter, not because upper-back size clearly increased.",
+        "The shoulder-to-waist and back-width-to-waist relationship appears slightly cleaner because the waist looks tighter, not because upper-back size clearly increased.",
       silhouette_observations: [
         "Overall rear silhouette appears slightly tighter.",
         "Waist occupies slightly less visual width.",
@@ -1174,7 +1174,7 @@ export function applyReasoningGuardrails(output) {
       ],
       uncertain_or_limited_observations: [
         "One week is too short to claim confident muscle gain.",
-        "Back photos support the visible-abs goal indirectly; front and side views are still needed for the clearest read.",
+        "Back photos support the visible-abs goal indirectly; front and side views are still needed for the clearest picture.",
       ],
       pose_specific_notes: [
         {
@@ -1221,7 +1221,7 @@ export function applyReasoningGuardrails(output) {
       trend_assessment:
         `${daysText}, the trend looks modestly positive: maintained upper body with possible emerging leanness through the rear waist and lower back.`,
       trend_interpretation:
-        "The most useful read is muscle maintained, conditioning possibly improving, and no sign that the plan needs adjustment.",
+        "The most useful takeaway is muscle maintained, conditioning possibly improving, and no sign that the plan needs adjustment.",
       decision_support: {
         should_change_plan: false,
         recommendation: "Stay the course.",
@@ -1236,7 +1236,7 @@ export function applyReasoningGuardrails(output) {
         `${daysText}, this is not enough to claim major change, but it is useful emerging evidence in the goal's direction.`,
       detailed_interpretation: {
         summary:
-          "The dominant story is a subtle but positive rear comparison: upper-back shape is maintained while the rear waist and lower back look a little tighter. Because this is a short interval, the detailed read should be treated as emerging evidence rather than confirmed change.",
+          "The dominant story is a subtle but positive rear comparison: upper-back shape is maintained while the rear waist and lower back look a little tighter. Because this is a short interval, the detailed assessment should be treated as emerging evidence rather than confirmed change.",
         sections: [
           {
             region: "Overall Rear Physique",
@@ -1247,7 +1247,7 @@ export function applyReasoningGuardrails(output) {
             what_did_not_change:
               "Upper-back size does not appear meaningfully larger or smaller.",
             why:
-              "The useful read is maintained upper body with possible emerging leanness through the waist.",
+              "The useful takeaway is maintained upper body with possible emerging leanness through the waist.",
             limitations: ["One week is short, so subtle differences need confirmation."],
           },
           {
@@ -1283,7 +1283,7 @@ export function applyReasoningGuardrails(output) {
             what_did_not_change:
               "This is not enough to confirm a major fat-loss change by itself.",
             why:
-              "The lower-back area reads a little cleaner, which improves the rear taper.",
+              "The lower-back area looks a little cleaner, which improves the rear taper.",
             limitations: ["Small changes can be affected by stance, camera angle, and lighting."],
           },
           {
@@ -1295,7 +1295,7 @@ export function applyReasoningGuardrails(output) {
             what_did_not_change:
               "No conclusion should be drawn about front visible-ab progress from this rear-only comparison.",
             why: "Those regions are not visible enough in the supplied rear photos.",
-            limitations: ["Add matching front and side views for a complete physique read."],
+            limitations: ["Add matching front and side views for a complete physique picture."],
           },
         ],
       },
@@ -1337,7 +1337,7 @@ export function applyReasoningGuardrails(output) {
       trajectory_support_summary:
         "The comparison modestly supports the working hypothesis: fat loss while preserving upper-body muscle.",
       global_shape_analysis:
-        `${daysText}, the front silhouette appears slightly more athletic because the waist reads modestly tighter while the upper body remains maintained.`,
+        `${daysText}, the front silhouette appears slightly more athletic because the waist looks modestly tighter while the upper body remains maintained.`,
       proportional_analysis:
         "The shoulder-to-waist relationship appears slightly cleaner because the waist looks modestly tighter while the chest, shoulders, and arms appear maintained.",
       silhouette_observations: [
@@ -1347,7 +1347,7 @@ export function applyReasoningGuardrails(output) {
       ],
       ratio_observations: [
         "Shoulder-to-waist ratio appears slightly cleaner.",
-        "Taper appears subtly improved because the waist reads tighter, not because upper-body size clearly changed.",
+        "Taper appears subtly improved because the waist looks tighter, not because upper-body size clearly changed.",
         "No confident evidence of upper-body muscle loss.",
       ],
       high_confidence_observations: [
@@ -1373,7 +1373,7 @@ export function applyReasoningGuardrails(output) {
             "Waist appears modestly tighter.",
             "Midsection conditioning appears to be improving modestly.",
             "Chest, shoulders, and arms appear maintained.",
-            "The overall front silhouette reads slightly more athletic.",
+            "The overall front silhouette looks slightly more athletic.",
           ],
         },
       ],
@@ -1415,14 +1415,14 @@ export function applyReasoningGuardrails(output) {
         `${daysText}, this is emerging evidence supporting the current fat-loss strategy, not confirmed major change.`,
       detailed_interpretation: {
         summary:
-          "The dominant story is modest support for fat loss while preserving the upper body. The front silhouette reads a little cleaner, but the interval is short enough that these are emerging signals rather than confirmed transformation.",
+          "The dominant story is modest support for fat loss while preserving the upper body. The front silhouette looks a little cleaner, but the interval is short enough that these are emerging signals rather than confirmed transformation.",
         sections: [
           {
             region: "Overall Physique",
             status: "improved",
             confidence: "moderate",
             what_changed:
-              "The front silhouette looks slightly more athletic because the waist reads modestly tighter.",
+              "The front silhouette looks slightly more athletic because the waist looks modestly tighter.",
             what_did_not_change:
               "There is no dramatic whole-body change over this short interval.",
             why:
@@ -1434,12 +1434,12 @@ export function applyReasoningGuardrails(output) {
             status: "maintained",
             confidence: "moderate",
             what_changed:
-              "Chest borders may read a little cleaner as the torso leans out.",
+              "Chest borders may look a little cleaner as the torso leans out.",
             what_did_not_change:
               "Chest size does not appear meaningfully larger or smaller.",
             why:
               "The chest remains visually present while the midsection looks slightly tighter.",
-            limitations: ["Arm position can affect how chest width and fullness read."],
+            limitations: ["Arm position can affect how chest width and fullness look."],
           },
           {
             region: "Midsection / Waist",
@@ -1451,14 +1451,14 @@ export function applyReasoningGuardrails(output) {
               "Lower abs are not fully established as a clear visual change.",
             why:
               "A slightly cleaner waist improves the shoulder-to-waist relationship.",
-            limitations: ["Abdominal engagement and posture can change the front read."],
+            limitations: ["Abdominal engagement and posture can change the front view."],
           },
           {
             region: "Shoulders / Arms",
             status: "maintained",
             confidence: "moderate",
             what_changed:
-              "Shoulders and arms stand out slightly more because the waist reads tighter.",
+              "Shoulders and arms stand out slightly more because the waist looks tighter.",
             what_did_not_change:
               "There is no clear evidence of new muscle gain or muscle loss.",
             why:
@@ -1474,7 +1474,7 @@ export function applyReasoningGuardrails(output) {
             what_did_not_change:
               "No conclusion should be drawn about rear or lower-body progress.",
             why: "Those regions are not visible enough in the supplied front view.",
-            limitations: ["Add matching rear and side photos for a complete physique read."],
+            limitations: ["Add matching rear and side photos for a complete physique picture."],
           },
         ],
       },
@@ -1499,7 +1499,7 @@ export function applyReasoningGuardrails(output) {
       user_facing_summary:
         `There are a few subtle signs you are moving in the right direction. Your overall shape looks a little cleaner, with the clearest change around the waist. Your upper body appears maintained, and your shoulder-to-waist ratio looks slightly sharper. It is still too early to call this a meaningful visual change, but the comparison modestly supports your current plan. I would stay the course.`,
       coach_briefing_insert:
-        `This front comparison modestly supports the direction of your goal. The useful read is your overall silhouette first: your waist looks modestly tighter, your shoulder-to-waist ratio looks slightly cleaner, and your upper body appears well maintained. These are small changes, not a confirmed transformation. Nothing here suggests we should change your plan. In the next comparison, PhysiqueOS will watch whether the tighter waist and cleaner front silhouette become a consistent trend.`,
+        `This front comparison modestly supports the direction of your goal. The useful takeaway is your overall silhouette first: your waist looks modestly tighter, your shoulder-to-waist ratio looks slightly cleaner, and your upper body appears well maintained. These are small changes, not a confirmed transformation. Nothing here suggests we should change your plan. In the next comparison, PhysiqueOS will watch whether the tighter waist and cleaner front silhouette become a consistent trend.`,
     };
   }
 
@@ -1545,7 +1545,7 @@ export function applyReasoningGuardrails(output) {
       "The interval is short, so subtle differences may reflect normal day-to-day variation.",
     ],
     trend_interpretation:
-      `${daysText}, the safest read is stable physique with possible emerging trend evidence.`,
+      `${daysText}, the safest conclusion is stable physique with possible emerging trend evidence.`,
     strategy_recommendation: "Stay the course.",
     should_change_plan: false,
     why_or_why_not:
@@ -1601,7 +1601,7 @@ function applyDetailedInterpretationDepth(output) {
       status: "improved",
       confidence: "moderate",
       what_changed:
-        "The dominant read is a leaner, cleaner front silhouette. The waist and lower abdomen draw less visual attention, which makes the upper body stand out more.",
+        "The main impression is a leaner, cleaner front silhouette. The waist and lower abdomen draw less visual attention, which makes the upper body stand out more.",
       what_did_not_change:
         "The upper body does not need to look bigger for this to be a successful cut, and there is no clear sign of upper-body drop-off.",
       why:
@@ -1613,7 +1613,7 @@ function applyDetailedInterpretationDepth(output) {
       status: "improved",
       confidence: "moderate",
       what_changed:
-        "The torso reads sharper and less soft. Muscle borders are easier to distinguish, especially through the midsection and chest outline.",
+        "The torso looks sharper and less soft. Muscle borders are easier to distinguish, especially through the midsection and chest outline.",
       what_did_not_change:
         "This does not prove an exact body-fat percentage or isolate where all fat was lost.",
       why:
@@ -1625,11 +1625,11 @@ function applyDetailedInterpretationDepth(output) {
       status: "improved",
       confidence: "moderate",
       what_changed:
-        "The shoulder-to-waist relationship looks cleaner because the waist reads tighter while the upper body appears maintained.",
+        "The shoulder-to-waist relationship looks cleaner because the waist looks tighter while the upper body appears maintained.",
       what_did_not_change:
         "There is no convincing evidence that shoulder width increased; the proportion change appears driven by the waist.",
       why:
-        "A smaller-looking waist makes the same upper body read more athletic.",
+        "A smaller-looking waist makes the same upper body look more athletic.",
       limitations: ["Arm angle and posture can affect perceived shoulder width."],
     },
     {
@@ -1637,7 +1637,7 @@ function applyDetailedInterpretationDepth(output) {
       status: "maintained",
       confidence: "moderate",
       what_changed:
-        "The lower chest border and overall chest outline read a bit sharper as the torso leans out.",
+        "The lower chest border and overall chest outline look a bit sharper as the torso leans out.",
       what_did_not_change:
         "Chest size does not appear meaningfully larger, but there is no clear evidence of volume loss.",
       why:
@@ -1649,7 +1649,7 @@ function applyDetailedInterpretationDepth(output) {
       status: "improved",
       confidence: "moderate",
       what_changed:
-        "Upper and mid-ab separation is easier to see, the midline reads stronger, and the lower abdomen looks flatter.",
+        "Upper and mid-ab separation is easier to see, the midline looks stronger, and the lower abdomen looks flatter.",
       what_did_not_change:
         "Lower abs have not fully emerged yet, which is normal late-cut territory.",
       why:
@@ -1665,7 +1665,7 @@ function applyDetailedInterpretationDepth(output) {
       what_did_not_change:
         "Oblique detail is not fully established as a high-confidence isolated change.",
       why:
-        "Cleaner edges through the side of the torso support the overall leaner read.",
+        "Cleaner edges through the side of the torso support the overall leaner look.",
       limitations: ["Front-only photos limit how confidently obliques can be judged."],
     },
     {
@@ -1690,7 +1690,7 @@ function applyDetailedInterpretationDepth(output) {
         "No conclusion should be drawn about these regions from the supplied front view alone.",
       why:
         "Those regions are either not visible or not visible enough to evaluate honestly.",
-      limitations: ["Add matching rear and side views for a full physique read."],
+      limitations: ["Add matching rear and side views for a full physique picture."],
     },
   ];
 
@@ -1711,7 +1711,7 @@ function applyDetailedInterpretationDepth(output) {
     detailed_interpretation: {
       summary:
         output.detailed_interpretation?.summary ||
-        "The detailed read supports a leaner front silhouette with maintained upper-body shape.",
+        "The detailed assessment supports a leaner front silhouette with maintained upper-body shape.",
       sections: mergedSections,
     },
   };
@@ -1787,22 +1787,22 @@ function applyAccumulatedOverallProgressGuardrail(output) {
       "Your physique is noticeably leaner than at the start of this comparison.",
     global_shape_analysis:
       compatibleGlobalShapeAnalysis ||
-      "The overall shape is the main read: the body appears cleaner through the waist while upper-body shape is maintained.",
+      "The overall shape is the main takeaway: the body appears cleaner through the waist while upper-body shape is maintained.",
     proportional_analysis:
       output.proportional_analysis ||
-      "The shoulder-to-waist relationship appears to be moving in the right direction because the waist reads tighter while the upper body remains maintained.",
+      "The shoulder-to-waist relationship appears to be moving in the right direction because the waist looks tighter while the upper body remains maintained.",
     high_confidence_observations: uniqueStrings([
       ...compatibleHighConfidenceObservations,
       "Upper body appears maintained.",
-      "Waist and lower abdomen read tighter than at the start of the comparison.",
+      "Waist and lower abdomen look tighter than at the start of the comparison.",
       "Overall silhouette looks cleaner, with a stronger shoulder-to-waist relationship.",
-      "Chest, shoulders, and arms do not need to look larger for this to be a successful cut; they read maintained while the torso looks leaner.",
+      "Chest, shoulders, and arms do not need to look larger for this to be a successful cut; they look maintained while the torso looks leaner.",
     ]),
     emerging_evidence: uniqueStrings([
       ...compatibleEmergingEvidence,
       "Upper and midsection definition appears clearer, even though the lower abs have not fully emerged yet.",
       "Chest and shoulder borders look a bit sharper while upper-body size appears maintained.",
-      "The lower abdomen reads flatter, which supports the cleaner waist and improved front silhouette.",
+      "The lower abdomen looks flatter, which supports the cleaner waist and improved front silhouette.",
       "The transition from ribs into waist appears cleaner, giving the physique a more athletic look.",
       "Shoulders and arms stand out slightly more because the waist and midsection look tighter, not because there is clear evidence of new muscle gain.",
       "Several small silhouette, conditioning, and proportion changes are adding up to meaningful overall progress.",
@@ -1833,7 +1833,7 @@ function applyAccumulatedOverallProgressGuardrail(output) {
           status: "improved",
           confidence: "moderate",
           what_changed:
-            "The overall silhouette reads leaner and more athletic. The waist and lower abdomen occupy less visual attention, which makes the upper body stand out more.",
+            "The overall silhouette looks leaner and more athletic. The waist and lower abdomen occupy less visual attention, which makes the upper body stand out more.",
           what_did_not_change:
             "Upper-body size does not appear meaningfully larger, and there is no need for it to look larger for this to be a successful cut.",
           why:
@@ -1861,7 +1861,7 @@ function applyAccumulatedOverallProgressGuardrail(output) {
           status: "maintained",
           confidence: "moderate",
           what_changed:
-            "Chest borders read a bit sharper, especially around the lower pec line, because surrounding body fat appears lower.",
+            "Chest borders look a bit sharper, especially around the lower pec line, because surrounding body fat appears lower.",
           what_did_not_change:
             "Chest size does not appear meaningfully larger, but there is also no clear evidence of volume loss.",
           why:
@@ -1875,7 +1875,7 @@ function applyAccumulatedOverallProgressGuardrail(output) {
           status: "improved",
           confidence: "moderate",
           what_changed:
-            "Upper and mid abs show clearer separation. The midline is easier to read, and the lower abdomen looks flatter.",
+            "Upper and mid abs show clearer separation. The midline is easier to see, and the lower abdomen looks flatter.",
           what_did_not_change:
             "Lower abs have not fully emerged yet, which is expected because they are often one of the last areas to become clearly visible.",
           why:
@@ -1889,9 +1889,9 @@ function applyAccumulatedOverallProgressGuardrail(output) {
           status: "improved",
           confidence: "moderate",
           what_changed:
-            "The waist reads tighter, and the transition from ribs into waist looks cleaner. This improves the shoulder-to-waist relationship.",
+            "The waist looks tighter, and the transition from ribs into waist looks cleaner. This improves the shoulder-to-waist relationship.",
           what_did_not_change:
-            "This does not prove a dramatic fat-loss change in one isolated area; it supports the overall leaner read.",
+            "This does not prove a dramatic fat-loss change in one isolated area; it supports the overall leaner look.",
           why:
             "A cleaner rib-to-waist transition makes the whole front silhouette look more athletic.",
           limitations: [

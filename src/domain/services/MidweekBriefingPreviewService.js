@@ -117,7 +117,7 @@ function piVerdict(selection) {
       primary.measuredDirections.training
     )
       ? "Training needs attention before Sunday."
-      : "Training is giving us the clearest read on your week so far.";
+      : "Training is giving the clearest picture of your week so far.";
   }
   if (primary.candidateType === "direct_recovery") {
     return primary.renderingContext?.relationshipState === "strained"

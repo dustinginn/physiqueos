@@ -99,8 +99,12 @@ export function createBriefingIntelligence({ window, days = [], policy = {} } = 
 
   // Reliability is judged on baseline and window days alike: an unreliable
   // baseline day would otherwise bias the very routine it is compared against.
-  const allReliability = detectReliabilityFindings({ windowDates: [...baselineDates, ...windowDates],
-    baselineDates, dayAt, settings });
+  // Completeness decides whether a day's record can be used at all; an
+  // unusual day with a complete record is behavior, kept and reported
+  // separately as an anomaly — never discarded for being unusual.
+  const { reliability: allReliability, anomalies: allAnomalies } = detectReliabilityFindings({
+    windowDates: [...baselineDates, ...windowDates], baselineDates, dayAt, settings });
+  const anomalies = allAnomalies.filter((item) => item.date >= window.startDate);
   const unreliable = new Set(allReliability.map((item) => `${item.domain}|${item.date}`));
   const reliability = allReliability.filter((item) => item.date >= window.startDate);
   const baselineUnreliableDays = allReliability.length - reliability.length;
@@ -188,6 +192,7 @@ export function createBriefingIntelligence({ window, days = [], policy = {} } = 
     patterns: ranked,
     characterization,
     reliability,
+    anomalies,
     limitations: baselineUnreliableDays
       ? [...limitations, { reason: "unreliable_baseline_days_excluded", count: baselineUnreliableDays }]
       : limitations,
@@ -387,39 +392,62 @@ function detectRecurrence({ segments, baselineDates, dayAt, observable, settings
   return result;
 }
 
+// Reliability answers one question: does the recorded intake plausibly
+// represent enough of the day to use? It is decided by completeness evidence
+// only — a source's partial-day marker, a record that is not independent
+// evidence of its own day (built from another day's source artifacts), or a
+// sparse record (a very low total with collapsed protein, few entries and no
+// full-day assertion). How unusual a day is compared with the person's own
+// baseline is never, by itself, evidence of bad data: it is reported as an
+// anomaly (behavior worth attention) and the day stays in every average.
 function detectReliabilityFindings({ windowDates, baselineDates, dayAt, settings }) {
-  const findings = [];
+  const reliability = [];
+  const anomalies = [];
   const proteinBase = baselineDates.map((date) => dayAt(date).nutrition)
     .filter((item) => Number.isFinite(item?.protein) && Number.isFinite(item?.calories) && item.calories > 0);
-  const proteinStats = proteinBase.length >= settings.minBaselineValueDays
-    ? robustStats(proteinBase.map((item) => item.protein), { scaleFloor: 10, relativeFloor: 0.06 }) : null;
-  const shareStats = proteinBase.length >= settings.minBaselineValueDays
-    ? robustStats(proteinBase.map((item) => (item.protein * 4) / item.calories), { scaleFloor: 0.02, relativeFloor: 0.05 }) : null;
+  const enough = proteinBase.length >= settings.minBaselineValueDays;
+  const proteinStats = enough ? robustStats(proteinBase.map((item) => item.protein), { scaleFloor: 10, relativeFloor: 0.06 }) : null;
+  const shareStats = enough ? robustStats(proteinBase.map((item) => (item.protein * 4) / item.calories), { scaleFloor: 0.02, relativeFloor: 0.05 }) : null;
+  const calorieMedian = enough ? robustStats(proteinBase.map((item) => item.calories), { scaleFloor: 100, relativeFloor: 0.05 }).median : null;
+  const artifactsSeen = new Map();
   let previous = null;
   for (const date of windowDates) {
     const nutrition = dayAt(date).nutrition;
-    if (nutrition && Number.isFinite(nutrition.calories)) {
-      if (proteinStats && shareStats && Number.isFinite(nutrition.protein) && nutrition.calories > 0) {
-        const proteinZ = (nutrition.protein - proteinStats.median) / proteinStats.scale;
-        const shareZ = ((nutrition.protein * 4) / nutrition.calories - shareStats.median) / shareStats.scale;
-        if (proteinZ <= -settings.reliabilityZ && shareZ <= -settings.reliabilityZ) {
-          findings.push({ id: `reliability|nutrition|${date}|implausible_macro_profile`, domain: "nutrition", date,
-            kind: "implausible_macro_profile", effect: "excluded_from_behavior",
-            evidence: { proteinZ: round(proteinZ, 2), proteinShareZ: round(shareZ, 2) } });
-        }
-      }
-      if (previous && sameTotals(previous.nutrition, nutrition)) {
-        findings.push({ id: `reliability|nutrition|${date}|duplicate_day_totals`, domain: "nutrition", date,
-          kind: "duplicate_day_totals", effect: "excluded_from_behavior", evidence: { duplicateOf: previous.date } });
-      }
-      if (nutrition.completeness === "partial") {
-        findings.push({ id: `reliability|nutrition|${date}|partial_day`, domain: "nutrition", date,
-          kind: "partial_day", effect: "excluded_from_behavior", evidence: {} });
-      }
+    if (!nutrition || !Number.isFinite(nutrition.calories)) { previous = null; continue; }
+    const evidence = nutrition.evidence ?? {};
+    const push = (kind, extra = {}) => reliability.push({ id: `reliability|nutrition|${date}|${kind}`, domain: "nutrition", date,
+      kind, basis: "completeness", effect: "excluded_from_behavior", evidence: extra });
+    // A. Completeness.
+    if (nutrition.completeness === "partial") push("partial_day");
+    // Only identifying artifacts (a file name or a submission id) can show
+    // reuse; generic labels like "Photo 1" name nothing in particular.
+    const artifacts = (evidence.artifacts ?? []).filter((ref) => /\.[a-z0-9]{2,5}$|evidence_submission_|^[0-9a-f]{24,}/iu.test(String(ref)));
+    const reused = artifacts.length ? [...artifactsSeen.entries()].find(([, list]) => artifacts.every((ref) => list.includes(ref)) ||
+      list.every((ref) => artifacts.includes(ref)) && list.length >= 2) : null;
+    if (reused) push("duplicate_source_evidence", { sameSourceAs: reused[0] });
+    if (artifacts.length) artifactsSeen.set(date, artifacts);
+    const proteinZ = proteinStats && Number.isFinite(nutrition.protein) ? (nutrition.protein - proteinStats.median) / proteinStats.scale : null;
+    const shareZ = shareStats && Number.isFinite(nutrition.protein) && nutrition.calories > 0
+      ? ((nutrition.protein * 4) / nutrition.calories - shareStats.median) / shareStats.scale : null;
+    const collapsed = proteinZ != null && proteinZ <= -settings.reliabilityZ;
+    if (calorieMedian && nutrition.calories < 0.5 * calorieMedian && collapsed && !evidence.fullDayAsserted &&
+        (evidence.entries == null || evidence.entries <= 3)) {
+      push("sparse_day", { share: round(nutrition.calories / calorieMedian, 2), entries: evidence.entries ?? null });
     }
-    previous = nutrition && Number.isFinite(nutrition.calories) ? { date, nutrition } : null;
+    // B. Anomaly: unusual behavior on a usable record — kept, and reported.
+    if (collapsed && shareZ != null && shareZ <= -settings.reliabilityZ) {
+      anomalies.push({ id: `anomaly|nutrition|${date}|low_protein`, domain: "nutrition", date, kind: "low_protein", basis: "anomaly",
+        effect: "kept_and_reported", evidence: { proteinZ: round(proteinZ, 2), proteinShareZ: round(shareZ, 2) } });
+    }
+    // Totals that match the previous day on independent evidence are a
+    // repeated day (a person can eat the same things), not bad data.
+    if (previous && sameTotals(previous.nutrition, nutrition) && !reused) {
+      anomalies.push({ id: `anomaly|nutrition|${date}|repeated_day_totals`, domain: "nutrition", date, kind: "repeated_day_totals",
+        basis: "anomaly", effect: "kept_and_reported", evidence: { sameAs: previous.date } });
+    }
+    previous = { date, nutrition };
   }
-  return findings;
+  return { reliability, anomalies };
 }
 
 // ---------------------------------------------------------------- ranking

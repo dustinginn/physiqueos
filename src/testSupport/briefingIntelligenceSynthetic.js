@@ -132,14 +132,22 @@ export function generateSyntheticPeriod({ seed, scenario, windowEnd = "2026-09-1
     truth.perturbed = run;
   } else if (scenario === "underlogged_day") {
     const [date] = span(1);
+    // A genuinely incomplete log: a fraction of the day's food recorded, with
+    // no full-day assertion and few entries (an unusual but complete day is
+    // behavior, not this).
     const day = at(date);
-    day.nutrition.protein = Math.round(day.nutrition.protein * between(0.3, 0.45));
+    day.nutrition.calories = Math.round(day.nutrition.calories * between(0.25, 0.4));
+    day.nutrition.protein = Math.round(day.nutrition.protein * between(0.2, 0.35));
+    day.nutrition.evidence = { artifacts: [], observations: [], entries: 2, fullDayAsserted: false };
     truth.perturbed = [date];
   } else if (scenario === "duplicate_day") {
     const index = 1 + Math.floor(random() * (windowDates.length - 1));
     const previous = at(windowDates[index - 1]);
+    // A record rebuilt from the previous day's own screenshots.
+    previous.nutrition.evidence = { artifacts: ["IMG_9001.jpeg", "IMG_9002.png"], observations: [], entries: 12, fullDayAsserted: false };
     at(windowDates[index]).nutrition = { ...previous.nutrition,
-      calories: previous.nutrition.calories + 0.4, protein: previous.nutrition.protein + 0.2 };
+      calories: previous.nutrition.calories + 0.4, protein: previous.nutrition.protein + 0.2,
+      evidence: { artifacts: ["IMG_9001.jpeg", "IMG_9002.png", "IMG_9003.jpeg"], observations: [], entries: 12, fullDayAsserted: false } };
     truth.perturbed = [windowDates[index]];
   } else if (scenario === "wearable_noise") {
     for (const date of windowDates) {
@@ -157,14 +165,22 @@ export function syntheticCanonicalRecords({ days, userId = "user_founder_001" })
   const weightEntries = [];
   for (const day of days) {
     if (day.nutrition) {
+      // A day with its own evidence (a screenshot log with entries, no
+      // full-day assertion) is recorded as such; otherwise a device full day.
+      const evidence = day.nutrition.evidence;
+      const logged = evidence && evidence.fullDayAsserted === false;
+      const meals = logged ? [{ id: "meal_1", name: "Logged", foods: Array.from({ length: evidence.entries ?? 0 },
+        (_, index) => ({ id: `food_${index + 1}`, name: `Food ${index + 1}` })) }] : [];
       canonicalObjects.push({ canonicalId: `nutrition|${day.date}|synthetic`, evidence_type: "nutrition",
         firstObservedAt: day.date, lastObservedAt: day.date, quality: { status: "active" }, userId,
         payload: { id: `synthetic_nutrition_${day.date}`, evidence_type: "nutrition", observed_at: day.date,
-          source: { application: "Apple Health", integration: "HealthKit", modality: "direct" },
+          source: logged ? { modality: "screenshot", source_artifact_refs: evidence.artifacts ?? [] }
+            : { application: "Apple Health", integration: "HealthKit", modality: "direct" },
           daily_totals: { calories: day.nutrition.calories, protein_g: day.nutrition.protein,
             carbs_g: day.nutrition.carbs, fat_g: day.nutrition.fat },
-          metadata: { date: day.date, daily_totals_scope: "full_day_summary", completeness: "complete",
-            meal_count: 0, coverage: "complete_day" },
+          meals,
+          metadata: logged ? { date: day.date, daily_totals_scope: "partial_meal_subtotal", completeness: "partial_meal_subtotal", meal_count: meals.length }
+            : { date: day.date, daily_totals_scope: "full_day_summary", completeness: "complete", meal_count: 0, coverage: "complete_day" },
           quality: { status: "complete" } } });
     }
     if (day.activity) {

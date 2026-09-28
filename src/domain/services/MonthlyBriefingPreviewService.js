@@ -1712,7 +1712,7 @@ function composeLegacyMonthlyNarrative(evidence, monthWindow, currentDexa, prior
       moments: [
         currentDexa ? {
           date: toDateKey(currentDexa.measuredAt || currentDexa.date),
-          label: "Composition read point",
+          label: "Composition checkpoint",
           body: "Composition and scale context were interpreted together to avoid overclaiming lean-mass change.",
         } : null,
         photos.length > 1 ? {

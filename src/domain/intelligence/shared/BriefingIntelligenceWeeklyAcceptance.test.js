@@ -93,20 +93,23 @@ describe("Shared Briefing Intelligence through the Weekly V3 pipeline", () => {
     }
   });
 
-  it("unreliable food logging is said only when it limits the picture, and never read as eating more or less", async () => {
+  it("incomplete food logging is said only when it limits the picture, and never taken as eating more or less", async () => {
     for (const seed of SEEDS) {
       const period = generateSyntheticPeriod({ seed, scenario: "late_disruption" });
-      for (const day of period.days.slice(-3)) day.nutrition.protein = Math.round(day.nutrition.protein * 0.3);
+      for (const day of period.days.slice(-3)) {
+        day.nutrition = { ...day.nutrition, calories: Math.round(day.nutrition.calories * 0.3), protein: Math.round(day.nutrition.protein * 0.3),
+          evidence: { artifacts: [], observations: [], entries: 2, fullDayAsserted: false } };
+      }
       const prepared = await weekly(period);
       const coach = prepared.narrativePlan.composition.coachTake;
-      expect(coach).toMatch(/food logs? (?:was|were) too patchy to read; complete logs from here on will make the next check clearer\./u);
+      expect(coach).toMatch(/food logs? (?:was|were) incomplete, so (?:it isn't|they aren't) counted; complete logs from here on will make the next check clearer\./u);
       const all = [...Object.values(prepared.narrativePlan.composition.sections), coach].join(" ");
       expect(all).not.toMatch(/\b(?:ate|eating|intake) (?:more|less|higher|lower)\b/iu);
       expect(all).not.toMatch(/intake stayed on (?:plan|target)/u);
-      // A single odd day does not earn a mention.
+      // A single unusual (but complete) day does not earn a mention.
       const single = generateSyntheticPeriod({ seed, scenario: "stable" });
       single.days.at(-1).nutrition.protein = Math.round(single.days.at(-1).nutrition.protein * 0.3);
-      expect((await weekly(single)).narrativePlan.composition.coachTake).not.toMatch(/patchy/u);
+      expect((await weekly(single)).narrativePlan.composition.coachTake).not.toMatch(/incomplete|counted/u);
     }
   });
 

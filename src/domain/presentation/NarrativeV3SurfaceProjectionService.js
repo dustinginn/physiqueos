@@ -542,7 +542,7 @@ function projectMonthlyFromIntelligence(context, intelligence) {
     } : null,
     energy: energy ? {
       eyebrow: "Nutrition and Energy",
-      title: "Energy was a little hard to read this month.",
+      title: "Energy was a little hard to judge this month.",
       summary: energySummary,
       interpretation: "Keep intake and activity where they are for now. Revisit them if training stalls, body-composition progress slows, or body fat begins pressing the guardrail.",
     } : null,

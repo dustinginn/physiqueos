@@ -52,10 +52,24 @@ function activeGoalWindow(fixture) {
     ? addDays(String(completionDate).slice(0, 10), 1)
     : String(activePhase?.startDate ?? fixture.previewWindow.startDate).slice(0, 10);
   return {
-    label: `${activePhase?.name ?? "Active Goal"} · Phase 1`,
+    label: phaseLabelOf(fixture.goal, activePhase),
     startDate,
     endDate: fixture.previewWindow.endDate,
   };
+}
+
+// The phase's canonical name and its position in the Goal's phase order
+// (the phase record's own `order`, else its place by start date). Never a
+// fixed ordinal.
+export function phaseLabelOf(goal, activePhase) {
+  if (!activePhase) return "Active Goal";
+  const phases = [...(goal?.phases ?? [])];
+  const ordered = phases.every((phase) => Number.isInteger(phase?.order))
+    ? phases.sort((left, right) => left.order - right.order)
+    : phases.sort((left, right) => String(left.startDate ?? "").localeCompare(String(right.startDate ?? "")));
+  const index = ordered.findIndex((phase) => phase.id === activePhase.id);
+  const position = Number.isInteger(activePhase.order) ? activePhase.order + 1 : index >= 0 ? index + 1 : null;
+  return position ? `${activePhase.name} · Phase ${position}` : activePhase.name;
 }
 
 function energyRecords(fixture, window = fixture.previewWindow) {

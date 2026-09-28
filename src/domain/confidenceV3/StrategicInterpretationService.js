@@ -426,8 +426,8 @@ function resolveNextDecisiveEvidence({ feasibilityState, persistenceState, evide
   return Object.freeze({
     evidenceType: evidenceDomain,
     reason: feasibilityState === FeasibilityState.UNPROVEN
-      ? "a first authoritative reading is needed to demonstrate feasibility at all"
-      : "a further comparable reading in the same direction would increase persistence",
+      ? "a first authoritative measurement is needed to demonstrate feasibility at all"
+      : "a further comparable measurement in the same direction would increase persistence",
   });
 }
 

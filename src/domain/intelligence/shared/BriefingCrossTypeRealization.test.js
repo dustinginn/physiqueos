@@ -133,7 +133,7 @@ describe("Midweek: light, partial and provisional", () => {
         expect(realized.meaning, label).toMatch(/^(?:So far this week, |The week so far )/u);
       }
       expect(realized.meaning, label).not.toMatch(/So far this week, (?:your weight|body fat|lean mass|the [A-Z][a-z]+ \d)/u);
-      expect(realized.result, label).toMatch(/^Early read: /u);
+      expect(realized.result, label).toMatch(/^Early days, but /u);
       expect(texts(realized).join(" "), label).not.toMatch(/This week held|a quiet finish|to the week\b|Strong training week|next week runs/u);
       expect(realized.headline.split(/\s+/u).length).toBeLessThanOrEqual(SECTION_CONTRACTS.midweek.headline.maxWords);
       expect((realized.coachTake.match(/[.!?](?:\s|$)/gu) ?? []).length).toBeLessThanOrEqual(1);

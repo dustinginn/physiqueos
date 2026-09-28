@@ -145,7 +145,7 @@ describe("Confidence V2 shared explanation model", () => {
       historicalContext: { matchedOnly: true, eventDate: "2026-08-22" },
     });
     expect(model.summary).toContain("visual checkpoint for August 22");
-    expect(model.summary).toContain("does not replace today's reading");
+    expect(model.summary).toContain("does not replace today's assessment");
     expect(model.summary).not.toMatch(/Photos (?:raised|increased|supported)/i);
   });
 

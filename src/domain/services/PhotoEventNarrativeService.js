@@ -437,7 +437,7 @@ function ordinaryEventCopy({goalContext,limitation,milestone}){
     title:"Today’s photos add a new check-in on your current goal.",
     summary:"The matched views add current visual evidence without overstating change from a single interval.",
     goalMeaning:"The photos add a useful visual check on your cut, while weight, training, and body composition tell us whether the change is meaningful.",
-    interpretation:"The matched views should be read alongside weight, training, nutrition, and body-composition evidence. Only changes supported by those records should be treated as progress.",
+    interpretation:"The matched views should be weighed alongside weight, training, nutrition, and body-composition evidence. Only changes supported by those records should be treated as progress.",
     limitation:`${limitation}${milestoneSentence}`,
     coach:`Keep the next photo session as consistent as possible.${milestone?.label?` Reassess alongside ${milestone.label}.`:""}`,
   };
@@ -480,7 +480,7 @@ function completionEventCopy(status,{latestDexa,priorDexa,baselineDexa},result){
     coachingDirection:"Keep the goal open and choose the next check deliberately.",
   };
   return{
-    title:"The final photo needs a clearer read.",
+    title:"The final photo needs a clearer view.",
     summary:"The image conditions do not support a reliable decision about lower-ab visibility at rest.",
     progress:"The journey remains visible, but the final Front Relaxed frame is not qualified enough to serve as the completion gate.",
     interpretation:[dexaSentence,leanSentence,...(result?.limitingFactors?.length?result.limitingFactors:["A clearly framed, original Front Relaxed photo under usable lighting would resolve the decision."])],
