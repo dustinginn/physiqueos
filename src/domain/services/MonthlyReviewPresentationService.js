@@ -36,6 +36,7 @@ export function applyMonthlyReviewToArtifact({ artifact, narrativePlan, confiden
       explanationModel: block.explanationModel ? { ...block.explanationModel, summary: confidence } : block.explanationModel };
   }
 
+  const monthName = review.period?.monthName ?? "This month";
   const training = module("training");
   if (training) {
     const { next: _next, highlights: _highlights, ...legacy } = presentation.training ?? {};
@@ -48,61 +49,45 @@ export function applyMonthlyReviewToArtifact({ artifact, narrativePlan, confiden
   const rebuilt = energy ? rebuildEnergy(presentation.energy, review.period, energy.excludedDates) : null;
   if (energy && rebuilt) {
     presentation.energy = { ...presentation.energy, ...rebuilt, eyebrow: presentation.energy.eyebrow ?? "Energy Evolution",
-      // The phase's own name; the legacy positional index ("· Phase 1") does
-      // not follow the goal's phase order.
-      phaseLabel: presentation.energy.phaseLabel ? String(presentation.energy.phaseLabel).replace(/\s*·\s*Phase \d+$/u, "") : null,
       title: energy.title, summary: energy.paragraphs.join(" "), whyItMatters: energy.interpretation ?? null };
   } else delete presentation.energy;
 
   const trajectory = module("trajectory");
-  const themes = [];
-  if (trajectory && !trajectory.scaleOnly) {
-    presentation.newBaseline = { eyebrow: trajectory.standing ? "Standing Measurement" : presentation.newBaseline?.eyebrow ?? "New Baseline",
+  if (trajectory) {
+    presentation.newBaseline = { eyebrow: presentation.newBaseline?.eyebrow ?? "New Baseline",
       title: trajectory.title, summary: trajectory.paragraphs.join(" "), callout: trajectory.interpretation ?? null,
       facts: measurementFacts(presentation.newBaseline?.facts, trajectory) };
   } else delete presentation.newBaseline;
-  // Without a measurement the scale is a "what changed" theme, not a baseline.
-  if (trajectory?.scaleOnly) {
-    themes.push({ label: "Scale", title: trajectory.title, body: trajectory.paragraphs.join(" "), tone: "weight" });
-  }
 
-  const execution = module("execution");
-  if (execution) {
-    execution.items.forEach((item, index) => themes.push({ label: item.title, title: item.label, body: item.text, tone: `routine-${index + 1}` }));
-    themes.push({ label: "Pattern", title: execution.title, body: execution.paragraphs.join(" "), tone: "routine-pattern" });
-  }
-  if (themes.length) {
-    // The heading names what the card holds, without restating the opening.
+  // What Changed: one thematic card per domain (label, headline, story).
+  const changes = module("changes");
+  if (changes) {
     presentation.changes = { eyebrow: presentation.changes?.eyebrow ?? "What Changed",
-      title: execution && trajectory?.scaleOnly ? "The routine and the scale, across the month."
-        : execution ? "Where the routine slipped." : trajectory.title, themes };
+      title: `${monthName} changed how progress should be judged.`,
+      themes: changes.items.map((item) => ({ label: item.title, title: item.value, body: item.text, tone: item.tone })) };
   } else delete presentation.changes;
 
-  // Dated moments are told inside their own modules; a separate timeline
-  // would repeat them.
-  delete presentation.moments;
+  // Defining Moments: the dated vertical timeline.
+  const moments = module("moments");
+  if (moments) {
+    presentation.moments = { eyebrow: presentation.moments?.eyebrow ?? "Defining Moments",
+      title: `${moments.items.length} moments defined ${monthName}.`,
+      moments: moments.items.map((item) => ({ date: item.date, label: item.title, body: item.text, tone: item.tone })) };
+  } else delete presentation.moments;
 
   const ahead = module("ahead");
-  presentation.monthAhead = { eyebrow: presentation.monthAhead?.eyebrow ?? "Month Ahead", title: ahead.title,
+  presentation.monthAhead = { eyebrow: presentation.monthAhead?.eyebrow ?? "Month Ahead",
+    title: `Turn ${monthName}'s signals into repeatable evidence.`,
     thesis: ahead.paragraphs.join(" "),
-    // Each action has its own tone: clients key the cards by it.
+    // Each card has its own domain tone: clients key the cards by it.
     guidance: ahead.items.map((item, index) => ({ label: item.label, value: item.value, detail: item.text,
       tone: item.tone ?? `action-${index + 1}` })) };
 
-  // The strategic card carries the coach's synthesis of the month only: the
-  // opening tells the month, Month Ahead the steps and watch, the hero the
-  // outlook.
-  const canonical = briefing.monthlyNarrative?.strategicSummaryV3;
-  const strategy = module("strategy")?.paragraphs.join(" ") ?? null;
-  if (canonical) {
-    briefing.monthlyNarrative.strategicSummaryV3 = { ...canonical,
-      sections: { result: null, meaning: null, action: null, watch: null, confidence: null },
-      coachTake: strategy ?? canonical.coachTake,
-      energy: null,
-      uncertainty: (canonical.uncertainty ?? []).filter((item) => item.surfaced === true &&
-        !["watch", "module"].includes(item.surfacedIn)).slice(0, 2) };
-  }
-  presentation.coachTake = strategy ? { eyebrow: "Coach's Take", body: strategy } : null;
+  // The approved Monthly has no strategic or uncertainty card: the canonical
+  // V3 narrative stays at briefing.narrativeV3, and the Monthly renders only
+  // its editorial skeleton.
+  if (briefing.monthlyNarrative) delete briefing.monthlyNarrative.strategicSummaryV3;
+  delete presentation.coachTake;
   briefing.monthlyNarrative.title = presentation.hero.title;
   briefing.monthlyNarrative.thesis = presentation.hero.thesis;
   briefing.monthlyReviewV3 = { schemaVersion: review.schemaVersion, period: review.period,

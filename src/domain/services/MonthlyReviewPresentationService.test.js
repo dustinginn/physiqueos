@@ -61,7 +61,15 @@ describe("Monthly review presentation", () => {
     const presentation = artifact.briefing.monthlyPresentation;
     const all = JSON.stringify(artifact.briefing);
     expect(all).not.toMatch(/Legacy (?:thesis|training|energy|baseline|change|moment|next)|Old lift/u);
-    expect(presentation.moments).toBeUndefined();
+    // Defining Moments keeps its approved shape: eyebrow, title, dated entries.
+    const moments = realized.review.modules.find((item) => item.role === "moments");
+    expect(presentation.moments).toEqual({ eyebrow: "Defining Moments", title: `${moments.items.length} moments defined September.`,
+      moments: moments.items.map((item) => ({ date: item.date, label: item.title, body: item.text, tone: item.tone })) });
+    // What Changed keeps its approved shape: thematic cards (label, title, body, tone).
+    for (const theme of presentation.changes.themes) expect(Object.keys(theme).sort()).toEqual(["body", "label", "title", "tone"]);
+    expect(presentation.changes.title).toBe("September changed how progress should be judged.");
+    expect(presentation.monthAhead.title).toBe("Turn September's signals into repeatable evidence.");
+    for (const card of presentation.monthAhead.guidance) expect(Object.keys(card).sort()).toEqual(["detail", "label", "tone", "value"]);
     expect(presentation.hero.title).toBe(realized.headline);
     expect(presentation.hero.period).toBe("September 1–19 · Month to date");
     expect(presentation.training.next).toBeUndefined();
@@ -85,14 +93,14 @@ describe("Monthly review presentation", () => {
     expect(new Set(aheadTones).size).toBe(aheadTones.length);
     expect(presentation.monthAhead.eyebrow).toBe("Month Ahead");
     expect(presentation.training.callout).toBe("Why it matters");
-    expect(presentation.coachTake.body).toBe(realized.review.modules.find((item) => item.role === "strategy").paragraphs.join(" "));
+
     // Compact Confidence in the hero; none in the strategic card.
     const words = presentation.hero.confidence.presentationExplanation.split(/\s+/u).length;
     expect(words).toBeLessThanOrEqual(REVIEW_CONTRACTS.monthly.confidence.maxWords);
     expect(presentation.hero.confidence.score).toBe(79);
-    const strategic = artifact.briefing.monthlyNarrative.strategicSummaryV3;
-    expect(strategic.sections).toMatchObject({ result: null, meaning: null, action: null, watch: null, confidence: null });
-    expect(strategic.coachTake).toBe(realized.review.modules.find((item) => item.role === "strategy").paragraphs.join(" "));
+    // The approved Monthly has no strategic or uncertainty card.
+    expect(artifact.briefing.monthlyNarrative.strategicSummaryV3).toBeUndefined();
+    expect(presentation.coachTake).toBeUndefined();
     expect(artifact.briefing.monthlyReviewV3.audit.ok).toBe(true);
   });
 
@@ -108,14 +116,13 @@ describe("Monthly review presentation", () => {
     expect(JSON.stringify(card)).not.toMatch(/January 1, 2020|Legacy/u);
   });
 
-  it("a month without a measurement tells the scale as a What Changed theme, never as a baseline", () => {
+  it("a month without a measurement has no New Baseline card; the scale is judged in What Changed", () => {
     const realized = review();
-    const modules = realized.review.modules.map((item) => (item.role === "trajectory"
-      ? { role: "trajectory", earnedBy: ["body_trajectory|weight_trend"], title: "The scale kept climbing.", paragraphs: ["Pace."], scaleOnly: true } : item));
+    const modules = realized.review.modules.filter((item) => item.role !== "trajectory");
     const plan = { holisticSynthesis: { review: { ...realized.review, modules } }, composition: { headline: realized.headline }, confidenceBriefing: {} };
     const artifact = applyMonthlyReviewToArtifact({ artifact: legacyArtifact("never"), narrativePlan: plan, confidenceBlock: block });
     expect(artifact.briefing.monthlyPresentation.newBaseline).toBeUndefined();
-    expect(artifact.briefing.monthlyPresentation.changes.themes[0]).toMatchObject({ label: "Scale", tone: "weight", title: "The scale kept climbing." });
+    expect(artifact.briefing.monthlyPresentation.changes.themes.map((item) => item.tone)).toContain("weight");
   });
 
   it("a Monthly without a realized review is returned exactly as it was", () => {

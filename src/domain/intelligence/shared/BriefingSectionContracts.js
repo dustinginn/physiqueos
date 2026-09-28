@@ -119,44 +119,47 @@ export const SECTION_CONTRACTS = Object.freeze({
 // the body carries the month's explanation.
 export const ReviewModule = Object.freeze({
   OPENING: "opening",
-  STRATEGY: "strategy",
   TRAINING: "training",
   ENERGY: "energy",
   TRAJECTORY: "trajectory",
-  EXECUTION: "execution",
-  OTHER: "other",
+  CHANGES: "changes",
+  MOMENTS: "moments",
   AHEAD: "ahead",
 });
 
+// The approved Monthly editorial skeleton, in display order: the opening
+// (hero, compact Confidence, feature cards), Training Progress, Energy
+// Evolution, New Baseline, What Changed, Defining Moments and Month Ahead.
+// The engine supplies each module's content; the skeleton does not change.
 export const ReviewModuleFacet = Object.freeze({
   [ReviewModule.OPENING]: "what defined the period and what it means for the goal",
-  [ReviewModule.STRATEGY]: "the coach's synthesis: what continues, what changes, what is still uncertain",
   [ReviewModule.TRAINING]: "performance progression, its persistence and the training rhythm",
   [ReviewModule.ENERGY]: "intake against the plan, its reliability, and expenditure with humility",
-  [ReviewModule.TRAJECTORY]: "body composition, the guardrail and the scale across the period",
-  [ReviewModule.EXECUTION]: "routine and activity patterns: persistent versus one-off",
-  [ReviewModule.OTHER]: "other goal-relevant evidence (photos, recovery) when it earns space",
-  [ReviewModule.AHEAD]: "priorities, the next evidence and what to watch in the coming period",
+  [ReviewModule.TRAJECTORY]: "the body-composition measurement, the guardrail and the scale's pace",
+  [ReviewModule.CHANGES]: "one thematic card per domain: how that evidence should now be judged against the goal",
+  [ReviewModule.MOMENTS]: "the period's genuinely defining dated events, in date order",
+  [ReviewModule.AHEAD]: "the strategy call, then one priority card per domain for the coming period",
 });
 
 export const REVIEW_CONTRACTS = Object.freeze({
   monthly: Object.freeze({
     cadence: "monthly",
-    modules: Object.freeze([ReviewModule.OPENING, ReviewModule.STRATEGY, ReviewModule.TRAINING, ReviewModule.ENERGY,
-      ReviewModule.TRAJECTORY, ReviewModule.EXECUTION, ReviewModule.OTHER, ReviewModule.AHEAD]),
-    // Per-module prose budget (sentences, words); data fields (chips, lift
-    // stats, the energy bars) are not prose and are not counted.
+    modules: Object.freeze([ReviewModule.OPENING, ReviewModule.TRAINING, ReviewModule.ENERGY, ReviewModule.TRAJECTORY,
+      ReviewModule.CHANGES, ReviewModule.MOMENTS, ReviewModule.AHEAD]),
+    // Per-module prose budget (sentences, words); data fields (feature cards,
+    // lift stats, energy figures, the metric grid, dates) are not counted.
     budgets: Object.freeze({
       [ReviewModule.OPENING]: { maxSentences: 3, maxWords: 75 },
-      [ReviewModule.STRATEGY]: { maxSentences: 4, maxWords: 90 },
       [ReviewModule.TRAINING]: { maxSentences: 5, maxWords: 110 },
       [ReviewModule.ENERGY]: { maxSentences: 5, maxWords: 110 },
-      [ReviewModule.TRAJECTORY]: { maxSentences: 5, maxWords: 110 },
-      [ReviewModule.EXECUTION]: { maxSentences: 5, maxWords: 110 },
-      [ReviewModule.OTHER]: { maxSentences: 3, maxWords: 70 },
-      [ReviewModule.AHEAD]: { maxSentences: 7, maxWords: 130 },
+      [ReviewModule.TRAJECTORY]: { maxSentences: 5, maxWords: 100 },
+      [ReviewModule.CHANGES]: { maxSentences: 14, maxWords: 230 },
+      [ReviewModule.MOMENTS]: { maxSentences: 12, maxWords: 190 },
+      [ReviewModule.AHEAD]: { maxSentences: 14, maxWords: 190 },
     }),
-    maxWords: 760,
+    maxWords: 1000,
+    maxThemes: 4,
+    maxMoments: 4,
     confidence: Object.freeze({ maxSentences: 2, maxWords: 35 }),
   }),
 });
@@ -171,7 +174,8 @@ export function resolveReviewContract(cadence) {
 // holds on every word of prose.
 export function auditReview(review, contract, { overlapCeiling = 0.5, claimSupport = undefined } = {}) {
   const issues = [];
-  const prose = (module) => [module.title, ...(module.paragraphs ?? []), ...(module.items ?? []).map((item) => item.text)]
+  const prose = (module) => [module.title, ...(module.paragraphs ?? []), module.interpretation,
+    ...(module.items ?? []).flatMap((item) => [item.title, item.value, item.text])]
     .filter(Boolean).join(" ");
   const texts = Object.fromEntries(review.modules.map((module) => [module.role, prose(module)]));
   issues.push(...auditClaimRestraint({ ...texts, confidence: review.confidence }, claimSupport));
@@ -194,10 +198,21 @@ export function auditReview(review, contract, { overlapCeiling = 0.5, claimSuppo
     }
   }
   const roles = review.modules.map((module) => module.role);
-  for (let left = 0; left < roles.length; left += 1) {
-    for (let right = left + 1; right < roles.length; right += 1) {
-      const value = contentOverlap(texts[roles[left]], texts[roles[right]]);
-      if (value > overlapCeiling) issues.push(`${roles[left]} and ${roles[right]} mostly say the same thing (${value.toFixed(2)})`);
+  // The same point must not be made twice: every story sentence is compared
+  // with every story sentence of the other modules.
+  const sentencesOf = (text) => String(text ?? "").split(/(?<=[.!?])\s+(?=[A-Z0-9"“])/u).filter(Boolean);
+  const units = review.modules.flatMap((module) => {
+    // Story sentences only: a card's headline may echo the opening that
+    // previews it, as every Monthly hero does.
+    const parts = [...(module.paragraphs ?? []), module.interpretation,
+      ...(module.items ?? []).map((item) => item.text)].filter(Boolean);
+    return parts.flatMap(sentencesOf).map((text) => ({ role: module.role, text }));
+  });
+  for (let left = 0; left < units.length; left += 1) {
+    for (let right = left + 1; right < units.length; right += 1) {
+      if (units[left].role === units[right].role) continue;
+      const value = contentOverlap(units[left].text, units[right].text);
+      if (value > overlapCeiling) issues.push(`${units[left].role} and ${units[right].role} repeat a point (${value.toFixed(2)}): "${units[left].text.slice(0, 60)}" ~ "${units[right].text.slice(0, 60)}"`);
     }
   }
   if (review.confidence) {

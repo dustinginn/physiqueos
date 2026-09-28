@@ -71,7 +71,7 @@ describe("Monthly review: rich where the month earns it", () => {
       "body_trajectory", "guardrail", "nutrition", "routine", "activity", "recovery", "visual_change"]));
     const roles = realized.review.modules.map((item) => item.role);
     expect(roles).toEqual(expect.arrayContaining([ReviewModule.TRAINING, ReviewModule.ENERGY, ReviewModule.TRAJECTORY,
-      ReviewModule.EXECUTION]));
+      ReviewModule.CHANGES, ReviewModule.MOMENTS]));
     const every = [...roles, ...realized.review.omitted.map((item) => item.role)];
     expect(new Set(every)).toEqual(new Set(REVIEW_CONTRACTS.monthly.modules));
     // Modules render in the contract's display order.
@@ -86,9 +86,12 @@ describe("Monthly review: rich where the month earns it", () => {
       // Without a measurement the trajectory module can only be the scale's own.
       if (domain("body_composition").status !== "assessed") {
         const trajectory = realized.review.modules.find((item) => item.role === ReviewModule.TRAJECTORY);
-        if (trajectory) expect(trajectory.scaleOnly).toBe(true);
+        expect(trajectory).toBeUndefined();
       }
-      if (domain("routine").state === "steady") expect(roles).not.toContain(ReviewModule.EXECUTION);
+      if (domain("routine").state === "steady") {
+        const changes = realized.review.modules.find((item) => item.role === ReviewModule.CHANGES);
+        expect((changes?.items ?? []).map((item) => item.tone)).not.toContain("routine");
+      }
       if (domain("training").status !== "assessed") expect(roles).not.toContain(ReviewModule.TRAINING);
     }
   });
@@ -109,7 +112,7 @@ describe("Monthly review: rich where the month earns it", () => {
 
   it("persistence: several short stretches, one stretch and a whole-month break read differently", () => {
     const labels = new Set(corpus.map(({ realized }) => realized.review.modules
-      .find((item) => item.role === ReviewModule.EXECUTION)?.persistence).filter(Boolean));
+      .find((item) => item.role === ReviewModule.CHANGES)?.items.find((item) => item.tone === "routine")?.persistence).filter(Boolean));
     expect(labels.size).toBeGreaterThanOrEqual(2);
     const missed = realize({ seed: 3, kind: "missed_week" }).realized.review;
     const training = missed.modules.find((item) => item.role === ReviewModule.TRAINING);
@@ -160,9 +163,10 @@ describe("Monthly review: rich where the month earns it", () => {
       expect(text).not.toMatch(/the scale (?:shows|proves|confirms) (?:lean|muscle|fat)/u);
       const trajectory = realized.review.modules.find((item) => item.role === ReviewModule.TRAJECTORY);
       const weight = picture.domains.find((item) => item.domain === "body_trajectory");
-      if (trajectory && weight?.status === "assessed" && weight.facts.movement !== "flat" &&
+      if (trajectory && weight?.status === "assessed" && weight.facts.movement !== "flat" && !["too_noisy", "not_goal_relevant"].includes(weight.state) &&
           Number.isFinite(weight.facts.firstWeekAverage) && Number.isFinite(weight.facts.lastWeekAverage)) {
-        expect(trajectory.paragraphs.join(" ")).toMatch(/can't tell .* apart from other weight|adds pace, not a verdict/u);
+        const weightTheme = realized.review.modules.find((item) => item.role === ReviewModule.CHANGES)?.items.find((item) => item.tone === "weight");
+        expect(weightTheme?.text ?? "").toMatch(/can't tell .* apart from other weight|verdict on what the weight is made of/u);
       }
       const energy = realized.review.modules.find((item) => item.role === ReviewModule.ENERGY);
       if (energy && picture.domains.find((item) => item.domain === "activity")?.facts?.measurement === "wearable_estimate") {
@@ -187,7 +191,7 @@ describe("Monthly review: rich where the month earns it", () => {
         if (training?.paragraphs.some((paragraph) => /New bests/u.test(paragraph))) {
           expect(training.paragraphs.join(" ")).toMatch(/through September 19/u);
         }
-        const open = review.modules.find((item) => item.role === ReviewModule.EXECUTION)?.items?.find((item) => /latest complete day/u.test(item.text));
+        const open = review.modules.find((item) => item.role === ReviewModule.MOMENTS)?.items?.find((item) => /latest complete day/u.test(item.text));
         if (open) expect(open.text).toMatch(/isn't known yet/u);
       }
     }
@@ -195,14 +199,16 @@ describe("Monthly review: rich where the month earns it", () => {
     const closed = realize({ seed: 1, kind: "risk_routine_progress", window: { startDate: "2026-08-01", endDate: "2026-08-31" } }).realized.review;
     expect(closed.period.toDate).toBe(false);
     expect(reviewText(closed).join(" ")).not.toMatch(/\bso far\b|through August 31|latest complete day/u);
-    expect(closed.modules.find((item) => item.role === ReviewModule.AHEAD).paragraphs[0]).toMatch(/^September's job/u);
+    expect(closed.modules.find((item) => item.role === ReviewModule.AHEAD).paragraphs[0]).toMatch(/September's job/u);
   });
 
   it("Recovery and Sleep have a declared slot: assessed first, and a module waits for real evidence", () => {
     const { realized, synthesis } = realize({ seed: 1, kind: "crowded" });
     expect(synthesis.considered.find((item) => item.domain === "recovery")).toBeTruthy();
-    expect(REVIEW_CONTRACTS.monthly.modules).toContain(ReviewModule.OTHER);
-    expect(realized.review.omitted.find((item) => item.role === ReviewModule.OTHER)?.reason).toMatch(/no_recovery_evidence_yet/u);
+    // A recovery theme appears only through the recovery assessor's own insights.
+    const changes = realized.review.modules.find((item) => item.role === ReviewModule.CHANGES);
+    expect((changes?.items ?? []).map((item) => item.tone)).not.toContain("recovery");
+    expect(synthesis.considered.find((item) => item.domain === "recovery").status).toBe("unavailable");
   });
 
   it("a span that is not a calendar month is never named as one", () => {
@@ -228,7 +234,8 @@ describe("Monthly review: rich where the month earns it", () => {
       const dates = new Set(shifts.flatMap((shift) => shift.affectedDates));
       const missed = picture.domains.find((item) => item.domain === "training").facts.missedDates;
       expect(missed.every((date) => dates.has(date))).toBe(true);
-      expect(realized.review.modules.some((item) => item.role === ReviewModule.EXECUTION)).toBe(true);
+      expect(realized.review.modules.some((item) => item.role === ReviewModule.MOMENTS &&
+        item.items.some((moment) => moment.tone === "routine"))).toBe(true);
     }
   });
 
@@ -240,6 +247,52 @@ describe("Monthly review: rich where the month earns it", () => {
     // Without a clause boundary it keeps the movement clause, never a cut mid-thought.
     const noClause = "Confidence jumped because the check measured a standout result across many measures that all pointed the same way through the whole period and then some more words to go well past the limit that the compact Confidence line is allowed to use in a review";
     expect(compactConfidence(noClause, REVIEW_CONTRACTS.monthly.confidence)).toBe("Confidence jumped.");
+  });
+
+  it("keeps the approved Monthly skeleton: module order, card shapes and unique card identities", () => {
+    for (const { realized } of corpus) {
+      const roles = realized.review.modules.map((item) => item.role);
+      expect(roles).toEqual(REVIEW_CONTRACTS.monthly.modules.filter((role) => roles.includes(role)));
+      expect(roles[0]).toBe(ReviewModule.OPENING);
+      expect(roles.at(-1)).toBe(ReviewModule.AHEAD);
+      const changes = realized.review.modules.find((item) => item.role === ReviewModule.CHANGES);
+      if (changes) {
+        expect(changes.items.length).toBeLessThanOrEqual(REVIEW_CONTRACTS.monthly.maxThemes);
+        expect(new Set(changes.items.map((item) => item.tone)).size).toBe(changes.items.length);
+        for (const item of changes.items) expect(item.title && item.value && item.text).toBeTruthy();
+      }
+      const ahead = realized.review.modules.find((item) => item.role === ReviewModule.AHEAD);
+      expect(new Set(ahead.items.map((item) => item.tone)).size).toBe(ahead.items.length);
+      for (const item of ahead.items) expect(item.label && item.value && item.text).toBeTruthy();
+    }
+  });
+
+  it("Defining Moments are the month's dated events from canonical evidence, in date order", () => {
+    const window = { startDate: "2026-09-01", endDate: "2026-09-19" };
+    let seen = 0;
+    for (const { realized, picture } of [...corpus, ...SEEDS.map((seed) => ({ ...realize({ seed, kind: "risk_routine_progress", window }) }))]) {
+      const moments = realized.review.modules.find((item) => item.role === ReviewModule.MOMENTS);
+      if (!moments) continue;
+      seen += 1;
+      const dates = moments.items.map((item) => item.date);
+      expect(dates).toEqual([...dates].sort());
+      expect(moments.items.length).toBeLessThanOrEqual(REVIEW_CONTRACTS.monthly.maxMoments);
+      const window2 = picture.window;
+      for (const item of moments.items) {
+        expect(item.date >= window2.startDate && item.date <= window2.endDate).toBe(true);
+        expect(item.date).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
+      }
+      // Each moment is earned by a canonical fact: a measurement date, a routine shift, a lift's best, a photo session.
+      for (const id of moments.earnedBy) expect(id).toMatch(/composition_result|routine_shift|training_progress|visual/u);
+      const c = picture.domains.find((item) => item.domain === "body_composition");
+      if (moments.items.some((item) => item.tone === "baseline")) expect(c.facts.newThisPeriod).toBe(true);
+      const training = picture.domains.find((item) => item.domain === "training").facts;
+      const lift = moments.items.find((item) => item.tone === "training");
+      if (lift) expect(String(training.milestones[0].observedAt).slice(0, 10)).toBe(lift.date);
+      // Never legacy template copy.
+      expect(moments.items.map((item) => `${item.title} ${item.text}`).join(" ")).not.toMatch(/steady physique|established the starting point|useful benchmarks|sustainable enough to test/u);
+    }
+    expect(seen).toBeGreaterThan(50);
   });
 
   it("is deterministic, and only the Monthly has a review", () => {

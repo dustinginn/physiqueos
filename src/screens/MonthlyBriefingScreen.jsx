@@ -52,7 +52,6 @@ export default function MonthlyBriefingScreen({ presentation, reconciliation = n
             </p>
           </aside>
         )}
-        {presentation.coachTake?.body && <CoachTake model={presentation.coachTake} />}
         {presentation.milestone && <GoalMilestone milestone={presentation.milestone} />}
         {presentation.training && <TrainingProgress training={presentation.training} />}
         {presentation.energy && <MonthlyEnergyEvolution model={presentation.energy} />}
@@ -201,14 +200,6 @@ function WhatChanged({ model }) {
     <EditorialSection icon={Sparkles} label={model.eyebrow} tone="violet">
       <h2 className="mt-3 text-xl font-extrabold text-slate-950 dark:text-white">{model.title}</h2>
       <div className="mt-3 space-y-2">{model.themes.map((theme) => <Theme key={theme.title} theme={theme} />)}</div>
-    </EditorialSection>
-  );
-}
-
-function CoachTake({ model }) {
-  return (
-    <EditorialSection icon={Sparkles} label={model.eyebrow} tone="violet" className="mb-3">
-      <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-100">{model.body}</p>
     </EditorialSection>
   );
 }
