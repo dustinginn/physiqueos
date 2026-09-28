@@ -523,8 +523,9 @@ describe("briefing budgets are semantic, not word counts", () => {
 // log itself is what gets checked.
 function expectWeightStep(action, risk, synthesis, label) {
   const intake = synthesis.selected.find((item) => item.kind === "intake_vs_plan" && item.polarity !== "supportive");
+  const onTarget = synthesis.selected.some((item) => item.kind === "intake_vs_plan" && item.polarity === "supportive");
   const push = intake ? (/under|below/u.test(intake.facts.state) ? "up" : "down") : null;
-  if (push && push === risk.facts.movement) {
+  if ((push && push === risk.facts.movement) || (onTarget && risk.facts.movement === "down")) {
     expect(action, label).toMatch(/^Make sure every meal gets logged/u);
     return;
   }
@@ -595,7 +596,7 @@ describe("sections agree with each other", () => {
       const label = `${goalType}/${kind}#${seed}`;
       expect(realized.action, label).toMatch(/^Keep intake at the plan's target and training on its usual rhythm this week\. The rest of the setup stays as it is\.$/u);
       expect(realized.watch).toContain(`next ${scenario.goalFacts.composition.eventName}`);
-      if (risk.kind === "composition_result" && realized.confidenceBody) {
+      if (realized.confidenceBody) {
         expect(realized.confidenceBody).toMatch(/^Confidence holds at the level/u);
         expect(realized.confidenceBody).not.toMatch(/worth watching/u);
       }
@@ -642,5 +643,49 @@ describe("sections agree with each other", () => {
       expect(synthesis.selected.some((item) => item.kind === "weight_trend"), `${kind}#${seed}`).toBe(false);
       if (realized) expect(realized.watch).not.toMatch(/weight average/u);
     }
+  });
+});
+
+describe("the food log is checked whenever logged intake and the scale disagree", () => {
+  // Hand-built pictures, so the mismatch paths are exercised directly.
+  const picture = (weightFacts, intakeState) => ({
+    schemaVersion: "test", goalType: "build_lean_mass", window: { startDate: "2026-09-20", endDate: "2026-09-26" },
+    outlook: { percentage: 70, delta: 0 }, strategy: { action: "continue_current_strategy" },
+    domains: [
+      { domain: "body_trajectory", weight: 0.9, status: "assessed", state: weightFacts.verdict, polarity: "neutral", facts: weightFacts,
+        insights: [{ id: "body_trajectory|weight_trend", domain: "body_trajectory", kind: "weight_trend",
+          role: ["rapid", "wrong_direction"].includes(weightFacts.verdict) ? "risk" : "progress",
+          polarity: weightFacts.verdict === "quick" ? "neutral" : "concern", strength: 2.4, facts: weightFacts }] },
+      { domain: "nutrition", weight: 1.0, status: "assessed", state: intakeState, polarity: "neutral", facts: {},
+        insights: [{ id: "nutrition|intake_vs_plan", domain: "nutrition", kind: "intake_vs_plan", role: "execution",
+          polarity: intakeState === "on_plan" ? "supportive" : "concern", strength: 1.8,
+          facts: { state: intakeState, observed: 2500, target: 2500 } }] },
+    ],
+  });
+  const realize = (weightFacts, intakeState, direction = "up") => {
+    const p = picture({ weeklyRate: weightFacts.movement === "down" ? -0.8 : 0.8, rateSpanDays: 28, ...weightFacts }, intakeState);
+    const synthesis = synthesizeBriefing({ picture: p, budget: { maxInsights: 3, maxLimitations: 1, floor: 0.5, heroInsights: 2 },
+      realizableKinds: WEEKLY_REALIZABLE_KINDS });
+    return realizeHolisticWeeklyV3({ synthesis, picture: p, goalLabel: "the goal",
+      goalPolicy: { weightExpectation: { direction } } });
+  };
+
+  it("intake on target while the scale falls the wrong way", () => {
+    const realized = realize({ verdict: "wrong_direction", movement: "down", expectedDirection: "up" }, "on_plan");
+    expect(realized.action).toMatch(/^Make sure every meal gets logged/u);
+    expect(realized.coachTake).toMatch(/food log is the first thing to check/u);
+  });
+
+  it("intake above target while the scale drops a little quickly on a maintenance goal (no risk)", () => {
+    const realized = realize({ verdict: "quick", movement: "down", expectedDirection: "stable" }, "above_plan", "stable");
+    expect(realized.action).toMatch(/^Make sure every meal gets logged/u);
+    expect(realized.action).not.toMatch(/bring intake/iu);
+  });
+
+  it("a wrong-way trend is focused on direction, not pace", () => {
+    const realized = realize({ verdict: "wrong_direction", movement: "down", expectedDirection: "up" }, "below_plan");
+    expect(realized.action).toMatch(/^Make sure intake reaches the plan's target/u);
+    expect(realized.coachTake).toMatch(/Turning the scale back the right way/u);
+    expect(realized.coachTake).not.toMatch(/pace/u);
   });
 });

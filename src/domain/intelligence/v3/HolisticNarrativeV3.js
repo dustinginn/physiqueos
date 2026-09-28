@@ -278,7 +278,7 @@ function coachSentences({ synthesis, told, facts, steps }) {
           ? `A similar ${stretch} stretch came in ${monthPart(prior.startDate)}; the useful move is simply to pick the rhythm back up.`
           : `${clause}, and a similar ${stretch} stretch came in ${monthPart(prior.startDate)}; the useful move is simply to pick the rhythm back up.`
         : introduced
-          ? `Nothing about a few ${stretch} days needs fixing; just pick the rhythm back up.`
+          ? "Nothing about that needs fixing; just pick the rhythm back up."
           : `${clause}; nothing about a few ${stretch} days needs fixing, so just pick the rhythm back up.`);
     } else if (!told.has(item.id)) {
       const clause = clauseFor(item, facts);
@@ -299,7 +299,9 @@ function coachSentences({ synthesis, told, facts, steps }) {
 
 function focusSentence(item) {
   switch (item.kind) {
-    case "weight_trend": return "The scale's pace is the one thing to steer this week.";
+    case "weight_trend": return item.facts.verdict === "wrong_direction"
+      ? "Turning the scale back the right way is the one thing to focus on this week."
+      : "The scale's pace is the one thing to steer this week.";
     case "training_frequency": return "Getting the usual sessions back in matters more than anything else this week.";
     case "composition_result": return `The ${item.facts.eventName} result is what matters most for the goal right now.`;
     case "guardrail_status": return `${upperFirst(item.facts.label)} is the number to protect right now.`;
@@ -345,25 +347,36 @@ function planSteps(synthesis) {
   const routine = selected.find((item) => item.kind === "routine_break");
   const missedTraining = selected.find((item) => item.kind === "training_frequency" && item.facts.direction === "below");
   const intake = selected.find((item) => item.kind === "intake_vs_plan" && item.polarity !== "supportive");
+  const intakeOnTarget = selected.find((item) => item.kind === "intake_vs_plan" && item.polarity === "supportive");
   const weight = selected.find((item) => item.kind === "weight_trend" && ["rapid", "quick", "wrong_direction"].includes(item.facts.verdict));
+  const anyWeight = selected.find((item) => item.kind === "weight_trend" && item.facts.movement !== "flat");
   const weightRisk = weight?.role === "risk" ? weight : null;
   const outcomeRisk = selected.find((item) => item.role === "risk" && ["composition_result", "guardrail_status"].includes(item.kind));
   // Which way an intake correction would push the scale.
   const intakePush = intake ? (/under|below/u.test(intake.facts.state) ? "up" : "down") : null;
-  const intakeContradictsScale = intake && weight && intakePush === weight.facts.movement;
+  // The logged intake and the scale disagree: intake said above target while
+  // the scale moves too fast downward (or the mirror), or intake on target
+  // while the scale falls the wrong way.
+  const intakeContradictsScale = Boolean((intake && weight && intakePush === weight.facts.movement) ||
+    (intakeOnTarget && weightRisk && weightRisk.facts.movement === "down"));
+  const logCheck = { text: "make sure every meal gets logged",
+    focus: "The logged intake and the scale point different ways, so the food log is the first thing to check." };
   const steps = [];
-  if (weightRisk) {
-    steps.push(intakeContradictsScale ? { source: weightRisk, text: "make sure every meal gets logged",
-      focus: "The logged intake and the scale point different ways, so the food log is the first thing to check." }
-      : { source: weightRisk, text: weightRisk.facts.movement === "up" ? "keep intake at or below the plan's target"
+  if (intakeContradictsScale && weight) {
+    steps.push({ source: weight, ...logCheck });
+  } else if (weightRisk) {
+    steps.push({ source: weightRisk, text: weightRisk.facts.movement === "up" ? "keep intake at or below the plan's target"
         : "make sure intake reaches the plan's target" });
   } else if (outcomeRisk) {
     steps.push({ source: outcomeRisk, text: "keep intake at the plan's target and training on its usual rhythm" });
   }
   const trainingGap = (routine && routine.facts.missed?.some((gap) => gap.domain === "training")) || missedTraining;
   if (trainingGap && !outcomeRisk) steps.push({ source: missedTraining ?? routine, text: "get the usual training rhythm back" });
-  // An intake step never pushes a scale that is already moving too fast the same way.
-  if (intake && !weightRisk && !outcomeRisk && !intakeContradictsScale) {
+  // An intake step never pushes the scale further the way it is already
+  // moving too fast, nor away from steady for a maintenance goal.
+  const pushesScale = anyWeight && intakePush === anyWeight.facts.movement &&
+    (anyWeight.facts.verdict !== "steady" || anyWeight.facts.expectedDirection === "stable");
+  if (intake && !weightRisk && !outcomeRisk && !intakeContradictsScale && !pushesScale) {
     steps.push({ source: intake, text: intakePush === "up" ? "bring intake up to the plan's target"
       : "bring intake back down to the plan's target" });
   }
@@ -430,7 +443,9 @@ function confidenceSentence({ synthesis, facts }) {
   const event = facts.composition.newThisPeriod ? `the new ${facts.composition.eventName}`
     : `the ${dateWords(facts.composition.measuredAt)} ${facts.composition.eventName}`;
   // When the risk is the outlook-setting result itself, say so once.
-  if (risk?.kind === "composition_result") {
+  // A guardrail reading comes from that same measurement, so it is part of
+  // the level it set, not a separate pending signal.
+  if (["composition_result", "guardrail_status"].includes(risk?.kind)) {
     return `Confidence holds at the level ${event} set, and nothing this week moves it either way.`;
   }
   const period = risk
