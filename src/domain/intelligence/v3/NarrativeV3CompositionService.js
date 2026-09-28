@@ -113,7 +113,9 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
     confidence: `${confidenceBriefing.heading}\n${confidenceBriefing.body}`,
   };
   const paragraphs = Object.values(sections).filter(Boolean);
-  const headline = firstSentence(sections.result ?? sections.meaning ?? sections.action);
+  // A holistic period brings its own short headline (its section contract);
+  // otherwise the headline is the result's first sentence.
+  const headline = context.period?.headline ?? firstSentence(sections.result ?? sections.meaning ?? sections.action);
   if (context.useRecurringSectionPlan) {
     assertHeroOutputBudget({ headline, meaning: sections.meaning });
   }
@@ -511,6 +513,8 @@ function summarizeHolistic(briefingIntelligence, context) {
     limitations: holistic?.synthesis?.limitations.map((item) => item.id) ?? [],
     omitted: holistic?.synthesis?.omitted.map((item) => ({ id: item.id, reason: item.reason })) ?? [],
     budget: holistic?.synthesis ? { purpose: holistic.synthesis.budget.purpose, maxInsights: holistic.synthesis.budget.maxInsights } : null,
+    sectionPlan: holistic?.realized?.sectionPlan ?? null,
+    sectionAudit: holistic?.realized?.sectionAudit ?? null,
   };
 }
 
@@ -533,8 +537,11 @@ function allocatePeriodCharacterization(context) {
     content: { result: period.result, meaning: period.meaning, action: period.action,
       watch, coachTake: period.coachTake },
     allocations: {
-      result: allocation("recent_change_worth_knowing", period.heroIds.join("+"), { scope: "holistic_period" }),
-      meaning: allocation("goal_relative_implication", "goal_implication"),
+      // Section contract: the headline and recap tell the period; the result
+      // (Biggest Takeaway) is the coach's interpretation of it.
+      result: allocation("coach_interpretation", `${period.heroIds.join("+")}|interpretation`, { scope: "holistic_period" }),
+      meaning: allocation("goal_relative_implication", "goal_implication",
+        { recapTopic: `${period.heroIds.join("+")}|evidence` }),
       action: allocation("current_coaching_action", "recommendation"),
       watch: allocation("specific_bounded_attention",
         context.periodOwnsWatch ? `${period.selectedIds.join("+")}|watch` : "next_assessment"),

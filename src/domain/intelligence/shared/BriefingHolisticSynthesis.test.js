@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { buildEvidencePicture } from "./BriefingEvidencePicture.js";
 import { synthesizeBriefing } from "./BriefingHolisticSynthesis.js";
 import { BRIEFING_INTELLIGENCE_POLICIES, resolveNarrativeBudget } from "./BriefingIntelligencePolicies.js";
-import { resolveGoalEvidencePolicy } from "./GoalEvidencePolicies.js";
+import { canonicalWeightPace, resolveGoalEvidencePolicy } from "./GoalEvidencePolicies.js";
 import { goalFactsFromInterpretationV3, realizeHolisticWeeklyV3, WEEKLY_REALIZABLE_KINDS } from "../v3/HolisticNarrativeV3.js";
 import { findNarrativeV3VoiceViolations } from "../v3/NarrativeV3CompositionService.js";
 import { HOLISTIC_GOAL_TYPES, HOLISTIC_KINDS, holisticScenario } from "../../../testSupport/briefingHolisticSynthetic.js";
@@ -29,8 +29,8 @@ function run({ seed, kind, cadence = "weekly", goalType = "build_lean_mass", bud
 // way the goal wants the scale to move.
 const weekly = HOLISTIC_GOAL_TYPES.flatMap((goalType) => HOLISTIC_KINDS.flatMap((kind) =>
   SEEDS.map((seed) => ({ kind, seed, goalType, ...run({ seed, kind, goalType }) }))));
-const textOf = (realized) => realized ? [realized.result, realized.meaning, realized.action, realized.watch,
-  realized.coachTake, realized.confidenceBody].filter(Boolean).join(" ") : "";
+const textOf = (realized) => realized ? [realized.headline, realized.meaning, realized.confidenceBody, realized.result,
+  realized.coachTake, realized.action, realized.watch].filter(Boolean).join(" ") : "";
 const byKind = (kind) => weekly.filter((item) => item.kind === kind);
 
 describe("every goal-relevant domain is assessed before synthesis", () => {
@@ -140,7 +140,7 @@ describe("Goal Confidence, strategy and restraint", () => {
       const text = textOf(realized);
       if (!scenario.goalFacts.composition) expect(text, `${kind}#${seed}`).not.toMatch(/\blean\b|body fat at/u);
       // The weight clause itself never names lean or fat mass.
-      expect(realized?.result ?? "").not.toMatch(/weight[^,.;]*\b(?:muscle|lean|fat)\b/u);
+      expect(`${realized?.recap ?? ""} ${realized?.coachTake ?? ""}`).not.toMatch(/weight[^,.;]*\b(?:muscle|lean|fat)\b/u);
     }
   });
 
@@ -175,9 +175,9 @@ describe("Goal Confidence, strategy and restraint", () => {
   it("each Weekly realization respects its hero budget and ends every section cleanly", () => {
     for (const { kind, seed, realized } of weekly) {
       if (!realized) continue;
-      expect(realized.result.length, `${kind}#${seed}`).toBeLessThanOrEqual(160);
+      expect(realized.recap.length, `${kind}#${seed}`).toBeLessThanOrEqual(160);
       expect((realized.meaning.match(/[.!?](?:\s|$)/gu) ?? []).length).toBeLessThanOrEqual(2);
-      for (const text of [realized.result, realized.meaning, realized.action, realized.watch, realized.coachTake]) {
+      for (const text of [realized.headline, realized.result, realized.meaning, realized.action, realized.watch, realized.coachTake]) {
         expect(text).toMatch(/[.]$/u);
         expect(text).not.toMatch(/\band\b[^.]*\band\b[^.]*\band\b/u);
       }
@@ -276,7 +276,7 @@ describe("goal-relative wording follows the goal's direction and the evidence's 
   it("never says 'plan' about the scale, the outcome, Confidence or Watch; the plan's target appears only as an action", () => {
     for (const { kind, seed, goalType, realized } of weekly) {
       if (!realized) continue;
-      for (const text of [realized.result, realized.meaning, realized.watch, realized.confidenceBody ?? ""]) {
+      for (const text of [realized.headline, realized.result, realized.meaning, realized.watch, realized.confidenceBody ?? ""]) {
         expect(text, `${goalType}/${kind}#${seed}`).not.toMatch(/\bplan(?:ned)?\b/u);
       }
       expect(realized.meaning).not.toMatch(/\bexpected\b|\bfits\b/u);
@@ -288,12 +288,15 @@ describe("goal-relative wording follows the goal's direction and the evidence's 
       const weight = weightOf(picture);
       if (!realized || !weight || !synthesis.selected.some((item) => item.kind === "weight_trend")) continue;
       const label = `${goalType}/${kind}#${seed}`;
-      const clause = /your weight [^,.]*/iu.exec(`${realized.result} ${realized.coachTake}`)?.[0] ?? "";
+      const clause = /your weight [^,.]*/iu.exec(`${realized.recap} ${realized.coachTake}`)?.[0] ?? "";
       if (weight.facts.movement === "up") expect(clause, label).not.toMatch(DOWN);
       if (weight.facts.movement === "down") expect(clause, label).not.toMatch(UP);
-      if (weight.facts.movement === "flat") expect(clause, label).toMatch(/held steady|a little quickly|fast/u);
-      if (/how much of this gain/u.test(realized.meaning)) expect(weight.facts.movement, label).toBe("up");
-      if (/how much of this loss/u.test(realized.meaning)) expect(weight.facts.movement, label).toBe("down");
+      if (weight.facts.movement === "flat") expect(clause, label).toMatch(/held steady|faster than the pace|drifted/u);
+      if (/how much of the recent gain/u.test(realized.meaning)) expect(weight.facts.movement, label).toBe("up");
+      if (/how much of the recent drop/u.test(realized.meaning)) expect(weight.facts.movement, label).toBe("down");
+      // The headline's direction words agree with the scale too.
+      if (/weight gain is picking up/u.test(realized.headline)) expect(weight.facts.movement, label).toBe("up");
+      if (/weight loss is picking up/u.test(realized.headline)) expect(weight.facts.movement, label).toBe("down");
       if (/steadier climb/u.test(realized.watch)) expect(weight.facts.movement, label).toBe("up");
       if (/steadier drop/u.test(realized.watch)) expect(weight.facts.movement, label).toBe("down");
       if (/(?:drop|rise|climb) in weight/u.test(realized.confidenceBody ?? "")) {
@@ -358,8 +361,12 @@ describe("goal-relative wording follows the goal's direction and the evidence's 
       expect(weight.facts.rateSpanDays).toBeLessThanOrEqual(28);
       const weeks = Math.round(weight.facts.rateSpanDays / 7);
       const words = ["", "", "two", "three", "four"];
-      for (const match of `${realized.result} ${realized.coachTake}`.matchAll(/lb a week[^,.;]*/gu)) {
-        expect(match[0], `${goalType}/${kind}#${seed}`).toBe(weeks <= 1 ? "lb a week over the last week" : `lb a week over the last ${words[weeks]} weeks`);
+      for (const match of `${realized.recap} ${realized.coachTake}`.matchAll(/lb a week[^,.;]*/gu)) {
+        // An acceleration names the recent two weeks it compares.
+        const expected = weight.facts.verdict === "accelerating" ? "lb a week over the last two weeks"
+          : weight.facts.rateSpanDays < 14 ? `lb a week over the last ${weight.facts.rateSpanDays} days`
+            : `lb a week over the last ${words[weeks]} weeks`;
+        expect(match[0], `${goalType}/${kind}#${seed}`).toBe(expected);
       }
     }
   });
@@ -406,7 +413,7 @@ describe("routine and training rhythm are told as they happened", () => {
       if (!routine || !realized) continue;
       const label = `${goalType}/${kind}#${seed}`;
       const f = routine.facts;
-      if (realized.result.includes("routine")) expect(realized.result, label).toContain(position[f.position]);
+      if (realized.recap.includes("routine")) expect(realized.recap, label).toContain(position[f.position]);
       const quiet = /(\w+) quiet days? (?:don't|doesn't)/u.exec(realized.meaning);
       if (quiet) {
         expect(f.direction, label).toBe("break");
@@ -534,7 +541,9 @@ function expectWeightStep(action, risk, synthesis, label) {
 }
 
 describe("sections agree with each other", () => {
-  const sections = (realized) => [realized.result, realized.meaning, realized.coachTake, realized.action, realized.watch];
+  // In reading order: headline, hero paragraph, Biggest Takeaway, What To Do,
+  // Into Next Week, What To Watch.
+  const sections = (realized) => [realized.headline, realized.meaning, realized.result, realized.coachTake, realized.action, realized.watch];
 
   it("a routine break is introduced before anything refers back to it", () => {
     for (const { kind, seed, goalType, realized } of weekly) {
@@ -563,14 +572,16 @@ describe("sections agree with each other", () => {
     }
   });
 
-  it("What To Do points at what Into Next Week acts on, and never endorses anything short of supportive", () => {
-    // Each focus line and the step it must sit beside.
+  it("What To Do's execution tip belongs to the step Into Next Week commits to, and never endorses anything short of supportive", () => {
+    // Each execution tip and the step it must sit beside.
     const FOCUS = [
-      [/scale's pace is the one thing to steer/u, /intake (?:at or below|reaches) the plan's target/u],
-      [/food log is the first thing to check/u, /every meal gets logged/u],
-      [/usual sessions back in/u, /training rhythm back/u],
-      [/result is what matters most|is the number to protect/u, /Keep intake at the plan's target and training/u],
-      [/Intake is the lever/u, /[Bb]ring intake/u],
+      [/Steady days on the plan's numbers/u, /at or below the plan's target/u],
+      [/Hitting the plan's numbers every day/u, /reaches the plan's target/u],
+      [/Log meals as they happen/u, /every meal gets logged/u],
+      [/Even shorter sessions count/u, /training rhythm back/u],
+      [/makes that result readable/u, /Keep intake at the plan's target and training/u],
+      [/Aim for the target most days/u, /[Bb]ring intake/u],
+      [/usual days and times/u, /[Ss]ettle back/u],
     ];
     let focused = 0;
     for (const { kind, seed, goalType, synthesis, realized } of weekly) {
@@ -579,14 +590,14 @@ describe("sections agree with each other", () => {
       for (const [focus, step] of FOCUS) {
         if (focus.test(realized.coachTake)) { focused += 1; expect(realized.action, label).toMatch(step); }
       }
-      if (/steady week|more of the same/u.test(realized.coachTake)) {
+      if (/Same days, same numbers/u.test(realized.coachTake)) {
         expect(synthesis.selected.every((item) => item.polarity === "supportive"), label).toBe(true);
         expect(realized.action).toBe("Keep the current setup in place.");
       }
       if (/Nothing here needs a change yet/u.test(realized.coachTake)) expect(realized.action).toBe("Keep the current setup in place.");
       expect(realized.coachTake).not.toMatch(/Nothing else needs changing|Keep doing what has been working/u);
     }
-    expect(focused).toBeGreaterThan(20);
+    expect(focused).toBeGreaterThan(15);
   });
 
   it("an outcome or guardrail risk gets its own step, Watch and a Confidence line that does not contradict itself", () => {
@@ -595,7 +606,9 @@ describe("sections agree with each other", () => {
       if (!risk || !realized || synthesis.selected.some((item) => item.kind === "weight_trend" && item.role === "risk")) continue;
       const label = `${goalType}/${kind}#${seed}`;
       expect(realized.action, label).toMatch(/^Keep intake at the plan's target and training on its usual rhythm this week\. The rest of the setup stays as it is\.$/u);
-      expect(realized.watch).toContain(`next ${scenario.goalFacts.composition.eventName}`);
+      // The meaning poses the next check; the watch never asks it again.
+      expect(realized.meaning, label).toContain(`next ${scenario.goalFacts.composition.eventName}`);
+      expect(realized.watch).not.toContain(`next ${scenario.goalFacts.composition.eventName}`);
       if (realized.confidenceBody) {
         expect(realized.confidenceBody).toMatch(/^Confidence holds at the level/u);
         expect(realized.confidenceBody).not.toMatch(/worth watching/u);
@@ -603,8 +616,8 @@ describe("sections agree with each other", () => {
       if (risk.kind === "guardrail_status") expect(realized.meaning).not.toMatch(/\bmatters\b/u);
     }
     const breached = weekly.filter((item) => item.kind === "guardrail_breached" && item.realized);
-    expect(breached.some((item) => /past its limit/u.test(item.realized.result))).toBe(true);
-    for (const { realized } of breached) expect(realized.result).not.toMatch(/closer to its limit/u);
+    expect(breached.some((item) => /past its limit/u.test(item.realized.recap))).toBe(true);
+    for (const { realized } of breached) expect(`${realized.headline} ${realized.recap}`).not.toMatch(/closer to its limit|near its limit/u);
   });
 
   it("the action never pushes the scale further the way it is already going too fast, nor contradicts the intake reading", () => {
@@ -673,7 +686,8 @@ describe("the food log is checked whenever logged intake and the scale disagree"
   it("intake on target while the scale falls the wrong way", () => {
     const realized = realize({ verdict: "wrong_direction", movement: "down", expectedDirection: "up" }, "on_plan");
     expect(realized.action).toMatch(/^Make sure every meal gets logged/u);
-    expect(realized.coachTake).toMatch(/food log is the first thing to check/u);
+    expect(realized.result).toMatch(/food log don't agree yet/u);
+    expect(realized.coachTake).toMatch(/Log meals as they happen/u);
   });
 
   it("intake above target while the scale drops a little quickly on a maintenance goal (no risk)", () => {
@@ -696,7 +710,52 @@ describe("the food log is checked whenever logged intake and the scale disagree"
   it("a wrong-way trend is focused on direction, not pace", () => {
     const realized = realize({ verdict: "wrong_direction", movement: "down", expectedDirection: "up" }, "below_plan");
     expect(realized.action).toMatch(/^Make sure intake reaches the plan's target/u);
-    expect(realized.coachTake).toMatch(/Turning the scale back the right way/u);
-    expect(realized.coachTake).not.toMatch(/pace/u);
+    expect(realized.result).toMatch(/turn back the right way/u);
+    expect(`${realized.result} ${realized.coachTake}`).not.toMatch(/\bpace\b/u);
+  });
+});
+
+describe("the scale's pace is judged only by a canonical authority", () => {
+  it("goal types own a direction only; no weekly rate lives in a goal policy", () => {
+    for (const goalType of HOLISTIC_GOAL_TYPES) {
+      const policy = holisticScenario({ seed: 1, kind: "stable_all", goalType }).goalPolicy;
+      if (policy.weightExpectation) expect(Object.keys(policy.weightExpectation)).toEqual(["direction"]);
+    }
+  });
+
+  it("without a canonical expected range, pace is never called fast or quick; only the person's own trend is compared", () => {
+    for (const { kind, seed, goalType, scenario, picture, realized } of weekly) {
+      if (canonicalWeightPace(scenario.goalFacts.weightTrajectory)) continue;
+      const weight = picture.domains.find((item) => item.domain === "body_trajectory");
+      const label = `${goalType}/${kind}#${seed}`;
+      expect(["rapid", "quick"], label).not.toContain(weight.state);
+      if (weight.status === "assessed" && weight.state !== "not_goal_relevant") {
+        expect(weight.facts.paceAuthority, label).toBe("personal_trend_relative");
+      }
+      expect(textOf(realized), label).not.toMatch(/pace the phase sets|moving fast|moving quickly|climbing fast|dropping fast/u);
+    }
+  });
+
+  it("a canonical expected range on the accepted phase trajectory is the only way pace becomes 'fast'", () => {
+    const cases = weekly.filter((item) => item.kind === "canonical_pace_fast" && ["build_lean_mass", "gain_weight", "lose_fat"].includes(item.goalType));
+    for (const { seed, goalType, picture, realized } of cases) {
+      const weight = picture.domains.find((item) => item.domain === "body_trajectory");
+      if (weight.status !== "assessed") continue;
+      expect(weight.facts.paceAuthority, `${goalType}#${seed}`).toBe("phase_expected_trajectory");
+      if (weight.state === "rapid") expect(realized.recap).toMatch(/faster than the pace the phase sets/u);
+    }
+    expect(cases.some((item) => item.picture.domains.find((d) => d.domain === "body_trajectory").state === "rapid")).toBe(true);
+  });
+
+  it("acceleration is the trend speeding up beyond its own noise, never a steady climb", () => {
+    for (const { kind, seed, goalType, picture } of weekly) {
+      const weight = picture.domains.find((item) => item.domain === "body_trajectory");
+      if (weight.state !== "accelerating") continue;
+      const f = weight.facts;
+      const sign = f.expectedDirection === "down" ? -1 : 1;
+      expect(sign * f.recentPace - sign * f.earlierPace, `${goalType}/${kind}#${seed}`).toBeGreaterThanOrEqual(2 * f.paceChangeNoise);
+    }
+    expect(weekly.filter((item) => item.kind === "stable_all").every((item) =>
+      item.picture.domains.find((d) => d.domain === "body_trajectory").state !== "accelerating")).toBe(true);
   });
 });

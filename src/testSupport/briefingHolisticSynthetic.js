@@ -13,7 +13,7 @@ export const HOLISTIC_KINDS = Object.freeze([
   "stable_all", "strong_training", "disruption_training_stable_weight", "weight_rising_no_dexa",
   "weight_rapid_guardrail", "weight_dexa_conflict", "unreliable_nutrition", "single_unreliable_day",
   "activity_variation", "crowded", "spectacular_pr", "sparse", "missed_week", "composition_regressed",
-  "risk_routine_progress", "guardrail_breached", "intake_conflicts_with_scale",
+  "risk_routine_progress", "guardrail_breached", "intake_conflicts_with_scale", "canonical_pace_fast",
 ]);
 
 export const HOLISTIC_GOAL_TYPES = Object.freeze(["build_lean_mass", "gain_weight", "lose_fat", "maintain", "general"]);
@@ -40,10 +40,18 @@ const DISRUPTED = new Set(["disruption_training_stable_weight", "crowded", "risk
 // Weekly scale trend by situation, in the goal's own direction: positive
 // means "the way this goal wants" (up for mass goals, down for fat loss).
 const TREND_WITH_GOAL = {
-  weight_rising_no_dexa: 0.6, weight_rapid_guardrail: 2.1, weight_dexa_conflict: -0.8, crowded: 1.2,
+  weight_rising_no_dexa: 0.6, weight_dexa_conflict: -0.8, crowded: 1.2,
   stable_all: 0.45, spectacular_pr: 0.4, disruption_training_stable_weight: 0.4, missed_week: 0.4,
-  risk_routine_progress: 2.1, intake_conflicts_with_scale: -0.8,
+  risk_routine_progress: 0.5, intake_conflicts_with_scale: -0.8, weight_rapid_guardrail: 0.5, canonical_pace_fast: 1.8,
 };
+
+// Situations whose scale trend speeds up over the last two weeks (the way
+// the goal wants), by this many lb/week on top of the base trend.
+const ACCELERATION = { weight_rapid_guardrail: 2.2, risk_routine_progress: 2.2 };
+
+// Situations with a canonical expected weekly range on the accepted phase
+// trajectory (the only authority for judging pace in absolute terms).
+const CANONICAL_PACE = { canonical_pace_fast: { expectedWeeklyRange: { min: 0.25, max: 0.75 }, cautionWeeklyRate: 1.25 } };
 
 export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "build_lean_mass" }) {
   const random = mulberry32(seed * 31 + HOLISTIC_KINDS.indexOf(kind) * 977 + HOLISTIC_GOAL_TYPES.indexOf(goalType) * 61 + 7);
@@ -60,6 +68,15 @@ export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "b
   const window = period.truth.window;
   const windowDays = period.days.filter((day) => day.date >= window.startDate);
 
+  if (ACCELERATION[kind] && direction !== "stable") {
+    const sign = direction === "down" ? -1 : 1;
+    const start = shiftBack(window.endDate, 13);
+    for (const day of period.days) {
+      if (day.date < start || !Number.isFinite(day.body?.weight)) continue;
+      const into = (Date.parse(`${day.date}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86400000;
+      day.body.weight = Math.round((day.body.weight + sign * ACCELERATION[kind] * into / 7) * 10) / 10;
+    }
+  }
   if (DISRUPTED.has(kind)) disruptLateStretch({ period, windowDays, length: 3 + Math.floor(random() * 2) });
   if (kind === "missed_week") {
     for (const day of windowDays) day.training = { sessions: 0 };
@@ -119,6 +136,7 @@ export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "b
         activity: { state: "on_plan", observed: 800, target: 800 } },
       trainingMilestones: milestones,
       visual,
+      weightTrajectory: CANONICAL_PACE[kind] ?? { direction: "goal_and_guardrail_aware", universalWeeklyRate: null },
       outlook: { percentage: 79, delta: 0 },
       strategy: { action: "continue_current_strategy" },
     },

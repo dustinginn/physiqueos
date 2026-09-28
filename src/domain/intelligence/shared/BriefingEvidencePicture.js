@@ -13,7 +13,7 @@
 // energy against plan targets, in-window training milestones, outlook,
 // strategy). This module never reads storage and never attributes causes.
 
-import { EVIDENCE_DOMAINS as D } from "./GoalEvidencePolicies.js";
+import { EVIDENCE_DOMAINS as D, WEIGHT_PACE_AUTHORITY as PACE, canonicalWeightPace } from "./GoalEvidencePolicies.js";
 import { BriefingPatternKind, dateRange, shiftDate } from "./BriefingIntelligence.js";
 
 export const EVIDENCE_PICTURE_VERSION = "briefing_evidence_picture_v1";
@@ -78,9 +78,13 @@ function pictureContext({ intelligence, goalPolicy, goalFacts }) {
 
 // ---------------------------------------------------------------- assessors
 
-// Scale weight: direction, weekly rate, and noise over the recent weeks,
-// compared with what this goal's phase expects. Never read as composition.
-function assessBodyTrajectory({ days, window, goalPolicy }) {
+// Scale weight: direction, pace and noise over the recent weeks, read against
+// the goal's expected direction and — only when the accepted Phase Expected
+// Trajectory declares one — a canonical expected weekly range. Without that
+// range the trend is judged against the person's own recent trend
+// (acceleration, stagnation, direction, volatility), never against an
+// engine-invented rate. Never read as composition.
+function assessBodyTrajectory({ days, window, goalPolicy, goalFacts }) {
   const spanStart = window ? shiftDate(window.endDate, -(WEIGHT_RATE_SPAN_DAYS - 1)) : null;
   const points = days.filter((day) => Number.isFinite(day?.body?.weight) && (!spanStart || day.date >= spanStart))
     .map((day) => ({ x: daysBetween(days[0].date, day.date), y: day.body.weight, date: day.date }));
@@ -94,19 +98,41 @@ function assessBodyTrajectory({ days, window, goalPolicy }) {
   const weeklyRate = round(fit.slope * 7, 2);
   const residual = Math.sqrt(points.reduce((sum, point) =>
     sum + (point.y - (fit.intercept + fit.slope * point.x)) ** 2, 0) / Math.max(1, points.length - 2));
+  // The last two weeks against the two before, for acceleration.
+  const split = window ? shiftDate(window.endDate, -13) : null;
+  // Each half's pace with its own standard error, so ordinary day-to-day
+  // noise is never read as the trend speeding up.
+  const halfPace = (list) => {
+    if (list.length < 5 || daysBetween(list[0].date, list.at(-1).date) < 7) return null;
+    const half = robustFit(list);
+    const mx = mean(list.map((point) => point.x));
+    const sxx = list.reduce((sum, point) => sum + (point.x - mx) ** 2, 0);
+    const sd = Math.sqrt(list.reduce((sum, point) => sum + (point.y - (half.intercept + half.slope * point.x)) ** 2, 0) /
+      Math.max(1, list.length - 2));
+    return { pace: round(half.slope * 7, 2), standardError: sxx > 0 ? (sd / Math.sqrt(sxx)) * 7 : Infinity };
+  };
+  const recentHalf = split ? halfPace(points.filter((point) => point.date >= split)) : null;
+  const earlierHalf = split ? halfPace(points.filter((point) => point.date < split)) : null;
+  const recentPace = recentHalf?.pace ?? null;
+  const earlierPace = earlierHalf?.pace ?? null;
+  const paceChangeNoise = recentHalf && earlierHalf
+    ? round(Math.sqrt(recentHalf.standardError ** 2 + earlierHalf.standardError ** 2), 2) : null;
   const windowAverage = round(mean(inWindow.map((point) => point.y)), 1);
   const priorWindow = points.filter((point) => window && point.date < window.startDate &&
     point.date >= shiftDate(window.startDate, -7));
   const priorAverage = priorWindow.length >= 3 ? round(mean(priorWindow.map((point) => point.y)), 1) : null;
   const expectation = goalPolicy.weightExpectation;
-  const verdict = weightVerdict(weeklyRate, expectation, residual);
-  const facts = { weeklyRate, windowAverage, priorWeekAverage: priorAverage, volatility: round(residual, 2),
-    weighIns: points.length, spanDays: daysBetween(points[0].date, points.at(-1).date) + 1,
-    rateSpanDays: daysBetween(points[0].date, points.at(-1).date) + 1, rateMethod: "theil_sen", movement: weeklyRate > 0.1 ? "up" : weeklyRate < -0.1 ? "down" : "flat",
+  const canonicalPace = canonicalWeightPace(goalFacts?.weightTrajectory);
+  const verdict = weightVerdict({ weeklyRate, recentPace, earlierPace, paceChangeNoise, residual, expectation, canonicalPace });
+  const facts = { weeklyRate, recentPace, earlierPace, paceChangeNoise, windowAverage, priorWeekAverage: priorAverage,
+    volatility: round(residual, 2), weighIns: points.length, spanDays: daysBetween(points[0].date, points.at(-1).date) + 1,
+    rateSpanDays: daysBetween(points[0].date, points.at(-1).date) + 1, rateMethod: "theil_sen",
+    movement: weeklyRate >= PACE.movementThresholdLbPerWeek ? "up" : weeklyRate <= -PACE.movementThresholdLbPerWeek ? "down" : "flat",
     expectedDirection: expectation?.direction ?? null, verdict,
+    paceAuthority: canonicalPace ? canonicalPace.authority : "personal_trend_relative",
     note: "scale_weight_does_not_identify_lean_or_fat_mass" };
-  const risk = ["rapid", "wrong_direction"].includes(verdict);
-  const polarity = verdict === "steady" ? "supportive" : risk ? "concern" : "neutral";
+  const risk = ["rapid", "wrong_direction", "accelerating"].includes(verdict);
+  const polarity = verdict === "steady" ? "supportive" : risk || verdict === "drifting" ? "concern" : "neutral";
   // A goal with no weight expectation keeps the trend as background only.
   if (verdict === "not_goal_relevant") {
     return assessed(D.BODY_TRAJECTORY, verdict, "neutral", facts, [
@@ -114,29 +140,49 @@ function assessBodyTrajectory({ days, window, goalPolicy }) {
     ]);
   }
   // A flat scale while the goal expects movement is informative in itself.
-  const strength = { steady: 1.6, quick: 1.8, rapid: 2.8, wrong_direction: 2.0, flat: 1.4, too_noisy: 0.6 }[verdict] ?? 0.8;
+  const strength = { steady: 1.6, quick: 1.8, rapid: 2.8, accelerating: 2.4, wrong_direction: 2.0, drifting: 1.8,
+    flat: 1.4, too_noisy: 0.6 }[verdict] ?? 0.8;
   return assessed(D.BODY_TRAJECTORY, verdict, polarity, facts, [
     insight(D.BODY_TRAJECTORY, "weight_trend", risk ? InsightRole.RISK : InsightRole.PROGRESS, polarity, strength, facts),
   ]);
 }
 
-// Pace against the goal type's typical range: steady, quick, rapid, flat or
-// the wrong way. A trend smaller than day-to-day noise is not a trend.
-function weightVerdict(weeklyRate, expectation, residual) {
+// The trend against the goal's direction. Pace is judged in absolute terms
+// only against a canonical expected range; otherwise only against the
+// person's own earlier pace. A trend smaller than day-to-day noise is not a
+// trend.
+function weightVerdict({ weeklyRate, recentPace, earlierPace, paceChangeNoise, residual, expectation, canonicalPace }) {
   if (!expectation) return "not_goal_relevant";
-  if (Math.abs(weeklyRate) < 0.1 && residual > 1.5) return "too_noisy";
-  const [low, high] = expectation.typicalWeeklyRate;
+  const move = PACE.movementThresholdLbPerWeek;
+  if (Math.abs(weeklyRate) < move && residual > 1.5) return "too_noisy";
+  if (canonicalPace) return canonicalPaceVerdict(weeklyRate, expectation, canonicalPace);
+  if (expectation.direction === "stable") return Math.abs(weeklyRate) < move ? "steady" : "drifting";
+  const sign = expectation.direction === "up" ? 1 : -1;
+  const along = sign * weeklyRate;
+  if (along <= -move) return "wrong_direction";
+  if (along < move) return "flat";
+  const recent = recentPace == null ? null : sign * recentPace;
+  const earlier = earlierPace == null ? null : sign * earlierPace;
+  // Speeding up: a real increase over the earlier pace, larger than the noise
+  // in the two paces themselves.
+  if (recent != null && earlier != null && recent >= move * 2 &&
+      recent - earlier >= Math.max(PACE.accelerationMinimumIncreaseLbPerWeek,
+        PACE.accelerationMinimumRelativeIncrease * Math.abs(earlier), 2 * (paceChangeNoise ?? Infinity))) return "accelerating";
+  return "steady";
+}
+
+function canonicalPaceVerdict(weeklyRate, expectation, { expectedWeeklyRange: [low, high], cautionWeeklyRate }) {
   if (expectation.direction === "stable") {
-    if (Math.abs(weeklyRate) <= high) return "steady";
-    return Math.abs(weeklyRate) >= Math.abs(expectation.cautionWeeklyRate) ? "rapid" : "quick";
+    if (weeklyRate >= low && weeklyRate <= high) return "steady";
+    return cautionWeeklyRate != null && Math.abs(weeklyRate) >= Math.abs(cautionWeeklyRate) ? "rapid" : "quick";
   }
   const sign = expectation.direction === "up" ? 1 : -1;
   const pace = sign * weeklyRate;
   const [typicalLow, typicalHigh] = sign > 0 ? [low, high] : [-high, -low];
-  if (pace >= sign * expectation.cautionWeeklyRate) return "rapid";
+  if (cautionWeeklyRate != null && pace >= sign * cautionWeeklyRate) return "rapid";
   if (pace > typicalHigh) return "quick";
   if (pace >= typicalLow) return "steady";
-  if (pace < -0.25) return "wrong_direction";
+  if (pace <= -PACE.movementThresholdLbPerWeek) return "wrong_direction";
   return "flat";
 }
 

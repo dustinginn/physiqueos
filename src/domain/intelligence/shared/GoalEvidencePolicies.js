@@ -35,35 +35,66 @@ export const EVIDENCE_DOMAIN_ROLES = Object.freeze({
   visual: D.VISUAL,
 });
 
+// Who may judge the scale's pace. A goal type sets only the direction it
+// expects. A pace judgment ("faster than planned") needs a canonical expected
+// weekly range — the accepted Phase Expected Trajectory's `weightTrajectory`
+// (phase_expected_trajectory_v1). Today's canonical records set
+// `universalWeeklyRate: null` and ask weight logic to warn on acceleration,
+// stagnation and volatility instead, so without a canonical range the engine
+// judges the trend only against the person's own recent trend. It never
+// derives a weight target from calories or wearable expenditure.
+export const WEIGHT_PACE_AUTHORITY = deepFreeze({
+  canonicalSource: "phase_expected_trajectory_v1.weightTrajectory",
+  canonicalRangeFields: ["expectedWeeklyRange", "cautionWeeklyRate"],
+  withoutCanonicalRange: "personal_trend_relative: acceleration, stagnation, direction, volatility",
+  // Measurement boundaries, not targets: below this the scale "held steady".
+  movementThresholdLbPerWeek: 0.25,
+  // Acceleration: the last two weeks' pace against the two weeks before.
+  accelerationMinimumIncreaseLbPerWeek: 0.5,
+  accelerationMinimumRelativeIncrease: 0.5,
+});
+
+// A canonical expected weekly range for the scale, when the accepted Phase
+// Expected Trajectory declares one; otherwise null (the engine then never
+// judges pace in absolute terms).
+export function canonicalWeightPace(weightTrajectory) {
+  const range = weightTrajectory?.expectedWeeklyRange;
+  const low = Number(range?.min ?? range?.[0]);
+  const high = Number(range?.max ?? range?.[1]);
+  if (!Number.isFinite(low) || !Number.isFinite(high) || low > high) return null;
+  const caution = Number(weightTrajectory.cautionWeeklyRate);
+  return { expectedWeeklyRange: [low, high], cautionWeeklyRate: Number.isFinite(caution) ? caution : null,
+    authority: "phase_expected_trajectory" };
+}
+
 const POLICIES = deepFreeze({
   build_lean_mass: {
     goalType: "build_lean_mass",
     // Weights reflect how much each domain can tell about this goal.
     domains: { [D.BODY_COMPOSITION]: 1.0, [D.TRAINING]: 1.0, [D.BODY_TRAJECTORY]: 0.9, [D.GUARDRAIL]: 0.9,
       [D.NUTRITION]: 0.8, [D.ROUTINE]: 0.8, [D.ACTIVITY]: 0.5, [D.RECOVERY]: 0.6, [D.VISUAL]: 0.7 },
-    // A mass-building phase expects scale weight to drift up. These are a
-    // typical pace for the goal type, not the Founder's plan: the engine may
-    // describe a pace as quick against them, never as "off plan". Scale weight
-    // never identifies lean versus fat mass.
-    weightExpectation: { direction: "up", typicalWeeklyRate: [0.25, 1.0], cautionWeeklyRate: 1.5 },
+    // A mass-building phase expects scale weight to move up. Direction only:
+    // the goal type owns no weekly rate (see WEIGHT_PACE_AUTHORITY). Scale
+    // weight never identifies lean versus fat mass.
+    weightExpectation: { direction: "up" },
   },
   gain_weight: {
     goalType: "gain_weight",
     domains: { [D.BODY_TRAJECTORY]: 1.0, [D.NUTRITION]: 1.0, [D.TRAINING]: 0.9, [D.BODY_COMPOSITION]: 0.8,
       [D.GUARDRAIL]: 0.8, [D.ROUTINE]: 0.8, [D.ACTIVITY]: 0.5, [D.RECOVERY]: 0.6, [D.VISUAL]: 0.6 },
-    weightExpectation: { direction: "up", typicalWeeklyRate: [0.25, 1.0], cautionWeeklyRate: 1.5 },
+    weightExpectation: { direction: "up" },
   },
   lose_fat: {
     goalType: "lose_fat",
     domains: { [D.BODY_COMPOSITION]: 1.0, [D.BODY_TRAJECTORY]: 1.0, [D.NUTRITION]: 1.0, [D.GUARDRAIL]: 0.9,
       [D.TRAINING]: 0.8, [D.ROUTINE]: 0.8, [D.ACTIVITY]: 0.6, [D.RECOVERY]: 0.6, [D.VISUAL]: 0.8 },
-    weightExpectation: { direction: "down", typicalWeeklyRate: [-1.5, -0.4], cautionWeeklyRate: -2.0 },
+    weightExpectation: { direction: "down" },
   },
   maintain: {
     goalType: "maintain",
     domains: { [D.BODY_TRAJECTORY]: 1.0, [D.BODY_COMPOSITION]: 0.9, [D.GUARDRAIL]: 0.9, [D.NUTRITION]: 0.8,
       [D.TRAINING]: 0.8, [D.ROUTINE]: 0.8, [D.ACTIVITY]: 0.5, [D.RECOVERY]: 0.6, [D.VISUAL]: 0.6 },
-    weightExpectation: { direction: "stable", typicalWeeklyRate: [-0.3, 0.3], cautionWeeklyRate: 0.75 },
+    weightExpectation: { direction: "stable" },
   },
   general: {
     goalType: "general",
