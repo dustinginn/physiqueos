@@ -309,12 +309,8 @@ describe("goal-relative wording follows the goal's direction and the evidence's 
       const label = `${goalType}/${kind}#${seed}`;
       expect(realized.meaning, label).not.toMatch(/can't say how much of this (?:gain|loss)|nothing this week points away/u);
       expect(realized.coachTake, label).not.toMatch(/Keep doing what has been working/u);
-      if (risk.kind === "weight_trend") {
-        expect(realized.action, label).toMatch(/intake (?:at|reaches) the plan's target/u);
-        // The action follows the scale: a rising trend is held, a falling one is fed.
-        expect(realized.action).toMatch(risk.facts.movement === "up" ? /rather than above it/u : /reaches the plan's target/u);
-        expect(realized.action).toMatch(/Otherwise keep the current setup/u);
-      }
+      if (risk.kind === "weight_trend") expectWeightStep(realized.action, risk, synthesis, label);
+      expect(realized.action).toMatch(/The rest of the setup stays as it is\.$/u);
     }
   });
 
@@ -324,7 +320,11 @@ describe("goal-relative wording follows the goal's direction and the evidence's 
       if (!risk || !realized || !scenario.goalFacts.composition) continue;
       const label = `${goalType}/${kind}#${seed}`;
       // A maintenance goal has no "right way": its outcome is what must hold.
-      if (goalType === "maintain") expect(realized.meaning, label).toContain(`whether ${scenario.goalFacts.composition.label} is holding`);
+      // For maintenance, a fast climb strains the guardrail and a fast drop the outcome.
+      if (goalType === "maintain") {
+        const measure = risk.facts.movement === "up" ? scenario.goalFacts.guardrail.label : scenario.goalFacts.composition.label;
+        expect(realized.meaning, label).toContain(`whether ${measure} is holding`);
+      }
       else if (risk.facts.verdict === "rapid") expect(realized.meaning, label).toContain(`whether ${scenario.goalFacts.guardrail.label} is holding`);
       if (risk.facts.verdict === "wrong_direction") {
         expect(realized.meaning, label).toContain(`whether ${scenario.goalFacts.composition.label} is still moving the right way`);
@@ -518,6 +518,20 @@ describe("briefing budgets are semantic, not word counts", () => {
   });
 });
 
+// A weight risk's step follows the scale (a climb is held at target, a drop
+// is fed to target), unless the logged intake points the other way — then the
+// log itself is what gets checked.
+function expectWeightStep(action, risk, synthesis, label) {
+  const intake = synthesis.selected.find((item) => item.kind === "intake_vs_plan" && item.polarity !== "supportive");
+  const push = intake ? (/under|below/u.test(intake.facts.state) ? "up" : "down") : null;
+  if (push && push === risk.facts.movement) {
+    expect(action, label).toMatch(/^Make sure every meal gets logged/u);
+    return;
+  }
+  expect(action, label).toMatch(risk.facts.movement === "up" ? /^Keep intake at or below the plan's target/u
+    : /^Make sure intake reaches the plan's target/u);
+}
+
 describe("sections agree with each other", () => {
   const sections = (realized) => [realized.result, realized.meaning, realized.coachTake, realized.action, realized.watch];
 
@@ -541,25 +555,37 @@ describe("sections agree with each other", () => {
     for (const { seed, goalType, synthesis, realized } of cases) {
       const risk = synthesis.selected.find((item) => item.kind === "weight_trend" && item.role === "risk");
       if (!risk) continue;
-      expect(realized.action, `${goalType}#${seed}`).toMatch(/intake (?:at|reaches) the plan's target/u);
+      expectWeightStep(realized.action, risk, synthesis, `${goalType}#${seed}`);
       if (synthesis.selected.some((item) => item.kind === "routine_break" && item.facts.missed?.some((gap) => gap.domain === "training"))) {
         expect(realized.action).toMatch(/training rhythm back/u);
       }
     }
   });
 
-  it("What To Do never contradicts Into Next Week, and never endorses anything short of supportive", () => {
+  it("What To Do points at what Into Next Week acts on, and never endorses anything short of supportive", () => {
+    // Each focus line and the step it must sit beside.
+    const FOCUS = [
+      [/scale's pace is the one thing to steer/u, /intake (?:at or below|reaches) the plan's target/u],
+      [/food log is the first thing to check/u, /every meal gets logged/u],
+      [/usual sessions back in/u, /training rhythm back/u],
+      [/result is what matters most|is the number to protect/u, /Keep intake at the plan's target and training/u],
+      [/Intake is the lever/u, /[Bb]ring intake/u],
+    ];
+    let focused = 0;
     for (const { kind, seed, goalType, synthesis, realized } of weekly) {
       if (!realized) continue;
       const label = `${goalType}/${kind}#${seed}`;
-      expect(realized.coachTake, label).not.toMatch(/Nothing else needs changing/u);
-      if (/Keep doing what has been working/u.test(realized.coachTake)) {
+      for (const [focus, step] of FOCUS) {
+        if (focus.test(realized.coachTake)) { focused += 1; expect(realized.action, label).toMatch(step); }
+      }
+      if (/steady week|more of the same/u.test(realized.coachTake)) {
         expect(synthesis.selected.every((item) => item.polarity === "supportive"), label).toBe(true);
+        expect(realized.action).toBe("Keep the current setup in place.");
       }
-      if (!/^Keep the current setup in place\.$/u.test(realized.action)) {
-        expect(realized.coachTake, label).not.toMatch(/nothing (?:else )?needs (?:changing|fixing) this week/iu);
-      }
+      if (/Nothing here needs a change yet/u.test(realized.coachTake)) expect(realized.action).toBe("Keep the current setup in place.");
+      expect(realized.coachTake).not.toMatch(/Nothing else needs changing|Keep doing what has been working/u);
     }
+    expect(focused).toBeGreaterThan(20);
   });
 
   it("an outcome or guardrail risk gets its own step, Watch and a Confidence line that does not contradict itself", () => {
@@ -567,7 +593,7 @@ describe("sections agree with each other", () => {
       const risk = synthesis.selected.find((item) => item.role === "risk" && ["composition_result", "guardrail_status"].includes(item.kind));
       if (!risk || !realized || synthesis.selected.some((item) => item.kind === "weight_trend" && item.role === "risk")) continue;
       const label = `${goalType}/${kind}#${seed}`;
-      expect(realized.action, label).toMatch(/^Keep intake at the plan's target and training on its usual rhythm this week\. Otherwise/u);
+      expect(realized.action, label).toMatch(/^Keep intake at the plan's target and training on its usual rhythm this week\. The rest of the setup stays as it is\.$/u);
       expect(realized.watch).toContain(`next ${scenario.goalFacts.composition.eventName}`);
       if (risk.kind === "composition_result" && realized.confidenceBody) {
         expect(realized.confidenceBody).toMatch(/^Confidence holds at the level/u);
@@ -580,14 +606,24 @@ describe("sections agree with each other", () => {
     for (const { realized } of breached) expect(realized.result).not.toMatch(/closer to its limit/u);
   });
 
-  it("a weight risk's step follows the scale even when intake reads the other way", () => {
-    for (const { seed, goalType, synthesis, realized } of weekly.filter((item) => item.kind === "intake_conflicts_with_scale")) {
-      const risk = synthesis.selected.find((item) => item.kind === "weight_trend" && item.role === "risk");
-      if (!risk) continue;
-      const label = `${goalType}#${seed}`;
-      expect(realized.action, label).not.toMatch(/bring intake/u);
-      expect(realized.action).toMatch(risk.facts.movement === "up" ? /rather than above it/u : /reaches the plan's target/u);
+  it("the action never pushes the scale further the way it is already going too fast, nor contradicts the intake reading", () => {
+    let mismatches = 0;
+    for (const { kind, seed, goalType, synthesis, realized } of weekly) {
+      if (!realized) continue;
+      const label = `${goalType}/${kind}#${seed}`;
+      const weight = synthesis.selected.find((item) => item.kind === "weight_trend" &&
+        ["rapid", "quick", "wrong_direction"].includes(item.facts.verdict));
+      const intake = synthesis.selected.find((item) => item.kind === "intake_vs_plan" && item.polarity !== "supportive");
+      // Eating less while the scale already falls fast, or more while it climbs fast.
+      if (weight?.facts.movement === "down") expect(realized.action, label).not.toMatch(/bring intake back down|at or below/u);
+      if (weight?.facts.movement === "up") expect(realized.action, label).not.toMatch(/bring intake up|reaches the plan's target/u);
+      // Intake said to run one way is never followed by a step implying the other.
+      if (/intake ran above target/u.test(textOf(realized))) expect(realized.action, label).not.toMatch(/reaches the plan's target|bring intake up/u);
+      if (/intake ran below target/u.test(textOf(realized))) expect(realized.action, label).not.toMatch(/at or below|bring intake back down/u);
+      if (intake && weight?.role === "risk" && /every meal gets logged/u.test(realized.action)) mismatches += 1;
     }
+    // The intake-against-scale situations actually reach the mismatch path.
+    expect(mismatches).toBeGreaterThan(0);
   });
 
   it("a maintenance goal asks the scale to level off, never to 'steady' a climb or drop it wants", () => {
