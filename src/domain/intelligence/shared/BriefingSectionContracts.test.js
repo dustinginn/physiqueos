@@ -277,7 +277,10 @@ describe("neutral findings are described, never framed as problems or praise", (
       const neutral = synthesis.selected.filter((item) => realized.heroIds.includes(item.id) && item.polarity === "neutral");
       for (const item of neutral) {
         checked += 1;
-        expect(realized.headlineIds, label).not.toContain(item.id);
+        // Headlined only as a plain description of what the scale did.
+        if (realized.headlineIds.includes(item.id)) {
+          expect(realized.headline, label).toMatch(/^(?:Weight held steady|The scale moved (?:up|down)|Weight moving in the goal's direction)\.$/u);
+        }
         if (item.kind === "weight_trend") expect(`${realized.headline} ${realized.result}`, label).not.toMatch(/drift|settle back|rein in|the scale went/u);
       }
     }
@@ -287,7 +290,11 @@ describe("neutral findings are described, never framed as problems or praise", (
   it("a standing result is never headlined as this week's news", () => {
     for (const { label, synthesis, realized } of weekly) {
       const composition = synthesis.selected.find((item) => item.kind === "composition_result" && realized.headlineIds.includes(item.id));
-      if (composition && !composition.facts.newThisPeriod) expect(realized.headline, label).toMatch(/still .* since the last/u);
+      // Said as what that measurement showed — never as persisting since.
+      if (composition && !composition.facts.newThisPeriod) {
+        expect(realized.headline, label).toMatch(/on the last /u);
+        expect(realized.headline).not.toMatch(/\bstill\b|\bsince\b/u);
+      }
     }
   });
 
@@ -319,6 +326,26 @@ describe("hand-built pictures exercise paths the generator rarely reaches", () =
     return realizeHolisticWeeklyV3({ synthesis, picture: p, goalLabel: "the goal", goalPolicy: { weightExpectation: { direction: "up" } } });
   };
 
+  it("a canonical 'quick' pace is a concern every section agrees on, with a step", () => {
+    const realized = realize([
+      insight("training", "training_progress", "progress", "supportive", { milestoneCount: 3 }),
+      insight("body_trajectory", "weight_trend", "progress", "concern", { verdict: "quick", movement: "up", weeklyRate: 0.9,
+        rateSpanDays: 28, expectedDirection: "up", paceAuthority: "phase_expected_trajectory" }),
+    ]);
+    expect(realized.headline).toBe("Strong training week, but the scale is ahead of pace.");
+    expect(realized.result).toMatch(/pace of the scale is worth easing a little/u);
+    expect(realized.action).toMatch(/^Keep intake at or below the plan's target/u);
+    expect(realized.coachTake).not.toMatch(/Nothing here needs a change/u);
+  });
+
+  it("a breached guardrail's takeaway points back inside the limit, never at holding it", () => {
+    const realized = realize([
+      insight("guardrail", "guardrail_status", "risk", "concern", { status: "breached", label: "body fat" }),
+    ]);
+    expect(realized.result).toMatch(/[Gg]etting back under that line/u);
+    expect(realized.result).not.toMatch(/holding body fat steady/u);
+  });
+
   it("two supportive leads read as a headline with a noun phrase after 'with'", () => {
     const realized = realize([
       insight("training", "training_progress", "progress", "supportive", { milestoneCount: 3, example: null }),
@@ -327,6 +354,34 @@ describe("hand-built pictures exercise paths the generator rarely reaches", () =
     expect(realized.headline).toBe("Strong training week, with a steady routine.");
     expect(realized.result).not.toMatch(/\byet\b/u);
     expect(realized.sectionAudit.text.issues).toEqual([]);
+  });
+});
+
+describe("maintenance movement is described, never sized or framed as a fix", () => {
+  it("a maintenance drift says what the scale did, without 'a little' or 'levels off'", () => {
+    let checked = 0;
+    for (const { label, synthesis, realized } of weekly.filter((item) => item.goalType === "maintain")) {
+      const weight = synthesis.selected.find((item) => item.kind === "weight_trend" && item.facts.verdict === "drifting");
+      if (!weight) continue;
+      checked += 1;
+      const text = [realized.headline, realized.meaning, realized.result, realized.coachTake, realized.action, realized.watch].join(" ");
+      expect(text, label).not.toMatch(/(?:moving|moved) a little|scale[^.]*a bit|levels off|settle back|drift/u);
+      if (realized.headlineIds.includes(weight.id)) expect(realized.headline).toMatch(/^The scale moved (?:up|down)\.$/u);
+    }
+    expect(checked).toBeGreaterThan(5);
+  });
+});
+
+describe("the takeaway interprets a missed week instead of restating it", () => {
+  it("never repeats the recap's missed training or the action's step", () => {
+    let checked = 0;
+    for (const { label, realized } of weekly.filter((item) => item.kind === "missed_week")) {
+      if (!/no training sessions were logged/iu.test(realized.recap)) continue;
+      checked += 1;
+      expect(realized.result, label).not.toMatch(/no training|sessions were|getting sessions back|training rhythm back/iu);
+      expect(realized.result).toMatch(/missed week is easy to absorb; the next one is the one that counts/u);
+    }
+    expect(checked).toBeGreaterThan(5);
   });
 });
 

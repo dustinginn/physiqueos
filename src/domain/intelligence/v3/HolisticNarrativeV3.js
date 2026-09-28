@@ -167,7 +167,7 @@ function concernPhrase(item, standalone = false) {
   switch (item.kind) {
     case "weight_trend":
       return { accelerating: `weight ${f.movement === "down" ? "loss" : "gain"} is picking up`,
-        rapid: "the scale is moving fast", quick: "the scale is moving quickly",
+        rapid: "the scale is moving fast", quick: "the scale is ahead of pace",
         wrong_direction: "the scale went the wrong way", drifting: "the scale drifted",
         flat: "the scale held flat" }[f.verdict] ?? null;
     case "routine_break": {
@@ -181,7 +181,7 @@ function concernPhrase(item, standalone = false) {
     case "guardrail_status": return f.status === "breached" ? `${f.label} past its limit` : `${f.label} near its limit`;
     // A standing result is not this week's news.
     case "composition_result": return f.newThisPeriod ? `${f.label} ${Number(f.change) > 0 ? "up" : "down"} on the ${f.eventName}`
-      : `${f.label} still ${Number(f.change) > 0 ? "up" : "down"} since the last ${f.eventName}`;
+      : `${f.label} ${Number(f.change) > 0 ? "up" : "down"} on the last ${f.eventName}`;
     case "intake_vs_plan": return "intake off target";
     case "activity_change": return f.direction === "below" ? "activity dipped" : "activity ran high";
     case "visual_change": return "little visible change";
@@ -194,7 +194,7 @@ function concernNoun(item) {
   const f = item.facts ?? {};
   if (item.kind === "weight_trend") {
     return { accelerating: `weight ${f.movement === "down" ? "loss" : "gain"} picking up`, rapid: "the scale moving fast",
-      quick: "the scale moving quickly", wrong_direction: "the scale going the wrong way", drifting: "the scale drifting",
+      quick: "the scale ahead of pace", wrong_direction: "the scale going the wrong way", drifting: "the scale drifting",
       flat: "the scale flat" }[f.verdict] ?? "the scale moving";
   }
   return concernPhrase(item);
@@ -223,6 +223,15 @@ function headlineSentence(lead, facts, budget) {
   if (concerns[0]) option(`${upperFirst(concernPhrase(concerns[0].item, true))}.`, concerns[0]);
   if (leads[0] && leads[1]) option(`${leads[0].lead}, with ${LEAD_NOUN[leads[1].item.kind]?.(leads[1].item.facts ?? {}) ?? "more to build on"}.`, leads[0], leads[1]);
   if (leads[0]) option(`${leads[0].lead}.`, leads[0]);
+  // A described (neutral) scale trend says what the scale did, no verdict.
+  const neutralWeight = lead.find((item) => item.kind === "weight_trend" && item.polarity === "neutral");
+  if (neutralWeight && !leads.length && !concerns.length) {
+    const f = neutralWeight.facts;
+    const phrase = f.movement === "flat" ? "Weight held steady."
+      : f.expectedDirection === "stable" ? `The scale moved ${f.movement === "down" ? "down" : "up"}.`
+        : f.movement === f.expectedDirection ? "Weight moving in the goal's direction." : null;
+    if (phrase) options.push({ text: phrase, ids: [neutralWeight.id] });
+  }
   options.push({ text: "A steady week.", ids: [] });
   const fits = ({ text }) => text.split(/\s+/u).length <= budget.maxWords && text.length <= budget.maxChars && !/\d/u.test(text);
   return options.find(fits) ?? { text: "A steady week.", ids: [] };
@@ -276,7 +285,8 @@ function prioritiesPhrase(item) {
     }
     case "training_frequency": return f.missedAll ? "a single missed week is easy to absorb; the next one is the one that counts"
       : "the missed sessions are easy to absorb if next week runs as usual";
-    case "guardrail_status": return `holding ${f.label} steady comes before anything else right now`;
+    case "guardrail_status": return f.status === "breached" ? "getting back under that line comes before anything else"
+      : `holding ${f.label} steady comes before anything else right now`;
     case "composition_result": return `the ${f.eventName} result is the thing to turn around`;
     case "intake_vs_plan": return "the food side is the lever this week";
     case "activity_change": return f.direction === "below" ? "activity is worth bringing back up" : null;
@@ -390,12 +400,14 @@ function implicationSentence({ synthesis, facts, goalLabel, lead }) {
   }
   if (risk) return read(`; ${next} is the check that settles it.`, `${next} is the check that settles it.`);
   if (weight && stableGoal && verdict === "quick") {
-    return read(`; the scale is moving faster than the pace the phase sets, and ${next} will show whether ${composition.label} is holding.`,
-      `the scale is moving faster than the pace the phase sets; ${next} will show whether ${composition.label} is holding.`);
+    return read(`; ${next} will show whether ${composition.label} is holding at this pace.`,
+      `${next} will show whether ${composition.label} is holding at this pace.`);
   }
   if (weight && stableGoal && verdict === "drifting") {
-    return read(`; the scale has moved ${movement === "down" ? "down" : "up"} a bit, and ${next} will show whether ${composition.label} is holding.`,
-      `the scale has moved ${movement === "down" ? "down" : "up"} a bit; ${next} will show whether ${composition.label} is holding.`);
+    // Names the movement only when the recap has not already said it.
+    const moved = lead.some((item) => item.kind === "weight_trend") ? "" : `the scale has moved ${movement === "down" ? "down" : "up"}, and `;
+    return read(`; ${moved}${next} will show whether ${composition.label} is holding.`,
+      `${moved}${next} will show whether ${composition.label} is holding.`);
   }
   if (weight && !stableGoal && ["steady", "quick"].includes(verdict) && movement !== "flat") {
     // Refers back to the scale only when the recap just told it.
@@ -532,8 +544,9 @@ function planSteps(synthesis) {
   const steps = [];
   if (intakeContradictsScale && weight) {
     steps.push({ source: weight, ...logCheck });
-  } else if (weightRisk) {
-    steps.push({ source: weightRisk, text: weightRisk.facts.movement === "up" ? "keep intake at or below the plan's target"
+  } else if (weightRisk || (weight?.facts.verdict === "quick" && weight.polarity === "concern")) {
+    const source = weightRisk ?? weight;
+    steps.push({ source, text: source.facts.movement === "up" ? "keep intake at or below the plan's target"
         : "make sure intake reaches the plan's target" });
   } else if (outcomeRisk) {
     steps.push({ source: outcomeRisk, text: "keep intake at the plan's target and training on its usual rhythm" });
