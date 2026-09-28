@@ -52,6 +52,7 @@ export default function MonthlyBriefingScreen({ presentation, reconciliation = n
             </p>
           </aside>
         )}
+        {presentation.coachTake?.body && <CoachTake model={presentation.coachTake} />}
         {presentation.milestone && <GoalMilestone milestone={presentation.milestone} />}
         {presentation.training && <TrainingProgress training={presentation.training} />}
         {presentation.energy && <MonthlyEnergyEvolution model={presentation.energy} />}
@@ -158,13 +159,17 @@ function TrainingProgress({ training }) {
             </section>
           ))}
         </div>
-        <div className="mt-3 rounded-2xl border-l-4 border-amber-500 bg-amber-100/70 p-4 dark:bg-amber-300/[.09]">
-          <p className="text-[10px] font-black uppercase tracking-[.1em] text-amber-800 dark:text-amber-300">{training.callout}</p>
-          <p className="mt-2 text-sm font-extrabold leading-6 text-slate-900 dark:text-white">{training.interpretation}</p>
-        </div>
-        <p className="mt-3 flex gap-2 text-xs font-bold leading-5 text-slate-700 dark:text-slate-200">
-          <ArrowUpRight className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300" size={15} />{training.next}
-        </p>
+        {training.interpretation && (
+          <div className="mt-3 rounded-2xl border-l-4 border-amber-500 bg-amber-100/70 p-4 dark:bg-amber-300/[.09]">
+            {training.callout && <p className="text-[10px] font-black uppercase tracking-[.1em] text-amber-800 dark:text-amber-300">{training.callout}</p>}
+            <p className="mt-2 text-sm font-extrabold leading-6 text-slate-900 dark:text-white">{training.interpretation}</p>
+          </div>
+        )}
+        {training.next && (
+          <p className="mt-3 flex gap-2 text-xs font-bold leading-5 text-slate-700 dark:text-slate-200">
+            <ArrowUpRight className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300" size={15} />{training.next}
+          </p>
+        )}
       </div>
     </section>
   );
@@ -181,10 +186,12 @@ function NewBaseline({ model }) {
       <h2 className="mt-3 text-xl font-extrabold leading-7 text-slate-950 dark:text-white">{model.title}</h2>
       <p className="mt-2 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-100">{model.summary}</p>
       <div className="mt-4 grid grid-cols-2 gap-2">{model.facts.map((fact) => <Fact fact={fact} key={fact.label} />)}</div>
-      <div className="mt-3 flex gap-3 rounded-2xl bg-sky-100/80 p-4 dark:bg-sky-300/[.09]">
-        <Gauge className="mt-0.5 shrink-0 text-sky-700 dark:text-sky-300" size={18} />
-        <p className="text-xs font-extrabold leading-5 text-slate-800 dark:text-slate-100">{model.callout}</p>
-      </div>
+      {model.callout && (
+        <div className="mt-3 flex gap-3 rounded-2xl bg-sky-100/80 p-4 dark:bg-sky-300/[.09]">
+          <Gauge className="mt-0.5 shrink-0 text-sky-700 dark:text-sky-300" size={18} />
+          <p className="text-xs font-extrabold leading-5 text-slate-800 dark:text-slate-100">{model.callout}</p>
+        </div>
+      )}
     </EditorialSection>
   );
 }
@@ -194,6 +201,14 @@ function WhatChanged({ model }) {
     <EditorialSection icon={Sparkles} label={model.eyebrow} tone="violet">
       <h2 className="mt-3 text-xl font-extrabold text-slate-950 dark:text-white">{model.title}</h2>
       <div className="mt-3 space-y-2">{model.themes.map((theme) => <Theme key={theme.title} theme={theme} />)}</div>
+    </EditorialSection>
+  );
+}
+
+function CoachTake({ model }) {
+  return (
+    <EditorialSection icon={Sparkles} label={model.eyebrow} tone="violet" className="mb-3">
+      <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-100">{model.body}</p>
     </EditorialSection>
   );
 }
@@ -317,7 +332,7 @@ function Theme({ theme }) {
     weight: "border-l-violet-500 bg-violet-50/80 dark:bg-violet-300/[.07]",
   };
   return (
-    <section className={`rounded-r-2xl border-l-4 p-4 ${colors[theme.tone]}`}>
+    <section className={`rounded-r-2xl border-l-4 p-4 ${colors[theme.tone] ?? "border-l-violet-500 bg-violet-50/80 dark:bg-violet-300/[.07]"}`}>
       <div className="flex items-center gap-2 text-violet-700 dark:text-violet-300"><Icon size={15} /><p className="text-[9px] font-black uppercase tracking-[.08em]">{theme.label}</p></div>
       <h3 className="mt-2 text-sm font-extrabold text-slate-950 dark:text-white">{theme.title}</h3>
       <p className="mt-1 text-xs font-semibold leading-5 text-slate-700 dark:text-slate-200">{theme.body}</p>

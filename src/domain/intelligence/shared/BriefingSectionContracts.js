@@ -219,7 +219,14 @@ export function compactConfidence(text, { maxSentences = 2, maxWords = 35 } = {}
     if (next.length > maxSentences || countWords(next.join(" ")) > maxWords) break;
     kept.push(sentence.trim());
   }
-  return kept.length ? kept.join(" ") : (sentences[0]?.trim() ?? null);
+  if (kept.length) return kept.join(" ");
+  // A single sentence longer than the budget is cut at its last clause
+  // boundary inside the budget, so the cap always holds.
+  const first = sentences[0]?.trim();
+  if (!first) return null;
+  const head = first.split(/\s+/u).slice(0, maxWords).join(" ");
+  const cut = Math.max(head.lastIndexOf(","), head.lastIndexOf(";"), head.lastIndexOf(":"));
+  return `${(cut > 0 ? head.slice(0, cut) : head).replace(/[,;:]$/u, "")}.`;
 }
 
 // A stated quantity with its unit and the word after it ("21 training",

@@ -16,6 +16,7 @@
 import { EVIDENCE_DOMAINS as D, WEIGHT_PACE_AUTHORITY as PACE, canonicalWeightPace } from "./GoalEvidencePolicies.js";
 import { BRIEFING_INTELLIGENCE_POLICIES } from "./BriefingIntelligencePolicies.js";
 import { BriefingPatternKind, dateRange, shiftDate } from "./BriefingIntelligence.js";
+import { PLAN_TOLERANCE_RATIO } from "../CadenceEnergyObservationsV3.js";
 
 export const EVIDENCE_PICTURE_VERSION = "briefing_evidence_picture_v1";
 
@@ -319,6 +320,12 @@ function assessNutrition({ goalFacts, windowDays, reliability, intelligence }) {
     // Intake over the readable days only: the one intake figure a briefing
     // may state when some days are unreadable.
     reliableIntakeAverage: reliable.length ? round(mean(reliable.map((day) => day.nutrition.calories)), 0) : null,
+    // The plan-relative state over the readable days, with the same
+    // tolerance the V3 energy observations use: the one intake verdict a
+    // briefing may state when some days are unreadable.
+    // When every logged day is readable, the upstream state (computed over
+    // those same days) is the authority; the two never disagree.
+    readableIntakeState: reliable.length === logged.length && intake?.state ? intake.state : readableIntakeState(reliable, intake?.target),
     usualProtein: proteinBaseline.length ? round(median(proteinBaseline), 0) : null };
   const insights = [];
   // The plan-relative intake average is computed upstream over every logged
@@ -344,6 +351,12 @@ function assessNutrition({ goalFacts, windowDays, reliability, intelligence }) {
   }
   const state = !readable ? "partly_unreadable" : intake?.state ?? "logged";
   return assessed(D.NUTRITION, state, readable && intake?.state === "on_plan" ? "supportive" : readable ? "neutral" : "limiting", facts, insights);
+}
+
+function readableIntakeState(reliable, target) {
+  if (reliable.length < 7 || !Number.isFinite(Number(target)) || Number(target) <= 0) return null;
+  const ratio = mean(reliable.map((day) => day.nutrition.calories)) / Number(target) - 1;
+  return Math.abs(ratio) <= PLAN_TOLERANCE_RATIO ? "on_plan" : ratio < 0 ? "below_plan" : "above_plan";
 }
 
 // Wearable activity: execution context, described by direction and never by

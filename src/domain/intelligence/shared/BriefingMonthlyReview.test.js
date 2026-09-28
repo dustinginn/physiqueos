@@ -83,7 +83,11 @@ describe("Monthly review: rich where the month earns it", () => {
       const domain = (name) => picture.domains.find((item) => item.domain === name);
       const roles = realized.review.modules.map((item) => item.role);
       if (domain("nutrition").status !== "assessed") expect(roles).not.toContain(ReviewModule.ENERGY);
-      if (domain("body_composition").status !== "assessed") expect(roles).not.toContain(ReviewModule.TRAJECTORY);
+      // Without a measurement the trajectory module can only be the scale's own.
+      if (domain("body_composition").status !== "assessed") {
+        const trajectory = realized.review.modules.find((item) => item.role === ReviewModule.TRAJECTORY);
+        if (trajectory) expect(trajectory.scaleOnly).toBe(true);
+      }
       if (domain("routine").state === "steady") expect(roles).not.toContain(ReviewModule.EXECUTION);
       if (domain("training").status !== "assessed") expect(roles).not.toContain(ReviewModule.TRAINING);
     }
@@ -158,7 +162,7 @@ describe("Monthly review: rich where the month earns it", () => {
       const weight = picture.domains.find((item) => item.domain === "body_trajectory");
       if (trajectory && weight?.status === "assessed" && weight.facts.movement !== "flat" &&
           Number.isFinite(weight.facts.firstWeekAverage) && Number.isFinite(weight.facts.lastWeekAverage)) {
-        expect(trajectory.paragraphs.join(" ")).toMatch(/can't tell .* apart from other weight/u);
+        expect(trajectory.paragraphs.join(" ")).toMatch(/can't tell .* apart from other weight|adds pace, not a verdict/u);
       }
       const energy = realized.review.modules.find((item) => item.role === ReviewModule.ENERGY);
       if (energy && picture.domains.find((item) => item.domain === "activity")?.facts?.measurement === "wearable_estimate") {
@@ -199,6 +203,40 @@ describe("Monthly review: rich where the month earns it", () => {
     expect(synthesis.considered.find((item) => item.domain === "recovery")).toBeTruthy();
     expect(REVIEW_CONTRACTS.monthly.modules).toContain(ReviewModule.OTHER);
     expect(realized.review.omitted.find((item) => item.role === ReviewModule.OTHER)?.reason).toMatch(/no_recovery_evidence_yet/u);
+  });
+
+  it("a span that is not a calendar month is never named as one", () => {
+    for (const { realized } of corpus) {
+      const text = [realized.headline, realized.meaning, realized.result, realized.confidenceBody, ...reviewText(realized.review)].join(" ");
+      expect(text).not.toMatch(/\bnull\b|\bundefined\b|The next month/u);
+    }
+  });
+
+  it("one intake verdict: the Energy module never contradicts the intake the opening states", () => {
+    for (const { realized, synthesis } of corpus) {
+      const energy = realized.review.modules.find((item) => item.role === ReviewModule.ENERGY);
+      const intake = synthesis.selected.find((item) => item.kind === "intake_vs_plan" && !item.restrained);
+      if (energy?.intakeState && intake) expect(energy.intakeState).toBe(intake.facts.state);
+    }
+  });
+
+  it("missed training days are pointed to the routine stretches only when they fall inside them", () => {
+    for (const { realized, picture } of corpus) {
+      const training = realized.review.modules.find((item) => item.role === ReviewModule.TRAINING);
+      if (!training?.paragraphs.some((text) => /routine stretches below/u.test(text))) continue;
+      const shifts = picture.domains.find((item) => item.domain === "routine").facts.shifts;
+      const dates = new Set(shifts.flatMap((shift) => shift.affectedDates));
+      const missed = picture.domains.find((item) => item.domain === "training").facts.missedDates;
+      expect(missed.every((date) => dates.has(date))).toBe(true);
+      expect(realized.review.modules.some((item) => item.role === ReviewModule.EXECUTION)).toBe(true);
+    }
+  });
+
+  it("the Confidence cap holds even for one over-long sentence", () => {
+    const one = "Confidence jumped because the check measured a standout result across many measures, with lean mass up, body fat controlled, the scale on pace, training strong and nutrition consistent through the whole period.";
+    const compact = compactConfidence(one, REVIEW_CONTRACTS.monthly.confidence);
+    expect(words(compact)).toBeLessThanOrEqual(REVIEW_CONTRACTS.monthly.confidence.maxWords);
+    expect(compact).toMatch(/^Confidence jumped because .*\.$/u);
   });
 
   it("is deterministic, and only the Monthly has a review", () => {

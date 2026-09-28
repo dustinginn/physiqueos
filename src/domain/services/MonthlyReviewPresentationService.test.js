@@ -18,6 +18,16 @@ function review(window = { startDate: "2026-09-01", endDate: "2026-09-19" }) {
     goalProgress: "You are more than halfway to the goal." });
 }
 
+// Legacy per-day energy over a phase that starts before the month.
+function dailyWeeks() {
+  const days = [];
+  for (let d = new Date("2026-08-15T12:00:00Z"); d <= new Date("2026-09-19T12:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+    const date = d.toISOString().slice(0, 10);
+    days.push({ id: date, date, day: Number(date.slice(8)), intake: date < "2026-09-01" ? 9999 : 2600, expenditure: 2500, balance: 100, missing: false, synthetic: false });
+  }
+  return [{ label: "Week 1", days }];
+}
+
 function legacyArtifact(referenceDate) {
   return { id: "monthly_x", briefing: {
     monthlyNarrative: { title: "Legacy", thesis: "Legacy thesis.", strategicSummaryV3: {
@@ -26,8 +36,8 @@ function legacyArtifact(referenceDate) {
     monthlyPresentation: {
       hero: { title: "Legacy", thesis: "Legacy thesis.", period: "September 1–19 · Delivered October 1", highlights: [{ label: "Old" }] },
       training: { title: "Legacy training", summary: "Legacy.", next: "Legacy next.", stats: [{ label: "Old lift" }], highlights: [{}] },
-      energy: { title: "Legacy energy", summary: "Legacy.", whyItMatters: "Legacy.", weekly: [{ label: "W1", intake: 2500, expenditure: 2600 }],
-        summaryMetrics: [{ label: "Avg intake", value: 2500 }] },
+      energy: { eyebrow: "Energy Evolution", title: "Legacy energy", summary: "Legacy.", whyItMatters: "Legacy.", weekly: [{ label: "W1", intake: 2500, expenditure: 2600 }],
+        summaryMetrics: [{ label: "Avg intake", value: 2500 }], dailyWeeks: dailyWeeks() },
       newBaseline: { title: "Legacy baseline", summary: "Legacy.", callout: "Legacy.", facts: [{ label: "Reference date", value: referenceDate }] },
       changes: { themes: [{ title: "Legacy change" }] },
       moments: { moments: [{ label: "Legacy moment" }] },
@@ -54,24 +64,56 @@ describe("Monthly review presentation", () => {
     expect(presentation.moments).toBeUndefined();
     expect(presentation.hero.title).toBe(realized.headline);
     expect(presentation.hero.period).toBe("September 1–19 · Month to date");
-    expect(presentation.training.next).toBeNull();
-    // Data the review does not author stays: the energy bars.
-    expect(presentation.energy.weekly).toHaveLength(1);
+    expect(presentation.training.next).toBeUndefined();
+    // The energy figures are rebuilt over the review's window and readable
+    // days: nothing from before the month, no unreadable day.
+    const excluded = new Set(realized.review.modules.find((item) => item.role === "energy")?.excludedDates ?? []);
+    expect(presentation.energy.weekly.map((week) => week.label)).toEqual(["Sep 1–Sep 7", "Sep 8–Sep 14", "Sep 15–Sep 19"]);
+    expect(presentation.energy.summaryMetrics[0]).toMatchObject({ label: "Avg intake", value: 2600 });
+    expect(presentation.energy.phaseDates).toBe("Sep 1–Sep 19");
+    for (const week of presentation.energy.dailyWeeks) for (const day of week.days) {
+      expect(day.date >= "2026-09-01").toBe(true);
+      if (excluded.has(day.date)) expect(day.missing).toBe(true);
+    }
+    expect(presentation.energy.eyebrow).toBe("Energy Evolution");
+    // Clients key What Changed and Month Ahead cards by tone: each is unique.
+    const changeTones = presentation.changes?.themes.map((item) => item.tone) ?? [];
+    expect(new Set(changeTones).size).toBe(changeTones.length);
+    const aheadTones = presentation.monthAhead.guidance.map((item) => item.tone);
+    expect(new Set(aheadTones).size).toBe(aheadTones.length);
+    expect(presentation.monthAhead.eyebrow).toBe("Month Ahead");
+    expect(presentation.training.callout).toBe("Why it matters");
+    expect(presentation.coachTake.body).toBe(realized.review.modules.find((item) => item.role === "strategy").paragraphs.join(" "));
     // Compact Confidence in the hero; none in the strategic card.
     const words = presentation.hero.confidence.presentationExplanation.split(/\s+/u).length;
     expect(words).toBeLessThanOrEqual(REVIEW_CONTRACTS.monthly.confidence.maxWords);
     expect(presentation.hero.confidence.score).toBe(79);
     const strategic = artifact.briefing.monthlyNarrative.strategicSummaryV3;
-    expect(strategic.sections).toMatchObject({ meaning: null, action: null, watch: null, confidence: null });
+    expect(strategic.sections).toMatchObject({ result: null, meaning: null, action: null, watch: null, confidence: null });
     expect(strategic.coachTake).toBe(realized.review.modules.find((item) => item.role === "strategy").paragraphs.join(" "));
     expect(artifact.briefing.monthlyReviewV3.audit.ok).toBe(true);
   });
 
-  it("drops the measurement card when its metric grid describes a different measurement", () => {
+  it("builds the measurement card from the review when the legacy grid describes another measurement", () => {
     const realized = review();
+    const trajectory = realized.review.modules.find((item) => item.role === "trajectory");
     const plan = { holisticSynthesis: { review: realized.review }, composition: { headline: realized.headline }, confidenceBriefing: {} };
     const artifact = applyMonthlyReviewToArtifact({ artifact: legacyArtifact("January 1, 2020"), narrativePlan: plan, confidenceBlock: block });
+    const card = artifact.briefing.monthlyPresentation.newBaseline;
+    if (!trajectory || trajectory.scaleOnly) return expect(card).toBeUndefined();
+    expect(card.title).toBe(trajectory.title);
+    expect(card.facts.map((item) => item.label)).toContain("Reference date");
+    expect(JSON.stringify(card)).not.toMatch(/January 1, 2020|Legacy/u);
+  });
+
+  it("a month without a measurement tells the scale as a What Changed theme, never as a baseline", () => {
+    const realized = review();
+    const modules = realized.review.modules.map((item) => (item.role === "trajectory"
+      ? { role: "trajectory", earnedBy: ["body_trajectory|weight_trend"], title: "The scale kept climbing.", paragraphs: ["Pace."], scaleOnly: true } : item));
+    const plan = { holisticSynthesis: { review: { ...realized.review, modules } }, composition: { headline: realized.headline }, confidenceBriefing: {} };
+    const artifact = applyMonthlyReviewToArtifact({ artifact: legacyArtifact("never"), narrativePlan: plan, confidenceBlock: block });
     expect(artifact.briefing.monthlyPresentation.newBaseline).toBeUndefined();
+    expect(artifact.briefing.monthlyPresentation.changes.themes[0]).toMatchObject({ label: "Scale", tone: "weight", title: "The scale kept climbing." });
   });
 
   it("a Monthly without a realized review is returned exactly as it was", () => {
