@@ -21,6 +21,8 @@
 // capacity; every section after the headline must add an insight or a new
 // capacity. Each briefing type lists only the sections it needs.
 
+import { auditClaimRestraint } from "./BriefingClaimRestraint.js";
+
 export const SectionRole = Object.freeze({
   HEADLINE: "headline",
   RECAP: "recap",
@@ -239,8 +241,9 @@ export function contentOverlap(left, right, { minimumShared = 3 } = {}) {
 // takeaway adds no numbers and is not a paraphrase of the headline or recap;
 // no two sections mostly share their content words; the action commits to
 // something and the watch looks forward.
-export function auditSectionTexts(texts, contract, { overlapCeiling = 0.6 } = {}) {
-  const issues = [];
+export function auditSectionTexts(texts, contract, { overlapCeiling = 0.6, claimSupport = undefined } = {}) {
+  // Claim restraint first: effectiveness and repair-the-past language.
+  const issues = [...auditClaimRestraint(texts, claimSupport)];
   const headline = texts[R.HEADLINE];
   if (headline) {
     const words = headline.split(/\s+/u).filter(Boolean).length;

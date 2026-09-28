@@ -13,6 +13,8 @@ import {
   leadInsights, resolveSectionContract, statedQuantities,
 } from "./BriefingSectionContracts.js";
 import { realizeHolisticWeeklyV3, WEEKLY_REALIZABLE_KINDS } from "../v3/HolisticNarrativeV3.js";
+import { ClaimScope, EFFECTIVENESS_LANGUAGE, RETROACTIVE_REPAIR_LANGUAGE, auditClaimRestraint, claimScopeOf,
+  claimSupport } from "./BriefingClaimRestraint.js";
 import { deepFreeze, isSemanticallyEquivalent } from "../v3/V3Runtime.js";
 import { projectV3CoachInsight, projectV3Hero } from "../../services/BriefingV3Projection.js";
 import { HOLISTIC_GOAL_TYPES, HOLISTIC_KINDS, holisticScenario } from "../../../testSupport/briefingHolisticSynthetic.js";
@@ -428,5 +430,62 @@ describe("the plan audit can fail", () => {
     expect(text).toMatch(/takeaway: introduces b\|y the recap did not tell/u);
     expect(text).toMatch(/b\|y is not in the synthesis/u);
     expect(text).toMatch(/action: no material and not marked minimal/u);
+  });
+});
+
+describe("claim restraint: performance is not proof of effectiveness; logging guidance looks forward", () => {
+  const sectionsOf = (realized) => [realized.headline, realized.meaning, realized.confidenceBody, realized.result,
+    realized.coachTake, realized.action, realized.watch].filter(Boolean);
+
+  it("exercise progression is performance evidence, a scan is a measurement — neither is causal support", () => {
+    expect(claimScopeOf({ kind: "training_progress" })).toBe(ClaimScope.PERFORMANCE);
+    expect(claimScopeOf({ kind: "composition_result" })).toBe(ClaimScope.MEASUREMENT);
+    expect(claimSupport({ selected: [{ kind: "training_progress" }, { kind: "composition_result" }] }).effectiveness).toBe(false);
+    expect(claimSupport({ selected: [{ kind: "x", causalSupport: "authoritative" }] }).effectiveness).toBe(true);
+  });
+
+  it("no generated Weekly claims the training or approach is working, paying off or producing the outcome", () => {
+    for (const { label, synthesis, realized } of weekly) {
+      expect(claimSupport(synthesis).effectiveness).toBe(false);
+      for (const text of sectionsOf(realized)) expect(text, label).not.toMatch(EFFECTIVENESS_LANGUAGE);
+    }
+  });
+
+  it("exercise progression is still credited, as performance progress", () => {
+    let credited = 0;
+    for (const { label, synthesis, realized } of weekly) {
+      const progress = synthesis.selected.find((item) => item.kind === "training_progress" && realized.heroIds.includes(item.id));
+      if (!progress) continue;
+      expect(realized.recap, label).toMatch(/Training (?:kept moving forward|produced a new best)/u);
+      if (/performance gains are real/u.test(realized.result)) credited += 1;
+    }
+    expect(credited).toBeGreaterThan(50);
+  });
+
+  it("guidance about incomplete past logging is prospective", () => {
+    let checked = 0;
+    for (const { label, realized } of weekly) {
+      for (const text of sectionsOf(realized)) {
+        expect(text, label).not.toMatch(RETROACTIVE_REPAIR_LANGUAGE);
+        if (/too patchy to read|looks copied/u.test(text)) {
+          checked += 1;
+          expect(text, label).toMatch(/from here on/u);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
+  });
+
+  it("the audit flags effectiveness and repair-the-past language, and allows them only with explicit support", () => {
+    const texts = { takeaway: "The training is clearly working.", meaning: "The new DEXA says the approach is working.",
+      coaching: "Logging those days fully will help.", routine: "The routine is doing its job." };
+    const issues = auditClaimRestraint(texts).join(" | ");
+    expect(issues).toMatch(/takeaway: claims effectiveness/u);
+    expect(issues).toMatch(/meaning: claims effectiveness/u);
+    expect(issues).toMatch(/routine: claims effectiveness/u);
+    expect(issues).toMatch(/coaching: implies the past period can be repaired/u);
+    expect(auditClaimRestraint(texts, { effectiveness: true, retroactiveCorrection: true })).toEqual([]);
+    expect(auditClaimRestraint({ takeaway: "The performance gains are real.",
+      coaching: "Complete logs from here on will make the next check clearer." })).toEqual([]);
   });
 });

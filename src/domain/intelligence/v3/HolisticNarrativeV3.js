@@ -16,6 +16,7 @@
 import { EVIDENCE_DOMAIN_ROLES as ROLES } from "../shared/GoalEvidencePolicies.js";
 import { SectionRole, allocateSections, auditSectionPlan, auditSectionTexts, leadInsights,
   resolveSectionContract } from "../shared/BriefingSectionContracts.js";
+import { ClaimScope, claimScopeOf, claimSupport } from "../shared/BriefingClaimRestraint.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
   "October", "November", "December"];
@@ -144,7 +145,8 @@ export function realizeHolisticWeeklyV3({ synthesis, picture, goalLabel, goalPol
     selectedIds: synthesis.selected.map((item) => item.id),
     limitationIds: synthesis.limitations.map((item) => item.id),
     sectionPlan,
-    sectionAudit: { plan: auditSectionPlan(sectionPlan, synthesis), text: auditSectionTexts(texts, contract) },
+    sectionAudit: { plan: auditSectionPlan(sectionPlan, synthesis),
+      text: auditSectionTexts(texts, contract, { claimSupport: claimSupport(synthesis) }) },
   };
 }
 
@@ -250,20 +252,25 @@ function recapSentence(lead, facts) {
   return sentence.length <= HERO_BUDGET ? sentence : `${upperFirst(first.text)}.`;
 }
 
-// ---- takeaway: the coach's read of the whole picture — what is working and
-// what matters now. Adds no new numbers and never restates the recap.
+// ---- takeaway: the coach's read of the whole picture — what is going well
+// and what matters now. Adds no new numbers and never restates the recap.
+//
+// What is "going well" is said within each finding's claim scope
+// (shared/BriefingClaimRestraint): performance evidence says performance
+// moved; a measurement says what it measured; execution says what was done.
+// None of them is turned into a claim that the training or the approach is
+// "working" (causing the outcome) without authoritative causal support.
+const GOING_WELL = {
+  [ClaimScope.PERFORMANCE]: () => "the performance gains are real",
+  [ClaimScope.MEASUREMENT]: (f, kind) => (kind === "visual_change" ? "the photos line up with the direction"
+    : `the new ${f.eventName} shows ${f.label} moving the right way`),
+  [ClaimScope.TRAJECTORY]: (f) => (f.verdict === "steady" ? "the scale is where the phase expects it" : null),
+  [ClaimScope.EXECUTION]: (f, kind) => ({ routine_steady: "the routine held", activity_on_plan: "the routine held",
+    intake_vs_plan: "intake stayed where it needs to be" }[kind] ?? null),
+};
 
 function workingPhrase(item) {
-  const f = item.facts ?? {};
-  switch (item.kind) {
-    case "training_progress": return "the training is clearly working";
-    case "weight_trend": return f.verdict === "steady" ? "this is exactly the kind of week the goal needs" : null;
-    case "composition_result": return `the new ${f.eventName} says the approach is working`;
-    case "routine_steady": case "activity_on_plan": return "the routine is doing its job";
-    case "intake_vs_plan": return "intake is where it needs to be";
-    case "visual_change": return "the photos back up the direction";
-    default: return null;
-  }
+  return GOING_WELL[claimScopeOf(item)]?.(item.facts ?? {}, item.kind) ?? null;
 }
 
 function prioritiesPhrase(item) {
@@ -306,7 +313,7 @@ function takeawaySentence({ lead, synthesis, steps }) {
   const priority = (item) => (mismatch && ["intake_vs_plan", "weight_trend"].includes(item.kind)
     ? "the scale and the food log don't agree yet, so the log is the first thing to check" : prioritiesPhrase(item));
   // No praise beside a risk or a problem with the goal's outcome or guardrail;
-  // training that is working may still be said beside a routine slip.
+  // training performance may still be credited beside a routine slip.
   const serious = lead.some((item) => item.role === "risk" ||
     (["guardrail_status", "composition_result", "training_frequency"].includes(item.kind) && item.polarity === "concern"));
   const working = lead.map((item) => (item.polarity === "supportive" && !serious ? workingPhrase(item) : null)).filter(Boolean);
@@ -467,7 +474,7 @@ function coachingSentences({ synthesis, lead, facts, steps, contract }) {
     // dressed up as something — a steady week stays short.
     const step = steps[0];
     parts.push(step ? step.focus ?? executionTip(step, facts)
-      : facts.sparse ? "Logging a little more each day will make next week's picture clearer."
+      : facts.sparse ? "Logging a little more each day from here on will make the next check clearer."
         : synthesis.selected.every((item) => item.polarity !== "concern") ? "Keep logging the same way; it is what makes weeks like this easy to read."
         : "Nothing here needs a change yet.");
   }
@@ -505,16 +512,18 @@ function exampleClause(example) {
   return `${label} set a new best`;
 }
 
-// Said like a coach, as something to carry forward: patchy logging first; a
-// copied day only when that is all there is.
+// Said like a coach, and prospective: the past days stay as they are (no
+// retroactive-correction action exists for them); what helps is complete
+// logging from here on. Patchy logging first; a copied day only when that is
+// all there is.
 function limitationSentence(item) {
   const byKind = item.facts?.datesByKind ?? {};
   const patchy = [...(byKind.implausible_macro_profile ?? []), ...(byKind.partial_day ?? [])].sort();
   if (patchy.length) {
-    return `${dayRange(patchy)}${patchy.length === 1 ? "'s food log was" : "'s food logs were"} too patchy to read; logging ${patchy.length === 1 ? "that day" : "those days"} fully will make next week's picture clearer.`;
+    return `${dayRange(patchy)}${patchy.length === 1 ? "'s food log was" : "'s food logs were"} too patchy to read; complete logs from here on will make the next check clearer.`;
   }
   const copied = byKind.duplicate_day_totals ?? item.facts?.dates ?? [];
-  return `${dayRange(copied)}'s food log looks copied from the day before; a fresh log each day keeps the picture honest.`;
+  return `${dayRange(copied)}'s food log looks copied from the day before; a fresh log each day from here on keeps the next check honest.`;
 }
 
 // The next steps (two when a risk needs its own), then the standing

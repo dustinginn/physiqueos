@@ -99,7 +99,7 @@ describe("Shared Briefing Intelligence through the Weekly V3 pipeline", () => {
       for (const day of period.days.slice(-3)) day.nutrition.protein = Math.round(day.nutrition.protein * 0.3);
       const prepared = await weekly(period);
       const coach = prepared.narrativePlan.composition.coachTake;
-      expect(coach).toMatch(/food logs? (?:was|were) too patchy to read; logging (?:that day|those days) fully will make next week's picture clearer\./u);
+      expect(coach).toMatch(/food logs? (?:was|were) too patchy to read; complete logs from here on will make the next check clearer\./u);
       const all = [...Object.values(prepared.narrativePlan.composition.sections), coach].join(" ");
       expect(all).not.toMatch(/\b(?:ate|eating|intake) (?:more|less|higher|lower)\b/iu);
       expect(all).not.toMatch(/intake stayed on (?:plan|target)/u);
