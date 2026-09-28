@@ -342,8 +342,34 @@ describe("hand-built pictures exercise paths the generator rarely reaches", () =
     const realized = realize([
       insight("guardrail", "guardrail_status", "risk", "concern", { status: "breached", label: "body fat" }),
     ]);
-    expect(realized.result).toMatch(/[Gg]etting back under that line/u);
-    expect(realized.result).not.toMatch(/holding body fat steady/u);
+    expect(realized.result).toMatch(/getting back within range/u);
+    expect(realized.result).not.toMatch(/holding body fat steady|\bunder\b|\babove\b|\bbelow\b|\bover\b/u);
+    // The takeaway's path agrees with the action's step.
+    expect(realized.action).toMatch(/^Keep intake at the plan's target and training on its usual rhythm/u);
+  });
+
+  it("a maintenance drift alone is headlined as what the scale did", () => {
+    const p = picture([insight("body_trajectory", "weight_trend", "progress", "neutral", { verdict: "drifting", movement: "down",
+      weeklyRate: -0.5, rateSpanDays: 28, expectedDirection: "stable", paceAuthority: "personal_trend_relative" })]);
+    const synthesis = synthesizeBriefing({ picture: p, budget: { maxInsights: 3, maxLimitations: 1, floor: 0.5, heroInsights: 2 },
+      realizableKinds: WEEKLY_REALIZABLE_KINDS });
+    const realized = realizeHolisticWeeklyV3({ synthesis, picture: p, goalLabel: "the goal", goalPolicy: { weightExpectation: { direction: "stable" } } });
+    expect(realized.headline).toBe("The scale moved down.");
+  });
+
+  it("a maintenance goal's canonical quick pace states the pace once", () => {
+    const weight = insight("body_trajectory", "weight_trend", "progress", "concern", { verdict: "quick", movement: "up", weeklyRate: 0.6,
+      rateSpanDays: 28, expectedDirection: "stable", paceAuthority: "phase_expected_trajectory" });
+    const composition = { id: "body_composition|composition_result", domain: "body_composition", kind: "composition_result",
+      role: "context", polarity: "supportive", strength: 1.3, facts: { measuredAt: "2026-09-12", change: 2, unit: "lb", label: "lean mass",
+        eventName: "DEXA", newThisPeriod: false } };
+    const p = picture([weight]);
+    p.domains.push({ domain: "body_composition", weight: 1, status: "assessed", state: "standing_measurement", polarity: "supportive",
+      facts: composition.facts, insights: [composition] });
+    const synthesis = synthesizeBriefing({ picture: p, budget: { maxInsights: 3, maxLimitations: 1, floor: 0.5, heroInsights: 2 },
+      realizableKinds: WEEKLY_REALIZABLE_KINDS });
+    const realized = realizeHolisticWeeklyV3({ synthesis, picture: p, goalLabel: "the goal", goalPolicy: { weightExpectation: { direction: "stable" } } });
+    expect((realized.meaning.match(/pace the phase sets/gu) ?? []).length).toBe(1);
   });
 
   it("two supportive leads read as a headline with a noun phrase after 'with'", () => {

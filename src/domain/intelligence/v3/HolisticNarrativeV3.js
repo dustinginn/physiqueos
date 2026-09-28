@@ -285,7 +285,9 @@ function prioritiesPhrase(item) {
     }
     case "training_frequency": return f.missedAll ? "a single missed week is easy to absorb; the next one is the one that counts"
       : "the missed sessions are easy to absorb if next week runs as usual";
-    case "guardrail_status": return f.status === "breached" ? "getting back under that line comes before anything else"
+    // Direction-neutral (a guardrail may be a ceiling or a floor), and
+    // consistent with a keep-to-target step.
+    case "guardrail_status": return f.status === "breached" ? "the priority now is getting back within range, and hitting the targets consistently is the way there"
       : `holding ${f.label} steady comes before anything else right now`;
     case "composition_result": return `the ${f.eventName} result is the thing to turn around`;
     case "intake_vs_plan": return "the food side is the lever this week";
