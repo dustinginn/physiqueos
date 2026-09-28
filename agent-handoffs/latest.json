@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-28T16:00:00Z",
+  "generated_at_utc": "2026-09-28T18:00:00Z",
   "task": {
-    "id": "urgent-native-home-production-incident-20260928",
-    "title": "INCIDENT RESOLVED: Native 'Home could not be loaded' — Founder device session revoked by refresh-credential reuse detection after a lost refresh response; restored by re-pairing",
+    "id": "monthly-structural-parity-september-preview-20260928",
+    "title": "Monthly structural parity vs approved August format — September MTD preview projected into the exact Monthly skeleton (candidate 086af316, not deployed)",
     "agent": "claude",
-    "status": "resolved"
+    "status": "parity_preview_ready_awaiting_acceptance"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -16,11 +16,11 @@
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "15b6e447",
+    "server_candidate_sha": "086af316",
     "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative"
   },
   "result": {
-    "summary": "15:32:27Z the app refreshed (server rotated R1->R2) but never received/applied the response (R2 never used); 15:35:28Z it re-sent R1, server correctly revoked the session family (REFRESH_REUSE_DETECTED). Server, DB, deploys healthy and unchanged. Founder re-paired 15:56:53Z; Home/Goals/Log/Evidence/You reads verified complete with normal latency, no errors. No deploy/rollback/data mutation. Briefing candidate 15b6e447 frozen, untouched.",
+    "summary": "September MTD Monthly renders the same 7 cards in the same order with the same components/field shapes as the approved August Monthly (served artifact via Native ProductionBriefingMapper, as in the Founder screenshots): Hero (compact Confidence) → Training Progress → Energy Evolution → New Baseline → What Changed → Defining Moments → Month Ahead. Defining Moments restored (engine-chosen canonical dated events), What Changed = per-domain thematic cards, Month Ahead = domain priority cards, strategic/uncertainty cards removed. All 42 prose strings trace to the shared engine; zero legacy sentences survive. Confidence 79/0 identical with/without engine.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -29,40 +29,39 @@
   },
   "validation": {
     "tests": {
-      "status": "not_applicable",
-      "summary": "No code change."
+      "status": "passed",
+      "summary": "BI + Monthly presentation 521/521; full repo 9116/9424, same 303 environmental failures, 0 new; review audit 0 issues on 270 synthetic months + real September; non-Monthly 0/2160 changed."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "No code change."
+      "status": "passed_with_fixes_applied",
+      "summary": "Fresh-context parity review of 4587b2aa PASS-WITH-FIXES (High: Native detail/review routes re-expanded Confidence) — fixed in 086af316."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Root cause established from production logs + read-only DB probe (READ ONLY verified, rolled back, no credential hashes read)."
+      "summary": "Real prepareMonthlyOccurrence + publishMonthlyOccurrence dryRun; Native mapper mirror render."
     }
   },
   "decisions_required": [
-    "Authorize (or not) the recommended prevention: server lost-response tolerance for refresh rotation (successor never used, short window) — security-sensitive, needs tests/review/guarded deploy.",
-    "Native next build: background-task assertion around refresh.",
-    "When to resume the frozen Briefing work (September Monthly acceptance, candidate 15b6e447)."
+    "Accept or refine the September Monthly in the approved format; then deploy decision for 086af316.",
+    "Optional Native follow-up: a 'routine' icon."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Refresh rotation has no lost-response tolerance: one dropped refresh response revokes the device session.",
-    "Home read returns 4.7 MB / Log 9.4 MB per load (not causal)."
+    "Native production has never rendered a Monthly; the screenshots show the served August artifact through the production mapper, which the candidate targets.",
+    "Native detail and review routes would have re-expanded the compact Confidence line (fixed)."
   ],
   "backlog": [
     "Native: read Server title/eyebrow for What Changed, Month Ahead, New Baseline headers.",
     "Confidence-side consolidation of MonthlyEvidenceIntelligenceV3 into the shared picture (moves Confidence; separate authorization).",
     "Sep 27 Strength reconciliation-review notification failure; Logged Today strength+cardio; Native Log-tab -> active Workout Logger; Photo visual-magnitude producer."
   ],
-  "recommended_next_step": "Founder decision on prevention fix; then resume Briefing acceptance when authorized.",
-  "full_report_path": "agent-handoffs/reports/20260928T160000Z-incident-native-home-session-revoked-refresh-reuse.md",
+  "recommended_next_step": "Founder/ChatGPT review of the September Monthly in the approved format.",
+  "full_report_path": "agent-handoffs/reports/20260928T180000Z-monthly-structural-parity-september-preview.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260928T160000Z-incident-native-home-session-revoked-refresh-reuse.md",
     "agent-handoffs/reports/20260928T110000Z-briefing-intelligence-september-mtd-monthly-review-preview.md",
     "agent-handoffs/reports/20260928T100000Z-briefing-intelligence-cross-briefing-previews.md",
-    "agent-handoffs/reports/20260928T090000Z-briefing-intelligence-measurement-causality-restraint-release-ready.md",
-    "agent-handoffs/reports/20260928T070000Z-briefing-intelligence-final-semantic-restraint-sep20-26-preview.md"
+    "agent-handoffs/reports/20260928T090000Z-briefing-intelligence-measurement-causality-restraint-release-ready.md"
   ],
   "safety": {
     "contains_secrets": false,

@@ -2,20 +2,25 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: URGENT incident — Native "Home could not be loaded"
+- Task: Monthly structural parity against the approved August format (September month-to-date preview)
 - Agent: claude
-- Status: **resolved** (restored at 15:56:53Z by re-pairing, and verified)
-- Generated (UTC): 2026-09-28T16:00:00Z
+- Status: parity preview ready for review (nothing deployed or published)
+- Generated (UTC): 2026-09-28T18:00:00Z
 
-The Server, the database and the deploy were all healthy and unchanged throughout. Only the Founder's phone session was revoked:
-- **08:32 PDT:** the app refreshed its sign-in. The server rotated the refresh credential, but the app never received or saved the response.
-- **08:35 PDT:** the app sent the old credential again. The server treats a reused credential as theft, so it revoked the session (by design).
-- **08:56 PDT:** re-pairing restored access. Home, Goals, Log, Evidence and You now load normally, with no errors.
+The September Monthly now renders in exactly the approved August format: the same seven cards, in the same order, with the same components.
 
-No data was affected. There was no deploy, rollback or data change. The Briefing candidate `15b6e447` stays frozen.
+**Hero → Training Progress → Energy Evolution → New Baseline → What Changed → Defining Moments → Month Ahead.**
 
-**Your call:** whether to fix the root cause so that one dropped response can no longer sign you out. This is a server-side tolerance for a lost refresh response plus a Native background guard. It is security-sensitive, so it would go through tests, review and a guarded deploy.
+- **Defining Moments is back.** The engine chose four dated events from the evidence: the Sep 3 off-routine stretch, the Sep 12 DEXA, the Sep 18 biggest lift step, and the Sep 24 stretch.
+- **What Changed** has thematic cards for Training, Calories, Weight and Routine.
+- **Month Ahead** has domain priority cards: Routine, Training, Calories, Weight, Photos and DEXA.
+- **The extra cards are gone:** the Coach's Take and uncertainty cards the last candidate added.
+- **Confidence** is the one deliberate change: it is compact.
+- **Every sentence comes from the shared engine;** no old template copy survives.
+- **No Native change is needed**, and the full test suite shows 0 new failures.
 
-Detailed report: `agent-handoffs/reports/20260928T160000Z-incident-native-home-session-revoked-refresh-reuse.md`
+**Your call:** review the September Monthly in the approved format. If you accept it, `086af316` is ready for a deploy decision.
+
+Detailed report: `agent-handoffs/reports/20260928T180000Z-monthly-structural-parity-september-preview.md`
 
 Protocol: `agent-handoffs/README.md`
