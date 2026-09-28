@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-28T01:30:00Z",
+  "generated_at_utc": "2026-09-28T03:00:00Z",
   "task": {
-    "id": "weekly-v3-sep20-26-founder-feedback-diagnosis-20260927",
-    "title": "Briefing Intelligence: real Sep 20-26 preview for Founder review (candidate 2a193138, not deployed)",
+    "id": "briefing-intelligence-holistic-coach-synthesis-iteration-20260927",
+    "title": "Briefing Intelligence: holistic coach synthesis - real Sep 20-26 preview for Founder review (candidate d0f1ac30, not deployed)",
     "agent": "claude",
     "status": "awaiting_founder_review"
   },
@@ -16,11 +16,11 @@
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "2a193138",
+    "server_candidate_sha": "d0f1ac30",
     "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative"
   },
   "result": {
-    "summary": "Shared Briefing Intelligence layer (briefing_intelligence_v1) implemented on the single V3 prepare path with per-type policies; Weekly wired. Real Sep 20-26 canonical evidence replayed offline through the candidate (harness proven bit-exact on production code). Candidate hero: late-week routine change (no training/weigh-ins Fri-Sat, activity well below usual Thu-Sat), second multi-day training break in five weeks; goal-level Confidence (DEXA anchor, no exercise); nutrition Thu-Sat reported as incomplete logs, not as higher intake; no generic Still Unresolved. Confidence 79 hold and recommendation unchanged. 42 new tests incl. 360+ synthetic periods; full repo 0 new failures; three fresh-context review rounds, all findings fixed.",
+    "summary": "Synthesis redesigned around holistic goal-relative coaching: every goal-relevant domain assessed (goal policy from canonical Goal Contract evaluation), complementary insight selection with reasoned omissions, per-briefing semantic budgets (Midweek partial window, Weekly moderate, Monthly persistence, DEXA outcome-led, Photo visual-scaled), Weekly coach-voice realization with cross-section agreement. Real Sep 20-26 zero-write preview: hero pairs training progress (7 bests) with a fast weight climb (~1.7 lb/wk robust 4-week pace); DEXA/body-fat meaning; Confidence goal-level (79 hold, no exercise); routine break and unreadable Thu-Sat food logs told once; next steps: intake at or below target + training rhythm back. Confidence and recommendation unchanged.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -30,37 +30,38 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "42 Briefing Intelligence tests; full repo unit suite 8955/9263 vs production 8913/9221, 0 new failures (303 identical environmental)."
+      "summary": "82 Briefing Intelligence tests (52 holistic properties over 5 goal types x 17 situations x 10 seeds, all briefing budgets, hand-built mismatch pictures); full repo 8998/9306 vs production baseline 8913/9221, 0 new failures (303 identical environmental)."
     },
     "review": {
       "status": "passed_with_fixes_applied",
-      "summary": "Round 1 FAIL (b61468d4) -> fixed ad487612; Round 2 PASS-WITH-FIXES -> fixed 2617e94c; Round 3 PASS-WITH-FIXES -> fixed 2a193138."
+      "summary": "Five fresh-context rounds (f02b0340, c26c5f72, 95e2c9c7, 1a6b241f, d08ce692): all PASS-WITH-FIXES, last two with no High; every finding fixed, final fixes in d0f1ac30 with tests."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Production code on the offline harness reproduces stored assessment b2428ffe bit-exactly."
+      "summary": "Offline harness reproduces stored assessment b2428ffe bit-exactly on production code; preview re-runs green on d0f1ac30."
     }
   },
   "decisions_required": [
-    "Founder reviews the real-data preview copy and the structured reasoning.",
-    "If accepted: separately authorize Server deploy of 2a193138 (next Weekly Oct 4 would be the first live run).",
-    "Whether to regenerate the published Sep 20-26 Weekly (not done; requires separate authorization)."
+    "Founder reviews the real-data preview copy, domain assessments and synthesis object.",
+    "Whether the 1.5 lb/wk typical-pace caution for a lean-mass goal type is right for your phase (goal-policy decision, not copy).",
+    "If accepted: separately authorize Server deploy of d0f1ac30.",
+    "Whether to regenerate the published Sep 20-26 Weekly (not done; separate authorization)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Canonical data does not show higher Thu-Sat intake; those days carry implausible protein profiles and are reported as incomplete logs.",
-    "Synthetic validation exposed three real engine weaknesses (rest days as missed training, single spike as run, weigh-ins headlining) - fixed."
+    "The robust 4-week weight pace on real data is ~1.7 lb/wk (weekly averages ~169.0 -> 171.5 -> 172.2 -> 174.2), above the lean-mass typical-pace caution, so the weight trend is the week's risk.",
+    "Canonical data still does not support reading Thu-Sat intake either way; the plan-relative intake verdict is restrained."
   ],
   "backlog": [
-    "Phase 2: wire Midweek/Monthly; fold EnergyVariabilityV3 and MonthlyEvidenceIntelligenceV3 silos into the shared detectors.",
-    "Phase 3: DEXA/Photo preceding-execution context.",
-    "Native hardening: drop BriefingReadModel materiality==high override (batch with Log-tab item).",
-    "Ingestion lane: HealthKit near-duplicate day totals; implausible-profile days tiered full_day_asserted; quarantined HK nutrition in Energy card.",
+    "Phase 2: Midweek realizer (so-far tense), Monthly realizer (persistence vs one-off, strategy fit), DEXA/Photo realizers; production producer for photo visual-change facts.",
+    "Phase 3: Sleep assessor over the existing recovery slot + realizable kind + phrase (HealthKit Sleep ingestion needs separate authorization).",
+    "Carry-over: fold EnergyVariabilityV3 and MonthlyEvidenceIntelligenceV3 silos into shared detectors; Native BriefingReadModel materiality override (batch with Log-tab item); ingestion lane items.",
     "Presentation: hero headline equals Biggest Takeaway (existing mapping)."
   ],
-  "recommended_next_step": "Founder reviews the preview; deploy 2a193138 only under separate explicit authorization.",
-  "full_report_path": "agent-handoffs/reports/20260928T013000Z-briefing-intelligence-sep20-26-preview.md",
+  "recommended_next_step": "Founder reviews the preview; deploy d0f1ac30 only under separate explicit authorization.",
+  "full_report_path": "agent-handoffs/reports/20260928T030000Z-briefing-intelligence-holistic-sep20-26-preview.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260928T013000Z-briefing-intelligence-sep20-26-preview.md",
     "agent-handoffs/reports/20260927T234500Z-briefing-intelligence-shared-layer-design.md"
   ],
   "safety": {
