@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-28T18:00:00Z",
+  "generated_at_utc": "2026-09-28T20:00:00Z",
   "task": {
-    "id": "monthly-structural-parity-september-preview-20260928",
-    "title": "Monthly structural parity vs approved August format — September MTD preview projected into the exact Monthly skeleton (candidate 086af316, not deployed)",
+    "id": "monthly-september-nutrition-reliability-phase-jargon-final-20260928",
+    "title": "Monthly final correction — nutrition completeness vs anomaly, canonical Phase label, no analytical 'read' jargon; regenerated September MTD (candidate 7242043f, not deployed)",
     "agent": "claude",
-    "status": "parity_preview_ready_awaiting_acceptance"
+    "status": "final_preview_ready_awaiting_review"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -16,11 +16,11 @@
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "086af316",
+    "server_candidate_sha": "7242043f",
     "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative"
   },
   "result": {
-    "summary": "September MTD Monthly renders the same 7 cards in the same order with the same components/field shapes as the approved August Monthly (served artifact via Native ProductionBriefingMapper, as in the Founder screenshots): Hero (compact Confidence) → Training Progress → Energy Evolution → New Baseline → What Changed → Defining Moments → Month Ahead. Defining Moments restored (engine-chosen canonical dated events), What Changed = per-domain thematic cards, Month Ahead = domain priority cards, strategic/uncertainty cards removed. All 42 prose strings trace to the shared engine; zero legacy sentences survive. Confidence 79/0 identical with/without engine.",
+    "summary": "Source-level zero-write audit: 3 of 5 September exclusions (Sep 24-26, incl. a 2,915 kcal day) came from a low-protein-vs-baseline anomaly rule, 1 (Sep 22, Founder-confirmed accurate) from matching totals; only Sep 6 was a real completeness problem (record built from Sep 5's own screenshot files). Reliability now excludes only on completeness evidence (partial-day marker, duplicate source evidence, sparse record); anomalies are kept and reported (protein ran well below usual Sep 24-26). September: 25/26 days count, intake 2,735 kcal vs 2,500 (a little above), Energy 'Lean Mass Build · Phase 2' (hard-coded '· Phase 1' literal fixed at source via canonical phase order). Analytical 'read' jargon removed across all briefing types + guards. Structure unchanged; Confidence 79/0 and assessment ids identical.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -30,38 +30,40 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "BI + Monthly presentation 521/521; full repo 9116/9424, same 303 environmental failures, 0 new; review audit 0 issues on 270 synthetic months + real September; non-Monthly 0/2160 changed."
+      "summary": "New suites BriefingNutritionReliability, BriefingLanguage, MonthlyPhaseLabel; e113c678 full repo 9135/9443, 0 new; 7242043f full run under load 150 flagged 21 timeouts/worker crashes — changed-area suites and ESM integrity pass individually; ~5,500 wider tests 0 new; node --check all changed files."
     },
     "review": {
       "status": "passed_with_fixes_applied",
-      "summary": "Fresh-context parity review of 4587b2aa PASS-WITH-FIXES (High: Native detail/review routes re-expanded Confidence) — fixed in 086af316."
+      "summary": "Fresh-context review of e113c678 PASS-WITH-FIXES (hashed Confidence wording changed assessment ids — reverted, ids identical; conditional low-protein clause; +5-10% wording; sparse wording; >=2 shared files; phase index; jargon regex) — fixed in 7242043f."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Real prepareMonthlyOccurrence + publishMonthlyOccurrence dryRun; Native mapper mirror render."
+      "summary": "Real Monthly pipeline dryRun; production read-only probe matched export for Sep 21-26."
     }
   },
   "decisions_required": [
-    "Accept or refine the September Monthly in the approved format; then deploy decision for 086af316.",
-    "Optional Native follow-up: a 'routine' icon."
+    "Review the regenerated September Monthly; if accepted, deploy decision for 7242043f.",
+    "Whether to surface low-protein runs in Weekly/Midweek (changes accepted selection)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Native production has never rendered a Monthly; the screenshots show the served August artifact through the production mapper, which the candidate targets.",
-    "Native detail and review routes would have re-expanded the compact Confidence line (fixed)."
+    "The reliability model excluded complete high/unusual days (anomaly vs personal baseline) — fixed.",
+    "Monthly Energy phase label was a hard-coded '· Phase 1' literal since Jul 29.",
+    "Weekly Sep 20-26 loses its 'patchy logs' sentence and Midweek Sep 20-22 gains an intake step because corrected days now count."
   ],
   "backlog": [
-    "Native: read Server title/eyebrow for What Changed, Month Ahead, New Baseline headers.",
-    "Confidence-side consolidation of MonthlyEvidenceIntelligenceV3 into the shared picture (moves Confidence; separate authorization).",
-    "Sep 27 Strength reconciliation-review notification failure; Logged Today strength+cardio; Native Log-tab -> active Workout Logger; Photo visual-magnitude producer."
+    "Low-protein runs as a Weekly/Midweek insight.",
+    "Spanning-month Energy prose window.",
+    "Native 'Baseline Read' label; Daily/lab jargon (out of scope).",
+    "Post-briefing backlog unchanged."
   ],
-  "recommended_next_step": "Founder/ChatGPT review of the September Monthly in the approved format.",
-  "full_report_path": "agent-handoffs/reports/20260928T180000Z-monthly-structural-parity-september-preview.md",
+  "recommended_next_step": "Founder/ChatGPT review of the regenerated September Monthly, then deploy decision for 7242043f.",
+  "full_report_path": "agent-handoffs/reports/20260928T200000Z-monthly-september-nutrition-phase-jargon-final.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260928T180000Z-monthly-structural-parity-september-preview.md",
     "agent-handoffs/reports/20260928T160000Z-incident-native-home-session-revoked-refresh-reuse.md",
     "agent-handoffs/reports/20260928T110000Z-briefing-intelligence-september-mtd-monthly-review-preview.md",
-    "agent-handoffs/reports/20260928T100000Z-briefing-intelligence-cross-briefing-previews.md",
-    "agent-handoffs/reports/20260928T090000Z-briefing-intelligence-measurement-causality-restraint-release-ready.md"
+    "agent-handoffs/reports/20260928T100000Z-briefing-intelligence-cross-briefing-previews.md"
   ],
   "safety": {
     "contains_secrets": false,

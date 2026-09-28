@@ -2,25 +2,29 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Monthly structural parity against the approved August format (September month-to-date preview)
+- Task: Monthly final correction — nutrition reliability, Phase label, "read" jargon
 - Agent: claude
-- Status: parity preview ready for review (nothing deployed or published)
-- Generated (UTC): 2026-09-28T18:00:00Z
+- Status: regenerated September Monthly ready for review (nothing deployed or published)
+- Generated (UTC): 2026-09-28T20:00:00Z
 
-The September Monthly now renders in exactly the approved August format: the same seven cards, in the same order, with the same components.
+**Nutrition.** I audited every disputed day at the source (read-only) before changing anything:
+- **Sep 24–26 (including a 2,915 kcal day):** these had been dropped for being *unusual* (low protein against your baseline), not incomplete.
+- **Sep 22:** dropped because its totals matched Sep 21; you confirmed it's accurate.
+- **Sep 6:** the only real problem. Its record was built from Sep 5's own screenshot files.
 
-**Hero → Training Progress → Energy Evolution → New Baseline → What Changed → Defining Moments → Month Ahead.**
+The model now drops a day only on completeness evidence. Unusual days stay in the averages and are reported:
+- 25 of 26 September days now count;
+- intake averaged 2,735 kcal against 2,500 ("a little above the plan's target");
+- new finding: **protein ran well below your usual on Sep 24–26.**
 
-- **Defining Moments is back.** The engine chose four dated events from the evidence: the Sep 3 off-routine stretch, the Sep 12 DEXA, the Sep 18 biggest lift step, and the Sep 24 stretch.
-- **What Changed** has thematic cards for Training, Calories, Weight and Routine.
-- **Month Ahead** has domain priority cards: Routine, Training, Calories, Weight, Photos and DEXA.
-- **The extra cards are gone:** the Coach's Take and uncertainty cards the last candidate added.
-- **Confidence** is the one deliberate change: it is compact.
-- **Every sentence comes from the shared engine;** no old template copy survives.
-- **No Native change is needed**, and the full test suite shows 0 new failures.
+**Phase.** The Monthly had "· Phase 1" hard-coded as a fixed string. It now comes from your goal's canonical phase order and reads **"Lean Mass Build · Phase 2"**. Stored history is unchanged.
 
-**Your call:** review the September Monthly in the approved format. If you accept it, `086af316` is ready for a deploy decision.
+**"Read" jargon.** Removed across Weekly, Midweek, Monthly, DEXA, Photo and Confidence copy. Guards now keep it from coming back.
 
-Detailed report: `agent-handoffs/reports/20260928T180000Z-monthly-structural-parity-september-preview.md`
+**Structure** is unchanged, and **Confidence** is identical (79%). Weekly Sep 20–26 drops its "patchy logs" sentence, and Midweek Sep 20–22 now suggests bringing intake down, because the corrected days count.
+
+**Your call:** review September; then decide on deploying `7242043f`.
+
+Detailed report: `agent-handoffs/reports/20260928T200000Z-monthly-september-nutrition-phase-jargon-final.md`
 
 Protocol: `agent-handoffs/README.md`
