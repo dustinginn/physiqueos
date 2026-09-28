@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-28T05:00:00Z",
+  "generated_at_utc": "2026-09-28T07:00:00Z",
   "task": {
-    "id": "briefing-intelligence-realization-section-contracts-final-iteration-20260927",
-    "title": "Briefing Intelligence: section contracts and weight-pace authority - real Sep 20-26 preview for Founder review (candidate a1ea5aab, not deployed)",
+    "id": "briefing-intelligence-final-semantic-restraint-preview-20260927",
+    "title": "Briefing Intelligence: final semantic restraint - real Sep 20-26 preview; release-ready recommendation (candidate e83b27d0, not deployed)",
     "agent": "claude",
-    "status": "awaiting_founder_review"
+    "status": "release_ready_awaiting_approval"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -16,11 +16,11 @@
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "a1ea5aab",
+    "server_candidate_sha": "e83b27d0",
     "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative"
   },
   "result": {
-    "summary": "Shared section contracts (headline/recap/meaning/confidence/takeaway/coaching/action/watch, each consuming a distinct facet of the holistic synthesis; per-type budgets Midweek<Weekly<Monthly, DEXA outcome-led, Photo visual-led and scaled) with structural and text anti-redundancy audits. Weekly: short headline ('Strong training week, but a quiet finish.'), evidence-rich hero paragraph, interpreting Biggest Takeaway distinct from the Hero, execution in What To Do. Weight-rate audit: the lean-mass lb/wk thresholds were an engine heuristic contradicting the accepted Phase Expected Trajectory (universalWeeklyRate null); goal types now own direction only and pace is judged only against a canonical signed range (consumer ready, not wired) or the person's own trend - Sep 20-26 weight (1.68 lb/wk, not accelerating) is now described, not called 'climbing fast'. Confidence 79 hold and recommendation unchanged.",
+    "summary": "Shared claim restraint (shared/BriefingClaimRestraint.js): insight kinds carry claim scopes; exercise progression realizes as performance progress, never as training/approach effectiveness without authoritative causal support; Goal Confidence never names training; incomplete-logging guidance is prospective. Real Sep 20-26 preview changed only in three sentences (Takeaway: 'The performance gains are real; ...'; What To Do: '... complete logs from here on will make the next check clearer.'; Confidence no longer names training). Synthesis and section allocation identical to a1ea5aab; audits clean (182 words).",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -30,38 +30,39 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "123 Briefing Intelligence tests (section-contract properties over 5 goal types x 18 situations x 8 seeds, holistic properties, hand-built pictures, failing-audit and mutation-guarding tests); full repo 9039/9347 vs production baseline 8913/9221, 0 new failures."
+      "summary": "134 Briefing Intelligence tests incl. claim-restraint corpus properties, detection positives/negatives, hand-built paths; full repo 9050/9358 vs production baseline 8913/9221, 0 new failures."
     },
     "review": {
       "status": "passed_with_fixes_applied",
-      "summary": "Five fresh-context rounds (1defc3c7, 39c5e2e5, 4b3fb6bb, 90de1a13, e557e94e), all PASS-WITH-FIXES; every finding fixed, final fixes in a1ea5aab with tests (no further round after that last wording fix)."
+      "summary": "Two fresh-context semantic reviews (5d5a207c, 2d39d1a7), both PASS-WITH-FIXES with no High; all findings fixed with tests in e83b27d0 (real copy unchanged by the final fixes)."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Offline harness reproduces stored assessment bit-exactly on production code; preview green on a1ea5aab; section audits pass (186 words)."
+      "summary": "Offline harness reproduces stored assessment bit-exactly on production code; preview green on e83b27d0."
     }
   },
   "decisions_required": [
-    "Founder reviews the real-data preview (all sections, allocation, anti-redundancy audit, weight authority audit).",
-    "Weight pace policy: keep personal-trend-relative judgment (canonical record says no universal weekly rate), or declare a signed expectedWeeklyRange on the accepted Phase Expected Trajectory and authorize the follow-on wiring.",
-    "If accepted: separately authorize Server deploy of a1ea5aab.",
+    "Approve deploy of Server candidate e83b27d0 (separate explicit authorization; not done).",
+    "Non-blocking: whether a DEXA-demonstrated strategy effectiveness counts as authoritative support for the pre-existing Confidence-sheet sentence 'The build plan is clearly working.' (report section 3).",
+    "Weight-pace policy (from a1ea5aab): keep personal-trend-relative, or declare a signed expectedWeeklyRange on the accepted Phase Expected Trajectory.",
     "Whether to regenerate the published Sep 20-26 Weekly (not done; separate authorization)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "The 'climbing fast' weight verdict in the d0f1ac30 preview came entirely from an engine-authored 1.5 lb/wk heuristic that the canonical phase record explicitly declines; under canonical-aligned policy the Sep 20-26 trend (last 2 weeks 2.04 vs prior 2.59 lb/wk) is steady, not accelerating."
+    "Pre-existing V3 strategy-meaning and Confidence-detail paths assert 'the plan is working' when V3 strategy effectiveness is DEXA-demonstrated; left unchanged and flagged for Founder decision."
   ],
   "backlog": [
+    "Founder decision on DEXA-demonstrated effectiveness wording (small follow-on if changed).",
     "Wire accepted Phase Expected Trajectory weightTrajectory into Weekly goal facts (only if a canonical range is declared).",
-    "Phase 2 realizers on the shared section contracts: Midweek (so-far), Monthly (persistence), DEXA (outcome-led), Photo (visual-led; needs a production visual-change producer).",
-    "Phase 3: Sleep assessor + realizable kind + phrase (HealthKit Sleep ingestion needs separate authorization).",
-    "Carry-over: EnergyVariabilityV3 / MonthlyEvidenceIntelligenceV3 silo folding; Native BriefingReadModel materiality override (batch with Log-tab item)."
+    "Phase 2 realizers: Midweek, Monthly, DEXA, Photo on shared section contracts.",
+    "Phase 3: Sleep (separate authorization).",
+    "Queued Native Log-tab -> active Workout Logger item remains approved for the next consolidated Native build."
   ],
-  "recommended_next_step": "Founder reviews the preview and decides the weight-pace policy; deploy a1ea5aab only under separate explicit authorization.",
-  "full_report_path": "agent-handoffs/reports/20260928T050000Z-briefing-intelligence-section-contracts-sep20-26-preview.md",
+  "recommended_next_step": "Founder/ChatGPT approval to deploy e83b27d0 under separate authorization; decide the non-blocking Confidence-sheet wording question.",
+  "full_report_path": "agent-handoffs/reports/20260928T070000Z-briefing-intelligence-final-semantic-restraint-sep20-26-preview.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260928T030000Z-briefing-intelligence-holistic-sep20-26-preview.md",
-    "agent-handoffs/reports/20260928T013000Z-briefing-intelligence-sep20-26-preview.md"
+    "agent-handoffs/reports/20260928T050000Z-briefing-intelligence-section-contracts-sep20-26-preview.md",
+    "agent-handoffs/reports/20260928T030000Z-briefing-intelligence-holistic-sep20-26-preview.md"
   ],
   "safety": {
     "contains_secrets": false,
