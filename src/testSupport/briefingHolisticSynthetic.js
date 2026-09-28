@@ -13,9 +13,10 @@ export const HOLISTIC_KINDS = Object.freeze([
   "stable_all", "strong_training", "disruption_training_stable_weight", "weight_rising_no_dexa",
   "weight_rapid_guardrail", "weight_dexa_conflict", "unreliable_nutrition", "single_unreliable_day",
   "activity_variation", "crowded", "spectacular_pr", "sparse", "missed_week", "composition_regressed",
+  "risk_routine_progress", "guardrail_breached", "intake_conflicts_with_scale",
 ]);
 
-export const HOLISTIC_GOAL_TYPES = Object.freeze(["build_lean_mass", "gain_weight", "lose_fat", "maintain"]);
+export const HOLISTIC_GOAL_TYPES = Object.freeze(["build_lean_mass", "gain_weight", "lose_fat", "maintain", "general"]);
 
 // Goal-type vocabulary a Goal Contract would carry.
 const GOAL_WORDS = {
@@ -23,6 +24,7 @@ const GOAL_WORDS = {
   gain_weight: { outcome: "lean mass", guardrail: "body fat", guardrailUnit: "%" },
   lose_fat: { outcome: "body fat", guardrail: "lean mass", guardrailUnit: "lb" },
   maintain: { outcome: "lean mass", guardrail: "body fat", guardrailUnit: "%" },
+  general: { outcome: "lean mass", guardrail: "body fat", guardrailUnit: "%" },
 };
 
 const HORIZON = {
@@ -33,13 +35,14 @@ const HORIZON = {
   photo: { windowDays: 28, baselineDays: 56 },
 };
 
-const DISRUPTED = new Set(["disruption_training_stable_weight", "crowded"]);
+const DISRUPTED = new Set(["disruption_training_stable_weight", "crowded", "risk_routine_progress"]);
 
 // Weekly scale trend by situation, in the goal's own direction: positive
 // means "the way this goal wants" (up for mass goals, down for fat loss).
 const TREND_WITH_GOAL = {
   weight_rising_no_dexa: 0.6, weight_rapid_guardrail: 2.1, weight_dexa_conflict: -0.8, crowded: 1.2,
   stable_all: 0.45, spectacular_pr: 0.4, disruption_training_stable_weight: 0.4, missed_week: 0.4,
+  risk_routine_progress: 2.1, intake_conflicts_with_scale: -0.8,
 };
 
 export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "build_lean_mass" }) {
@@ -77,7 +80,8 @@ export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "b
   const policy = BRIEFING_INTELLIGENCE_POLICIES[cadence];
   const intelligence = createBriefingIntelligence({ window, days: period.days, policy });
   const milestoneCount = { strong_training: 4, disruption_training_stable_weight: 3, crowded: 5,
-    unreliable_nutrition: 2, single_unreliable_day: 2, spectacular_pr: 1, composition_regressed: 2 }[kind] ?? 0;
+    unreliable_nutrition: 2, single_unreliable_day: 2, spectacular_pr: 1, composition_regressed: 2,
+    risk_routine_progress: 4 }[kind] ?? 0;
   const milestones = Array.from({ length: milestoneCount }, (_, index) => ({
     subjectId: `lift_${index}`, subjectLabel: `Lift ${String.fromCharCode(65 + index)}`, type: "load_milestone",
     observedAt: windowDays[Math.min(windowDays.length - 1, index)].date, metric: "heaviest_load",
@@ -97,8 +101,11 @@ export function holisticScenario({ seed, kind, cadence = "weekly", goalType = "b
     change: Math.round((regressed ? -1 : 1) * progressSign * (1 + random() * 4) * 10) / 10,
     unit: "lb", currentValue: 150, label: words.outcome, eventName: "DEXA",
   };
-  const guardrailStatus = kind === "weight_rapid_guardrail" ? "watch" : "clear";
-  const intakeState = kind === "crowded" ? "above_plan" : "on_plan";
+  const guardrailStatus = kind === "weight_rapid_guardrail" ? "watch" : kind === "guardrail_breached" ? "breached" : "clear";
+  // Intake read against a scale already moving the other way (above plan
+  // while the scale falls against a gain goal, say).
+  const intakeState = kind === "crowded" ? "above_plan" : kind === "intake_conflicts_with_scale"
+    ? (direction === "down" ? "below_plan" : "above_plan") : "on_plan";
   const visual = cadence === "photo" && composition ? { available: true, capturedAt: eventDate,
     change: kind === "strong_training" ? "visible" : kind === "stable_all" ? "none" : "subtle" } : null;
   return {

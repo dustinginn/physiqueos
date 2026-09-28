@@ -178,8 +178,8 @@ function selectionReason(item, selectedBefore) {
 }
 
 function omissionReason(item, kept, covered, budget, stoppedAtFloor) {
-  if (kept.some((other) => other.domain === item.domain)) return "domain_already_represented";
   if (covered.has(item.kind)) return "told_within_a_selected_insight";
+  if (kept.some((other) => other.domain === item.domain)) return "domain_already_represented";
   if (item.value < budget.floor) return "below_briefing_floor";
   return stoppedAtFloor ? "not_enough_to_add_beside_what_was_said" : "information_budget_reached";
 }

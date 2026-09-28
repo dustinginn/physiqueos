@@ -73,24 +73,54 @@ const POLICIES = deepFreeze({
   },
 });
 
+// Resolved from the primary objective's measure and its canonical evaluation
+// (mode, desiredDirection, targets) — the same fields the Goal Contract
+// normalizes — never from a display name.
 export function resolveGoalEvidencePolicy(goalContract) {
-  const capabilities = [
-    ...(goalContract?.objectives ?? []).map((item) => ({ id: item?.metricCapability?.id, mode: item?.evaluation?.mode,
-      direction: item?.evaluation?.direction })),
-  ];
-  const ids = capabilities.map((item) => String(item.id ?? ""));
-  const says = (item, pattern) => pattern.test(`${item.direction ?? ""} ${item.mode ?? ""}`);
-  if (ids.some((id) => /lean_mass|muscle|skeletal/u.test(id))) return POLICIES.build_lean_mass;
-  if (ids.some((id) => /body_fat|fat_mass/u.test(id))) return POLICIES.lose_fat;
-  // A body-weight objective carries its own direction.
-  const weight = capabilities.find((item) => /weight|body_mass/u.test(String(item.id)));
-  if (weight) {
-    if (says(weight, /maintain|stability|range/u)) return POLICIES.maintain;
-    if (says(weight, /increase|up|gain|maximi|minimum/u)) return POLICIES.gain_weight;
-    if (says(weight, /decrease|down|lose|minimi|maximum/u)) return POLICIES.lose_fat;
+  const objectives = goalContract?.objectives ?? [];
+  const primary = objectives.find((item) => item?.priority === "primary") ?? objectives[0] ?? null;
+  if (!primary) return POLICIES.general;
+  const id = String(primary.metricCapability?.id ?? primary.metricCapability?.key ?? "");
+  const direction = objectiveDirection(primary.evaluation ?? {});
+  if (/lean_mass|muscle|skeletal/u.test(id)) return direction === "stable" ? POLICIES.maintain : direction === "up" ? POLICIES.build_lean_mass : POLICIES.general;
+  if (/body_fat|fat_mass/u.test(id)) return direction === "stable" ? POLICIES.maintain : direction === "down" ? POLICIES.lose_fat : POLICIES.general;
+  if (/weight|body_mass/u.test(id)) {
+    return { up: POLICIES.gain_weight, down: POLICIES.lose_fat, stable: POLICIES.maintain }[direction] ?? POLICIES.general;
   }
-  if (capabilities.some((item) => ["maintain_range", "stability"].includes(item.mode))) return POLICIES.maintain;
-  return POLICIES.general;
+  return direction === "stable" ? POLICIES.maintain : POLICIES.general;
+}
+
+// The direction an objective asks its measure to move: up, down or stable.
+function objectiveDirection(evaluation) {
+  const declared = String(evaluation.desiredDirection ?? "").toLowerCase();
+  if (/^(?:increase|up|higher)$/u.test(declared)) return "up";
+  if (/^(?:decrease|down|lower)$/u.test(declared)) return "down";
+  if (/^(?:stable|maintain|hold)$/u.test(declared)) return "stable";
+  const mode = evaluation.mode;
+  if (["increase", "minimum"].includes(mode)) return "up";
+  if (["decrease", "maximum"].includes(mode)) return "down";
+  if (["maintain_range", "stability"].includes(mode)) return "stable";
+  // A target is a direction relative to where the goal started.
+  const baseline = Number(evaluation.baselineValue);
+  const target = mode === "target_range"
+    ? midpoint(evaluation.targetRange) : Number(evaluation.targetValue);
+  if (Number.isFinite(baseline) && Number.isFinite(target)) {
+    if (mode === "target_range" && inRange(baseline, evaluation.targetRange)) return "stable";
+    return target > baseline ? "up" : target < baseline ? "down" : "stable";
+  }
+  return null;
+}
+
+function midpoint(range) {
+  const low = Number(range?.min ?? range?.low);
+  const high = Number(range?.max ?? range?.high);
+  return Number.isFinite(low) && Number.isFinite(high) ? (low + high) / 2 : NaN;
+}
+
+function inRange(value, range) {
+  const low = Number(range?.min ?? range?.low);
+  const high = Number(range?.max ?? range?.high);
+  return Number.isFinite(low) && Number.isFinite(high) && value >= low && value <= high;
 }
 
 export function goalEvidencePolicyFor(goalType) {

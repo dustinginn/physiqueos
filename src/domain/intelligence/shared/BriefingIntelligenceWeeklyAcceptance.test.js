@@ -102,7 +102,7 @@ describe("Shared Briefing Intelligence through the Weekly V3 pipeline", () => {
       expect(coach).toMatch(/Food logging (?:for|on) [^,]+ is too patchy to read, so (?:that day isn't|those days aren't) part of this picture\./u);
       const all = [...Object.values(prepared.narrativePlan.composition.sections), coach].join(" ");
       expect(all).not.toMatch(/\b(?:ate|eating|intake) (?:more|less|higher|lower)\b/iu);
-      expect(all).not.toMatch(/intake stayed on plan/u);
+      expect(all).not.toMatch(/intake stayed on (?:plan|target)/u);
       // A single odd day does not earn a mention.
       const single = generateSyntheticPeriod({ seed, scenario: "stable" });
       single.days.at(-1).nutrition.protein = Math.round(single.days.at(-1).nutrition.protein * 0.3);

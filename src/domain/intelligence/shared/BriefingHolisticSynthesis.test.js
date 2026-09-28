@@ -78,7 +78,8 @@ describe("synthesis is holistic, complementary and budgeted", () => {
 
   it("no one domain monopolizes a week with several meaningful domains", () => {
     for (const kind of ["disruption_training_stable_weight", "crowded", "spectacular_pr", "strong_training"]) {
-      for (const { seed, synthesis } of byKind(kind)) {
+      // A goal with no weight expectation has fewer meaningful domains here.
+      for (const { seed, synthesis } of byKind(kind).filter((item) => item.goalType !== "general")) {
         expect(new Set(synthesis.selected.map((item) => item.domain)).size, `${kind}#${seed}`).toBeGreaterThanOrEqual(2);
       }
     }
@@ -101,7 +102,7 @@ describe("synthesis is holistic, complementary and budgeted", () => {
   });
 
   it("a spectacular PR is mentioned as an example without taking over the week", () => {
-    for (const { seed, synthesis, realized } of byKind("spectacular_pr")) {
+    for (const { seed, synthesis, realized } of byKind("spectacular_pr").filter((item) => item.goalType !== "general")) {
       expect(synthesis.selected.some((item) => item.kind === "training_progress"), `seed ${seed}`).toBe(true);
       expect(realized.coachTake).toMatch(/Lift A/u);
       expect(synthesis.selected.some((item) => item.domain !== "training")).toBe(true);
@@ -113,7 +114,7 @@ describe("synthesis is holistic, complementary and budgeted", () => {
       expect(synthesis.selected.some((item) => item.kind === "intake_vs_plan"), `seed ${seed}`).toBe(false);
       expect(synthesis.omitted.some((item) => item.id === "nutrition|intake_vs_plan" &&
         item.reason === "restrained:unreliable_days_in_average")).toBe(true);
-      expect(textOf(realized)).not.toMatch(/intake stayed on plan/u);
+      expect(textOf(realized)).not.toMatch(/intake stayed on (?:plan|target)/u);
     }
   });
 
@@ -163,8 +164,8 @@ describe("Goal Confidence, strategy and restraint", () => {
   it("a real risk is never told as fitting the plan", () => {
     for (const kind of ["weight_rapid_guardrail", "weight_dexa_conflict"]) {
       // A maintenance goal has no wrong direction; its drift is only "quick".
-      for (const { seed, synthesis, realized } of byKind(kind).filter((item) => item.kind === "weight_rapid_guardrail" ||
-          item.goalType !== "maintain")) {
+      for (const { seed, synthesis, realized } of byKind(kind).filter((item) => item.goalType !== "general" &&
+          (item.kind === "weight_rapid_guardrail" || item.goalType !== "maintain"))) {
         expect(synthesis.selected.some((item) => item.role === "risk"), `${kind}#${seed}`).toBe(true);
         expect(realized.meaning).not.toMatch(/fits the plan/u);
       }
@@ -322,7 +323,9 @@ describe("goal-relative wording follows the goal's direction and the evidence's 
       const risk = synthesis.selected.find((item) => item.kind === "weight_trend" && item.role === "risk");
       if (!risk || !realized || !scenario.goalFacts.composition) continue;
       const label = `${goalType}/${kind}#${seed}`;
-      if (risk.facts.verdict === "rapid") expect(realized.meaning, label).toContain(`whether ${scenario.goalFacts.guardrail.label} is holding`);
+      // A maintenance goal has no "right way": its outcome is what must hold.
+      if (goalType === "maintain") expect(realized.meaning, label).toContain(`whether ${scenario.goalFacts.composition.label} is holding`);
+      else if (risk.facts.verdict === "rapid") expect(realized.meaning, label).toContain(`whether ${scenario.goalFacts.guardrail.label} is holding`);
       if (risk.facts.verdict === "wrong_direction") {
         expect(realized.meaning, label).toContain(`whether ${scenario.goalFacts.composition.label} is still moving the right way`);
       }
@@ -352,22 +355,37 @@ describe("goal-relative wording follows the goal's direction and the evidence's 
     for (const { kind, seed, goalType, picture, realized } of weekly) {
       const weight = weightOf(picture);
       if (!realized || !weight) continue;
-      expect(weight.facts.rateSpanDays).toBe(28);
+      expect(weight.facts.rateSpanDays).toBeLessThanOrEqual(28);
+      const weeks = Math.round(weight.facts.rateSpanDays / 7);
+      const words = ["", "", "two", "three", "four"];
       for (const match of `${realized.result} ${realized.coachTake}`.matchAll(/lb a week[^,.;]*/gu)) {
-        expect(match[0], `${goalType}/${kind}#${seed}`).toBe("lb a week over the last four weeks");
+        expect(match[0], `${goalType}/${kind}#${seed}`).toBe(weeks <= 1 ? "lb a week over the last week" : `lb a week over the last ${words[weeks]} weeks`);
       }
     }
   });
 
-  it("body-weight goals resolve to their own direction, never to a goal with no weight expectation", () => {
-    const contract = (id, direction, mode) => ({ objectives: [{ metricCapability: { id }, evaluation: { direction, mode } }] });
-    expect(resolveGoalEvidencePolicy(contract("body_composition.lean_mass", "increase")).goalType).toBe("build_lean_mass");
-    expect(resolveGoalEvidencePolicy(contract("body.weight", "increase")).goalType).toBe("gain_weight");
-    expect(resolveGoalEvidencePolicy(contract("body.weight", "increase")).weightExpectation.direction).toBe("up");
-    expect(resolveGoalEvidencePolicy(contract("body.weight", "decrease")).goalType).toBe("lose_fat");
-    expect(resolveGoalEvidencePolicy(contract("body.weight", null, "maintain_range")).goalType).toBe("maintain");
-    expect(resolveGoalEvidencePolicy(contract("body_composition.body_fat_percentage", "decrease")).goalType).toBe("lose_fat");
-    expect(resolveGoalEvidencePolicy(contract("performance.vo2max", "increase")).goalType).toBe("general");
+  it("goals resolve from the canonical evaluation (mode, desiredDirection, targets), never a display name", () => {
+    // Shaped exactly as GoalContractV3 normalizes objectives.
+    const contract = (id, evaluation) => ({ objectives: [{ priority: "primary", metricCapability: { id },
+      evaluation: { baselineValue: null, targetValue: null, targetRange: null, desiredDirection: null, ...evaluation } }] });
+    const type = (id, evaluation) => resolveGoalEvidencePolicy(contract(id, evaluation)).goalType;
+    expect(type("body_composition.lean_mass", { mode: "increase" })).toBe("build_lean_mass");
+    expect(type("body_composition.lean_mass", { mode: "target_value", baselineValue: 148, targetValue: 158 })).toBe("build_lean_mass");
+    expect(type("body_composition.lean_mass", { mode: "maintain_range", targetRange: { min: 150, max: 154 } })).toBe("maintain");
+    expect(type("body.weight", { mode: "increase" })).toBe("gain_weight");
+    expect(resolveGoalEvidencePolicy(contract("body.weight", { mode: "minimum" })).weightExpectation.direction).toBe("up");
+    expect(type("body.weight", { mode: "decrease" })).toBe("lose_fat");
+    expect(type("body.weight", { mode: "target_value", baselineValue: 170, targetValue: 180 })).toBe("gain_weight");
+    expect(type("body.weight", { mode: "target_value", baselineValue: 190, targetValue: 180 })).toBe("lose_fat");
+    expect(type("body.weight", { mode: "custom_declarative", desiredDirection: "increase" })).toBe("gain_weight");
+    // A target range above where the goal started is a gain, not maintenance.
+    expect(type("body.weight", { mode: "target_range", baselineValue: 170, targetRange: { min: 178, max: 182 } })).toBe("gain_weight");
+    expect(type("body.weight", { mode: "target_range", baselineValue: 180, targetRange: { min: 178, max: 182 } })).toBe("maintain");
+    expect(type("body.weight", { mode: "maintain_range", targetRange: { min: 178, max: 182 } })).toBe("maintain");
+    expect(type("body_composition.body_fat_percentage", { mode: "decrease" })).toBe("lose_fat");
+    expect(type("body_composition.body_fat_percentage", { mode: "maintain_range", targetRange: { min: 9, max: 11 } })).toBe("maintain");
+    expect(type("performance.vo2max", { mode: "increase" })).toBe("general");
+    expect(resolveGoalEvidencePolicy({ objectives: [] }).goalType).toBe("general");
   });
 });
 
@@ -395,7 +413,9 @@ describe("routine and training rhythm are told as they happened", () => {
         const words = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
         expect(words.indexOf(quiet[1].toLowerCase()), label).toBe(f.extentDays);
       }
-      if (f.direction !== "break") expect(`${realized.meaning} ${realized.coachTake}`, label).not.toMatch(/\bquiet\b/u);
+      if (f.direction !== "break") {
+        expect(`${realized.meaning} ${realized.coachTake} ${realized.confidenceBody ?? ""}`, label).not.toMatch(/\bquiet\b/u);
+      }
       expect(realized.watch).not.toMatch(/next weekend/u);
       const training = f.missed?.find((gap) => gap.domain === "training")?.dates ?? [];
       for (const day of WEEKDAYS.filter((name) => realized.watch.includes(name))) {
@@ -494,6 +514,97 @@ describe("briefing budgets are semantic, not word counts", () => {
       const { synthesis } = run({ seed, kind: "weight_rapid_guardrail", cadence: "dexa" });
       expect(synthesis.lead?.domain, `seed ${seed}`).toBe("body_composition");
       expect(synthesis.selected[0].reason).toBe("briefing_lead_domain");
+    }
+  });
+});
+
+describe("sections agree with each other", () => {
+  const sections = (realized) => [realized.result, realized.meaning, realized.coachTake, realized.action, realized.watch];
+
+  it("a routine break is introduced before anything refers back to it", () => {
+    for (const { kind, seed, goalType, realized } of weekly) {
+      if (!realized) continue;
+      const text = sections(realized).join(" ");
+      const back = text.search(/similar (?:quiet|off-routine) stretch|a few (?:quiet|off-routine) days/u);
+      if (back < 0) continue;
+      const intro = text.search(/routine slipped|ran off its usual routine|quiet days? (?:don't|doesn't)/u);
+      expect(intro, `${goalType}/${kind}#${seed}`).toBeGreaterThanOrEqual(0);
+      expect(intro).toBeLessThan(back);
+    }
+  });
+
+  it("a week with a risk, progress and a routine break tells all three and acts on the risk", () => {
+    const cases = weekly.filter((item) => item.kind === "risk_routine_progress" && item.goalType !== "general");
+    expect(cases.some((item) => ["training_progress", "routine_break"].every((kind) =>
+      item.synthesis.selected.some((insight) => insight.kind === kind)) &&
+      item.synthesis.selected.some((insight) => insight.role === "risk"))).toBe(true);
+    for (const { seed, goalType, synthesis, realized } of cases) {
+      const risk = synthesis.selected.find((item) => item.kind === "weight_trend" && item.role === "risk");
+      if (!risk) continue;
+      expect(realized.action, `${goalType}#${seed}`).toMatch(/intake (?:at|reaches) the plan's target/u);
+      if (synthesis.selected.some((item) => item.kind === "routine_break" && item.facts.missed?.some((gap) => gap.domain === "training"))) {
+        expect(realized.action).toMatch(/training rhythm back/u);
+      }
+    }
+  });
+
+  it("What To Do never contradicts Into Next Week, and never endorses anything short of supportive", () => {
+    for (const { kind, seed, goalType, synthesis, realized } of weekly) {
+      if (!realized) continue;
+      const label = `${goalType}/${kind}#${seed}`;
+      expect(realized.coachTake, label).not.toMatch(/Nothing else needs changing/u);
+      if (/Keep doing what has been working/u.test(realized.coachTake)) {
+        expect(synthesis.selected.every((item) => item.polarity === "supportive"), label).toBe(true);
+      }
+      if (!/^Keep the current setup in place\.$/u.test(realized.action)) {
+        expect(realized.coachTake, label).not.toMatch(/nothing (?:else )?needs (?:changing|fixing) this week/iu);
+      }
+    }
+  });
+
+  it("an outcome or guardrail risk gets its own step, Watch and a Confidence line that does not contradict itself", () => {
+    for (const { kind, seed, goalType, synthesis, realized, scenario } of weekly) {
+      const risk = synthesis.selected.find((item) => item.role === "risk" && ["composition_result", "guardrail_status"].includes(item.kind));
+      if (!risk || !realized || synthesis.selected.some((item) => item.kind === "weight_trend" && item.role === "risk")) continue;
+      const label = `${goalType}/${kind}#${seed}`;
+      expect(realized.action, label).toMatch(/^Keep intake at the plan's target and training on its usual rhythm this week\. Otherwise/u);
+      expect(realized.watch).toContain(`next ${scenario.goalFacts.composition.eventName}`);
+      if (risk.kind === "composition_result" && realized.confidenceBody) {
+        expect(realized.confidenceBody).toMatch(/^Confidence holds at the level/u);
+        expect(realized.confidenceBody).not.toMatch(/worth watching/u);
+      }
+      if (risk.kind === "guardrail_status") expect(realized.meaning).not.toMatch(/\bmatters\b/u);
+    }
+    const breached = weekly.filter((item) => item.kind === "guardrail_breached" && item.realized);
+    expect(breached.some((item) => /past its limit/u.test(item.realized.result))).toBe(true);
+    for (const { realized } of breached) expect(realized.result).not.toMatch(/closer to its limit/u);
+  });
+
+  it("a weight risk's step follows the scale even when intake reads the other way", () => {
+    for (const { seed, goalType, synthesis, realized } of weekly.filter((item) => item.kind === "intake_conflicts_with_scale")) {
+      const risk = synthesis.selected.find((item) => item.kind === "weight_trend" && item.role === "risk");
+      if (!risk) continue;
+      const label = `${goalType}#${seed}`;
+      expect(realized.action, label).not.toMatch(/bring intake/u);
+      expect(realized.action).toMatch(risk.facts.movement === "up" ? /rather than above it/u : /reaches the plan's target/u);
+    }
+  });
+
+  it("a maintenance goal asks the scale to level off, never to 'steady' a climb or drop it wants", () => {
+    for (const { kind, seed, synthesis, realized } of weekly.filter((item) => item.goalType === "maintain")) {
+      if (!realized) continue;
+      expect(realized.watch, `${kind}#${seed}`).not.toMatch(/steadier (?:climb|drop)|turns back/u);
+      if (synthesis.selected.some((item) => item.kind === "weight_trend" && ["quick", "rapid"].includes(item.facts.verdict))) {
+        expect(realized.watch).toMatch(/levels off/u);
+      }
+    }
+    expect(weekly.some((item) => item.goalType === "maintain" && /levels off/u.test(item.realized?.watch ?? ""))).toBe(true);
+  });
+
+  it("a goal with no weight expectation never makes the scale its story or its Watch", () => {
+    for (const { kind, seed, synthesis, realized } of weekly.filter((item) => item.goalType === "general")) {
+      expect(synthesis.selected.some((item) => item.kind === "weight_trend"), `${kind}#${seed}`).toBe(false);
+      if (realized) expect(realized.watch).not.toMatch(/weight average/u);
     }
   });
 });

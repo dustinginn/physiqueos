@@ -88,7 +88,9 @@ function assessBodyTrajectory({ days, window, goalPolicy }) {
   if (points.length < 8 || inWindow.length < 3) {
     return insufficient(D.BODY_TRAJECTORY, "too_few_weigh_ins", { weighIns: points.length, windowWeighIns: inWindow.length });
   }
-  const fit = linearFit(points);
+  // Robust pace (Theil–Sen: the median of every pairwise slope), so one step
+  // change or a stray weigh-in cannot set the verdict on its own.
+  const fit = robustFit(points);
   const weeklyRate = round(fit.slope * 7, 2);
   const residual = Math.sqrt(points.reduce((sum, point) =>
     sum + (point.y - (fit.intercept + fit.slope * point.x)) ** 2, 0) / Math.max(1, points.length - 2));
@@ -100,11 +102,17 @@ function assessBodyTrajectory({ days, window, goalPolicy }) {
   const verdict = weightVerdict(weeklyRate, expectation, residual);
   const facts = { weeklyRate, windowAverage, priorWeekAverage: priorAverage, volatility: round(residual, 2),
     weighIns: points.length, spanDays: daysBetween(points[0].date, points.at(-1).date) + 1,
-    rateSpanDays: WEIGHT_RATE_SPAN_DAYS, movement: weeklyRate > 0.1 ? "up" : weeklyRate < -0.1 ? "down" : "flat",
+    rateSpanDays: daysBetween(points[0].date, points.at(-1).date) + 1, rateMethod: "theil_sen", movement: weeklyRate > 0.1 ? "up" : weeklyRate < -0.1 ? "down" : "flat",
     expectedDirection: expectation?.direction ?? null, verdict,
     note: "scale_weight_does_not_identify_lean_or_fat_mass" };
   const risk = ["rapid", "wrong_direction"].includes(verdict);
   const polarity = verdict === "steady" ? "supportive" : risk ? "concern" : "neutral";
+  // A goal with no weight expectation keeps the trend as background only.
+  if (verdict === "not_goal_relevant") {
+    return assessed(D.BODY_TRAJECTORY, verdict, "neutral", facts, [
+      insight(D.BODY_TRAJECTORY, "weight_trend", InsightRole.CONTEXT, "neutral", 0.5, facts),
+    ]);
+  }
   // A flat scale while the goal expects movement is informative in itself.
   const strength = { steady: 1.6, quick: 1.8, rapid: 2.8, wrong_direction: 2.0, flat: 1.4, too_noisy: 0.6 }[verdict] ?? 0.8;
   return assessed(D.BODY_TRAJECTORY, verdict, polarity, facts, [
@@ -341,6 +349,19 @@ function insufficient(domain, reason, facts = {}) {
 
 function unavailable(domain, reason) {
   return { domain, status: "unavailable", state: reason, polarity: "neutral", facts: {}, insights: [] };
+}
+
+function robustFit(points) {
+  const slopes = [];
+  for (let i = 0; i < points.length; i += 1) {
+    for (let j = i + 1; j < points.length; j += 1) {
+      if (points[j].x !== points[i].x) slopes.push((points[j].y - points[i].y) / (points[j].x - points[i].x));
+    }
+  }
+  if (!slopes.length) return linearFit(points);
+  const slope = median(slopes);
+  const intercept = median(points.map((point) => point.y - slope * point.x));
+  return { slope, intercept, n: points.length };
 }
 
 function linearFit(points) {
