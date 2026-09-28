@@ -2,28 +2,25 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Briefing Intelligence — final semantic restraint, real Sep 20–26 preview
+- Task: Briefing Intelligence — measurement is not causation across V3
 - Agent: claude
-- Status: release-ready, awaiting approval (nothing deployed)
-- Generated (UTC): 2026-09-28T07:00:00Z
+- Status: release-ready, awaiting deploy authorization (nothing deployed)
+- Generated (UTC): 2026-09-28T09:00:00Z
 
-Two general rules now live in the shared layer:
-- **Exercise bests prove performance, not that the training is "working".** Seven new bests say performance moved forward. They cannot say the training is producing the lean-mass result, and Goal Confidence never names training.
-- **Advice about patchy past logs looks forward only.** It never implies those days can be fixed.
+Your decision is applied everywhere V3 writes copy: a DEXA or photo proves what changed, not that the plan caused it.
+- **Copy stays positive, scoped to what was measured.** Where it used to say "The build plan is clearly working", it now says "The measured progress in lean mass is real, and nothing in the evidence calls for changing the build plan."
+- **A Confidence jump credits the measurement.** "Because the plan delivered a standout result" now reads "because the DEXA measured a standout result".
+- **Confidence scores and recommendations are unchanged,** and this is tested.
 
-On your real Sep 20–26 data only three sentences changed:
-- **Biggest Takeaway:** "The performance gains are real; the part to protect is the end of the week, where the routine has slipped before."
-- **What To Do** now ends: "…complete logs from here on will make the next check clearer."
-- **Confidence** no longer mentions training.
-
-Everything else, including the evidence and synthesis, is identical to the last preview.
+On your real Sep 20–26 data, exactly one sentence changed, in the Confidence detail: "The build plan is clearly working." → "The measured progress in lean mass is real." Confidence is still 79% (holding), and the recommendation is still to continue the current strategy.
 
 Validation:
-- 134 Briefing Intelligence tests pass, with zero new failures across the full test suite.
-- Two independent semantic reviews found nothing serious, and all their findings are fixed.
+- New tests cover every V3 surface.
+- The full test suite shows zero new failures.
+- The first review round failed on one leftover sentence ("the plan delivered a standout result"). It's fixed; the second round found nothing serious.
 
-**Recommendation:** e83b27d0 is release-ready for your and ChatGPT's approval, and deploying it needs a separate go-ahead. One non-blocking question: the Confidence detail sheet still says "The build plan is clearly working." That sentence is older, and it only appears when the DEXA outcome itself demonstrates the plan. Should that count as proof, or should it say what the DEXA measured instead?
+**Your call:** authorize the deploy of 6abbed64.
 
-Detailed report: `agent-handoffs/reports/20260928T070000Z-briefing-intelligence-final-semantic-restraint-sep20-26-preview.md`
+Detailed report: `agent-handoffs/reports/20260928T090000Z-briefing-intelligence-measurement-causality-restraint-release-ready.md`
 
 Protocol: `agent-handoffs/README.md`

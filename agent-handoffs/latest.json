@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-28T07:00:00Z",
+  "generated_at_utc": "2026-09-28T09:00:00Z",
   "task": {
-    "id": "briefing-intelligence-final-semantic-restraint-preview-20260927",
-    "title": "Briefing Intelligence: final semantic restraint - real Sep 20-26 preview; release-ready recommendation (candidate e83b27d0, not deployed)",
+    "id": "briefing-intelligence-final-measurement-causality-restraint-20260927",
+    "title": "Briefing Intelligence: measurement is not causation across V3 - real Sep 20-26 preview; release-ready (candidate 6abbed64, not deployed)",
     "agent": "claude",
-    "status": "release_ready_awaiting_approval"
+    "status": "release_ready_awaiting_authorization"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -16,11 +16,11 @@
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "e83b27d0",
+    "server_candidate_sha": "6abbed64",
     "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative"
   },
   "result": {
-    "summary": "Shared claim restraint (shared/BriefingClaimRestraint.js): insight kinds carry claim scopes; exercise progression realizes as performance progress, never as training/approach effectiveness without authoritative causal support; Goal Confidence never names training; incomplete-logging guidance is prospective. Real Sep 20-26 preview changed only in three sentences (Takeaway: 'The performance gains are real; ...'; What To Do: '... complete logs from here on will make the next check clearer.'; Confidence no longer names training). Synthesis and section allocation identical to a1ea5aab; audits clean (182 words).",
+    "summary": "Measurement-not-causation applied across V3 realization (composition strategy meaning/result/action/coach take/watch/Confidence body and detail, surface projection, Confidence explanation presentation, ambiguity vocabulary, Photo interpreter copy/prompt, Active Goal next-DEXA lines): DEXA-demonstrated progress is stated as measured progress and compatibility with staying the course, never 'the plan is working'. Claim audit recorded on every V3 narrative (claimRestraint.issues, held empty by tests). Real Sep 20-26: only Confidence detail 'why' changed ('The measured progress in lean mass is real.'); Confidence 79/delta 0 and continue_current_strategy unchanged; audit empty.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -30,39 +30,37 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "134 Briefing Intelligence tests incl. claim-restraint corpus properties, detection positives/negatives, hand-built paths; full repo 9050/9358 vs production baseline 8913/9221, 0 new failures."
+      "summary": "New MeasurementCausalityRestraint suite (factual DEXA wording, no effectiveness on any V3 surface, unchanged Confidence/recommendation, causal-support marker distinguishable, source template scan, empty recorded audits); 134 Briefing Intelligence tests; full repo 9063/9371 vs baseline 8913/9221, 0 new failures."
     },
     "review": {
       "status": "passed_with_fixes_applied",
-      "summary": "Two fresh-context semantic reviews (5d5a207c, 2d39d1a7), both PASS-WITH-FIXES with no High; all findings fixed with tests in e83b27d0 (real copy unchanged by the final fixes)."
+      "summary": "Round 1 (1d5dfefa) FAIL: reachable 'plan delivered a standout result' + throwing invariant - fixed in 559e9b09; Round 2 (559e9b09) PASS-WITH-FIXES, no High, no causal claim reachable from V3 production across 260 test files + 22-run sweep - wording fixes in 6abbed64."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Offline harness reproduces stored assessment bit-exactly on production code; preview green on e83b27d0."
+      "summary": "Offline harness bit-exact on production code; Sep 20-26 preview green on 6abbed64."
     }
   },
   "decisions_required": [
-    "Approve deploy of Server candidate e83b27d0 (separate explicit authorization; not done).",
-    "Non-blocking: whether a DEXA-demonstrated strategy effectiveness counts as authoritative support for the pre-existing Confidence-sheet sentence 'The build plan is clearly working.' (report section 3).",
-    "Weight-pace policy (from a1ea5aab): keep personal-trend-relative, or declare a signed expectedWeeklyRange on the accepted Phase Expected Trajectory.",
-    "Whether to regenerate the published Sep 20-26 Weekly (not done; separate authorization)."
+    "Authorize Server deploy of 6abbed64 (not done).",
+    "Optional: weight-pace policy (declare a signed expectedWeeklyRange on the accepted Phase Expected Trajectory).",
+    "Whether to regenerate the published Sep 20-26 Weekly (stored artifacts keep their original wording until then)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Pre-existing V3 strategy-meaning and Confidence-detail paths assert 'the plan is working' when V3 strategy effectiveness is DEXA-demonstrated; left unchanged and flagged for Founder decision."
+    "Stored artifacts (e.g. Sep 19 Photo) still carry 'The plan is working.' until the next publication or an authorized regeneration; they are served as stored by design."
   ],
   "backlog": [
-    "Founder decision on DEXA-demonstrated effectiveness wording (small follow-on if changed).",
-    "Wire accepted Phase Expected Trajectory weightTrajectory into Weekly goal facts (only if a canonical range is declared).",
-    "Phase 2 realizers: Midweek, Monthly, DEXA, Photo on shared section contracts.",
-    "Phase 3: Sleep (separate authorization).",
+    "Legacy V2-only causal phrasing (DailyBriefingService, MonthlyNarrativeCompositionService, PINarrativeAssessmentService, SyntheticDEXAV2PreviewService, two legacy screens) - out of V3 scope.",
+    "Wire accepted Phase Expected Trajectory weightTrajectory into Weekly goal facts if a canonical range is declared.",
+    "Phase 2 realizers (Midweek/Monthly/DEXA/Photo) on the shared section contracts; Phase 3 Sleep (separate authorization).",
     "Queued Native Log-tab -> active Workout Logger item remains approved for the next consolidated Native build."
   ],
-  "recommended_next_step": "Founder/ChatGPT approval to deploy e83b27d0 under separate authorization; decide the non-blocking Confidence-sheet wording question.",
-  "full_report_path": "agent-handoffs/reports/20260928T070000Z-briefing-intelligence-final-semantic-restraint-sep20-26-preview.md",
+  "recommended_next_step": "Founder/ChatGPT authorization to deploy 6abbed64.",
+  "full_report_path": "agent-handoffs/reports/20260928T090000Z-briefing-intelligence-measurement-causality-restraint-release-ready.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260928T050000Z-briefing-intelligence-section-contracts-sep20-26-preview.md",
-    "agent-handoffs/reports/20260928T030000Z-briefing-intelligence-holistic-sep20-26-preview.md"
+    "agent-handoffs/reports/20260928T070000Z-briefing-intelligence-final-semantic-restraint-sep20-26-preview.md",
+    "agent-handoffs/reports/20260928T050000Z-briefing-intelligence-section-contracts-sep20-26-preview.md"
   ],
   "safety": {
     "contains_secrets": false,
