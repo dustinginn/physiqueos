@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { buildEvidencePicture } from "./BriefingEvidencePicture.js";
 import { synthesizeBriefing } from "./BriefingHolisticSynthesis.js";
 import { BRIEFING_INTELLIGENCE_POLICIES, resolveNarrativeBudget } from "./BriefingIntelligencePolicies.js";
-import { realizeHolisticWeeklyV3 } from "../v3/HolisticNarrativeV3.js";
+import { goalFactsFromInterpretationV3, realizeHolisticWeeklyV3 } from "../v3/HolisticNarrativeV3.js";
 import { findNarrativeV3VoiceViolations } from "../v3/NarrativeV3CompositionService.js";
 import { HOLISTIC_KINDS, holisticScenario } from "../../../testSupport/briefingHolisticSynthetic.js";
 
@@ -229,3 +229,21 @@ describe("information budgets scale with each briefing's horizon and purpose", (
     }
   });
 });
+
+describe("training milestones are real bests in the period", () => {
+  it("counts one milestone per lift, only inside the period, and never a comparison that went down", () => {
+    const candidate = (subjectId, type, observedAt, basis) => ({ domain: "training", type, observedAt, subjectId,
+      subjectLabel: subjectId, score: 100, evidenceBasis: basis });
+    const interpretation = { objectiveFindings: [], guardrailFindings: [], coachingObservationSelection: { rankedCandidates: [
+      candidate("press", "load_milestone", "2026-09-22", { currentValue: 90, previousValue: 85 }),
+      candidate("press", "volume_milestone", "2026-09-23", { currentValue: 7680, previousValue: 7500 }),
+      candidate("squat", "reps_at_load_milestone", "2026-09-21", { currentValue: 12, previousValue: 6, load: 115, metric: "reps_at_load" }),
+      candidate("leg_press", "longitudinal_progression", "2026-09-21", { percentChange: -16.5 }),
+      candidate("row", "load_milestone", "2026-09-12", { currentValue: 100, previousValue: 95 }),
+    ] } };
+    const facts = goalFactsFromInterpretationV3({ interpretation, confidence: null,
+      window: { startDate: "2026-09-20", endDate: "2026-09-26" } });
+    expect(facts.trainingMilestones.map((item) => item.subjectId)).toEqual(["squat", "press"]);
+  });
+});
+

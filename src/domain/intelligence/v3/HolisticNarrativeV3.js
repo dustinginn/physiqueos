@@ -68,6 +68,8 @@ function trainingMilestones(interpretation, window) {
   const bySubject = new Map();
   for (const item of inWindow) {
     const milestone = normalizeMilestone(item);
+    // A comparison that went down is not a best, whatever its candidate type.
+    if (milestone.relativeGain != null && milestone.relativeGain <= 0) continue;
     const current = bySubject.get(milestone.subjectId);
     if (!current || rankMilestone(milestone) > rankMilestone(current)) bySubject.set(milestone.subjectId, milestone);
   }
