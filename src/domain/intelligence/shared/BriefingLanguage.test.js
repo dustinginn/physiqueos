@@ -21,6 +21,7 @@ const TEMPLATE_FILES = [
   "services/MonthlyReviewPresentationService.js", "services/MonthlyBriefingPresentationService.js", "services/MonthlyBriefingPreviewService.js",
   "services/MidweekBriefingPreviewService.js", "services/WeeklyNarrativeService.js", "services/DEXAEventNarrativeService.js",
   "services/PhotoEventNarrativeService.js", "interpreters/PhotoInterpreterService.js",
+  "presentation/evidenceInterpretationPresentation.js", "services/PhaseAwareActiveGoalPreviewService.js",
 ];
 
 // String and template literals only; code identifiers and comments are not copy.
@@ -31,10 +32,13 @@ function literals(source) {
 describe("no analytical \"read\" jargon in Founder-facing Briefing Intelligence copy", () => {
   it("the rule targets the jargon, not the English word", () => {
     for (const text of ["Performance stayed the clearest read.", "21 were complete enough to read.", "read the weekly balance as directional",
-      "Early read: the gains are real.", "The waist reads tighter.", "the steadier read of intake", "Energy was a little hard to read this month."]) {
+      "Early read: the gains are real.", "The waist reads tighter.", "the steadier read of intake", "Energy was a little hard to read this month.",
+      "The torso reads as leaner.", "The clearest reading of the trend."]) {
       expect(findAnalyticalReadJargon(text), text).not.toBeNull();
     }
-    for (const text of ["Read the label on the tub.", "Tap to read the full briefing.", "PhysiqueOS is reading your upload."]) {
+    for (const text of ["Read the label on the tub.", "Tap to read the full briefing.", "PhysiqueOS is reading your upload.",
+      "The scale that read 174 lb this morning.", "The report can be read on the web.", "Read the scale first thing in the morning.",
+      "An authoritative reading of lean mass."]) {
       expect(findAnalyticalReadJargon(text), text).toBeNull();
     }
   });

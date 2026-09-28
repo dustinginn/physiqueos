@@ -422,8 +422,12 @@ function detectReliabilityFindings({ windowDates, baselineDates, dayAt, settings
     // Only identifying artifacts (a file name or a submission id) can show
     // reuse; generic labels like "Photo 1" name nothing in particular.
     const artifacts = (evidence.artifacts ?? []).filter((ref) => /\.[a-z0-9]{2,5}$|evidence_submission_|^[0-9a-f]{24,}/iu.test(String(ref)));
-    const reused = artifacts.length ? [...artifactsSeen.entries()].find(([, list]) => artifacts.every((ref) => list.includes(ref)) ||
-      list.every((ref) => artifacts.includes(ref)) && list.length >= 2) : null;
+    // Reuse needs at least two shared identifying files, and one set must
+    // contain the other: a single shared summary image proves nothing.
+    const reused = artifacts.length ? [...artifactsSeen.entries()].find(([, list]) => {
+      const shared = artifacts.filter((ref) => list.includes(ref)).length;
+      return shared >= 2 && (shared === artifacts.length || shared === list.length);
+    }) : null;
     if (reused) push("duplicate_source_evidence", { sameSourceAs: reused[0] });
     if (artifacts.length) artifactsSeen.set(date, artifacts);
     const proteinZ = proteinStats && Number.isFinite(nutrition.protein) ? (nutrition.protein - proteinStats.median) / proteinStats.scale : null;

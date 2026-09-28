@@ -30,7 +30,7 @@ export function describeWeightAndEnergyInterpretation({
     return [
       "It's still early in this phase for weight and energy trends to mean much on their own.",
       targetsClause,
-      "The next DEXA will be the real read on how things are moving.",
+      "The next DEXA will show how things are really moving.",
     ].filter(Boolean).join(" ");
   }
 

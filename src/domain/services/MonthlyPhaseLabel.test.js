@@ -21,6 +21,9 @@ describe("Monthly phase label authority", () => {
     // Without an explicit order, the phases' start dates decide.
     const unordered = { phases: goal.phases.map(({ order: _order, ...phase }) => phase).reverse() };
     expect(phaseLabelOf(unordered, unordered.phases[0])).toBe("Lean Mass Build · Phase 2");
+    // Sparse orders are positions, not numbers.
+    const sparse = { phases: [{ ...goal.phases[0], order: 0 }, { ...goal.phases[1], order: 2 }] };
+    expect(phaseLabelOf(sparse, sparse.phases[1])).toBe("Lean Mass Build · Phase 2");
   });
 
   it("a month entirely inside the second phase is labelled with it", () => {

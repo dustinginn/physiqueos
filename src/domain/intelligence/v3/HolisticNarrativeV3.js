@@ -721,7 +721,7 @@ function limitationSentence(item) {
     return `${dayRange(incomplete)}${incomplete.length === 1 ? "'s food log was" : "'s food logs were"} incomplete, so ${incomplete.length === 1 ? "it isn't" : "they aren't"} counted; complete logs from here on will make the next check clearer.`;
   }
   const reused = byKind.duplicate_source_evidence ?? item.facts?.dates ?? [];
-  return `${dayRange(reused)}'s record repeats another day's screenshots, so it isn't counted; a fresh log each day from here on keeps the next check honest.`;
+  return `${dayRange(reused)}'s record repeats another day's screenshots, so it isn't counted; a separate record for each day from here on keeps the next check accurate.`;
 }
 
 // The next steps (two when a risk needs its own), then the standing
@@ -1068,10 +1068,12 @@ function changesModule({ picture, facts, synthesis, trajectory, energy, reviewCo
     const climbing = weight?.movement === "up";
     themes.push({ tone: "energy", title: "Calories", earnedBy: energy.earnedBy[0],
       value: state === "above_plan" ? "Intake ran ahead of the plan." : state === "below_plan" ? "Intake ran short of the plan."
-        : state === "on_plan" ? "Intake held to the plan." : "Logging set the limit on what calories can show.",
+        : state === "on_plan" && energy.lean ? `Intake leaned a little ${energy.lean} the plan.`
+          : state === "on_plan" ? "Intake held to the plan." : "Logging set the limit on what calories can show.",
       text: [state === "above_plan" && climbing ? "With the scale already climbing, the calorie number is the one to tighten, not to raise."
         : state === "below_plan" && weight?.movement === "down" && facts.direction === "up" ? "With the scale drifting down, calories are the lever to raise."
-          : state === "on_plan" ? "Holding the target is what lets the scale and the next measurement be judged cleanly." : null,
+          : state === "on_plan" && energy.lean ? `That is still inside the plan's range, but it is the direction to keep an eye on.`
+            : state === "on_plan" ? "Holding the target is what lets the scale and the next measurement be judged cleanly." : null,
       energy.excludedDates?.length ? "A day that couldn't be used limits how sure that picture is." : null].filter(Boolean).join(" ") ||
         "Intake is judged against the plan's target, never against the wearable." });
   }
@@ -1273,16 +1275,19 @@ function energyModule(nutrition, activity, period) {
   const usable = f.reliableDays >= 7 && Number.isFinite(f.reliableIntakeAverage);
   // The plan-relative verdict is the shared picture's (usable days, V3 tolerance).
   const state = usable ? f.readableIntakeState : null;
+  // Within the plan's tolerance, a clear lean either way is still said.
+  const ratio = usable && f.intakeTarget ? f.reliableIntakeAverage / f.intakeTarget : null;
+  const lean = state === "on_plan" && ratio != null ? (ratio >= 1.05 ? "above" : ratio <= 0.95 ? "below" : null) : null;
   const title = !state ? "Food was logged across the month."
     : state === "above_plan" ? "Intake ran above the plan's target."
-      : state === "below_plan" ? "Intake ran below the plan's target." : "Intake stayed close to the plan's target.";
+      : state === "below_plan" ? "Intake ran below the plan's target."
+        : lean ? `Intake ran a little ${lean} the plan's target.` : "Intake stayed close to the plan's target.";
   const days = period?.days ?? f.loggedDays;
   const logged = f.loggedDays >= days ? `all ${days} days` : `${f.loggedDays} of ${days} days`;
   const excluded = f.unreliableDates ?? [];
-  const counted = excluded.length === 0 ? "and every day counts toward the averages"
-    : excluded.length <= 2 ? `and every day but ${dateList(excluded)} counts toward the averages`
-      : `and ${f.reliableDays} of them count toward the averages`;
-  const paragraphs = [`Food was logged on ${logged}${period?.toDate ? ` through ${dateWords(period.endDate)}` : ""}, ${counted}.`];
+  // Excluded days are named once, with their reason, below.
+  const counted = excluded.length === 0 ? ", and every day counts toward the averages" : "";
+  const paragraphs = [`Food was logged on ${logged}${period?.toDate ? ` through ${dateWords(period.endDate)}` : ""}${counted}.`];
   if (usable) {
     const protein = Number.isFinite(f.reliableProteinAverage) ? `, and protein averaged around ${f.reliableProteinAverage} g${Number.isFinite(f.usualProtein) &&
       Math.abs(f.reliableProteinAverage - f.usualProtein) <= 0.08 * f.usualProtein ? ", close to your usual" : ""}` : "";
@@ -1290,12 +1295,14 @@ function energyModule(nutrition, activity, period) {
   }
   // Unusual days stay in the averages; a clear run of them is behavior worth saying.
   if ((f.lowProteinDates ?? []).length >= 2) {
-    paragraphs.push(`Protein ran well below your usual on ${dateList(f.lowProteinDates)}, even on days when total intake was normal or high.`);
+    // Said only when true of those very days.
+    const fedDays = (f.lowProteinIntakes ?? []).some((kcal) => Number.isFinite(kcal) && f.intakeTarget && kcal >= f.intakeTarget * 0.95);
+    paragraphs.push(`Protein ran well below your usual on ${dateList(f.lowProteinDates)}${fedDays ? ", even on days when total intake was at or above target" : ""}.`);
   }
   for (const reason of exclusionReasons(f.exclusions ?? [])) paragraphs.push(reason);
   const wearable = activity?.facts?.measurement === "wearable_estimate";
   const earnedBy = nutrition.insights.length ? nutrition.insights.map((item) => item.id) : [`nutrition|assessed:${nutrition.state}`];
-  return { role: ReviewModule.ENERGY, earnedBy, title, paragraphs, intakeState: state, excludedDates: excluded,
+  return { role: ReviewModule.ENERGY, earnedBy, title, paragraphs, intakeState: state, lean, excludedDates: excluded,
     interpretation: wearable ? "Expenditure is a wearable estimate, so treat the weekly balance as a rough guide; the scale's trend gives a better sense of where intake sits against the work." : null };
 }
 
@@ -1308,8 +1315,11 @@ function exclusionReasons(exclusions) {
   }
   const partial = byKind("partial_day").map((item) => item.date);
   if (partial.length) out.push(`${upperFirst(dateList(partial))} ${partial.length === 1 ? "was" : "were"} only partly logged, so ${partial.length === 1 ? "it is" : "they are"} left out of the averages.`);
-  const sparse = byKind("sparse_day").map((item) => item.date);
-  if (sparse.length) out.push(`${upperFirst(dateList(sparse))} ${sparse.length === 1 ? "has" : "have"} too few entries to stand for a whole day, so ${sparse.length === 1 ? "it is" : "they are"} left out of the averages.`);
+  const sparse = byKind("sparse_day");
+  const fewEntries = sparse.filter((item) => item.entries != null).map((item) => item.date);
+  const partOfDay = sparse.filter((item) => item.entries == null).map((item) => item.date);
+  if (fewEntries.length) out.push(`${upperFirst(dateList(fewEntries))} ${fewEntries.length === 1 ? "has" : "have"} too few entries to stand for a whole day, so ${fewEntries.length === 1 ? "it is" : "they are"} left out of the averages.`);
+  if (partOfDay.length) out.push(`Only part of a usual day was recorded on ${dateList(partOfDay)}, so ${partOfDay.length === 1 ? "it is" : "they are"} left out of the averages.`);
   return out;
 }
 
@@ -1375,9 +1385,9 @@ function aheadModule({ synthesis, facts, steps, discriminators, period, energy, 
     const reusedOnly = kinds.size > 0 && [...kinds].every((kind) => kind === "duplicate_source_evidence");
     const value = intakeStep ? upperFirst(intakeStep.text)
       : offTarget ? `Bring intake ${energy.intakeState === "above_plan" ? "back down" : "up"} to the target`
-        : reusedOnly ? "Send each day's own log" : "Log complete days";
+        : reusedOnly ? "Keep one record per day" : "Log complete days";
     const text = [intakeStep ? monthTip(intakeStep, facts) : offTarget ? "Hit the target on most days rather than making up for it on one." : null,
-      unreadable ? (reusedOnly ? `A fresh record for each day keeps ${next}'s intake accurate.` : `A complete log every day makes intake the easiest part of ${next} to judge.`) : null]
+      unreadable ? (reusedOnly ? `A separate record for each day keeps ${next}'s intake accurate.` : `A complete log every day makes intake the easiest part of ${next} to judge.`) : null]
       .filter(Boolean).join(" ");
     items.push({ label: "Calories", tone: "energy", value, text });
   }

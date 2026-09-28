@@ -95,6 +95,14 @@ describe("nutrition reliability: completeness, never normality", () => {
     expect(generic.excluded(6)).toEqual([]);
   });
 
+  it("one shared file, or a partial overlap, is not proof of reuse", () => {
+    const single = run({ 5: { evidence: { artifacts: ["IMG_3001.png"] } }, 6: { evidence: { artifacts: ["IMG_3001.png"] } } });
+    expect(single.excluded(6)).toEqual([]);
+    const partial = run({ 5: { evidence: { artifacts: ["IMG_3001.png", "IMG_3002.png", "IMG_3003.png"] } },
+      6: { evidence: { artifacts: ["IMG_3002.png", "IMG_3003.png", "IMG_3010.png"] } } });
+    expect(partial.excluded(6)).toEqual([]);
+  });
+
   it("a source's partial-day marker is left out on completeness", () => {
     const { excluded } = run({ 5: { calories: 1200, completeness: "partial", evidence: { fullDayAsserted: false } } });
     expect(excluded(5)).toEqual(["partial_day"]);

@@ -38,19 +38,19 @@ const OUTCOME_DIRECTION_SUMMARY = Object.freeze({
 });
 
 const FEASIBILITY_SUMMARY = Object.freeze({
-  unproven: "Feasibility has not been demonstrated yet — no authoritative measurement has shown the required rate is achievable.",
+  unproven: "Feasibility has not been demonstrated yet — no authoritative reading has shown the required rate is achievable.",
   weakly_supported: "Feasibility is only weakly supported — the required rate has not been clearly demonstrated.",
-  demonstrated: "Feasibility has been demonstrated — an authoritative measurement showed progress consistent with the required rate.",
-  strongly_demonstrated: "Feasibility is strongly demonstrated — an authoritative measurement showed progress ahead of the required rate, with the guardrail respected.",
-  contradicted: "Feasibility is currently contradicted — the most recent authoritative measurement moved against the Goal or breached a guardrail.",
+  demonstrated: "Feasibility has been demonstrated — an authoritative reading showed progress consistent with the required rate.",
+  strongly_demonstrated: "Feasibility is strongly demonstrated — an authoritative reading showed progress ahead of the required rate, with the guardrail respected.",
+  contradicted: "Feasibility is currently contradicted — the most recent authoritative reading moved against the Goal or breached a guardrail.",
 });
 
 const PERSISTENCE_SUMMARY = Object.freeze({
   unestablished: "There is not yet a comparable interval to judge persistence from.",
   single_observation: "This is the first time this favorable direction has been observed — persistence is not yet established.",
-  confirmed_repeat: "This favorable direction has now been confirmed by a second measurement.",
-  sustained_repeat: "This favorable direction has been sustained across multiple measurements.",
-  contradicted: "A contradicting measurement is present, resetting persistence for future favorable measurements.",
+  confirmed_repeat: "This favorable direction has now been confirmed by a second reading.",
+  sustained_repeat: "This favorable direction has been sustained across multiple readings.",
+  contradicted: "A contradicting reading is present, resetting persistence for future favorable readings.",
 });
 
 // Word choice here is load-bearing, not stylistic: `increased`/`decreased`
@@ -192,10 +192,10 @@ function buildLimitingFactors({ interpretation, eligibility }) {
 }
 
 const UNCERTAINTY_TEXT = Object.freeze({
-  single_observation_of_favorable_direction: "This favorable measurement is a single observation — persistence has not yet been confirmed by a second interval.",
-  biological_persistence_unproven: "Because this is a single high-authority measurement, the underlying biological trend still needs to be confirmed rather than assumed.",
-  awaiting_sustained_confirmation: "A second confirming measurement has been seen, but sustained confirmation (a third) has not.",
-  contradicting_reading_present: "A measurement contradicting the favorable direction is present in the evidence history.",
+  single_observation_of_favorable_direction: "This favorable reading is a single observation — persistence has not yet been confirmed by a second interval.",
+  biological_persistence_unproven: "Because this is a single high-authority reading, the underlying biological trend still needs to be confirmed rather than assumed.",
+  awaiting_sustained_confirmation: "A second confirming reading has been seen, but sustained confirmation (a third) has not.",
+  contradicting_reading_present: "A reading contradicting the favorable direction is present in the evidence history.",
   required_rate_not_yet_demonstrated: "The rate of progress required to achieve the Goal has not yet been clearly demonstrated.",
   no_deadline_pace_unavailable: "This Goal has no deadline, so pace-vs-deadline cannot be assessed — only raw progress magnitude.",
   guardrail_state_unknown: "At least one guardrail's position could not be assessed from available evidence.",
@@ -219,14 +219,14 @@ function buildOperatingPlanImplications({ interpretation, eligibility }) {
     implications.push(Object.freeze({
       key: "next_decisive_evidence",
       evidenceType: interpretation.nextDecisiveEvidence.evidenceType,
-      text: `The next decisive evidence would be another ${interpretation.nextDecisiveEvidence.evidenceType} measurement — ${interpretation.nextDecisiveEvidence.reason}.`,
+      text: `The next decisive evidence would be another ${interpretation.nextDecisiveEvidence.evidenceType} reading — ${interpretation.nextDecisiveEvidence.reason}.`,
     }));
   }
   for (const missing of eligibility?.missingEvidence ?? []) {
     implications.push(Object.freeze({
       key: `collect_${missing.domain}`,
       evidenceType: missing.domain,
-      text: `No ${missing.domain} evidence is eligible yet — the Operating Plan's ${missing.domain} cadence has not produced a usable measurement.`,
+      text: `No ${missing.domain} evidence is eligible yet — the Operating Plan's ${missing.domain} cadence has not produced a usable reading.`,
     }));
   }
   return implications.length ? Object.freeze(implications) : Object.freeze([]);

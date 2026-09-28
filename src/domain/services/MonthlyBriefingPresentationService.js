@@ -68,8 +68,7 @@ export function phaseLabelOf(goal, activePhase) {
     ? phases.sort((left, right) => left.order - right.order)
     : phases.sort((left, right) => String(left.startDate ?? "").localeCompare(String(right.startDate ?? "")));
   const index = ordered.findIndex((phase) => phase.id === activePhase.id);
-  const position = Number.isInteger(activePhase.order) ? activePhase.order + 1 : index >= 0 ? index + 1 : null;
-  return position ? `${activePhase.name} · Phase ${position}` : activePhase.name;
+  return index >= 0 ? `${activePhase.name} · Phase ${index + 1}` : activePhase.name;
 }
 
 function energyRecords(fixture, window = fixture.previewWindow) {

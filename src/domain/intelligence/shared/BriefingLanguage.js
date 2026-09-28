@@ -11,12 +11,15 @@ export const ANALYTICAL_READ_JARGON = new RegExp([
   "\\b(?:easy|hard|harder|easier|difficult) to read\\b",
   "\\b(?:complete|clean) enough to read\\b",
   "\\btoo (?:patchy|incomplete|sparse) to read\\b",
-  "\\bread (?:on|the (?:weekly|balance|scale|trend)|intake|cleanly|as directional|together)\\b",
-  "\\bbe read\\b",
+  "\\bread on (?:progress|how|your|the (?:week|month|trend|goal|change|cut|build))\\b",
+  "\\bread (?:the (?:weekly|balance|trend)|intake|cleanly|as directional|together)\\b",
+  "\\bbe read (?:together|cleanly|alongside|as)\\b",
+  "\\breads? (?:as|like)\\b",
+  "\\bclear(?:er|est)? reading\\b",
   "\\b(?:un)?readable days?\\b",
   "\\bthe read (?:is|was)\\b",
   "\\breads? (?:tighter|cleaner|leaner|sharper|flatter|stronger|softer|smaller|larger|bigger|wider|more|less|a (?:little|bit)|slightly|modestly|maintained|athletic)\\b",
-  "\\b(?:its|the|this|that) read\\b",
+  "\\b(?:its|this) read\\b(?! \\d)",
 ].join("|"), "iu");
 
 export function findAnalyticalReadJargon(text) {

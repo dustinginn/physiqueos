@@ -320,10 +320,13 @@ function assessNutrition({ goalFacts, windowDays, reliability, anomalies = [], i
     reliableProteinAverage: reliable.length ? round(mean(reliable.map((day) => day.nutrition.protein).filter(Number.isFinite)), 0) : null,
     // Why each excluded day could not be used (completeness evidence only).
     exclusions: reliability.filter((item) => item.domain === "nutrition")
-      .map((item) => ({ date: item.date, kind: item.kind, sameSourceAs: item.evidence?.sameSourceAs ?? null }))
+      .map((item) => ({ date: item.date, kind: item.kind, sameSourceAs: item.evidence?.sameSourceAs ?? null,
+        entries: item.evidence?.entries ?? null }))
       .sort((left, right) => left.date.localeCompare(right.date)),
     // Unusual days on usable records: behavior, kept in every average.
     lowProteinDates: [...new Set(anomalies.filter((item) => item.domain === "nutrition" && item.kind === "low_protein").map((item) => item.date))].sort(),
+    lowProteinIntakes: anomalies.filter((item) => item.domain === "nutrition" && item.kind === "low_protein")
+      .map((item) => windowDays.find((day) => day.date === item.date)?.nutrition?.calories ?? null),
     repeatedDates: [...new Set(anomalies.filter((item) => item.domain === "nutrition" && item.kind === "repeated_day_totals").map((item) => item.date))].sort(),
     // Intake over the usable days only: the one intake figure a briefing
     // may state when some days cannot be used.
