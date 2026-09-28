@@ -5,25 +5,30 @@ import { describe, expect, it } from "vitest";
 import { buildEvidencePicture } from "./BriefingEvidencePicture.js";
 import { synthesizeBriefing } from "./BriefingHolisticSynthesis.js";
 import { BRIEFING_INTELLIGENCE_POLICIES, resolveNarrativeBudget } from "./BriefingIntelligencePolicies.js";
-import { goalFactsFromInterpretationV3, realizeHolisticWeeklyV3 } from "../v3/HolisticNarrativeV3.js";
+import { resolveGoalEvidencePolicy } from "./GoalEvidencePolicies.js";
+import { goalFactsFromInterpretationV3, realizeHolisticWeeklyV3, WEEKLY_REALIZABLE_KINDS } from "../v3/HolisticNarrativeV3.js";
 import { findNarrativeV3VoiceViolations } from "../v3/NarrativeV3CompositionService.js";
-import { HOLISTIC_KINDS, holisticScenario } from "../../../testSupport/briefingHolisticSynthetic.js";
+import { HOLISTIC_GOAL_TYPES, HOLISTIC_KINDS, holisticScenario } from "../../../testSupport/briefingHolisticSynthetic.js";
 
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const ANALYST_TERMS = /\b(?:anchor\w*|directional\w*|evidence|robust|materiality|reliab\w*|anomal\w*|deviation\w*|baseline|signal\w*|z-?scores?|causal\w*)\b/iu;
 
-function run({ seed, kind, cadence = "weekly" }) {
-  const scenario = holisticScenario({ seed, kind, cadence });
+function run({ seed, kind, cadence = "weekly", goalType = "build_lean_mass", budgetOverride = null }) {
+  const scenario = holisticScenario({ seed, kind, cadence, goalType });
   const picture = buildEvidencePicture({ intelligence: scenario.intelligence, goalPolicy: scenario.goalPolicy,
     goalFacts: scenario.goalFacts });
-  const budget = resolveNarrativeBudget(scenario.policy, picture);
-  const synthesis = synthesizeBriefing({ picture, budget });
+  const budget = budgetOverride ?? resolveNarrativeBudget(scenario.policy, picture);
+  const synthesis = synthesizeBriefing({ picture, budget,
+    realizableKinds: cadence === "weekly" ? WEEKLY_REALIZABLE_KINDS : null });
   const realized = cadence === "weekly"
     ? realizeHolisticWeeklyV3({ synthesis, picture, goalLabel: "the goal", goalPolicy: scenario.goalPolicy }) : null;
   return { scenario, picture, budget, synthesis, realized };
 }
 
-const weekly = HOLISTIC_KINDS.flatMap((kind) => SEEDS.map((seed) => ({ kind, seed, ...run({ seed, kind }) })));
+// Every situation under every goal type: wording rules must hold whichever
+// way the goal wants the scale to move.
+const weekly = HOLISTIC_GOAL_TYPES.flatMap((goalType) => HOLISTIC_KINDS.flatMap((kind) =>
+  SEEDS.map((seed) => ({ kind, seed, goalType, ...run({ seed, kind, goalType }) }))));
 const textOf = (realized) => realized ? [realized.result, realized.meaning, realized.action, realized.watch,
   realized.coachTake, realized.confidenceBody].filter(Boolean).join(" ") : "";
 const byKind = (kind) => weekly.filter((item) => item.kind === kind);
@@ -38,9 +43,11 @@ describe("every goal-relevant domain is assessed before synthesis", () => {
     }
   });
 
-  it("weight is always assessed for a mass goal when there are enough weigh-ins", () => {
+  it("weight is always assessed for a weight-relevant goal when there are enough weigh-ins", () => {
     for (const { kind, seed, picture } of weekly.filter((item) => item.kind !== "sparse")) {
       const trajectory = picture.domains.find((item) => item.domain === "body_trajectory");
+      // A disrupted stretch without weigh-ins can leave the window itself too thin.
+      if (trajectory.status === "insufficient" && trajectory.facts.windowWeighIns < 3) continue;
       expect(trajectory.status, `${kind}#${seed}`).toBe("assessed");
       expect(trajectory.facts.note).toBe("scale_weight_does_not_identify_lean_or_fat_mass");
     }
@@ -155,7 +162,9 @@ describe("Goal Confidence, strategy and restraint", () => {
 
   it("a real risk is never told as fitting the plan", () => {
     for (const kind of ["weight_rapid_guardrail", "weight_dexa_conflict"]) {
-      for (const { seed, synthesis, realized } of byKind(kind)) {
+      // A maintenance goal has no wrong direction; its drift is only "quick".
+      for (const { seed, synthesis, realized } of byKind(kind).filter((item) => item.kind === "weight_rapid_guardrail" ||
+          item.goalType !== "maintain")) {
         expect(synthesis.selected.some((item) => item.role === "risk"), `${kind}#${seed}`).toBe(true);
         expect(realized.meaning).not.toMatch(/fits the plan/u);
       }
@@ -176,12 +185,16 @@ describe("Goal Confidence, strategy and restraint", () => {
 });
 
 describe("information budgets scale with each briefing's horizon and purpose", () => {
-  it("budgets are ordered Midweek < Weekly < Monthly, and the same picture yields more under a larger budget", () => {
+  it("budgets are ordered Midweek < Weekly < Monthly, and the same picture yields more under a larger allowance", () => {
     const { midweek, weekly: week, monthly } = BRIEFING_INTELLIGENCE_POLICIES;
     expect(midweek.narrative.maxInsights).toBeLessThan(week.narrative.maxInsights);
     expect(week.narrative.maxInsights).toBeLessThan(monthly.narrative.maxInsights);
+    // Allowance alone (Monthly's persistence and Midweek's partial-window
+    // semantics are tested separately).
+    const allowance = ({ narrative }) => ({ maxInsights: narrative.maxInsights, maxLimitations: narrative.maxLimitations,
+      floor: narrative.floor, heroInsights: narrative.heroInsights });
     for (const { picture } of byKind("crowded")) {
-      const count = (policy) => synthesizeBriefing({ picture, budget: resolveNarrativeBudget(policy, picture) }).selected.length;
+      const count = (policy) => synthesizeBriefing({ picture, budget: allowance(policy) }).selected.length;
       expect(count(midweek)).toBeLessThanOrEqual(count(week));
       expect(count(week)).toBeLessThanOrEqual(count(monthly));
     }
@@ -214,12 +227,18 @@ describe("information budgets scale with each briefing's horizon and purpose", (
     }
   });
 
-  it("Photo depth grows with the strength of the outcome, not a fixed length", () => {
-    const withOutcome = run({ seed: 2, kind: "strong_training", cadence: "photo" });
+  it("Photo depth grows with how much the photos changed, not with a DEXA or a fixed length", () => {
     const policy = BRIEFING_INTELLIGENCE_POLICIES.photo;
-    expect(withOutcome.budget.maxInsights).toBe(policy.narrative.maxInsights + policy.narrative.scaleWithOutcome.extraInsights);
-    const noOutcome = run({ seed: 2, kind: "weight_rising_no_dexa", cadence: "photo" });
-    expect(noOutcome.budget.maxInsights).toBe(policy.narrative.maxInsights);
+    expect(policy.narrative.scaleWithOutcome.domain).toBe("visual_change");
+    const visible = run({ seed: 2, kind: "strong_training", cadence: "photo" });
+    expect(visible.scenario.goalFacts.visual.change).toBe("visible");
+    expect(visible.budget.maxInsights).toBe(policy.narrative.maxInsights + policy.narrative.scaleWithOutcome.extraInsights);
+    // A fresh DEXA with only a subtle photo change does not deepen a Photo briefing.
+    const subtle = run({ seed: 2, kind: "disruption_training_stable_weight", cadence: "photo" });
+    expect(subtle.scenario.goalFacts.composition.measuredAt).toBe(subtle.scenario.window.endDate);
+    expect(subtle.budget.maxInsights).toBe(policy.narrative.maxInsights);
+    const noPhotos = run({ seed: 2, kind: "weight_rising_no_dexa", cadence: "photo" });
+    expect(noPhotos.budget.maxInsights).toBe(policy.narrative.maxInsights);
   });
 
   it("sparse evidence degrades gracefully: domains are insufficient, never invented", () => {
@@ -247,3 +266,234 @@ describe("training milestones are real bests in the period", () => {
   });
 });
 
+
+describe("goal-relative wording follows the goal's direction and the evidence's polarity", () => {
+  const weightOf = (picture) => picture.domains.find((item) => item.domain === "body_trajectory")?.insights?.[0];
+  const UP = /\b(?:climbing|edging up|creeping up|climb|rise|gain)\b/u;
+  const DOWN = /\b(?:dropping|easing down|drifting down|drop|loss)\b/u;
+
+  it("never says 'plan' about the scale, the outcome, Confidence or Watch; the plan's target appears only as an action", () => {
+    for (const { kind, seed, goalType, realized } of weekly) {
+      if (!realized) continue;
+      for (const text of [realized.result, realized.meaning, realized.watch, realized.confidenceBody ?? ""]) {
+        expect(text, `${goalType}/${kind}#${seed}`).not.toMatch(/\bplan(?:ned)?\b/u);
+      }
+      expect(realized.meaning).not.toMatch(/\bexpected\b|\bfits\b/u);
+    }
+  });
+
+  it("every direction word matches the scale's actual movement, in every section", () => {
+    for (const { kind, seed, goalType, picture, synthesis, realized } of weekly) {
+      const weight = weightOf(picture);
+      if (!realized || !weight || !synthesis.selected.some((item) => item.kind === "weight_trend")) continue;
+      const label = `${goalType}/${kind}#${seed}`;
+      const clause = /your weight [^,.]*/iu.exec(`${realized.result} ${realized.coachTake}`)?.[0] ?? "";
+      if (weight.facts.movement === "up") expect(clause, label).not.toMatch(DOWN);
+      if (weight.facts.movement === "down") expect(clause, label).not.toMatch(UP);
+      if (weight.facts.movement === "flat") expect(clause, label).toMatch(/held steady|a little quickly|fast/u);
+      if (/how much of this gain/u.test(realized.meaning)) expect(weight.facts.movement, label).toBe("up");
+      if (/how much of this loss/u.test(realized.meaning)) expect(weight.facts.movement, label).toBe("down");
+      if (/steadier climb/u.test(realized.watch)) expect(weight.facts.movement, label).toBe("up");
+      if (/steadier drop/u.test(realized.watch)) expect(weight.facts.movement, label).toBe("down");
+      if (/(?:drop|rise|climb) in weight/u.test(realized.confidenceBody ?? "")) {
+        expect(/drop in weight/u.test(realized.confidenceBody) ? "down" : "up", label).toBe(weight.facts.movement);
+      }
+    }
+  });
+
+  it("a wrong-way or too-fast trend is never read as ordinary progress, and never endorsed", () => {
+    for (const { kind, seed, goalType, synthesis, realized } of weekly) {
+      const risk = synthesis.selected.find((item) => item.role === "risk");
+      if (!risk || !realized) continue;
+      const label = `${goalType}/${kind}#${seed}`;
+      expect(realized.meaning, label).not.toMatch(/can't say how much of this (?:gain|loss)|nothing this week points away/u);
+      expect(realized.coachTake, label).not.toMatch(/Keep doing what has been working/u);
+      if (risk.kind === "weight_trend") {
+        expect(realized.action, label).toMatch(/intake (?:at|reaches) the plan's target/u);
+        // The action follows the scale: a rising trend is held, a falling one is fed.
+        expect(realized.action).toMatch(risk.facts.movement === "up" ? /rather than above it/u : /reaches the plan's target/u);
+        expect(realized.action).toMatch(/Otherwise keep the current setup/u);
+      }
+    }
+  });
+
+  it("a too-fast trend puts the guardrail in question; a wrong-way trend puts the outcome in question", () => {
+    for (const { kind, seed, goalType, scenario, synthesis, realized } of weekly) {
+      const risk = synthesis.selected.find((item) => item.kind === "weight_trend" && item.role === "risk");
+      if (!risk || !realized || !scenario.goalFacts.composition) continue;
+      const label = `${goalType}/${kind}#${seed}`;
+      if (risk.facts.verdict === "rapid") expect(realized.meaning, label).toContain(`whether ${scenario.goalFacts.guardrail.label} is holding`);
+      if (risk.facts.verdict === "wrong_direction") {
+        expect(realized.meaning, label).toContain(`whether ${scenario.goalFacts.composition.label} is still moving the right way`);
+      }
+    }
+  });
+
+  it("the wrong-direction case is covered for every directional goal", () => {
+    for (const goalType of ["build_lean_mass", "gain_weight", "lose_fat"]) {
+      const cases = weekly.filter((item) => item.goalType === goalType && item.kind === "weight_dexa_conflict");
+      expect(cases.some((item) => item.synthesis.selected.some((insight) => insight.facts?.verdict === "wrong_direction")),
+        goalType).toBe(true);
+    }
+  });
+
+  it("a recent result that went the wrong way is a risk the week is read against, never background", () => {
+    for (const { kind, seed, goalType, picture, synthesis, realized } of weekly.filter((item) => item.kind === "composition_regressed")) {
+      const label = `${goalType}/${kind}#${seed}`;
+      const composition = picture.domains.find((item) => item.domain === "body_composition").insights[0];
+      expect(composition.role, label).toBe("risk");
+      expect(synthesis.selected.some((item) => item.id === composition.id), label).toBe(true);
+      expect(realized.meaning).toMatch(/has turned back/u);
+      expect(realized.meaning).not.toMatch(/nothing this week points away/u);
+    }
+  });
+
+  it("the scale's pace always names the span it was measured over", () => {
+    for (const { kind, seed, goalType, picture, realized } of weekly) {
+      const weight = weightOf(picture);
+      if (!realized || !weight) continue;
+      expect(weight.facts.rateSpanDays).toBe(28);
+      for (const match of `${realized.result} ${realized.coachTake}`.matchAll(/lb a week[^,.;]*/gu)) {
+        expect(match[0], `${goalType}/${kind}#${seed}`).toBe("lb a week over the last four weeks");
+      }
+    }
+  });
+
+  it("body-weight goals resolve to their own direction, never to a goal with no weight expectation", () => {
+    const contract = (id, direction, mode) => ({ objectives: [{ metricCapability: { id }, evaluation: { direction, mode } }] });
+    expect(resolveGoalEvidencePolicy(contract("body_composition.lean_mass", "increase")).goalType).toBe("build_lean_mass");
+    expect(resolveGoalEvidencePolicy(contract("body.weight", "increase")).goalType).toBe("gain_weight");
+    expect(resolveGoalEvidencePolicy(contract("body.weight", "increase")).weightExpectation.direction).toBe("up");
+    expect(resolveGoalEvidencePolicy(contract("body.weight", "decrease")).goalType).toBe("lose_fat");
+    expect(resolveGoalEvidencePolicy(contract("body.weight", null, "maintain_range")).goalType).toBe("maintain");
+    expect(resolveGoalEvidencePolicy(contract("body_composition.body_fat_percentage", "decrease")).goalType).toBe("lose_fat");
+    expect(resolveGoalEvidencePolicy(contract("performance.vo2max", "increase")).goalType).toBe("general");
+  });
+});
+
+describe("routine and training rhythm are told as they happened", () => {
+  it("routine breaks are reliably present in disrupted situations, so these properties are exercised", () => {
+    for (const kind of ["disruption_training_stable_weight", "crowded"]) {
+      const cases = weekly.filter((item) => item.kind === kind);
+      const withBreak = cases.filter((item) => item.synthesis.selected.some((insight) => insight.kind === "routine_break"));
+      expect(withBreak.length / cases.length, kind).toBeGreaterThanOrEqual(0.9);
+    }
+  });
+
+  it("the quiet-day count, its position and the Watch weekdays come from the break itself", () => {
+    const position = { late: "late in the week", early: "early in the week", middle: "midweek", whole: "for most of the week" };
+    const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    for (const { kind, seed, goalType, synthesis, realized } of weekly) {
+      const routine = synthesis.selected.find((item) => item.kind === "routine_break");
+      if (!routine || !realized) continue;
+      const label = `${goalType}/${kind}#${seed}`;
+      const f = routine.facts;
+      if (realized.result.includes("routine")) expect(realized.result, label).toContain(position[f.position]);
+      const quiet = /(\w+) quiet days? (?:don't|doesn't)/u.exec(realized.meaning);
+      if (quiet) {
+        expect(f.direction, label).toBe("break");
+        const words = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+        expect(words.indexOf(quiet[1].toLowerCase()), label).toBe(f.extentDays);
+      }
+      if (f.direction !== "break") expect(`${realized.meaning} ${realized.coachTake}`, label).not.toMatch(/\bquiet\b/u);
+      expect(realized.watch).not.toMatch(/next weekend/u);
+      const training = f.missed?.find((gap) => gap.domain === "training")?.dates ?? [];
+      for (const day of WEEKDAYS.filter((name) => realized.watch.includes(name))) {
+        expect(training.map((date) => WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()]), label).toContain(day);
+      }
+      expect(realized.coachTake).not.toMatch(/looks a lot like/u);
+    }
+  });
+
+  it("a fully missed training week is said and acted on, never dropped as 'insufficient'", () => {
+    for (const { seed, goalType, picture, synthesis, realized } of weekly.filter((item) => item.kind === "missed_week")) {
+      const label = `${goalType}#${seed}`;
+      const training = picture.domains.find((item) => item.domain === "training");
+      expect(training.status, label).toBe("assessed");
+      expect(training.state).toBe("missed");
+      const told = synthesis.selected.find((item) => item.kind === "training_frequency") ??
+        synthesis.selected.find((item) => item.kind === "routine_break");
+      expect(told, label).toBeTruthy();
+      expect(realized.action).toMatch(/training rhythm/u);
+    }
+  });
+});
+
+describe("reliability restraint and extensibility", () => {
+  it("one unreliable day already restrains the intake verdict, and is said only when that verdict mattered", () => {
+    for (const { seed, goalType, picture, synthesis, realized } of weekly.filter((item) => item.kind === "single_unreliable_day")) {
+      const label = `${goalType}#${seed}`;
+      const nutrition = picture.domains.find((item) => item.domain === "nutrition");
+      if (!nutrition.facts.unreliableDates?.length) continue;
+      expect(synthesis.omitted.find((item) => item.id === "nutrition|intake_vs_plan")?.reason, label)
+        .toBe("restrained:unreliable_days_in_average");
+      // The restrained verdict was on plan — nothing that would have been said.
+      expect(synthesis.limitations.length, label).toBe(0);
+      expect(realized.coachTake).not.toMatch(/patchy|copied/u);
+    }
+  });
+
+  it("an insight the briefing cannot phrase (a future Sleep finding) never takes a slot", () => {
+    for (const { seed, goalType, picture } of weekly.filter((item) => item.kind === "stable_all")) {
+      const withSleep = { ...picture, domains: picture.domains.map((domain) => domain.domain !== "recovery" ? domain : {
+        ...domain, status: "assessed", state: "short_sleep", insights: [{ id: "recovery|sleep_shortfall", domain: "recovery",
+          kind: "sleep_shortfall", role: "execution", polarity: "concern", strength: 3.5, facts: {} }] }) };
+      const budget = resolveNarrativeBudget(BRIEFING_INTELLIGENCE_POLICIES.weekly, withSleep);
+      const unaware = synthesizeBriefing({ picture: withSleep, budget });
+      expect(unaware.selected.some((item) => item.kind === "sleep_shortfall"), `${goalType}#${seed}`).toBe(true);
+      const synthesis = synthesizeBriefing({ picture: withSleep, budget, realizableKinds: WEEKLY_REALIZABLE_KINDS });
+      expect(synthesis.selected.some((item) => item.kind === "sleep_shortfall")).toBe(false);
+      expect(synthesis.omitted.find((item) => item.id === "recovery|sleep_shortfall")?.reason).toBe("no_realization_for_kind");
+    }
+  });
+
+  it("every selected Weekly insight has its own phrase", () => {
+    for (const { kind, seed, goalType, synthesis } of weekly) {
+      for (const item of synthesis.selected) expect(WEEKLY_REALIZABLE_KINDS.has(item.kind), `${goalType}/${kind}#${seed}`).toBe(true);
+    }
+  });
+});
+
+describe("briefing budgets are semantic, not word counts", () => {
+  it("Midweek cannot conclude a complete-week finding and speaks of what is emerging so far", () => {
+    for (const seed of SEEDS) {
+      const { synthesis } = run({ seed, kind: "missed_week", cadence: "midweek" });
+      expect(synthesis.partialWindow).toBe(true);
+      expect(synthesis.selected.some((item) => item.kind === "training_frequency" && item.requiresCompleteWindow), `seed ${seed}`).toBe(false);
+      if (synthesis.omitted.some((item) => item.kind === "training_frequency")) {
+        expect(synthesis.omitted.find((item) => item.kind === "training_frequency").reason).toBe("partial_window_cannot_conclude");
+      }
+      for (const item of synthesis.selected) expect(item.tense).toBe("so_far");
+    }
+  });
+
+  it("Monthly labels persistence and favors what held across the month over a one-off stretch", () => {
+    for (const seed of SEEDS) {
+      const { synthesis } = run({ seed, kind: "disruption_training_stable_weight", cadence: "monthly" });
+      for (const item of synthesis.selected) expect(["persistent", "sustained", "one_off"]).toContain(item.temporal);
+      // The late three-to-four-day disruption is a one-off inside a month and
+      // is worth less there than the same stretch would be without the
+      // persistence rule.
+      const { narrative } = BRIEFING_INTELLIGENCE_POLICIES.monthly;
+      const plain = run({ seed, kind: "disruption_training_stable_weight", cadence: "monthly",
+        budgetOverride: { ...narrative, persistence: false } }).synthesis;
+      const find = (result) => [...result.selected, ...result.omitted].find((item) => item.kind === "routine_break");
+      const routine = find(synthesis);
+      expect(routine, `seed ${seed}`).toBeTruthy();
+      expect(synthesis.selected.find((item) => item.kind === "routine_break")?.temporal ?? "one_off").toBe("one_off");
+      expect(routine.value).toBeLessThan(find(plain).value);
+      // Trends by nature (training bests, the scale's multi-week pace) are sustained.
+      for (const item of synthesis.selected.filter((entry) => ["training_progress", "weight_trend"].includes(entry.kind))) {
+        expect(item.temporal).toBe("sustained");
+      }
+    }
+  });
+
+  it("DEXA leads with its outcome even beside a strong risk elsewhere", () => {
+    for (const seed of SEEDS) {
+      const { synthesis } = run({ seed, kind: "weight_rapid_guardrail", cadence: "dexa" });
+      expect(synthesis.lead?.domain, `seed ${seed}`).toBe("body_composition");
+      expect(synthesis.selected[0].reason).toBe("briefing_lead_domain");
+    }
+  });
+});

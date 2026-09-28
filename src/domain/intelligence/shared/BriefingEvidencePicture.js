@@ -38,7 +38,13 @@ export const DOMAIN_ASSESSORS = Object.freeze({
   [D.ACTIVITY]: assessActivity,
   [D.ROUTINE]: assessRoutine,
   [D.RECOVERY]: assessRecovery,
+  [D.VISUAL]: assessVisualChange,
 });
+
+// Scale-trend rate is fit over a fixed recent span (ending with the period),
+// so a Weekly and a Monthly describe the same "recent pace" and the prose can
+// name the span it covers.
+export const WEIGHT_RATE_SPAN_DAYS = 28;
 
 export function buildEvidencePicture({ intelligence, goalPolicy, goalFacts = {} }) {
   const context = pictureContext({ intelligence, goalPolicy, goalFacts });
@@ -75,7 +81,8 @@ function pictureContext({ intelligence, goalPolicy, goalFacts }) {
 // Scale weight: direction, weekly rate, and noise over the recent weeks,
 // compared with what this goal's phase expects. Never read as composition.
 function assessBodyTrajectory({ days, window, goalPolicy }) {
-  const points = days.filter((day) => Number.isFinite(day?.body?.weight))
+  const spanStart = window ? shiftDate(window.endDate, -(WEIGHT_RATE_SPAN_DAYS - 1)) : null;
+  const points = days.filter((day) => Number.isFinite(day?.body?.weight) && (!spanStart || day.date >= spanStart))
     .map((day) => ({ x: daysBetween(days[0].date, day.date), y: day.body.weight, date: day.date }));
   const inWindow = points.filter((point) => window && point.date >= window.startDate);
   if (points.length < 8 || inWindow.length < 3) {
@@ -93,6 +100,7 @@ function assessBodyTrajectory({ days, window, goalPolicy }) {
   const verdict = weightVerdict(weeklyRate, expectation, residual);
   const facts = { weeklyRate, windowAverage, priorWeekAverage: priorAverage, volatility: round(residual, 2),
     weighIns: points.length, spanDays: daysBetween(points[0].date, points.at(-1).date) + 1,
+    rateSpanDays: WEIGHT_RATE_SPAN_DAYS, movement: weeklyRate > 0.1 ? "up" : weeklyRate < -0.1 ? "down" : "flat",
     expectedDirection: expectation?.direction ?? null, verdict,
     note: "scale_weight_does_not_identify_lean_or_fat_mass" };
   const risk = ["rapid", "wrong_direction"].includes(verdict);
@@ -134,9 +142,14 @@ function assessBodyComposition({ goalFacts, window }) {
     ["regressed", "outside_target"].includes(composition.state) ? "concern" : "neutral";
   // A new scan leads the period; a recent one is the context everything else
   // is read against; an old one fades.
-  const strength = fresh ? 3.2 : ageDays <= 45 ? 1.3 : 0.5;
+  // A recent result that went the wrong way is not background: it is a risk
+  // the period is read against.
+  const current = fresh || ageDays <= 45;
+  const concern = polarity === "concern" && current;
+  const strength = fresh ? (concern ? 3.4 : 3.2) : concern ? 2.2 : ageDays <= 45 ? 1.3 : 0.5;
+  const role = concern ? InsightRole.RISK : fresh ? InsightRole.OUTCOME : InsightRole.CONTEXT;
   return assessed(D.BODY_COMPOSITION, fresh ? "new_measurement" : "standing_measurement", polarity, facts, [
-    insight(D.BODY_COMPOSITION, "composition_result", fresh ? InsightRole.OUTCOME : InsightRole.CONTEXT, polarity, strength, facts),
+    insight(D.BODY_COMPOSITION, "composition_result", role, polarity, strength, facts),
   ]);
 }
 
@@ -175,14 +188,29 @@ function assessTraining({ goalFacts, windowDays, patterns, intelligence }) {
       Math.min(2.6, 1.3 + 0.35 * milestones.length), { milestoneCount: milestones.length, example: milestones[0],
         others: milestones.slice(1, 3) }));
   }
+  // Rhythm: a frequency change, a run of missed sessions, or no training at
+  // all where the routine expects it. A routine shift spanning training tells
+  // the same thing; synthesis lets it cover this one rather than dropping
+  // rhythm here.
   const frequency = gaps.find((item) => item.kind === BriefingPatternKind.FREQUENCY_CHANGE);
-  if (frequency && !gaps.some((item) => item.kind === BriefingPatternKind.ROUTINE_GAP)) {
+  const gap = gaps.filter((item) => item.kind === BriefingPatternKind.ROUTINE_GAP)
+    .sort((left, right) => right.materiality - left.materiality)[0];
+  const missedWholePeriod = !trainingDays && usualDays != null && usualDays >= 1;
+  if (missedWholePeriod) {
+    insights.push(insight(D.TRAINING, "training_frequency", InsightRole.EXECUTION, "concern",
+      Math.min(2.6, 1.2 + 0.4 * usualDays), { observed: 0, expected: usualDays, direction: "below", missedAll: true,
+        extentDays: windowDays.length }, { requiresCompleteWindow: true }));
+  } else if (frequency) {
     insights.push(insight(D.TRAINING, "training_frequency", InsightRole.EXECUTION,
       frequency.direction === "below" ? "concern" : "neutral", Math.min(2.4, frequency.materiality / 1.4),
-      { observed: frequency.magnitude.observed, expected: frequency.magnitude.expected, direction: frequency.direction }));
+      { observed: frequency.magnitude.observed, expected: frequency.magnitude.expected, direction: frequency.direction,
+        extentDays: windowDays.length }, { requiresCompleteWindow: true }));
+  } else if (gap) {
+    insights.push(insight(D.TRAINING, "training_frequency", InsightRole.EXECUTION, "concern",
+      Math.min(2.2, gap.materiality / 1.4), { direction: "below", missedDates: gap.dates, extentDays: gap.dates.length }));
   }
-  if (!trainingDays && !milestones.length) return insufficient(D.TRAINING, "no_training_recorded", facts);
-  const state = milestones.length ? "progressing" : gaps.length ? "interrupted" : "steady";
+  if (!trainingDays && !milestones.length && !insights.length) return insufficient(D.TRAINING, "no_training_recorded", facts);
+  const state = missedWholePeriod ? "missed" : milestones.length ? "progressing" : gaps.length ? "interrupted" : "steady";
   return assessed(D.TRAINING, state, milestones.length ? "supportive" : gaps.length ? "concern" : "neutral", facts, insights);
 }
 
@@ -201,7 +229,9 @@ function assessNutrition({ goalFacts, windowDays, reliability, intelligence }) {
     reliableProteinAverage: reliable.length ? round(mean(reliable.map((day) => day.nutrition.protein).filter(Number.isFinite)), 0) : null,
     usualProtein: proteinBaseline.length ? round(median(proteinBaseline), 0) : null };
   const insights = [];
-  const readable = unreliableDates.length < 2;
+  // The plan-relative intake average is computed upstream over every logged
+  // day, so a single unreliable day already bends it.
+  const readable = unreliableDates.length === 0;
   if (intake?.state) {
     const polarity = intake.state === "on_plan" ? "supportive" : "concern";
     insights.push({ ...insight(D.NUTRITION, "intake_vs_plan", InsightRole.EXECUTION, polarity,
@@ -238,7 +268,7 @@ function assessActivity({ goalFacts, windowDays, patterns }) {
   if (run) {
     insights.push(insight(D.ACTIVITY, "activity_change", InsightRole.EXECUTION,
       run.direction === "below" ? "concern" : "neutral", Math.min(2.0, run.materiality / 1.3),
-      { direction: run.direction, dates: run.dates, patternId: run.id }));
+      { direction: run.direction, dates: run.dates, patternId: run.id, extentDays: run.dates.length }));
   } else if (activity?.state === "on_plan") {
     insights.push(insight(D.ACTIVITY, "activity_on_plan", InsightRole.EXECUTION, "supportive", 0.6, { state: activity.state }));
   }
@@ -257,8 +287,9 @@ function assessRoutine({ characterization, patterns }) {
   const byId = new Map(patterns.map((item) => [item.id, item]));
   const members = (shift.members ?? []).map((id) => byId.get(id)).filter(Boolean);
   const direction = members.every((item) => ["below", "absent"].includes(item.direction)) ? "break" : "change";
+  const affectedDates = [...new Set(members.flatMap((item) => item.dates ?? []))].sort();
   const facts = { span: shift.span, position: shift.position, domains: shift.domains, direction,
-    recurrence: shift.recurrence ?? null,
+    recurrence: shift.recurrence ?? null, affectedDates, extentDays: affectedDates.length,
     missed: members.filter((item) => item.kind === BriefingPatternKind.ROUTINE_GAP)
       .map((item) => ({ domain: item.domain, dates: item.dates })),
     lower: members.filter((item) => item.kind === BriefingPatternKind.VALUE_RUN && item.direction === "below")
@@ -278,6 +309,20 @@ function assessRecovery({ days }) {
   const nights = days.filter((day) => Number.isFinite(day?.recovery?.sleepHours));
   if (!nights.length) return unavailable(D.RECOVERY, "no_recovery_evidence_yet");
   return insufficient(D.RECOVERY, "recovery_assessment_not_yet_defined", { nights: nights.length });
+}
+
+// Visual change from progress photos: its own evidence, scaled by how much
+// actually changed; never a composition measurement.
+function assessVisualChange({ goalFacts, window }) {
+  const visual = goalFacts.visual;
+  if (!visual?.available) return unavailable(D.VISUAL, "no_photo_comparison");
+  const fresh = window && visual.capturedAt >= window.startDate && visual.capturedAt <= window.endDate;
+  const strength = { visible: 3.0, subtle: 1.6, none: 0.8 }[visual.change] ?? 0.8;
+  const facts = { ...visual, newThisPeriod: Boolean(fresh) };
+  return assessed(D.VISUAL, visual.change ?? "compared", "neutral", facts, [
+    insight(D.VISUAL, "visual_change", fresh ? InsightRole.OUTCOME : InsightRole.CONTEXT, "neutral",
+      fresh ? strength : Math.min(strength, 1.0), facts),
+  ]);
 }
 
 // ---------------------------------------------------------------- helpers

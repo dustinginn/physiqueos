@@ -5,7 +5,7 @@ import {
   naturalizeUserFacingNarrativeProjection,
   naturalizeUserFacingNarrativeText,
 } from "../../services/UserFacingObjectLanguageService.js";
-import { goalFactsFromInterpretationV3, realizeHolisticWeeklyV3 } from "./HolisticNarrativeV3.js";
+import { goalFactsFromInterpretationV3, realizeHolisticWeeklyV3, WEEKLY_REALIZABLE_KINDS } from "./HolisticNarrativeV3.js";
 import { buildEvidencePicture } from "../shared/BriefingEvidencePicture.js";
 import { synthesizeBriefing } from "../shared/BriefingHolisticSynthesis.js";
 import { resolveGoalEvidencePolicy } from "../shared/GoalEvidencePolicies.js";
@@ -484,12 +484,16 @@ function safelySynthesize({ briefingIntelligence, goalContract, interpretation, 
     const policy = resolveBriefingIntelligencePolicy(briefingIntelligence.policy.cadence);
     const budget = resolveNarrativeBudget(policy, picture);
     if (!budget) return null;
-    const synthesis = synthesizeBriefing({ picture, budget });
+    const synthesis = synthesizeBriefing({ picture, budget,
+      realizableKinds: policy.cadence === "weekly" ? WEEKLY_REALIZABLE_KINDS : null });
     const realized = policy.cadence === "weekly" ? realizeHolisticWeeklyV3({ synthesis, picture, goalPolicy,
       goalLabel: goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel ?? "the goal" }) : null;
     return { goalPolicy, picture, synthesis, realized };
-  } catch {
-    return null;
+  } catch (error) {
+    // Synthesis never blocks a briefing: the prior composition path runs, and
+    // the failure stays visible in the narrative's semantic lineage.
+    return { failed: true, failureCode: "holistic_synthesis_failed",
+      failureMessage: String(error?.message ?? error).slice(0, 200) };
   }
 }
 
@@ -500,6 +504,7 @@ function summarizeHolistic(briefingIntelligence, context) {
     synthesisVersion: holistic?.synthesis?.schemaVersion ?? null,
     goalType: holistic?.goalPolicy?.goalType ?? null,
     realized: Boolean(context.period),
+    failureCode: holistic?.failureCode ?? null,
     considered: holistic?.synthesis?.considered.map((item) => ({ domain: item.domain, status: item.status, state: item.state })) ?? [],
     selected: holistic?.synthesis?.selected.map((item) => ({ id: item.id, role: item.role, reason: item.reason })) ?? [],
     context: holistic?.synthesis?.context.map((item) => item.id) ?? [],

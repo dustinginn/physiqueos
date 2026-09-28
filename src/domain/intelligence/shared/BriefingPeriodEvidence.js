@@ -99,6 +99,8 @@ export function buildBriefingPeriodDays({
       activity: activeKcal == null ? null : { activeKcal, exerciseMinutes: minutesByDate.get(date) ?? null },
       training: { sessions: sessionsByDate.get(date)?.size ?? 0 },
       body: { weighIn: weightByDate.has(date), weight: weightByDate.get(date)?.pounds ?? null },
+      // Recovery/Sleep slot: filled when Sleep evidence is admitted.
+      recovery: null,
     };
   });
 }

@@ -57,7 +57,7 @@ export const BRIEFING_INTELLIGENCE_POLICIES = Object.freeze({
     narrativeRole: "preceding_execution_context",
     // Depth scales with how much the visual evidence actually changed.
     narrative: Object.freeze({ maxInsights: 2, maxLimitations: 1, floor: 0.9, heroInsights: 1,
-      purpose: "visual_change_with_corroboration", scaleWithOutcome: { domain: "body_composition", extraInsights: 2 },
+      purpose: "visual_change_with_corroboration", scaleWithOutcome: { domain: "visual_change", extraInsights: 2 },
       watchDiscriminators: 1 }),
   }),
 });
