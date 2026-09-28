@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-28T11:00:00Z",
+  "generated_at_utc": "2026-09-28T16:00:00Z",
   "task": {
-    "id": "briefing-intelligence-september-mtd-monthly-zine-preview-20260927",
-    "title": "Briefing Intelligence: Monthly as a review of the month - September MTD (through Sep 26) zero-write preview for acceptance (candidate 15b6e447, not deployed)",
+    "id": "urgent-native-home-production-incident-20260928",
+    "title": "INCIDENT RESOLVED: Native 'Home could not be loaded' — Founder device session revoked by refresh-credential reuse detection after a lost refresh response; restored by re-pairing",
     "agent": "claude",
-    "status": "preview_ready_awaiting_acceptance"
+    "status": "resolved"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -20,7 +20,7 @@
     "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative"
   },
   "result": {
-    "summary": "Monthly is now a review/zine written entirely by the shared Briefing Intelligence engine: a review contract (opening, strategy, training, energy, trajectory, execution, other/recovery slot, month ahead), each module earned by the shared picture or omitted with a reason; Confidence compact (<=2 sentences/35 words) on Native hero, strategic card and web. Real September 1-26 preview (4 days remaining): 'Real measured progress, but two off-routine stretches.' ~500 words across 7 modules (2.8x the accepted Weekly), Confidence 79/0 and continue_current_strategy identical with and without the engine, claim audit empty, deterministic. On the same evidence the legacy Monthly editorial engine produced false template copy (e.g. 'did not prove that you gained muscle', 'Progress photos showed a steady physique'); it no longer reaches the page. Midweek/Weekly/DEXA/Photo byte-identical to f563e1eb.",
+    "summary": "15:32:27Z the app refreshed (server rotated R1->R2) but never received/applied the response (R2 never used); 15:35:28Z it re-sent R1, server correctly revoked the session family (REFRESH_REUSE_DETECTED). Server, DB, deploys healthy and unchanged. Founder re-paired 15:56:53Z; Home/Goals/Log/Evidence/You reads verified complete with normal latency, no errors. No deploy/rollback/data mutation. Briefing candidate 15b6e447 frozen, untouched.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -29,40 +29,40 @@
   },
   "validation": {
     "tests": {
-      "status": "passed",
-      "summary": "BI + Monthly presentation/web 537/537 incl. new BriefingMonthlyReview and MonthlyReviewPresentationService suites; full repo 9113/9421, same 303 environmental failures as baseline, 0 new; non-Monthly corpus 0/2160 changed."
+      "status": "not_applicable",
+      "summary": "No code change."
     },
     "review": {
-      "status": "passed_with_fixes_applied",
-      "summary": "Fresh-context review of c567158a PASS-WITH-FIXES (2 High: energy card data vs prose, Native duplicate ids) fixed in 8f36b02f; verification PASS-WITH-FIXES (11/13; correction-format gate, compact cut, standing-DEXA scale wording, one-day bar) fixed in 15b6e447."
+      "status": "not_applicable",
+      "summary": "No code change."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Real prepareMonthlyOccurrence + publishMonthlyOccurrence dryRun over write-refusing in-memory repositories on the read-only export."
+      "summary": "Root cause established from production logs + read-only DB probe (READ ONLY verified, rolled back, no credential hashes read)."
     }
   },
   "decisions_required": [
-    "Accept or refine the September month-to-date Monthly preview.",
-    "If accepted: deploy decision for cross-briefing candidate 15b6e447.",
-    "Optional: restore Defining Moments as a dated timeline (currently omitted)."
+    "Authorize (or not) the recommended prevention: server lost-response tolerance for refresh rotation (successor never used, short window) — security-sensitive, needs tests/review/guarded deploy.",
+    "Native next build: background-task assertion around refresh.",
+    "When to resume the frozen Briefing work (September Monthly acceptance, candidate 15b6e447)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Legacy Monthly editorial engine produces false template copy on September evidence (baseline/photos/cut claims); replaced by the shared engine.",
-    "Native Monthly has three fixed template headers that ignore Server titles (next consolidated Native build)."
+    "Refresh rotation has no lost-response tolerance: one dropped refresh response revokes the device session.",
+    "Home read returns 4.7 MB / Log 9.4 MB per load (not causal)."
   ],
   "backlog": [
     "Native: read Server title/eyebrow for What Changed, Month Ahead, New Baseline headers.",
     "Confidence-side consolidation of MonthlyEvidenceIntelligenceV3 into the shared picture (moves Confidence; separate authorization).",
     "Sep 27 Strength reconciliation-review notification failure; Logged Today strength+cardio; Native Log-tab -> active Workout Logger; Photo visual-magnitude producer."
   ],
-  "recommended_next_step": "Founder/ChatGPT acceptance of the September Monthly preview, then a deploy decision for 15b6e447.",
-  "full_report_path": "agent-handoffs/reports/20260928T110000Z-briefing-intelligence-september-mtd-monthly-review-preview.md",
+  "recommended_next_step": "Founder decision on prevention fix; then resume Briefing acceptance when authorized.",
+  "full_report_path": "agent-handoffs/reports/20260928T160000Z-incident-native-home-session-revoked-refresh-reuse.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260928T110000Z-briefing-intelligence-september-mtd-monthly-review-preview.md",
     "agent-handoffs/reports/20260928T100000Z-briefing-intelligence-cross-briefing-previews.md",
     "agent-handoffs/reports/20260928T090000Z-briefing-intelligence-measurement-causality-restraint-release-ready.md",
-    "agent-handoffs/reports/20260928T070000Z-briefing-intelligence-final-semantic-restraint-sep20-26-preview.md",
-    "agent-handoffs/reports/20260928T050000Z-briefing-intelligence-section-contracts-sep20-26-preview.md"
+    "agent-handoffs/reports/20260928T070000Z-briefing-intelligence-final-semantic-restraint-sep20-26-preview.md"
   ],
   "safety": {
     "contains_secrets": false,
