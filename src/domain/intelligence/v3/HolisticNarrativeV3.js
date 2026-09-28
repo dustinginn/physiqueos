@@ -1069,7 +1069,7 @@ function changesModule({ picture, facts, synthesis, trajectory, energy, reviewCo
     themes.push({ tone: "energy", title: "Calories", earnedBy: energy.earnedBy[0],
       value: state === "above_plan" ? "Intake ran ahead of the plan." : state === "below_plan" ? "Intake ran short of the plan."
         : state === "on_plan" ? "Intake held to the plan." : "Logging set the limit on what calories can show.",
-      text: [state === "above_plan" && climbing ? "With the scale already climbing, calories are the lever to tighten, not to raise."
+      text: [state === "above_plan" && climbing ? "With the scale already climbing, the calorie number is the one to tighten, not to raise."
         : state === "below_plan" && weight?.movement === "down" && facts.direction === "up" ? "With the scale drifting down, calories are the lever to raise."
           : state === "on_plan" ? "Holding the target is what lets the scale and the next measurement be read cleanly." : null,
       energy.excludedDates?.length ? "Days too incomplete to read limit how sure that picture is." : null].filter(Boolean).join(" ") ||
@@ -1079,15 +1079,17 @@ function changesModule({ picture, facts, synthesis, trajectory, energy, reviewCo
   if (w?.status === "assessed" && !["too_noisy", "not_goal_relevant"].includes(w.state)) {
     const f = w.facts;
     const moving = f.movement !== "flat";
-    const scaleOnly = !trajectory;
-    const pace = scaleOnly && moving && Number.isFinite(f.weeklyRate)
-      ? ` The recent trend is roughly ${formatNumber(Math.round(Math.abs(f.weeklyRate) * 10) / 10)} lb a week.` : "";
+    // The scale's own numbers live here (the measurement card is the scan's).
+    const pace = moving && Number.isFinite(f.firstWeekAverage) && Number.isFinite(f.lastWeekAverage)
+      ? ` The weekly average went from about ${formatNumber(Math.round(f.firstWeekAverage))} lb in the first week to about ${formatNumber(Math.round(f.lastWeekAverage))} lb in the latest, roughly ${formatNumber(Math.round(Math.abs(f.weeklyRate) * 10) / 10)} lb a week on the recent trend.`
+      : moving && Number.isFinite(f.weeklyRate) ? ` The recent trend is roughly ${formatNumber(Math.round(Math.abs(f.weeklyRate) * 10) / 10)} lb a week.` : "";
     themes.push({ tone: "weight", title: "Weight", earnedBy: `${ROLES.trajectory}|assessed:${w.state}`,
-      value: c ? "The scale set the pace; the scan owns the verdict." : "Scale weight stayed context, not a verdict.",
+      value: moving ? `The scale kept ${f.movement === "up" ? "climbing" : "dropping"}${f.expectedDirection === f.movement ? ", as the goal expects" : ""}.` : "The scale held steady.",
       // Said once: the opening's goal meaning may already have posed it.
       text: /can't (?:say|show) (?:how much|whether)|will show (?:whether|where)/u.test(opening)
         ? `Between scans it sets the pace${moving && f.expectedDirection === f.movement ? ", and that pace is in the goal's direction" : ""}; the verdict on what the weight is made of waits for ${c ? `the next ${c.eventName}` : "a body-composition measurement"}.${pace}`
-        : `${moving ? `The scale kept ${f.movement === "up" ? "climbing" : "dropping"}${f.expectedDirection === f.movement ? " in the goal's direction" : ""}` : "Across the month the scale did not move"}, but it can't tell ${c?.label ?? "what the weight is made of"}${c ? " apart from other weight" : ""}${c ? `; the next ${c.eventName} will` : ""}.${pace}` });
+        // The headline already said what the scale did; the story adds what it can't say.
+        : `It can't tell ${c?.label ?? "what the weight is made of"}${c ? " apart from other weight" : ""}${c ? `; the next ${c.eventName} will` : ""}.${pace}` });
   }
   const routine = domain("routine");
   const shifts = Array.isArray(routine?.facts?.shifts) ? routine.facts.shifts : [];
@@ -1307,9 +1309,6 @@ function trajectoryModule(facts, trajectory, opening = "") {
   const guardTold = facts.guardrail && new RegExp(`${facts.guardrail.label} (?:past|near) its limit`, "u").test(opening);
   const paragraphs = [`It measured ${moved}${c.comparisonAt ? ` since ${dateWords(c.comparisonAt)}` : ""}${guard && !guardTold ? `, and ${guard}` : ""}.`];
   const w = trajectory?.status === "assessed" ? trajectory.facts : null;
-  if (w && Number.isFinite(w.firstWeekAverage) && Number.isFinite(w.lastWeekAverage) && w.movement !== "flat") {
-    paragraphs.push(`On the scale, the weekly average went from about ${formatNumber(Math.round(w.firstWeekAverage))} lb in the first week to about ${formatNumber(Math.round(w.lastWeekAverage))} lb in the latest, roughly ${formatNumber(Math.round(Math.abs(w.weeklyRate) * 10) / 10)} lb a week on the recent trend.`);
-  }
   return { role: ReviewModule.TRAJECTORY, earnedBy: [`${ROLES.outcome}|composition_result`, ...(w ? [`${ROLES.trajectory}|weight_trend`] : [])],
     title: c.newThisPeriod ? `The ${dateWords(c.measuredAt)} ${c.eventName} is the new reference point.` : `The ${dateWords(c.measuredAt)} ${c.eventName} still sets the reference point.`,
     paragraphs, interpretation: c.newThisPeriod ? `The next ${c.eventName} will be compared with this one.` : null,
@@ -1363,7 +1362,7 @@ function aheadModule({ synthesis, facts, steps, discriminators, period, energy, 
   const weightStep = steps.find((step) => step.source?.kind === "weight_trend" && !step.mismatch);
   if (watch || weightStep) {
     items.push({ label: "Weight", tone: "weight", value: weightStep ? upperFirst(weightStep.text) : `Watch ${watch.text}`,
-      text: weightStep ? monthTip(weightStep, facts) : "It shows the pace between checks; a single weigh-in never does." });
+      text: weightStep ? monthTip(weightStep, facts) : "One weigh-in never tells the trend; the weekly average does." });
   }
   // Photos earn a card when the goal reads visual evidence: new photos, or
   // none this month to keep the visual check going.
@@ -1381,7 +1380,7 @@ function aheadModule({ synthesis, facts, steps, discriminators, period, energy, 
     // The measurement card above already told what it measured.
     const told = c.newThisPeriod || c.ageDays <= 45;
     items.push({ label: c.eventName, tone: "baseline", value: `Use the next ${c.eventName === "check" ? "check" : "scan"}`,
-      text: posed ? "It is the check that settles the question above." : named || told ? "It is the next direct read; everything until then is pace."
+      text: posed ? "It is the check that settles the question above." : named || told ? "It is the next direct measurement of the goal."
         : `It measures what the scale can't: ${c.label}${facts.guardrail ? `, and ${facts.guardrail.label} against its limit` : ""}.` });
   }
   // The close: the strategy call, then the coming period's job.

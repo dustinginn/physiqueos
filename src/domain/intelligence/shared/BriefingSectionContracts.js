@@ -255,8 +255,9 @@ function reviewQuantities(text) {
   const withoutDates = String(text ?? "").replace(new RegExp(`\\b(?:${MONTHS}) \\d{1,2}(?: through \\d{1,2}| and \\d{1,2})?\\b`, "gu"), "");
   // With a unit the number and unit are the fact ("5 lb"); without one the
   // word after it says what was counted.
-  return [...withoutDates.matchAll(/\b(\d[\d,]*(?:\.\d+)?)(?:\s?(lb|%|g|kg)\b|(?:\s+(?:of\s+)?([a-z-]+))?)/gu)]
-    .map((match) => (match[2] ? `${match[1]} ${match[2]}` : `${match[1]} ${match[3] ?? ""}`.trim()));
+  // A rate ("1.7 lb a week") is its own fact, distinct from an amount ("1.7 lb").
+  return [...withoutDates.matchAll(/\b(\d[\d,]*(?:\.\d+)?)(?:\s?(lb|%|g|kg)\b(\s+a\s+(?:week|day))?|(?:\s+(?:of\s+)?([a-z-]+))?)/gu)]
+    .map((match) => (match[2] ? `${match[1]} ${match[2]}${match[3] ? " per" : ""}` : `${match[1]} ${match[4] ?? ""}`.trim()));
 }
 
 function countWords(text) { return String(text ?? "").split(/\s+/u).filter(Boolean).length; }

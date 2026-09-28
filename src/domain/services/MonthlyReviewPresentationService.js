@@ -22,6 +22,10 @@ export function applyMonthlyReviewToArtifact({ artifact, narrativePlan, confiden
   const presentation = briefing.monthlyPresentation;
   const module = (role) => review.modules.find((item) => item.role === role) ?? null;
   const opening = module("opening");
+  const ahead = module("ahead");
+  // A review always carries its opening and its close; without them the
+  // Monthly stays exactly as it was.
+  if (!opening || !ahead) return artifact;
   const confidence = compactConfidence(review.confidence ?? narrativePlan.confidenceBriefing?.body, contract.confidence);
 
   presentation.hero = { ...presentation.hero,
@@ -39,7 +43,7 @@ export function applyMonthlyReviewToArtifact({ artifact, narrativePlan, confiden
   const monthName = review.period?.monthName ?? "This month";
   const training = module("training");
   if (training) {
-    const { next: _next, highlights: _highlights, ...legacy } = presentation.training ?? {};
+    const { next: _next, highlights: _highlights, selectedPerformanceStories: _stories, ...legacy } = presentation.training ?? {};
     presentation.training = { ...legacy, eyebrow: legacy.eyebrow ?? "Training Progress", title: training.title,
       summary: training.paragraphs.join(" "), interpretation: training.interpretation ?? null,
       callout: training.interpretation ? legacy.callout ?? "Why it matters" : null, stats: training.stats, highlights: [] };
@@ -75,7 +79,6 @@ export function applyMonthlyReviewToArtifact({ artifact, narrativePlan, confiden
       moments: moments.items.map((item) => ({ date: item.date, label: item.title, body: item.text, tone: item.tone })) };
   } else delete presentation.moments;
 
-  const ahead = module("ahead");
   presentation.monthAhead = { eyebrow: presentation.monthAhead?.eyebrow ?? "Month Ahead",
     title: `Turn ${monthName}'s signals into repeatable evidence.`,
     thesis: ahead.paragraphs.join(" "),
@@ -86,10 +89,12 @@ export function applyMonthlyReviewToArtifact({ artifact, narrativePlan, confiden
   // The approved Monthly has no strategic or uncertainty card: the canonical
   // V3 narrative stays at briefing.narrativeV3, and the Monthly renders only
   // its editorial skeleton.
-  if (briefing.monthlyNarrative) delete briefing.monthlyNarrative.strategicSummaryV3;
+  // The legacy editorial narrative is not kept beside the review: only its
+  // title, thesis and Confidence block (both now the review's) remain.
+  const legacyNarrative = briefing.monthlyNarrative ?? {};
+  briefing.monthlyNarrative = { ...(legacyNarrative.confidence ? { confidence: legacyNarrative.confidence } : {}),
+    title: presentation.hero.title, thesis: presentation.hero.thesis };
   delete presentation.coachTake;
-  briefing.monthlyNarrative.title = presentation.hero.title;
-  briefing.monthlyNarrative.thesis = presentation.hero.thesis;
   briefing.monthlyReviewV3 = { schemaVersion: review.schemaVersion, period: review.period,
     modules: review.modules.map((item) => item.role), omitted: review.omitted, audit: review.audit };
   return artifact;

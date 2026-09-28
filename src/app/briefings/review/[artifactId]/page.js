@@ -85,10 +85,12 @@ export default async function BriefingReviewPage({ params, searchParams }) {
     const presentation = artifact.briefing.monthlyPresentation;
     return <MonthlyBriefingScreen presentation={{...presentation, hero: {
       ...presentation.hero,
-      confidence: projectConfidenceExplanationForSurface(
-        presentation.hero?.confidence,
-        { assessment: confidenceAssessment, surface: "monthly" }
-      ),
+      // A Monthly review's compact Confidence line is rendered as stored.
+      confidence: artifact.briefing.monthlyReviewV3 ? presentation.hero?.confidence
+        : projectConfidenceExplanationForSurface(
+          presentation.hero?.confidence,
+          { assessment: confidenceAssessment, surface: "monthly" }
+        ),
     }}}/>;
   }
   return <BriefingReviewScreen artifact={artifact} preview={preview}/>;

@@ -98,10 +98,14 @@ export function createBriefingNavigationReadService({ store } = {}) {
           ...artifact,
           briefing: { ...artifact.briefing, monthlyPresentation: {
             ...presentation,
-            hero: { ...presentation.hero, confidence: projectConfidenceExplanationForSurface(
-              presentation.hero?.confidence,
-              { assessment: context.confidenceAssessment, surface: "monthly" }
-            ) },
+            // A Monthly review carries its compact Confidence line in the
+            // stored artifact; it is rendered as stored, never re-expanded.
+            hero: { ...presentation.hero, confidence: artifact.briefing.monthlyReviewV3
+              ? presentation.hero?.confidence
+              : projectConfidenceExplanationForSurface(
+                presentation.hero?.confidence,
+                { assessment: context.confidenceAssessment, surface: "monthly" }
+              ) },
           } },
         });
       }

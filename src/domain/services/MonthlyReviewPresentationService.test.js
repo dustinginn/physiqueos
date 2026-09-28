@@ -100,6 +100,9 @@ describe("Monthly review presentation", () => {
     expect(presentation.hero.confidence.score).toBe(79);
     // The approved Monthly has no strategic or uncertainty card.
     expect(artifact.briefing.monthlyNarrative.strategicSummaryV3).toBeUndefined();
+    // No legacy editorial narrative is stored beside the review.
+    expect(Object.keys(artifact.briefing.monthlyNarrative).sort()).toEqual(["thesis", "title"]);
+    expect(presentation.training.selectedPerformanceStories).toBeUndefined();
     expect(presentation.coachTake).toBeUndefined();
     expect(artifact.briefing.monthlyReviewV3.audit.ok).toBe(true);
   });
@@ -145,5 +148,16 @@ describe("Monthly review publication gate", () => {
     const fs = await import("node:fs");
     const source = fs.readFileSync(new URL("./MonthlyBriefingService.js", import.meta.url), "utf8");
     expect(source).toMatch(/if \(!replacement \|\| existing\?\.briefing\?\.monthlyReviewV3\) \{\s*applyMonthlyReviewToArtifact/u);
+  });
+});
+
+describe("compact Monthly Confidence on every read path", () => {
+  it("Native detail, web and review routes render a review's stored Confidence line, never re-expanded", async () => {
+    const fs = await import("node:fs");
+    const read = (path) => fs.readFileSync(new URL(path, import.meta.url), "utf8");
+    for (const source of [read("../../application/briefings/BriefingNavigationReadService.js"),
+      read("../../app/briefings/monthly/[artifactId]/page.js"), read("../../app/briefings/review/[artifactId]/page.js")]) {
+      expect(source).toMatch(/monthlyReviewV3\s*\?\s*presentation\.hero\?\.confidence|monthlyReviewV3\s*\n?\s*\?\s*compatiblePresentation\.hero\?\.confidence/u);
+    }
   });
 });
