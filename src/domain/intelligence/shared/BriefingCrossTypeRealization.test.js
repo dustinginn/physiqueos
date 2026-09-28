@@ -140,6 +140,14 @@ describe("Midweek: light, partial and provisional", () => {
     }
   });
 
+  it("places time once, and never asks to 'get back' days that already passed", () => {
+    for (const { label, realized } of of("midweek")) {
+      const text = texts(realized).join(" ");
+      expect(text, label).not.toMatch(/so far[^.]*so far/iu);
+      expect(realized.watch, label).not.toMatch(/\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/u);
+    }
+  });
+
   it("never concludes a complete-week finding", () => {
     for (const { label, synthesis } of of("midweek")) {
       expect(synthesis.selected.some((item) => item.requiresCompleteWindow), label).toBe(false);
@@ -151,6 +159,13 @@ describe("Monthly: multi-week synthesis, not four Weeklies", () => {
   it("speaks of the month and names calendar dates, never a weekday or 'this week'", () => {
     for (const { label, realized } of of("monthly")) {
       expect(texts(realized).join(" "), label).not.toMatch(/\bthis week\b|\bnext week\b|\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/u);
+    }
+  });
+
+  it("never watches dates that have already passed, and never says 'next month' about the month just told", () => {
+    for (const { label, realized } of [...of("monthly"), ...of("dexa"), ...of("photo")]) {
+      expect(realized.watch, label).not.toMatch(/(?:January|February|March|April|May|June|July|August|September|October|November|December) \d/u);
+      expect(texts(realized).join(" "), label).not.toMatch(/\bnext month\b/u);
     }
   });
 
@@ -211,6 +226,22 @@ describe("Photo: visual-led, depth proportional to visual change, no invented fa
   const visualCases = (change) => GOALS.flatMap((goalType) => SEEDS.map((seed) =>
     realize({ seed, kind: "strong_training", goalType, cadence: "photo",
       visual: { available: true, capturedAt: "2026-09-19", change, comparable: true } })));
+
+  it("a measurement from before the photos is never called new", () => {
+    for (const goalType of GOALS) for (const seed of SEEDS) {
+      const scenario = holisticScenario({ seed, kind: "strong_training", goalType, cadence: "photo" });
+      const earlier = new Date(`${scenario.window.endDate}T12:00:00Z`);
+      earlier.setUTCDate(earlier.getUTCDate() - 7);
+      const composition = { ...scenario.goalFacts.composition, measuredAt: earlier.toISOString().slice(0, 10) };
+      const picture = buildEvidencePicture({ intelligence: scenario.intelligence, goalPolicy: scenario.goalPolicy,
+        goalFacts: { ...scenario.goalFacts, composition, visual: null } });
+      const outcome = picture.domains.find((item) => item.domain === "body_composition");
+      expect(outcome.facts.newThisPeriod, `${goalType}#${seed}`).toBe(false);
+      const synthesis = synthesizeBriefing({ picture, budget: resolveNarrativeBudget(scenario.policy, picture), realizableKinds: BRIEFING_REALIZABLE_KINDS });
+      const realized = realizeHolisticBriefingV3({ cadence: "photo", synthesis, picture, goalLabel: "the goal", goalPolicy: scenario.goalPolicy });
+      if (realized) expect(texts(realized).join(" "), `${goalType}#${seed}`).not.toMatch(/\bnew DEXA\b|New DEXA/u);
+    }
+  });
 
   it("the visual result leads when one exists", () => {
     for (const { label, synthesis, realized } of [...visualCases("visible"), ...visualCases(null)]) {

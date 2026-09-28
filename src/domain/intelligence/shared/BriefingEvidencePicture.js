@@ -14,6 +14,7 @@
 // strategy). This module never reads storage and never attributes causes.
 
 import { EVIDENCE_DOMAINS as D, WEIGHT_PACE_AUTHORITY as PACE, canonicalWeightPace } from "./GoalEvidencePolicies.js";
+import { BRIEFING_INTELLIGENCE_POLICIES } from "./BriefingIntelligencePolicies.js";
 import { BriefingPatternKind, dateRange, shiftDate } from "./BriefingIntelligence.js";
 
 export const EVIDENCE_PICTURE_VERSION = "briefing_evidence_picture_v1";
@@ -205,7 +206,7 @@ function assessBodyComposition({ goalFacts, window, intelligence }) {
   // For an event briefing the window is the lead-up; only a measurement on
   // the event date itself is new. For a recurring briefing, any measurement
   // in its window is.
-  const eventBriefing = Boolean(intelligence?.policy?.contextWindowDays);
+  const eventBriefing = Boolean(BRIEFING_INTELLIGENCE_POLICIES[intelligence?.policy?.cadence]?.contextWindowDays);
   const fresh = window && (eventBriefing ? composition.measuredAt === window.endDate
     : composition.measuredAt >= window.startDate && composition.measuredAt <= window.endDate);
   const ageDays = window ? daysBetween(composition.measuredAt, window.endDate) : null;

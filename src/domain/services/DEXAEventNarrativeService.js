@@ -671,7 +671,7 @@ export function createDEXAEventNarrativeService({
           timeZone: context?.timeZone ?? "America/Los_Angeles",
           canonicalObjects: canonical,
           // Enrichment only: a failed read never blocks the DEXA publication.
-          weightEntries: await Promise.resolve(repositories.weights?.listWeightEntries?.(userId) ?? []).catch(() => []),
+          weightEntries: await (async () => repositories.weights?.listWeightEntries?.(userId) ?? [])().catch(() => []),
           dexaScans: scans,
         },
       });

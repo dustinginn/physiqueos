@@ -298,11 +298,11 @@ async function prepareMonthlyOccurrence({
   // Monthly policy's 56-day baseline reaches before the window); the Monthly
   // cross-source intelligence above keeps feeding Confidence as evidence.
   // Enrichment only: a failed read leaves the Monthly exactly as before.
-  const periodEvidence = await Promise.all([
+  const periodEvidence = await (async () => Promise.all([
     repositories.canonicalEvidence?.listCanonicalEvidenceObjects?.(userId) ?? [],
     repositories.weights?.listWeightEntries?.(userId) ?? [],
     repositories.dexaScans?.listDEXAScans?.(userId) ?? [],
-  ]).then(([canonicalObjects, weightEntries, dexaScans]) => ({
+  ]))().then(([canonicalObjects, weightEntries, dexaScans]) => ({
     window: { startDate: window.startDate, endDate: window.endDate }, timeZone,
     canonicalObjects, weightEntries, dexaScans,
   })).catch(() => null);

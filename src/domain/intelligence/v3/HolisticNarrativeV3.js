@@ -135,28 +135,33 @@ export const WEEKLY_REALIZABLE_KINDS = BRIEFING_REALIZABLE_KINDS;
 // the section roles are shared; only the period's words differ.
 const PERIOD_WORDS = Object.freeze({
   weekly: { noun: "week", this: "this week", thisPoss: "this week's", next: "next week", inThis: "in this week",
+    logTip: "Keep logging the same way; it is what makes weeks like this easy to read.", ahead: "next week",
     steady: "A steady week", strongTraining: "Strong training week", stepTail: "this week", leverWhen: "this week",
     usual: "This week held to its usual pattern.", midNoun: "midweek",
     positions: { late: "late in the week", early: "early in the week", middle: "midweek", whole: "for most of the week" },
     parts: { late: "the end of the week", early: "the start of the week", middle: "the middle of the week" } },
   midweek: { noun: "week", this: "so far this week", thisPoss: "this week's", next: "the rest of the week", inThis: "so far",
+    logTip: "Keep logging the same way; it keeps the week easy to read.", ahead: "for the rest of the week",
     steady: "Steady so far", strongTraining: "Strong training so far", stepTail: "for the rest of the week",
     leverWhen: "for the rest of the week", usual: "The week so far is holding to its usual pattern.", midNoun: "stretch",
     recapLead: "So far this week, ", partial: true,
-    positions: { late: "in the last day or two", early: "at the start of the week", middle: "so far", whole: "so far this week" },
+    positions: { late: "in the last day or two", early: "at the start of the week", middle: "midway through", whole: "most days" },
     parts: {} },
-  monthly: { calendarDates: true, noun: "month", this: "this month", thisPoss: "this month's", next: "next month", inThis: "in this month",
+  monthly: { calendarDates: true, noun: "month", this: "this month", thisPoss: "this month's", next: "the coming month", inThis: "in this month",
+    logTip: "Keep logging the same way; it keeps the picture easy to read.", ahead: "over the coming weeks",
     steady: "A steady month", strongTraining: "Strong training month", stepTail: "over the coming weeks",
     leverWhen: "over the coming weeks", usual: "This month held to its usual pattern.", midNoun: "mid-month",
     positions: { late: "late in the month", early: "early in the month", middle: "mid-month", whole: "for most of the month" },
     parts: { late: "the end of the month", early: "the start of the month", middle: "the middle of the month" } },
-  outcomeCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before this check", thisPoss: "the lead-up's", next: "the next few weeks",
+  outcomeCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before this check",
+    logTip: "Keep logging the same way; it keeps the picture easy to read.", ahead: "over the next few weeks", thisPoss: "the lead-up's", next: "the next few weeks",
     inThis: "in the lead-up to this check", steady: "A steady lead-up", strongTraining: "Strong training before this check",
     stepTail: "over the next few weeks", leverWhen: "from here", usual: "The weeks before this check held to their usual pattern.",
     midNoun: "stretch", context: "in the weeks before this check", before: "before this check", outcomeLed: true,
     positions: { late: "just before this check", early: "early in the lead-up", middle: "midway through the lead-up",
       whole: "through most of the lead-up" }, parts: {} },
-  visualCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before these photos", thisPoss: "the lead-up's", next: "the next few weeks",
+  visualCheck: { calendarDates: true, noun: "lead-up", this: "in the weeks before these photos",
+    logTip: "Keep logging the same way; it keeps the picture easy to read.", ahead: "over the next few weeks", thisPoss: "the lead-up's", next: "the next few weeks",
     inThis: "in the lead-up to these photos", steady: "A steady lead-up", strongTraining: "Strong training before these photos",
     stepTail: "over the next few weeks", leverWhen: "from here", usual: "The weeks before these photos held to their usual pattern.",
     midNoun: "stretch", context: "in the weeks before these photos", before: "before these photos",
@@ -359,7 +364,8 @@ function recapSentence(lead, facts) {
   const outcomeFirst = P.context && ["composition_result", "visual_change", "visual_comparison"].includes(clauses[0].item.kind);
   // Clauses that carry their own time (a stretch's dates, a measurement's own
   // "new" or date) are never re-placed in the lead-up.
-  const dated = new Set(["routine_break", "activity_change", "training_frequency", "composition_result", "guardrail_status"]);
+  const dated = new Set(["routine_break", "activity_change", "training_frequency", "composition_result", "guardrail_status",
+    "weight_trend"]);
   const texts = clauses.map((entry, index) => (outcomeFirst && index > 0 && !dated.has(entry.item.kind)
     ? `${P.context}, ${entry.text}` : entry.text));
   const joiner = (index) => (clauses[index - 1].item.polarity === "supportive" && clauses[index].item.polarity === "concern"
@@ -471,7 +477,8 @@ function takeawaySentence({ lead, synthesis, steps }) {
   if (priorities.length) return `${upperFirst(priorities[0])}${priorities[1] ? `; ${priorities[1]}` : ""}.`;
   if (working.length > 1) return `${upperFirst(working[0])}, and ${working[1]}.`;
   if (working.length) return `${upperFirst(working[0])}, and that is the part to keep.`;
-  return synthesis.selected.some((item) => item.polarity === "concern")
+  // An event's lead-up execution is context, not an open concern.
+  return synthesis.selected.some((item) => item.polarity === "concern" && !(P.context && contextOnly.has(item.kind)))
     ? "Nothing here needs a change yet; the next few weeks will say more."
     : `Nothing ${P.inThis} calls for a different approach.`;
 }
@@ -487,7 +494,8 @@ function clauseFor(item, facts) {
     case "routine_break":
       return f.direction === "break"
         ? `the routine slipped ${positionPhrase(f.position)}`
-        : `${P.context ? "the routine" : `the ${P.noun}`} ran off its usual pattern ${positionPhrase(f.position)}`;
+        : P.context ? `the routine ran off its usual pattern ${positionPhrase(f.position)}`
+          : `the ${P.noun} ran off its usual routine ${positionPhrase(f.position)}`;
     case "composition_result":
       return `${f.newThisPeriod ? "the new" : `the ${dateWords(f.measuredAt)}`} ${f.eventName} ${compositionPhrase(f)}`;
     case "visual_change":
@@ -636,7 +644,7 @@ function coachingSentences({ synthesis, lead, facts, steps, contract }) {
     const step = steps[0];
     parts.push(step ? step.focus ?? executionTip(step, facts)
       : facts.sparse ? "Logging a little more each day from here on will make the next check clearer."
-        : synthesis.selected.every((item) => item.polarity !== "concern") ? "Keep logging the same way; it keeps the picture easy to read."
+        : synthesis.selected.every((item) => item.polarity !== "concern") ? P.logTip
         : "Nothing here needs a change yet.");
   }
   return parts.slice(0, contract.coaching?.maxSentences ?? 3).join(" ");
@@ -775,9 +783,11 @@ function watchItems({ synthesis, facts }) {
   }
   const missedTraining = synthesis.selected.find((item) => item.kind === "training_frequency" && item.facts.direction === "below");
   if (missedTraining && !routine) items.push({ source: missedTraining, text: "whether the usual training days come back" });
-  if (routine && P.context) {
-    // Past lead-up dates are never something to "get back"; watch the rhythm ahead.
-    items.push({ source: routine, text: `whether the usual training rhythm holds over ${P.next}` });
+  if (routine && (P.context || P.calendarDates || P.partial)) {
+    // Days that have already passed are never something to "get back"
+    // (an event's lead-up, a finished month, the start of this week):
+    // watch the rhythm ahead.
+    items.push({ source: routine, text: `whether the usual training rhythm holds ${P.ahead}` });
   } else if (routine) {
     const training = routine.facts.missed?.find((gap) => gap.domain === "training")?.dates;
     const dates = training?.length ? training : routine.facts.affectedDates;
@@ -791,7 +801,7 @@ function watchItems({ synthesis, facts }) {
 }
 
 function watchSentence(items) {
-  if (!items.length) return `Watch that the usual rhythm holds ${P.next}.`;
+  if (!items.length) return `Watch that the usual rhythm holds ${P.ahead}.`;
   return items.length === 1 ? `Watch ${items[0].text}.` : `Watch ${items[0].text} and ${items[1].text}.`;
 }
 
