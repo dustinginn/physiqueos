@@ -620,9 +620,12 @@ function coachingSentences({ synthesis, lead, facts, steps, contract }) {
     if (item.kind === "routine_break") {
       const prior = item.facts.recurrence?.priorSpans?.at(-1);
       const stretch = item.facts.direction === "break" ? "quiet" : "off-routine";
-      // An event's lead-up gets no "way back" tip: it is context for the result.
-      const covered = Boolean(P.context) || steps.some((step) => step.source?.id === item.id);
-      parts.push(`${upperFirst(clauseFor(item, facts))}${prior ? `, and a similar ${stretch} stretch came in ${monthPart(prior.startDate)}` : ""}${covered ? "" : "; the usual days and times are the easiest way back"}.`);
+      // An event's lead-up gets no "way back" tip: it is context for the result,
+      // so the only guidance looks ahead to the next comparison.
+      const covered = steps.some((step) => step.source?.id === item.id);
+      const tail = P.context ? "; the usual days and times from here keep the next comparison clean"
+        : covered ? "" : "; the usual days and times are the easiest way back";
+      parts.push(`${upperFirst(clauseFor(item, facts))}${prior ? `, and a similar ${stretch} stretch came in ${monthPart(prior.startDate)}` : ""}${tail}.`);
     } else if (item.kind === "weight_trend" && item.facts.verdict === "steady" && item.facts.movement !== "flat") {
       parts.push(`${upperFirst(clauseFor(item, facts))}, in the direction the goal wants.`);
     } else if (item.kind === "weight_trend" && item.facts.movement === "flat") {
