@@ -26,7 +26,7 @@ describe("Unwired Home Confidence and canonical evidence vocabulary", () => {
     expect(home.expanded.explanation).toBe(result.narrativePlan.confidenceDeepExplanation);
     expect(home.publication).toMatchObject({ clientWiring: false, persistenceWrites: 0, artifactWrites: 0 });
     expect(home.expanded.explanation.whatCouldRaiseIt.join(" ")).toContain("before the next DEXA");
-    expect(home.expanded.explanation.nextEvidence).toContain("not whether the plan works");
+    expect(home.expanded.explanation.nextEvidence).toContain("progress measured so far is already on record");
     expect(home.collapsed).toMatchObject({ label: "goal confidence", movementLabel: "up 17 points" });
     expect(home.expanded.explanation.whatIsHoldingItBack).toContain("One excellent response is not a promise that the next few weeks will match it.");
     expect(home.expanded.explanation.whatCouldLowerIt.join(" ")).toContain("Body fat moving outside the intended range of 8–9%");

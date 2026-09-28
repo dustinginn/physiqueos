@@ -1231,9 +1231,9 @@ export function applyReasoningGuardrails(output) {
       strategy_recommendation: "Stay the course.",
       should_change_plan: false,
       why_or_why_not:
-        "No. The evidence modestly increases confidence that the current strategy is working, and there is no clear problem to correct.",
+        "No. The evidence modestly supports the goal's direction, and there is no clear problem to correct.",
       meaningful_change_assessment:
-        `${daysText}, this is not enough to claim major change, but it is useful emerging evidence that the current strategy is working.`,
+        `${daysText}, this is not enough to claim major change, but it is useful emerging evidence in the goal's direction.`,
       detailed_interpretation: {
         summary:
           "The dominant story is a subtle but positive rear comparison: upper-back shape is maintained while the rear waist and lower back look a little tighter. Because this is a short interval, the detailed read should be treated as emerging evidence rather than confirmed change.",
@@ -1320,7 +1320,7 @@ export function applyReasoningGuardrails(output) {
       user_facing_summary:
         `There are a few subtle signs you are moving in the right direction. Your upper back, shoulders, and arms look maintained, and your rear waist and lower back look a little tighter. There are early signs of improving back definition, but it is still too early to be confident. Based on these photos, I would stay the course.`,
       coach_briefing_insert:
-        `This rear comparison modestly increases confidence that your current strategy is working. Your upper back, shoulders, and arms appear well maintained. Your rear waist and lower back look slightly tighter. Back definition may be starting to show, but it is still early. Nothing here suggests we should change your plan. In the next comparison, PhysiqueOS will watch whether the tighter waistline becomes a consistent trend while your upper back remains well maintained.`,
+        `This rear comparison modestly supports the direction of your goal. Your upper back, shoulders, and arms appear well maintained. Your rear waist and lower back look slightly tighter. Back definition may be starting to show, but it is still early. Nothing here suggests we should change your plan. In the next comparison, PhysiqueOS will watch whether the tighter waistline becomes a consistent trend while your upper back remains well maintained.`,
     };
   }
 
@@ -1499,7 +1499,7 @@ export function applyReasoningGuardrails(output) {
       user_facing_summary:
         `There are a few subtle signs you are moving in the right direction. Your overall shape looks a little cleaner, with the clearest change around the waist. Your upper body appears maintained, and your shoulder-to-waist ratio looks slightly sharper. It is still too early to call this a meaningful visual change, but the comparison modestly supports your current plan. I would stay the course.`,
       coach_briefing_insert:
-        `This front comparison modestly increases confidence that your current strategy is working. The useful read is your overall silhouette first: your waist looks modestly tighter, your shoulder-to-waist ratio looks slightly cleaner, and your upper body appears well maintained. These are small changes, not a confirmed transformation. Nothing here suggests we should change your plan. In the next comparison, PhysiqueOS will watch whether the tighter waist and cleaner front silhouette become a consistent trend.`,
+        `This front comparison modestly supports the direction of your goal. The useful read is your overall silhouette first: your waist looks modestly tighter, your shoulder-to-waist ratio looks slightly cleaner, and your upper body appears well maintained. These are small changes, not a confirmed transformation. Nothing here suggests we should change your plan. In the next comparison, PhysiqueOS will watch whether the tighter waist and cleaner front silhouette become a consistent trend.`,
     };
   }
 

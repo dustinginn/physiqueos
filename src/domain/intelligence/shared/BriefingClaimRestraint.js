@@ -97,18 +97,24 @@ export function claimSupport(synthesis) {
   };
 }
 
+// Strategy-level causal support: a future evidence schema may mark a
+// strategy's effectiveness as causally established (for example, a
+// controlled comparison). An outcome that merely demonstrated feasibility —
+// a DEXA showing the measure moved while the plan ran — is not that.
+export function hasAuthoritativeCausalSupport(interpretation) {
+  return interpretation?.strategyEffectiveness?.causalSupport === "authoritative";
+}
+
 // Text-level audit: effectiveness language needs authoritative causal
 // support; repair-the-past language needs an explicit correction action.
 export function auditClaimRestraint(texts, support = { effectiveness: false, retroactiveCorrection: false }) {
   const issues = [];
   for (const [role, text] of Object.entries(texts ?? {})) {
     if (!text) continue;
-    if (!support.effectiveness && EFFECTIVENESS_LANGUAGE.test(text)) {
-      issues.push(`${role}: claims effectiveness without authoritative causal support`);
-    }
-    if (!support.retroactiveCorrection && RETROACTIVE_REPAIR_LANGUAGE.test(text)) {
-      issues.push(`${role}: implies the past period can be repaired`);
-    }
+    const effectiveness = support.effectiveness ? null : EFFECTIVENESS_LANGUAGE.exec(text);
+    if (effectiveness) issues.push(`${role}: claims effectiveness without authoritative causal support ("${effectiveness[0]}")`);
+    const repair = support.retroactiveCorrection ? null : RETROACTIVE_REPAIR_LANGUAGE.exec(text);
+    if (repair) issues.push(`${role}: implies the past period can be repaired ("${repair[0]}")`);
   }
   return issues;
 }

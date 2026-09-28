@@ -15,13 +15,18 @@ import {
   derivePhotoStructuredObservationsV3, withStructuredPhotoObservationsV3,
 } from "../PhotoEventStructuredObservationsV3.js";
 
-// Text digests recorded from the pristine production base (895935bd) on the
-// same evidence. The unified V3 correction must not change what DEXA or Photo
-// say. Structured fields (uncertainty, identity digests) are additive.
-const BASE_DEXA_TEXT_SHA256 = "75f822e7f5c4674742e3231c2e17f3fc7f0806a696dff076e1a40d764a02f13c";
-const BASE_PHOTO_TEXT_SHA256 = "75f822e7f5c4674742e3231c2e17f3fc7f0806a696dff076e1a40d764a02f13c";
+// Text digests of what DEXA and Photo say on the same evidence. Originally
+// recorded from the pristine production base (895935bd); re-recorded for the
+// Founder-authorized measurement-not-causation restraint
+// (briefing-intelligence-final-measurement-causality-restraint-20260927),
+// which changes only the causal sentences ("the plan is clearly working", "not
+// whether the plan works. That question has been answered") to measured-
+// progress wording. Confidence (76) and the recommendation are unchanged and
+// still asserted below. Structured fields are additive.
+const BASE_DEXA_TEXT_SHA256 = "8c784f17e8af72ab13d7d43dc54f97f9677bcc0cc41122fa89adfc074bac9651";
+const BASE_PHOTO_TEXT_SHA256 = "8c784f17e8af72ab13d7d43dc54f97f9677bcc0cc41122fa89adfc074bac9651";
 // The same events published with a prior Weekly in the store (production's normal shape).
-const BASE_WITH_PRIOR_WEEKLY_TEXT_SHA256 = "4269bad26fbba30f7945038865874d70cda7a59602f5c7c1bcb49844a1a2ae7f";
+const BASE_WITH_PRIOR_WEEKLY_TEXT_SHA256 = "c040d6790947d0e5bf347f1a9fb3a8bd558c908905601e6d7b079e12087ab6ba";
 // The accepted Sep 19 Photo artifact's stored V3 text (a stored artifact is served, never rebuilt).
 const ACCEPTED_SEP19_PHOTO_TEXT_SHA256 = "a139d9834a66e550998d7fb21f95254ed1707096b25d6f91eaa5cd834aab5791";
 

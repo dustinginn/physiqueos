@@ -186,7 +186,7 @@ describe("production-shaped Goal-generic V3 evidence adapter", () => {
     expect(result.narrativePlan.composition.sections.result)
       .toContain("body fat stayed controlled at 8.1%");
     expect(result.narrativePlan.composition.sections.meaning)
-      .toContain("The build plan is clearly working.");
+      .toContain("The measured progress in lean mass is real, and nothing in the evidence calls for changing the build plan.");
     expect(result.narrativePlan.composition.sections.action)
       .toContain("Stay the course.");
     expect(result.narrativePlan.composition.coachTake)

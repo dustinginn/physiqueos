@@ -65,7 +65,7 @@ const FACTOR_PRESENTATION = Object.freeze({
   },
   strategy_confirmed: {
     role: "support", semanticToken: "strategy_confirmed",
-    text: "The current plan is producing the responses we expected.", priority: 15,
+    text: "Results are coming in the way the plan expected.", priority: 15,
   },
   strategy_directionally_supported: {
     role: "support", semanticToken: "strategy_supported",
@@ -590,7 +590,7 @@ function surfaceSummary({ assessment, evidenceContextNote, historicalContext,
       ? `The ${date} DEXA gave us a reliable body-composition baseline and showed that the plan was still on track.`
       : `The ${date} DEXA gave us a reliable body-composition baseline.`;
     const eventEffect = assessment.movement === "increase"
-      ? `${movementExplanation.text} The scan gave us new evidence that the plan was working.`
+      ? `${movementExplanation.text} The scan gave us new evidence of measured progress.`
       : assessment.movement === "decrease"
         ? `${movementExplanation.text} The scan raised a new concern that needed attention.`
         : "It did not change confidence because one scan could not yet show a lasting lean-mass response.";
@@ -600,7 +600,7 @@ function surfaceSummary({ assessment, evidenceContextNote, historicalContext,
     const consistencyNeeds = [energy && "calories", recovery && "recovery"].filter(Boolean);
     const sentences = [
       "Training is moving in the right direction, but it is still too early to raise confidence.",
-      `This month brought encouraging progress in the gym${consistencyNeeds.length ? `, while ${listClauses(consistencyNeeds)} still ${consistencyNeeds.length === 1 ? "needs" : "need"} more consistency` : ""}${pending ? " and we do not yet have enough body-composition evidence to confirm that the plan is adding muscle the way we want" : ""}.`,
+      `This month brought encouraging progress in the gym${consistencyNeeds.length ? `, while ${listClauses(consistencyNeeds)} still ${consistencyNeeds.length === 1 ? "needs" : "need"} more consistency` : ""}${pending ? " and we do not yet have enough body-composition evidence to confirm lean-mass progress the way we want" : ""}.`,
       `${onPath || feasible || noContradiction ? "Nothing this month suggests the plan is off track, so " : ""}confidence stays at ${assessment.currentPercentage}%.`,
       nextDexa
         ? "Your next DEXA will be the most important check on whether the early progress is turning into measurable lean-mass gain."
@@ -707,11 +707,11 @@ const SUPPORT_RATIONALE_COPY = Object.freeze({
 });
 
 const CAPABILITY_SUPPORT_COPY = Object.freeze({
-  training: "Training has continued moving forward, which supports confidence that the plan is working.",
-  nutrition: "Nutrition and intake trends have continued to hold up, which supports confidence that the plan is working.",
-  weight: "Weight trends have continued to hold up, which supports confidence that the plan is working.",
-  recovery: "Recovery has continued to hold up, which supports confidence that the plan is working.",
-  activity: "Activity trends have continued to hold up, which supports confidence that the plan is working.",
+  training: "Training has continued moving forward, which supports the outlook.",
+  nutrition: "Nutrition and intake trends have continued to hold up, which supports the outlook.",
+  weight: "Weight trends have continued to hold up, which supports the outlook.",
+  recovery: "Recovery has continued to hold up, which supports the outlook.",
+  activity: "Activity trends have continued to hold up, which supports the outlook.",
 });
 const GENERIC_SUPPORT_COPY = "Recent evidence has continued to support the current plan.";
 

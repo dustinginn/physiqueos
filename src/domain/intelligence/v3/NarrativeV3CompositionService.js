@@ -6,6 +6,7 @@ import {
   naturalizeUserFacingNarrativeText,
 } from "../../services/UserFacingObjectLanguageService.js";
 import { goalFactsFromInterpretationV3, realizeHolisticWeeklyV3, WEEKLY_REALIZABLE_KINDS } from "./HolisticNarrativeV3.js";
+import { auditClaimRestraint, hasAuthoritativeCausalSupport } from "../shared/BriefingClaimRestraint.js";
 import { buildEvidencePicture } from "../shared/BriefingEvidencePicture.js";
 import { synthesizeBriefing } from "../shared/BriefingHolisticSynthesis.js";
 import { resolveGoalEvidencePolicy } from "../shared/GoalEvidencePolicies.js";
@@ -124,6 +125,8 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   const finalNarrative = paragraphs.join("\n\n");
   assertDistinctSectionComposition({ context, sections, coachTake });
   assertNarrativeV3Voice(`${finalNarrative}\n${coachTake}\n${JSON.stringify(confidenceDeepExplanation)}`);
+  assertNarrativeV3ClaimRestraint({ interpretation, texts: { narrative: finalNarrative, coachTake,
+    confidenceBody: confidenceBriefing.body, confidenceDetail: JSON.stringify(confidenceDeepExplanation) } });
 
   const uncertaintyTypes = interpretation.uncertaintyProfile.map((item) => {
     const surfacing = resolveUncertaintySurfacing(item, interpretation, context);
@@ -232,6 +235,17 @@ export function findNarrativeV3VoiceViolations(value) {
     if (pattern.test(text)) violations.push(`engine_language:${pattern.source}`);
   }
   return [...new Set(violations)];
+}
+
+// Measurement is not causation: no V3 narrative surface may claim the plan,
+// approach or training "is working" (or equivalent) unless the interpretation
+// carries explicit authoritative causal support — which no evidence in the
+// model provides today. An outcome check proves what changed, not what
+// caused it.
+function assertNarrativeV3ClaimRestraint({ interpretation, texts }) {
+  const issues = auditClaimRestraint(texts, { effectiveness: hasAuthoritativeCausalSupport(interpretation),
+    retroactiveCorrection: true });
+  if (issues.length) throw new Error(`Narrative V3 claim restraint failed: ${issues.join("; ")}`);
 }
 
 function assertNarrativeV3Voice(value) {
@@ -790,7 +804,7 @@ function composeResult(context) {
   const guardrailCopy = guardrail ? describeGuardrail(context, guardrail) : null;
   if (context.recentEventFollowup) {
     return [
-      `The ${context.priorEventName} already established that ${strategyLabel(context)} is working.`,
+      `The ${context.priorEventName} already showed ${objectiveLabel(context)} moving the right way.`,
       composeOperatingEvidence(context),
       composeEvidenceTension(context),
       "Nothing here calls for a change.",
@@ -805,7 +819,7 @@ function composeResult(context) {
         : null),
       composeEvidenceTension(context),
       context.anchorPreviouslyCommunicated
-        ? `${upperFirst(nextEvidenceName(context))} already established that ${strategyLabel(context)} is working.`
+        ? `${upperFirst(nextEvidenceName(context))} already showed ${objectiveLabel(context)} moving the right way.`
         : `The latest outcome still stands: ${lowerFirst(movement)}`,
     ].filter(Boolean).join(" ");
   }
@@ -849,19 +863,22 @@ function composeMeaning(context) {
   if (["challenged", "refuted"].includes(interpretation.strategyEffectiveness.feasibility)) {
     strategyMeaning = `The latest evidence is strong enough to question ${strategy}. The earlier result still belongs in the record, but the plan should not continue unchanged.`;
   } else if (interpretation.strategyEffectiveness.feasibility === "demonstrated") {
+    // An outcome measurement proves what changed, not what caused it
+    // (shared/BriefingClaimRestraint): measured progress, and compatibility
+    // with staying the course — never "the plan is working".
     strategyMeaning = inherited ?
-      `${upperFirst(strategy)} is working, and nothing here changes that conclusion.` :
+      `The measured progress in ${objectiveLabel(context)} still stands, and nothing here changes it.` :
       interpretation.recommendation.action === "continue_current_strategy" ?
-        `${upperFirst(strategy)} is clearly working. There is no reason to second-guess the approach.` :
-        `${upperFirst(strategy)} is producing progress, but ${naturalList(context.consequentialGuardrails.map((item) => guardrailLabel(goalContract, item)))} still ${context.consequentialGuardrails.length > 1 ? "need" : "needs"} attention.`;
+        `The measured progress in ${objectiveLabel(context)} is real, and nothing in the evidence calls for changing ${strategy}.` :
+        `${upperFirst(objectiveLabel(context))} is progressing, but ${naturalList(context.consequentialGuardrails.map((item) => guardrailLabel(goalContract, item)))} still ${context.consequentialGuardrails.length > 1 ? "need" : "needs"} attention.`;
   } else if (interpretation.strategyEffectiveness.feasibility === "testing") {
-    strategyMeaning = `The direction may be encouraging, but there is not enough yet to know whether ${strategy} is doing the job.`;
+    strategyMeaning = `The direction may be encouraging, but there is not enough yet to know whether ${objectiveLabel(context)} is moving the way the goal needs.`;
   } else {
     strategyMeaning = `There is not enough useful evidence yet to judge ${strategy}.`;
   }
 
   if (isMaintenanceObjective(context.objectiveDefinition) && ["stable_success", "satisfied"].includes(objective?.state)) {
-    strategyMeaning = `Holding the target range is the win for ${goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel}. ${upperFirst(strategy)} is doing its job.`;
+    strategyMeaning = `Holding the target range is the win for ${goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel}, and the measurements show it holding.`;
   }
   return [progress, strategyMeaning].filter(Boolean).join(" ");
 }
@@ -952,10 +969,10 @@ function composeAction(context) {
   }
   if (action === "review_strategy") return "Review the plan before continuing unchanged. The new result is meaningful enough to require a real adjustment.";
   if (action === "transition_goal") return "The goal has been reached. Lock in the result and choose the next target before extending the current plan.";
-  if (action === "transition_phase") return `Move into ${goalContract.phase.nextPhaseLabel ?? "the next planned phase"}. The current phase did what it needed to do.`;
+  if (action === "transition_phase") return `Move into ${goalContract.phase.nextPhaseLabel ?? "the next planned phase"}. The current phase reached what it set out to.`;
   if (action === "continue_with_guardrail_monitoring") {
     const names = naturalList(consequentialGuardrails.map((item) => guardrailLabel(goalContract, item)));
-    return `Keep the parts that are working, but tighten attention around ${names}.${reconsideration}`;
+    return `Keep what is going well, but tighten attention around ${names}.${reconsideration}`;
   }
   if (interpretation.strategyEffectiveness.feasibility === "demonstrated") {
     return context.recentEventFollowup ? "Stay consistent and keep the plan where it is." :
@@ -981,14 +998,16 @@ function composeWatchFallback(context) {
   if (purpose === "confirm_persistence") {
     if (context.recentEventFollowup) return `${upperFirst(nextEvidenceName(context))} will show whether ${objectivePhrase} continues${guardrailPhrase}.`;
     const contrast = interpretation.strategyEffectiveness.feasibility === "demonstrated" ?
-      "—not whether the plan works. That question has been answered" : "";
+      // The measured progress is on record; what caused it is not a question
+      // an outcome check answers (shared/BriefingClaimRestraint).
+      "; the progress measured so far is already on record" : "";
     return `${upperFirst(nextEvidenceName(context))} ${nextEvidenceVerb(context)} about whether ${objectivePhrase} continues${guardrailPhrase}${contrast}.`;
   }
-  if (purpose === "establish_feasibility") return `${upperFirst(nextEvidenceName(context))} should show whether ${strategyLabel(context)} is moving ${objectiveLabel(context)} in the right direction.`;
+  if (purpose === "establish_feasibility") return `${upperFirst(nextEvidenceName(context))} should show whether ${objectiveLabel(context)} is moving in the right direction under ${strategyLabel(context)}.`;
   if (purpose === "resolve_contradiction") return `${upperFirst(nextEvidenceName(context))} should resolve whether the latest setback is a real change or a one-off result.`;
   if (purpose === "assess_guardrail") return `${upperFirst(nextEvidenceName(context))} should show whether ${naturalList(context.consequentialGuardrails.map((item) => guardrailLabel(context.goalContract, item)))} ${context.consequentialGuardrails.length > 1 ? "are" : "is"} back where ${context.consequentialGuardrails.length > 1 ? "they need" : "it needs"} to be.`;
   if (purpose === "improve_measurement_quality") return "A cleaner, more complete measurement is the next useful step.";
-  if (purpose === "improve_attribution") return "Keep the plan stable long enough for the next result to show what is actually driving the change.";
+  if (purpose === "improve_attribution") return "Keep the plan stable long enough for the next result to give a clearer read on the change.";
   if (purpose === "establish_phase_readiness") return `${upperFirst(nextEvidenceName(context))} should show whether this phase has earned the planned transition.`;
   if (purpose === "update_forecast") return `${upperFirst(nextEvidenceName(context))} should update how quickly the goal is likely to arrive.`;
 
@@ -1015,7 +1034,7 @@ function composeCoachTake(context) {
       ? `${sentence(specific.recommendationCapability.text)} ` : "";
     const support = context.interpretation.crossDomainSynthesis?.operatingSupport === "supportive"
       ? "The current work supports staying the course. " : "";
-    return `${observation}${suggestion}The last ${context.nextEvidence.displayName} still supports the plan, and the plan is doing its job. ${support}Keep the focus on consistent execution; ${nextEvidenceName(context)} ${nextEvidenceVerb(context)} about continued progress.`;
+    return `${observation}${suggestion}The last ${context.nextEvidence.displayName} still supports the plan, and nothing here argues for changing it. ${support}Keep the focus on consistent execution; ${nextEvidenceName(context)} ${nextEvidenceVerb(context)} about continued progress.`;
   }
   if (interpretation.recommendation.action === "transition_goal") {
     return "The goal has been reached. Protect the result and choose the next target rather than keep extending the current plan.";
@@ -1038,7 +1057,7 @@ function composeCoachTake(context) {
 
   if (interpretation.coachingAffect.intensity === "strong" && interpretation.strategyEffectiveness.feasibility === "demonstrated") {
     const fraction = confidenceTrajectory(context)?.fractionAchieved;
-    const position = fraction > 0.5 && fraction < 1 ? "The goal is more than halfway there, and the plan is clearly working." : "The plan is clearly working.";
+    const position = fraction > 0.5 && fraction < 1 ? "The goal is more than halfway there on measured progress." : "The measured progress is clearly on track.";
     const phase = context.goalContract.vocabulary?.phase?.contextName ?? "this phase";
     return `This is exactly what ${phase} needed: ${lowerFirst(stripPeriod(objectiveMovement(context, { includeComparison: false })))}${guardrail ? `, with ${guardrail}.` : "."} ${position} Don't change it. ${stripPeriod(execute)} and use ${nextEvidenceName(context)} to see whether ${continuationPhrase(context)} continues.`;
   }
@@ -1054,7 +1073,7 @@ function composeCoachTake(context) {
       ? sentence(specific.recommendationCapability.text) : null;
     return [specificTake, suggestion, operatingConclusion,
       composeCoachTension(context), progress,
-      `${acceptedResult} The plan is working.`, `Stay consistent. ${execute}`, watch]
+      `${acceptedResult} The measured progress supports staying with the plan.`, `Stay consistent. ${execute}`, watch]
       .filter(Boolean).join(" ");
   }
   return [result, composeAction(context), watch].filter(Boolean).join(" ");
@@ -1165,7 +1184,7 @@ function composeConfidenceBriefing(context) {
       "Confidence holds. This check-in does not change the outlook for reaching the goal." };
   }
   if (confidence.projectionPolicy.mode === "execution_update") {
-    return { heading, body: `Confidence moved up because consistent execution is supporting the goal. ${interpretation.strategyEffectiveness.feasibility === "demonstrated" ? `The plan is working; ${nextEvidenceName(context)} still needs to confirm that progress continued.` : "The next useful result still needs to show that the effort is delivering."}` };
+    return { heading, body: `Confidence moved up because consistent execution is supporting the goal. ${interpretation.strategyEffectiveness.feasibility === "demonstrated" ? `The measured progress is real; ${nextEvidenceName(context)} still needs to confirm that it continued.` : "The next useful result still needs to show the progress continuing."}` };
   }
   const trajectory = confidenceTrajectory(context);
   const strong = context.objective?.significance === "major" && context.objective?.quality === "robust";
@@ -1213,7 +1232,9 @@ function composeConfidenceDeepExplanation(context) {
       : coachingClauses(item.factualSummary)[0])
     .filter(Boolean).map(sentence);
   return {
-    why: [goalProgressSentence(context), `${upperFirst(strategyLabel(context))} ${demonstrated ? "is clearly working" : "still needs a useful outcome check"}.`, time].filter(Boolean).join(" "),
+    // Measured progress, not causation (shared/BriefingClaimRestraint).
+    why: [goalProgressSentence(context), demonstrated ? `The measured progress in ${objectiveLabel(context)} is real.`
+      : `${upperFirst(strategyLabel(context))} still needs a useful outcome check.`, time].filter(Boolean).join(" "),
     whatIncreasedIt: context.objective?.state === "progressed" ? [objectiveMovement(context), ...(primaryGuardrail?.status === "clear" ? [describeGuardrail(context, primaryGuardrail)] : [])] : [],
     whatSupportsItNow: [remaining, ...currentSupport].filter(Boolean),
     whatIsHoldingItBack: [

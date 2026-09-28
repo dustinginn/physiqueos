@@ -51,7 +51,7 @@ export function describeUncertaintyV3(item, { vocabulary = null } = {}) {
     case "measurement":
       return "A direct measurement carries a stated limitation.";
     case "strategy_feasibility":
-      return "It is too early to say whether the current plan is producing the intended result.";
+      return "It is too early to say whether the intended result is on its way.";
     case "objective_measurement":
       return "The main result has not been measured recently enough to update.";
     default:

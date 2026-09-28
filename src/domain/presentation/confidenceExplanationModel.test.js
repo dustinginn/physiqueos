@@ -20,7 +20,7 @@ describe("Confidence V2 shared explanation model", () => {
       sourceAssessmentId: "assessment-current",
     });
     expect(model.summary).toBe(
-      "Training is moving in the right direction, but it is still too early to raise confidence. This month brought encouraging progress in the gym, while calories and recovery still need more consistency and we do not yet have enough body-composition evidence to confirm that the plan is adding muscle the way we want. Nothing this month suggests the plan is off track, so confidence stays at 62%. Your next DEXA will be the most important check on whether the early progress is turning into measurable lean-mass gain."
+      "Training is moving in the right direction, but it is still too early to raise confidence. This month brought encouraging progress in the gym, while calories and recovery still need more consistency and we do not yet have enough body-composition evidence to confirm lean-mass progress the way we want. Nothing this month suggests the plan is off track, so confidence stays at 62%. Your next DEXA will be the most important check on whether the early progress is turning into measurable lean-mass gain."
     );
     expect(model.summary).not.toMatch(/Photos|Weight/);
     expect(model.movementExplanation.text).toBe(

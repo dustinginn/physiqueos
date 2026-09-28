@@ -266,7 +266,7 @@ describe("Narrative V3 remaining surface shadow projections", () => {
       recommendationLabel: "Continue Lean Mass Build",
       decisionOptions: [{ label: "Continue Lean Mass Build", recommended: true }],
     });
-    expect(review.explanation).toContain("current phase is still doing its job");
+    expect(review.explanation).toContain("current phase remains on course");
     expect(review.unresolved).toContain("The next DEXA");
     expect(review.founderAuthority).toContain("Nothing changes until you choose");
     expect(review).not.toHaveProperty("command");

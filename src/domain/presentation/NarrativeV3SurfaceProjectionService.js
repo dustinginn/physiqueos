@@ -202,7 +202,9 @@ function projectActiveGoal(context) {
   const strategy = strategyName(goalContract);
   const strategySentence = interpretation.strategyEffectiveness.feasibility ===
     "demonstrated"
-    ? `${upperFirst(strategy)} is working, and current training still supports staying the course.`
+    // Measured progress supports staying the course; it does not prove the
+    // plan caused it (shared/BriefingClaimRestraint).
+    ? `The measured progress supports staying the course with ${strategy}, and current training still supports it too.`
     : `${upperFirst(strategy)} still needs a clear outcome before it should be treated as proven.`;
   const guardrailSentence = guardrail?.finding.status === "clear"
     ? `${upperFirst(guardrail.label)} remains inside the ${guardrail.range} guardrail.`
@@ -343,7 +345,7 @@ function projectMonthly(context, monthlyIntelligence = null) {
       title: progressPercent == null
         ? `${achievementLabel(interpretation.goalAchievement,
           trajectory)}, and the current plan remains appropriate.`
-        : `${progressPercent}% of the Goal is complete, and the plan is working.`,
+        : `${progressPercent}% of the Goal is complete, and the current plan remains appropriate.`,
       thesis: `${progress ?? `${upperFirst(objectiveWords.displayName ??
         "Goal progress")} remains in progress.`} Current training supports continuing the plan, while the next ${
         narrative.nextEvidence.displayName} will show whether that progress continues.`,
@@ -397,7 +399,7 @@ function projectMonthly(context, monthlyIntelligence = null) {
           detail: "A watch item is not a reason to change the plan by itself." },
         { label: "Next check", value: `Use the next ${
           narrative.nextEvidence.displayName} to test continuation.`,
-        detail: "It is testing whether the response continues, not whether the plan worked." },
+        detail: "It is testing whether the response continues." },
         { label: "Confidence", value: `${confidence.currentPercentage}% · ${
           confidence.delta === 0 ? "Holding" : "Changed"}`,
         detail: confidence.delta === 0 ?
@@ -553,7 +555,7 @@ function projectMonthlyFromIntelligence(context, intelligence) {
     monthAhead: {
       eyebrow: "Month Ahead",
       title: `${upperFirst(goalContract.vocabulary?.strategy?.continueAction ??
-        `Keep ${phaseContext} steady`)} and protect what is working.`,
+        `Keep ${phaseContext} steady`)} and protect what is going well.`,
       thesis: "Carry the training and nutrition rhythm forward without chasing day-to-day noise.",
       guidance: [
         { label: "Continue", value: "Keep the current plan in place.",
@@ -639,8 +641,8 @@ function projectPhaseReview(context) {
   const recommendationLabel = shouldTransition
     ? `Review beginning ${nextPhase}` : `Continue ${currentPhase}`;
   const explanation = shouldTransition
-    ? `The current phase has completed its job, and the Goal evidence supports reviewing the planned transition to ${nextPhase}.`
-    : `${upperFirst(progress)}. The current phase is still doing its job: the plan has produced meaningful progress, training remains supportive, and ${
+    ? `The current phase has reached its aim, and the Goal evidence supports reviewing the planned transition to ${nextPhase}.`
+    : `${upperFirst(progress)}. The current phase remains on course: measured progress is meaningful, training remains supportive, and ${
       guardrail ? `${guardrail.label} remains inside the ${guardrail.range} guardrail` :
         "no assessed guardrail requires a change"}.`;
   return {
@@ -685,7 +687,7 @@ function projectGoalTransitionReview(context) {
         Number.isFinite(trajectory?.totalRequirement)
         ? `No Goal transition is warranted right now. You have completed ${number(
         trajectory?.completedRequirement, 1)} of the ${number(
-        trajectory?.totalRequirement)} ${context.objective?.unit}, ${strategy} is working, and ${
+        trajectory?.totalRequirement)} ${context.objective?.unit}, ${strategy} remains appropriate, and ${
         guardrail ? `${guardrail.label} remains inside the ${guardrail.range} guardrail` :
           "no assessed guardrail requires a change"}.`
         : `No Goal transition is warranted right now. ${upperFirst(

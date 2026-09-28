@@ -36,7 +36,7 @@ describe("confidenceExplanationPresentation", () => {
         movementRationaleCode: "proxy_support_sustained_increase",
       });
       expect(detail.supportingFactors).toEqual([
-        "Training has continued moving forward, which supports confidence that the plan is working.",
+        "Training has continued moving forward, which supports the outlook.",
       ]);
       expectNoInternalVocabulary(detail.supportingFactors);
       expectInternalDomainNamesNatural(detail.supportingFactors);

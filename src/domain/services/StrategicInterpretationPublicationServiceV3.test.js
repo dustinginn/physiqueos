@@ -52,14 +52,14 @@ describe("shared canonical V3 strategic publication", () => {
       currentPercentage: 79,
       movement: "increased",
       delta: 17,
-      whyConfidence: expect.stringMatching(/plan is clearly working/iu),
+      whyConfidence: expect.stringMatching(/measured progress in .* is real/iu),
       whatIncreasedIt: expect.arrayContaining([
         expect.stringMatching(/added 5\.0 lb/iu),
       ]),
       whatCouldRaiseIt: expect.arrayContaining([
         expect.stringMatching(/next DEXA/iu),
       ]),
-      nextEvidence: expect.stringMatching(/not whether the plan works/iu),
+      nextEvidence: expect.stringMatching(/progress measured so far is already on record/iu),
       coachTake: expect.stringMatching(/exactly what this build needed/iu),
       goal: { id: fixtures.dexa.goalContract.goalId,
         label: "the 10 lb lean-mass goal" },

@@ -160,9 +160,9 @@ describe("Narrative V3 briefing section intelligence", () => {
     expect(event.narrativePlan.composition).toMatchObject({
       sections: {
         result: expect.stringMatching(/^This is a huge win/u),
-        meaning: expect.stringMatching(/more than halfway.*plan is clearly working/isu),
+        meaning: expect.stringMatching(/more than halfway.*measured progress in .* is real/isu),
         action: expect.stringMatching(/^Stay the course/u),
-        watch: expect.stringMatching(/next DEXA.*not whether the plan works/isu),
+        watch: expect.stringMatching(/next DEXA.*progress measured so far is already on record/isu),
       },
       coachTake: expect.stringMatching(/exactly what this build needed/iu),
     });
