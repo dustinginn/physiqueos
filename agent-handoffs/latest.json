@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-28T10:00:00Z",
+  "generated_at_utc": "2026-09-28T11:00:00Z",
   "task": {
-    "id": "briefing-intelligence-cross-briefing-realizer-wiring-20260928",
-    "title": "Briefing Intelligence: Midweek, Monthly, DEXA, Photo wired to the shared engine - one real preview per type for acceptance (candidate f563e1eb, not deployed)",
+    "id": "briefing-intelligence-september-mtd-monthly-zine-preview-20260927",
+    "title": "Briefing Intelligence: Monthly as a review of the month - September MTD (through Sep 26) zero-write preview for acceptance (candidate 15b6e447, not deployed)",
     "agent": "claude",
-    "status": "previews_ready_awaiting_acceptance"
+    "status": "preview_ready_awaiting_acceptance"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -16,11 +16,11 @@
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "f563e1eb",
+    "server_candidate_sha": "15b6e447",
     "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative"
   },
   "result": {
-    "summary": "One shared engine (evidence picture -> holistic synthesis -> briefing policy/budget/section contract -> one realizer with role-keyed per-type words) now serves Midweek, Monthly, DEXA and Photo as well as Weekly. Real zero-write previews: Midweek Sep 20-22 ('Strong training so far.', early read, 59 words), Monthly Aug 2026 dry run ('Strong training month.', 3-insight multi-week recap), DEXA Sep 12 ('New DEXA shows progress.', outcome-led, lead-up is context), Photo Sep 19 ('New photos, compared with the last set.'). Confidence/recommendation identical with and without the engine on every type; claim audits empty; Weekly byte-identical to 6abbed64. Photo production gap: no canonical visual-magnitude producer; visible/subtle/none paths shown on a synthetic fixture.",
+    "summary": "Monthly is now a review/zine written entirely by the shared Briefing Intelligence engine: a review contract (opening, strategy, training, energy, trajectory, execution, other/recovery slot, month ahead), each module earned by the shared picture or omitted with a reason; Confidence compact (<=2 sentences/35 words) on Native hero, strategic card and web. Real September 1-26 preview (4 days remaining): 'Real measured progress, but two off-routine stretches.' ~500 words across 7 modules (2.8x the accepted Weekly), Confidence 79/0 and continue_current_strategy identical with and without the engine, claim audit empty, deterministic. On the same evidence the legacy Monthly editorial engine produced false template copy (e.g. 'did not prove that you gained muscle', 'Progress photos showed a steady physique'); it no longer reaches the page. Midweek/Weekly/DEXA/Photo byte-identical to f563e1eb.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -30,35 +30,36 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Shared BI 157/157 incl. new cross-type realization suite + publication-independence suite; full repo 9089/9397, same 303 environmental failures as baseline, 0 new; Weekly 720 synthetic + real Sep 20-26 identical to 6abbed64."
+      "summary": "BI + Monthly presentation/web 537/537 incl. new BriefingMonthlyReview and MonthlyReviewPresentationService suites; full repo 9113/9421, same 303 environmental failures as baseline, 0 new; non-Monthly corpus 0/2160 changed."
     },
     "review": {
       "status": "passed_with_fixes_applied",
-      "summary": "Three fresh-context rounds; final verification of 10a7f166 PASS-WITH-FIXES, no High; all fixes in cc2cb267/f563e1eb with tests."
+      "summary": "Fresh-context review of c567158a PASS-WITH-FIXES (2 High: energy card data vs prose, Native duplicate ids) fixed in 8f36b02f; verification PASS-WITH-FIXES (11/13; correction-format gate, compact cut, standing-DEXA scale wording, one-day bar) fixed in 15b6e447."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Real services with in-memory write-refusing repositories over the local read-only export; Monthly via publishMonthlyOccurrence dryRun."
+      "summary": "Real prepareMonthlyOccurrence + publishMonthlyOccurrence dryRun over write-refusing in-memory repositories on the read-only export."
     }
   },
   "decisions_required": [
-    "Accept or refine the Midweek, Monthly, DEXA and Photo previews.",
-    "Then authorize Server deploy of f563e1eb (supersedes undeployed 6abbed64)."
+    "Accept or refine the September month-to-date Monthly preview.",
+    "If accepted: deploy decision for cross-briefing candidate 15b6e447.",
+    "Optional: restore Defining Moments as a dated timeline (currently omitted)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Canonical photo producer records no visual-change magnitude, so visual-depth scaling is unreachable in production until a producer exists.",
-    "Monthly cross-source intelligence (MonthlyEvidenceIntelligenceV3) remains a separate Confidence input; consolidation is a follow-on."
+    "Legacy Monthly editorial engine produces false template copy on September evidence (baseline/photos/cut claims); replaced by the shared engine.",
+    "Native Monthly has three fixed template headers that ignore Server titles (next consolidated Native build)."
   ],
   "backlog": [
-    "Consolidate MonthlyEvidenceIntelligenceV3/Energy reliability into the shared picture.",
-    "Canonical photo visual-magnitude producer.",
-    "Composer guard pre-check for non-period watch and Confidence body.",
-    "After acceptance: Sep 27 Strength reconciliation-review notification failure; Logged Today strength+cardio together; Native Log-tab -> active Workout Logger (next consolidated Native build)."
+    "Native: read Server title/eyebrow for What Changed, Month Ahead, New Baseline headers.",
+    "Confidence-side consolidation of MonthlyEvidenceIntelligenceV3 into the shared picture (moves Confidence; separate authorization).",
+    "Sep 27 Strength reconciliation-review notification failure; Logged Today strength+cardio; Native Log-tab -> active Workout Logger; Photo visual-magnitude producer."
   ],
-  "recommended_next_step": "Founder/ChatGPT acceptance of the four previews, then deploy authorization for f563e1eb.",
-  "full_report_path": "agent-handoffs/reports/20260928T100000Z-briefing-intelligence-cross-briefing-previews.md",
+  "recommended_next_step": "Founder/ChatGPT acceptance of the September Monthly preview, then a deploy decision for 15b6e447.",
+  "full_report_path": "agent-handoffs/reports/20260928T110000Z-briefing-intelligence-september-mtd-monthly-review-preview.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260928T100000Z-briefing-intelligence-cross-briefing-previews.md",
     "agent-handoffs/reports/20260928T090000Z-briefing-intelligence-measurement-causality-restraint-release-ready.md",
     "agent-handoffs/reports/20260928T070000Z-briefing-intelligence-final-semantic-restraint-sep20-26-preview.md",
     "agent-handoffs/reports/20260928T050000Z-briefing-intelligence-section-contracts-sep20-26-preview.md"

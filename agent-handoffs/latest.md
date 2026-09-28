@@ -2,23 +2,27 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Briefing Intelligence — cross-briefing wiring (Midweek, Monthly, DEXA, Photo)
+- Task: Briefing Intelligence — Monthly as a review of the month (September month-to-date preview)
 - Agent: claude
-- Status: previews ready for acceptance (nothing deployed)
-- Generated (UTC): 2026-09-28T10:00:00Z
+- Status: preview ready for acceptance (nothing deployed or published)
+- Generated (UTC): 2026-09-28T11:00:00Z
 
-The shared engine now writes all five briefing types. Each type has its own purpose and length. Here is one real preview per type, all generated without writing anything:
-- **Midweek, Sep 20–22:** "Strong training so far." The recap reads "So far this week, training kept moving forward, with new bests on five lifts." The takeaway is framed as "Early read: …", and the briefing is 59 words.
-- **Monthly, August:** "Strong training month." The recap covers three things: new bests on 18 lifts, weight rising about 1 lb a week, and more training days than usual.
-- **DEXA, Sep 12:** "New DEXA shows progress." The result leads, and the off-routine stretch before the scan is treated as context, not a reason to change course.
-- **Photo, Sep 19:** "New photos, compared with the last set." The Sep 12 DEXA stays context and is never called "new".
+The Monthly now reads like a review of the month, and every card is written by the shared engine. This preview is your September Monthly, generated from September 1–26 (4 days are still to come). The headline is: "Real measured progress, but two off-routine stretches."
+- **The opening** says what defined the month so far: measured progress in lean mass on the September 12 DEXA, new training bests across most of the month, and two short off-routine stretches.
+- **The detail cards** cover:
+  - **Training:** 12 new bests across three of the four weeks, from 21 training days.
+  - **Energy:** readable-day intake of about 2,800 against a 2,500 target, with the wearable treated as an estimate.
+  - **The DEXA as the new reference point**, with the scale's pace.
+  - **The two stretches**, with the latest one still open.
+  - **October's priorities.**
+- **Confidence stays compact:** "Confidence holds. The September 12 DEXA sets the outlook, and a few off-routine days aren't enough to change it."
+- **Confidence (79%) and the recommendation are identical** with and without the engine.
+- **The other briefing types are unchanged**, and the full test suite shows 0 new failures.
 
-Confidence and the recommendation are identical with and without the engine for every type. Weekly is unchanged. The full test suite shows 0 new failures.
+On September's data, the old Monthly editorial engine was writing false template copy, such as "…did not prove that you gained muscle" and "Progress photos showed a steady physique". That copy is gone.
 
-**Gap:** the photo pipeline never measures how much the photos changed, so the "visible / subtle / little change" wording is shown on a synthetic fixture.
+**Your call:** accept or refine the September preview. If you accept it, the cross-briefing candidate `15b6e447` is ready for a deploy decision.
 
-**Your call:** accept or refine the four previews, then authorize the deploy of `f563e1eb`.
-
-Detailed report: `agent-handoffs/reports/20260928T100000Z-briefing-intelligence-cross-briefing-previews.md`
+Detailed report: `agent-handoffs/reports/20260928T110000Z-briefing-intelligence-september-mtd-monthly-review-preview.md`
 
 Protocol: `agent-handoffs/README.md`
