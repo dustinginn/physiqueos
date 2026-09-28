@@ -5,7 +5,11 @@ import {
   naturalizeUserFacingNarrativeProjection,
   naturalizeUserFacingNarrativeText,
 } from "../../services/UserFacingObjectLanguageService.js";
-import { realizePeriodCharacterizationV3 } from "./PeriodCharacterizationLanguageV3.js";
+import { goalFactsFromInterpretationV3, realizeHolisticWeeklyV3 } from "./HolisticNarrativeV3.js";
+import { buildEvidencePicture } from "../shared/BriefingEvidencePicture.js";
+import { synthesizeBriefing } from "../shared/BriefingHolisticSynthesis.js";
+import { resolveGoalEvidencePolicy } from "../shared/GoalEvidencePolicies.js";
+import { resolveBriefingIntelligencePolicy, resolveNarrativeBudget } from "../shared/BriefingIntelligencePolicies.js";
 
 const FIRST_PERSON_SINGULAR = new Set(["i", "me", "my", "mine", "myself", "i'm", "i’m", "i’ve", "i've", "i’d", "i'd", "i’ll", "i'll"]);
 const RAW_ENGINE_LANGUAGE = [
@@ -74,16 +78,19 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
   context.specificCoachingObservations =
     interpretation.coachingObservationSelection?.selected ?? [];
   context.reconciliationTensions = interpretation.crossDomainSynthesis?.tensions ?? [];
-  // Shared Briefing Intelligence: what characterized the period, realized at
-  // period level. It only speaks when the plan holds; a decision-changing
-  // evaluation keeps its own allocation.
-  context.period = briefingIntelligence && context.useRecurringSectionPlan &&
+  // Holistic synthesis over the shared Briefing Intelligence: every
+  // goal-relevant domain is assessed, then a complementary set is chosen for
+  // this briefing's own information budget. It writes the recap only when the
+  // plan holds; a decision-changing evaluation keeps its own allocation.
+  context.holistic = briefingIntelligence && context.useRecurringSectionPlan
+    ? safelySynthesize({ briefingIntelligence, goalContract, interpretation, confidence, words: {
+      outcomeEventName: context.nextEvidence.displayName,
+      outcomeLabel: objectiveLabel(context),
+      guardrailLabel: context.primaryGuardrail ? guardrailLabel(goalContract, context.primaryGuardrail) : null,
+    } }) : null;
+  context.period = context.holistic?.realized &&
       interpretation.recommendation.action === "continue_current_strategy"
-    ? safelyRealizePeriod({
-      intelligence: briefingIntelligence,
-      goalLabel: goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel ?? "goal",
-      nextEvidenceName: nextEvidenceName(context),
-    }) : null;
+    ? context.holistic.realized : null;
   context.sectionPlan = allocateNarrativeSections(context);
   const primaryConfidenceSnapshot = { percentage: confidence.currentPercentage, delta: confidence.delta, movement: confidence.movement };
   const casingOptions = {
@@ -190,14 +197,7 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
       status: item.status,
     })),
     uncertaintyTypes: uncertaintyTypes,
-    ...(briefingIntelligence ? { periodCharacterization: {
-      schemaVersion: briefingIntelligence.schemaVersion,
-      realized: Boolean(context.period),
-      leadId: context.period?.leadId ?? null,
-      items: briefingIntelligence.characterization.map((item) => ({
-        id: item.id, kind: item.kind, materiality: item.materiality })),
-      reliabilityIds: briefingIntelligence.reliability.map((item) => item.id),
-    } } : {}),
+    ...(briefingIntelligence ? { holisticSynthesis: summarizeHolistic(briefingIntelligence, context) } : {}),
     questionTransitions: interpretation.questionTransitions,
     recommendation: interpretation.recommendation,
     nextEvidencePurpose: interpretation.nextCoachingQuestion?.evidencePurpose ?? null,
@@ -475,8 +475,38 @@ function allocateNarrativeSections(context) {
 
 // Enrichment never fails a briefing: an unrealizable characterization falls
 // back to the prior recurring allocation.
-function safelyRealizePeriod(input) {
-  try { return realizePeriodCharacterizationV3(input); } catch { return null; }
+function safelySynthesize({ briefingIntelligence, goalContract, interpretation, confidence, words }) {
+  try {
+    const goalPolicy = resolveGoalEvidencePolicy(goalContract);
+    const goalFacts = goalFactsFromInterpretationV3({ interpretation, confidence,
+      window: briefingIntelligence.horizon.window, words });
+    const picture = buildEvidencePicture({ intelligence: briefingIntelligence, goalPolicy, goalFacts });
+    const policy = resolveBriefingIntelligencePolicy(briefingIntelligence.policy.cadence);
+    const budget = resolveNarrativeBudget(policy, picture);
+    if (!budget) return null;
+    const synthesis = synthesizeBriefing({ picture, budget });
+    const realized = policy.cadence === "weekly" ? realizeHolisticWeeklyV3({ synthesis, picture, goalPolicy,
+      goalLabel: goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel ?? "the goal" }) : null;
+    return { goalPolicy, picture, synthesis, realized };
+  } catch {
+    return null;
+  }
+}
+
+function summarizeHolistic(briefingIntelligence, context) {
+  const holistic = context.holistic;
+  return {
+    intelligenceVersion: briefingIntelligence.schemaVersion,
+    synthesisVersion: holistic?.synthesis?.schemaVersion ?? null,
+    goalType: holistic?.goalPolicy?.goalType ?? null,
+    realized: Boolean(context.period),
+    considered: holistic?.synthesis?.considered.map((item) => ({ domain: item.domain, status: item.status, state: item.state })) ?? [],
+    selected: holistic?.synthesis?.selected.map((item) => ({ id: item.id, role: item.role, reason: item.reason })) ?? [],
+    context: holistic?.synthesis?.context.map((item) => item.id) ?? [],
+    limitations: holistic?.synthesis?.limitations.map((item) => item.id) ?? [],
+    omitted: holistic?.synthesis?.omitted.map((item) => ({ id: item.id, reason: item.reason })) ?? [],
+    budget: holistic?.synthesis ? { purpose: holistic.synthesis.budget.purpose, maxInsights: holistic.synthesis.budget.maxInsights } : null,
+  };
 }
 
 // The period's own character leads when the plan holds: the week is
@@ -498,15 +528,15 @@ function allocatePeriodCharacterization(context) {
     content: { result: period.result, meaning: period.meaning, action: period.action,
       watch, coachTake: period.coachTake },
     allocations: {
-      result: allocation("recent_change_worth_knowing", period.leadId, { scope: "period" }),
+      result: allocation("recent_change_worth_knowing", period.heroIds.join("+"), { scope: "holistic_period" }),
       meaning: allocation("goal_relative_implication", "goal_implication"),
       action: allocation("current_coaching_action", "recommendation"),
       watch: allocation("specific_bounded_attention",
-        context.periodOwnsWatch ? `${period.leadId}|persistence` : "next_assessment"),
+        context.periodOwnsWatch ? `${period.selectedIds.join("+")}|watch` : "next_assessment"),
       confidence: allocation("goal_outlook_movement", "confidence_movement"),
-      coachTake: allocation("highest_value_remaining_coaching_point", `${period.leadId}|coaching`,
-        { allocationReason: "period_characterization",
-          ...(period.reliabilityIds.length ? { reliabilityIds: period.reliabilityIds } : {}) }),
+      coachTake: allocation("highest_value_remaining_coaching_point", `${period.selectedIds.join("+")}|coaching`,
+        { allocationReason: "holistic_synthesis",
+          ...(period.limitationIds.length ? { limitationIds: period.limitationIds } : {}) }),
     },
   };
 }
@@ -1113,14 +1143,11 @@ function composeConfidenceBriefing(context) {
     // outlook and whether the period's evidence is strong enough to move it.
     // A single exercise or movement result is never the explanation — it lives
     // in Training detail, not in the goal outlook.
+    if (context.period?.confidenceBody) return { heading, body: context.period.confidenceBody };
     const anchor = context.objective?.freshness === "carried_forward" &&
       context.nextEvidence.namedFromBinding
-      ? `The last ${context.nextEvidence.displayName} still anchors the outlook` : null;
-    if (anchor) {
-      return { heading, body: context.period
-        ? `Confidence holds. ${anchor}, and ${context.period.confidencePeriod} is not enough evidence to change it.`
-        : `Confidence holds. ${anchor}, and nothing in this check-in changes it.` };
-    }
+      ? `The last ${context.nextEvidence.displayName} still sets the outlook` : null;
+    if (anchor) return { heading, body: `Confidence holds. ${anchor}, and nothing in this check-in changes it.` };
     return { heading, body: confidence.projectionPolicy.mode === "continuity_hold" ?
       "Confidence holds. Nothing new changes the outlook for the goal." :
       "Confidence holds. This check-in does not change the outlook for reaching the goal." };

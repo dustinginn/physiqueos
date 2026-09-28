@@ -70,12 +70,16 @@ export function buildBriefingPeriodDays({
     sessionsByDate.set(date, ids);
   }
 
-  const weighIns = new Set();
+  // Latest weigh-in per local day, in pounds.
+  const weightByDate = new Map();
   for (const entry of weightEntries) {
     const value = entry?.measuredAt ?? entry?.date;
-    if (!value || !Number.isFinite(Number(entry?.weight?.value ?? entry?.weight))) continue;
+    const pounds = weightInPounds(entry);
+    if (!value || pounds == null) continue;
     const date = getCanonicalLocalDate(value, timeZone);
-    if (inRange(date)) weighIns.add(date);
+    if (!inRange(date)) continue;
+    const previous = weightByDate.get(date);
+    if (!previous || String(value) > previous.at) weightByDate.set(date, { at: String(value), pounds });
   }
 
   return dateRange(startDate, endDate).map((date) => {
@@ -94,9 +98,17 @@ export function buildBriefingPeriodDays({
       },
       activity: activeKcal == null ? null : { activeKcal, exerciseMinutes: minutesByDate.get(date) ?? null },
       training: { sessions: sessionsByDate.get(date)?.size ?? 0 },
-      body: { weighIn: weighIns.has(date) },
+      body: { weighIn: weightByDate.has(date), weight: weightByDate.get(date)?.pounds ?? null },
     };
   });
+}
+
+function weightInPounds(entry) {
+  const raw = entry?.weight?.value ?? entry?.weight;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const unit = String(entry?.weight?.unit ?? "lb").toLowerCase();
+  return unit === "kg" ? value * 2.20462 : value;
 }
 
 function isDeliberateTraining(payload) {

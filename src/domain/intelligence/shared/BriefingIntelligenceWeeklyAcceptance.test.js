@@ -47,32 +47,31 @@ describe("Shared Briefing Intelligence through the Weekly V3 pipeline", () => {
     }
   });
 
-  it("a materially different week yields a rich, specific recap while the plan holds", async () => {
+  it("a materially different week yields a holistic recap while the plan holds", async () => {
     for (const seed of SEEDS) {
       const prepared = await weekly(generateSyntheticPeriod({ seed, scenario: "late_disruption" }));
-      const { composition, periodCharacterization } = prepared.narrativePlan;
-      expect(periodCharacterization.realized).toBe(true);
-      expect(composition.headline).toMatch(/^(?:Late in the week the usual routine changed: |Activity (?:well )?below your usual )/u);
+      const { composition, holisticSynthesis } = prepared.narrativePlan;
+      expect(holisticSynthesis.realized).toBe(true);
+      expect(holisticSynthesis.considered.map((item) => item.domain)).toEqual(expect.arrayContaining(
+        ["body_trajectory", "body_composition", "guardrail", "training", "nutrition", "activity", "routine", "recovery"]));
       expect(composition.headline).not.toMatch(/Nothing here calls for a change/u);
       expect(composition.coachTake).not.toMatch(/Nothing needs fixing right now/u);
       expect(composition.sections.action).toMatch(/Keep the current setup in place\.$/u);
-      expect(composition.sections.watch).toMatch(/^Watch whether next week holds its routine/u);
+      expect(composition.sections.watch).toMatch(/^Watch /u);
       expect(composition.headline.length).toBeLessThanOrEqual(160);
       expect(findNarrativeV3VoiceViolations(Object.values(composition.sections).join("\n") + composition.coachTake)).toEqual([]);
     }
   });
 
-  it("a stable week keeps the existing concise no-change narrative", async () => {
-    const base = await withoutIntelligence();
-    let concise = 0;
+  it("a stable week stays concise: few insights, no disruption or risk language", async () => {
     for (const seed of SEEDS) {
       const prepared = await weekly(generateSyntheticPeriod({ seed, scenario: "stable" }));
-      if (prepared.narrativePlan.periodCharacterization.realized) continue;
-      concise += 1;
-      expect(prepared.narrativePlan.composition.sections).toEqual(base.narrativePlan.composition.sections);
-      expect(prepared.narrativePlan.composition.coachTake).toBe(base.narrativePlan.composition.coachTake);
+      const { composition, holisticSynthesis } = prepared.narrativePlan;
+      expect(holisticSynthesis.selected.length, `seed ${seed}`).toBeLessThanOrEqual(2);
+      expect(holisticSynthesis.selected.some((item) => ["routine|routine_break", "guardrail|guardrail_status"].includes(item.id))).toBe(false);
+      expect((composition.sections.meaning.match(/[.!?](?:\s|$)/gu) ?? []).length).toBeLessThanOrEqual(2);
+      expect(composition.coachTake).not.toMatch(/quiet|patchy|slipped/u);
     }
-    expect(concise).toBeGreaterThanOrEqual(SEEDS.length - 1);
   });
 
   it("Goal Confidence is explained at goal level: no single exercise, no undefined referent", async () => {
@@ -94,16 +93,20 @@ describe("Shared Briefing Intelligence through the Weekly V3 pipeline", () => {
     }
   });
 
-  it("an unreliable nutrition day is disclosed as a logging question, never as eating more or less", async () => {
+  it("unreliable food logging is said only when it limits the picture, and never read as eating more or less", async () => {
     for (const seed of SEEDS) {
       const period = generateSyntheticPeriod({ seed, scenario: "late_disruption" });
-      const last = period.days.at(-1);
-      last.nutrition.protein = Math.round(last.nutrition.protein * 0.3);
+      for (const day of period.days.slice(-3)) day.nutrition.protein = Math.round(day.nutrition.protein * 0.3);
       const prepared = await weekly(period);
       const coach = prepared.narrativePlan.composition.coachTake;
-      expect(coach).toMatch(/nutrition logs? for [^,]+ (?:looks|look) incomplete \(protein far below your usual\), so this recap does not read intake on (?:that day|those days) either way\./u);
+      expect(coach).toMatch(/Food logging (?:for|on) [^,]+ is too patchy to read, so (?:that day isn't|those days aren't) part of this picture\./u);
       const all = [...Object.values(prepared.narrativePlan.composition.sections), coach].join(" ");
       expect(all).not.toMatch(/\b(?:ate|eating|intake) (?:more|less|higher|lower)\b/iu);
+      expect(all).not.toMatch(/intake stayed on plan/u);
+      // A single odd day does not earn a mention.
+      const single = generateSyntheticPeriod({ seed, scenario: "stable" });
+      single.days.at(-1).nutrition.protein = Math.round(single.days.at(-1).nutrition.protein * 0.3);
+      expect((await weekly(single)).narrativePlan.composition.coachTake).not.toMatch(/patchy/u);
     }
   });
 
@@ -117,7 +120,7 @@ describe("Shared Briefing Intelligence through the Weekly V3 pipeline", () => {
 
   it("without period evidence, V3 runs exactly as before: no characterization, no lineage stamp", async () => {
     const base = await withoutIntelligence();
-    expect(base.narrativePlan.periodCharacterization).toBeUndefined();
+    expect(base.narrativePlan.holisticSynthesis).toBeUndefined();
     expect(base.briefingIntelligence).toBeNull();
     expect(base.assessment.sourceLineage.briefingIntelligenceVersion).toBeUndefined();
     const withEvidence = await weekly(generateSyntheticPeriod({ seed: 1, scenario: "late_disruption" }));

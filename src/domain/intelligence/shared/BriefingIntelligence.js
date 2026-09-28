@@ -182,6 +182,9 @@ export function createBriefingIntelligence({ window, days = [], policy = {} } = 
     policy: { cadence: settings.cadence ?? null, admissibleKinds: [...settings.admissibleKinds],
       maxCharacterization: settings.maxCharacterization, minMateriality: settings.minMateriality },
     baselines,
+    // The canonical day series (baseline + window) the findings were read
+    // from, for downstream domain assessment. In-memory only; never persisted.
+    periodDays: [...baselineDates, ...windowDates].map((date) => dayAt(date)),
     patterns: ranked,
     characterization,
     reliability,

@@ -1,16 +1,13 @@
-// Realization and policy properties: the recap language stays grammatical,
-// honest and internally consistent for every lead kind, direction and span
-// the shared layer can produce; each briefing policy can express its role.
+// Shared-layer and policy properties over hand-shaped variants of generated
+// periods (breaks, increases, week-long and early leads). Narrative language
+// is validated by the holistic synthesis suite.
 
 import { describe, expect, it } from "vitest";
 import { BriefingPatternKind, createBriefingIntelligence, dateRange, shiftDate } from "./BriefingIntelligence.js";
 import { BRIEFING_INTELLIGENCE_POLICIES } from "./BriefingIntelligencePolicies.js";
-import { realizePeriodCharacterizationV3 } from "../v3/PeriodCharacterizationLanguageV3.js";
-import { findNarrativeV3VoiceViolations } from "../v3/NarrativeV3CompositionService.js";
 import { SYNTHETIC_SCENARIOS, generateSyntheticPeriod } from "../../../testSupport/briefingIntelligenceSynthetic.js";
 
 const weekly = BRIEFING_INTELLIGENCE_POLICIES.weekly;
-const realize = (intelligence) => realizePeriodCharacterizationV3({ intelligence, goalLabel: "the goal", nextEvidenceName: "the next check" });
 
 function intelligenceFor(days, window, policy = weekly) {
   return createBriefingIntelligence({ window, days, policy });
@@ -48,70 +45,12 @@ function variants() {
     out.push({ name: `early_break#${seed}`, days: early, window: base.truth.window });
   }
   return out.map((item) => ({ ...item, intelligence: intelligenceFor(item.days, item.window) }))
-    .map((item) => ({ ...item, period: realize(item.intelligence) }))
-    .filter((item) => item.period);
+    .filter((item) => item.intelligence.characterization.length);
 }
 
-const realized = variants();
+const realized = variants(); // generated variants with a characterization
 
-describe("recap language across lead kinds, directions and spans", () => {
-  it("covers breaks, increases and single-signal leads (the suite is not vacuous)", () => {
-    const tones = new Set(realized.map((item) => item.period.tone));
-    expect(tones.has("break")).toBe(true);
-    expect(tones.has("increase")).toBe(true);
-    expect(realized.some((item) => item.intelligence.characterization[0].kind !== BriefingPatternKind.ROUTINE_SHIFT)).toBe(true);
-    expect(realized.length).toBeGreaterThan(20);
-  });
-
-  it("is grammatical: subject agreement, whole clauses, budgeted headline", () => {
-    for (const { name, period } of realized) {
-      const sections = [period.result, period.meaning, period.action, period.watch, period.coachTake];
-      expect(findNarrativeV3VoiceViolations(sections.join("\n")), name).toEqual([]);
-      expect(period.result.length, name).toBeLessThanOrEqual(160);
-      for (const text of sections) expect(text, name).toMatch(/[.]$/u);
-      expect(period.result, name).not.toMatch(/(?:through|and|or|,)\.$/u);
-      expect(period.meaning, name).not.toMatch(/\bis small\b[^.]*\bdo not\b/u);
-      expect(period.meaning, name).not.toMatch(/\bare small\b[^.]*\bdoes not\b/u);
-      expect(period.meaning, name).not.toMatch(/\bthe the\b/u);
-      expect(period.coachTake, name).not.toMatch(/\blog for [^,]*(?:through|and) [A-Z][a-z]+day (?:look|repeat|cover)\b/u);
-      expect(period.coachTake, name).not.toMatch(/\blogs for [A-Z][a-z]+day (?:looks|repeats|covers)\b/u);
-    }
-  });
-
-  it("never assumes progress or contradicts itself", () => {
-    for (const { name, period, intelligence } of realized) {
-      const all = [period.result, period.meaning, period.action, period.watch, period.coachTake].join(" ");
-      expect(all, name).not.toMatch(/undo the progress|your progress/u);
-      if (intelligence.characterization[0].recurrence) expect(all, name).not.toMatch(/one-off/u);
-      if (period.tone !== "break") {
-        expect(period.action, name).not.toMatch(/^Get back to/u);
-        expect(all, name).not.toMatch(/\bbreak\b/u);
-      }
-    }
-  });
-
-  it("the action only names what the headline told", () => {
-    const told = { training: /training/iu, "weigh-in": /weigh-ins/iu, activity: /activity/iu, intake: /intake/iu };
-    for (const { name, period } of realized) {
-      if (!/^Get back to your usual/u.test(period.action)) continue;
-      for (const [target, headline] of Object.entries(told)) {
-        if (period.action.includes(target)) expect(period.result, `${name}: ${target}`).toMatch(headline);
-      }
-    }
-  });
-
-  it("reliability wording matches the finding and stays within this recap's scope", () => {
-    const period = generateSyntheticPeriod({ seed: 3, scenario: "late_disruption" });
-    const last = period.days.at(-1);
-    const previous = period.days.at(-2);
-    last.nutrition = { ...previous.nutrition, calories: previous.nutrition.calories + 0.3 };
-    const text = realize(intelligenceFor(period.days, period.truth.window)).coachTake;
-    expect(text).toMatch(/repeats the previous day's totals, so this recap does not read intake on that day either way\./u);
-    expect(text).not.toMatch(/look(?:s)? incomplete/u);
-  });
-});
-
-describe("second-review fixes", () => {
+describe("routine-shift structure", () => {
   it("a routine shift joins overlapping days, one member per signal family, and needs two behavior domains", () => {
     for (const { name, intelligence } of realized) {
       const byId = new Map(intelligence.patterns.map((item) => [item.id, item]));
@@ -124,34 +63,6 @@ describe("second-review fixes", () => {
     }
   });
 
-  it("intake is advised against the plan, never against the person's usual", () => {
-    for (const { name, period } of realized) {
-      expect(period.action, name).not.toMatch(/usual intake|intake range|intake back toward your usual/u);
-      if (/intake/iu.test(period.result)) expect(period.action, name).toMatch(/Keep intake on plan/u);
-      expect(period.watch, name).not.toMatch(/intake settles back toward your usual/u);
-      if (/^Intake /u.test(period.result)) expect(period.action, name).not.toMatch(/usual routine/u);
-    }
-  });
-
-  it("span words match the lead's span", () => {
-    for (const { name, period, intelligence } of realized) {
-      const spanDays = intelligence.characterization[0].span.days;
-      const all = [period.meaning, period.watch, period.coachTake].join(" ");
-      if (spanDays < 7) expect(all, name).not.toMatch(/\b(?:One|one) week\b|second week/u);
-      if (spanDays > 4) expect(all, name).not.toMatch(/\bshort break\b/u);
-    }
-  });
-
-  it("the reliability note names each day once", () => {
-    const period = generateSyntheticPeriod({ seed: 5, scenario: "late_disruption" });
-    const last = period.days.at(-1);
-    last.nutrition.protein = Math.round(last.nutrition.protein * 0.25);
-    last.nutrition.completeness = "partial";
-    const text = realize(intelligenceFor(period.days, period.truth.window)).coachTake;
-    const note = text.slice(text.search(/The nutrition log/u));
-    const weekday = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(`${last.date}T12:00:00Z`).getUTCDay()];
-    expect(note.split(weekday).length - 1).toBe(1);
-  });
 });
 
 describe("shared-layer fixes", () => {
@@ -223,11 +134,4 @@ describe("briefing policies can express their role", () => {
     }
   });
 
-  it("only the Weekly recap language is wired in Phase 1", () => {
-    const period = generateSyntheticPeriod({ seed: 1, scenario: "late_disruption" });
-    for (const type of ["midweek", "monthly", "dexa", "photo"]) {
-      const intelligence = intelligenceFor(period.days, period.truth.window, BRIEFING_INTELLIGENCE_POLICIES[type]);
-      expect(realize(intelligence)).toBeNull();
-    }
-  });
 });

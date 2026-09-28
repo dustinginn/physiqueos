@@ -374,7 +374,7 @@ describe("Item 3: Confidence is concrete and never uses an undefined update phra
       expect(text.toLowerCase()).not.toContain(label.toLowerCase());
     }
     expect(text).not.toMatch(/’s recent result/u);
-    expect(text).toMatch(/Confidence holds\. (?:The last [^,]+ still anchors the outlook, and (?:nothing in this check-in changes it|[^.]+ is not enough evidence to change it)|Nothing new changes the outlook for the goal|This check-in does not change the outlook for reaching the goal)\./u);
+    expect(text).toMatch(/Confidence holds\. (?:The last [^,]+ still sets the outlook, and (?:nothing in this check-in changes it|[^.]+ is not enough evidence to change it)|Nothing new changes the outlook for the goal|This check-in does not change the outlook for reaching the goal)\./u);
   });
 
   it("the deterministic voice guard rejects the retired generic phrasing outright", () => {

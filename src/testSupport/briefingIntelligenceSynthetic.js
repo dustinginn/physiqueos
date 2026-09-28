@@ -32,7 +32,8 @@ export function mulberry32(seed) {
   };
 }
 
-export function generateSyntheticPeriod({ seed, scenario, windowEnd = "2026-09-19", baselineDays = 28, windowDays = 7 }) {
+export function generateSyntheticPeriod({ seed, scenario, windowEnd = "2026-09-19", baselineDays = 28, windowDays = 7,
+  weightTrend = null }) {
   const random = mulberry32(seed * 7919 + SYNTHETIC_SCENARIOS.indexOf(scenario) * 104729 + 1);
   const between = (min, max) => min + (max - min) * random();
   const gauss = () => {
@@ -49,6 +50,17 @@ export function generateSyntheticPeriod({ seed, scenario, windowEnd = "2026-09-1
     trainingDays: pickWeekdays(random, Math.round(between(4, 6))),
     weighInRate: between(0.85, 1),
   };
+  // Weight draws come from their own stream so adding weight never changes
+  // any other generated value for a seed.
+  const weightRandom = mulberry32(seed * 104729 + 11);
+  const weightBetween = (min, max) => min + (max - min) * weightRandom();
+  const weightGauss = () => {
+    const u = Math.max(weightRandom(), 1e-9);
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * weightRandom());
+  };
+  routine.startWeight = weightBetween(150, 200);
+  routine.weeklyWeightTrend = weightTrend ?? weightBetween(-0.1, 0.9);
+  routine.weightNoise = weightBetween(0.4, 1.1);
   const windowStart = shiftDate(windowEnd, -(windowDays - 1));
   const start = shiftDate(windowStart, -baselineDays);
   const dates = dateRange(start, windowEnd);
@@ -67,6 +79,11 @@ export function generateSyntheticPeriod({ seed, scenario, windowEnd = "2026-09-1
       body: { weighIn: random() < routine.weighInRate },
     };
   });
+  for (const [index, day] of days.entries()) {
+    day.body.weight = day.body.weighIn
+      ? Math.round((routine.startWeight + routine.weeklyWeightTrend * index / 7 + routine.weightNoise * weightGauss()) * 10) / 10
+      : null;
+  }
   const windowDates = dateRange(windowStart, windowEnd);
   const at = (date) => days.find((day) => day.date === date);
   const truth = { scenario, seed, routine, window: { startDate: windowStart, endDate: windowEnd }, perturbed: [] };
@@ -99,7 +116,7 @@ export function generateSyntheticPeriod({ seed, scenario, windowEnd = "2026-09-1
   } else if (scenario === "data_outage") {
     const run = span(2 + Math.floor(random() * 2));
     for (const date of run) Object.assign(at(date), { nutrition: null, activity: null,
-      training: { sessions: 0 }, body: { weighIn: false } });
+      training: { sessions: 0 }, body: { weighIn: false, weight: null } });
     truth.perturbed = run;
   } else if (scenario === "late_disruption") {
     const length = 2 + Math.floor(random() * 2);
@@ -108,6 +125,7 @@ export function generateSyntheticPeriod({ seed, scenario, windowEnd = "2026-09-1
       const day = at(date);
       day.training.sessions = 0;
       day.body.weighIn = false;
+      day.body.weight = null;
       day.activity.activeKcal = Math.round(day.activity.activeKcal * between(0.35, 0.55));
       day.activity.exerciseMinutes = Math.round(day.activity.exerciseMinutes * between(0.1, 0.35));
     }
@@ -166,7 +184,7 @@ export function syntheticCanonicalRecords({ days, userId = "user_founder_001" })
     }
     if (day.body.weighIn) {
       weightEntries.push({ id: `weight_${day.date}`, measuredAt: `${day.date}T14:00:00.000Z`,
-        weight: { value: 175, unit: "lb" } });
+        weight: { value: day.body.weight ?? 175, unit: "lb" } });
     }
   }
   return { canonicalObjects, weightEntries };
