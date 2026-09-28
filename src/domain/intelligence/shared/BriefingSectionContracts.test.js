@@ -374,6 +374,24 @@ describe("hand-built pictures exercise paths the generator rarely reaches", () =
     expect((realized.meaning.match(/pace the phase sets/gu) ?? []).length).toBe(1);
   });
 
+  it("a canonically on-pace scale is credited as where the phase expects it, never as what the goal 'needs'", () => {
+    const realized = realize([insight("body_trajectory", "weight_trend", "progress", "supportive", { verdict: "steady", movement: "up",
+      weeklyRate: 0.5, rateSpanDays: 28, expectedDirection: "up", paceAuthority: "phase_expected_trajectory" })]);
+    expect(realized.result).toBe("The scale is where the phase expects it, and that is the part to keep.");
+    expect(realized.sectionAudit.text.issues).toEqual([]);
+  });
+
+  it("a limitation-only week keeps its forward logging guidance in What To Do, never in Watch", () => {
+    const realized = realize([
+      insight("routine", "routine_steady", "execution", "supportive"),
+      { ...insight("nutrition", "nutrition_unclear", "limitation", "neutral", { dates: ["2026-09-24", "2026-09-25"],
+        datesByKind: { implausible_macro_profile: ["2026-09-24", "2026-09-25"] }, kinds: ["implausible_macro_profile"] }),
+        strength: 2.2, limits: ["nutrition"] },
+    ]);
+    expect(realized.coachTake).toMatch(/too patchy to read; complete logs from here on/u);
+    expect(realized.watch).not.toMatch(/log|fill/iu);
+  });
+
   it("two supportive leads read as a headline with a noun phrase after 'with'", () => {
     const realized = realize([
       insight("training", "training_progress", "progress", "supportive", { milestoneCount: 3, example: null }),
@@ -492,11 +510,12 @@ describe("claim restraint: performance is not proof of effectiveness; logging gu
 
 describe("claim-restraint language detection", () => {
   it("catches effectiveness and causal phrasing in its common tenses and forms", () => {
-    for (const text of ["The training is clearly working.", "The plan works.", "The training worked.", "It has been working.",
+    for (const text of ["The training is clearly working.", "The plan works.", "The training worked.", "The plan has been working.", "The approach has worked.",
       "The training’s working.", "The approach is proving effective.", "The training drove the gains.", "That produced the gains.",
       "The plan is paying off.", "The lifting is paying dividends.", "The program is delivering results.",
       "The training is building muscle.", "This is exactly the kind of week the goal needs.", "The routine is doing its job.",
-      "The new DEXA says the approach is working."]) {
+      "The new DEXA says the approach is working.", "It is translating into lean mass.", "The gains are coming from the training.",
+      "The program is getting results.", "The surplus fueled the lean-mass gain."]) {
       expect(text).toMatch(EFFECTIVENESS_LANGUAGE);
     }
   });
@@ -505,19 +524,22 @@ describe("claim-restraint language detection", () => {
     for (const text of ["Thanks to steady logging, the picture is clear.", "Missed logs result in a thinner picture.",
       "It rarely leads to a setback.", "You were working late.", "Adding mass is the goal.",
       "Nothing this week changes the direction of building lean mass.", "The performance gains are real.",
-      "Training kept moving forward, with new bests on seven lifts.", "Keep pushing the same lifts."]) {
+      "Training kept moving forward, with new bests on seven lifts.", "Keep pushing the same lifts.",
+      "If that works for you, keep it.", "It worked out to about 2,000 calories."]) {
       expect(text).not.toMatch(EFFECTIVENESS_LANGUAGE);
     }
   });
 
   it("catches repair-the-past logging guidance but not prospective guidance", () => {
     for (const text of ["Fill in Thursday's log.", "Add the missing meals.", "Log Thursday through Saturday fully.",
-      "Complete the week's logs.", "Updating the log for those days will help.", "Logging those days fully will make next week clearer."]) {
+      "Complete the week's logs.", "Updating the log for those days will help.", "Logging those days fully will make next week clearer.",
+      "Those days can still be logged.", "Enter the meals you skipped."]) {
       expect(text).toMatch(RETROACTIVE_REPAIR_LANGUAGE);
     }
     for (const text of ["Log that day going forward.", "Complete logs from here on will make the next check clearer.",
       "Logging a little more each day from here on will make the next check clearer.",
-      "A fresh log each day from here on keeps the next check honest.", "Watch whether food logs are complete next week."]) {
+      "A fresh log each day from here on keeps the next check honest.", "Watch whether food logs are complete next week.",
+      "Add that set next week.", "Log Monday through Friday this week.", "Adding those extra steps next week helps."]) {
       expect(text).not.toMatch(RETROACTIVE_REPAIR_LANGUAGE);
     }
   });

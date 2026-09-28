@@ -50,11 +50,13 @@ export function claimScopeOf(item) {
 // Effectiveness/causal language: an intervention "working", paying off,
 // producing or driving an outcome.
 const APOSTROPHE = "['\u2019]";
-const AGENT = "(?:training|lifting|plan|approach|program|programme|strategy|routine|setup|work|it|this|that)";
+// Named interventions only: "it"/"that" also start ordinary sentences
+// ("if that works for you", "it worked out to …").
+const AGENT = "(?:training|lifting|plan|approach|program|programme|strategy|routine|setup)";
 
 export const EFFECTIVENESS_LANGUAGE = new RegExp([
   // "the training is working", "the plan works", "it has been working", "training's working"
-  `\\b${AGENT}(?:${APOSTROPHE}s|\\s+(?:is|are|was|were|has been|have been))?\\s+(?:clearly\\s+|really\\s+|definitely\\s+)?(?:working|works|worked)\\b`,
+  `\\b${AGENT}(?:${APOSTROPHE}s|\\s+(?:is|are|was|were|has been|have been|has|have))?\\s+(?:clearly\\s+|really\\s+|definitely\\s+)?(?:working|works|worked)\\b`,
   `\\b${AGENT}\\s+(?:is\\s+|has been\\s+)?(?:effective|succeeding|proving effective|paying off|pays off|paid off|paying dividends|delivering results|doing (?:its|the) job)\\b`,
   "\\b(?:paying off|pays off|paid off|paying dividends|delivering results|doing (?:its|their) job|doing what it should)\\b",
   // the intervention producing the outcome
@@ -62,16 +64,26 @@ export const EFFECTIVENESS_LANGUAGE = new RegExp([
   "\\b(?:dr(?:ive|ives|iving|ove)|produc(?:e|es|ed|ing)|caus(?:e|es|ed|ing))\\s+(?:the\\s+|this\\s+|those\\s+)?(?:gains?|results?|progress|change|lean[- ]mass)\\b",
   "\\b(?:thanks to|responsible for|because of)\\s+(?:the\\s+)?(?:training|lifting|plan|program|programme|routine|approach)\\b",
   "\\b(?:result(?:s|ed)? in|leads? to|led to)\\s+(?:the\\s+|more\\s+)?(?:gains?|lean|muscle|fat loss|progress)\\b",
+  "\\btranslat(?:e|es|ed|ing) into (?:lean|muscle|mass|results?|gains?)\\b",
+  "\\bcoming from the (?:training|lifting|plan|program|programme|routine)\\b",
+  "\\bgetting results\\b",
+  "\\bfuel(?:s|ed|led|ing|ling)? (?:the\\s+)?(?:lean[- ]mass\\s+)?gains?\\b",
   // normative-causal: a week "is what the goal needs"
   "\\bthe kind of week the goal needs\\b",
 ].join("|"), "iu");
 
 // Guidance that implies the past period can still be repaired — not
 // prospective guidance ("from here on", "going forward", "next week").
-const PAST = "(?:those|that|these|the missing|the past|this week's|last week's|the week's|monday's|tuesday's|wednesday's|thursday's|friday's|saturday's|sunday's|(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\\s+through\\s+\\w+)?)";
+const DAY = "(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)";
+const LOG_NOUN = "(?:days?|logs?|entries|meals?|food)";
+// Past-period references: "those days", "the missing meals", "Thursday's
+// log", "Thursday through Saturday" — a day range followed by "this/next
+// week" is a plan for the coming week, not a repair.
+const PAST = `(?:(?:those|that|these|the missing|the past)\\s+${LOG_NOUN}|(?:this|last|the) week's\\s+${LOG_NOUN}|${DAY}'s\\s+${LOG_NOUN}|(?!${DAY}(?:\\s+through\\s+${DAY})?\\s+(?:this|next) week)${DAY}(?:\\s+through\\s+${DAY})?(?:\\s+${LOG_NOUN})?)`;
 export const RETROACTIVE_REPAIR_LANGUAGE = new RegExp([
-  `\\b(?:logging|log|fill(?:ing)? in|complet(?:e|ing)|fix(?:ing)?|correct(?:ing)?|updat(?:e|ing)(?:\\s+the\\s+log\\s+for)?|add(?:ing)?)\\s+${PAST}(?:\\s+(?:days?|logs?|entries|meals?|week))?\\b(?![^.;]*\\b(?:going forward|from here on|from now on)\\b)`,
-  "\\bgo back and\\b", "\\bbackfill",
+  `\\b(?:logging|log|fill(?:ing)? in|complet(?:e|ing)|fix(?:ing)?|correct(?:ing)?|updat(?:e|ing)(?:\\s+the\\s+log\\s+for)?|add(?:ing)?)\\s+${PAST}\\b(?![^.;]*\\b(?:going forward|from here on|from now on)\\b)`,
+  "\\bgo back and\\b", "\\bbackfill", "\\bcan still be (?:logged|added|filled in)\\b",
+  "\\benter the (?:meals?|food) you (?:skipped|missed)\\b",
 ].join("|"), "iu");
 
 // Whether any selected finding carries explicit authoritative causal

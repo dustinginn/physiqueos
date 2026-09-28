@@ -262,7 +262,7 @@ function recapSentence(lead, facts) {
 // "working" (causing the outcome) without authoritative causal support.
 const GOING_WELL = {
   [ClaimScope.PERFORMANCE]: () => "the performance gains are real",
-  [ClaimScope.MEASUREMENT]: (f, kind) => (kind === "visual_change" ? "the photos line up with the goal's direction"
+  [ClaimScope.MEASUREMENT]: (f, kind) => (kind === "visual_change" ? `the photos show ${f.change === "visible" ? "a visible" : "a subtle"} change`
     : `the new ${f.eventName} shows ${f.label} moving the right way`),
   [ClaimScope.TRAJECTORY]: (f) => (f.verdict === "steady" ? "the scale is where the phase expects it" : null),
   [ClaimScope.EXECUTION]: (f, kind) => ({ routine_steady: "the routine held", activity_on_plan: "the routine held",
@@ -320,7 +320,7 @@ function takeawaySentence({ lead, synthesis, steps }) {
   // Priorities come only from real concerns; a neutral finding is not a problem.
   const priorities = [...new Set(lead.map((item) => (item.polarity === "concern" ? priority(item) : null)).filter(Boolean))];
   if (working.length && priorities.length) return `${upperFirst(working[0])}; ${priorities[0]}.`;
-  if (priorities.length) return `${upperFirst(priorities[0])}${priorities[1] ? `, and ${priorities[1]}` : ""}.`;
+  if (priorities.length) return `${upperFirst(priorities[0])}${priorities[1] ? `; ${priorities[1]}` : ""}.`;
   if (working.length > 1) return `${upperFirst(working[0])}, and ${working[1]}.`;
   if (working.length) return `${upperFirst(working[0])}, and that is the part to keep.`;
   return synthesis.selected.some((item) => item.polarity === "concern")
@@ -650,7 +650,7 @@ function confidenceSentence({ synthesis, facts }) {
   const period = risk
     ? `${riskNoun(risk)} is worth watching but hasn't changed it yet`
     : supportive.length
-      ? `this week's ${supportive.map((item) => item.kind === "training_progress" ? "training" : "weight trend").join(" and ")} ${supportive.length === 1 ? "fits" : "fit"} it${disruption ? `; ${few} ${disruption.facts.direction === "break" ? "isn't" : "aren't"} enough to change that` : ""}`
+      ? `this week's weight trend fits it${disruption ? `; ${few} ${disruption.facts.direction === "break" ? "isn't" : "aren't"} enough to change that` : ""}`
       : disruption ? `${few} ${disruption.facts.direction === "break" ? "isn't" : "aren't"} enough to change it` : "nothing this week changes it";
   const scan = facts.composition.newThisPeriod ? `${upperFirst(event)} sets` : `${upperFirst(event)} still sets`;
   return `Confidence holds. ${scan} the outlook, and ${period}.`;
