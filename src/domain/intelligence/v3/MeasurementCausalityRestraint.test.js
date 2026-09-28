@@ -62,8 +62,13 @@ describe("the Confidence body credits the measurement, not the plan", () => {
   });
 
   it("every composed V3 narrative records an empty claim-restraint audit", async () => {
-    const paired = runConfidenceNarrativeV3(createPairedCalibrationFixtures().dexa);
-    expect(paired.narrativePlan.claimRestraint).toEqual({ schemaVersion: "narrative_claim_restraint_v1", issues: [] });
+    const empty = { schemaVersion: "narrative_claim_restraint_v1", issues: [] };
+    for (const fixture of Object.values(createPairedCalibrationFixtures())) {
+      expect(runConfidenceNarrativeV3(fixture).narrativePlan.claimRestraint).toEqual(empty);
+    }
+    for (const run of [await prepareDexaV3(), await preparePhotoV3({ structured: false }), await preparePhotoV3({ structured: true })]) {
+      expect(run.prepared.narrativePlan.claimRestraint).toEqual(empty);
+    }
   });
 
   it("detects delivered/appears/answered forms of causal overreach", () => {

@@ -653,7 +653,7 @@ function recurringMeaning(context, { resultObservation, operatingSignal }) {
   }
   if (context.interpretation.strategyEffectiveness.feasibility === "demonstrated") {
     return context.recentEventFollowup
-      ? `${upperFirst(context.priorEventName)} already measured the big result; this update is about keeping conditions steady.`
+      ? `${upperFirst(context.priorEventName)} already recorded the big result; this update is about keeping conditions steady.`
       : "The goal remains on course, and this check-in does not change that.";
   }
   return null;
@@ -822,7 +822,7 @@ function composeResult(context) {
         : null),
       composeEvidenceTension(context),
       context.anchorPreviouslyCommunicated
-        ? `${upperFirst(nextEvidenceName(context))} already showed ${objectiveLabel(context)} moving the right way.`
+        ? `The last ${context.nextEvidence.displayName} already showed ${objectiveLabel(context)} moving the right way.`
         : `The latest outcome still stands: ${lowerFirst(movement)}`,
     ].filter(Boolean).join(" ");
   }
@@ -972,7 +972,7 @@ function composeAction(context) {
   }
   if (action === "review_strategy") return "Review the plan before continuing unchanged. The new result is meaningful enough to require a real adjustment.";
   if (action === "transition_goal") return "The goal has been reached. Lock in the result and choose the next target before extending the current plan.";
-  if (action === "transition_phase") return `Move into ${goalContract.phase.nextPhaseLabel ?? "the next planned phase"}. The current phase reached what it set out to do.`;
+  if (action === "transition_phase") return `Move into ${goalContract.phase.nextPhaseLabel ?? "the next planned phase"}. The current phase met its criteria.`;
   if (action === "continue_with_guardrail_monitoring") {
     const names = naturalList(consequentialGuardrails.map((item) => guardrailLabel(goalContract, item)));
     return `Keep what is going well, but tighten attention around ${names}.${reconsideration}`;
@@ -1059,7 +1059,7 @@ function composeCoachTake(context) {
 
   if (interpretation.coachingAffect.intensity === "strong" && interpretation.strategyEffectiveness.feasibility === "demonstrated") {
     const fraction = confidenceTrajectory(context)?.fractionAchieved;
-    const position = fraction > 0.5 && fraction < 1 ? "Measured progress puts the goal more than halfway there." : "The measured progress is on track.";
+    const position = fraction > 0.5 && fraction < 1 ? "Measured progress puts the goal more than halfway there." : "The measured progress keeps the goal on course.";
     const phase = context.goalContract.vocabulary?.phase?.contextName ?? "this phase";
     return `This is exactly what ${phase} needed: ${lowerFirst(stripPeriod(objectiveMovement(context, { includeComparison: false })))}${guardrail ? `, with ${guardrail}.` : "."} ${position} Nothing here calls for a change. ${stripPeriod(execute)} and use ${nextEvidenceName(context)} to see whether ${continuationPhrase(context)} continues.`;
   }
