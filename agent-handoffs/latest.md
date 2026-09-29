@@ -2,17 +2,19 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: production deploy of daily-driver Server `faa9151a`
+- Task: final integration of Native Build 69 (Claude + Codex)
 - Agent: claude
-- Status: **DEPLOYED and verified.** Native Build 69 is held for Codex.
-- Generated (UTC): 2026-09-29T04:30:00Z
+- Status: **FINAL CANDIDATE READY. Not uploaded.**
+- Generated (UTC): 2026-09-29T06:00:00Z
 
-Production now runs `faa9151a` (deployment `76c3d8aa`).
-- **Checks:** health is green, the new code is what's running, and the schema is unchanged.
-- **Data:** no data changed; all 47 collections and every command receipt are identical before and after.
+**Build 69 (`efa65db1`)** is the accepted Build 69 plus Codex's Workout Complete celebration: a "New performance records" card from the Server's own records, with a small one-time confetti. It also includes one integration fix: an in-progress workout now wins over an older recovered Workout Complete screen.
 
-**Sep 28 fixed itself:** at 04:19Z, your phone's first sync on the new build unfroze Sep 28 Activity, from 171 to 851 cal. No manual repair was involved.
+**Validation:** 1501/1501 tests pass, the Release build succeeds, and the independent review approved it with no must-fixes.
 
-**Native Build 69 is not uploaded.** I'm waiting at the integration gate for Codex's Workout Complete records celebration report.
+**The records card needs one Server change** that isn't live yet. It's ready as `98534bf8`: 0 new test failures, build passes, not deployed. Until it's deployed the card simply doesn't appear.
 
-Full report: `agent-handoffs/reports/20260929T043000Z-daily-driver-server-faa9151a-production-deploy.md`
+**Decisions:**
+- accept Build 69 and authorize the TestFlight upload;
+- authorize the Server records deploy (`98534bf8`).
+
+Full report: `agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md`

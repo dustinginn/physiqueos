@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-29T04:30:00Z",
+  "generated_at_utc": "2026-09-29T06:00:00Z",
   "task": {
-    "id": "daily-driver-server-faa9151a-production-deploy-20260929",
-    "title": "DEPLOYED: Server faa9151a (deployment 76c3d8aa) — verified, zero drift; Sep 28 Activity unfroze naturally (171 -> 851 cal); Native Build 69 held for Codex",
+    "id": "native-build69-final-integration-20260929",
+    "title": "FINAL CANDIDATE READY: integrated Native Build 69 efa65db1 (Claude + Codex records celebration); Server records candidate 98534bf8 gated",
     "agent": "claude",
-    "status": "blocked"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -16,40 +16,43 @@
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "faa9151a",
-    "server_candidate_branch": "claude/daily-driver-server-candidate-20260929",
+    "server_candidate_sha": "98534bf8",
+    "server_candidate_branch": "claude/server-records-on-prod-20260929",
     "production_deployment_id": "76c3d8aa-fbfd-4809-9e14-569c67af969b",
     "previous_production_server_sha": "396e750d7a2c9c4cb4971b8936c56e4476805e07",
-    "native_candidate_sha": "c2b43091",
-    "native_candidate_branch": "claude/native-daily-driver-20260929",
-    "native_recommended_build": "69"
+    "native_candidate_sha": "efa65db1",
+    "native_candidate_branch": "claude/native-build69-integrated-20260929",
+    "native_recommended_build": "69",
+    "codex_celebration_branch": "codex/native-workout-complete-record-celebration-20260928",
+    "codex_celebration_sha": "ef54e482"
   },
   "result": {
-    "summary": "Guarded deploy of the accepted faa9151a: prod branch fast-forward 396e750d->faa9151a, 4-line spec stamp, force-rebuild 76c3d8aa ACTIVE 9/9. Verified source_commit_hash + runtime gitSha, /live /ready 200, schema 000014 unchanged, in-container markers present (records change absent), zero drift across 47 collections and all receipts. First natural ingest at 04:19:13Z took over Sep 28 via cross_device_cumulative_advance: canonical v10 171.4 -> v11 851.4 cal, no repair.",
+    "summary": "Integrated Codex's Workout Complete records celebration (1fa66457 + ef54e482, cherry-picked -x) onto the accepted base c2b43091; conflicts resolved preserving both sides; integration fix efa65db1 makes the Log-tab resume win over a relaunch-recovered earlier completion. Full suite 1501/1501, Release BUILD SUCCEEDED (no new warnings), fresh review APPROVE WITH NITS. Card needs Server records change: candidate 98534bf8 (= prod faa9151a + aaa0d675) validated, 0 new regressions, build ok, not deployed.",
     "success": true,
     "production_mutated": false,
-    "deployed": true,
+    "deployed": false,
     "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Exact-SHA full regression 0 new; production build exit 0."
+      "summary": "Native 1501/1501, Release compile ok; Server 98534bf8 regression 0 new, build ok."
     },
     "review": {
       "status": "passed",
-      "summary": "Fresh review approved; Founder/ChatGPT decision authorized."
+      "summary": "Fresh review of integrated candidate APPROVE WITH NITS; its one low-medium finding fixed (efa65db1)."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Read-only drift snapshots identical; natural Sep 28 correction observed read-only."
+      "summary": "No production change in this step."
     }
   },
-  "decisions_required": [],
-  "blockers": [
-    "Native integration gate: waiting for Codex's workout-complete-performance-record-celebration report on GH."
+  "decisions_required": [
+    "Accept final integrated Build 69 efa65db1, then authorize the TestFlight upload.",
+    "Authorize guarded Server deploy of 98534bf8 (records) so the Workout Complete card appears."
   ],
+  "blockers": [],
   "unexpected_findings": [
     "Sep 28 Activity is still frozen in production (supersedes continue to 837 cal); self-heals at the next-morning complete_day summary."
   ],
@@ -60,13 +63,13 @@
     "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
   ],
-  "recommended_next_step": "Claude integrates Codex's records celebration onto Native c2b43091 when its report appears, then publishes the final integrated Build 69 candidate.",
-  "full_report_path": "agent-handoffs/reports/20260929T043000Z-daily-driver-server-faa9151a-production-deploy.md",
+  "recommended_next_step": "Founder/ChatGPT acceptance of the final integrated Build 69 and the Server records deploy decision.",
+  "full_report_path": "agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260929T043000Z-daily-driver-server-faa9151a-production-deploy.md",
     "agent-handoffs/reports/20260929T050000Z-native-consolidated-daily-driver-candidate-build69.md",
     "agent-handoffs/reports/20260929T040000Z-activity-sep28-consistency-diagnosis.md",
-    "agent-handoffs/reports/20260929T031500Z-strength-reconciliation-fix-396e750d-production-deploy.md",
-    "agent-handoffs/reports/20260929T020000Z-strength-reconciliation-review-gap-diagnosis.md"
+    "agent-handoffs/reports/20260929T031500Z-strength-reconciliation-fix-396e750d-production-deploy.md"
   ],
   "safety": {
     "contains_secrets": false,
