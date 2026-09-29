@@ -11,12 +11,30 @@ const principal = { userId: ownerUserId, deviceId: "device-one", sessionId: "ses
 const now = () => new Date("2026-08-11T12:00:00.000Z");
 const TODAY = "2026-08-11";
 
+// Verified production shape for Foam Rolling: `recovery_reminder` → protocol
+// category `recovery` → manual-completion `recovery` Execution item. Synthetic
+// ids and version numbers only.
+const RECOVERY_PROTOCOL = {
+  id: "protocol-recovery", userId: ownerUserId, category: "recovery", name: "Foam Rolling", status: "active", version: 1,
+};
+const RECOVERY_EXECUTION = {
+  id: "execution_foam_roll", userId: ownerUserId, type: "recovery", title: "Foam Rolling", active: true,
+  linkedProtocolId: "protocol-recovery", cadence: { type: "daily" },
+  preferredSchedule: { daysOfWeek: [], timeOfDay: "17:00", startDate: "2026-07-23" },
+  completionMethod: "manual", executionRevision: 1, notes: "", version: 1,
+};
+const RECOVERY_REMINDER = {
+  id: "reminder_foam_roll_daily", userId: ownerUserId, title: "Foam Roll", type: "recovery_reminder",
+  linkedEntityType: "protocol", linkedEntityId: "protocol-recovery", active: true,
+  schedule: { type: "daily", timeOfDay: "17:00" }, completionHistory: [], version: 1,
+};
+
 function fixture({ dailyCheckIns = [], reminders = null } = {}) {
   return createInMemoryCanonicalRecordStore({
     user: [{ id: ownerUserId, timeZone: "America/Los_Angeles", version: 1 }],
     goals: [{ id: "goal-one", userId: ownerUserId, title: "Goal", primary: true, status: "active", version: 1 }],
-    protocols: [],
-    executionItems: [],
+    protocols: [RECOVERY_PROTOCOL],
+    executionItems: [RECOVERY_EXECUTION],
     reminders: reminders ?? [
       {
         id: "priority-one", userId: ownerUserId, title: "Stretch", type: "other", active: true,
@@ -31,6 +49,11 @@ function fixture({ dailyCheckIns = [], reminders = null } = {}) {
         id: "reminder_peptide", userId: ownerUserId, title: "Peptide", type: "protocol_reminder",
         linkedEntityId: "protocol-peptide", active: true, completionHistory: [], version: 1,
       },
+      {
+        id: "reminder_creatine", userId: ownerUserId, title: "Creatine", type: "supplement_reminder",
+        linkedEntityId: "protocol-supplement", active: true, completionHistory: [], version: 1,
+      },
+      RECOVERY_REMINDER,
     ],
     weightEntries: [], dailyCheckIns, evidencePackages: [], canonicalEvidenceObjects: [],
     dexaScans: [], protocolVersions: [], progressPhotos: [], dailyBriefings: [], analyses: [],
@@ -173,6 +196,83 @@ describe("priority.skip.v1 canonical port", () => {
     expect(selection.items).toEqual([]);
     expect(selection.diagnostics.exclusions).toEqual([{ priorityId: "priority-one", reason: "dated_reconciliation" }]);
     expect(selection.diagnostics.existingReconciliationKeys).toEqual(["priority-one:2026-08-11"]);
+  });
+});
+
+describe("priority.skip.v1 for an execution-backed recovery Support reminder (Foam Rolling)", () => {
+  const FOAM = "reminder_foam_roll_daily";
+
+  it("skips today's recovery occurrence through the same dated reconciliation entry", async () => {
+    const records = fixture();
+    const outcome = await ports(records).skipPriority(context({ priorityId: FOAM, occurrenceDate: TODAY }, "1", "foam-skip"));
+    expect(outcome).toMatchObject({
+      status: "committed",
+      outbox: [],
+      result: {
+        status: "skipped",
+        priorityId: FOAM,
+        occurrenceDate: TODAY,
+        occurrenceKey: `${FOAM}:2026-08-11`,
+        note: null,
+        skippedAt: "2026-08-11T12:00:00.000Z",
+        revision: 2,
+        checkInId: "daily_check_in_2026_08_11",
+        execution: { workflow: "priority_detail", expectedVersion: 2 },
+      },
+    });
+    const snapshot = records.snapshot();
+    const reminder = snapshot.reminders.find((item) => item.id === FOAM);
+    expect(reminder.completionHistory).toEqual([]);
+    expect(reminder.version).toBe(2);
+    expect(snapshot.executionItems.find((item) => item.id === "execution_foam_roll")).toEqual(RECOVERY_EXECUTION);
+    const checkIn = snapshot.dailyCheckIns.find((item) => item.id === "daily_check_in_2026_08_11");
+    expect(checkIn.reconciliation).toEqual([{
+      key: `${FOAM}:2026-08-11`,
+      reminderId: FOAM,
+      occurrenceDate: TODAY,
+      status: "skipped",
+      note: null,
+      recordedAt: "2026-08-11T12:00:00.000Z",
+    }]);
+  });
+
+  it("returns already_skipped when completion targets the skipped recovery occurrence, without writing", async () => {
+    const records = fixture();
+    await ports(records).skipPriority(context({ priorityId: FOAM, occurrenceDate: TODAY }, "1", "foam-skip"));
+    const before = records.snapshot();
+    const outcome = await ports(records).completePriority(context(
+      { priorityId: FOAM, occurrenceDate: TODAY, dose: null, protocolId: "protocol-recovery" }, "2", "foam-complete-after"
+    ));
+    expect(outcome.result).toMatchObject({
+      status: "already_skipped", priorityId: FOAM, occurrenceKey: `${FOAM}:2026-08-11`,
+      skippedAt: "2026-08-11T12:00:00.000Z", revision: 2,
+    });
+    expect(records.snapshot()).toEqual(before);
+    expect(records.snapshot().reminders.find((item) => item.id === FOAM).completionHistory).toEqual([]);
+  });
+
+  it("still refuses the dose-aware peptide reminder and the (deferred) supplement reminder", async () => {
+    const records = fixture();
+    await expect(ports(records).skipPriority(context({ priorityId: "reminder_peptide", occurrenceDate: TODAY }, "1", "peptide")))
+      .rejects.toMatchObject({ status: 422, code: "PRIORITY_SKIP_UNSUPPORTED", recovery: { workflow: "priority_detail" } });
+    await expect(ports(records).skipPriority(context({ priorityId: "reminder_creatine", occurrenceDate: TODAY }, "1", "supplement")))
+      .rejects.toMatchObject({ status: 422, code: "PRIORITY_SKIP_UNSUPPORTED", recovery: { workflow: "priority_detail" } });
+    expect(records.snapshot().dailyCheckIns).toEqual([]);
+  });
+
+  it("excludes the skipped recovery occurrence from the next morning's selection as a dated reconciliation", async () => {
+    const records = fixture();
+    await ports(records).skipPriority(context({ priorityId: FOAM, occurrenceDate: TODAY }, "1", "foam-skip"));
+    const snapshot = records.snapshot();
+    const selection = getPreviousDayIncompletePrioritySelection({
+      now: new Date("2026-08-12T15:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
+      reminders: snapshot.reminders.filter((item) => item.id === FOAM),
+      checkIns: snapshot.dailyCheckIns,
+    });
+    expect(selection.items).toEqual([]);
+    expect(selection.diagnostics.exclusions).toEqual([{ priorityId: FOAM, reason: "dated_reconciliation" }]);
+    expect(selection.diagnostics.existingReconciliationKeys).toEqual([`${FOAM}:2026-08-11`]);
   });
 });
 

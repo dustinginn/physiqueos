@@ -214,20 +214,22 @@ export function openOnlyNotificationAction({ priorityId, occurrenceDate }) {
 
 // Today-only skip from Priority Detail (`priority.skip.v1`). The Server is the
 // single owner of skip eligibility; Native renders `skippable`/`skipCommand`
-// and never re-derives it. Skip is offered only for an ordinary
-// `priority_detail` reminder. Excluded (they own their own workflow or have
-// dose/execution semantics a blind skip must not bypass):
+// and never re-derives it. Skip is offered for an ordinary `priority_detail`
+// reminder — including an execution-backed recovery Support reminder such as
+// Foam Rolling (`recovery_reminder`; manual completion, no dose). Excluded:
 // - Morning Weigh-in (`morning_check_in` workflow)
 // - Progress Photos (`progress_photos` workflow)
 // - DEXA reminders / appointments (`dexa_evidence` workflow; DEXA
 //   appointment priorities have no reminder at all)
-// - execution-backed Protocol Support reminders — peptide (dose-aware),
-//   recovery, supplement (`protocol_reminder`, `recovery_reminder`,
-//   `supplement_reminder`).
+//   (all three by `executionContract.workflow`, not by reminder type)
+// - peptide Protocol Support reminders (`protocol_reminder`): completion is
+//   dose-aware, so a blind skip must not bypass it
+// - supplement Support reminders (`supplement_reminder`): not dose-aware in
+//   the peptide sense, but whether a supplement occurrence may be skipped
+//   from Priority Detail is a product decision still deferred.
 export const PRIORITY_SKIP_COMMAND_TYPE = "priority.skip.v1";
 const PRIORITY_SKIP_EXCLUDED_REMINDER_TYPES = new Set([
   "protocol_reminder",
-  "recovery_reminder",
   "supplement_reminder",
 ]);
 
