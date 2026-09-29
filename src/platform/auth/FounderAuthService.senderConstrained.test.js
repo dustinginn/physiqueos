@@ -12,6 +12,21 @@ const PEPPER = "sender-constrained-test-pepper".repeat(3);
 const START = new Date("2026-09-29T12:00:00.000Z");
 
 describe("sender-constrained persistent pairing threat matrix", () => {
+  it("matches the shared Swift/Node canonicalization vector", () => {
+    const vector = {
+      refreshCredential: "a".repeat(43),
+      rotationIntentId: "i".repeat(43),
+      successorRefreshCredential: "b".repeat(43),
+      nonce: "n".repeat(43),
+      proofId: "p".repeat(43),
+    };
+    vector.successorCommitment = createSuccessorCommitment(vector.successorRefreshCredential);
+    expect(vector.successorCommitment).toBe("jbaY_8twy8ui3RqbVNnLl36qQwcWwR5c2oS6kokaWEc");
+    expect(createRefreshProofMessage(vector).toString("base64url")).toBe(
+      "cGh5c2lxdWVvcy1kZXZpY2UtcHJvb2YtdjEKUE9TVAovYXBpL3YxL25hdGl2ZS9hdXRoL3JlZnJlc2gKUmVhYnRCRWlSams2Y1VOZXdoOUZQT3VCU1VfVWpzWUdTcVdCUUp0Y2tZTQpubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5uCnBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA",
+    );
+  });
+
   it("keeps Build 69 on strict legacy rotation until enrollment is enabled", async () => {
     const current = harness({ allowSenderConstrainedEnrollment: false });
     const pair = await current.pair({ offerProof: true });
