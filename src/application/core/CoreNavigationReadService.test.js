@@ -731,3 +731,19 @@ function services({ readCanonicalExerciseRegistry = null } = {}) {
     }),
   };
 }
+
+describe("peptide Support next due honours pause windows (S3)", () => {
+  // NOW is Saturday 2026-08-29 (America/Los_Angeles); the plan is Thursdays 21:45.
+  it("skips suspended Thursdays and returns null while a suspension is open", async () => {
+    const { narrow, runtime } = peptideSupportServices();
+    await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({ nextDue: "Sep 3, 2026 · 9:45 PM" });
+    runtime.executionItems[0].scheduleSuspensions = [{ pausedFrom: "2026-09-01", resumedOn: "2026-09-10" }];
+    await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({ nextDue: "Sep 10, 2026 · 9:45 PM" });
+    runtime.executionItems[0].scheduleSuspensions = [{ pausedFrom: "2026-09-01", resumedOn: "2026-09-11" }];
+    await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({ nextDue: "Sep 17, 2026 · 9:45 PM" });
+    runtime.executionItems[0].scheduleSuspensions = [{ pausedFrom: "2026-08-29", resumedOn: null }];
+    await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({ nextDue: null });
+    runtime.executionItems[0].scheduleSuspensions = null;
+    await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({ nextDue: "Sep 3, 2026 · 9:45 PM" });
+  });
+});

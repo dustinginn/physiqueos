@@ -1055,3 +1055,62 @@ function peptideSupportFixture() {
     canonicalExerciseLibrary: [], piEnergyConfidenceWorkItems: [], piTrainingConfidenceWorkItems: [],
   });
 }
+
+describe("priority.complete.v1 honours peptide pause windows (S3)", () => {
+  function pausedFixture(scheduleSuspensions, reminderOverrides = {}) {
+    return createInMemoryCanonicalRecordStore({
+      user: [{ id: ownerUserId, timeZone: "America/Los_Angeles", version: 1 }],
+      protocols: [{ id: "protocol-peptide", userId: ownerUserId, category: "peptide", status: "active", name: "Peptide", version: 1 }],
+      executionItems: [{
+        id: "execution-peptide", userId: ownerUserId, type: "peptide", protocolRootId: "protocol-peptide", active: true,
+        timeline: [{ startDate: "2026-08-01", endDate: null, dose: { amount: "0.25", unit: "mg" }, notes: "" }],
+        ...(scheduleSuspensions === undefined ? {} : { scheduleSuspensions }),
+        version: 1,
+      }],
+      reminders: [{
+        id: "priority-peptide", userId: ownerUserId, type: "protocol_reminder", linkedEntityId: "protocol-peptide",
+        title: "Peptide", active: true, completionHistory: [], version: 1, ...reminderOverrides,
+      }],
+      dailyCheckIns: [],
+    });
+  }
+  const complete = (records, occurrenceDate, commandId) =>
+    createCanonicalPersistenceCommandPorts({ records, now }).completePriority(commandContext({
+      priorityId: "priority-peptide", occurrenceDate, dose: "0.25 mg", protocolId: "protocol-peptide",
+    }, "1", commandId));
+
+  it("refuses an occurrence inside an open or closed window with 422 PRIORITY_OCCURRENCE_PAUSED and writes nothing", async () => {
+    for (const [windows, date] of [
+      [[{ pausedFrom: "2026-08-11", resumedOn: null }], "2026-08-11"],
+      [[{ pausedFrom: "2026-08-01", resumedOn: "2026-08-12" }], "2026-08-11"],
+    ]) {
+      const records = pausedFixture(windows);
+      await expect(complete(records, date, `paused-${date}`)).rejects.toMatchObject({
+        status: 422, code: "PRIORITY_OCCURRENCE_PAUSED",
+        recovery: { pausedFrom: windows[0].pausedFrom, protocolId: "protocol-peptide" },
+      });
+      expect(records.snapshot().reminders[0]).toMatchObject({ completionHistory: [], version: 1 });
+    }
+  });
+
+  it("completes normally before the pause, on the resumedOn day, and when no window or no execution exists", async () => {
+    for (const [windows, date] of [
+      [[{ pausedFrom: "2026-08-12", resumedOn: null }], "2026-08-11"],
+      [[{ pausedFrom: "2026-08-01", resumedOn: "2026-08-11" }], "2026-08-11"],
+      [undefined, "2026-08-11"],
+      [null, "2026-08-11"],
+    ]) {
+      const result = await complete(pausedFixture(windows), date, `ok-${JSON.stringify(windows)}`);
+      expect(result.result).toMatchObject({ status: "completed", occurrenceDate: date, revision: 2 });
+    }
+    const unlinked = pausedFixture([{ pausedFrom: "2026-08-11", resumedOn: null }], { linkedEntityId: "protocol-other" });
+    expect((await complete(unlinked, "2026-08-11", "unlinked")).result.status).toBe("completed");
+  });
+
+  it("keeps an already completed occurrence idempotent even inside a window (Completed wins)", async () => {
+    const records = pausedFixture([{ pausedFrom: "2026-08-11", resumedOn: null }], {
+      completionHistory: [{ id: "priority-peptide:2026-08-11", occurrenceDate: "2026-08-11", completedAt: "2026-08-11T20:00:00.000Z" }],
+    });
+    expect((await complete(records, "2026-08-11", "already")).result.status).toBe("already_completed");
+  });
+});

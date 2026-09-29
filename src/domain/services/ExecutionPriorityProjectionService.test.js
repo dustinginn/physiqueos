@@ -3,6 +3,7 @@ import {
   ExecutionPriorityOperationalReason,
   ExecutionPriorityOperationalState,
   findExecutionForProtocol,
+  findSuspensionWindow,
   formatExecutionDose,
   projectExecutionPriority,
   scheduleAppliesOnDate,
@@ -365,3 +366,75 @@ function phase(startDate, endDate, amount) {
     notes: "",
   };
 }
+
+describe("Execution priority projection honours pause windows (S3)", () => {
+  const window = { pausedFrom: "2026-07-23", resumedOn: "2026-08-06" };
+
+  it("returns PAUSED and ineligible for every local date inside [pausedFrom, resumedOn)", () => {
+    const item = peptideExecution({ scheduleSuspensions: [window] });
+    for (const localDate of ["2026-07-23", "2026-07-30", "2026-08-05"]) {
+      const result = projectExecutionPriority({ executionItem: item, localDate, protocol, reminder });
+      expect(result).toMatchObject({
+        occurrenceEligible: false,
+        completable: false,
+        operationalState: ExecutionPriorityOperationalState.PAUSED,
+        operationalReason: ExecutionPriorityOperationalReason.EXECUTION_PAUSED,
+        lifecycleState: "paused",
+        pauseContext: { pausedFrom: "2026-07-23", resumedOn: "2026-08-06" },
+        executionStatus: "active",
+      });
+    }
+    expect(ExecutionPriorityOperationalState.PAUSED).toBe("paused");
+  });
+
+  it("makes the resumedOn day and the day before pausedFrom eligible again", () => {
+    const item = peptideExecution({ scheduleSuspensions: [window] });
+    for (const localDate of ["2026-07-16", "2026-08-06"]) {
+      expect(projectExecutionPriority({ executionItem: item, localDate, protocol, reminder })).toMatchObject({
+        occurrenceEligible: true,
+        operationalState: ExecutionPriorityOperationalState.ACTIONABLE,
+        lifecycleState: "active",
+        pauseContext: null,
+      });
+    }
+  });
+
+  it("treats an open window as paused until further notice and an absent or null field as no windows", () => {
+    const open = peptideExecution({ scheduleSuspensions: [{ pausedFrom: "2026-07-23", resumedOn: null }] });
+    expect(projectExecutionPriority({ executionItem: open, localDate: "2026-12-31", protocol, reminder }))
+      .toMatchObject({ operationalState: ExecutionPriorityOperationalState.PAUSED, occurrenceEligible: false });
+    for (const scheduleSuspensions of [undefined, null, [], "bad"]) {
+      const result = projectExecutionPriority({
+        executionItem: peptideExecution(scheduleSuspensions === undefined ? {} : { scheduleSuspensions }),
+        localDate: "2026-07-30", protocol, reminder,
+      });
+      expect(result).toMatchObject({
+        occurrenceEligible: true,
+        operationalState: ExecutionPriorityOperationalState.ACTIONABLE,
+        lifecycleState: "active",
+        pauseContext: null,
+      });
+    }
+    expect(findSuspensionWindow(peptideExecution(), "2026-07-30")).toBeNull();
+    expect(findSuspensionWindow(open, "2026-07-30")).toEqual({ pausedFrom: "2026-07-23", resumedOn: null });
+  });
+
+  it("outranks the weekly schedule on paused days and lets an inactive execution stay INACTIVE", () => {
+    const item = peptideExecution({ scheduleSuspensions: [window] });
+    expect(projectExecutionPriority({ executionItem: item, localDate: "2026-07-24", protocol, reminder }))
+      .toMatchObject({ operationalState: ExecutionPriorityOperationalState.PAUSED });
+    expect(projectExecutionPriority({ executionItem: { ...item, active: false }, localDate: "2026-07-30", protocol, reminder }))
+      .toMatchObject({ operationalState: ExecutionPriorityOperationalState.INACTIVE, lifecycleState: "paused" });
+    expect(projectExecutionPriority({ executionItem: null, localDate: "2026-07-30", protocol, reminder }))
+      .toMatchObject({ lifecycleState: null, pauseContext: null });
+  });
+
+  it("keeps a completed occurrence marked completed inside a window so Completed can win over Paused", () => {
+    const item = peptideExecution({ scheduleSuspensions: [window] });
+    const result = projectExecutionPriority({
+      executionItem: item, localDate: "2026-07-30", protocol,
+      reminder: { ...reminder, completionHistory: [{ occurrenceDate: "2026-07-30", completedAt: "2026-07-31T04:50:00Z" }] },
+    });
+    expect(result).toMatchObject({ operationalState: ExecutionPriorityOperationalState.PAUSED, occurrenceCompleted: true });
+  });
+});

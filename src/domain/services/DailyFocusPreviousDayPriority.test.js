@@ -297,3 +297,41 @@ describe("Morning Check-In previous-day priority selection", () => {
     });
   });
 });
+
+describe("Morning Check-In previous-day selection honours pause windows (S3)", () => {
+  const peptideReminder = () => reminder("reminder_peptide", { linkedEntityId: "protocol_peptide" });
+  const peptideExecution = (scheduleSuspensions) => ({
+    id: "execution_peptide", userId: "user", type: "peptide", protocolRootId: "protocol_peptide", active: true,
+    ...(scheduleSuspensions === undefined ? {} : { scheduleSuspensions }),
+  });
+  const protocols = [{ id: "protocol_peptide", userId: "user", category: "peptide", status: "active" }];
+
+  it("excludes an execution-backed priority whose execution was suspended yesterday as execution_paused", () => {
+    for (const windows of [
+      [{ pausedFrom: "2026-07-28", resumedOn: null }],
+      [{ pausedFrom: "2026-07-20", resumedOn: "2026-07-29" }],
+    ]) {
+      const result = selection({
+        reminders: [peptideReminder()],
+        executionItems: [peptideExecution(windows)],
+        protocols,
+      });
+      expect(result.items).toEqual([]);
+      expect(result.diagnostics.exclusions).toEqual([{ priorityId: "reminder_peptide", reason: "execution_paused" }]);
+    }
+  });
+
+  it("keeps the occurrence when the pause ended on or before yesterday, or when no execution is known", () => {
+    for (const executionItems of [
+      [peptideExecution([{ pausedFrom: "2026-07-20", resumedOn: "2026-07-28" }])],
+      [peptideExecution([{ pausedFrom: "2026-07-29", resumedOn: null }])],
+      [peptideExecution(undefined)],
+      [peptideExecution(null)],
+      [],
+      undefined,
+    ]) {
+      const result = selection({ reminders: [peptideReminder()], executionItems, protocols });
+      expect(result.items.map((item) => item.occurrenceKey)).toEqual(["reminder_peptide:2026-07-28"]);
+    }
+  });
+});

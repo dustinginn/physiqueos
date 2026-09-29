@@ -333,9 +333,14 @@ function composeMorningSelection({
   reviews,
   ...dailyFocusInputs
 }) {
-  const prioritySelection = getPreviousDayIncompletePrioritySelection(
-    dailyFocusInputs
-  );
+  // Execution items (and protocols) reach the previous-day selection so an
+  // execution suspended on that date is excluded as `execution_paused`
+  // instead of being offered for reconciliation.
+  const prioritySelection = getPreviousDayIncompletePrioritySelection({
+    ...dailyFocusInputs,
+    executionItems,
+    protocols,
+  });
   const recoverySelection = createMorningEvidenceRecoverySelection({
     canonicalObjects,
     executionItems,

@@ -20,6 +20,7 @@ import {
   PeptideExecutionState,
 } from "../../domain/services/PeptideExecutionManagementService.js";
 import { formatSupportScheduleSummary } from "../../domain/models/SupportScheduleModel.js";
+import { isDateSuspended, normalizeScheduleSuspensions } from "../../domain/models/PeptideDosingStrategyModel.js";
 import { ReminderType } from "../../domain/models/reminder.js";
 import { composeOperatingPlanStrategyDetail } from "../../domain/services/OperatingPlanStrategyDetailService.js";
 import { createStrategyEditorModel, TRAINING_AREAS } from "../../domain/services/StrategyEditorService.js";
@@ -371,7 +372,10 @@ export function createCoreNavigationReadService({
           reminderPreference: hydration.reminderPreference,
           timingContext: hydration.timingContext,
           notes: hydration.notes,
-          nextDue: projectNextSupportDue({ schedule: hydration.supportSchedule, reminder, localDate }),
+          nextDue: projectNextSupportDue({
+            schedule: hydration.supportSchedule, reminder, localDate,
+            suspensions: hydration.scheduleSuspensions,
+          }),
         });
       });
     },
@@ -986,12 +990,16 @@ function projectMethodReminderEnabled({ category, method, ownerUserId, runtime }
     .reminderPreference === "remind";
 }
 
-function projectNextSupportDue({ schedule, reminder, localDate }) {
+function projectNextSupportDue({ schedule, reminder, localDate, suspensions = [] }) {
   // "Next due" belongs to the canonical execution schedule, not to iOS
   // reminder delivery. Turning reminders off must hide the bell without
   // erasing when the Support itself is next due. Completion history still
-  // comes from the reminder occurrence anchor when one exists.
+  // comes from the reminder occurrence anchor when one exists. A suspended
+  // execution (peptide pause window) has no next due while the window is
+  // open; dates inside any closed window are skipped, not shifted.
   if (!schedule || !localDate) return null;
+  const windows = normalizeScheduleSuspensions(suspensions);
+  if (windows.some((window) => window.resumedOn === null)) return null;
   const start = /^\d{4}-\d{2}-\d{2}$/.test(schedule.startDate ?? "") ? schedule.startDate : localDate;
   const end = /^\d{4}-\d{2}-\d{2}$/.test(schedule.endDate ?? "") ? schedule.endDate : null;
   for (let offset = 0; offset <= 370; offset += 1) {
@@ -999,6 +1007,7 @@ function projectNextSupportDue({ schedule, reminder, localDate }) {
     if (candidate < start) continue;
     if (end && candidate > end) return null;
     if (!supportScheduleIncludesDate(schedule, candidate, start)) continue;
+    if (isDateSuspended(windows, candidate)) continue;
     if (offset === 0 && isReminderOccurrenceCompleted(reminder, { occurrenceDate: candidate })) continue;
     const time = resolveScheduledTime(schedule.timing === "specific" ? schedule.specificTime : schedule.timing);
     const date = new Intl.DateTimeFormat("en-US", {

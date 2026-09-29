@@ -6,7 +6,12 @@ import {
   resolveReminderOccurrenceDate,
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
 
+import { findSuspensionWindow } from "../../domain/services/ExecutionPriorityProjectionService.js";
+
 export const PRIORITY_COMPLETION_COLLECTIONS = Object.freeze(["reminders"]);
+// Execution items are read (never written) so a peptide occurrence inside a
+// pause window is refused before the reminder history is touched.
+export const PRIORITY_COMPLETION_READ_COLLECTIONS = Object.freeze(["reminders", "executionItems"]);
 
 export function createPriorityCompletionService({ mutateCanonicalRuntime, now = () => new Date() } = {}) {
   if (typeof mutateCanonicalRuntime !== "function") throw new Error("Priority completion requires a bounded canonical mutation.");
@@ -22,7 +27,7 @@ export function createPriorityCompletionService({ mutateCanonicalRuntime, now = 
       const committed = await mutateCanonicalRuntime({
         operation: "priority-completion",
         allowedCollections: PRIORITY_COMPLETION_COLLECTIONS,
-        readCollections: PRIORITY_COMPLETION_COLLECTIONS,
+        readCollections: PRIORITY_COMPLETION_READ_COLLECTIONS,
         readApplicationContext: false,
         readImportMetadata: false,
         allowApplicationContextMutation: false,
@@ -42,6 +47,17 @@ export function createPriorityCompletionService({ mutateCanonicalRuntime, now = 
               occurrenceKey: createPriorityOccurrenceKey(priorityId, effectiveOccurrenceDate),
               execution: resolvePriorityExecutionContract({ reminder: current, occurrenceDate: effectiveOccurrenceDate }),
               reminder: current,
+            });
+          }
+          const pauseWindow = findSuspensionWindow(
+            findPeptideExecutionForReminder(candidate.executionItems, current),
+            effectiveOccurrenceDate
+          );
+          if (pauseWindow) {
+            throw Object.assign(new Error("This priority is paused. Resume it from the Operating Plan to record doses again."), {
+              code: "PRIORITY_OCCURRENCE_PAUSED",
+              status: 422,
+              pausedFrom: pauseWindow.pausedFrom,
             });
           }
           if (effectiveOccurrenceDate && dose && protocolId) {
@@ -79,4 +95,12 @@ export function createPriorityCompletionService({ mutateCanonicalRuntime, now = 
       });
     },
   });
+}
+
+function findPeptideExecutionForReminder(executionItems, reminder) {
+  if (!reminder?.linkedEntityId || !Array.isArray(executionItems)) return null;
+  const matches = executionItems.filter((item) =>
+    item?.type === "peptide" && item.protocolRootId === reminder.linkedEntityId
+  );
+  return matches.length === 1 ? matches[0] : null;
 }

@@ -11,6 +11,7 @@ import {
   ExecutionPriorityOperationalReason,
   ExecutionPriorityOperationalState,
   findExecutionForProtocol,
+  findSuspensionWindow,
   formatExecutionDose,
   formatExecutionSchedule,
   projectExecutionPriority,
@@ -323,8 +324,10 @@ export function getPreviousDayIncompletePriorityItems(options = {}) {
 export function getPreviousDayIncompletePrioritySelection({
   checkIns = [],
   dexaScans = [],
+  executionItems = [],
   now = new Date(),
   progressPhotos = [],
+  protocols = [],
   reminders = [],
   timeZone = DEFAULT_LOCAL_TIME_ZONE,
   weightEntries = [],
@@ -340,7 +343,9 @@ export function getPreviousDayIncompletePrioritySelection({
       date: window.previousLocalDate,
       dayName,
       dexaScans,
+      executionItems,
       progressPhotos,
+      protocols,
       reminder,
       timeZone: window.timeZone,
       weightEntries,
@@ -398,12 +403,14 @@ export function createPriorityOccurrenceKey(priorityId, occurrenceDate) {
   return createCanonicalPriorityOccurrenceKey(priorityId, occurrenceDate);
 }
 
-function getPreviousDayPriorityExclusionReason({
+export function getPreviousDayPriorityExclusionReason({
   checkIns,
   date,
   dayName,
   dexaScans,
+  executionItems = [],
   progressPhotos,
+  protocols = [],
   reminder,
   timeZone,
   weightEntries,
@@ -412,6 +419,12 @@ function getPreviousDayPriorityExclusionReason({
     return "not_user_facing";
   }
   if (!isPriorityRecordOpen(reminder)) return "priority_resolved";
+  // An execution-backed priority whose execution was suspended on that date
+  // (a peptide pause window) has no occurrence to reconcile; the paused day
+  // is neither completed nor skipped, it simply did not happen.
+  if (isExecutionSuspendedOnDate({ date, executionItems, protocols, reminder })) {
+    return "execution_paused";
+  }
   if (!reminderAppliesToday(reminder, dayName, date)) {
     return "not_scheduled_previous_day";
   }
@@ -436,6 +449,15 @@ function getPreviousDayPriorityExclusionReason({
   }
 
   return null;
+}
+
+function isExecutionSuspendedOnDate({ date, executionItems = [], protocols = [], reminder }) {
+  if (!isExecutionBackedReminder(reminder) || !reminder?.linkedEntityId) return false;
+  if (!Array.isArray(executionItems) || executionItems.length === 0) return false;
+  const protocol = (protocols ?? []).find((item) => item?.id === reminder.linkedEntityId) ?? null;
+  if (protocol && !["peptide", "recovery", "supplement"].includes(protocol.category)) return false;
+  const { executionItem } = findExecutionForProtocol(executionItems, reminder.linkedEntityId);
+  return Boolean(findSuspensionWindow(executionItem, date));
 }
 
 function isUserFacingMorningReconciliationReminder(reminder) {
@@ -851,11 +873,16 @@ function getExecutionBackedProtocolItems({
       });
 
       if (!projection.occurrenceEligible) return null;
+      // A paused execution (dated suspension window) is dropped from Home and
+      // from the notification horizon explicitly, beside the inactive and
+      // not-scheduled states, so the check never depends on eligibility alone.
       if (
         projection.operationalState ===
           ExecutionPriorityOperationalState.INACTIVE ||
         projection.operationalState ===
-          ExecutionPriorityOperationalState.NOT_SCHEDULED_TODAY
+          ExecutionPriorityOperationalState.NOT_SCHEDULED_TODAY ||
+        projection.operationalState ===
+          ExecutionPriorityOperationalState.PAUSED
       ) {
         return null;
       }
