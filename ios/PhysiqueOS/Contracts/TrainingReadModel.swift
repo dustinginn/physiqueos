@@ -874,26 +874,57 @@ struct TrainingSessionPerformanceRecords: Codable, Equatable, Sendable {
 }
 
 /// The Workout Complete card's content: the first few Server records in the
-/// Server's own order, and a "+N more records" summary for the rest.
-struct NewPerformanceRecordsPresentation {
-    var visible: [TrainingPerformanceRecord]
+/// Server's own order, grouped only by exact canonical exercise identity so a
+/// session with several records for one exercise does not repeat its name.
+/// Native does not rank, compare, or otherwise reinterpret the records.
+struct NewPerformanceRecordsPresentation: Equatable {
+    struct ExerciseGroup: Identifiable, Equatable {
+        var canonicalExerciseId: String
+        var canonicalExerciseName: String
+        var records: [TrainingPerformanceRecord]
+
+        var id: String { canonicalExerciseId }
+    }
+
+    var groups: [ExerciseGroup]
     var moreLabel: String?
 
     init(records: [TrainingPerformanceRecord], visibleLimit: Int) {
-        visible = Array(records.prefix(visibleLimit))
+        let visible = Array(records.prefix(max(0, visibleLimit)))
+        var groupIndexes: [String: Int] = [:]
+        var grouped: [ExerciseGroup] = []
+        for record in visible {
+            if let index = groupIndexes[record.canonicalExerciseId] {
+                grouped[index].records.append(record)
+            } else {
+                groupIndexes[record.canonicalExerciseId] = grouped.count
+                grouped.append(.init(
+                    canonicalExerciseId: record.canonicalExerciseId,
+                    canonicalExerciseName: record.canonicalExerciseName,
+                    records: [record]
+                ))
+            }
+        }
+        groups = grouped
         let hidden = records.count - visible.count
         moreLabel = hidden > 0 ? "+\(hidden) more record\(hidden == 1 ? "" : "s")" : nil
     }
 }
 
 /// One-shot celebration gate: the confetti plays once per completed
-/// session (never again on reappearance or a later revisit), and never when
-/// Reduce Motion is on.
+/// session with records (never again on reappearance or a later revisit).
+/// Reduce Motion consumes that first appearance without animating, so turning
+/// the setting off later cannot replay a celebration the Founder already saw.
 enum WorkoutCelebrationGate {
-    static func claim(key: String?, reduceMotion: Bool, defaults: UserDefaults = .standard) -> Bool {
-        guard !reduceMotion, let key, !defaults.bool(forKey: key) else { return false }
+    static func claim(
+        key: String?,
+        hasRecords: Bool,
+        reduceMotion: Bool,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        guard hasRecords, let key, !defaults.bool(forKey: key) else { return false }
         defaults.set(true, forKey: key)
-        return true
+        return !reduceMotion
     }
 }
 
