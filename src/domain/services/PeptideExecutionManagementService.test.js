@@ -2,7 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe,expect,it } from "vitest";
-import { applyPreparedPeptideExecutionTransition,buildPeptideExecutionDraftFromFormData,classifyPeptideExecutionState,createPeptideExecutionHydrationModel,createPeptideExecutionManagementService,formatPeptideExecutionSummary,PeptideExecutionState,preparePeptideExecutionTransition,resolvePeptideDose,validatePeptideExecutionDraft,verifyPreparedPeptideExecutionTransition } from "./PeptideExecutionManagementService";
+import { applyPreparedPeptideExecutionTransition,buildPeptideExecutionDraftFromFormData,buildPeptideSupportDraft,classifyPeptideExecutionState,createPeptideExecutionHydrationModel,createPeptideExecutionManagementService,createPeptideSupportHydrationModel,formatPeptideExecutionSummary,PEPTIDE_TIMELINE_HISTORY_LIMIT,PeptideExecutionOutcome,PeptideExecutionRejectionCode,PeptideExecutionState,preparePeptideExecutionTransition,preparePeptideLifecycleTransition,resolvePeptideDose,resolvePeptideLifecycleState,validatePeptideExecutionDraft,verifyPreparedPeptideExecutionTransition } from "./PeptideExecutionManagementService";
+import { composeTimelineWithStrategy,generatePeptideDosingTimeline,hydratePeptideDosingStrategy } from "../models/PeptideDosingStrategyModel";
 
 describe("shared peptide Execution",()=>{
   it("keeps Web's transaction behavior identical to the extracted pure transition",async()=>{const fixture=setup("Retatrutide",["thursday"],true);const requested=command(fixture,{expectedRevision:1,draft:draft(["thursday"],{priority:"high"})});const candidate=structuredClone(fixture.live);const prepared=preparePeptideExecutionTransition(candidate,requested,new Date("2026-07-25T12:00:00Z"));expect(prepared.ok).toBe(true);const direct=applyPreparedPeptideExecutionTransition(candidate,prepared);expect(verifyPreparedPeptideExecutionTransition(candidate,prepared)).toBe(true);const web=await fixture.service.save(requested);expect(web).toMatchObject({outcome:"success",...direct});expect(fixture.live.executionItems).toEqual(candidate.executionItems);});
@@ -46,3 +47,225 @@ function command(fixture,overrides={}){return{protocolId:"peptide",userId:"found
 function draft(days,overrides={}){return{cadence:{type:days.length===1?"weekly":"specific_days"},preferredSchedule:{daysOfWeek:days,timeOfDay:"21:45",startDate:"2026-05-01",endDate:null},timingContext:"fasted_before_bed",reminderPreference:"remind",priority:"normal",notes:"legacy",timeline:[phase("2026-05-01",null)],...overrides};}
 function phase(startDate,endDate,amount="0.5"){return{startDate,endDate,dose:{amount,unit:"mg"},notes:""};}
 function formData(days,timeline){const form=new FormData();Object.entries({cadence:days.length===1?"weekly":"specific_days",days:days.join(","),timing:"specific",specificTime:"21:45",startDate:"2026-05-01",endDate:"",timingContext:"fasted_before_bed",reminderPreference:"remind",priority:"normal",notes:"",timelineOperation:"replace",timelineJson:JSON.stringify(timeline)}).forEach(([key,value])=>form.set(key,value));return form;}
+
+describe("history-preserving peptide saves (S1/S2)",()=>{
+  it("changes the dose from today: frozen prefix byte-identical, one archive, revision bumped",()=>{
+    const store=structuredStore();const before=structuredClone(store.executionItems[0].timeline);
+    const prepared=prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.5",TODAY)})});
+    expect(prepared.ok).toBe(true);
+    const item=commit(store,prepared);
+    expect(item.timeline.slice(0,4)).toEqual(before.slice(0,4));
+    expect(item.timeline[4]).toEqual({...before[4],endDate:"2026-07-24"});
+    expect(item.timeline[5]).toEqual({startDate:TODAY,endDate:null,dose:{amount:"1.5",unit:"mg"},notes:""});
+    expect(item.timeline).toHaveLength(6);
+    expect(item.timelineHistory).toEqual([{archivedAt:"2026-07-25T12:00:00.000Z",executionRevision:1,timeline:before}]);
+    expect(item.executionRevision).toBe(2);
+    expect(item.dosingStrategy).toMatchObject({pattern:"stay",startDate:TODAY,startingDose:{amount:"1.5",unit:"mg"}});
+    expect(hydratePeptideDosingStrategy(item)).toMatchObject({mode:"structured",generated:[item.timeline[5]]});
+    expect(createPeptideSupportHydrationModel({executionItem:item,protocol:store.protocols[0]})).toMatchObject({dosingMode:"structured",lifecycle:{state:"active",since:null,history:[]},scheduleSuspensions:[]});
+  });
+  it("changes the dose from a future date, keeping every phase that started before it",()=>{
+    const store=structuredStore();const before=structuredClone(store.executionItems[0].timeline);
+    const item=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.5","2026-08-13")})}));
+    expect(item.timeline.slice(0,6)).toEqual(before.slice(0,6));
+    expect(item.timeline[6]).toEqual({...before[6],endDate:"2026-08-12"});
+    expect(item.timeline[7]).toMatchObject({startDate:"2026-08-13",endDate:null,dose:{amount:"1.5",unit:"mg"}});
+    expect(validatePeptideExecutionDraft({...supportDraft(),timeline:item.timeline})).toEqual([]);
+  });
+  it("changes the dose on a phase-transition day without a malformed frozen phase",()=>{
+    const store=structuredStore();const before=structuredClone(store.executionItems[0].timeline);
+    const item=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.5","2026-07-30")})}));
+    expect(item.timeline.slice(0,5)).toEqual(before.slice(0,5));
+    expect(item.timeline[5]).toMatchObject({startDate:"2026-07-30",endDate:null,dose:{amount:"1.5",unit:"mg"}});
+    expect(item.timeline).toHaveLength(6);
+    expect(item.timeline.every((phase)=>!phase.endDate||phase.endDate>=phase.startDate)).toBe(true);
+  });
+  it("is idempotent twice in one day and replaces only the tail on a second different dose",()=>{
+    const store=structuredStore();
+    commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.5",TODAY)})}));
+    const repeated=prepare(store,{expectedRevision:2,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.5",TODAY)})});
+    expect(repeated).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.UNCHANGED});
+    const first=structuredClone(store.executionItems[0].timeline);
+    const item=commit(store,prepare(store,{expectedRevision:2,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.75",TODAY)})}));
+    expect(item.timeline.slice(0,5)).toEqual(first.slice(0,5));
+    expect(item.timeline[5]).toMatchObject({startDate:TODAY,dose:{amount:"1.75"}});
+    expect(item.timeline).toHaveLength(6);
+    expect(item.timelineHistory).toHaveLength(2);
+    expect(item.executionRevision).toBe(3);
+  });
+  it("refuses a strategy that starts before today unless the draft rewrites history explicitly",()=>{
+    const store=structuredStore();
+    const backdated=supportDraft({dosingStrategy:{...PLAN,landingDose:"0.5"}});
+    const refused=prepare(store,{expectedRevision:1,today:TODAY,draft:backdated});
+    expect(refused).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.INVALID,code:PeptideExecutionRejectionCode.PLAN_REWRITES_HISTORY});
+    expect(store.executionItems[0].executionRevision).toBe(1);
+    const item=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:{...backdated,rewriteHistory:true}}));
+    expect(item.timeline.at(-1)).toMatchObject({startDate:"2026-07-30",endDate:null,dose:{amount:"0.5"}});
+    expect(item.timeline).toHaveLength(6);
+    expect(item.timelineHistory).toHaveLength(1);
+  });
+  it("accepts a full save whose past-dated strategy reproduces the stored plan (notes-only edit)",()=>{
+    const store=structuredStore();const before=structuredClone(store.executionItems[0].timeline);
+    const item=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({notes:"Rotate injection sites"})}));
+    expect(item.timeline).toEqual(before);
+    expect(item.notes).toBe("Rotate injection sites");
+    expect(item.timelineHistory).toBeUndefined();
+    expect(prepare(store,{expectedRevision:2,today:TODAY,draft:supportDraft({notes:"Rotate injection sites"})})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.UNCHANGED});
+  });
+  it.each([
+    ["day-of-week",{supportSchedule:{daysOfWeek:["friday"]}}],
+    ["time",{supportSchedule:{specificTime:"20:30"}}],
+    ["reminder off",{reminderPreference:"none"}],
+    ["notes",{notes:"Different note"}],
+  ])("keeps the timeline and reminder history on a %s change",(_label,overrides)=>{
+    const store=structuredStore();const before=structuredClone(store.executionItems[0].timeline);const history=structuredClone(store.reminders[0].completionHistory);
+    const prepared=prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft(overrides)});
+    expect(prepared.ok).toBe(true);
+    const item=commit(store,prepared);
+    expect(item.timeline).toEqual(before);
+    expect(item.timelineHistory).toBeUndefined();
+    expect(store.reminders[0].completionHistory).toEqual(history);
+    expect(store.reminders[0].completedAt).toBe("2026-07-23T21:50:00.000Z");
+    if(overrides.reminderPreference==="none"){expect(store.reminders[0].active).toBe(false);
+      const on=commit(store,prepare(store,{expectedRevision:2,today:TODAY,draft:supportDraft()}));
+      expect(on.timeline).toEqual(before);expect(store.reminders[0].active).toBe(true);expect(store.reminders[0].completionHistory).toEqual(history);}
+  });
+  it("supports an explicit end date and an open end on a stay strategy",()=>{
+    const store=structuredStore();
+    const ended=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:{...stay("1.5",TODAY),endDate:"2026-09-30"}})}));
+    expect(ended.timeline.at(-1)).toEqual({startDate:TODAY,endDate:"2026-09-30",dose:{amount:"1.5",unit:"mg"},notes:""});
+    expect(hydratePeptideDosingStrategy(ended).mode).toBe("structured");
+    const open=commit(store,prepare(store,{expectedRevision:2,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.5",TODAY)})}));
+    expect(open.timeline.at(-1)).toEqual({startDate:TODAY,endDate:null,dose:{amount:"1.5",unit:"mg"},notes:""});
+    expect(open.timeline.slice(0,5)).toEqual(ended.timeline.slice(0,5));
+  });
+  it("preserves a historical titration after a stable change and resolves doses from the full timeline",()=>{
+    const store=structuredStore();
+    const item=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.5",TODAY)})}));
+    expect(resolvePeptideDose(item,"2026-06-15").current.dose.amount).toBe("1");
+    expect(resolvePeptideDose(item,"2026-07-23").current.dose.amount).toBe("0.75");
+    expect(resolvePeptideDose(item,TODAY).current.dose.amount).toBe("1.5");
+    expect(hydratePeptideDosingStrategy(item).timeline).toHaveLength(6);
+  });
+  it("keeps raw timeline replace drafts on the full-replace path",()=>{
+    const store=structuredStore();const replaced=[phase("2026-08-01",null,"1.25")];
+    const item=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:draft(["thursday"],{timelineOperation:"replace",timeline:replaced})}));
+    expect(item.timeline).toEqual(replaced);
+  });
+  it("bounds timelineHistory to the newest archived entries",()=>{
+    const store=structuredStore();
+    store.executionItems[0].timelineHistory=Array.from({length:PEPTIDE_TIMELINE_HISTORY_LIMIT},(_,index)=>({archivedAt:`2026-01-${String(index+1).padStart(2,"0")}T00:00:00.000Z`,executionRevision:index+1,timeline:[]}));
+    const item=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.5",TODAY)})}));
+    expect(item.timelineHistory).toHaveLength(PEPTIDE_TIMELINE_HISTORY_LIMIT);
+    expect(item.timelineHistory[0].archivedAt).toBe("2026-01-02T00:00:00.000Z");
+    expect(item.timelineHistory.at(-1).executionRevision).toBe(1);
+  });
+  it("saves through the transaction service with the same composition and surfaces the rejection code",async()=>{
+    const fixture=setup("Retatrutide",["thursday"],true);
+    Object.assign(fixture.live.executionItems[0],structuredStore().executionItems[0]);fs.writeFileSync(fixture.file,JSON.stringify(fixture.live));
+    const refused=await fixture.service.save(command(fixture,{expectedRevision:1,today:TODAY,preserveTimelineHistory:true,draft:supportDraft({dosingStrategy:{...PLAN,landingDose:"0.5"}})}));
+    expect(refused).toMatchObject({outcome:"invalid",committed:false,code:PeptideExecutionRejectionCode.PLAN_REWRITES_HISTORY});
+    const saved=await fixture.service.save(command(fixture,{expectedRevision:1,today:TODAY,preserveTimelineHistory:true,draft:supportDraft({dosingStrategy:stay("1.5",TODAY)})}));
+    expect(saved).toMatchObject({outcome:"success",executionRevision:2});
+    expect(fixture.live.executionItems[0].timeline).toHaveLength(6);
+    expect(fixture.live.executionItems[0].timelineHistory).toHaveLength(1);
+  });
+});
+
+describe("peptide pause and resume lifecycle (S3)",()=>{
+  it("pauses from an effective date, bumps the revision and leaves everything else untouched",()=>{
+    const store=structuredStore();const before=structuredClone(store.executionItems[0]);const reminder=structuredClone(store.reminders[0]);
+    const prepared=lifecycle(store,{operation:"pause",effectiveDate:"2026-07-01",expectedRevision:1,reason:"Travel"});
+    expect(prepared).toMatchObject({ok:true,operation:"pause",timelineChanged:false,lifecycle:{state:"paused",since:"2026-07-01"}});
+    const item=commit(store,prepared);
+    expect(item.scheduleSuspensions).toEqual([{pausedFrom:"2026-07-01",resumedOn:null,pausedAt:"2026-07-01T12:00:00.000Z",resumedAt:null,reason:"Travel",pausedExecutionRevision:1,resumedExecutionRevision:null}]);
+    expect(item.executionRevision).toBe(2);
+    const {scheduleSuspensions,executionRevision,updatedAt,...rest}=item;const {executionRevision:_r,updatedAt:_u,...expected}=before;
+    expect(rest).toEqual(expected);
+    expect(store.reminders[0]).toEqual(reminder);
+    expect(resolvePeptideLifecycleState(item)).toEqual({state:"paused",since:"2026-07-01",history:[{state:"paused",effectiveDate:"2026-07-01",at:"2026-07-01T12:00:00.000Z",reason:"Travel"}]});
+  });
+  it("rejects a repeated pause as NOT_ACTIVE and a resume while active as NOT_PAUSED",()=>{
+    const store=structuredStore();
+    expect(lifecycle(store,{operation:"resume",effectiveDate:"2026-07-01",expectedRevision:1})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.NOT_PAUSED,code:PeptideExecutionRejectionCode.LIFECYCLE_NOT_PAUSED});
+    commit(store,lifecycle(store,{operation:"pause",effectiveDate:"2026-07-01",expectedRevision:1}));
+    expect(lifecycle(store,{operation:"pause",effectiveDate:"2026-07-02",expectedRevision:2})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.NOT_ACTIVE,code:PeptideExecutionRejectionCode.LIFECYCLE_NOT_ACTIVE});
+    expect(lifecycle(store,{operation:"resume",effectiveDate:"2026-07-10",expectedRevision:1})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.VERSION_CONFLICT});
+    expect(lifecycle(store,{operation:"resume",effectiveDate:"bad",expectedRevision:2})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.INVALID});
+    expect(preparePeptideLifecycleTransition({protocol:store.protocols[0],executionItem:null,operation:"pause",effectiveDate:"2026-07-01",expectedRevision:1})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.NOT_FOUND});
+    expect(preparePeptideLifecycleTransition({protocol:{...store.protocols[0],status:"paused"},executionItem:store.executionItems[0],operation:"pause",effectiveDate:"2026-07-01",expectedRevision:2})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.NOT_FOUND});
+  });
+  it("pause, edit, resume archives exactly two entries and shifts the plan per the generator",()=>{
+    const store=structuredStore();
+    commit(store,lifecycle(store,{operation:"pause",effectiveDate:"2026-07-01",expectedRevision:1,now:"2026-07-01T12:00:00.000Z"}));
+    const edited=commit(store,prepare(store,{expectedRevision:2,today:"2026-07-03",draft:supportDraft({dosingStrategy:{...PLAN,landingDose:"0.5"},rewriteHistory:true})}));
+    expect(edited.timelineHistory).toHaveLength(1);
+    expect(edited.scheduleSuspensions).toHaveLength(1);
+    const beforeResume=structuredClone(edited.timeline);
+    const prepared=lifecycle(store,{operation:"resume",effectiveDate:"2026-07-10",expectedRevision:3,now:"2026-07-10T12:00:00.000Z"});
+    expect(prepared).toMatchObject({ok:true,operation:"resume",timelineChanged:true,lifecycle:{state:"active",since:"2026-07-10"}});
+    const item=commit(store,prepared);
+    const closed=[{pausedFrom:"2026-07-01",resumedOn:"2026-07-10"}];
+    expect(item.timeline).toEqual(composeTimelineWithStrategy({existingTimeline:beforeResume,strategy:item.dosingStrategy,generated:generatePeptideDosingTimeline(item.dosingStrategy,{suspensions:closed})}));
+    expect(item.timeline.map((entry)=>entry.startDate)).toEqual(["2026-05-21","2026-05-28","2026-06-04","2026-06-11","2026-08-01","2026-08-08"]);
+    expect(item.timeline[3].endDate).toBe("2026-07-31");
+    expect(item.timelineHistory).toHaveLength(2);
+    expect(item.timelineHistory[1].timeline).toEqual(beforeResume);
+    expect(item.scheduleSuspensions).toEqual([{pausedFrom:"2026-07-01",resumedOn:"2026-07-10",pausedAt:"2026-07-01T12:00:00.000Z",resumedAt:"2026-07-10T12:00:00.000Z",reason:null,pausedExecutionRevision:1,resumedExecutionRevision:3}]);
+    expect(item.executionRevision).toBe(4);
+    expect(hydratePeptideDosingStrategy(item).mode).toBe("structured");
+    expect(prepare(store,{expectedRevision:4,today:"2026-07-10",draft:supportDraft({dosingStrategy:{...PLAN,landingDose:"0.5"}})})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.UNCHANGED});
+    const notes=commit(store,prepare(store,{expectedRevision:4,today:"2026-07-10",draft:supportDraft({dosingStrategy:{...PLAN,landingDose:"0.5"},notes:"After the trip"})}));
+    expect(notes.timeline).toEqual(item.timeline);expect(notes.scheduleSuspensions).toEqual(item.scheduleSuspensions);expect(notes.timelineHistory).toHaveLength(2);
+    expect(createPeptideSupportHydrationModel({executionItem:notes,protocol:store.protocols[0]}).dosingMode).toBe("structured");
+  });
+  it("resume with a stay plan leaves the timeline unchanged; an empty window follows a pause starting tomorrow",()=>{
+    const store=structuredStore();
+    commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:stay("1.5",TODAY)})}));
+    const before=structuredClone(store.executionItems[0].timeline);
+    commit(store,lifecycle(store,{operation:"pause",effectiveDate:"2026-08-01",expectedRevision:2}));
+    const resumed=commit(store,lifecycle(store,{operation:"resume",effectiveDate:"2026-08-11",expectedRevision:3}));
+    expect(resumed.timeline).toEqual(before);
+    expect(resumed.timelineHistory).toHaveLength(1);
+    expect(resumed.scheduleSuspensions[0]).toMatchObject({pausedFrom:"2026-08-01",resumedOn:"2026-08-11"});
+    expect(resumed.executionRevision).toBe(4);
+    commit(store,lifecycle(store,{operation:"pause",effectiveDate:"2026-08-21",expectedRevision:4}));
+    const early=commit(store,lifecycle(store,{operation:"resume",effectiveDate:"2026-08-20",expectedRevision:5}));
+    expect(early.scheduleSuspensions[1]).toMatchObject({pausedFrom:"2026-08-21",resumedOn:"2026-08-21"});
+    expect(resolvePeptideLifecycleState(early)).toMatchObject({state:"active",since:"2026-08-21"});
+    expect(lifecycle(store,{operation:"pause",effectiveDate:"2026-08-20",expectedRevision:6})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.INVALID});
+  });
+  it("treats an absent scheduleSuspensions as [] and preserves stored windows through an old-shape save",()=>{
+    const store=structuredStore();
+    expect(resolvePeptideLifecycleState(store.executionItems[0])).toEqual({state:"active",since:null,history:[]});
+    expect(resolvePeptideLifecycleState({scheduleSuspensions:null})).toEqual({state:"active",since:null,history:[]});
+    commit(store,lifecycle(store,{operation:"pause",effectiveDate:"2026-07-01",expectedRevision:1}));
+    const windows=structuredClone(store.executionItems[0].scheduleSuspensions);
+    const oldShape=prepare(store,{expectedRevision:2,draft:draft(["thursday"],{timelineOperation:"preserve",timeline:[],notes:"old client"})});
+    expect(oldShape.ok).toBe(true);
+    expect(oldShape.executionCandidate.scheduleSuspensions).toEqual(windows);
+    const item=commit(store,oldShape);
+    expect(item.scheduleSuspensions).toEqual(windows);
+    expect(resolvePeptideLifecycleState(item).state).toBe("paused");
+    const lost=structuredClone(store);delete lost.executionItems[0].scheduleSuspensions;
+    expect(verifyPreparedPeptideExecutionTransition(lost,oldShape)).toBe(false);
+    const paused=commit(store,prepare(store,{expectedRevision:3,today:"2026-07-03",draft:supportDraft({supportSchedule:{specificTime:"20:00"}})}));
+    expect(paused.scheduleSuspensions).toEqual(windows);expect(paused.preferredSchedule.timeOfDay).toBe("20:00");
+  });
+  it("leaves UNCHANGED detection intact when the field is absent on both sides",()=>{
+    const store=structuredStore();
+    expect(prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft()})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.UNCHANGED});
+    store.executionItems[0].scheduleSuspensions=[];
+    expect(prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft()})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.UNCHANGED});
+  });
+});
+
+const TODAY="2026-07-25";
+const PLAN={pattern:"up_hold_down",startingDose:{amount:"0.25",unit:"mg"},startDate:"2026-05-21",stepAmount:"0.25",stepInterval:1,stepUnit:"weeks",targetDose:"1",holdDuration:6,holdUnit:"weeks",decreaseAmount:"0.25",decreaseInterval:1,decreaseUnit:"weeks",landingDose:"0.25",endDate:null};
+const SCHEDULE={frequency:"weekly",daysOfWeek:["thursday"],intervalDays:1,timing:"specific",specificTime:"21:45",startDate:"2026-05-21",endDate:null};
+function stay(amount,startDate){return{pattern:"stay",startingDose:{amount,unit:"mg"},startDate,endDate:null};}
+function structuredStore(){const timeline=generatePeptideDosingTimeline(PLAN);return{protocols:[{id:"peptide",userId:"founder",name:"Retatrutide",category:"peptide",status:"active",currentGoalIds:["goal"],relatedGoalIds:[]}],executionItems:[{id:"execution_retatrutide",userId:"founder",type:"peptide",title:"Retatrutide",description:"Peptide Execution",active:true,protocolRootId:"peptide",linkedStrategyIds:["peptide"],linkedGoalIds:["goal"],linkedEvidenceTypes:[],cadence:{type:"weekly"},preferredSchedule:{daysOfWeek:["thursday"],timeOfDay:"21:45",startDate:"2026-05-21",endDate:null},timingContext:"fasted_before_bed",reminderPreference:"remind",priority:"normal",notes:"Fasted before bed",completionHistory:[],dosingStrategy:PLAN,timeline,executionRevision:1,author:{type:"user",id:"founder"},createdAt:"2026-05-21T12:00:00.000Z",updatedAt:"2026-05-21T12:00:00.000Z"}],reminders:[{id:"reminder_peptide",userId:"founder",title:"Retatrutide",type:"protocol_reminder",linkedEntityType:"protocol",linkedEntityId:"peptide",relatedGoalIds:["goal"],active:true,schedule:{type:"weekly",cadence:"weekly",interval:1,unit:"week",daysOfWeek:["thursday"],dayOfWeek:"thursday",timeOfDay:"21:45",startDate:"2026-05-21",endDate:null,timingContext:"fasted_before_bed",timezone:"America/Los_Angeles"},completedAt:"2026-07-23T21:50:00.000Z",completionHistory:[{id:"prior",evidenceDate:"2026-07-23",dose:{amount:"0.75",unit:"mg"}}]}]};}
+function supportDraft(overrides={}){return buildPeptideSupportDraft({supportSchedule:{...SCHEDULE,...(overrides.supportSchedule??{})},dosingStrategy:overrides.dosingStrategy??PLAN,timingContext:"fasted_before_bed",reminderPreference:overrides.reminderPreference??"remind",notes:overrides.notes??"Fasted before bed",rewriteHistory:overrides.rewriteHistory===true});}
+function prepare(store,overrides={}){return preparePeptideExecutionTransition(store,{protocolId:"peptide",userId:"founder",author:{type:"user",id:"founder"},synchronizeReminder:true,preservePriority:true,preserveTimelineHistory:true,...overrides},new Date(`${overrides.today??TODAY}T12:00:00.000Z`));}
+function lifecycle(store,{now,...overrides}){return preparePeptideLifecycleTransition({protocol:store.protocols[0],executionItems:store.executionItems,reminder:store.reminders[0],now:new Date(now??`${overrides.effectiveDate}T12:00:00.000Z`),...overrides});}
+function commit(store,prepared){expect(prepared.ok).toBe(true);applyPreparedPeptideExecutionTransition(store,prepared);expect(verifyPreparedPeptideExecutionTransition(store,prepared)).toBe(true);return store.executionItems[0];}
