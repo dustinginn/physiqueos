@@ -93,4 +93,39 @@ final class PriorityDetailViewModel {
             state = .failed("This priority was not marked complete. Refresh before retrying.")
         }
     }
+
+    /// Marks today's occurrence Skipped through the canonical skip command.
+    /// Offered only when the Server says the occurrence is skippable.
+    func skip() async {
+        guard authority == .founderProduction,
+              (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: authority)) != nil,
+              case .loaded(.some(let occurrence)) = state,
+              occurrence.skippable, !occurrence.completed, !occurrence.skipped,
+              let version = occurrence.skipExpectedVersion
+        else { return }
+        do {
+            try await writeAPI.skip(
+                priorityId: occurrence.routePriorityId ?? occurrence.id,
+                occurrenceDate: occurrence.date,
+                expectedVersion: version
+            )
+            var acknowledged = occurrence
+            acknowledged.skipped = true
+            acknowledged.skippable = false
+            acknowledged.completable = false
+            state = .loaded(acknowledged)
+            // Same cleanup as completion: withdraw this occurrence's local
+            // reminder and re-sync Home and the notification horizon.
+            await notificationCleanup(occurrence.routePriorityId ?? occurrence.id, occurrence.date)
+            do {
+                state = .loaded(try await api.fetchPriority(priorityId: priorityId, occurrenceDate: occurrenceDate))
+            } catch {
+                // The durable skip already succeeded; keep the acknowledged state.
+            }
+        } catch PrioritySkipError.alreadyCompleted {
+            state = .loaded(try? await api.fetchPriority(priorityId: priorityId, occurrenceDate: occurrenceDate))
+        } catch {
+            state = .failed("This priority was not marked skipped. Refresh before retrying.")
+        }
+    }
 }

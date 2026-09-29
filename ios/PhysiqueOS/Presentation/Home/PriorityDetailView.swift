@@ -18,6 +18,7 @@ struct PriorityDetailView: View {
     @Environment(\.dismiss) private var dismiss
     var onNavigate: (AppDestination) -> Void
     @State private var viewModel: PriorityDetailViewModel?
+    @State private var isConfirmingSkip = false
     let priorityId: String
     var occurrenceDate: String? = nil
 
@@ -175,7 +176,13 @@ struct PriorityDetailView: View {
 
     @ViewBuilder
     private func actionSection(_ priority: PriorityOccurrence) -> some View {
-        if priority.completable {
+        if priority.skipped {
+            CardContainer {
+                Label("Skipped for today.", systemImage: "forward.end.circle.fill")
+                    .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+        } else if priority.completable {
             if priority.completed {
                 CardContainer {
                     Label("Priority complete for today.", systemImage: "checkmark.circle.fill")
@@ -187,6 +194,26 @@ struct PriorityDetailView: View {
                     Task { await viewModel?.complete() }
                 }
                 .accessibilityIdentifier("priorityDetail.markComplete")
+                if priority.skippable {
+                    Button("Mark Skipped") { isConfirmingSkip = true }
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .accessibilityIdentifier("priorityDetail.markSkipped")
+                        .confirmationDialog(
+                            "Skip \(priority.title) today?",
+                            isPresented: $isConfirmingSkip,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Mark Skipped", role: .destructive) {
+                                Task { await viewModel?.skip() }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("Today's occurrence will be recorded as skipped and can't be completed afterwards.")
+                        }
+                }
             }
         } else if let destination = priority.continueActionDestination {
             PrimaryActionButton(title: priority.actionLabel ?? "Continue") {

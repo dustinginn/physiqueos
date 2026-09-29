@@ -14,6 +14,7 @@ enum ProductionCommandType {
     static let submitWeight = "weight.submit.v1"
     static let submitCheckIn = "check-in.submit.v1"
     static let completePriority = "priority.complete.v1"
+    static let skipPriority = "priority.skip.v1"
     static let commitTrainingSession = "training-session.commit.v1"
     static let upsertNutritionDay = "nutrition-day.upsert.v1"
     static let upsertActivityDay = "activity-day.upsert.v1"
@@ -96,6 +97,16 @@ protocol PriorityCompletionWriteAPI: Sendable {
         context: PriorityCompletionContext?,
         expectedVersion: Int
     ) async throws
+    /// Marks today's occurrence Skipped through the canonical skip semantic
+    /// (`priority.skip.v1`, the same record Morning Check-In writes). The
+    /// Server alone decides eligibility (`skippable`) and "today".
+    func skip(priorityId: String, occurrenceDate: String, expectedVersion: Int) async throws
+}
+
+extension PriorityCompletionWriteAPI {
+    func skip(priorityId: String, occurrenceDate: String, expectedVersion: Int) async throws {
+        throw NotAvailablePriorityCompletionWriteAPI.NotAvailable()
+    }
 }
 
 struct ProductionPriorityCompletionWriteAPI: PriorityCompletionWriteAPI {
@@ -146,6 +157,52 @@ struct ProductionPriorityCompletionWriteAPI: PriorityCompletionWriteAPI {
             }
         }
     }
+}
+
+extension ProductionPriorityCompletionWriteAPI {
+    func skip(priorityId: String, occurrenceDate: String, expectedVersion: Int) async throws {
+        try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction)
+        let signature = ProductionIdempotentSubmission.signature([
+            ProductionCommandType.skipPriority, priorityId, occurrenceDate, String(expectedVersion),
+        ])
+        let scope = "priority-skip.\(priorityId).\(occurrenceDate)"
+        let idempotencyKey = idempotencyStore.resolvedKey(scope: scope, signature: signature)
+        let payload = PrioritySkipPayload(priorityId: priorityId, occurrenceDate: occurrenceDate)
+        for attempt in 0..<2 {
+            do {
+                let outcome: ProductionCommandOutcome<PriorityCompletionResult> = try await api.submitCommand(
+                    ProductionCommandType.skipPriority,
+                    idempotencyKey: idempotencyKey,
+                    expectedVersion: String(expectedVersion),
+                    payload: payload
+                )
+                guard outcome.isConfirmed, let result = outcome.receipt.result else {
+                    throw ProductionNativeError.invalidResponse
+                }
+                // Terminal states are first-wins on the Server: a skip that
+                // finds the occurrence already completed changes nothing.
+                guard ["skipped", "already_skipped"].contains(result.status) else {
+                    throw PrioritySkipError.alreadyCompleted
+                }
+                return
+            } catch {
+                guard attempt == 0,
+                      ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error)
+                else { throw error }
+                // Same exact envelope identity: the Server returns the
+                // original receipt and cannot record a second skip.
+            }
+        }
+    }
+}
+
+enum PrioritySkipError: Error, Equatable {
+    case alreadyCompleted
+}
+
+private struct PrioritySkipPayload: Encodable {
+    var priorityId: String
+    var occurrenceDate: String
 }
 
 private struct PriorityCompletionPayload: Encodable {

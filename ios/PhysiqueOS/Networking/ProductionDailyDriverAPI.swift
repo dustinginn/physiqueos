@@ -1084,8 +1084,12 @@ struct ProductionPriorityAPI: PriorityAPI {
             changeLabel: nil, icon: .target, color: .primary,
             urgency: value.status == "Upcoming" ? .upcoming : .available,
             completed: value.status == "Completed",
-            completable: value.status != "Completed" && value.executionContract?.expectedVersion != nil,
+            completable: !["Completed", "Skipped"].contains(value.status) && value.executionContract?.expectedVersion != nil,
             expectedVersion: value.executionContract?.expectedVersion,
+            skipped: value.status == "Skipped",
+            skippable: value.skippable == true && value.skipCommand?.commandType == ProductionCommandType.skipPriority
+                && value.skipCommand?.expectedVersion != nil,
+            skipExpectedVersion: value.skipCommand?.expectedVersion,
             actionLabel: value.action?.label, completionContext: value.completionContext,
             continueActionDestination: Self.destination(forActionHref: value.action?.href), attributedScope: nil,
             detailSections: value.sections.map { PrioritySectionReadModel(title: $0.title, items: $0.items.map { PriorityDetailFieldReadModel(label: $0.label, detail: $0.detail) }) },
@@ -1103,7 +1107,10 @@ struct ProductionPriorityAPI: PriorityAPI {
         var action: ActionPayload?
         var sections: [Section]
         var relatedWeight: PriorityRelatedWeight?
+        var skippable: Bool?
+        var skipCommand: SkipCommand?
     }
+    private struct SkipCommand: Decodable { var commandType: String?; var expectedVersion: Int? }
     private struct ExecutionContract: Decodable { var priorityId: String?; var occurrenceDate: String?; var expectedVersion: Int? }
     private struct ExecutionProjection: Decodable { var executionId: String? }
     private struct ActionPayload: Decodable { var label: String?; var href: String? }

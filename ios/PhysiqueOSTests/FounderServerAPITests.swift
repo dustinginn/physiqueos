@@ -1627,6 +1627,60 @@ final class FounderServerAPITests: XCTestCase {
     }
 
     @MainActor
+    func testMarkSkippedRecordsTheCanonicalSkipAndReconcilesHomeAndNotifications() async throws {
+        var occurrence = PriorityOccurrence(
+            id: "foam", routePriorityId: "reminder-foam", executionItemId: "execution-foam", date: "2026-09-28",
+            title: "Foam Rolling", subtitle: "Tonight", metadata: nil, changeLabel: nil,
+            icon: .activity, color: .success, urgency: .available, completed: false, completable: true,
+            expectedVersion: 12, actionLabel: nil, completionContext: nil, continueActionDestination: nil
+        )
+        occurrence.skippable = true
+        occurrence.skipExpectedVersion = 12
+        let writer = RecordingPriorityCompletionAPI()
+        var cleaned: [String] = []
+        let viewModel = PriorityDetailViewModel(
+            api: FirstPriorityThenFailureAPI(occurrence: occurrence), writeAPI: writer,
+            morningCheckInAPI: NotAvailableMorningCheckInAPI(), store: LoggingSandboxStore(), authority: .founderProduction,
+            priorityId: "reminder-foam", occurrenceDate: "2026-09-28",
+            notificationCleanup: { cleaned.append("\($0)|\($1)") }
+        )
+        await viewModel.load()
+        await viewModel.skip()
+
+        guard case .loaded(.some(let acknowledged)) = viewModel.state else { return XCTFail("Durable skip must be acknowledged") }
+        XCTAssertTrue(acknowledged.skipped)
+        XCTAssertFalse(acknowledged.completable)
+        XCTAssertFalse(acknowledged.skippable)
+        let skips = await writer.skips
+        XCTAssertEqual(skips, ["reminder-foam|2026-09-28|12"])
+        XCTAssertEqual(cleaned, ["reminder-foam|2026-09-28"], "Home and the notification horizon reconcile exactly as after completion.")
+        // Already skipped: a second tap sends nothing.
+        await viewModel.skip()
+        let again = await writer.skips
+        XCTAssertEqual(again.count, 1)
+    }
+
+    @MainActor
+    func testMarkSkippedIsNeverSentWhenTheServerDidNotOfferIt() async throws {
+        let occurrence = PriorityOccurrence(
+            id: "weigh", routePriorityId: "reminder-weigh", executionItemId: "execution-weigh", date: "2026-09-28",
+            title: "Morning Weigh-in", subtitle: nil, metadata: nil, changeLabel: nil,
+            icon: .target, color: .primary, urgency: .available, completed: false, completable: true,
+            expectedVersion: 3, actionLabel: nil, completionContext: nil, continueActionDestination: nil
+        )
+        let writer = RecordingPriorityCompletionAPI()
+        let viewModel = PriorityDetailViewModel(
+            api: FirstPriorityThenFailureAPI(occurrence: occurrence), writeAPI: writer,
+            morningCheckInAPI: NotAvailableMorningCheckInAPI(), store: LoggingSandboxStore(), authority: .founderProduction,
+            priorityId: "reminder-weigh", occurrenceDate: "2026-09-28"
+        )
+        await viewModel.load()
+        await viewModel.skip()
+        let skips = await writer.skips
+        XCTAssertTrue(skips.isEmpty)
+    }
+
+    @MainActor
     func testPriorityDetailAcknowledgesCompletionBeforeNotificationReconciliation() async throws {
         let occurrence = PriorityOccurrence(
             id: "foam", routePriorityId: "reminder-foam", executionItemId: "execution-foam", date: "2026-09-13",
@@ -4010,6 +4064,56 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(specializedPayload["protocolId"] as? String, "protocol-tesamorelin")
     }
 
+    func testProductionPrioritySkipSendsTheCanonicalCommandWithHeaderSafeKeyAndIfMatch() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionCommandOutcomeJSON(result: #"{"status":"skipped","priorityId":"reminder-foam","occurrenceDate":"2026-09-28"}"#)),
+            .json(200, productionCommandOutcomeJSON(result: #"{"status":"already_completed","priorityId":"reminder-foam","occurrenceDate":"2026-09-28"}"#)),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionPriorityCompletionWriteAPI(api: api, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        try await writeAPI.skip(priorityId: "reminder-foam", occurrenceDate: "2026-09-28", expectedVersion: 12)
+        let requests = await transport.requests
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "If-Match"), "\"12\"")
+        let key = try XCTUnwrap(requests[1].value(forHTTPHeaderField: "Idempotency-Key"))
+        XCTAssertNotNil(key.range(of: #"^[A-Za-z0-9._:/-]{16,200}$"#, options: .regularExpression), "header-safe key")
+        let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        XCTAssertEqual(body["commandType"] as? String, "priority.skip.v1")
+        XCTAssertEqual(body["payload"] as? [String: String], ["priorityId": "reminder-foam", "occurrenceDate": "2026-09-28"])
+
+        // Completed first wins on the Server: a skip that finds it completed is not reported as skipped.
+        await XCTAssertThrowsErrorAsync(try await writeAPI.skip(priorityId: "reminder-foam", occurrenceDate: "2026-09-28", expectedVersion: 13)) { error in
+            XCTAssertEqual(error as? PrioritySkipError, .alreadyCompleted)
+        }
+    }
+
+    func testProductionPriorityDetailMapsSkippedAndServerOwnedSkipEligibility() async throws {
+        func detail(_ extra: String, status: String = "Active") async throws -> PriorityOccurrence {
+            let json = productionEnvelope(resource: "priority", data: #"{"id":"reminder-foam","title":"Foam Rolling","status":"\#(status)","sections":[],"executionContract":{"priorityId":"reminder-foam","occurrenceDate":"2026-09-28","expectedVersion":12}\#(extra)}"#)
+            let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["priority": json])
+            let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+            _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+            let value = try await ProductionPriorityAPI(api: native).fetchPriority(priorityId: "reminder-foam", occurrenceDate: "2026-09-28")
+            return try XCTUnwrap(value)
+        }
+        let open = try await detail(#","skippable":true,"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":12,"payload":{"priorityId":"reminder-foam","occurrenceDate":"2026-09-28"}}"#)
+        XCTAssertTrue(open.skippable)
+        XCTAssertEqual(open.skipExpectedVersion, 12)
+        XCTAssertTrue(open.completable)
+        XCTAssertFalse(open.skipped)
+
+        let skipped = try await detail(#","skippable":false,"skipCommand":null"#, status: "Skipped")
+        XCTAssertTrue(skipped.skipped)
+        XCTAssertFalse(skipped.completable, "A skipped occurrence can no longer be completed.")
+        XCTAssertFalse(skipped.skippable)
+
+        // An older Server (no skip fields) never offers Mark Skipped.
+        let legacy = try await detail("")
+        XCTAssertFalse(legacy.skippable)
+    }
+
     func testProductionPriorityCompletionFailureIsNotAcceptedAsSuccess() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
@@ -5733,9 +5837,14 @@ private actor FirstPriorityThenFailureAPI: PriorityAPI {
 
 private actor RecordingPriorityCompletionAPI: PriorityCompletionWriteAPI {
     private(set) var submissionCount = 0
+    private(set) var skips: [String] = []
 
     func complete(priorityId: String, occurrenceDate: String, context: PriorityCompletionContext?, expectedVersion: Int) async throws {
         submissionCount += 1
+    }
+
+    func skip(priorityId: String, occurrenceDate: String, expectedVersion: Int) async throws {
+        skips.append("\(priorityId)|\(occurrenceDate)|\(expectedVersion)")
     }
 }
 
