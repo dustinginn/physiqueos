@@ -76,7 +76,7 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
         }
     }
 
-    private final class ReconcileCounter { var count = 0 }
+    private final class ReconcileCounter { var count = 0; var events: [String] = [] }
 
     // MARK: - Fixtures (synthetic values only)
 
@@ -114,7 +114,8 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
             supportAPI: api,
             lifecycleAPI: lifecycle,
             store: OperatingPlanSandboxStore(),
-            reconcileNotifications: { reconcile.count += 1 },
+            reconcileNotifications: { reconcile.count += 1; reconcile.events.append("reconcile") },
+            withdrawOccurrenceNotifications: { reconcile.events.append("withdraw:\($0)") },
             deviceToday: { deviceToday }
         )
     }
@@ -268,6 +269,39 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
         XCTAssertFalse(model.isPaused)
         XCTAssertEqual(model.resultMessage, "Resumed. Next dose Thu, Oct 1 · 9:45 PM.")
         XCTAssertEqual(reconcile.count, 2)
+    }
+
+    func testPauseWithdrawsTheReminderNotificationsThenReconcilesAndResumeOnlyReconciles() async throws {
+        let api = StubSupportAPI(fetchQueue: [
+            try detail(revision: 3),
+            try detail(revision: 4, lifecycle: #"{"state":"paused","since":"2026-09-29","history":[]}"#, nextDueDate: nil, nextDueTime: nil),
+            try detail(revision: 5),
+        ])
+        let lifecycle = StubLifecycleAPI()
+        let reconcile = ReconcileCounter()
+        let model = makeModel(api: api, lifecycle: lifecycle, reconcile: reconcile)
+        await model.load()
+
+        let paused = await model.pause(effectiveDate: .today)
+        XCTAssertTrue(paused)
+        XCTAssertEqual(reconcile.events, ["withdraw:reminder-peptide", "reconcile"],
+                       "Pending and delivered notifications are withdrawn with the lifecycle result's priorityId before the horizon is reconciled")
+
+        let resumed = await model.resume()
+        XCTAssertTrue(resumed)
+        XCTAssertEqual(reconcile.events, ["withdraw:reminder-peptide", "reconcile", "reconcile"], "Resume never withdraws; the re-read horizon reschedules")
+
+        // A refused pause withdraws nothing.
+        let stale = try problem(status: 412, code: "STALE_VERSION", title: "The resource changed after it was loaded.")
+        let refusedAPI = StubSupportAPI(fetchQueue: [try detail(revision: 3), try detail(revision: 6)])
+        let refusedLifecycle = StubLifecycleAPI()
+        refusedLifecycle.error = ProductionNativeError.failedPrecondition(stale)
+        let refusedReconcile = ReconcileCounter()
+        let refused = makeModel(api: refusedAPI, lifecycle: refusedLifecycle, reconcile: refusedReconcile)
+        await refused.load()
+        let outcome = await refused.pause(effectiveDate: .today)
+        XCTAssertFalse(outcome)
+        XCTAssertEqual(refusedReconcile.events, [])
     }
 
     func testPauseWithoutARevisionIsRefusedLocally() async throws {

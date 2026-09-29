@@ -19,6 +19,11 @@ struct PriorityDetailView: View {
     var onNavigate: (AppDestination) -> Void
     @State private var viewModel: PriorityDetailViewModel?
     @State private var isConfirmingSkip = false
+    /// "Took a different amount": the decimal-pad buffer for a peptide
+    /// occurrence's dose, seeded once per loaded occurrence from the
+    /// Server's planned dose so an untouched field sends the default path.
+    @State private var amountTakenText = ""
+    @State private var amountSeededFor: String?
     let priorityId: String
     var occurrenceDate: String? = nil
 
@@ -182,6 +187,8 @@ struct PriorityDetailView: View {
                     .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
+        } else if priority.paused {
+            pausedCard(priority)
         } else if priority.completable {
             if priority.completed {
                 CardContainer {
@@ -190,9 +197,24 @@ struct PriorityDetailView: View {
                         .foregroundStyle(PhysiqueOSTheme.chartSuccess)
                 }
             } else {
-                PrimaryActionButton(title: "Mark Complete") {
-                    Task { await viewModel?.complete() }
+                let plannedDose = priority.completionContext?.dose
+                let doseComponents = plannedDose.flatMap(PriorityDoseEntry.components(of:))
+                let doseOutcome: PriorityDoseEntry.Outcome = plannedDose.map {
+                    PriorityDoseEntry.outcome(text: amountTakenText, plannedDose: $0)
+                } ?? .unchanged
+                if let doseComponents {
+                    amountTakenCard(unit: doseComponents.unit, seed: doseComponents.amount, outcome: doseOutcome, key: priority.id + "|" + priority.date)
                 }
+                PrimaryActionButton(title: "Mark Complete") {
+                    Task {
+                        if case .changed(let dose) = doseOutcome {
+                            await viewModel?.complete(dose: dose)
+                        } else {
+                            await viewModel?.complete()
+                        }
+                    }
+                }
+                .disabled(doseOutcome == .invalid)
                 .accessibilityIdentifier("priorityDetail.markComplete")
                 if priority.skippable {
                     Button("Mark Skipped") { isConfirmingSkip = true }
@@ -219,6 +241,75 @@ struct PriorityDetailView: View {
             PrimaryActionButton(title: priority.actionLabel ?? "Continue") {
                 onNavigate(destination)
             }
+        }
+    }
+
+    /// Design S3: a suspended occurrence has no Mark Complete or Mark
+    /// Skipped — Resume lives on the Operating Plan's peptide screen.
+    @ViewBuilder
+    private func pausedCard(_ priority: PriorityOccurrence) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(Self.pausedCopy(pausedFrom: priority.pauseContext?.pausedFrom), systemImage: "pause.circle.fill")
+                    .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+        }
+        .accessibilityIdentifier("priorityDetail.paused")
+        if let destination = priority.continueActionDestination {
+            PrimaryActionButton(title: "Go to \(priority.title)") {
+                onNavigate(destination)
+            }
+            .accessibilityIdentifier("priorityDetail.goToPeptide")
+        }
+    }
+
+    /// "Paused since Sep 12. Resume from the Operating Plan to continue."
+    static func pausedCopy(pausedFrom: String?) -> String {
+        if let pausedFrom, !pausedFrom.isEmpty {
+            return "Paused since \(TrainingDateFormatting.short(pausedFrom)). Resume from the Operating Plan to continue."
+        }
+        return "Paused. Resume from the Operating Plan to continue."
+    }
+
+    /// "Took a different amount" — the planned dose is pre-filled; leaving
+    /// it untouched sends the untouched completion context (the Build 69
+    /// path), editing it records the amount actually taken as
+    /// `effectiveDose` without touching the dose plan.
+    private func amountTakenCard(unit: String, seed: String, outcome: PriorityDoseEntry.Outcome, key: String) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeading("Took a different amount?")
+                HStack(spacing: 10) {
+                    Text("Amount taken")
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Spacer(minLength: 8)
+                    NumericEditField(text: $amountTakenText, accessibilityLabel: "Amount taken", placeholder: seed)
+                        .frame(width: 96, height: 44)
+                        .accessibilityIdentifier("priorityDetail.amountTaken")
+                    Text(unit)
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                }
+                Text(Self.amountCaption(outcome: outcome, seed: seed, unit: unit))
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(outcome == .invalid ? PhysiqueOSTheme.chartEffort : PhysiqueOSTheme.textSecondary)
+            }
+        }
+        .onAppear {
+            if amountSeededFor != key {
+                amountSeededFor = key
+                amountTakenText = seed
+            }
+        }
+    }
+
+    static func amountCaption(outcome: PriorityDoseEntry.Outcome, seed: String, unit: String) -> String {
+        switch outcome {
+        case .unchanged: "Planned \(seed) \(unit). Edit only if you took a different amount."
+        case .changed(let dose): "\(dose) will be recorded for this dose. Your dose plan is unchanged."
+        case .invalid: "Enter the amount you took, or leave the planned \(seed) \(unit)."
         }
     }
 

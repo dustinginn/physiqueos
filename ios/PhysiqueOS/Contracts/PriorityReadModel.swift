@@ -219,11 +219,24 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     var skippableState: Bool? = nil
     /// Reminder revision the Server's skip command expects (If-Match).
     var skipExpectedVersion: Int? = nil
+    /// The occurrence date falls inside a peptide suspension window (design
+    /// S3: `priority.paused`). Stored optionally like `skippedState` so
+    /// payloads and cached snapshots from before Pause existed still decode.
+    var pausedState: Bool? = nil
+    /// `priority.pauseContext` — the Server's canonical `pausedFrom` date.
+    var pauseContext: PriorityPauseContext? = nil
 
     /// Today's occurrence was marked Skipped (canonical, terminal).
     var skipped: Bool {
         get { skippedState ?? false }
         set { skippedState = newValue }
+    }
+
+    /// The occurrence is suspended by a peptide pause: no Mark Complete or
+    /// Mark Skipped; the only way forward is Resume on the Operating Plan.
+    var paused: Bool {
+        get { pausedState ?? false }
+        set { pausedState = newValue }
     }
 
     /// The Server offers Mark Skipped for this occurrence (today, open,
@@ -292,6 +305,13 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
         let candidates: Set<String> = ["execution_morning_weigh_in", "reminder_morning_weight"]
         return candidates.contains(executionItemId) || candidates.contains(id)
     }
+}
+
+/// Mirrors `priority.pauseContext` (design S3): the canonical local date the
+/// suspension started on. Every key optional so an older Server (or a
+/// cached snapshot) decodes.
+struct PriorityPauseContext: Codable, Equatable {
+    var pausedFrom: String? = nil
 }
 
 struct PriorityRelatedWeight: Codable, Equatable {

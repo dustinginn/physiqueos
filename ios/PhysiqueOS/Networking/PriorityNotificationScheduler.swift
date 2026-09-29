@@ -159,6 +159,13 @@ enum PriorityNotificationScheduler {
         return identifier == snoozeBase || identifier.hasPrefix("\(snoozeBase).attempt.")
     }
 
+    /// Every occurrence of one priority, any date, scheduled or snoozed
+    /// (any attempt). The trailing `.` keeps `reminder_foam_roll` from
+    /// matching `reminder_foam_roll_extra`.
+    static func isPriorityIdentifier(_ identifier: String, priorityId: String) -> Bool {
+        identifier.hasPrefix("\(scheduledPrefix)\(priorityId).") || identifier.hasPrefix("\(snoozedPrefix)\(priorityId).")
+    }
+
     static func nextSnoozeAttempt(originalRequestIdentifier: String, priorityId: String, occurrenceDate: String) -> Int {
         let base = snoozeIdentifier(priorityId: priorityId, occurrenceDate: occurrenceDate)
         guard originalRequestIdentifier.hasPrefix("\(base).attempt.") else {
@@ -193,13 +200,27 @@ enum PriorityNotificationScheduler {
         let settings = await center.notificationSettings()
         let pending = await center.pendingNotificationRequests()
         let delivered = await center.deliveredNotifications()
+        let deliveredIdentifiers = Set(delivered.map { $0.request.identifier })
         await cleanupCompletedNotifications(
             items: items,
             pendingIdentifiers: Set(pending.map(\.identifier)),
-            deliveredIdentifiers: Set(delivered.map { $0.request.identifier }),
+            deliveredIdentifiers: deliveredIdentifiers,
             center: center,
             now: now
         )
+        // A delivered (already fired) priority notification whose occurrence
+        // the canonical horizon no longer projects — paused, retired, or
+        // otherwise dropped — must not linger offering "Complete".
+        let orphaned = deliveredWithdrawalPlan(items: items, deliveredIdentifiers: deliveredIdentifiers)
+        if !orphaned.isEmpty {
+            _ = await executeCompletionCleanup(
+                plan: CompletionCleanupPlan(pendingIdentifiers: [], deliveredIdentifiers: orphaned),
+                removePending: { center.removePendingNotificationRequests(withIdentifiers: $0) },
+                removeDelivered: { center.removeDeliveredNotifications(withIdentifiers: $0) },
+                cause: "orphaned",
+                now: now
+            )
+        }
         guard canSchedule(authorizationStatus: settings.authorizationStatus) else {
             for item in items {
                 NotificationDiagnostics.record(.init(
@@ -333,6 +354,62 @@ enum PriorityNotificationScheduler {
         )
     }
 
+    /// Delivered priority notifications (scheduled or snoozed) that belong
+    /// to no occurrence in the canonical horizon at all. Completed
+    /// occurrences are already covered by `completionCleanupPlan`; this
+    /// covers the ones the Server stopped projecting (design S3: a paused
+    /// date drops out of Home and the horizon). Only `priority.*`
+    /// identifiers are ever considered — briefing and review alerts are
+    /// never touched.
+    static func deliveredWithdrawalPlan(items: [PriorityOccurrence], deliveredIdentifiers: Set<String>) -> [String] {
+        deliveredIdentifiers.filter { identifier in
+            guard identifier.hasPrefix(scheduledPrefix) || identifier.hasPrefix(snoozedPrefix) else { return false }
+            return !items.contains { item in
+                isOccurrenceIdentifier(identifier, priorityId: item.routePriorityId ?? item.id, occurrenceDate: item.date)
+            }
+        }.sorted()
+    }
+
+    /// Everything iOS holds for one priority — every date, pending AND
+    /// delivered, scheduled and snoozed — so a pause (design S3) leaves no
+    /// fired banner offering "Complete" for a dose the Server now refuses.
+    static func withdrawalPlan(
+        priorityId: String,
+        pendingIdentifiers: Set<String>,
+        deliveredIdentifiers: Set<String>
+    ) -> CompletionCleanupPlan {
+        CompletionCleanupPlan(
+            pendingIdentifiers: pendingIdentifiers.filter { isPriorityIdentifier($0, priorityId: priorityId) }.sorted(),
+            deliveredIdentifiers: deliveredIdentifiers.filter { isPriorityIdentifier($0, priorityId: priorityId) }.sorted()
+        )
+    }
+
+    /// Called by the peptide screen right after a pause is accepted (with
+    /// the lifecycle result's `priorityId`), before the canonical horizon
+    /// is re-read. Best-effort like every cleanup here.
+    @MainActor
+    @discardableResult
+    static func withdrawOccurrences(
+        priorityId: String,
+        center: UNUserNotificationCenter = .current(),
+        now: Date = Date()
+    ) async -> CompletionCleanupResult {
+        let pending = await center.pendingNotificationRequests()
+        let delivered = await center.deliveredNotifications()
+        let plan = withdrawalPlan(
+            priorityId: priorityId,
+            pendingIdentifiers: Set(pending.map(\.identifier)),
+            deliveredIdentifiers: Set(delivered.map { $0.request.identifier })
+        )
+        return await executeCompletionCleanup(
+            plan: plan,
+            removePending: { center.removePendingNotificationRequests(withIdentifiers: $0) },
+            removeDelivered: { center.removeDeliveredNotifications(withIdentifiers: $0) },
+            cause: "paused",
+            now: now
+        )
+    }
+
     @MainActor
     static func cleanupCompletedOccurrence(
         priorityId: String,
@@ -388,6 +465,7 @@ enum PriorityNotificationScheduler {
         plan: CompletionCleanupPlan,
         removePending: @MainActor ([String]) async throws -> Void,
         removeDelivered: @MainActor ([String]) async throws -> Void,
+        cause: String = "completed",
         now: Date = Date()
     ) async -> CompletionCleanupResult {
         var pendingRemoved = plan.pendingIdentifiers.isEmpty
@@ -396,18 +474,18 @@ enum PriorityNotificationScheduler {
             do {
                 try await removePending(plan.pendingIdentifiers)
                 pendingRemoved = true
-                recordCompletionCleanup(plan.pendingIdentifiers, kind: "pending", succeeded: true, now: now)
+                recordCompletionCleanup(plan.pendingIdentifiers, kind: "pending", cause: cause, succeeded: true, now: now)
             } catch {
-                recordCompletionCleanup(plan.pendingIdentifiers, kind: "pending", succeeded: false, now: now)
+                recordCompletionCleanup(plan.pendingIdentifiers, kind: "pending", cause: cause, succeeded: false, now: now)
             }
         }
         if !plan.deliveredIdentifiers.isEmpty {
             do {
                 try await removeDelivered(plan.deliveredIdentifiers)
                 deliveredRemoved = true
-                recordCompletionCleanup(plan.deliveredIdentifiers, kind: "delivered", succeeded: true, now: now)
+                recordCompletionCleanup(plan.deliveredIdentifiers, kind: "delivered", cause: cause, succeeded: true, now: now)
             } catch {
-                recordCompletionCleanup(plan.deliveredIdentifiers, kind: "delivered", succeeded: false, now: now)
+                recordCompletionCleanup(plan.deliveredIdentifiers, kind: "delivered", cause: cause, succeeded: false, now: now)
             }
         }
         return CompletionCleanupResult(
@@ -418,16 +496,16 @@ enum PriorityNotificationScheduler {
 
     @MainActor
     private static func recordCompletionCleanup(
-        _ identifiers: [String], kind: String, succeeded: Bool, now: Date
+        _ identifiers: [String], kind: String, cause: String = "completed", succeeded: Bool, now: Date
     ) {
         for identifier in identifiers {
             NotificationDiagnostics.record(.init(
                 capturedAt: now,
                 identifier: identifier,
-                operation: succeeded ? "completed \(kind) notification removal requested" : "completed \(kind) notification removal deferred",
+                operation: succeeded ? "\(cause) \(kind) notification removal requested" : "\(cause) \(kind) notification removal deferred",
                 reason: succeeded
-                    ? "Canonical completion requested removal of the exact occurrence-scoped iOS notification; reconciliation verifies and retries."
-                    : "Canonical completion remains durable; notification cleanup will retry on reconciliation.",
+                    ? "The canonical state (\(cause)) requested removal of the exact occurrence-scoped iOS notification; reconciliation verifies and retries."
+                    : "The canonical state (\(cause)) remains durable; notification cleanup will retry on reconciliation.",
                 fireDate: nil,
                 timeZoneIdentifier: TimeZone.current.identifier
             ))

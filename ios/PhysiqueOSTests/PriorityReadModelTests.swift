@@ -37,6 +37,34 @@ final class PriorityReadModelTests: XCTestCase {
         XCTAssertEqual(context, .init(occurrenceDate: "2026-09-18", dose: "4 mg", protocolId: "retatrutide"))
     }
 
+    func testTookADifferentAmountParsesThePlannedDoseAndKeepsTheDefaultPathWhenUntouched() {
+        XCTAssertEqual(PriorityDoseEntry.components(of: "1.5 mg")?.amount, "1.5")
+        XCTAssertEqual(PriorityDoseEntry.components(of: "1.5 mg")?.unit, "mg")
+        XCTAssertEqual(PriorityDoseEntry.components(of: " 250 mcg ")?.unit, "mcg")
+        XCTAssertNil(PriorityDoseEntry.components(of: "No dose scheduled"), "No numeric amount: the field is not offered")
+        XCTAssertNil(PriorityDoseEntry.components(of: "1.5"), "No unit: Native never invents one")
+
+        XCTAssertEqual(PriorityDoseEntry.outcome(text: "1.5", plannedDose: "1.5 mg"), .unchanged)
+        XCTAssertEqual(PriorityDoseEntry.outcome(text: "1.50", plannedDose: "1.5 mg"), .unchanged, "Same value, different spelling: still the default path")
+        XCTAssertEqual(PriorityDoseEntry.outcome(text: "1.25", plannedDose: "1.5 mg"), .changed("1.25 mg"))
+        XCTAssertEqual(PriorityDoseEntry.outcome(text: "2", plannedDose: "1.5 mg"), .changed("2 mg"))
+        XCTAssertEqual(PriorityDoseEntry.outcome(text: "", plannedDose: "1.5 mg"), .invalid)
+        XCTAssertEqual(PriorityDoseEntry.outcome(text: "0", plannedDose: "1.5 mg"), .invalid)
+        XCTAssertEqual(PriorityDoseEntry.outcome(text: "abc", plannedDose: "1.5 mg"), .invalid)
+        XCTAssertEqual(PriorityDoseEntry.outcome(text: "anything", plannedDose: "No dose scheduled"), .unchanged)
+        XCTAssertEqual(PriorityDoseEntry.format(0.75), "0.75")
+        XCTAssertEqual(PriorityDoseEntry.format(2.5), "2.5")
+        XCTAssertEqual(PriorityDoseEntry.format(3), "3")
+    }
+
+    @MainActor
+    func testPausedPriorityDetailCopyNamesThePausedFromDate() {
+        XCTAssertEqual(PriorityDetailView.pausedCopy(pausedFrom: "2026-09-12"), "Paused since Sep 12. Resume from the Operating Plan to continue.")
+        XCTAssertEqual(PriorityDetailView.pausedCopy(pausedFrom: nil), "Paused. Resume from the Operating Plan to continue.")
+        XCTAssertEqual(PriorityDetailView.amountCaption(outcome: .changed("1.25 mg"), seed: "1.5", unit: "mg"), "1.25 mg will be recorded for this dose. Your dose plan is unchanged.")
+        XCTAssertEqual(PriorityDetailView.amountCaption(outcome: .unchanged, seed: "1.5", unit: "mg"), "Planned 1.5 mg. Edit only if you took a different amount.")
+    }
+
     func testMorningWeighInRoutesToMorningCheckInInsteadOfGenericPriorityDetail() throws {
         let store = try LoggingSandboxStore()
         let occurrence = try XCTUnwrap(

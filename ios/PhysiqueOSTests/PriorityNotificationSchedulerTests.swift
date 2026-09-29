@@ -947,6 +947,91 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertTrue(plan.deliveredIdentifiers.isEmpty)
     }
 
+    func testWithdrawOccurrencesRemovesPendingAndDeliveredWithMatchingPrefixesOnly() {
+        let scheduledToday = PriorityNotificationScheduler.identifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13")
+        let snoozedToday = PriorityNotificationScheduler.snoozeIdentifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13")
+        let snoozedAttempt = PriorityNotificationScheduler.snoozeIdentifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13", attempt: 2)
+        let scheduledLater = PriorityNotificationScheduler.identifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-20")
+        let prefixTrap = PriorityNotificationScheduler.identifier(priorityId: "reminder_foam_roll_extra", occurrenceDate: "2026-09-13")
+        let unrelated = PriorityNotificationScheduler.identifier(priorityId: "reminder_tesamorelin", occurrenceDate: "2026-09-13")
+        let reviewReady = "evidence.reviewReady.review-1"
+        let briefing = "briefing.ready.brief-1"
+
+        let plan = PriorityNotificationScheduler.withdrawalPlan(
+            priorityId: "reminder_foam_roll",
+            pendingIdentifiers: [scheduledToday, scheduledLater, prefixTrap, unrelated, reviewReady, briefing],
+            deliveredIdentifiers: [scheduledToday, snoozedToday, snoozedAttempt, prefixTrap, unrelated, reviewReady]
+        )
+        XCTAssertEqual(plan.pendingIdentifiers, [scheduledToday, scheduledLater].sorted(), "Every date of the paused priority, pending")
+        XCTAssertEqual(plan.deliveredIdentifiers, [scheduledToday, snoozedToday, snoozedAttempt].sorted(), "Already-fired banners and every snooze attempt go too")
+        XCTAssertFalse(plan.pendingIdentifiers.contains(prefixTrap), "reminder_foam_roll never matches reminder_foam_roll_extra")
+        XCTAssertFalse(plan.deliveredIdentifiers.contains(unrelated))
+        XCTAssertFalse(plan.pendingIdentifiers.contains(reviewReady))
+        XCTAssertFalse(plan.pendingIdentifiers.contains(briefing))
+        XCTAssertTrue(PriorityNotificationScheduler.isPriorityIdentifier(snoozedAttempt, priorityId: "reminder_foam_roll"))
+        XCTAssertFalse(PriorityNotificationScheduler.isPriorityIdentifier(prefixTrap, priorityId: "reminder_foam_roll"))
+
+        let empty = PriorityNotificationScheduler.withdrawalPlan(priorityId: "reminder_foam_roll", pendingIdentifiers: [], deliveredIdentifiers: [])
+        XCTAssertTrue(empty.pendingIdentifiers.isEmpty)
+        XCTAssertTrue(empty.deliveredIdentifiers.isEmpty)
+    }
+
+    @MainActor
+    func testWithdrawalExecutesThroughTheSameBestEffortCleanupAsCompletion() async {
+        let scheduled = PriorityNotificationScheduler.identifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13")
+        let snoozed = PriorityNotificationScheduler.snoozeIdentifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13")
+        let plan = PriorityNotificationScheduler.withdrawalPlan(
+            priorityId: "reminder_foam_roll", pendingIdentifiers: [scheduled], deliveredIdentifiers: [scheduled, snoozed]
+        )
+        var pendingCalls: [[String]] = []
+        var deliveredCalls: [[String]] = []
+        let result = await PriorityNotificationScheduler.executeCompletionCleanup(
+            plan: plan,
+            removePending: { pendingCalls.append($0) },
+            removeDelivered: { deliveredCalls.append($0) },
+            cause: "paused"
+        )
+        XCTAssertEqual(result, .init(pendingRemoved: true, deliveredRemoved: true))
+        XCTAssertEqual(pendingCalls, [[scheduled]])
+        XCTAssertEqual(deliveredCalls, [[scheduled, snoozed].sorted()])
+
+        let failed = await PriorityNotificationScheduler.executeCompletionCleanup(
+            plan: plan,
+            removePending: { _ in throw URLError(.cannotRemoveFile) },
+            removeDelivered: { _ in throw URLError(.cannotRemoveFile) },
+            cause: "paused"
+        )
+        XCTAssertEqual(failed, .init(pendingRemoved: false, deliveredRemoved: false), "A cleanup failure never undoes the canonical pause")
+    }
+
+    func testSyncRemovesDeliveredPriorityNotificationsAbsentFromTheHorizon() {
+        let openToday = Self.foamRolling(scheduledTime: "07:00", completed: false)
+        let scheduledToday = PriorityNotificationScheduler.identifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13")
+        let snoozedToday = PriorityNotificationScheduler.snoozeIdentifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-13", attempt: 3)
+        let pausedDate = PriorityNotificationScheduler.identifier(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-14")
+        let pausedSnooze = PriorityNotificationScheduler.snoozeIdentifier(priorityId: "reminder_tesamorelin", occurrenceDate: "2026-09-13")
+        let reviewReady = "evidence.reviewReady.review-1"
+        let briefing = "briefing.ready.brief-1"
+
+        let removed = PriorityNotificationScheduler.deliveredWithdrawalPlan(
+            items: [openToday],
+            deliveredIdentifiers: [scheduledToday, snoozedToday, pausedDate, pausedSnooze, reviewReady, briefing]
+        )
+        XCTAssertEqual(removed, [pausedDate, pausedSnooze].sorted(), "Only priority notifications the horizon no longer projects are withdrawn")
+        XCTAssertFalse(removed.contains(scheduledToday), "An open occurrence in the horizon keeps its delivered banner")
+        XCTAssertFalse(removed.contains(snoozedToday))
+        XCTAssertFalse(removed.contains(reviewReady))
+        XCTAssertFalse(removed.contains(briefing))
+
+        // Completed occurrences stay with the exact completion cleanup, which is unchanged.
+        let completed = Self.foamRolling(scheduledTime: "07:00", completed: true)
+        let completionPlan = PriorityNotificationScheduler.completionCleanupPlan(
+            items: [completed], pendingIdentifiers: [scheduledToday, pausedDate], deliveredIdentifiers: [scheduledToday, pausedDate]
+        )
+        XCTAssertEqual(completionPlan.deliveredIdentifiers, [scheduledToday])
+        XCTAssertEqual(PriorityNotificationScheduler.deliveredWithdrawalPlan(items: [], deliveredIdentifiers: [reviewReady]), [])
+    }
+
     func testAPriorityNoLongerPresentIsTreatedAsStaleAndCancelled() {
         let staleIdentifier = PriorityNotificationScheduler.identifier(priorityId: "reminder_old", occurrenceDate: "2026-09-13")
         let plan = PriorityNotificationScheduler.reconciliationPlan(

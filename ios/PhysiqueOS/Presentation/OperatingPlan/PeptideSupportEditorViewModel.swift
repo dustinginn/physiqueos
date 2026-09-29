@@ -63,6 +63,11 @@ final class PeptideSupportEditorViewModel {
     /// write so the landing and the domain card behind this screen re-read
     /// the Server (the pause chip, the dose, the schedule).
     private let invalidateSiblingReads: @MainActor () async -> Void
+    /// Withdraws every pending and already-delivered iOS notification for
+    /// the peptide's priority right after a pause is accepted, so no fired
+    /// banner keeps offering "Complete" for a dose the Server now refuses
+    /// (`422 PRIORITY_OCCURRENCE_PAUSED`). Runs before the horizon re-read.
+    private let withdrawOccurrenceNotifications: @MainActor (String) async -> Void
     private let deviceToday: () -> String
 
     static let unavailableCopy = "This peptide protocol is unavailable."
@@ -78,6 +83,7 @@ final class PeptideSupportEditorViewModel {
         store: OperatingPlanSandboxStore,
         reconcileNotifications: @escaping @MainActor () async -> Void = {},
         invalidateSiblingReads: @escaping @MainActor () async -> Void = {},
+        withdrawOccurrenceNotifications: @escaping @MainActor (String) async -> Void = { _ in },
         deviceToday: @escaping () -> String = { PeptideSupportPresentation.deviceToday() }
     ) {
         self.protocolId = protocolId
@@ -87,6 +93,7 @@ final class PeptideSupportEditorViewModel {
         self.store = store
         self.reconcileNotifications = reconcileNotifications
         self.invalidateSiblingReads = invalidateSiblingReads
+        self.withdrawOccurrenceNotifications = withdrawOccurrenceNotifications
         self.deviceToday = deviceToday
     }
 
@@ -102,6 +109,9 @@ final class PeptideSupportEditorViewModel {
                 await environment.productionNativeAPI.invalidateReadResources([
                     "operating-plan", "operating-plan-protocol-domain",
                 ])
+            },
+            withdrawOccurrenceNotifications: { priorityId in
+                await PriorityNotificationScheduler.withdrawOccurrences(priorityId: priorityId)
             }
         )
     }
@@ -337,7 +347,13 @@ final class PeptideSupportEditorViewModel {
                 return false
             }
             do {
-                _ = try await lifecycleAPI.pause(protocolId: protocolId, expectedRevision: revision, effectiveDate: effectiveDate)
+                let result = try await lifecycleAPI.pause(protocolId: protocolId, expectedRevision: revision, effectiveDate: effectiveDate)
+                // The lifecycle result names the reminder (`priorityId`);
+                // the read's own `priorityId` is the fallback. Withdraw
+                // first, then re-read and reconcile the horizon.
+                if let priorityId = result.priorityId ?? detail.priorityId, !priorityId.isEmpty {
+                    await withdrawOccurrenceNotifications(priorityId)
+                }
                 await refresh()
                 await invalidateSiblingReads()
                 await reconcileNotifications()

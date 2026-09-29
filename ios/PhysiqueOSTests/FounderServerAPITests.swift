@@ -4239,6 +4239,143 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertFalse(legacy.skippable)
     }
 
+    func testProductionPausedPriorityDetailDecodesNonCompletableAndLegacyPayloadsStillDecode() async throws {
+        func detail(_ data: String) async throws -> PriorityOccurrence {
+            let json = productionEnvelope(resource: "priority", data: data)
+            let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["priority": json])
+            let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+            _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+            let value = try await ProductionPriorityAPI(api: native).fetchPriority(priorityId: "reminder-peptide", occurrenceDate: "2026-10-01")
+            return try XCTUnwrap(value)
+        }
+        // Design S3 PAUSED branch: status Paused, completable false, no completion context, expectedVersion null.
+        let paused = try await detail(#"{"id":"reminder-peptide","title":"Retatrutide","status":"Paused","completable":false,"completionContext":null,"paused":true,"pauseContext":{"pausedFrom":"2026-09-12"},"action":{"label":"View Execution","href":"/profile/operating-plan/execution/peptides/peptide-protocol"},"executionProjection":{"executionId":"execution-peptide","protocolRootId":"peptide-protocol"},"sections":[{"title":"Dose","items":[{"label":"1.5 mg","detail":"Until changed"}]}],"executionContract":{"priorityId":"reminder-peptide","occurrenceDate":"2026-10-01","expectedVersion":null},"notificationAction":{"classification":"open_only","scheduledTime":"21:45","completionCommand":null},"skippable":false,"skipCommand":null}"#)
+        XCTAssertTrue(paused.paused)
+        XCTAssertFalse(paused.completable, "A paused occurrence has no Mark Complete")
+        XCTAssertFalse(paused.skippable)
+        XCTAssertFalse(paused.completed)
+        XCTAssertNil(paused.expectedVersion)
+        XCTAssertEqual(paused.pauseContext?.pausedFrom, "2026-09-12")
+        XCTAssertEqual(paused.date, "2026-10-01")
+        XCTAssertEqual(paused.continueActionDestination, .operatingPlanPeptideExecution(protocolId: "peptide-protocol"),
+                       "Go to <name> leads to the peptide screen where Resume lives")
+        XCTAssertEqual(paused.destination, .operatingPlanPeptideExecution(protocolId: "peptide-protocol"))
+
+        // The Server's own destination wins when it sends one; an unknown one never fails the read.
+        let served = try await detail(#"{"id":"reminder-peptide","title":"Retatrutide","status":"Paused","paused":true,"pauseContext":{"pausedFrom":"2026-09-12"},"action":{"label":"View Execution","destination":{"operatingPlanProtocolDomain":{"protocolId":"peptide-protocol"}}},"executionProjection":{"executionId":"execution-peptide","protocolRootId":"peptide-protocol"},"sections":[],"executionContract":{"priorityId":"reminder-peptide","occurrenceDate":"2026-10-01","expectedVersion":null}}"#)
+        XCTAssertEqual(served.continueActionDestination, .operatingPlanProtocolDomain(protocolId: "peptide-protocol"))
+        let unknown = try await detail(#"{"id":"reminder-peptide","title":"Retatrutide","status":"Paused","paused":true,"action":{"label":"View Execution","destination":{"notAKnownCase":{"x":1}}},"executionProjection":{"executionId":"execution-peptide","protocolRootId":"peptide-protocol"},"sections":[],"executionContract":{"priorityId":"reminder-peptide","occurrenceDate":"2026-10-01","expectedVersion":null}}"#)
+        XCTAssertTrue(unknown.paused)
+        XCTAssertEqual(unknown.continueActionDestination, .operatingPlanPeptideExecution(protocolId: "peptide-protocol"))
+
+        // Completed wins over Paused.
+        let completed = try await detail(#"{"id":"reminder-peptide","title":"Retatrutide","status":"Completed","paused":true,"pauseContext":{"pausedFrom":"2026-09-12"},"sections":[],"completionContext":{"occurrenceDate":"2026-10-01","dose":"1.5 mg","protocolId":"peptide-protocol"},"executionContract":{"priorityId":"reminder-peptide","occurrenceDate":"2026-10-01","expectedVersion":9}}"#)
+        XCTAssertTrue(completed.completed)
+        XCTAssertFalse(completed.paused)
+        XCTAssertNil(completed.continueActionDestination, "Build 69: no continue button is invented for an open or completed peptide")
+
+        // An older Server (no paused/pauseContext) still decodes and stays completable.
+        let legacy = try await detail(#"{"id":"reminder-peptide","title":"Retatrutide","status":"Open","completable":true,"sections":[],"completionContext":{"occurrenceDate":"2026-10-01","dose":"1.5 mg","protocolId":"peptide-protocol"},"action":{"label":"View Execution","href":"/profile/operating-plan/execution/peptides/peptide-protocol"},"executionProjection":{"executionId":"execution-peptide","protocolRootId":"peptide-protocol"},"executionContract":{"priorityId":"reminder-peptide","occurrenceDate":"2026-10-01","expectedVersion":9}}"#)
+        XCTAssertFalse(legacy.paused)
+        XCTAssertNil(legacy.pauseContext)
+        XCTAssertTrue(legacy.completable)
+        XCTAssertEqual(legacy.expectedVersion, 9)
+        XCTAssertNil(legacy.continueActionDestination, "Build 69 behaviour: the unmapped href stays nil")
+    }
+
+    func testPriorityOccurrencesCachedBeforePauseExistedStillDecode() throws {
+        let occurrence = PriorityOccurrence(
+            id: "peptide", executionItemId: "execution-peptide", date: "2026-10-01", title: "Retatrutide",
+            subtitle: nil, metadata: nil, changeLabel: nil, icon: .target, color: .primary, urgency: .available,
+            completed: false, completable: true, actionLabel: nil, completionContext: nil, continueActionDestination: nil
+        )
+        var object = try XCTUnwrap(try JSONSerialization.jsonObject(with: JSONEncoder().encode(occurrence)) as? [String: Any])
+        object.removeValue(forKey: "pausedState")
+        object.removeValue(forKey: "pauseContext")
+        let legacy = try JSONDecoder().decode(PriorityOccurrence.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertFalse(legacy.paused)
+        XCTAssertNil(legacy.pauseContext)
+        XCTAssertTrue(legacy.completable)
+
+        var paused = occurrence
+        paused.paused = true
+        paused.pauseContext = .init(pausedFrom: "2026-09-12")
+        let roundTrip = try JSONDecoder().decode(PriorityOccurrence.self, from: JSONEncoder().encode(paused))
+        XCTAssertTrue(roundTrip.paused)
+        XCTAssertEqual(roundTrip.pauseContext?.pausedFrom, "2026-09-12")
+    }
+
+    @MainActor
+    func testPriorityDetailSendsTheEditedDoseThroughTheCompletionContextAndKeepsTheDefaultPathUntouched() async throws {
+        let planned = PriorityCompletionContext(occurrenceDate: "2026-10-01", dose: "1.5 mg", protocolId: "peptide-protocol")
+        let occurrence = PriorityOccurrence(
+            id: "reminder-peptide", routePriorityId: "reminder-peptide", executionItemId: "execution-peptide", date: "2026-10-01",
+            title: "Retatrutide", subtitle: nil, metadata: nil, changeLabel: nil,
+            icon: .target, color: .primary, urgency: .available, completed: false, completable: true,
+            expectedVersion: 9, actionLabel: nil, completionContext: planned, continueActionDestination: nil
+        )
+        let writer = RecordingPriorityCompletionAPI()
+        func makeViewModel() -> PriorityDetailViewModel {
+            PriorityDetailViewModel(
+                api: FirstPriorityThenFailureAPI(occurrence: occurrence), writeAPI: writer,
+                morningCheckInAPI: NotAvailableMorningCheckInAPI(), store: LoggingSandboxStore(), authority: .founderProduction,
+                priorityId: "reminder-peptide", occurrenceDate: "2026-10-01"
+            )
+        }
+        let edited = makeViewModel()
+        await edited.load()
+        await edited.complete(dose: "1.25 mg")
+        let untouched = makeViewModel()
+        await untouched.load()
+        await untouched.complete()
+
+        let contexts = await writer.contexts
+        XCTAssertEqual(contexts.count, 2)
+        XCTAssertEqual(contexts[0], .init(occurrenceDate: "2026-10-01", dose: "1.25 mg", protocolId: "peptide-protocol"),
+                       "The amount actually taken rides the existing completion dose (effectiveDose)")
+        XCTAssertEqual(contexts[1], planned, "Untouched: the Build 69 context is sent byte-for-byte")
+
+        // A plain reminder (no planned dose) never gains a dose from Native.
+        var plain = occurrence
+        plain.completionContext = nil
+        XCTAssertNil(PriorityDetailViewModel.completionContext(for: plain, dose: "1.25 mg"))
+        plain.completionContext = .init(occurrenceDate: "2026-10-01", dose: nil, protocolId: "peptide-protocol")
+        XCTAssertEqual(PriorityDetailViewModel.completionContext(for: plain, dose: "1.25 mg")?.dose, nil)
+
+        // A paused occurrence never completes, even when asked.
+        var paused = occurrence
+        paused.paused = true
+        paused.completable = false
+        let pausedModel = PriorityDetailViewModel(
+            api: FirstPriorityThenFailureAPI(occurrence: paused), writeAPI: writer,
+            morningCheckInAPI: NotAvailableMorningCheckInAPI(), store: LoggingSandboxStore(), authority: .founderProduction,
+            priorityId: "reminder-peptide", occurrenceDate: "2026-10-01"
+        )
+        await pausedModel.load()
+        await pausedModel.complete()
+        await pausedModel.skip()
+        let after = await writer.submissionCount
+        XCTAssertEqual(after, 2)
+        let skips = await writer.skips
+        XCTAssertTrue(skips.isEmpty)
+    }
+
+    func testOperatingPlanCommandsInvalidateMorningCheckInAndPriorityReads() async {
+        let api = ProductionNativeAPI(
+            baseURL: testOrigin, credentialStore: MemoryCredentialStore(),
+            transport: RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: [:])
+        )
+        for command in [ProductionCommandType.changePeptideLifecycle, "operating-plan.peptide-support.save.v1"] {
+            let affected = await api.resourcesAffected(by: command)
+            for resource in ["home", "priority", "morning-check-in", "operating-plan-peptide-support", "operating-plan-protocol-domain", "operating-plan"] {
+                XCTAssertTrue(affected.contains(resource), "\(command) must invalidate \(resource)")
+            }
+        }
+        // Unrelated invalidation sets are unchanged.
+        let checkIn = await api.resourcesAffected(by: ProductionCommandType.submitCheckIn)
+        XCTAssertEqual(checkIn, ["home", "weight", "morning-check-in", "priority"])
+    }
+
     func testProductionPriorityCompletionFailureIsNotAcceptedAsSuccess() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),
@@ -5963,9 +6100,11 @@ private actor FirstPriorityThenFailureAPI: PriorityAPI {
 private actor RecordingPriorityCompletionAPI: PriorityCompletionWriteAPI {
     private(set) var submissionCount = 0
     private(set) var skips: [String] = []
+    private(set) var contexts: [PriorityCompletionContext?] = []
 
     func complete(priorityId: String, occurrenceDate: String, context: PriorityCompletionContext?, expectedVersion: Int) async throws {
         submissionCount += 1
+        contexts.append(context)
     }
 
     func skip(priorityId: String, occurrenceDate: String, expectedVersion: Int) async throws {

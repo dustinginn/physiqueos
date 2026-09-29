@@ -1076,6 +1076,18 @@ struct ProductionPriorityAPI: PriorityAPI {
         guard let date = value.completionContext?.occurrenceDate ?? value.executionContract?.occurrenceDate else {
             throw ProductionDailyDriverError.missingCanonicalIdentity("priority occurrence date")
         }
+        // Design S3: the Server's explicit PAUSED branch sends `status:
+        // "Paused"`, `paused: true`, `completionContext: null` and nulls
+        // `executionContract.expectedVersion`; Completed wins over Paused.
+        let paused = value.status != "Completed" && (value.paused == true || value.status == "Paused")
+        // A paused occurrence has no "Mark Complete"; its only action is the
+        // Operating Plan's peptide screen (Resume lives there). The Server's
+        // own `action.destination` wins when it decodes; otherwise the
+        // execution projection's protocol root identifies that screen.
+        let pausedDestination: AppDestination? = paused
+            ? value.action?.destination
+                ?? value.executionProjection?.protocolRootId.map { AppDestination.operatingPlanPeptideExecution(protocolId: $0) }
+            : nil
         return PriorityOccurrence(
             id: value.id, routePriorityId: value.executionContract?.priorityId ?? value.id,
             executionItemId: value.executionProjection?.executionId ?? value.id,
@@ -1084,14 +1096,17 @@ struct ProductionPriorityAPI: PriorityAPI {
             changeLabel: nil, icon: .target, color: .primary,
             urgency: value.status == "Upcoming" ? .upcoming : .available,
             completed: value.status == "Completed",
-            completable: !["Completed", "Skipped"].contains(value.status) && value.executionContract?.expectedVersion != nil,
+            completable: !["Completed", "Skipped", "Paused"].contains(value.status) && !paused
+                && value.executionContract?.expectedVersion != nil,
             expectedVersion: value.executionContract?.expectedVersion,
             skippedState: value.status == "Skipped",
             skippableState: value.skippable == true && value.skipCommand?.commandType == ProductionCommandType.skipPriority
                 && value.skipCommand?.expectedVersion != nil,
             skipExpectedVersion: value.skipCommand?.expectedVersion,
+            pausedState: paused,
+            pauseContext: value.pauseContext,
             actionLabel: value.action?.label, completionContext: value.completionContext,
-            continueActionDestination: Self.destination(forActionHref: value.action?.href), attributedScope: nil,
+            continueActionDestination: Self.destination(forActionHref: value.action?.href) ?? pausedDestination, attributedScope: nil,
             detailSections: value.sections.map { PrioritySectionReadModel(title: $0.title, items: $0.items.map { PriorityDetailFieldReadModel(label: $0.label, detail: $0.detail) }) },
             relatedWeight: value.relatedWeight,
             notificationAction: value.notificationAction
@@ -1109,11 +1124,36 @@ struct ProductionPriorityAPI: PriorityAPI {
         var relatedWeight: PriorityRelatedWeight?
         var skippable: Bool?
         var skipCommand: SkipCommand?
+        /// Design S3 (`priority.paused` / `priority.pauseContext`); absent
+        /// on an older Server, which never pauses a peptide.
+        var paused: Bool?
+        var pauseContext: PriorityPauseContext?
     }
     private struct SkipCommand: Decodable { var commandType: String?; var expectedVersion: Int? }
     private struct ExecutionContract: Decodable { var priorityId: String?; var occurrenceDate: String?; var expectedVersion: Int? }
-    private struct ExecutionProjection: Decodable { var executionId: String? }
-    private struct ActionPayload: Decodable { var label: String?; var href: String? }
+    private struct ExecutionProjection: Decodable { var executionId: String?; var protocolRootId: String? }
+    private struct ActionPayload: Decodable {
+        var label: String?
+        var href: String?
+        /// The Server's own `AppDestination` for the action, when it sends
+        /// one and Native knows the case. A destination this build cannot
+        /// decode must never fail the whole priority read, so it is read
+        /// leniently and falls back to `nil`.
+        var destination: AppDestination?
+
+        private enum CodingKeys: String, CodingKey { case label, href, destination }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            label = try container.decodeIfPresent(String.self, forKey: .label)
+            href = try container.decodeIfPresent(String.self, forKey: .href)
+            do {
+                destination = try container.decodeIfPresent(AppDestination.self, forKey: .destination)
+            } catch {
+                destination = nil
+            }
+        }
+    }
     private struct Section: Decodable { var title: String; var items: [Item] }
     private struct Item: Decodable { var label: String; var detail: String? }
 

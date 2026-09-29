@@ -1143,8 +1143,11 @@ actor ProductionNativeAPI {
             return ["home", "weight", "morning-check-in", "priority"]
         }
         if commandType.hasPrefix("operating-plan.") {
+            // A peptide pause/resume or schedule change moves occurrences:
+            // Home, every Priority detail and Morning Check-In's previous-
+            // day selection (design S3 enforcement site 5) all re-project.
             return [
-                "home", "priority", "operating-plan", "operating-plan-recurring-support",
+                "home", "priority", "morning-check-in", "operating-plan", "operating-plan-recurring-support",
                 "operating-plan-nutrition-strategy", "operating-plan-training-strategy",
                 "operating-plan-peptide-support", "operating-plan-protocol-domain",
                 "operating-plan-supplement-support", "operating-plan-supplement-strategy-editor",
