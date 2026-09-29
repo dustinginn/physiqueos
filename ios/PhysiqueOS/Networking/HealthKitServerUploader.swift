@@ -138,6 +138,11 @@ struct ProductionHealthKitObservationUploader: HealthKitObservationUploader, Hea
 
     let api: ProductionNativeAPI
     var ledger: HealthKitCanonicalizationLedger? = nil
+    /// Called after every durably accepted ingest -- foreground sync and
+    /// HealthKit background delivery alike. Every ingest re-assesses the
+    /// in-window workouts on the Server, so any of them can make a Strength
+    /// reconciliation review ready. Must not block: it only schedules work.
+    var onDurablyAccepted: (@Sendable () -> Void)? = nil
 
     func healthKitAuthenticatedDeviceIdentity() async throws -> String {
         try await api.authenticatedServerDeviceIdentity()
@@ -181,6 +186,7 @@ struct ProductionHealthKitObservationUploader: HealthKitObservationUploader, Hea
             let receipt = outcome.receipt.commandId
                 ?? outcome.receipt.operationId
                 ?? "receipt:\(partition.identity)"
+            onDurablyAccepted?()
             return .durablyAccepted(batchID: result.batchId, receiptIdentity: receipt)
         } catch let error as ProductionNativeError {
             switch error {

@@ -244,18 +244,40 @@ enum WorkoutReconciliationReviewReadyNotifier {
         center: UNUserNotificationCenter = .current(),
         defaults: UserDefaults = .standard
     ) async {
+        let plan = plan(reviews: reviews, defaults: defaults)
+        // Withdraw an already-delivered alert whose review is no longer
+        // pending (resolved in the app or elsewhere): it would only lead to a
+        // review that is gone.
+        if !plan.withdrawnIdentifiers.isEmpty {
+            center.removeDeliveredNotifications(withIdentifiers: plan.withdrawnIdentifiers)
+        }
+        for request in plan.requests {
+            try? await center.add(request)
+        }
+    }
+
+    struct Plan {
+        var requests: [UNNotificationRequest]
+        var withdrawnIdentifiers: [String]
+    }
+
+    /// Pure, synchronous planning step. The observed set is updated here,
+    /// BEFORE any notification is added, so two passes that overlap (a Log
+    /// load and a sync finishing together) can never both notify the same
+    /// review: whichever plans first claims the identity.
+    @MainActor
+    static func plan(reviews: [PendingEvidenceReview], defaults: UserDefaults = .standard) -> Plan {
         let reconciliationReviews = reviews.filter { $0.kind == reconciliationKind }
         let currentIDs = Set(reconciliationReviews.map(\.id))
         guard defaults.object(forKey: observedKey) != nil else {
             defaults.set(Array(currentIDs).sorted(), forKey: observedKey)
-            return
+            return Plan(requests: [], withdrawnIdentifiers: [])
         }
         let observed = Set(defaults.stringArray(forKey: observedKey) ?? [])
         let requests = requestsForNewReviews(reviews: reconciliationReviews, observedIDs: observed)
-        for request in requests {
-            try? await center.add(request)
-        }
         defaults.set(Array(observed.union(currentIDs)).sorted(), forKey: observedKey)
+        let withdrawn = observed.subtracting(currentIDs).sorted().map { "evidence.reviewReady.\($0)" }
+        return Plan(requests: requests, withdrawnIdentifiers: withdrawn)
     }
 
     static func requestsForNewReviews(
@@ -276,5 +298,96 @@ enum WorkoutReconciliationReviewReadyNotifier {
                 identifier: "evidence.reviewReady.\(review.id)", content: content, trigger: nil
             )
         }
+    }
+}
+
+/// Runs the reconciliation-review notifier whenever a HealthKit sync may have
+/// made a review ready -- regardless of which tab is open, foreground sync or
+/// HealthKit background delivery -- so the notification brings the Founder
+/// to the review instead of requiring Log to be opened first.
+///
+/// Overlapping requests coalesce: while one pass runs, further requests
+/// schedule exactly one more pass (a sync uploads several partitions in a
+/// row; the last one's reassessment is what counts). Never prompts for
+/// notification permission; with permission undetermined or denied it does
+/// nothing, leaving reviews unobserved for the Log's own prompt.
+///
+/// Limitation (no APNs): if iOS does not wake the app, the notification waits
+/// for the next time the app runs a sync.
+actor WorkoutReconciliationNotificationRefresher {
+    typealias Fetch = @Sendable () async throws -> [PendingEvidenceReview]
+    typealias Permission = @Sendable () async -> Bool
+    typealias Deliver = @Sendable ([PendingEvidenceReview]) async -> Void
+
+    private let isEnabled: Permission
+    private let fetch: Fetch
+    private let deliver: Deliver
+    private var running = false
+    private var rerunRequested = false
+    private(set) var passes = 0
+
+    init(isEnabled: @escaping Permission, fetch: @escaping Fetch, deliver: @escaping Deliver) {
+        self.isEnabled = isEnabled
+        self.fetch = fetch
+        self.deliver = deliver
+    }
+
+    /// Request a pass; returns once this request is covered by a pass (or
+    /// immediately when a running pass will re-run for it).
+    func requestRefresh() async {
+        if running {
+            rerunRequested = true
+            return
+        }
+        running = true
+        repeat {
+            rerunRequested = false
+            await runOnce()
+        } while rerunRequested
+        running = false
+    }
+
+    private func runOnce() async {
+        passes += 1
+        guard await isEnabled() else { return }
+        guard let reviews = try? await fetch() else { return }
+        await deliver(reviews)
+    }
+
+    /// Production wiring: permission from the notification center (never
+    /// requested here), pending reviews from the Server's review queue.
+    static func production(
+        api: ProductionNativeAPI,
+        isFounderProduction: @escaping @Sendable () async -> Bool
+    ) -> WorkoutReconciliationNotificationRefresher {
+        WorkoutReconciliationNotificationRefresher(
+            isEnabled: {
+                guard await isFounderProduction() else { return false }
+                let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+                return [.authorized, .provisional, .ephemeral].contains(status)
+            },
+            fetch: { try await ProductionLogAPI(api: api).fetchPendingReviews() },
+            deliver: { reviews in
+                await WorkoutReconciliationReviewReadyNotifier.reconcile(reviews: reviews)
+            }
+        )
+    }
+}
+
+/// Thread-safe mirror of "the app is on Founder Production authority", read
+/// from background HealthKit delivery where the environment is not reachable.
+final class FounderProductionAuthorityFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Bool
+
+    init(_ value: Bool) { self.value = value }
+
+    var isFounderProduction: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return value
+    }
+
+    func set(_ newValue: Bool) {
+        lock.lock(); value = newValue; lock.unlock()
     }
 }

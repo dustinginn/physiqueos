@@ -828,6 +828,22 @@ struct ProductionLogAPI: LogAPI {
         return try await fetchLog()
     }
 
+    /// The Server's pending reviews only, freshly read -- the lean read the
+    /// reconciliation notifier needs after a sync (no weight or Training Day).
+    func fetchPendingReviews() async throws -> [PendingEvidenceReview] {
+        await api.invalidateReadResources(["evidence-review-queue"])
+        let payload = try await api.readResource("evidence-review-queue", query: ["timeZone": timeZone().identifier], as: Payload.self).data
+        return payload.pendingEvidenceReviews.map(Self.pendingReview)
+    }
+
+    private static func pendingReview(_ review: ReviewPayload) -> PendingEvidenceReview {
+        PendingEvidenceReview(
+            id: review.id, title: review.title, date: review.date,
+            summary: review.summary, likelyDuplicate: review.likelyDuplicate,
+            destination: .evidenceReview(reviewId: review.id), kind: review.kind
+        )
+    }
+
     func fetchLog() async throws -> LogReadModel {
         async let logRead = api.readResource("evidence-review-queue", query: ["timeZone": timeZone().identifier], as: Payload.self)
         async let weightRead = api.readResource("weight", query: ["context": "all"], as: WeightPayload.self)
@@ -889,13 +905,7 @@ struct ProductionLogAPI: LogAPI {
             }
         }
 
-        var pending = payload.pendingEvidenceReviews.map { review in
-            PendingEvidenceReview(
-                id: review.id, title: review.title, date: review.date,
-                summary: review.summary, likelyDuplicate: review.likelyDuplicate,
-                destination: .evidenceReview(reviewId: review.id), kind: review.kind
-            )
-        }
+        var pending = payload.pendingEvidenceReviews.map(Self.pendingReview)
         var processing = payload.processingEvidenceReviews ?? []
         let acknowledgments = await api.acceptedEvidenceReviewProcessingAcknowledgments()
         for acknowledgment in acknowledgments {

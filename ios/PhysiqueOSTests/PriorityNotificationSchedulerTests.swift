@@ -1234,4 +1234,109 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         let date = try XCTUnwrap(calendar.date(from: trigger.dateComponents))
         return [calendar.component(.hour, from: date), calendar.component(.minute, from: date)]
     }
+
+    // MARK: Reconciliation notification timing (fires when the review is ready)
+
+    private func reconciliationReview(_ id: String) -> PendingEvidenceReview {
+        PendingEvidenceReview(
+            id: id, title: "Match Apple Health workout", date: "Monday, September 28",
+            summary: "1 possible Logger session", likelyDuplicate: false,
+            destination: .evidenceReview(reviewId: id), kind: "healthkit_workout_reconciliation"
+        )
+    }
+
+    private func isolatedDefaults() -> UserDefaults {
+        let suite = "reconciliation-notifier-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
+
+    @MainActor
+    func testReconciliationPlanSeedsOnceThenNotifiesEachNewReviewExactlyOnce() {
+        let defaults = isolatedDefaults()
+        // First ever pass seeds silently (pre-existing reviews are not "new").
+        XCTAssertTrue(WorkoutReconciliationReviewReadyNotifier.plan(reviews: [reconciliationReview("r27")], defaults: defaults).requests.isEmpty)
+        // A newly ready review notifies once...
+        let first = WorkoutReconciliationReviewReadyNotifier.plan(reviews: [reconciliationReview("r27"), reconciliationReview("r28")], defaults: defaults)
+        XCTAssertEqual(first.requests.map(\.identifier), ["evidence.reviewReady.r28"])
+        // ...and never again on an ordinary refresh, including an overlapping
+        // pass that plans after the first claimed the identity.
+        XCTAssertTrue(WorkoutReconciliationReviewReadyNotifier.plan(reviews: [reconciliationReview("r27"), reconciliationReview("r28")], defaults: defaults).requests.isEmpty)
+    }
+
+    @MainActor
+    func testReconciliationPlanWithdrawsTheAlertOfAResolvedReviewAndNeverNotifiesIt() {
+        let defaults = isolatedDefaults()
+        _ = WorkoutReconciliationReviewReadyNotifier.plan(reviews: [], defaults: defaults)
+        _ = WorkoutReconciliationReviewReadyNotifier.plan(reviews: [reconciliationReview("r27"), reconciliationReview("r28")], defaults: defaults)
+        // Founder resolved Sep 27: it drops out of pending.
+        let after = WorkoutReconciliationReviewReadyNotifier.plan(reviews: [reconciliationReview("r28")], defaults: defaults)
+        XCTAssertTrue(after.requests.isEmpty)
+        XCTAssertEqual(after.withdrawnIdentifiers, ["evidence.reviewReady.r27"])
+    }
+
+    func testReconciliationRefresherCoalescesOverlappingSyncsAndDelivers() async {
+        let delivered = LockedBox<[[String]]>([])
+        let gate = LockedBox<Int>(0)
+        let review = reconciliationReview("r28")
+        let refresher = WorkoutReconciliationNotificationRefresher(
+            isEnabled: { true },
+            fetch: {
+                gate.mutate { $0 += 1 }
+                try await Task.sleep(nanoseconds: 50_000_000)
+                return [review]
+            },
+            deliver: { reviews in delivered.mutate { $0.append(reviews.map(\.id)) } }
+        )
+        // Five partitions accepted in a burst.
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<5 { group.addTask { await refresher.requestRefresh() } }
+        }
+        let passes = await refresher.passes
+        XCTAssertGreaterThanOrEqual(passes, 1)
+        XCTAssertLessThanOrEqual(passes, 2, "A burst coalesces into at most one pass plus one re-run.")
+        XCTAssertEqual(delivered.value.last, ["r28"])
+    }
+
+    func testReconciliationRefresherDoesNothingWithoutPermissionOrOnAFailedRead() async {
+        let fetched = LockedBox<Int>(0)
+        let delivered = LockedBox<Int>(0)
+        let disabled = WorkoutReconciliationNotificationRefresher(
+            isEnabled: { false },
+            fetch: { fetched.mutate { $0 += 1 }; return [] },
+            deliver: { _ in delivered.mutate { $0 += 1 } }
+        )
+        await disabled.requestRefresh()
+        XCTAssertEqual(fetched.value, 0, "Never reads (or prompts) when notifications are not permitted.")
+        let failing = WorkoutReconciliationNotificationRefresher(
+            isEnabled: { true },
+            fetch: { throw URLError(.notConnectedToInternet) },
+            deliver: { _ in delivered.mutate { $0 += 1 } }
+        )
+        await failing.requestRefresh()
+        XCTAssertEqual(delivered.value, 0, "A failed read delivers nothing; the next sync tries again.")
+    }
+
+    func testDurableHealthKitIngestTriggersTheNotifierIndependentOfTheLogTab() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let uploader = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Networking/HealthKitServerUploader.swift"), encoding: .utf8)
+        // The callback fires only on the durable-acceptance path, immediately before it returns.
+        let hook = try XCTUnwrap(uploader.range(of: "onDurablyAccepted?()"))
+        let accepted = try XCTUnwrap(uploader.range(of: "return .durablyAccepted(batchID: result.batchId, receiptIdentity: receipt)"))
+        XCTAssertLessThan(hook.lowerBound, accepted.lowerBound)
+        XCTAssertEqual(uploader.components(separatedBy: "onDurablyAccepted?()").count, 2)
+        let environment = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/App/AppEnvironment.swift"), encoding: .utf8)
+        XCTAssertTrue(environment.contains("onDurablyAccepted: { Task { await reconciliationRefresher.requestRefresh() } }"))
+    }
+}
+
+
+/// Minimal lock-protected box for test counters shared with @Sendable closures.
+final class LockedBox<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Value
+    init(_ value: Value) { stored = value }
+    var value: Value { lock.lock(); defer { lock.unlock() }; return stored }
+    func mutate(_ change: (inout Value) -> Void) { lock.lock(); change(&stored); lock.unlock() }
 }

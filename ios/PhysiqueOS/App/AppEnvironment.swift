@@ -241,6 +241,10 @@ final class AppEnvironment {
     /// remain fixture-backed and cannot silently mix this sandbox read.
     let founderServerAPI: FounderServerAPI
     let productionNativeAPI: ProductionNativeAPI
+    /// Runs the Strength reconciliation-review notifier after every durably
+    /// accepted HealthKit ingest, whatever tab is open.
+    let workoutReconciliationNotificationRefresher: WorkoutReconciliationNotificationRefresher
+    private let founderProductionAuthorityFlag: FounderProductionAuthorityFlag
     let founderPhotoMediaStore: FounderPhotoMediaStore
     let founderProductionPhotoMediaStore: FounderProductionPhotoMediaStore
     /// Shared across every Production write domain — see
@@ -579,7 +583,8 @@ final class AppEnvironment {
         stagedPhotoIntakeStore: (any StagedPhotoIntakeStore)? = nil
     ) {
         self.authoritySelectionStore = authoritySelectionStore
-        self.nativeAuthority = nativeAuthority ?? authoritySelectionStore.load() ?? .sandbox
+        let resolvedNativeAuthority = nativeAuthority ?? authoritySelectionStore.load() ?? .sandbox
+        self.nativeAuthority = resolvedNativeAuthority
         self.sandboxHomeAPI = homeAPI
         self.sandboxGoalsAPI = goalsAPI
         self.sandboxLogAPI = logAPI
@@ -614,8 +619,19 @@ final class AppEnvironment {
             featureGate: healthKitFeatureGate
         )
         let canonicalizationLedger = HealthKitCanonicalizationLedger()
+        let founderProductionAuthorityFlag = FounderProductionAuthorityFlag(resolvedNativeAuthority == .founderProduction)
+        self.founderProductionAuthorityFlag = founderProductionAuthorityFlag
+        let reconciliationRefresher = WorkoutReconciliationNotificationRefresher.production(
+            api: productionNativeAPI,
+            isFounderProduction: { founderProductionAuthorityFlag.isFounderProduction }
+        )
+        self.workoutReconciliationNotificationRefresher = reconciliationRefresher
         let uploader = healthKitObservationUploader
-            ?? ProductionHealthKitObservationUploader(api: productionNativeAPI, ledger: canonicalizationLedger)
+            ?? ProductionHealthKitObservationUploader(
+                api: productionNativeAPI,
+                ledger: canonicalizationLedger,
+                onDurablyAccepted: { Task { await reconciliationRefresher.requestRefresh() } }
+            )
         // The automatic engine alone carries the Workout activation floor
         // (second line of defense behind the query client's predicate); the
         // canary engine below is deliberately constructed without it, so the
@@ -656,6 +672,7 @@ final class AppEnvironment {
 
     func selectNativeAuthority(_ authority: NativeAPIEnvironment) {
         nativeAuthority = authority
+        founderProductionAuthorityFlag.set(authority == .founderProduction)
         authoritySelectionStore.save(authority)
     }
 
