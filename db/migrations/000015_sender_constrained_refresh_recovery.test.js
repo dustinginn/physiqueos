@@ -8,16 +8,19 @@ describe("sender-constrained refresh recovery migration", () => {
   it("persists key binding, proof replay state, exchanges, and access use", () => {
     for (const fragment of [
       "CREATE TABLE physiqueos.installation_signing_keys",
+      "CREATE INDEX installation_signing_keys_thumbprint_idx",
       "ADD COLUMN refresh_proof_version",
       "ADD COLUMN first_used_at",
       "CREATE TABLE physiqueos.refresh_proof_challenges",
       "proof_id_digest char(64) UNIQUE",
+      "CREATE UNIQUE INDEX refresh_proof_challenges_one_pending_idx",
       "CREATE TABLE physiqueos.refresh_exchanges",
       "predecessor_refresh_id text NOT NULL UNIQUE",
       "successor_refresh_id text NOT NULL UNIQUE",
       "maximum_recoveries integer NOT NULL",
       "CREATE TABLE physiqueos.refresh_exchange_access_credentials",
     ]) expect(migration.UP_SQL).toContain(fragment);
+    expect(migration.UP_SQL).not.toContain("thumbprint char(64) NOT NULL UNIQUE");
   });
 
   it("has a complete reverse migration", () => {

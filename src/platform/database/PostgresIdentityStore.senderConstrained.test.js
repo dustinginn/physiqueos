@@ -26,6 +26,19 @@ describe("Postgres sender-constrained refresh persistence", () => {
     expect(query.mock.calls[1][0]).toContain("proof_id_digest = $2");
   });
 
+  it("keeps at most one unconsumed challenge per refresh credential", async () => {
+    const query = vi.fn(async () => ({ rows: [{}], rowCount: 1 }));
+    const store = createPostgresIdentityStore({ query });
+    await store.createRefreshProofChallenge({
+      id: "challenge", userId: "user", deviceId: "device", sessionId: "session",
+      familyId: "family", refreshCredentialId: "refresh", installationKeyId: "key",
+      nonceDigest: "a".repeat(64), intentDigest: "b".repeat(64),
+      successorCommitmentDigest: "c".repeat(64), expiresAt: new Date(),
+    });
+    expect(query.mock.calls[0][0]).toContain("ON CONFLICT (refresh_credential_id) WHERE proof_id_digest IS NULL");
+    expect(query.mock.calls[0][0]).toContain("nonce_digest = EXCLUDED.nonce_digest");
+  });
+
   it("revokes all prior exchange access before linking a replacement", async () => {
     const query = vi.fn(async () => ({ rows: [{}], rowCount: 1 }));
     const store = createPostgresIdentityStore({ query });

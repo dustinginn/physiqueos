@@ -104,7 +104,22 @@ export function createPostgresIdentityStore({ query }) {
         `INSERT INTO physiqueos.refresh_proof_challenges
           (id, user_id, device_id, session_id, family_id, refresh_credential_id, installation_key_id,
            nonce_digest, intent_digest, successor_commitment_digest, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (refresh_credential_id) WHERE proof_id_digest IS NULL
+         DO UPDATE SET
+           id = EXCLUDED.id,
+           user_id = EXCLUDED.user_id,
+           device_id = EXCLUDED.device_id,
+           session_id = EXCLUDED.session_id,
+           family_id = EXCLUDED.family_id,
+           installation_key_id = EXCLUDED.installation_key_id,
+           nonce_digest = EXCLUDED.nonce_digest,
+           intent_digest = EXCLUDED.intent_digest,
+           successor_commitment_digest = EXCLUDED.successor_commitment_digest,
+           expires_at = EXCLUDED.expires_at,
+           consumed_at = NULL,
+           created_at = now()
+         RETURNING *`,
         [record.id, record.userId, record.deviceId, record.sessionId, record.familyId,
           record.refreshCredentialId, record.installationKeyId, record.nonceDigest,
           record.intentDigest, record.successorCommitmentDigest, record.expiresAt],

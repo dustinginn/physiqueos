@@ -24,6 +24,7 @@ The capable client creates a non-exportable Secure Enclave P-256 signing key. Pa
 ```
 
 The Server canonicalizes the SPKI, verifies P-256, stores the public key and SHA-256 thumbprint, and binds the new session to that key. The pair response declares either `sender-constrained-refresh-v1` or `legacy-refresh-v1`.
+The same non-exportable installation key may be enrolled again by an explicit pairing ceremony after a terminal session. Thumbprints are indexed for audit correlation, not globally unique, because iOS Keychain material may survive a reconnect or app reinstall.
 
 ## Durable rotation intent
 
@@ -41,6 +42,7 @@ base64url(SHA-256("physiqueos-refresh-successor-v1\0" || B))
 ```
 
 Native first posts A, the intent ID, and commitment to `/api/v1/native/auth/refresh-challenge`. The Server persists only keyed digests, associates the one-time nonce with the exact credential/key/device/session/family, and returns the nonce plus challenge ID.
+There is at most one unconsumed challenge row per refresh credential. Issuing a replacement challenge atomically overwrites that pending row; consumed proof identities remain durable and globally unique.
 
 ## Proof
 

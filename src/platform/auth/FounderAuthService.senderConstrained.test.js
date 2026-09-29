@@ -40,6 +40,51 @@ describe("sender-constrained persistent pairing threat matrix", () => {
     expect(current.state.exchanges.size).toBe(1);
   });
 
+  it("allows explicit re-pairing with the same non-exportable installation key", async () => {
+    const current = harness();
+    const first = await current.pair();
+    current.state.sessions.get(first.sessionId).status = "revoked";
+    current.allowPairing();
+
+    const reconnected = await current.pair();
+    expect(reconnected.deviceId).not.toBe(first.deviceId);
+    expect(reconnected.authProtocol).toBe(SENDER_CONSTRAINED_REFRESH_PROTOCOL);
+    expect(new Set([...current.state.installationKeys.values()].map((key) => key.thumbprint)).size).toBe(1);
+    expect(current.state.installationKeys.size).toBe(2);
+  });
+
+  it("bounds an unproved caller to one pending challenge per refresh credential", async () => {
+    const current = harness();
+    const pair = await current.pair();
+    const first = await current.pending(pair.refreshCredential);
+    const second = await current.pending(pair.refreshCredential, {
+      intent: first.intent,
+      successor: first.successor,
+    });
+
+    expect([...current.state.challenges.values()].filter((row) => !row.proof_id_digest)).toHaveLength(1);
+    await expect(current.service.rotateRefreshCredential(first.request)).rejects.toMatchObject({ code: "DEVICE_PROOF_INVALID" });
+    await expect(current.service.rotateRefreshCredential(second.request)).resolves.toMatchObject({ recovered: false });
+  });
+
+  it("keeps independent proof-bound sessions isolated across multiple devices", async () => {
+    const current = harness();
+    const firstKey = current.keyPair;
+    const first = await current.pair();
+    current.allowPairing();
+    const secondKey = createKeyPair();
+    const second = await current.pair({ keyPair: secondKey });
+
+    const firstPending = await current.pending(first.refreshCredential, { signingKey: firstKey.privateKey });
+    const secondPending = await current.pending(second.refreshCredential, { signingKey: secondKey.privateKey });
+    await current.service.rotateRefreshCredential(firstPending.request);
+    await current.service.rotateRefreshCredential(secondPending.request);
+
+    expect(first.deviceId).not.toBe(second.deviceId);
+    expect(current.sessionStatus(first.sessionId)).toBe("active");
+    expect(current.sessionStatus(second.sessionId)).toBe("active");
+  });
+
   it("recovers a lost response after suspension or relaunch without creating C", async () => {
     const current = harness();
     const pair = await current.pair();
@@ -232,12 +277,13 @@ function harness({ allowSenderConstrainedEnrollment = true } = {}) {
     createSecret: () => Buffer.alloc(32, ++secretCounter).toString("base64url"),
   });
 
-  async function pair({ offerProof = true } = {}) {
+  async function pair({ offerProof = true, keyPair: offeredKeyPair = keyPair } = {}) {
+    const offeredPublicKeySpki = offeredKeyPair.publicKey.export({ format: "der", type: "spki" }).toString("base64url");
     return service.registerDeviceWithPairing({
       pairingCredential: "p".repeat(43),
       platform: "ios",
       displayName: "Founder iPhone",
-      refreshProof: offerProof ? { algorithm: "ES256", publicKeySpki } : null,
+      refreshProof: offerProof ? { algorithm: "ES256", publicKeySpki: offeredPublicKeySpki } : null,
     });
   }
 
@@ -297,6 +343,7 @@ function harness({ allowSenderConstrainedEnrollment = true } = {}) {
     pending,
     retry,
     signature,
+    allowPairing() { state.pairingAvailable = true; },
     advance(milliseconds) { now = new Date(now.getTime() + milliseconds); },
     sessionStatus(id) { return state.sessions.get(id).status; },
   };
@@ -375,6 +422,11 @@ function identityStore(state, clock) {
       previous.replaced_by_id = next.id;
     },
     async createRefreshProofChallenge(record) {
+      for (const [id, challenge] of state.challenges) {
+        if (challenge.refresh_credential_id === record.refreshCredentialId && !challenge.proof_id_digest) {
+          state.challenges.delete(id);
+        }
+      }
       state.challenges.set(record.id, {
         id: record.id, user_id: record.userId, device_id: record.deviceId, session_id: record.sessionId,
         family_id: record.familyId, refresh_credential_id: record.refreshCredentialId,

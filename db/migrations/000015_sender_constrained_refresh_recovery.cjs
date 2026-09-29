@@ -9,13 +9,15 @@ CREATE TABLE physiqueos.installation_signing_keys (
   device_id text NOT NULL UNIQUE REFERENCES physiqueos.devices(id) ON DELETE CASCADE,
   algorithm text NOT NULL CHECK (algorithm = 'ES256'),
   public_key_spki bytea NOT NULL,
-  thumbprint char(64) NOT NULL UNIQUE CHECK (thumbprint ~ '^[0-9a-f]{64}$'),
+  thumbprint char(64) NOT NULL CHECK (thumbprint ~ '^[0-9a-f]{64}$'),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'revoked')),
   revoked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT installation_signing_keys_owner_fk FOREIGN KEY (device_id, user_id)
     REFERENCES physiqueos.devices(id, user_id) ON DELETE CASCADE
 );
+CREATE INDEX installation_signing_keys_thumbprint_idx
+  ON physiqueos.installation_signing_keys(thumbprint);
 
 ALTER TABLE physiqueos.sessions
   ADD COLUMN refresh_proof_version integer NOT NULL DEFAULT 0
@@ -49,6 +51,9 @@ CREATE TABLE physiqueos.refresh_proof_challenges (
     REFERENCES physiqueos.sessions(id, user_id, device_id) ON DELETE CASCADE
 );
 CREATE INDEX refresh_proof_challenges_expiry_idx ON physiqueos.refresh_proof_challenges(expires_at);
+CREATE UNIQUE INDEX refresh_proof_challenges_one_pending_idx
+  ON physiqueos.refresh_proof_challenges(refresh_credential_id)
+  WHERE proof_id_digest IS NULL;
 
 CREATE TABLE physiqueos.refresh_exchanges (
   id text PRIMARY KEY,
