@@ -2,20 +2,24 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: diagnose the missing Strength reconciliation reviews and notifications for Sep 27 and Sep 28
+- Task: production deploy of the Strength reconciliation fix `396e750d`
 - Agent: claude
-- Status: **DIAGNOSED. Fix ready, NOT deployed.**
-- Generated (UTC): 2026-09-29T02:00:00Z
+- Status: **DEPLOYED and verified end to end**
+- Generated (UTC): 2026-09-29T03:15:00Z
 
-**Cause:** both days fail for the same reason. The server matched each Watch workout to its Logger session confidently. It then skipped your review because it assumed the match would be confirmed automatically. But automatic confirmation has been off since Sep 25. So each match was neither confirmed nor sent to you: no review, nothing pending in Log, and no notification. The Native app is not at fault.
+Production now runs `396e750d` (deployment `c0ad0cc9`). The build passed, the tests passed with 0 new failures, health is green and the schema is unchanged.
 
-**Fix:** the server skips your review only when automatic confirmation will actually happen. The fix is on branch `claude/strength-review-autoconfirm-gap-20260928` at `396e750d`.
-- The new tests fail on production and pass with the fix.
-- The full regression has 0 new failures.
-- The fresh review approved it, with minor test nits.
+**The Sep 27 and Sep 28 reviews recovered on their own:**
+- **02:58Z:** your phone's first ordinary HealthKit sync after the deploy created exactly two pending reviews through the normal matcher.
+- **A second sync** changed nothing: no duplicates and nothing reopened. The links, other reviews, workouts and evidence are unchanged.
+- **Seconds later** the app loaded Log and fired both "Workout needs review" notifications (your screenshot).
 
-**After the fix is deployed:** the next routine HealthKit sync creates exactly two pending reviews, for Sep 27 and Sep 28, and the app notifies you. Nothing else is affected, and no Native build is needed.
+**Worth knowing:**
+- The app only fires this notification when the Log screen loads; changing that needs a Native change.
+- The notification says "1 possible Logger sessions", a one-line server wording fix.
 
-**Decision needed:** approve deploying `396e750d`.
+Both are in the backlog.
 
-Full report: `agent-handoffs/reports/20260929T020000Z-strength-reconciliation-review-gap-diagnosis.md`
+**Next:** resolve the two reviews in Log.
+
+Full report: `agent-handoffs/reports/20260929T031500Z-strength-reconciliation-fix-396e750d-production-deploy.md`

@@ -1,68 +1,69 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-29T02:00:00Z",
+  "generated_at_utc": "2026-09-29T03:15:00Z",
   "task": {
-    "id": "strength-reconciliation-review-gap-diagnosis-20260928",
-    "title": "DIAGNOSED: Sep 27/28 Strength reviews never created \u2014 aligned match skipped Founder review while auto-confirm is off; fix ready, NOT deployed",
+    "id": "strength-reconciliation-fix-396e750d-production-deploy-20260929",
+    "title": "DEPLOYED: Strength reconciliation fix 396e750d (deployment c0ad0cc9) — Sep 27/28 reviews recovered naturally; both Native notifications fired",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "production_server_sha": "7242043fd11825b49788839bd99a41d983f04c6e",
+    "production_server_sha": "396e750d7a2c9c4cb4971b8936c56e4476805e07",
     "native_build67_final_sha": "8359bdcb",
     "native_reviewed_candidate_sha": "dc7763e5",
     "native_build68_final_sha": "537f538b",
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "7242043f",
-    "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative",
-    "production_deployment_id": "e22b966b-adfb-4da2-9cc1-dd2d65b0087b",
-    "previous_production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
-    "fix_branch": "claude/strength-review-autoconfirm-gap-20260928",
-    "fix_sha": "396e750d"
+    "server_candidate_sha": "396e750d",
+    "server_candidate_branch": "claude/strength-review-autoconfirm-gap-20260928",
+    "production_deployment_id": "c0ad0cc9-cea7-4c54-81e5-b4861501ea73",
+    "previous_production_server_sha": "7242043fd11825b49788839bd99a41d983f04c6e"
   },
   "result": {
-    "summary": "Both days share one Server root cause: a CONFIDENT, gate-eligible Strength match was excluded from Founder review on the assumption auto-confirm would handle it, but production policy v4 has linkAutoConfirm=false (since Sep 25). Links stayed 'candidate' with no evidenceReviews record, so Log had nothing pending and Native's local notifier had nothing to fire on. Fix: skip review only when auto-confirm will actually run now. After deploy, the next routine HealthKit ingest creates exactly two pending reviews (Sep 27, Sep 28); nothing else is stranded or reopened. No Native build needed.",
+    "summary": "Guarded deploy of the approved 396e750d (prod branch fast-forward 7242043f→396e750d, 4-line spec stamp, force-rebuild c0ad0cc9 ACTIVE 9/9). Verified source_commit_hash, runtime gitSha, /live /ready 200, schema 000014 unchanged. The first ordinary HealthKit ingest after deploy (02:58:03Z) created exactly two pending reconciliation reviews (Sep 27, Sep 28) through the matcher; a second ingest left them unchanged; links still candidate, claims/other reviews/canonical workouts/evidence byte-identical. Device read core.navigation.log at 02:58:07Z and the Native notifier fired both 'Workout needs review' notifications (Founder screenshot).",
     "success": true,
     "production_mutated": false,
-    "deployed": false,
+    "deployed": true,
     "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "New tests RED on production, GREEN with fix; full regression 9139/9447, same 303 environmental failures as production baseline, 0 new."
+      "summary": "Exact-SHA production build exit 0; affected files 87/87; full regression 0 new vs production baseline."
     },
     "review": {
       "status": "passed",
-      "summary": "Fresh-context review: APPROVE WITH NITS (test-coverage nits only)."
+      "summary": "Fresh-context review APPROVE WITH NITS."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Read-only production trace (READ ONLY, rolled back) of observations, canonical workouts, links, claims, reviews, Logger sessions, receipts and policy."
+      "summary": "Read-only pre/post/after-ingest state snapshots; server read log; Founder device screenshot of both notifications."
     }
   },
-  "decisions_required": [
-    "Authorize deploying fix 396e750d to production via the guarded workflow."
-  ],
+  "decisions_required": [],
   "blockers": [],
-  "unexpected_findings": [],
+  "unexpected_findings": [
+    "Build 68 reconciliation notifier runs only on Log screen loads, not on background or Home.",
+    "Pending-review summary reads '1 possible Logger sessions' (server pluralization)."
+  ],
   "backlog": [
     "Native backlog (Logged Today, Log-tab shortcut, Mark Skipped, PR celebration, routine icon, Baseline Read label).",
     "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window.",
-    "Reviewer nits: predates-activation pending-review assertion; resolve-then-reingest test for eligible matches; runner pending-review branch test."
+    "Reconciliation notifier independent of Log tab (Native).",
+    "Pluralize pending reconciliation summary (Server, one line).",
+    "Reviewer test nits from the Strength fix review."
   ],
-  "recommended_next_step": "Founder authorizes deploy of 396e750d; then read-only verify two pending reviews appear on next routine ingest and the Native notification fires.",
-  "full_report_path": "agent-handoffs/reports/20260929T020000Z-strength-reconciliation-review-gap-diagnosis.md",
+  "recommended_next_step": "Founder resolves the two pending Strength reviews in Log; next task per Founder.",
+  "full_report_path": "agent-handoffs/reports/20260929T031500Z-strength-reconciliation-fix-396e750d-production-deploy.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260929T020000Z-strength-reconciliation-review-gap-diagnosis.md",
     "agent-handoffs/reports/20260929T003000Z-briefing-intelligence-7242043f-production-deploy.md",
     "agent-handoffs/reports/20260928T200000Z-monthly-september-nutrition-phase-jargon-final.md",
-    "agent-handoffs/reports/20260928T180000Z-monthly-structural-parity-september-preview.md",
-    "agent-handoffs/reports/20260928T160000Z-incident-native-home-session-revoked-refresh-reuse.md"
+    "agent-handoffs/reports/20260928T180000Z-monthly-structural-parity-september-preview.md"
   ],
   "safety": {
     "contains_secrets": false,
