@@ -488,11 +488,10 @@ private struct WeightHistoryRow: View {
     }
 }
 
-/// A local disclosure (collapsed summary / expanded content) — mirrors
-/// `TrainingHistoryView.swift`'s private `TrainingDisclosureRow` exactly
-/// (matching the web's plain `<details>`/`<summary>` `ReportDrawer`
-/// styling), redefined here rather than exposed from that file since
-/// Training's own version stays `private` to its file by design.
+/// A local disclosure (collapsed summary / expanded content) — the same
+/// shape as the shared `PhysiqueOSDisclosureRow` (matching the web's plain
+/// `<details>`/`<summary>` `ReportDrawer` styling), kept local because it
+/// combines its children for VoiceOver the way this history list needs.
 private struct EvidenceDisclosureRow<Summary: View, Expanded: View>: View {
     @Binding var isExpanded: Bool
     var summary: Summary

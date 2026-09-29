@@ -114,21 +114,46 @@ struct OperatingPlanRow: View {
 
 /// Mirrors `composeOperatingPlanStrategyDetail`'s `field(label, value)`
 /// rows — a plain label/value pair, not a card.
+///
+/// At accessibility Dynamic Type sizes the fixed 132pt label column would
+/// wrap both sides into a narrow stack, so the label moves above the value
+/// (layout only; the type and colours are unchanged). VoiceOver reads the
+/// pair as one element.
 struct OperatingPlanFieldRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let label: String
     let value: String
 
     var body: some View {
-        HStack(alignment: .top) {
-            Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                .frame(width: 132, alignment: .leading)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 2) {
+                    labelText
+                    valueText
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .top) {
+                    labelText
+                        .frame(width: 132, alignment: .leading)
+                    valueText
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
         }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var labelText: some View {
+        Text(label)
+            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+            .foregroundStyle(PhysiqueOSTheme.textMuted)
+    }
+
+    private var valueText: some View {
+        Text(value)
+            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+            .foregroundStyle(PhysiqueOSTheme.textPrimary)
     }
 }
 
@@ -185,7 +210,17 @@ struct OperatingPlanEditorErrorBanner: View {
 struct OperatingPlanChoicePill: View {
     let title: String
     let isSelected: Bool
+    /// A minimum hit height (44 for a HIG-sized target). `nil` keeps the
+    /// compact Build 69 pill every existing editor lays out.
+    var minHeight: CGFloat? = nil
     let action: () -> Void
+
+    init(title: String, isSelected: Bool, minHeight: CGFloat? = nil, action: @escaping () -> Void) {
+        self.title = title
+        self.isSelected = isSelected
+        self.minHeight = minHeight
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
@@ -194,9 +229,11 @@ struct OperatingPlanChoicePill: View {
                 .foregroundStyle(isSelected ? PhysiqueOSTheme.background : PhysiqueOSTheme.textPrimary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .frame(minHeight: minHeight)
                 .background(isSelected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.surfaceMuted)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }

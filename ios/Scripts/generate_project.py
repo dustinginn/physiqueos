@@ -334,6 +334,9 @@ dd_app_files = [
 # object (including the daily-driver files) so adding it renumbers nothing.
 peptide_app_files = [
     ("Presentation/OperatingPlan", "PeptideSupportEditorViewModel.swift"),
+    ("SharedUI", "PhysiqueOSDisclosureRow.swift"),
+    ("Presentation/OperatingPlan", "PeptideSupportSheets.swift"),
+    ("Presentation/OperatingPlan", "PeptideDosePlanEditor.swift"),
 ]
 
 late_test_files = [
@@ -350,6 +353,7 @@ n1_test_files = [
 
 peptide_test_files = [
     ("PhysiqueOSTests", "PeptideSupportEditorViewModelTests.swift"),
+    ("PhysiqueOSTests", "PeptideScreenPresentationTests.swift"),
 ]
 
 late_reference_only_files = [

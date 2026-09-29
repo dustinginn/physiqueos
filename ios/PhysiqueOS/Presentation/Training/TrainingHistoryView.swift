@@ -226,7 +226,7 @@ struct TrainingHistoryView: View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Reporting")
-                TrainingDisclosureRow(isExpanded: $isReportingExpanded) {
+                PhysiqueOSDisclosureRow(isExpanded: $isReportingExpanded) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Review trends and summaries")
@@ -316,7 +316,7 @@ struct TrainingHistoryView: View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Current Protocol")
-                TrainingDisclosureRow(isExpanded: $isProtocolExpanded) {
+                PhysiqueOSDisclosureRow(isExpanded: $isProtocolExpanded) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(protocolSummary.sourceOfTruth)
@@ -449,41 +449,6 @@ struct TrainingCompactActionLabel: View {
 /// disclosure — not SwiftUI's `DisclosureGroup`, whose automatic trailing
 /// chevron doesn't match the web's plain `&lt;details&gt;`/`&lt;summary&gt;`
 /// styling.
-private struct TrainingDisclosureRow<Summary: View, Expanded: View>: View {
-    @Binding var isExpanded: Bool
-    var summary: Summary
-    var expanded: Expanded
-
-    init(isExpanded: Binding<Bool>, @ViewBuilder summary: () -> Summary, @ViewBuilder expanded: () -> Expanded) {
-        self._isExpanded = isExpanded
-        self.summary = summary()
-        self.expanded = expanded()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-            } label: {
-                summary
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-
-            if isExpanded {
-                expanded
-                    .padding(.top, 12)
-            }
-        }
-        .padding(12)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
 private struct TrainingRecordPreviewRow: View {
     let label: String
     let detail: String

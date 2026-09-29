@@ -305,7 +305,7 @@
           "protocolId": "protocol_fixture_peptide_retatrutide",
           "name": "Retatrutide",
           "purpose": "Support body composition alongside training and nutrition.",
-          "supportSummary": "Up, hold, then down · weekly",
+          "supportSummary": "Increase, hold, then decrease · weekly",
           "currentDose": "3 mg",
           "currentSchedule": "Weekly, Monday",
           "editDestination": { "id": "native.operating-plan.protocol.peptide", "parameters": { "protocolId": "protocol_fixture_peptide_retatrutide" } }
@@ -315,7 +315,7 @@
           "protocolId": "protocol_fixture_peptide_tesamorelin",
           "name": "Tesamorelin",
           "purpose": "Support lean mass and recovery alongside training.",
-          "supportSummary": "Stay at starting dose · daily",
+          "supportSummary": "Keep this dose · daily",
           "currentDose": "2.0 mg",
           "currentSchedule": "Daily",
           "editDestination": { "id": "native.operating-plan.protocol.peptide", "parameters": { "protocolId": "protocol_fixture_peptide_tesamorelin" } }

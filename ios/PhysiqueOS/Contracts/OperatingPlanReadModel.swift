@@ -339,6 +339,19 @@ struct OperatingPlanSupportMethodReadModel: Codable, Equatable, Identifiable {
     /// production payloads. New production reads always project the value.
     var reminderEnabled: Bool?
     var editDestination: AppDestination?
+    /// S4 `operating-plan-protocol-domain.methods[].executionLifecycle` — the
+    /// peptide execution's suspension state. `lifecycleState` stays `active`
+    /// for peptides (Build 69 hides Edit when it reads `paused`), so only this
+    /// build reads the pause from here. Optional with a default: older
+    /// payloads, the fixture and cached snapshots keep decoding.
+    var executionLifecycle: PeptideExecutionLifecycleReadModel? = nil
+}
+
+struct PeptideExecutionLifecycleReadModel: Codable, Equatable {
+    var state: String
+    var since: String? = nil
+
+    var isPaused: Bool { state == "paused" }
 }
 
 // MARK: - Shared recurring Support schedule
@@ -398,15 +411,22 @@ enum PeptideDosingPattern: String, Codable, CaseIterable, Identifiable {
     case upHoldDown = "up_hold_down"
     case custom
     var id: String { rawValue }
+    /// Plain-language labels only (design §3): the generator vocabulary
+    /// never reaches the routine path. `custom` is a read-only "Manual
+    /// plan" and is never offered as a choice.
     var label: String {
         switch self {
-        case .stay: "Stay at starting dose"
-        case .titrateUp: "Titrate up"
-        case .titrateDown: "Titrate down"
-        case .upHoldDown: "Up, hold, then down"
-        case .custom: "Custom"
+        case .stay: "Keep this dose"
+        case .titrateUp: "Increase step by step"
+        case .titrateDown: "Decrease step by step"
+        case .upHoldDown: "Increase, hold, then decrease"
+        case .custom: "Manual plan"
         }
     }
+
+    /// The patterns a user may pick. `custom` is shown read-only when a
+    /// record already is one.
+    static let selectable: [PeptideDosingPattern] = [.stay, .titrateUp, .titrateDown, .upHoldDown]
 
     var usesStep: Bool { self == .titrateUp || self == .titrateDown || self == .upHoldDown }
     var usesTarget: Bool { self == .titrateUp || self == .titrateDown || self == .upHoldDown }

@@ -8,6 +8,12 @@ import SwiftUI
 ///
 /// Supplement rows retain the distinct web Strategy and Support edit
 /// concepts; Pause/Restore remains a separate lifecycle action.
+///
+/// Peptide rows read their pause from the S4 `executionLifecycle` key
+/// (`lifecycleState` stays `active` for peptides so Build 69 keeps its
+/// button). The entry button is always visible and says "Manage" — the
+/// peptide screen is where Pause lives — and a paused peptide also gets a
+/// one-tap "Resume" here so it is never unreachable.
 struct OperatingPlanProtocolDomainView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -86,9 +92,11 @@ struct OperatingPlanProtocolDomainView: View {
     }
 
     private func methodCard(_ method: OperatingPlanSupportMethodReadModel, category: ProtocolCategory) -> some View {
-        let status = category == .supplement && environment.nativeAuthority == .sandbox
-            ? environment.operatingPlanStore.supplementStatus(protocolId: method.protocolId)
-            : method.lifecycleState ?? "active"
+        let status = Self.lifecycleStatus(
+            method: method,
+            category: category,
+            sandboxStatus: environment.nativeAuthority == .sandbox ? sandboxLifecycleStatus(method, category: category) : nil
+        )
         let isPaused = status == "paused"
         let lifecycleAction = OperatingPlanLifecycleActionReadModel(
             label: isPaused ? "Restore" : "Pause",
@@ -122,7 +130,21 @@ struct OperatingPlanProtocolDomainView: View {
                     OperatingPlanFieldRow(label: "Schedule", value: schedule)
                 }
                 HStack(spacing: 12) {
-                    if let editDestination = method.editDestination, !isPaused {
+                    if category == .peptide {
+                        if let editDestination = method.editDestination {
+                            Button("Manage") { onNavigate(editDestination) }
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .foregroundStyle(PhysiqueOSTheme.accent)
+                                .accessibilityIdentifier("operatingPlan.domain.peptide.manage")
+                        }
+                        if isPaused {
+                            Button("Resume") { resumePeptide(method) }
+                                .disabled(changingLifecycleProtocolId == method.protocolId)
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                                .accessibilityIdentifier("operatingPlan.domain.peptide.resume")
+                        }
+                    } else if let editDestination = method.editDestination, !isPaused {
                         Button("Edit Support") { onNavigate(editDestination) }
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                             .foregroundStyle(PhysiqueOSTheme.accent)
@@ -140,6 +162,61 @@ struct OperatingPlanProtocolDomainView: View {
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(lifecycleAction.isPause ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.chartSuccess)
                     }
+                }
+            }
+        }
+    }
+
+    /// Which lifecycle string the card chip follows. Supplements: the
+    /// protocol `lifecycleState` (sandbox: the local store). Peptides: the
+    /// S4 `executionLifecycle.state` — the protocol stays `active` while an
+    /// execution is suspended — falling back to `active` when the Server
+    /// does not project it yet. A sandbox status, when given, wins.
+    static func lifecycleStatus(
+        method: OperatingPlanSupportMethodReadModel,
+        category: ProtocolCategory,
+        sandboxStatus: String?
+    ) -> String {
+        if let sandboxStatus { return sandboxStatus }
+        switch category {
+        case .peptide: return method.executionLifecycle?.state ?? "active"
+        default: return method.lifecycleState ?? "active"
+        }
+    }
+
+    private func sandboxLifecycleStatus(_ method: OperatingPlanSupportMethodReadModel, category: ProtocolCategory) -> String? {
+        switch category {
+        case .supplement: environment.operatingPlanStore.supplementStatus(protocolId: method.protocolId)
+        case .peptide: environment.operatingPlanStore.peptideLifecycleState(protocolId: method.protocolId)
+        default: nil
+        }
+    }
+
+    /// S3 resume from the domain card. The If-Match token is the
+    /// `executionRevision` from a fresh peptide-support read — the domain
+    /// read does not carry one — so a stale card can never resume blindly.
+    private func resumePeptide(_ method: OperatingPlanSupportMethodReadModel) {
+        switch environment.nativeAuthority {
+        case .sandbox:
+            environment.operatingPlanStore.setPeptidePaused(protocolId: method.protocolId, paused: false)
+        case .founderProduction:
+            Task { @MainActor in
+                changingLifecycleProtocolId = method.protocolId
+                lifecycleError = nil
+                defer { changingLifecycleProtocolId = nil }
+                do {
+                    guard let revision = try await environment.peptideSupportAPI.fetchSupport(protocolId: method.protocolId)?.executionRevision else {
+                        lifecycleError = "Refresh \(method.name) before resuming it."
+                        return
+                    }
+                    _ = try await environment.peptideLifecycleAPI.resume(protocolId: method.protocolId, expectedRevision: revision)
+                    await environment.productionNativeAPI.invalidateReadResources([
+                        "operating-plan", "operating-plan-protocol-domain", "operating-plan-peptide-support",
+                    ])
+                    await environment.reconcileCanonicalPriorityNotifications()
+                    await loadProductionIfNeeded()
+                } catch {
+                    lifecycleError = "\(method.name) was not resumed. Open Manage to try again."
                 }
             }
         }

@@ -54,11 +54,15 @@ final class PeptideSupportEditorViewModel {
     private(set) var resultMessage: String?
 
     let protocolId: String
-    private let authority: NativeAPIEnvironment
+    let authority: NativeAPIEnvironment
     private let supportAPI: PeptideSupportAPI
     private let lifecycleAPI: PeptideLifecycleAPI
     private let store: OperatingPlanSandboxStore
     private let reconcileNotifications: @MainActor () async -> Void
+    /// Drops the cached `operating-plan` / protocol-domain reads after a
+    /// write so the landing and the domain card behind this screen re-read
+    /// the Server (the pause chip, the dose, the schedule).
+    private let invalidateSiblingReads: @MainActor () async -> Void
     private let deviceToday: () -> String
 
     static let unavailableCopy = "This peptide protocol is unavailable."
@@ -73,6 +77,7 @@ final class PeptideSupportEditorViewModel {
         lifecycleAPI: PeptideLifecycleAPI,
         store: OperatingPlanSandboxStore,
         reconcileNotifications: @escaping @MainActor () async -> Void = {},
+        invalidateSiblingReads: @escaping @MainActor () async -> Void = {},
         deviceToday: @escaping () -> String = { PeptideSupportPresentation.deviceToday() }
     ) {
         self.protocolId = protocolId
@@ -81,6 +86,7 @@ final class PeptideSupportEditorViewModel {
         self.lifecycleAPI = lifecycleAPI
         self.store = store
         self.reconcileNotifications = reconcileNotifications
+        self.invalidateSiblingReads = invalidateSiblingReads
         self.deviceToday = deviceToday
     }
 
@@ -91,7 +97,12 @@ final class PeptideSupportEditorViewModel {
             supportAPI: environment.peptideSupportAPI,
             lifecycleAPI: environment.peptideLifecycleAPI,
             store: environment.operatingPlanStore,
-            reconcileNotifications: { await environment.reconcileCanonicalPriorityNotifications() }
+            reconcileNotifications: { await environment.reconcileCanonicalPriorityNotifications() },
+            invalidateSiblingReads: {
+                await environment.productionNativeAPI.invalidateReadResources([
+                    "operating-plan", "operating-plan-protocol-domain",
+                ])
+            }
         )
     }
 
@@ -108,6 +119,50 @@ final class PeptideSupportEditorViewModel {
     var supportsSimpleEditor: Bool { detail?.supportsSimpleEditor ?? false }
     var isPaused: Bool { detail?.isPaused ?? false }
     var name: String { detail?.name ?? "" }
+    var reminderEnabled: Bool { detail?.reminderPreference == .remind }
+    var hasAdvancedPlan: Bool { detail?.advancedPlan ?? false }
+    var isManualPlan: Bool { detail?.dosingMode == "legacy_custom" || detail?.dosing.pattern == .custom }
+
+    /// Today has a scheduled dose that is still open (the Server clears
+    /// `nextDueDate` past a completed occurrence and while paused), so the
+    /// pause flow offers "Starting: Tomorrow".
+    var todayHasScheduledDose: Bool {
+        guard let next = detail?.nextDueDate else { return false }
+        return next == today
+    }
+
+    /// The editable read model the Advanced editor and the legacy path
+    /// start from — the same shape Build 69 edited in place.
+    var editableModel: OperatingPlanPeptideExecutionReadModel? {
+        detail.map(Self.readModel(from:))
+    }
+
+    static func readModel(from detail: PeptideSupportDetail) -> OperatingPlanPeptideExecutionReadModel {
+        OperatingPlanPeptideExecutionReadModel(
+            protocolId: detail.protocolId,
+            name: detail.name,
+            purpose: detail.purpose,
+            state: detail.state,
+            supportSchedule: detail.supportSchedule,
+            dosing: detail.dosing,
+            timeline: detail.timeline,
+            reminderPreference: detail.reminderPreference,
+            notes: detail.notes,
+            nextDue: detail.nextDue,
+            executionRevision: detail.executionRevision,
+            lifecycle: detail.lifecycle,
+            currentDose: detail.currentDose,
+            currentDoseLabel: detail.currentDoseLabel,
+            currentPhase: detail.currentPhase,
+            plannedChanges: detail.plannedChanges,
+            dosingHistory: detail.dosingHistory,
+            dosingMode: detail.dosingMode,
+            advancedPlan: detail.advancedPlan,
+            nextDueDate: detail.nextDueDate,
+            nextDueTime: detail.nextDueTime,
+            priorityId: detail.priorityId
+        )
+    }
 
     /// The owner's canonical local date when the read carries one; the
     /// device date only as a fallback. Used for "Today"/"Tomorrow" and the
@@ -273,6 +328,7 @@ final class PeptideSupportEditorViewModel {
         case .sandbox:
             store.setPeptidePaused(protocolId: protocolId, paused: true)
             await load()
+            await invalidateSiblingReads()
             resultMessage = effectiveDate == .tomorrow ? "Paused starting tomorrow." : "Paused."
             return true
         case .founderProduction:
@@ -283,6 +339,7 @@ final class PeptideSupportEditorViewModel {
             do {
                 _ = try await lifecycleAPI.pause(protocolId: protocolId, expectedRevision: revision, effectiveDate: effectiveDate)
                 await refresh()
+                await invalidateSiblingReads()
                 await reconcileNotifications()
                 resultMessage = effectiveDate == .tomorrow ? "Paused starting tomorrow." : "Paused."
                 return true
@@ -305,6 +362,7 @@ final class PeptideSupportEditorViewModel {
         case .sandbox:
             store.setPeptidePaused(protocolId: protocolId, paused: false)
             await load()
+            await invalidateSiblingReads()
             resultMessage = resumedCopy
             return true
         case .founderProduction:
@@ -315,6 +373,7 @@ final class PeptideSupportEditorViewModel {
             do {
                 _ = try await lifecycleAPI.resume(protocolId: protocolId, expectedRevision: revision)
                 await refresh()
+                await invalidateSiblingReads()
                 await reconcileNotifications()
                 resultMessage = resumedCopy
                 return true
@@ -325,9 +384,22 @@ final class PeptideSupportEditorViewModel {
         }
     }
 
-    private var resumedCopy: String {
-        if let next = nextDoseLabel, next != "Paused" { return "Resumed. Next dose \(next)." }
-        return "Resumed."
+    /// "Resumed. Next dose Thu, Oct 1 · 9:45 PM." plus, when a plan with
+    /// future changes was frozen across the pause (S3), "Planned changes
+    /// moved to Oct 15 and Oct 29." The dates are the Server's own
+    /// post-resume `plannedChanges`; Native never shifts them itself.
+    var resumedCopy: String {
+        var lines: [String] = []
+        if let next = nextDoseLabel, next != "Paused" {
+            lines.append("Resumed. Next dose \(next).")
+        } else {
+            lines.append("Resumed.")
+        }
+        if hasAdvancedPlan, let changes = detail?.plannedChanges, !changes.isEmpty {
+            let dates = PeptideSupportPresentation.joinDates(changes.map(\.startDate))
+            lines.append("Planned change\(changes.count == 1 ? "" : "s") moved to \(dates).")
+        }
+        return lines.joined(separator: " ")
     }
 
     // MARK: - Save core
@@ -352,6 +424,7 @@ final class PeptideSupportEditorViewModel {
             switch store.savePeptideExecution(execution) {
             case .success:
                 await load()
+                await invalidateSiblingReads()
                 return true
             case .failure(let error):
                 errorMessage = error.message
@@ -371,6 +444,7 @@ final class PeptideSupportEditorViewModel {
                     rewriteHistory: rewriteHistory
                 )
                 await refresh()
+                await invalidateSiblingReads()
                 await reconcileNotifications()
                 return true
             } catch {
@@ -466,8 +540,7 @@ final class PeptideSupportEditorViewModel {
         ]
         let removed = (detail.plannedChanges ?? []).filter { $0.startDate >= effectiveDate }
         if !removed.isEmpty {
-            let dates = removed.map { PeptideSupportPresentation.shortDate($0.startDate) }
-            let list = dates.count == 1 ? dates[0] : dates.dropLast().joined(separator: ", ") + " and " + dates[dates.count - 1]
+            let list = PeptideSupportPresentation.joinDates(removed.map(\.startDate))
             lines.append("Planned change\(removed.count == 1 ? "" : "s") on \(list) will be removed.")
         }
         return lines.joined(separator: " ")
@@ -586,6 +659,56 @@ enum PeptideSupportPresentation {
     static func shortDate(_ key: String) -> String {
         guard let date = dateFormatter.date(from: key) else { return key }
         return shortDateFormatter.string(from: date)
+    }
+
+    /// "Oct 8" / "Oct 8 and Oct 22" / "Oct 8, Oct 15 and Oct 22".
+    static func joinDates(_ keys: [String]) -> String {
+        let dates = keys.map(shortDate)
+        guard let last = dates.last else { return "" }
+        if dates.count == 1 { return last }
+        return dates.dropLast().joined(separator: ", ") + " and " + last
+    }
+
+    /// The Time sheet's preview: "Thursdays at 9:45 PM" for one weekday,
+    /// otherwise the Days label ("Sun–Thu at 9:45 PM", "Every day at 8:00 AM").
+    static func timePreview(_ schedule: OperatingPlanSupportScheduleReadModel, localTime: String) -> String {
+        let clock = OperatingPlanSchedulePresentation.formattedLocalTime(localTime)
+        let days = OperatingPlanWeekday.allCases.filter { schedule.daysOfWeek.contains($0) }
+        if schedule.frequency != .daily, schedule.frequency != .everyXDays, days.count == 1, let day = days.first {
+            return "\(day.label)s at \(clock)"
+        }
+        return "\(formatDays(schedule)) at \(clock)"
+    }
+
+    /// The `HH:mm` the Time wheel opens on: the exact time when the schedule
+    /// has one, otherwise a representative clock for the bucket (morning
+    /// 08:00 / afternoon 13:00 / evening 20:00) so the wheel never opens on
+    /// an unrelated 09:00 and a bucket is only overwritten deliberately.
+    static func seedTime(for schedule: OperatingPlanSupportScheduleReadModel) -> String {
+        switch schedule.timing {
+        case .specific:
+            return schedule.specificTime.range(of: #"^([01]\d|2[0-3]):[0-5]\d$"#, options: .regularExpression) != nil
+                ? schedule.specificTime
+                : "08:00"
+        case .morning: return "08:00"
+        case .afternoon: return "13:00"
+        case .evening: return "20:00"
+        }
+    }
+
+    /// "Currently set to Evening" while the schedule is still a bucket.
+    static func bucketCaption(for schedule: OperatingPlanSupportScheduleReadModel) -> String? {
+        schedule.timing == .specific ? nil : "Currently set to \(schedule.timing.label)"
+    }
+
+    /// The Days sheet's initial selection: every day for `daily`, the
+    /// chosen days otherwise (an interval cadence starts with none).
+    static func seedDays(for schedule: OperatingPlanSupportScheduleReadModel) -> [OperatingPlanWeekday] {
+        switch schedule.frequency {
+        case .daily: return OperatingPlanWeekday.allCases
+        case .weekly, .specificDays: return OperatingPlanWeekday.allCases.filter { schedule.daysOfWeek.contains($0) }
+        case .everyXDays: return []
+        }
     }
 
     private static let calendar: Calendar = {

@@ -164,7 +164,7 @@ struct AppDestinationRouterView: View {
         case .operatingPlanProtocolDomain(let protocolId):
             OperatingPlanProtocolDomainView(protocolId: protocolId, onNavigate: onNavigate)
         case .operatingPlanPeptideExecution(let protocolId):
-            OperatingPlanPeptideExecutionView(protocolId: protocolId)
+            OperatingPlanPeptideExecutionView(protocolId: protocolId, onNavigate: onNavigate)
         case .operatingPlanRecoverySupport(let executionId):
             OperatingPlanRecoverySupportView(executionId: executionId)
         case .operatingPlanTracking:
