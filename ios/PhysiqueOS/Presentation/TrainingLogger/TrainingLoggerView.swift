@@ -73,7 +73,11 @@ struct TrainingLoggerView: View {
             await viewModel?.load()
             // Opened from the Log tab for an in-progress session: resume that
             // exact draft (if it still exists) instead of the entry screen.
-            if let draftId = environment.consumeTrainingLoggerResumeDraftId(), viewModel?.draft == nil {
+            // It also wins over a relaunch-recovered completion of an earlier
+            // workout (already durable on the Server), so the Founder lands in
+            // the workout they are doing, not an older Workout Complete.
+            if let draftId = environment.consumeTrainingLoggerResumeDraftId(),
+               viewModel?.draft == nil || (viewModel?.draft?.step == .complete && viewModel?.draft?.id != draftId) {
                 viewModel?.resume(draftId: draftId)
             }
         }

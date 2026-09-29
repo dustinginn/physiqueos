@@ -1043,6 +1043,34 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(viewModel.completedPerformanceRecords, [record])
     }
 
+    /// Integration with the Log-tab routing: a relaunch-recovered completion of
+    /// an earlier workout never hides the workout in progress -- resuming it
+    /// (what the Log-tab hint does) switches to it and drops the old records.
+    @MainActor
+    func testResumingTheInProgressWorkoutReplacesARecoveredEarlierCompletion() async throws {
+        var submitted = draft()
+        submitted.submissionState = .acceptedProcessing
+        var inProgress = TrainingLoggerDraft.fresh(mode: .live, workoutDate: submitted.workoutDate,
+                                                   startedAt: ISO8601DateFormatter().string(from: Date()))
+        inProgress.step = .workout
+        let store = MemoryTrainingLoggerDraftStore(draft: submitted)
+        store.save(inProgress)
+        let viewModel = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: DurableDraftIDsProbeTrainingWriteAPI(durableIDs: [submitted.id]),
+            draftStore: store,
+            authority: .founderProduction
+        )
+        await viewModel.load()
+        XCTAssertEqual(viewModel.draft?.id, submitted.id)
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+
+        viewModel.resume(draftId: inProgress.id)
+        XCTAssertEqual(viewModel.draft?.id, inProgress.id)
+        XCTAssertEqual(viewModel.draft?.step, .workout)
+        XCTAssertTrue(viewModel.completedPerformanceRecords.isEmpty)
+    }
+
     @MainActor
     func testFailureAndRetryCannotCelebrateBeforeAuthoritativeSuccess() async throws {
         let suite = "celebration-retry-\(UUID().uuidString)"

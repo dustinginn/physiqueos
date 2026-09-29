@@ -110,7 +110,9 @@ final class AppTabTests: XCTestCase {
         XCTAssertTrue(tabs.contains("logPath.append(AppDestination.trainingLogger)"))
         let logger = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"), encoding: .utf8)
         // Resumes the exact hinted draft once, and never rebuilds on tab revisit.
-        XCTAssertTrue(logger.contains("if let draftId = environment.consumeTrainingLoggerResumeDraftId(), viewModel?.draft == nil {"))
+        XCTAssertTrue(logger.contains("if let draftId = environment.consumeTrainingLoggerResumeDraftId(),"))
+        // The in-progress workout wins over a relaunch-recovered completion of a different workout.
+        XCTAssertTrue(logger.contains("viewModel?.draft == nil || (viewModel?.draft?.step == .complete && viewModel?.draft?.id != draftId)"))
         XCTAssertTrue(logger.contains("if viewModelAuthority != environment.nativeAuthority {"))
     }
 }
