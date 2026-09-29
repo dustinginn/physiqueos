@@ -54,4 +54,53 @@ final class AppTabTests: XCTestCase {
         XCTAssertEqual(AppTab.goals.serverRouteKey, "goals")
         XCTAssertEqual(AppTab.log.serverRouteKey, "log")
     }
+
+    // MARK: Context-aware Log tab -> active Workout Logger
+
+    private func draft(_ id: String, mode: TrainingLoggerMode = .live, step: TrainingLoggerStep = .workout,
+                       startedMinutesAgo: Double? = 20, submission: TrainingLoggerSubmissionState? = nil,
+                       now: Date) -> TrainingLoggerDraft {
+        var draft = TrainingLoggerDraft.fresh(mode: mode, workoutDate: "2026-09-28",
+            startedAt: startedMinutesAgo.map { ISO8601DateFormatter().string(from: now.addingTimeInterval(-$0 * 60)) })
+        draft.id = id
+        draft.step = step
+        draft.submissionState = submission
+        return draft
+    }
+
+    func testActiveLiveSessionIsTheNewestInProgressLiveWorkout() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        XCTAssertNil(TrainingLoggerDraft.activeLiveSession(in: [], now: now))
+        let older = draft("older", startedMinutesAgo: 90, now: now)
+        let newer = draft("newer", startedMinutesAgo: 10, now: now)
+        XCTAssertEqual(TrainingLoggerDraft.activeLiveSession(in: [older, newer], now: now)?.id, "newer")
+    }
+
+    func testNoActiveSessionForPastCompletedSubmittedOrStaleDrafts() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let candidates = [
+            draft("past", mode: .past, startedMinutesAgo: nil, now: now),
+            draft("complete", step: .complete, now: now),
+            draft("submitted", submission: .acceptedProcessing, now: now),
+            draft("unknown-result", submission: .resultUnknown, now: now),
+            draft("stale", startedMinutesAgo: 13 * 60, now: now),
+            draft("no-start", startedMinutesAgo: nil, now: now),
+        ]
+        XCTAssertNil(TrainingLoggerDraft.activeLiveSession(in: candidates, now: now),
+                     "Completed/abandoned/submitted sessions immediately restore normal Log behavior.")
+    }
+
+    func testLogTabRoutesIntoTheActiveSessionOnlyWhenEnteringLogAtItsRoot() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let tabs = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Root/RootTabView.swift"), encoding: .utf8)
+        XCTAssertTrue(tabs.contains("TabView(selection: Binding(get: { selectedTab }, set: selectTab))"))
+        // Only when switching INTO Log from another tab with Log at its root: no trap, no bounce.
+        XCTAssertTrue(tabs.contains("guard newTab == .log, previous != .log, logPath.isEmpty,"))
+        // Pushed on top of Log (never replacing it), so Back returns to the ordinary Log page.
+        XCTAssertTrue(tabs.contains("logPath.append(AppDestination.trainingLogger)"))
+        let logger = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"), encoding: .utf8)
+        // Resumes the exact hinted draft once, and never rebuilds on tab revisit.
+        XCTAssertTrue(logger.contains("if let draftId = environment.consumeTrainingLoggerResumeDraftId(), viewModel?.draft == nil {"))
+        XCTAssertTrue(logger.contains("if viewModelAuthority != environment.nativeAuthority {"))
+    }
 }

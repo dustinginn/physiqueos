@@ -220,6 +220,31 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     }
 }
 
+extension TrainingLoggerDraft {
+    /// How long a live workout counts as "in progress" for Log-tab routing.
+    /// An older live draft is treated as abandoned: it stays resumable from
+    /// Log's saved-workouts card, but tapping Log no longer jumps into it.
+    static let activeLiveSessionWindow: TimeInterval = 12 * 60 * 60
+
+    /// The Workout Logger session the Founder is in the middle of, if any:
+    /// the newest live (not past) draft that is not complete, not already
+    /// submitted, and started within `activeLiveSessionWindow`.
+    static func activeLiveSession(in drafts: [TrainingLoggerDraft], now: Date = Date()) -> TrainingLoggerDraft? {
+        let formatter = ISO8601DateFormatter()
+        func started(_ draft: TrainingLoggerDraft) -> Date? {
+            draft.startedAt.flatMap { formatter.date(from: $0) }
+        }
+        return drafts
+            .filter { draft in
+                guard draft.mode == .live, draft.step != .complete, draft.submissionState == nil,
+                      let start = started(draft) else { return false }
+                let age = now.timeIntervalSince(start)
+                return age >= -5 * 60 && age <= activeLiveSessionWindow
+            }
+            .max { (started($0) ?? .distantPast) < (started($1) ?? .distantPast) }
+    }
+}
+
 enum TrainingLoggerSubmissionState: String, Codable, Equatable {
     case acceptedProcessing
     case resultUnknown

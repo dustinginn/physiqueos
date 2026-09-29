@@ -6,6 +6,9 @@ struct TrainingLoggerView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: TrainingLoggerViewModel?
+    /// The authority `viewModel` was built for; guards against rebuilding
+    /// (and losing the on-screen workout) when the tab is revisited.
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var pastWorkoutDate = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
     @State private var provisionalName = ""
     @State private var provisionalAreaId = ""
@@ -54,15 +57,25 @@ struct TrainingLoggerView: View {
             }
         }
         .task(id: environment.nativeAuthority) {
-            viewModel = TrainingLoggerViewModel(
-                api: environment.trainingLoggerAPI,
-                writeAPI: environment.trainingWriteAPI,
-                catalogWriteAPI: environment.trainingExerciseCatalogWriteAPI,
-                draftStore: environment.trainingLoggerDraftStore,
-                attachmentStore: environment.trainingLoggerAttachmentStore,
-                authority: environment.nativeAuthority
-            )
+            // `.task(id:)` re-fires when the tab is revisited; rebuilding here
+            // used to drop a mid-workout Founder back to the entry screen.
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = TrainingLoggerViewModel(
+                    api: environment.trainingLoggerAPI,
+                    writeAPI: environment.trainingWriteAPI,
+                    catalogWriteAPI: environment.trainingExerciseCatalogWriteAPI,
+                    draftStore: environment.trainingLoggerDraftStore,
+                    attachmentStore: environment.trainingLoggerAttachmentStore,
+                    authority: environment.nativeAuthority
+                )
+                viewModelAuthority = environment.nativeAuthority
+            }
             await viewModel?.load()
+            // Opened from the Log tab for an in-progress session: resume that
+            // exact draft (if it still exists) instead of the entry screen.
+            if let draftId = environment.consumeTrainingLoggerResumeDraftId(), viewModel?.draft == nil {
+                viewModel?.resume(draftId: draftId)
+            }
         }
         .onDisappear { viewModel?.persist() }
         .onChange(of: focusedNumericFieldID) { isNumericKeyboardVisible = focusedNumericFieldID != nil }

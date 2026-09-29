@@ -27,7 +27,7 @@ struct RootTabView: View {
     @State private var youPath = NavigationPath()
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: Binding(get: { selectedTab }, set: selectTab)) {
             NavigationStack(path: $homePath) {
                 HomeView(onNavigate: { noteNavigation($0); homePath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
@@ -112,6 +112,22 @@ struct RootTabView: View {
             await Task.yield()
             logPath = NavigationPath()
         }
+    }
+
+    /// Tab bar selection. Entering Log from another tab while a Workout
+    /// Logger session is in progress opens that session directly, pushed on
+    /// top of Log so Back (or Save & Leave) returns to the ordinary Log page.
+    /// Re-tapping Log while already there, or a Log stack that is already
+    /// somewhere, never redirects -- so the Founder can always reach Log.
+    private func selectTab(_ newTab: AppTab) {
+        let previous = selectedTab
+        selectedTab = newTab
+        guard newTab == .log, previous != .log, logPath.isEmpty,
+              let session = TrainingLoggerDraft.activeLiveSession(in: environment.trainingLoggerDraftStore.loadAll())
+        else { return }
+        environment.pendingTrainingLoggerResumeDraftId = session.id
+        noteNavigation(.trainingLogger)
+        logPath.append(AppDestination.trainingLogger)
     }
 
     private func noteNavigation(_ destination: AppDestination) {

@@ -175,6 +175,16 @@ final class AppEnvironment {
     /// request-id idempotency for cold launch, resume, and already-running
     /// notification responses.
     let notificationDeepLinkCoordinator = NotificationDeepLinkCoordinator()
+    /// One-shot hint set when the Log tab routes straight into an active
+    /// Workout Logger session; the Logger consumes it on load and resumes
+    /// that exact draft. Never persisted.
+    var pendingTrainingLoggerResumeDraftId: String?
+
+    /// Consumes the resume hint (so a later ordinary open is unaffected).
+    func consumeTrainingLoggerResumeDraftId() -> String? {
+        defer { pendingTrainingLoggerResumeDraftId = nil }
+        return pendingTrainingLoggerResumeDraftId
+    }
     /// The Evidence Review id currently on screen, if any — set/cleared by
     /// `EvidenceReviewDetailView` itself. `EvidenceReviewReadyNotifier`
     /// checks this before posting a fallback "ready to review" notification
