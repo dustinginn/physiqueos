@@ -21,10 +21,6 @@ final class TrainingLoggerViewModel {
     var configuration: TrainingLoggerConfiguration?
     var draft: TrainingLoggerDraft?
     var savedDrafts: [TrainingLoggerDraft] = []
-    /// Canonical performance records the just-completed session established,
-    /// as reported by the Server. Empty when there are none or they are not
-    /// known; Native never computes them.
-    var completedPerformanceRecords: [TrainingPerformanceRecord] = []
     /// Compatibility for older presentation/tests. New flows always select
     /// an exact draft identity from `savedDrafts`.
     var savedDraft: TrainingLoggerDraft? { savedDrafts.first }
@@ -245,10 +241,8 @@ final class TrainingLoggerViewModel {
         validationMessage = nil
         refreshWarning = nil
         defer { isSubmitting = false }
-        let committed: TrainingCommitResult
         do {
             let result = try await writeAPI.commit(submittedDraft)
-            committed = result
             guard result.isDurable else {
                 let state: TrainingLoggerSubmissionState = result.status == "accepted_processing"
                     ? .acceptedProcessing : .resultUnknown
@@ -271,17 +265,6 @@ final class TrainingLoggerViewModel {
         // as failed or resurrect the local draft — nothing after this point
         // is authoritative over that.
         completeLocalCapture()
-        if let records = committed.performanceRecords, records.isAuthoritative {
-            completedPerformanceRecords = records.records
-        } else {
-            // The commit result did not carry them (read-back recovery, an
-            // older receipt, or deferred derivation): read the Server's own
-            // session records once, without blocking the completion screen.
-            Task { [weak self, writeAPI] in
-                guard let records = await writeAPI.sessionPerformanceRecords(for: submittedDraft) else { return }
-                self?.completedPerformanceRecords = records
-            }
-        }
         // Reconciling any attached supporting evidence happens entirely in
         // the background, after the durable commit above and after
         // navigation to the completion screen — never blocking either one.

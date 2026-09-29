@@ -29,18 +29,12 @@ protocol TrainingWriteAPI: Sendable {
     /// true only when identity, date, exercises, sets, variants, and
     /// relationships all match; callers may then safely clear local state.
     func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool
-    /// The canonical performance records the committed session established,
-    /// read back from the Server when the commit result did not carry them
-    /// (a read-back recovery, a replayed older receipt, or deferred
-    /// derivation). `nil` when they are not known.
-    func sessionPerformanceRecords(for draft: TrainingLoggerDraft) async -> [TrainingPerformanceRecord]?
 }
 
 extension TrainingWriteAPI {
     func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async {}
     func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async {}
     func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { false }
-    func sessionPerformanceRecords(for draft: TrainingLoggerDraft) async -> [TrainingPerformanceRecord]? { nil }
 }
 
 struct TrainingCommitResult: Decodable, Equatable, Sendable {
@@ -50,9 +44,6 @@ struct TrainingCommitResult: Decodable, Equatable, Sendable {
     var sessionId: String
     var intendedDate: String
     var exerciseIds: [String]
-    /// Canonical records this session established; absent on older Servers
-    /// and on receipts recorded before the Server reported them.
-    var performanceRecords: TrainingSessionPerformanceRecords? = nil
 
     var isDurable: Bool { status == "durable" || status == "durable_readback" }
 }
@@ -295,18 +286,6 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             status: "durable_readback", reviewId: nil, sessionId: payload.sessionId,
             intendedDate: payload.localDate, exerciseIds: actualExerciseIds
         )
-    }
-
-    func sessionPerformanceRecords(for draft: TrainingLoggerDraft) async -> [TrainingPerformanceRecord]? {
-        let canonicalId = "training|authoritative|training_logger_draft_\(draft.id)"
-        await api.invalidateReadResources(["training-session"])
-        guard let session = try? await api.readResource(
-            "training-session", query: ["sessionId": canonicalId], as: TrainingSessionDetailReadModel.self
-        ).data,
-              session.id == canonicalId,
-              let records = session.performanceRecords, records.isAuthoritative
-        else { return nil }
-        return records.records
     }
 
     func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool {
