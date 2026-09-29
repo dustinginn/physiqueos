@@ -115,15 +115,6 @@ export function createPostgresTrainingNavigationReadStore({
        ORDER BY record_id`,
       [ownerUserId, canonicalExerciseId]
     ),
-    // Bounded, owner-scoped: only the events attributed to one canonical
-    // Training session or its session identity (liveness is decided by the caller).
-    listTrainingPerformanceEventsBySession: ({ canonicalId = null, sessionId = null } = {}) => queryRecords(
-      `SELECT payload,version FROM physiqueos.canonical_training_records
-       WHERE owner_user_id=$1 AND collection_name='trainingPerformanceEvents'
-         AND (payload->>'sourceCanonicalTrainingId'=$2 OR payload->>'sourceSessionId'=$3)
-       ORDER BY record_id`,
-      [ownerUserId, canonicalId || null, sessionId || null]
-    ),
   });
 }
 
@@ -153,8 +144,5 @@ export function createRepositoryTrainingNavigationReadStore({ repositories } = {
     listHealthKitWorkoutLinkClaims: async () => repositories.healthKitWorkoutLinkClaims?.list?.() ?? [],
     listTrainingPerformanceEventsByExercise: async (canonicalExerciseId) => (await repositories.trainingPerformanceEvents.listTrainingPerformanceEvents())
       .filter((event) => event.canonicalExerciseId === canonicalExerciseId),
-    listTrainingPerformanceEventsBySession: async ({ canonicalId = null, sessionId = null } = {}) => (await repositories.trainingPerformanceEvents.listTrainingPerformanceEvents())
-      .filter((event) => (canonicalId && event.sourceCanonicalTrainingId === canonicalId) ||
-        (sessionId && event.sourceSessionId === sessionId)),
   });
 }

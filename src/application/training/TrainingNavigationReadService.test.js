@@ -304,52 +304,6 @@ describe("provider-native Training navigation", () => {
     ]);
   });
 
-  it("includes the canonical performance records the session established", async () => {
-    const record = training("canonical-session-records", "2026-08-26");
-    const own = performanceEvent("2026-08-26", { canonicalId: "canonical-session-records", sessionId: "payload-canonical-session-records" });
-    const ownReps = createTrainingPerformanceEvent({
-      eventType: "reps_at_load_pr", sourceReviewId: "review", sourceEvidencePackageId: "package",
-      sourceCanonicalTrainingId: "canonical-session-records", sourceSessionId: "payload-canonical-session-records",
-      sourceAnalysisId: "analysis", workoutDate: "2026-08-26", canonicalExerciseId: "ez_bar_curl",
-      canonicalExerciseName: "EZ Bar Curls", currentValue: 10, previousBaselineValue: 8,
-      load: 65, loadUnit: "lb", reps: 10, unit: "reps", createdAt: "2026-08-26T12:00:00Z",
-    });
-    const otherSession = performanceEvent("2026-08-20", { canonicalId: "canonical-other", sessionId: "payload-canonical-other" });
-    const legacy = { id: "legacy-pr", sourceCanonicalTrainingId: "canonical-session-records", exercise: "EZ Bar Curls" };
-    const store = navigationStore([record, training("canonical-other", "2026-08-20")], [own, ownReps, otherSession, legacy]);
-    const session = await createTrainingNavigationReadService({ store }).getSession({ sessionId: "canonical-session-records" });
-
-    expect(store.listTrainingPerformanceEventsBySession).toHaveBeenCalledWith({
-      canonicalId: "canonical-session-records", sessionId: "payload-canonical-session-records",
-    });
-    expect(session.performanceRecords.status).toBe("completed");
-    expect(session.performanceRecords.records.map((item) => [item.sourceEventId, item.achievementType, item.value])).toEqual([
-      [own.id, "session_volume_pr", "650 lb"],
-      [ownReps.id, "reps_at_load_pr", "10 reps at 65 lb"],
-    ]);
-  });
-
-  it("returns no session records for a session without events or whose events are no longer live", async () => {
-    const record = training("canonical-session-plain", "2026-08-26");
-    const plain = await createTrainingNavigationReadService({ store: navigationStore([record]) })
-      .getSession({ sessionId: "canonical-session-plain" });
-    expect(plain.performanceRecords).toEqual({ status: "completed", records: [] });
-
-    // An event whose exercise or workout date no longer matches the active
-    // session is not live for it.
-    const moved = performanceEvent("2026-08-25", { canonicalId: "canonical-session-plain", sessionId: "payload-canonical-session-plain" });
-    const stale = await createTrainingNavigationReadService({ store: navigationStore([record], [moved]) })
-      .getSession({ sessionId: "canonical-session-plain" });
-    expect(stale.performanceRecords).toEqual({ status: "completed", records: [] });
-
-    // A superseded session is not presented, so none of its immutable events are.
-    const superseded = { ...record, canonicalId: "canonical-session-superseded", quality: { status: "superseded", supersededBy: "elsewhere" } };
-    const event = performanceEvent("2026-08-26", { canonicalId: "canonical-session-superseded", sessionId: "payload-canonical-session-plain" });
-    const read = await createTrainingNavigationReadService({ store: navigationStore([superseded], [event]) })
-      .getSession({ sessionId: "canonical-session-superseded" });
-    expect(read).toBeNull();
-  });
-
   it("loads only one exercise's occurrences and events with unchanged scoped ordering", async () => {
     const records = [training("older", "2026-08-20"), training("newer", "2026-08-26")];
     const events = [performanceEvent("2026-08-26", { canonicalId: "newer", sessionId: "payload-newer" })];
@@ -518,8 +472,6 @@ function navigationStore(records, events = []) {
     listCanonicalTrainingEvidenceByExercise: vi.fn(async (id) => records.filter((record) => record.payload.exercises.some((exercise) => exercise.canonicalExerciseId === id))),
     listEvidencePackages: vi.fn(async () => []),
     listTrainingPerformanceEventsByExercise: vi.fn(async (id) => events.filter((event) => event.canonicalExerciseId === id)),
-    listTrainingPerformanceEventsBySession: vi.fn(async ({ canonicalId, sessionId }) => events.filter((event) =>
-      (canonicalId && event.sourceCanonicalTrainingId === canonicalId) || (sessionId && event.sourceSessionId === sessionId))),
   };
 }
 

@@ -47,30 +47,6 @@ describe("PostgreSQL Training navigation read store", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
-  it("reads one session's performance events with a single owner-scoped attribution query", async () => {
-    const event = { id: "training_performance_event_a", sourceCanonicalTrainingId: "training|authoritative|training_logger_draft_s1" };
-    const query = vi.fn(async () => ({ rows: [{ payload: event, version: "1" }] }));
-    const store = createPostgresTrainingNavigationReadStore({
-      pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 },
-      ownerUserId: "owner-one",
-    });
-    const events = await store.listTrainingPerformanceEventsBySession({
-      canonicalId: "training|authoritative|training_logger_draft_s1",
-      sessionId: "training_logger_session_s1",
-    });
-    expect(events).toEqual([{ ...event, version: 1 }]);
-    expect(query).toHaveBeenCalledTimes(1);
-    const [sql, values] = query.mock.calls[0];
-    expect(sql).toContain("collection_name='trainingPerformanceEvents'");
-    expect(sql).toContain("payload->>'sourceCanonicalTrainingId'=$2");
-    expect(sql).toContain("payload->>'sourceSessionId'=$3");
-    expect(values).toEqual(["owner-one", "training|authoritative|training_logger_draft_s1", "training_logger_session_s1"]);
-
-    query.mockClear();
-    await store.listTrainingPerformanceEventsBySession({ canonicalId: "training|authoritative|x" });
-    expect(query.mock.calls[0][1]).toEqual(["owner-one", "training|authoritative|x", null]);
-  });
-
   it("keeps the Training landing to three narrow reads and zero runtime loads", async () => {
     const query = vi.fn(async () => ({ rows: [] }));
     const complete = vi.fn();

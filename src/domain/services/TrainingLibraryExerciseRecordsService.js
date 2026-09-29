@@ -47,32 +47,6 @@ export function createTrainingLibraryExerciseRecordsReadModel({
   };
 }
 
-// Every valid performance record one Training session established, across all
-// of its exercises and NOT reduced to the strongest per type: the caller has
-// already scoped `events` to a single session (Workout Complete, session
-// detail). Each stored event is a new best set by its source session, so every
-// valid one is a record this session earned. Legacy non-schema rows are
-// ignored by the same checks the Library presentation applies. Ordered by
-// exercise name, then achievement type, then event id.
-export function createSessionPerformanceRecordsReadModel({ events = [] } = {}) {
-  const byId = new Map();
-  for (const event of events ?? []) {
-    if (!event || byId.has(event.id)) continue;
-    const item = toItem(event, cleanString(event.canonicalExerciseId));
-    if (item) byId.set(event.id, item);
-  }
-  return [...byId.values()].sort(compareSessionRecords);
-}
-
-function compareSessionRecords(left, right) {
-  return (
-    left.canonicalExerciseName.localeCompare(right.canonicalExerciseName) ||
-    left.canonicalExerciseId.localeCompare(right.canonicalExerciseId) ||
-    TYPE_ORDER[left.achievementType] - TYPE_ORDER[right.achievementType] ||
-    left.sourceEventId.localeCompare(right.sourceEventId)
-  );
-}
-
 function activeRecordFamilyKey(event) {
   const variant = event.executionVariant?.key ?? "ordinary";
   const relationship = event.relationshipContext

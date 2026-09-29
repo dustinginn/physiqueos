@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTrainingPerformanceEvent } from "../models/trainingPerformanceEvent";
 import {
-  createSessionPerformanceRecordsReadModel,
   createTrainingLibraryExerciseRecordsReadModel,
 } from "./TrainingLibraryExerciseRecordsService";
 
@@ -186,67 +185,6 @@ describe("Training Library exercise records read model", () => {
     expect(compose("cable_pushdown", fixtures).records).toHaveLength(1);
     expect(compose("forearm_curl", fixtures).records).toHaveLength(1);
     expect(compose("spider_curl", fixtures)).toBeNull();
-  });
-});
-
-describe("Session performance records read model", () => {
-  it("returns an empty list for a session without records", () => {
-    expect(createSessionPerformanceRecordsReadModel({ events: [] })).toEqual([]);
-    expect(createSessionPerformanceRecordsReadModel()).toEqual([]);
-  });
-
-  it("maps one event to the Native TrainingPerformanceRecord shape", () => {
-    const event = volume();
-    const [record, ...rest] = createSessionPerformanceRecordsReadModel({ events: [event] });
-    expect(rest).toEqual([]);
-    expect(record).toMatchObject({
-      id: `training_library_record_${event.id}`,
-      sourceEventId: event.id,
-      canonicalExerciseId: "cable_pushdown",
-      canonicalExerciseName: "Cable Rope Pushdowns",
-      achievementType: "session_volume_pr",
-      title: "Session volume record",
-      value: "6,160 lb",
-      previousBaseline: "Previous: 5,830 lb",
-      improvement: "Improved by 330 lb",
-      detail: "Previous: 5,830 lb · Improved by 330 lb",
-      workoutDate: "2026-07-25",
-      achievedValue: 6160,
-    });
-  });
-
-  it("lists every record across exercises without reducing per type, in a deterministic order", () => {
-    const events = [
-      reps({ reps: 15, baseline: 13, load: 65 }),
-      volume({ exerciseId: "ez_bar_curl", exerciseName: "EZ Bar Curls", value: 3000, baseline: 2800 }),
-      reps({ reps: 10, baseline: 8, load: 75 }),
-      volume(),
-    ];
-    const forward = createSessionPerformanceRecordsReadModel({ events });
-    const reversed = createSessionPerformanceRecordsReadModel({ events: [...events].reverse() });
-    expect(reversed).toEqual(forward);
-    expect(forward.map((item) => [item.canonicalExerciseName, item.achievementType])).toEqual([
-      ["Cable Rope Pushdowns", "session_volume_pr"],
-      ["EZ Bar Curls", "session_volume_pr"],
-      ["EZ Bar Curls", "reps_at_load_pr"],
-      ["EZ Bar Curls", "reps_at_load_pr"],
-    ]);
-    const repsIds = forward.slice(2).map((item) => item.sourceEventId);
-    expect(repsIds).toEqual([...repsIds].sort());
-  });
-
-  it("ignores legacy, unsupported, malformed and duplicate rows", () => {
-    const valid = volume();
-    expect(createSessionPerformanceRecordsReadModel({ events: [
-      valid,
-      structuredClone(valid),
-      null,
-      { id: "legacy_pr_row", exerciseId: "cable_pushdown", type: "volume", value: 7000 },
-      { ...volume(), schemaVersion: "training_performance_event_v2", id: "future" },
-      { ...volume(), eventType: "estimated_1rm_pr", id: "unsupported" },
-      { ...volume(), sessionVolume: null, id: "malformed" },
-      { ...volume(), canonicalExerciseId: undefined, id: "no_exercise" },
-    ] }).map((item) => item.sourceEventId)).toEqual([valid.id]);
   });
 });
 

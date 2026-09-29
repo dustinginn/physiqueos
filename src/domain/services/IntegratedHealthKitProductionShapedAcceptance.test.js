@@ -485,7 +485,7 @@ describe("Item 15: Cardio is NOT activated by the combined candidate", () => {
       "src/platform/database/HealthKitGraduationReader.js", "src/platform/database/HealthKitGraduationReader.test.js",
       "src/platform/database/PostgresActiveGoalReadStore.js", "src/platform/database/PostgresActiveGoalReadStore.test.js",
       "src/platform/database/PostgresPriorityNavigationReadStore.js",
-      "src/platform/database/PostgresTrainingNavigationReadStore.js", "src/platform/database/PostgresTrainingNavigationReadStore.test.js"]);
+      "src/platform/database/PostgresTrainingNavigationReadStore.js"]);
     // Daily-driver candidate: Priority Detail reads the day's check-in (skip state) by exact record id -- a read, no write.
     const priorityStoreAdded = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", "src/platform/database/PostgresPriorityNavigationReadStore.js")
       .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n");
