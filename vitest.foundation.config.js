@@ -8,6 +8,7 @@ export default defineConfig({
       "src/application/commands/executeIdempotentCommand.test.js",
       "src/application/platform/getPlatformStatus.test.js",
       "src/platform/auth/foundationIdentity.test.js",
+      "src/platform/auth/RefreshRotationRecoveryPolicy.test.js",
       "src/platform/database/foundationDatabase.test.js",
       "src/platform/migration/migrationManifest.test.js",
       "src/platform/object-storage/InMemoryPrivateObjectStorage.test.js",
