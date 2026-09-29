@@ -213,10 +213,7 @@ final class FounderServerAPITests: XCTestCase {
 
         let interrupted = senderConstrainedAPI(store: store, signer: signer, transport: transport)
         await XCTAssertThrowsErrorAsync(try await interrupted.readProfile()) { error in
-            guard case ProductionNativeError.unauthenticated(let problem) = error else {
-                return XCTFail("Expected retryable proof rejection, got \(error)")
-            }
-            XCTAssertEqual(problem?.code, "DEVICE_PROOF_INVALID")
+            XCTAssertEqual(error as? ProductionNativeError, .sessionRecoveryUnavailable)
         }
         let pending = try XCTUnwrap(store.currentEnvelope()?.pendingRotation)
         let interruptedState = await interrupted.sessionRecoveryState()
@@ -245,6 +242,24 @@ final class FounderServerAPITests: XCTestCase {
         await model.load()
 
         XCTAssertEqual(model.state, .reconnectRequired)
+    }
+
+    @MainActor
+    func testHomePresentsRetryableProofRejectionAsExplicitSessionRecovery() async {
+        let model = HomeViewModel(
+            api: FailingHomeAPI(error: ProductionNativeError.sessionRecoveryUnavailable),
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+
+        await model.load()
+
+        guard case .failed(let message) = model.state else {
+            return XCTFail("Expected an explicit recovering state")
+        }
+        XCTAssertEqual(message, "Recovering the secure session. Try again when the connection is available.")
     }
 
     private func senderConstrainedAPI(

@@ -1106,6 +1106,10 @@ actor ProductionNativeAPI {
                 recoveryState = .reconnectRequired
                 throw ProductionNativeError.reconnectRequired
             }
+            if isRetryableProofError(error) {
+                recoveryState = .recoveringSession
+                throw ProductionNativeError.sessionRecoveryUnavailable
+            }
             if Task.isCancelled || error is CancellationError {
                 recoveryState = .recoveringSession
                 throw ProductionNativeError.sessionRecoveryUnavailable
@@ -1158,6 +1162,11 @@ actor ProductionNativeAPI {
             "REFRESH_PROOF_UNAVAILABLE",
             "CREDENTIAL_MALFORMED",
         ].contains(code)
+    }
+
+    private func isRetryableProofError(_ error: Error) -> Bool {
+        guard case ProductionNativeError.unauthenticated(let problem) = error else { return false }
+        return problem?.code == "DEVICE_PROOF_INVALID"
     }
 
     private func authenticatedJSON<Response: Decodable>(
