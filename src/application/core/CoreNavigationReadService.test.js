@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { generatePeptideDosingTimeline } from "../../domain/models/PeptideDosingStrategyModel.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import { createHomeBriefingService } from "../../domain/services/HomeBriefingService.js";
@@ -745,5 +746,107 @@ describe("peptide Support next due honours pause windows (S3)", () => {
     await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({ nextDue: null });
     runtime.executionItems[0].scheduleSuspensions = null;
     await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({ nextDue: "Sep 3, 2026 · 9:45 PM" });
+  });
+});
+
+describe("peptide Support S4 read contract (additive keys)", () => {
+  // NOW is Saturday 2026-08-29 (America/Los_Angeles); the plan is Thursdays 21:45.
+  it("exposes lifecycle, current dose, history, planned changes, next due date/time and priorityId", async () => {
+    const { narrow } = peptideSupportServices();
+    const result = await narrow.getPeptideSupport({ protocolId: "peptide-protocol" });
+    expect(result).toMatchObject({
+      priorityId: "reminder-peptide",
+      lifecycle: { state: "active", since: null, history: [] },
+      dosingMode: "structured",
+      dosing: { pattern: "stay" },
+      currentDose: { amount: 0.5, unit: "mg" },
+      currentDoseLabel: "0.5 mg",
+      currentPhase: { startDate: "2026-05-21", endDate: null },
+      plannedChanges: [],
+      dosingHistory: [{ startDate: "2026-05-21", endDate: null, dose: { amount: 0.5, unit: "mg" }, label: "0.5 mg · May 21 – Ongoing" }],
+      advancedPlan: false,
+      nextDue: "Sep 3, 2026 · 9:45 PM",
+      nextDueDate: "2026-09-03",
+      nextDueTime: "21:45",
+    });
+    expect(result.timeline).toHaveLength(1);
+    expect(result).not.toHaveProperty("timelineHistory");
+    expect(result).not.toHaveProperty("scheduleSuspensions");
+  });
+
+  it("reads back a paused peptide: lifecycle paused with since, no next due, domain dose Paused with the protocol still active", async () => {
+    const { narrow, runtime } = peptideSupportServices();
+    runtime.executionItems[0].scheduleSuspensions = [{
+      pausedFrom: "2026-08-27", resumedOn: null, pausedAt: "2026-08-27T16:00:00.000Z", resumedAt: null,
+      reason: "Travel", pausedExecutionRevision: 3, resumedExecutionRevision: null,
+    }];
+    const support = await narrow.getPeptideSupport({ protocolId: "peptide-protocol" });
+    expect(support).toMatchObject({
+      state: "CANONICAL",
+      lifecycle: { state: "paused", since: "2026-08-27", history: [{ state: "paused", effectiveDate: "2026-08-27", at: "2026-08-27T16:00:00.000Z", reason: "Travel" }] },
+      currentDose: { amount: 0.5, unit: "mg" },
+      nextDue: null, nextDueDate: null, nextDueTime: null,
+    });
+    const domain = await narrow.getOperatingPlanProtocolDomain({ protocolId: "peptide-protocol" });
+    expect(domain.methods[0]).toMatchObject({
+      lifecycleState: "active",
+      executionLifecycle: { state: "paused", since: "2026-08-27" },
+      currentDose: "Paused",
+      editDestination: { id: "native.operating-plan.protocol.peptide", parameters: { protocolId: "peptide-protocol" } },
+    });
+    runtime.executionItems[0].scheduleSuspensions[0].resumedOn = "2026-08-28";
+    runtime.executionItems[0].scheduleSuspensions[0].resumedAt = "2026-08-28T16:00:00.000Z";
+    await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({
+      lifecycle: { state: "active", since: "2026-08-28", history: [{ state: "paused" }, { state: "active", effectiveDate: "2026-08-28" }] },
+      nextDueDate: "2026-09-03", nextDueTime: "21:45",
+    });
+    expect((await narrow.getOperatingPlanProtocolDomain({ protocolId: "peptide-protocol" })).methods[0]).toMatchObject({
+      executionLifecycle: { state: "active", since: "2026-08-28" }, currentDose: "0.5 mg",
+    });
+  });
+
+  it("marks advancedPlan only for a generator plan with changes ahead and never for a future-dated stay", async () => {
+    const { narrow, runtime } = peptideSupportServices();
+    const execution = runtime.executionItems[0];
+    execution.dosingStrategy = {
+      pattern: "titrate_up", startingDose: { amount: "0.5", unit: "mg" }, startDate: "2026-08-20",
+      stepAmount: "0.5", stepInterval: 1, stepUnit: "weeks", targetDose: "1.5", endDate: null,
+    };
+    execution.timeline = generatePeptideDosingTimeline(execution.dosingStrategy);
+    const titration = await narrow.getPeptideSupport({ protocolId: "peptide-protocol" });
+    expect(titration).toMatchObject({
+      dosingMode: "structured",
+      currentDose: { amount: 1, unit: "mg" },
+      currentDoseLabel: "1 mg",
+      currentPhase: { startDate: "2026-08-27", endDate: "2026-09-02" },
+      plannedChanges: [{ startDate: "2026-09-03", dose: { amount: 1.5, unit: "mg" }, label: "1.5 mg on Sep 3" }],
+      advancedPlan: true,
+    });
+    expect(titration.dosingHistory.map((entry) => entry.label)).toEqual(["1 mg · Aug 27 – Sep 2", "0.5 mg · Aug 20 – Aug 26"]);
+    expect(titration.timeline).toHaveLength(3);
+
+    // A simple "change dose from Sep 10" (stay) on the Founder-shaped record keeps history and is not advanced.
+    execution.dosingStrategy = { pattern: "stay", startingDose: { amount: "0.75", unit: "mg" }, startDate: "2026-09-10", endDate: null };
+    execution.timeline = [
+      { startDate: "2026-05-21", endDate: "2026-09-09", dose: { amount: "0.5", unit: "mg" }, notes: "" },
+      { startDate: "2026-09-10", endDate: null, dose: { amount: "0.75", unit: "mg" }, notes: "" },
+    ];
+    const futureStay = await narrow.getPeptideSupport({ protocolId: "peptide-protocol" });
+    expect(futureStay).toMatchObject({
+      dosingMode: "structured",
+      dosing: { pattern: "stay", startDate: "2026-09-10" },
+      currentDose: { amount: 0.5, unit: "mg" },
+      currentDoseLabel: "0.5 mg",
+      plannedChanges: [{ startDate: "2026-09-10", dose: { amount: 0.75, unit: "mg" }, label: "0.75 mg on Sep 10" }],
+      advancedPlan: false,
+    });
+    expect(futureStay.timeline.map((phase) => phase.status)).toEqual(["active", "upcoming"]);
+
+    // A generator-less (custom) record with a hand-authored future phase is never "advanced".
+    execution.dosingStrategy = null;
+    const custom = await narrow.getPeptideSupport({ protocolId: "peptide-protocol" });
+    expect(custom).toMatchObject({ dosingMode: "legacy_custom", advancedPlan: false });
+    expect(custom.plannedChanges).toHaveLength(1);
+    expect(custom.dosing).not.toBeNull();
   });
 });

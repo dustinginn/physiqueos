@@ -77,6 +77,7 @@ const payloads = {
   [Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE]: {
     protocolId: "supplement-protocol", operation: "pause", expectedCurrentVersionId: "supplement-protocol_v1",
   },
+  [Phase3Command.CHANGE_PEPTIDE_LIFECYCLE]: { protocolId: "peptide-protocol", operation: "pause", effectiveDate: "today" },
   [Phase3Command.SAVE_COACHING_UPDATES]: {
     protocolId: "coaching-protocol", expectedCurrentVersionId: "coaching-v1",
     expectedSemanticDigest: "digest", photoExpectedCurrentVersionId: "photos-v1",
@@ -184,6 +185,7 @@ function commandPort(commandType) {
     [Phase3Command.SAVE_SUPPLEMENT_SUPPORT]: "saveSupplementSupport",
     [Phase3Command.SAVE_SUPPLEMENT_STRATEGY]: "saveSupplementStrategy",
     [Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE]: "changeSupplementLifecycle",
+    [Phase3Command.CHANGE_PEPTIDE_LIFECYCLE]: "changePeptideLifecycle",
     [Phase3Command.SAVE_COACHING_UPDATES]: "saveCoachingUpdates",
   })[commandType];
 }

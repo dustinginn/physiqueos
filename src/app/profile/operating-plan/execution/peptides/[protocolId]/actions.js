@@ -112,6 +112,9 @@ export async function savePeptideExecution(context, _state, formData) {
 
 function viewerMessage(result) {
   if (result.outcome === "unchanged") return "No changes to save.";
+  if (result.code === "PEPTIDE_PLAN_REWRITES_HISTORY") {
+    return "This plan starts before today and would rewrite your dose history. Start a new plan from today, or confirm the rewrite.";
+  }
   if (result.outcome === "version_conflict") {
     return "This peptide schedule changed while you were editing it. Review the latest version and try again.";
   }

@@ -48,6 +48,47 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     ]);
   });
 
+  it("reads a paused peptide on the landing and the domain while its protocol root stays active", async () => {
+    const runtime = source();
+    const execution = (windows) => ({
+      id: `execution-${windows ? "paused" : "active"}-peptide`, userId: OWNER, type: "peptide", title: "Peptide", active: true,
+      protocolRootId: windows ? "peptide" : "peptide-two", linkedStrategyIds: [], linkedGoalIds: ["goal"], linkedEvidenceTypes: [],
+      cadence: { type: "weekly" }, preferredSchedule: { daysOfWeek: ["thursday"], timeOfDay: "21:45", startDate: "2026-07-25", endDate: null },
+      timingContext: "fasted_before_bed", reminderPreference: "remind", priority: "high", notes: "",
+      dosingStrategy: { pattern: "stay", startingDose: { amount: "0.25", unit: "mg" }, startDate: "2026-07-25", endDate: null },
+      timeline: [{ startDate: "2026-07-25", endDate: null, dose: { amount: "0.25", unit: "mg" }, notes: "" }],
+      executionRevision: 2, ...(windows ? { scheduleSuspensions: windows } : {}),
+    });
+    runtime.executionItems.push(execution([{ pausedFrom: "2026-09-12", resumedOn: null, pausedAt: "2026-09-12T15:00:00.000Z", resumedAt: null, reason: null, pausedExecutionRevision: 1, resumedExecutionRevision: null }]));
+    runtime.reminders.push({ id: "reminder-peptide", userId: OWNER, type: "protocol_reminder", linkedEntityType: "protocol", linkedEntityId: "peptide", active: true, schedule: { type: "weekly", daysOfWeek: ["thursday"], timeOfDay: "21:45", timezone: "America/Los_Angeles" }, completionHistory: [] });
+    const plan = (protocols) => buildOperatingPlan({ protocols, executionItems: runtime.executionItems, reminders: runtime.reminders })
+      .find((section) => section.title === "Peptides");
+    expect(plan(runtime.protocols)).toMatchObject({ subtitle: "0 active · 1 paused", items: [{ id: "peptide-strategy", status: "Paused" }] });
+    expect(runtime.protocols.find((item) => item.id === "peptide").status).toBe("active");
+
+    const reads = createCoreNavigationReadService({
+      now: () => NOW,
+      store: createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime }),
+    });
+    const domain = await reads.getOperatingPlanProtocolDomain({ protocolId: "peptide" });
+    expect(domain.methods).toEqual([expect.objectContaining({
+      protocolId: "peptide", lifecycleState: "active", executionLifecycle: { state: "paused", since: "2026-09-12" }, currentDose: "Paused",
+      editDestination: { id: "native.operating-plan.protocol.peptide", parameters: { protocolId: "peptide" } },
+    })]);
+    await expect(reads.getPeptideSupport({ protocolId: "peptide" })).resolves.toMatchObject({
+      priorityId: "reminder-peptide", executionRevision: 2,
+      lifecycle: { state: "paused", since: "2026-09-12" }, currentDoseLabel: "0.25 mg",
+      nextDue: null, nextDueDate: null, nextDueTime: null,
+    });
+
+    runtime.protocols.push(root("peptide-two", "peptide"));
+    runtime.executionItems.push(execution(null));
+    expect(plan(runtime.protocols)).toMatchObject({ subtitle: "1 active · 1 paused", items: [{ status: "Active" }] });
+    const both = await reads.getOperatingPlanProtocolDomain({ protocolId: "peptide" });
+    expect(both.methods.map((method) => [method.protocolId, method.executionLifecycle.state, method.currentDose]))
+      .toEqual([["peptide", "paused", "Paused"], ["peptide-two", "active", "0.25 mg"]]);
+  });
+
   it("reads Energy's real canonical strategy while intentionally withholding edits", async () => {
     const fixture = setup();
     const detail = await fixture.reads().getEnergyStrategyDetail({ strategyId: "energy" });

@@ -4,6 +4,7 @@ import {
   resolvePeptideDose,
 } from "./ExecutionPhaseResolver.js";
 import { formatSupplementSupportSummary } from "./SupplementSupportManagementService.js";
+import { resolvePeptideLifecycleState } from "./PeptideExecutionManagementService.js";
 
 export const STRATEGY_DOMAIN_PRESENTATION = Object.freeze({
   recovery: Object.freeze({
@@ -77,16 +78,21 @@ export function buildStrategyDomainModel({
 function buildSupportMethod({ category, executionItem, goalReference, localDate, protocol, version }) {
   if (category === "peptide") {
     const current = resolvePeptideDose(executionItem, localDate).current;
+    // A peptide's pause lives on its execution item (scheduleSuspensions), not
+    // on the protocol root: `lifecycleState` stays the root status while
+    // `executionLifecycle` carries the suspension state.
+    const lifecycle = resolvePeptideLifecycleState(executionItem);
     return Object.freeze({
       id: protocol.id,
       protocolId: protocol.id,
       lifecycleState: protocol.status,
+      executionLifecycle: Object.freeze({ state: lifecycle.state, since: lifecycle.since }),
       currentVersionId: protocol.currentVersionId ?? null,
       executionId: executionItem?.id ?? null,
       name: protocol.name,
       purpose: peptideStrategicRole(protocol, goalReference),
       supportSummary: formatPeptideExecutionSummary(executionItem, localDate),
-      currentDose: current ? formatPeptideDose(current.dose) : "No active phase",
+      currentDose: lifecycle.state === "paused" ? "Paused" : current ? formatPeptideDose(current.dose) : "No active phase",
       currentSchedule: formatPeptideSchedule(executionItem, localDate),
       editSupportHref: `/profile/operating-plan/execution/peptides/${encodeURIComponent(protocol.id)}?edit=1`,
     });

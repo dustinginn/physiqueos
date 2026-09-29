@@ -134,9 +134,11 @@ import {
   buildPeptideSupportDraft,
   classifyPeptideExecutionState,
   PeptideExecutionOutcome,
+  PeptideExecutionRejectionCode,
   preparePeptideExecutionTransition,
   verifyPreparedPeptideExecutionTransition,
 } from "../../domain/services/PeptideExecutionManagementService.js";
+import { createPeptideLifecyclePort } from "./PeptideLifecyclePort.js";
 import {
   applyPreparedSupplementSupportTransition,
   prepareSupplementSupportTransition,
@@ -174,7 +176,7 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "resolveWorkoutReconciliation",
   "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
   "saveSupplementSupport",
-  "saveSupplementStrategy", "changeSupplementLifecycle",
+  "saveSupplementStrategy", "changeSupplementLifecycle", "changePeptideLifecycle",
   "saveCoachingUpdates",
 ]);
 
@@ -352,6 +354,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     saveSupplementSupport,
     saveSupplementStrategy,
     changeSupplementLifecycle,
+    changePeptideLifecycle: createPeptideLifecyclePort({ now, loadCandidate, persistCandidateCollections }),
     saveCoachingUpdates,
   });
 
@@ -1457,17 +1460,26 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
   async function savePeptideSupport(context) {
     const { candidate, before } = await loadCandidate(PEPTIDE_SUPPORT_READ_COLLECTIONS, context.ownerUserId);
     const requested = context.payload.draft ?? {};
+    const peptideProtocol = (candidate.protocols ?? []).find((item) => item.id === context.payload.protocolId) ?? null;
+    const existingExecution = peptideProtocol
+      ? classifyPeptideExecutionState({ protocol: peptideProtocol, executionItems: candidate.executionItems ?? [] }).record
+      : null;
     const draft = buildPeptideSupportDraft({
       supportSchedule: requested.supportSchedule,
       dosingStrategy: requested.dosingStrategy,
       timingContext: requested.timingContext,
       reminderPreference: requested.reminderPreference,
       notes: requested.notes,
+      rewriteHistory: requested.rewriteHistory === true,
+      scheduleSuspensions: existingExecution?.scheduleSuspensions ?? [],
     });
     const prepared = preparePeptideExecutionTransition(candidate, {
       protocolId: context.payload.protocolId,
       userId: context.ownerUserId,
       expectedRevision: context.metadata.expectedVersion,
+      // S1 guard: a plan dated before the user's local today is refused unless
+      // the draft explicitly rewrites history (only the Advanced editor does).
+      today: getLocalDateKey(now(), resolveLocalTimeZone(candidate.user?.timeZone ?? candidate.user?.timezone)),
       draft,
       author: {
         type: "user",
@@ -1508,6 +1520,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           },
           outbox: [],
         };
+      }
+      if (prepared.code === PeptideExecutionRejectionCode.PLAN_REWRITES_HISTORY) {
+        throw problem(400, PeptideExecutionRejectionCode.PLAN_REWRITES_HISTORY, prepared.reason);
       }
       throw problem(400, "PEPTIDE_SUPPORT_INVALID", prepared.reason ?? "This peptide Support plan is invalid.");
     }
