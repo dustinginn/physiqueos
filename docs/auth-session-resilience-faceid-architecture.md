@@ -6,16 +6,17 @@ Status: Phase A security decision. No production behavior is changed by this doc
 
 Do not implement the proposed rule as “accept token A again when successor B is unused.” That rule cannot distinguish a lost reply from an attacker who acquired A after the legitimate rotation. It would let that attacker invalidate B and receive fresh credentials during the grace window, changing a detected replay into session takeover.
 
-Use an exactly retryable rotation instead:
+Exact-attempt idempotency alone is also insufficient. An attacker who captures the complete first refresh request receives A and its attempt ID and can replay both. Recovery therefore requires the coordinated combination of durable rotation intent and sender constraint:
 
-1. Native generates a cryptographically random `rotationAttemptId` and atomically persists `{refreshCredential: A, pendingRotationAttemptId}` in one Keychain item before sending anything.
-2. Native sends A and the attempt ID over TLS. A relaunch or retry reuses the same attempt ID until the response is durably committed.
-3. Server locks A. On first use, it stores only a digest of the attempt ID and durable links to the issued access credential and successor B.
-4. Server can reproduce the same credential values without storing plaintext by deriving them with a dedicated versioned HMAC key from the credential row ID and attempt ID. The existing credential pepper must not be reused for derivation.
-5. A repeat of A is accepted only when the attempt digest is identical, Server time is inside a short window (recommended 120 seconds), the linked access response remains live, B exists, B is unused/unrevoked, and every user/device/session/family binding matches. The response is byte-equivalent credential material with the original expirations; no C is created.
-6. Any different attempt ID, retry outside the window, used/missing/revoked B, missing/expired access response, or ownership mismatch retains current family revocation and `REFRESH_REUSE_DETECTED` behavior.
+1. Pairing registers a non-exportable per-installation signing key with the Server device. Every normal rotation and recovery presentation requires a fresh application-level proof from that key.
+2. Before transmission, Native atomically persists `{current: A, intentId, proposedSuccessor: B, state: pending}` in one Keychain item. The request carries A, the intent ID, and a domain-separated commitment to B, all covered by the device proof.
+3. The proof binds HTTP method, canonical refresh URL, request-body digest, intent, successor commitment, a Server nonce, and a unique proof ID. A captured request cannot be replayed after its nonce/proof ID is consumed, and a new proof cannot be constructed without the enrolled private key.
+4. Server locks A and commits one exchange that binds predecessor, successor hash, device key, device, session, family, intent, issued access credential, Server timestamps, and recovery count.
+5. A used A is recoverable only under a fresh valid proof from the same key, for the exact committed intent and B commitment, within a short Server-clock window, while B is unused and no access credential issued by the exchange has ever authenticated a request.
+6. Recovery retains B, revokes the earlier unused access credential, and issues one replacement access credential. It never creates C. Any valid-key mismatch, used B, used exchange access, expired window, or ownership mismatch retains family revocation.
+7. Missing or invalid device proof is rejected and security-logged without granting recovery. It must not let an attacker revoke a family merely by presenting a stolen bearer with a bad proof.
 
-This is retry idempotency, not a bearer-token grace period.
+This is a sender-constrained, idempotent exchange—not a bearer-token grace period. Server and Native must ship it as a coordinated protocol; neither half is safe alone.
 
 ## Current-state audit
 
@@ -29,7 +30,7 @@ The Sep 28 incident report establishes the production sequence: R1 rotated succe
 - `rotateRefreshCredential` locks the presented row. Any `used_at` value currently revokes the entire family. A normal rotation creates access and successor refresh rows and then sets `used_at`/`replaced_by_id` in one transaction.
 - Session and device status are checked. Revocation invalidates access and refresh rows.
 - Production routes and runtime logging are on `origin/combined-app-platform-cutover`, not this task's `origin/main`. The refresh success event includes route/request ID/duration and no token. The failure logger supplies request ID, but reuse-specific safe metadata is absent.
-- Current schema has the successor link needed for detection, but not an attempt digest or access-response link needed for exact retry.
+- Current schema has the successor link needed for detection, but not a durable exchange, enrolled device key, nonce/proof replay state, recovery counter, or access `first_used_at` marker.
 - No device-bound signing key or attestation participates in pairing or refresh.
 
 ### Native (Build 69 lineage inspected read-only)
@@ -47,19 +48,20 @@ The Sep 28 incident report establishes the production sequence: R1 rotated succe
 
 | Scenario | Required outcome |
 | --- | --- |
-| Attacker steals unused A before rotation | Existing bearer-token risk remains: attacker can rotate first. Phase 2 should bind refresh to a device-held signing key. |
-| Attacker steals used A but not its random attempt ID | Different/missing attempt ID revokes the family. No recovery response. |
-| Attacker observes A and attempt ID | TLS is the primary network control. Full endpoint compromise remains out of scope; device-bound proof is the next hardening layer. |
-| Legitimate client loses B response | Same A + same attempt ID returns exactly B and the original access response. |
-| Client saved B but accidentally retries A | If B is still unused, exact retry returns B; once B is used, A reuse revokes. |
-| Concurrent refresh, same attempt | Row lock serializes; both responses are identical. |
-| Concurrent refresh, different attempts | First commits; second is replay and revokes. |
-| Delayed first response | Both responses contain the same B; Keychain replacement is idempotent. |
-| App suspension mid-refresh | Pending attempt survives; relaunch retries exactly. Background assertion reduces frequency but is not the correctness mechanism. |
+| Attacker steals unused A before rotation | Reject without a fresh proof from A's enrolled installation key. |
+| Attacker steals A after legitimate rotation | Bearer and attempt state are insufficient; reject without the enrolled key. |
+| Attacker captures the complete first request | Its Server nonce/proof ID is one-time. Replay is rejected; attacker cannot sign a fresh proof. |
+| Legitimate client loses B response | Fresh device proof + exact durable intent/B commitment may recover while B and exchange access remain unused. |
+| Client saved B but accidentally retries A | Recover only if neither B nor exchange access was used; otherwise revoke. |
+| Concurrent refresh, same intent | Row lock serializes; recovery retains the one precommitted B. |
+| Concurrent refresh, different intents | First commits; a later valid-key mismatch is replay and revokes. |
+| Delayed first response | One intent owns one B. A recovery response issues only replacement access, not a competing successor. |
+| App suspension mid-refresh | Pending A/intent/B survives; relaunch resolves it under a fresh proof before normal reads. Background assertion reduces frequency but is not the correctness mechanism. |
 | Device clock manipulation | Irrelevant; Server time alone controls the retry window and expirations. |
-| Repeated lost replies | Same response may be replayed repeatedly only inside the window and while B remains unused. |
+| Repeated lost replies | Bound recovery count and Server time; then require reauthorization without silently creating a new device. |
 | Replay outside window | Revoke family. |
 | B already used | Revoke family. |
+| Access token issued with B already used | Revoke family even when B itself is unused; the exchange demonstrably progressed. |
 | Revoked session/device | Reject; never recover. |
 | Multiple devices | User/device/session/family equality is mandatory; no cross-device recovery. |
 
@@ -69,25 +71,28 @@ The companion `RefreshRotationRecoveryPolicy` encodes these server-observable de
 
 Integrate on a fresh branch from the then-current production Server lineage, not by merging this audit branch wholesale.
 
-- Extend refresh request with a required 128-bit-or-stronger `rotationAttemptId` for capable clients. Keep legacy clients on strict current semantics until upgraded; do not silently grant legacy grace.
-- Add a `refresh_rotation_attempts` table (preferred over widening credential rows) keyed by previous refresh ID with: versioned attempt digest, successor refresh ID, access credential ID, created/expiry timestamps, and the credential-derivation key version. Enforce user/device/session/family ownership with foreign keys where possible.
-- Derive access/refresh secrets with domain-separated HMAC labels and a dedicated rotation-derivation key. Store only normal credential hashes. Key rotation must retain old versions through the maximum retry window.
-- Lock the previous refresh row before classifying. The attempt row, access row, successor row, and previous-row consumption must commit together.
-- Log only event type, request ID, credential-row IDs if policy permits, ages, and the decision reason. Never log token or attempt-ID values/digests.
-- Add metrics for `exact_retry_replayed`, `reuse_revoked`, `retry_window_expired`, and `successor_already_used` without high-cardinality secrets.
-- Roll out behind an explicit capability/version gate. First deploy schema + strict-compatible server, then upgraded Native, then enable exact retry after production observation.
+- Register a per-installation P-256 public key during pairing; keep the private key non-exportable. Require a fresh nonce-bound proof on every refresh, not only recovery. Follow the sender-constrained direction of RFC 9700 and the proof properties of RFC 9449 without claiming interoperability.
+- Extend refresh with a 128-bit-or-stronger intent ID and a domain-separated commitment to Native's precommitted B. Apply a Server-held pepper before persisting commitment lookup material; never store raw B or a directly usable client hash.
+- Add a durable refresh-exchange table keyed by predecessor with device-key thumbprint, intent digest, successor hash/link, access credential IDs, Server timestamps, replay window, and bounded recovery count. Enforce user/device/session/family ownership with constraints.
+- Add `first_used_at` (or an equivalent exchange-use fact) to access credentials and update it on successful access authentication. `B unused` is not enough.
+- Lock the predecessor before classification. Exchange, successor, access, nonce/proof replay state, and predecessor consumption must commit atomically.
+- On exact recovery, retain B, revoke the earlier unused exchange access credential, and issue one replacement access token. Missing/invalid proof rejects without recovery; a valid-key mismatch revokes the family.
+- Log only event type, request ID, opaque row IDs where permitted, ages, count, and reason. Never log credentials, intents, successor commitments, nonces, signatures, or full public keys.
+- Roll out without downgrade: legacy sessions retain today's strict bearer semantics; once a session/device is proof-bound it can never fall back, even if recovery is disabled or an older request shape appears.
 
 ## Native renewal contract
 
 Integrate separately on a fresh descendant of the accepted Native release lineage after Claude's Build 69 work is frozen.
 
-- Replace the string-only Keychain item with one versioned Codable envelope containing refresh credential plus optional pending attempt ID. One `SecItemUpdate` is the atomic commit boundary.
-- Before sending refresh, persist a new pending attempt ID. On transport interruption, cancellation, decoding failure, process death, or Keychain write failure, retain A + the same attempt ID. Never invent a new attempt for the same A.
-- After a valid response, atomically replace the envelope with B and clear pending state, then publish access token/device ID in memory.
+- Create/register the per-installation signing key independently of Face ID. Its unattended proof operation must not prompt on every refresh; physical-device tests must establish the correct Secure Enclave/Keychain accessibility policy.
+- Replace the string-only Keychain item with one versioned Codable envelope containing A plus optional pending `{intentId, proposedSuccessor: B}`. One `SecItemUpdate` is the atomic commit boundary.
+- Before sending refresh, atomically precommit A/intent/B. On interruption, cancellation, decode failure, process death, or Keychain promotion failure, retain the exact pending state. Never invent a new intent or B for A.
+- Sign each first presentation or retry with a fresh Server nonce and proof ID over the exact request. A retry reuses intent/B but never reuses a consumed proof.
+- After a valid response, atomically promote B and clear pending state before exposing its access token/device ID to any caller.
 - Wrap foreground refresh with `UIApplication.beginBackgroundTask` and end it only after Keychain commit. Treat expiration as cancellation and leave pending state. This reduces suspensions but is not relied on for correctness.
 - Keep `WhenUnlockedThisDeviceOnly`. If protected data is unavailable after reboot/lock, show “Unlock iPhone to reconnect securely” and retry after protected data becomes available. Do not weaken storage to make background refresh easier.
 - Delete the Keychain session only for terminal Server states (confirmed revoke, expired absolute session, explicit disconnect), not network failures, task cancellation, invalid response, or local Keychain failure.
-- Unit-test suspension after Server acceptance, Keychain write failure, relaunch with pending attempt, repeated identical response, concurrent reads, and terminal revocation. Assert request/body/debug descriptions never contain credentials or attempt IDs.
+- Unit-test suspension after Server acceptance, Keychain failure, relaunch with pending intent, captured-request replay, nonce/proof replay, access-use recovery denial, concurrent reads, and terminal revocation. Assert request/body/debug descriptions never contain credentials, intent IDs, B commitments, proofs, or nonces.
 
 ## Face ID / local device authentication
 
@@ -103,7 +108,7 @@ Recommended UX:
 - No-biometric devices use device passcode. Devices without any configured device authentication should clearly explain that local app lock is unavailable; Server pairing remains valid.
 - Re-pairing is reserved for terminal Server recovery, not local-auth cancellation.
 
-A later hardening phase may register a Secure Enclave public key at pairing and require signed refresh proofs. That key must allow background cryptographic use without a Face ID prompt; app-unlock Face ID remains a separate UI policy. Attestation can strengthen initial key registration but is not currently present and should not be improvised into this incident fix.
+The installation signing key is mandatory for safe refresh recovery, but it is not Face ID and must not require a biometric prompt for routine unattended renewal. App-unlock Face ID remains a separate UI policy. Attestation may strengthen initial key registration, but it is not currently present and must not be treated as a substitute for proof validation.
 
 ## Recovery UX state machine
 
@@ -118,16 +123,16 @@ Native should expose distinct states:
 
 ## HealthKit identity recommendation
 
-Do not change HealthKit identity in this workstream. The current coupling to `principal.deviceId` is real and undesirable for a persistent physical-phone delivery stream, but changing it affects observation identity, daily revision recovery, deduplication, and canonical history.
+Do not change HealthKit identity in this workstream. Server stamping of authenticated `principal.deviceId` is a sound authorization boundary; the continuity problem is that routine re-pairing creates a new device row for the same installation.
 
-Follow up with a separate migration that registers a stable HealthKit delivery-source ID to the Founder and physical installation (ideally derived from a device-bound public-key fingerprint), survives session replacement/re-pair, and can be revoked independently. Preserve the existing local Keychain cursor identity. Provide migration/alias rules so historical and new delivery IDs do not split the same phone's stream.
+Follow up with a key-proven reauthorization path that reuses the existing active device record for the same installation while replacement-device pairing still creates a new device. HealthKit can then retain authenticated `deviceId` without splitting a phone's delivery stream. Test key loss, reinstall, restored backup, revoked/lost device, duplicate keys, and a legitimate second iPhone.
 
 ## Verification and release gates
 
-Before enabling exact retries:
+Before enabling sender-constrained recovery:
 
 1. Run deterministic service tests for every threat-model row, including real concurrent database transactions.
 2. Run Native tests for Keychain failures, process relaunch, background-task expiry, LocalAuthentication success/failure/cancel/passcode/no-biometric/biometric-change, UX routing, and log redaction.
-3. Run an integration fault injector that drops the first successful refresh response after Server commit, relaunches Native, and proves the same successor is recovered without session revocation.
+3. Run an integration fault injector that drops the first successful refresh response after Server commit, relaunches Native, and proves the precommitted successor is recovered under a fresh device proof without session revocation.
 4. Obtain a fresh security review of exact deployed candidates and migration SQL.
 5. Deploy Server compatibility first, release Native second, enable the gated behavior last. No deploy or TestFlight action is authorized by this report.
