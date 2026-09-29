@@ -1032,22 +1032,101 @@ struct TrainingLoggerView: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
             WorkoutCompleteConfirmation()
-            if let achievements = viewModel.draft?.performanceAchievementLines, !achievements.isEmpty {
-                CardContainer(background: PhysiqueOSTheme.chartSuccess.opacity(0.12)) {
-                    VStack(alignment: .center, spacing: 10) {
-                        Label("Better performance", systemImage: "trophy.fill")
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading20).foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                        ForEach(achievements, id: \.self) {
-                            Text($0)
-                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
+            if !viewModel.completedPerformanceRecords.isEmpty {
+                NewPerformanceRecordsCard(
+                    records: viewModel.completedPerformanceRecords,
+                    celebrationKey: viewModel.draft.map { "physiqueos.workoutComplete.celebrated.\($0.id)" }
+                )
             }
             PrimaryActionButton(title: "Return to Log") { dismiss() }
+        }
+    }
+
+    /// The canonical records this session established, exactly as the Server
+    /// reported them, with a small one-time celebration. Absent entirely when
+    /// there is no new record.
+    private struct NewPerformanceRecordsCard: View {
+        let records: [TrainingPerformanceRecord]
+        /// Per-session key: the confetti plays on the first presentation only.
+        let celebrationKey: String?
+        static let visibleLimit = 3
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @State private var celebrate = false
+
+        var body: some View {
+            let presentation = NewPerformanceRecordsPresentation(records: records, visibleLimit: Self.visibleLimit)
+            CardContainer(background: PhysiqueOSTheme.chartSuccess.opacity(0.12)) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("New performance records", systemImage: "trophy.fill")
+                        .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                        .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                    ForEach(presentation.visible) { record in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(record.canonicalExerciseName)
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            Text("\(record.title) · \(record.value)")
+                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            if let detail = record.detail {
+                                Text(detail)
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                    if let more = presentation.moreLabel {
+                        Text(more)
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .overlay(alignment: .top) {
+                if celebrate { ConfettiBurst().allowsHitTesting(false).accessibilityHidden(true) }
+            }
+            .onAppear {
+                guard WorkoutCelebrationGate.claim(key: celebrationKey, reduceMotion: reduceMotion) else { return }
+                celebrate = true
+            }
+        }
+    }
+
+    /// A short, self-contained confetti pop (about 1.4 s), then gone.
+    private struct ConfettiBurst: View {
+        private struct Piece: Identifiable {
+            let id: Int
+            let dx: CGFloat, dy: CGFloat, spin: Double, color: Color, size: CGFloat
+        }
+        @State private var launched = false
+        private let pieces: [Piece] = (0..<28).map { index in
+            let colors: [Color] = [PhysiqueOSTheme.chartSuccess, PhysiqueOSTheme.accent, PhysiqueOSTheme.chartEvidence, PhysiqueOSTheme.chartEffort]
+            let angle = Double(index) / 28 * 2 * .pi
+            return Piece(id: index,
+                         dx: CGFloat(cos(angle)) * CGFloat(70 + (index * 37) % 90),
+                         dy: CGFloat(sin(angle)) * CGFloat(40 + (index * 53) % 70) + 90,
+                         spin: Double((index * 97) % 360),
+                         color: colors[index % colors.count],
+                         size: CGFloat(5 + index % 4))
+        }
+
+        var body: some View {
+            ZStack {
+                ForEach(pieces) { piece in
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(piece.color)
+                        .frame(width: piece.size, height: piece.size * 1.8)
+                        .rotationEffect(.degrees(launched ? piece.spin : 0))
+                        .offset(x: launched ? piece.dx : 0, y: launched ? piece.dy : 0)
+                        .opacity(launched ? 0 : 1)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .onAppear {
+                withAnimation(.easeOut(duration: 1.4)) { launched = true }
+            }
         }
     }
 
