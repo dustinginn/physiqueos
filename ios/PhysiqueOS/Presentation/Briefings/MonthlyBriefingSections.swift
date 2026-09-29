@@ -256,7 +256,7 @@ struct MonthlyBriefingSections: View {
                     .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 if let interpretation = newBaseline.interpretation {
-                    callout(title: "Baseline Read", text: interpretation, color: PhysiqueOSTheme.chartEvidence)
+                    callout(title: "What it means", text: interpretation, color: PhysiqueOSTheme.chartEvidence)
                 }
             }
         }
@@ -498,14 +498,7 @@ struct MonthlyBriefingSections: View {
     }
 
     private func changeIcon(for domain: String) -> String {
-        switch domain {
-        case "training": "dumbbell.fill"
-        case "calories": "bolt.fill"
-        case "weight": "scalemass.fill"
-        case "photos": "camera.fill"
-        case "dexa": "scope"
-        default: "sparkles"
-        }
+        ProductionBriefingMapper.monthlyIcon(domain)
     }
 
     private func monthlySpotlight(icon: String, label: String, value: String, color: Color) -> some View {

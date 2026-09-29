@@ -1829,6 +1829,54 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(trainingRow.destination, .trainingDay(date: "2026-09-26"), "Multiple sessions link to the day, never one arbitrarily chosen session.")
     }
 
+    /// Sep 28: the Server composes Strength and today's canonical Cardio into
+    /// one Training row, one line per modality. Native renders those lines
+    /// verbatim and never re-derives Cardio from Training Day.
+    func testProductionLoggedTodayRendersServerStrengthAndCardioLines() async throws {
+        let lines = #"[{"id":"training:logger","kind":"logger","summary":"Strength Training · 50 min · Apple Health","href":"/progress/training/session/s","recordId":"s"},{"id":"training:cardio:outdoor-walk","kind":"cardio","summary":"2 Outdoor Walks · 32 min","href":"/progress/training","recordId":null},42,{"id":"broken"}]"#
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-28","loggedToday":{"rows":[{"id":"training","summary":"Strength Training · 50 min · Apple Health, 2 Outdoor Walks · 32 min","context":null,"recordId":null,"lines":\#(lines)},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"171 active calories so far","context":"Apple Health","recordId":"activity_day|2026-09-28"}]},"pendingEvidenceReviews":[]}"#),
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+
+        let trainingRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
+        // Malformed elements (a number, a line without a summary) are dropped, never fatal.
+        XCTAssertEqual(trainingRow.displayLines.map(\.summary), ["Strength Training · 50 min · Apple Health", "2 Outdoor Walks · 32 min"])
+        XCTAssertEqual(trainingRow.summary, "Strength Training · 50 min · Apple Health, 2 Outdoor Walks · 32 min")
+        XCTAssertEqual(trainingRow.destination, .trainingDay(date: "2026-09-28"))
+        let activityRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .activity })
+        XCTAssertEqual(activityRow.summary, "171 active calories so far")
+    }
+
+    /// A Server-composed Cardio-only row is authoritative: the older local
+    /// Training Day fallback does not run (no `training-day` read is routed here).
+    func testProductionLoggedTodayServerCardioOnlyLinesNeedNoLocalFallback() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-26","loggedToday":{"rows":[{"id":"training","summary":"Outdoor Walk · 17 min","context":"Apple Health","recordId":null,"lines":[{"id":"training:cardio:outdoor-walk","kind":"cardio","summary":"Outdoor Walk · 17 min","recordId":null}]},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[]}"#),
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+
+        let trainingRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
+        XCTAssertEqual(trainingRow.summary, "Outdoor Walk · 17 min")
+        XCTAssertEqual(trainingRow.context, "Apple Health")
+        XCTAssertTrue(trainingRow.displayLines.isEmpty, "A single line renders as the ordinary summary.")
+        XCTAssertEqual(trainingRow.destination, .trainingDay(date: "2026-09-26"))
+    }
+
     /// `.other` (TrainingSessionKind's fourth case, e.g. a typed session with
     /// no matching activity-type keyword) is a distinct, non-Strength,
     /// non-Cardio classification -- calling it "Cardio" would be a factually

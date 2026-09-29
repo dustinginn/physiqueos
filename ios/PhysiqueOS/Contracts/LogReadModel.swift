@@ -65,8 +65,27 @@ struct LoggedTodayRow: Codable, Equatable, Identifiable {
     var context: String?
     var destination: AppDestination?
     var processing: Bool? = nil
+    /// Server-composed lines for a row that summarizes more than one thing
+    /// (Training: Strength and today's Cardio, one line per modality).
+    /// `summary` stays the single-line fallback and accessibility text.
+    var lines: [LoggedTodayLine]? = nil
 
     var id: String { kind.rawValue }
+
+    /// The lines to show when the row summarizes several things; empty when
+    /// the single `summary` line already says everything.
+    var displayLines: [LoggedTodayLine] {
+        guard let lines, lines.count > 1 else { return [] }
+        return lines
+    }
+}
+
+/// One server-composed line of a Logged Today row (e.g. "Strength Training ·
+/// 50 min", "2 Outdoor Walks · 32 min"). Native renders it verbatim.
+struct LoggedTodayLine: Codable, Equatable, Hashable, Identifiable {
+    var id: String
+    var kind: String
+    var summary: String
 }
 
 struct ProcessingEvidenceReview: Codable, Equatable, Identifiable {

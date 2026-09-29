@@ -952,14 +952,19 @@ enum ProductionBriefingMapper {
         energy?["summaryMetrics"]?.array.first(where: { $0["label"]?.string == label })?["value"]?.int
     }
 
-    private static func monthlyIcon(_ value: String?) -> String {
+    /// The one Monthly tone -> icon mapping (moments, Month Ahead, highlights and
+    /// What Changed). `calories`/`dexa` are the legacy fixture names for
+    /// `energy`/`baseline`.
+    static func monthlyIcon(_ value: String?) -> String {
         switch value {
         case "training": "dumbbell.fill"
-        case "energy": "bolt.fill"
+        case "energy", "calories": "bolt.fill"
         case "weight": "scalemass.fill"
         case "photos": "camera.fill"
-        case "baseline": "scope"
+        case "baseline", "dexa": "scope"
         case "completion": "trophy.fill"
+        case "routine": "calendar.badge.checkmark"
+        case "recovery": "bed.double.fill"
         default: "sparkles"
         }
     }

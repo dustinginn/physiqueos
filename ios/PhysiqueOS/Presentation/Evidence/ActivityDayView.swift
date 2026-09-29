@@ -113,9 +113,9 @@ struct ActivityDayView: View {
                 SectionHeading("Activity Metrics")
                 ActivityMetricGridView(day: day)
                 if let warning = day.energyAnomalyMessage {
-                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    Label(warning, systemImage: day.energyAnomalyIsProvisional ? "clock.arrow.circlepath" : "exclamationmark.triangle.fill")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                        .foregroundStyle(day.energyAnomalyIsProvisional ? PhysiqueOSTheme.textSecondary : PhysiqueOSTheme.chartEffort)
                 }
             }
         }

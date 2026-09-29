@@ -756,4 +756,32 @@ final class BriefingV3PresentationTests: XCTestCase {
             "goals": [["id": "goal-canonical", "title": "Build Lean Mass"]]
         ])
     }
+
+    // MARK: Monthly cleanup (approved Monthly, no redesign)
+
+    func testMonthlyToneIconsCoverEveryServerToneWithoutGenericFallback() {
+        // Tones the server emits for What Changed, Defining Moments, highlights and Month Ahead.
+        let expected: [String: String] = [
+            "training": "dumbbell.fill", "energy": "bolt.fill", "weight": "scalemass.fill",
+            "photos": "camera.fill", "baseline": "scope", "completion": "trophy.fill",
+            "routine": "calendar.badge.checkmark", "recovery": "bed.double.fill",
+        ]
+        for (tone, icon) in expected {
+            XCTAssertEqual(ProductionBriefingMapper.monthlyIcon(tone), icon, tone)
+        }
+        // Legacy fixture names still resolve to the same icons.
+        XCTAssertEqual(ProductionBriefingMapper.monthlyIcon("calories"), "bolt.fill")
+        XCTAssertEqual(ProductionBriefingMapper.monthlyIcon("dexa"), "scope")
+        // Unknown tones keep the neutral fallback.
+        XCTAssertEqual(ProductionBriefingMapper.monthlyIcon("action-3"), "sparkles")
+        XCTAssertEqual(ProductionBriefingMapper.monthlyIcon(nil), "sparkles")
+    }
+
+    func testMonthlyWhatChangedUsesTheSharedToneMappingAndNoAnalyticalReadLabel() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Briefings/MonthlyBriefingSections.swift"), encoding: .utf8)
+        XCTAssertTrue(source.contains("ProductionBriefingMapper.monthlyIcon(domain)"))
+        XCTAssertFalse(source.contains("Baseline Read"))
+        XCTAssertTrue(source.contains("callout(title: \"What it means\""))
+    }
 }

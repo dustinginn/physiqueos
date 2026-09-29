@@ -172,6 +172,11 @@ struct ActivityDayRecord: Codable, Equatable, Identifiable {
     var workoutActiveCalories: Double?
     var nonWorkoutActiveCalories: Double?
     var linkedTrainingSessionCount: Int
+    /// Apple Health coverage of this day's summary: `"partial_day"` while the
+    /// day is still in progress (its totals are "so far"), `"complete_day"`
+    /// once final. A String so a new Server value never fails decoding.
+    var coverage: String? = nil
+    var isPartialDay: Bool? = nil
     /// Explicit non-additive attribution from confirmed HealthKit workout
     /// relationships. Optional for pre-integration Server payloads.
     var workoutEnergyAttribution: ActivityWorkoutEnergyAttribution? = nil
@@ -208,6 +213,9 @@ struct ActivityEnergyAnomaly: Codable, Equatable {
     var code: String
     var dailyActiveCalories: Double
     var workoutActiveCalories: Double
+    /// True when the daily total is still "so far" (a partial Apple Health
+    /// day): the gap is expected to close, not a conflict in the data.
+    var provisional: Bool? = nil
 }
 
 /// `daily_activity.ring_completion` — move/exercise/stand completion
@@ -236,9 +244,22 @@ struct ActivityMetricTile: Identifiable, Equatable {
 }
 
 extension ActivityDayRecord {
+    /// The day's totals are still accumulating in Apple Health.
+    var isInProgress: Bool {
+        coverage == "partial_day" || (coverage == nil && isPartialDay == true)
+    }
+
+    /// The workout-exceeds-daily gap is against a total still "so far".
+    var energyAnomalyIsProvisional: Bool {
+        energyAnomaly?.provisional == true || isInProgress
+    }
+
     var energyAnomalyMessage: String? {
         guard energyAnomaly?.code == "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY",
               let anomaly = energyAnomaly else { return nil }
+        if energyAnomalyIsProvisional {
+            return "Apple Health is still updating today's total. Workout energy (\(Self.formatNumber(anomaly.workoutActiveCalories)) cal) is above the active total so far (\(Self.formatNumber(anomaly.dailyActiveCalories)) cal); non-workout calories show 0 until it catches up."
+        }
         return "Workout energy (\(Self.formatNumber(anomaly.workoutActiveCalories)) cal) exceeds the recorded daily active total (\(Self.formatNumber(anomaly.dailyActiveCalories)) cal). Non-workout calories are shown as 0."
     }
     /// Mirrors `formatOptionalCalories`/`formatOptionalMinutes`/

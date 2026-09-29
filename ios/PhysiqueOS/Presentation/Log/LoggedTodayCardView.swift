@@ -40,9 +40,17 @@ private struct LoggedTodayRowView: View {
                 Text(row.kind.label)
                     .physiqueOSFont(PhysiqueOSTypography.rowEyebrow)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                Text(row.summary)
-                    .physiqueOSFont(PhysiqueOSTypography.rowSummary)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                if row.displayLines.isEmpty {
+                    Text(row.summary)
+                        .physiqueOSFont(PhysiqueOSTypography.rowSummary)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                } else {
+                    ForEach(row.displayLines) { line in
+                        Text(line.summary)
+                            .physiqueOSFont(PhysiqueOSTypography.rowSummary)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    }
+                }
                 if let context = row.context {
                     Text(context)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)

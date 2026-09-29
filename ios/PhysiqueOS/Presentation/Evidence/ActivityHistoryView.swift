@@ -159,6 +159,11 @@ struct ActivityHistoryView: View {
                                     Text(day.detail)
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    if day.isInProgress {
+                                        Text("Still updating from Apple Health")
+                                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    }
                                 }
                                 Spacer(minLength: 8)
                                 Image(systemName: "chevron.right")
@@ -167,9 +172,9 @@ struct ActivityHistoryView: View {
                             }
                             ActivityMetricGridView(day: day)
                             if let warning = day.energyAnomalyMessage {
-                                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                                Label(warning, systemImage: day.energyAnomalyIsProvisional ? "clock.arrow.circlepath" : "exclamationmark.triangle.fill")
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                                    .foregroundStyle(day.energyAnomalyIsProvisional ? PhysiqueOSTheme.textSecondary : PhysiqueOSTheme.chartEffort)
                             }
                         }
                         .padding(12)

@@ -187,6 +187,41 @@ final class ActivityReadModelTests: XCTestCase {
         )
     }
 
+    /// Sep 28: a partial Apple Health day is "so far"; its workout-over-total
+    /// gap is provisional, not a data conflict. Complete days are unchanged.
+    func testPartialDayIsInProgressAndItsEnergyGapIsProvisional() throws {
+        func day(coverage: String?, provisional: Bool?) throws -> ActivityDayRecord {
+            let coverageJSON = coverage.map { "\"\($0)\"" } ?? "null"
+            let provisionalJSON = provisional.map { $0 ? "true" : "false" } ?? "null"
+            let json = Data("""
+            {"id":"sep28","label":"Daily Activity","value":"171 active cal / 26 min so far","detail":"3 workouts linked · 0 non-workout active cal","date":"2026-09-28","isToday":true,
+             "activeCalories":171,"totalCalories":null,"exerciseMinutes":26,"standHours":2,"moveGoal":null,"exerciseGoal":null,"standGoal":null,"ringCompletion":null,
+             "workoutActiveCalories":567,"nonWorkoutActiveCalories":0,"linkedTrainingSessionCount":3,"coverage":\(coverageJSON),
+             "energyAnomaly":{"code":"WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY","dailyActiveCalories":171,"workoutActiveCalories":567,"provisional":\(provisionalJSON)},
+             "protocolStatus":"Activity context available."}
+            """.utf8)
+            return try JSONDecoder().decode(ActivityDayRecord.self, from: json)
+        }
+        let partial = try day(coverage: "partial_day", provisional: true)
+        XCTAssertTrue(partial.isInProgress)
+        XCTAssertTrue(partial.energyAnomalyIsProvisional)
+        XCTAssertEqual(partial.energyAnomalyMessage,
+            "Apple Health is still updating today's total. Workout energy (567 cal) is above the active total so far (171 cal); non-workout calories show 0 until it catches up.")
+        XCTAssertEqual(partial.metricTiles.first { $0.label == "Linked Workouts" }?.value, "3")
+
+        let complete = try day(coverage: "complete_day", provisional: false)
+        XCTAssertFalse(complete.isInProgress)
+        XCTAssertFalse(complete.energyAnomalyIsProvisional)
+        XCTAssertTrue(complete.energyAnomalyMessage?.hasPrefix("Workout energy (567 cal) exceeds") == true)
+
+        // An older Server (no coverage, no provisional flag) keeps today's exact wording.
+        let legacy = try day(coverage: nil, provisional: nil)
+        XCTAssertFalse(legacy.isInProgress)
+        XCTAssertTrue(legacy.energyAnomalyMessage?.hasPrefix("Workout energy (567 cal) exceeds") == true)
+        // An unknown future coverage value decodes and is not treated as partial.
+        XCTAssertFalse(try day(coverage: "some_new_value", provisional: nil).isInProgress)
+    }
+
     // MARK: - Server-owned intelligence remains presentation data, never recomputed
 
     /// `protocolStatus` must decode as an opaque, already-formatted server

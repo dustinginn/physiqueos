@@ -840,7 +840,8 @@ struct ProductionLogAPI: LogAPI {
                 summary: row.summary,
                 context: row.context,
                 destination: Self.destination(for: row, localDate: payload.localDate),
-                processing: row.processing
+                processing: row.processing,
+                lines: row.lines?.values
             )
         }
         rows.append(Self.weightRow(weightPayload, localDate: payload.localDate))
@@ -862,7 +863,11 @@ struct ProductionLogAPI: LogAPI {
         // server-reported Training row is genuinely empty (no recordId --
         // i.e. no Logger Strength session exists), so a real Strength day,
         // including one that also has Cardio, is never touched.
+        // A Server that composes the Training row's lines itself (Strength and
+        // canonical Cardio together) is authoritative; this local fallback only
+        // serves an older Server that sends no lines.
         if let trainingIndex = rows.firstIndex(where: { $0.kind == .training }),
+           payload.loggedToday.rows.first(where: { $0.id == .training })?.lines == nil,
            payload.loggedToday.rows.first(where: { $0.id == .training })?.recordId == nil,
            let trainingDay = try? await ProductionTrainingAPI(api: api).fetchTrainingDay(date: payload.localDate),
            trainingDay.summary.strengthSessions == 0 {
@@ -947,6 +952,7 @@ struct ProductionLogAPI: LogAPI {
         rows[index].summary = "\(kind.label) processing"
         rows[index].context = "Confirmation accepted · No action required"
         rows[index].processing = true
+        rows[index].lines = nil
     }
 
     /// `recordId` is the real canonical record the row is about — Training
@@ -956,6 +962,11 @@ struct ProductionLogAPI: LogAPI {
     /// server's own computed "today", never a Native-derived date). A row
     /// with no `recordId` (nothing logged) has no destination.
     private static func destination(for row: RowPayload, localDate: String) -> AppDestination? {
+        // A Training row summarizing several workouts (Strength with Cardio,
+        // or Cardio alone) has no single record: it opens today's Training Day.
+        if row.id == .training, row.recordId == nil, !(row.lines?.values.isEmpty ?? true) {
+            return .trainingDay(date: localDate)
+        }
         guard let recordId = row.recordId else { return nil }
         switch row.id {
         case .training: return .trainingSession(sessionId: recordId)
@@ -1004,6 +1015,27 @@ struct ProductionLogAPI: LogAPI {
         var context: String?
         var recordId: String?
         var processing: Bool?
+        var lines: LossyLines?
+    }
+
+    /// Decodes each line independently so one malformed line never fails the
+    /// whole Log read; a line without a summary is dropped.
+    struct LossyLines: Decodable {
+        var values: [LoggedTodayLine]
+
+        init(from decoder: Decoder) throws {
+            let elements = (try? decoder.singleValueContainer().decode([BriefingJSONValue].self)) ?? []
+            var values: [LoggedTodayLine] = []
+            for element in elements {
+                guard let summary = element["summary"]?.string, !summary.isEmpty else { continue }
+                values.append(LoggedTodayLine(
+                    id: element["id"]?.string ?? "line-\(values.count)",
+                    kind: element["kind"]?.string ?? "",
+                    summary: summary
+                ))
+            }
+            self.values = values
+        }
     }
 
     private struct ReviewPayload: Decodable {
