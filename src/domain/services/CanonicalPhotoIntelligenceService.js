@@ -319,6 +319,9 @@ function normalizeRegions(values = []) {
   return (Array.isArray(values) ? values : []).map((value) => ({
     region: String(value.region ?? "photo_evidence"),
     metric: String(value.metric ?? "unknown"),
+    ...(value.underlyingConclusion ? {
+      underlyingConclusion: String(value.underlyingConclusion),
+    } : {}),
     direction: String(value.direction ?? "unknown").toLowerCase(),
     apparentMagnitude: normalizeMagnitude(
       value.apparentMagnitude ?? value.apparent_magnitude

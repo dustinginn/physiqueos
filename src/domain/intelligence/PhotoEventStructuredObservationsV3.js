@@ -9,27 +9,38 @@ export const PHOTO_EVENT_STRUCTURED_OBSERVATIONS_VERSION = "photo_event_structur
 
 export function derivePhotoStructuredObservationsV3(narrative = {}) {
   const canonical = narrative.photoIntelligence;
-  if (canonical?.schemaVersion === "canonical_photo_intelligence_v1") {
+  if (["canonical_photo_intelligence_v1", "canonical_photo_intelligence_set_v1"]
+    .includes(canonical?.schemaVersion)) {
     const comparable = !["insufficient", "unknown"].includes(
       String(canonical.comparability?.overall ?? "unknown").toLowerCase()
     );
     return {
       schemaVersion: PHOTO_EVENT_STRUCTURED_OBSERVATIONS_VERSION,
-      producerSource: "canonical_photo_intelligence",
-      structured_observations: (canonical.observations ?? []).map((item) => ({
-        metric: item.metric,
-        region: item.region,
-        direction: item.direction,
-        magnitude: item.apparentMagnitude,
-        comparability: comparable ? "comparable" : "not_comparable",
-        comparable,
-        factualSummary: item.observation,
-        confidence: item.confidence,
-        limitations: [...(item.confounders ?? [])],
-      })),
+      producerSource: canonical.schemaVersion === "canonical_photo_intelligence_set_v1"
+        ? "canonical_photo_intelligence_set" : "canonical_photo_intelligence",
+      structured_observations: (canonical.observations ?? []).map((item) => {
+        const observationComparability = comparabilityForObservation(canonical, item);
+        return {
+          metric: item.metric,
+          region: item.region,
+          direction: item.direction,
+          magnitude: item.apparentMagnitude,
+          comparability: observationComparability.comparable
+            ? "comparable" : "not_comparable",
+          comparable: observationComparability.comparable,
+          comparabilityRatings: observationComparability.ratings,
+          factualSummary: item.observation,
+          confidence: item.confidence,
+          limitations: [...(item.confounders ?? [])],
+          supportingViewIds: [...(item.supportingViewIds ?? [])],
+          sourceObservationRefs: [...(item.sourceObservationRefs ?? [])],
+        };
+      }),
       comparison_metadata: {
         comparable,
-        poseCount: canonical.captureAssessment?.views?.length ?? 0,
+        poseCount: canonical.viewComparisons?.filter((item) =>
+          item.matchStatus === "like_for_like").length ??
+          canonical.captureAssessment?.views?.length ?? 0,
         interval_days: canonical.comparison?.daysElapsed ?? null,
         window: {
           startDate: canonical.comparison?.baselineDate ?? null,
@@ -68,6 +79,43 @@ export function derivePhotoStructuredObservationsV3(narrative = {}) {
     comparison_metadata: { comparable, poseCount: structured.length },
     limitations: [...(narrative.conditionLimitations ?? [])].filter((item) => typeof item === "string"),
   };
+}
+
+function comparabilityForObservation(canonical, observation) {
+  const globalRating = String(
+    canonical.comparability?.overall ?? "unknown"
+  ).toLowerCase();
+  if (canonical.schemaVersion !== "canonical_photo_intelligence_set_v1") {
+    return {
+      comparable: isComparableRating(globalRating),
+      ratings: [{ scope: "comparison", rating: globalRating }],
+    };
+  }
+  const supportingViewIds = new Set(observation.supportingViewIds ?? []);
+  const ratings = (canonical.viewComparisons ?? [])
+    .filter((view) => supportingViewIds.has(view.id))
+    .map((view) => ({
+      viewComparisonId: view.id,
+      rating: String(
+        view.comparability?.overall ??
+        view.photoIntelligence?.comparability?.overall ??
+        "unknown"
+      ).toLowerCase(),
+    }));
+  if (!ratings.length) {
+    return {
+      comparable: isComparableRating(globalRating),
+      ratings: [{ scope: "set", rating: globalRating }],
+    };
+  }
+  return {
+    comparable: ratings.every((item) => isComparableRating(item.rating)),
+    ratings,
+  };
+}
+
+function isComparableRating(rating) {
+  return !["insufficient", "unknown"].includes(rating);
 }
 
 // The interpretation handed to the V3 photo adapter: the stored narrative plus

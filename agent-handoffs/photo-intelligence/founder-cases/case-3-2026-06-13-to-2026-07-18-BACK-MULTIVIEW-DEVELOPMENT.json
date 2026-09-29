@@ -1,0 +1,921 @@
+{
+  "schemaVersion": "canonical_photo_intelligence_set_v1",
+  "resultLabel": "MULTI-VIEW ARCHITECTURE/CALIBRATION CASE — HUMAN REFERENCE PRE-FROZEN",
+  "comparison": {
+    "caseId": "founder_back_pose_case_3",
+    "baselineSetId": "founder_photo_set_2026-06-13",
+    "comparisonSetId": "founder_photo_set_2026-07-18",
+    "baselineDate": "2026-06-13",
+    "baselineDates": [
+      "2026-06-13"
+    ],
+    "comparisonDate": "2026-07-18",
+    "daysElapsed": 35,
+    "goalContext": {
+      "name": "Visible Abs",
+      "source": "runtime_context_supplied_with_case",
+      "usedFor": [
+        "regional_relevance",
+        "goal_relative_interpretation",
+        "user_facing_narrative"
+      ],
+      "notUsedFor": [
+        "altering_visual_observations",
+        "increasing_visual_confidence",
+        "inferring_non_photo_evidence"
+      ]
+    }
+  },
+  "sets": {
+    "baseline": {
+      "id": "founder_photo_set_2026-06-13",
+      "date": "2026-06-13",
+      "dates": [
+        "2026-06-13"
+      ],
+      "sourceSetIds": [
+        "founder_photo_set_2026-06-13"
+      ],
+      "identityStatus": "canonical",
+      "cadenceContext": null
+    },
+    "comparison": {
+      "id": "founder_photo_set_2026-07-18",
+      "date": "2026-07-18",
+      "dates": [
+        "2026-07-18"
+      ],
+      "sourceSetIds": [
+        "founder_photo_set_2026-07-18"
+      ],
+      "identityStatus": "canonical",
+      "cadenceContext": null
+    }
+  },
+  "viewComparisons": [
+    {
+      "id": "back_informal_double_biceps",
+      "view": "back",
+      "pose": "informal-back-double-biceps",
+      "matchStatus": "like_for_like",
+      "baselineImage": {
+        "sourceId": "sha256:13ef0080b14f20c7620b0e4665228aa9728a41e30017bdf39a3d2171793bf9b5",
+        "setId": "founder_photo_set_2026-06-13",
+        "date": "2026-06-13",
+        "view": "back",
+        "pose": "informal-back-double-biceps",
+        "visibleRegions": [
+          "upper_back",
+          "mid_back",
+          "lats",
+          "rear_delts",
+          "upper_arms_triceps",
+          "lower_back",
+          "waist_flanks"
+        ],
+        "mimeType": "image/jpeg",
+        "pixelWidth": 2880,
+        "pixelHeight": 3840,
+        "provenance": "Founder-supplied exact attachment; inspected in place; bytes not copied into the repository"
+      },
+      "comparisonImage": {
+        "sourceId": "sha256:04e79be2b1a93e02e7c002bcbe641568685b6d9ef37199374d807c883defe323",
+        "setId": "founder_photo_set_2026-07-18",
+        "date": "2026-07-18",
+        "view": "back",
+        "pose": "informal-back-double-biceps",
+        "visibleRegions": [
+          "upper_back",
+          "mid_back",
+          "lats",
+          "rear_delts",
+          "upper_arms_triceps",
+          "lower_back",
+          "waist_flanks"
+        ],
+        "mimeType": "image/jpeg",
+        "pixelWidth": 2880,
+        "pixelHeight": 3840,
+        "provenance": "Founder-supplied exact attachment; inspected in place; bytes not copied into the repository"
+      },
+      "visibleRegions": [
+        "upper_back",
+        "mid_back",
+        "lats",
+        "rear_delts",
+        "upper_arms_triceps",
+        "lower_back",
+        "waist_flanks"
+      ],
+      "comparability": {
+        "overall": "moderate",
+        "usableFor": [
+          "overall back conditioning",
+          "lower-back and waist appearance",
+          "upper-back, rear-delt, arm, and lat definition",
+          "back-to-waist taper"
+        ],
+        "notReliableFor": [
+          "lat size or hypertrophy",
+          "small changes in back width",
+          "fine symmetry",
+          "front torso, abdominal, chest, glute, or leg change"
+        ],
+        "dimensions": {
+          "view": {
+            "rating": "good",
+            "reason": "Both photos are directly back-facing."
+          },
+          "pose": {
+            "rating": "moderate",
+            "reason": "Both are broadly double-arm flexed poses, but elbow height and scapular positioning differ materially."
+          },
+          "framingAndDistance": {
+            "rating": "moderate",
+            "reason": "The baseline is closer and more tightly framed; the comparison is farther away."
+          },
+          "cameraAngle": {
+            "rating": "moderate_to_good",
+            "reason": "Both are near torso height and rear-facing without a major rotational mismatch."
+          },
+          "lighting": {
+            "rating": "moderate",
+            "reason": "Both use the same general environment, but daylight strength and shadow direction differ."
+          },
+          "clothing": {
+            "rating": "high",
+            "reason": "The same shorts and a shirtless torso provide a consistent waist reference."
+          },
+          "flexingAndScapularPosition": {
+            "rating": "limited_to_moderate",
+            "reason": "Higher elbows and different scapular positioning can materially change lat width and upper-back presentation."
+          }
+        },
+        "regionalReliability": {
+          "overallBackConditioning": "high",
+          "lowerBackAndWaist": "moderate_to_high",
+          "upperBackDefinition": "moderate_to_high",
+          "rearDeltDefinition": "moderate",
+          "armAndTricepsDefinition": "moderate",
+          "latDefinition": "moderate",
+          "backToWaistTaper": "moderate_to_high",
+          "latSize": "low"
+        }
+      },
+      "observations": [
+        {
+          "region": "overall_back_conditioning",
+          "metric": "conditioning_and_shape",
+          "direction": "improved",
+          "apparentMagnitude": "moderate",
+          "confidence": "high",
+          "observation": "The comparison shows a visibly leaner, sharper back with broader muscular separation and a cleaner transition into the waist.",
+          "basis": [
+            "more distinct upper-back contours",
+            "less diffuse lower-back softness",
+            "multiple rear regions change in the same direction"
+          ],
+          "confounders": [
+            "different elbow height",
+            "different lighting",
+            "different camera distance"
+          ]
+        },
+        {
+          "region": "lower_back_and_waist",
+          "metric": "apparent_leanness",
+          "direction": "increased",
+          "apparentMagnitude": "pronounced",
+          "confidence": "moderate_to_high",
+          "observation": "The lower back and waist look substantially tighter, with less apparent flank and lower-back softness above the waistband.",
+          "basis": [
+            "narrower-looking lower-back contour",
+            "cleaner taper into the waistband",
+            "less diffuse softness at both flanks"
+          ],
+          "confounders": [
+            "camera distance differs",
+            "minor pelvic and torso-position differences"
+          ]
+        },
+        {
+          "region": "upper_back",
+          "metric": "definition",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "moderate_to_high",
+          "observation": "Upper-back musculature and the borders around the shoulder blades are considerably easier to distinguish in July.",
+          "basis": [
+            "clearer scapular borders",
+            "stronger separation across the upper back",
+            "less visually diffuse tissue between shoulder blades"
+          ],
+          "confounders": [
+            "scapular positioning differs",
+            "directional lighting changes shadow depth"
+          ]
+        },
+        {
+          "region": "rear_delts",
+          "metric": "definition",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "moderate",
+          "observation": "Rear-delt contours are clearer and separate more distinctly from the upper arms and upper back.",
+          "basis": [
+            "more distinct rear-shoulder borders",
+            "cleaner transition into the upper arm"
+          ],
+          "confounders": [
+            "higher elbow position",
+            "different shoulder rotation"
+          ]
+        },
+        {
+          "region": "upper_arms_and_triceps",
+          "metric": "definition",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "moderate",
+          "observation": "Upper-arm and triceps contours appear sharper, especially along the rear and lower arm borders.",
+          "basis": [
+            "clearer triceps outline",
+            "more distinct separation between rear delts and upper arms"
+          ],
+          "confounders": [
+            "arm angle differs",
+            "flexing intensity is unverified"
+          ]
+        },
+        {
+          "region": "lats",
+          "metric": "definition",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "moderate",
+          "observation": "Lat borders and the transition from the upper back toward the waist are more clearly defined in July.",
+          "basis": [
+            "cleaner lateral back contours",
+            "stronger visual separation above the waist"
+          ],
+          "confounders": [
+            "elbow height and scapular position materially alter lat presentation"
+          ]
+        },
+        {
+          "region": "back_to_waist_taper",
+          "metric": "proportion",
+          "direction": "improved",
+          "apparentMagnitude": "pronounced",
+          "confidence": "moderate_to_high",
+          "observation": "The shoulder- and back-to-waist taper is substantially stronger, driven mainly by the tighter waist and clearer back definition.",
+          "basis": [
+            "narrower-looking waist relative to the upper back",
+            "more distinct muscular borders across the back",
+            "cleaner lower-back contour"
+          ],
+          "confounders": [
+            "pose changes can alter apparent back width",
+            "camera distance differs"
+          ]
+        },
+        {
+          "region": "lat_size",
+          "metric": "muscularity",
+          "direction": "unknown",
+          "apparentMagnitude": "none",
+          "confidence": "low",
+          "observation": "The photos do not reliably distinguish lat growth from the effects of leanness, elbow height, and scapular positioning.",
+          "basis": [],
+          "confounders": [
+            "material pose mismatch",
+            "different flexing mechanics",
+            "different framing"
+          ]
+        }
+      ],
+      "confidence": {
+        "overallReliability": "moderate_to_high",
+        "rationale": "Confidence is high that a meaningful conditioning change occurred and moderate-to-high in the tighter lower-back/waist conclusion. Pose differences materially reduce confidence in lat-size or hypertrophy claims but do not explain the widespread definition change.",
+        "limitations": [
+          "Elbow height and scapular position differ materially.",
+          "Camera distance and framing differ.",
+          "Lighting direction and daylight strength differ.",
+          "Flexing intensity, pump, hydration, food intake, and time of day are unknown.",
+          "Only one back view is available at each date."
+        ]
+      },
+      "photoIntelligence": {
+        "schemaVersion": "canonical_photo_intelligence_v1",
+        "resultLabel": "MULTI-VIEW ARCHITECTURE/CALIBRATION CASE — HUMAN REFERENCE PRE-FROZEN",
+        "comparison": {
+          "caseId": "founder_back_pose_case_3:back:informal-back-double-biceps",
+          "baselineDate": "2026-06-13",
+          "comparisonDate": "2026-07-18",
+          "daysElapsed": 35,
+          "goalContext": {
+            "name": "Visible Abs",
+            "source": "runtime_context_supplied_with_case",
+            "usedFor": [
+              "regional_relevance",
+              "goal_relative_interpretation",
+              "user_facing_narrative"
+            ],
+            "notUsedFor": [
+              "altering_visual_observations",
+              "increasing_visual_confidence",
+              "inferring_non_photo_evidence"
+            ]
+          }
+        },
+        "source": {
+          "images": [
+            {
+              "sourceId": "sha256:13ef0080b14f20c7620b0e4665228aa9728a41e30017bdf39a3d2171793bf9b5",
+              "setId": "founder_photo_set_2026-06-13",
+              "date": "2026-06-13",
+              "view": "back",
+              "pose": "informal-back-double-biceps",
+              "visibleRegions": [
+                "upper_back",
+                "mid_back",
+                "lats",
+                "rear_delts",
+                "upper_arms_triceps",
+                "lower_back",
+                "waist_flanks"
+              ],
+              "mimeType": "image/jpeg",
+              "pixelWidth": 2880,
+              "pixelHeight": 3840,
+              "provenance": "Founder-supplied exact attachment; inspected in place; bytes not copied into the repository"
+            },
+            {
+              "sourceId": "sha256:04e79be2b1a93e02e7c002bcbe641568685b6d9ef37199374d807c883defe323",
+              "setId": "founder_photo_set_2026-07-18",
+              "date": "2026-07-18",
+              "view": "back",
+              "pose": "informal-back-double-biceps",
+              "visibleRegions": [
+                "upper_back",
+                "mid_back",
+                "lats",
+                "rear_delts",
+                "upper_arms_triceps",
+                "lower_back",
+                "waist_flanks"
+              ],
+              "mimeType": "image/jpeg",
+              "pixelWidth": 2880,
+              "pixelHeight": 3840,
+              "provenance": "Founder-supplied exact attachment; inspected in place; bytes not copied into the repository"
+            }
+          ]
+        },
+        "captureAssessment": {
+          "baseline": {
+            "view": "back",
+            "pose": "informal_back_double_biceps",
+            "bodyOrientation": "rear_facing",
+            "visibleRegions": [
+              "upper_back",
+              "mid_back",
+              "lats",
+              "rear_delts",
+              "upper_arms_triceps",
+              "lower_back",
+              "waist_flanks"
+            ],
+            "notReliablyVisible": [
+              "front_torso",
+              "abdomen",
+              "chest",
+              "legs",
+              "glutes"
+            ],
+            "captureNotes": [
+              "Elbows are farther outward and the upper arms are nearer horizontal.",
+              "Torso fills more of the frame.",
+              "Strong side and rear daylight creates uneven modeling across the back."
+            ]
+          },
+          "comparison": {
+            "view": "back",
+            "pose": "informal_back_double_biceps",
+            "bodyOrientation": "rear_facing",
+            "visibleRegions": [
+              "upper_back",
+              "mid_back",
+              "lats",
+              "rear_delts",
+              "upper_arms_triceps",
+              "lower_back",
+              "waist_flanks"
+            ],
+            "notReliablyVisible": [
+              "front_torso",
+              "abdomen",
+              "chest",
+              "legs",
+              "glutes"
+            ],
+            "captureNotes": [
+              "Elbows are higher and the forearms are more vertical.",
+              "Camera is farther away and includes more of the lower body.",
+              "Strong rear and side daylight changes local shadow contrast."
+            ]
+          }
+        },
+        "comparability": {
+          "overall": "moderate",
+          "usableFor": [
+            "overall back conditioning",
+            "lower-back and waist appearance",
+            "upper-back, rear-delt, arm, and lat definition",
+            "back-to-waist taper"
+          ],
+          "notReliableFor": [
+            "lat size or hypertrophy",
+            "small changes in back width",
+            "fine symmetry",
+            "front torso, abdominal, chest, glute, or leg change"
+          ],
+          "dimensions": {
+            "view": {
+              "rating": "good",
+              "reason": "Both photos are directly back-facing."
+            },
+            "pose": {
+              "rating": "moderate",
+              "reason": "Both are broadly double-arm flexed poses, but elbow height and scapular positioning differ materially."
+            },
+            "framingAndDistance": {
+              "rating": "moderate",
+              "reason": "The baseline is closer and more tightly framed; the comparison is farther away."
+            },
+            "cameraAngle": {
+              "rating": "moderate_to_good",
+              "reason": "Both are near torso height and rear-facing without a major rotational mismatch."
+            },
+            "lighting": {
+              "rating": "moderate",
+              "reason": "Both use the same general environment, but daylight strength and shadow direction differ."
+            },
+            "clothing": {
+              "rating": "high",
+              "reason": "The same shorts and a shirtless torso provide a consistent waist reference."
+            },
+            "flexingAndScapularPosition": {
+              "rating": "limited_to_moderate",
+              "reason": "Higher elbows and different scapular positioning can materially change lat width and upper-back presentation."
+            }
+          },
+          "regionalReliability": {
+            "overallBackConditioning": "high",
+            "lowerBackAndWaist": "moderate_to_high",
+            "upperBackDefinition": "moderate_to_high",
+            "rearDeltDefinition": "moderate",
+            "armAndTricepsDefinition": "moderate",
+            "latDefinition": "moderate",
+            "backToWaistTaper": "moderate_to_high",
+            "latSize": "low"
+          }
+        },
+        "observations": [
+          {
+            "region": "overall_back_conditioning",
+            "metric": "conditioning_and_shape",
+            "direction": "improved",
+            "apparentMagnitude": "moderate",
+            "confidence": "high",
+            "observation": "The comparison shows a visibly leaner, sharper back with broader muscular separation and a cleaner transition into the waist.",
+            "basis": [
+              "more distinct upper-back contours",
+              "less diffuse lower-back softness",
+              "multiple rear regions change in the same direction"
+            ],
+            "confounders": [
+              "different elbow height",
+              "different lighting",
+              "different camera distance"
+            ]
+          },
+          {
+            "region": "lower_back_and_waist",
+            "metric": "apparent_leanness",
+            "direction": "increased",
+            "apparentMagnitude": "pronounced",
+            "confidence": "moderate_to_high",
+            "observation": "The lower back and waist look substantially tighter, with less apparent flank and lower-back softness above the waistband.",
+            "basis": [
+              "narrower-looking lower-back contour",
+              "cleaner taper into the waistband",
+              "less diffuse softness at both flanks"
+            ],
+            "confounders": [
+              "camera distance differs",
+              "minor pelvic and torso-position differences"
+            ]
+          },
+          {
+            "region": "upper_back",
+            "metric": "definition",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "moderate_to_high",
+            "observation": "Upper-back musculature and the borders around the shoulder blades are considerably easier to distinguish in July.",
+            "basis": [
+              "clearer scapular borders",
+              "stronger separation across the upper back",
+              "less visually diffuse tissue between shoulder blades"
+            ],
+            "confounders": [
+              "scapular positioning differs",
+              "directional lighting changes shadow depth"
+            ]
+          },
+          {
+            "region": "rear_delts",
+            "metric": "definition",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "moderate",
+            "observation": "Rear-delt contours are clearer and separate more distinctly from the upper arms and upper back.",
+            "basis": [
+              "more distinct rear-shoulder borders",
+              "cleaner transition into the upper arm"
+            ],
+            "confounders": [
+              "higher elbow position",
+              "different shoulder rotation"
+            ]
+          },
+          {
+            "region": "upper_arms_and_triceps",
+            "metric": "definition",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "moderate",
+            "observation": "Upper-arm and triceps contours appear sharper, especially along the rear and lower arm borders.",
+            "basis": [
+              "clearer triceps outline",
+              "more distinct separation between rear delts and upper arms"
+            ],
+            "confounders": [
+              "arm angle differs",
+              "flexing intensity is unverified"
+            ]
+          },
+          {
+            "region": "lats",
+            "metric": "definition",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "moderate",
+            "observation": "Lat borders and the transition from the upper back toward the waist are more clearly defined in July.",
+            "basis": [
+              "cleaner lateral back contours",
+              "stronger visual separation above the waist"
+            ],
+            "confounders": [
+              "elbow height and scapular position materially alter lat presentation"
+            ]
+          },
+          {
+            "region": "back_to_waist_taper",
+            "metric": "proportion",
+            "direction": "improved",
+            "apparentMagnitude": "pronounced",
+            "confidence": "moderate_to_high",
+            "observation": "The shoulder- and back-to-waist taper is substantially stronger, driven mainly by the tighter waist and clearer back definition.",
+            "basis": [
+              "narrower-looking waist relative to the upper back",
+              "more distinct muscular borders across the back",
+              "cleaner lower-back contour"
+            ],
+            "confounders": [
+              "pose changes can alter apparent back width",
+              "camera distance differs"
+            ]
+          },
+          {
+            "region": "lat_size",
+            "metric": "muscularity",
+            "direction": "unknown",
+            "apparentMagnitude": "none",
+            "confidence": "low",
+            "observation": "The photos do not reliably distinguish lat growth from the effects of leanness, elbow height, and scapular positioning.",
+            "basis": [],
+            "confounders": [
+              "material pose mismatch",
+              "different flexing mechanics",
+              "different framing"
+            ]
+          }
+        ],
+        "dominantVisualStory": "The comparison shows a visibly leaner and more defined back, led by a tighter lower back and waist plus clearer separation across the upper back, rear delts, lats, and arms, producing a substantially stronger back-to-waist taper.",
+        "overallMagnitude": "major",
+        "magnitudeCalibration": {
+          "magnitude": "major",
+          "reportedMagnitude": "moderate",
+          "promotionApplied": true,
+          "rule": "meaningful_global_anchor_plus_four_reliable_directional_regions",
+          "alignedDirection": "positive",
+          "reliableDirectionalRegionCount": 6,
+          "subtleFindingsCannotPromote": true
+        },
+        "confidence": {
+          "overallReliability": "moderate_to_high",
+          "rationale": "Confidence is high that a meaningful conditioning change occurred and moderate-to-high in the tighter lower-back/waist conclusion. Pose differences materially reduce confidence in lat-size or hypertrophy claims but do not explain the widespread definition change.",
+          "limitations": [
+            "Elbow height and scapular position differ materially.",
+            "Camera distance and framing differ.",
+            "Lighting direction and daylight strength differ.",
+            "Flexing intensity, pump, hydration, food intake, and time of day are unknown.",
+            "Only one back view is available at each date."
+          ]
+        },
+        "goalRelativeInterpretation": {
+          "direction": "supportive",
+          "strength": "strong_visual_support",
+          "interpretation": "The back-view pair provides strong visual support for progress toward Visible Abs: the lower back and waist appear materially tighter, muscular definition is clearer across the back and rear arms, and the back-to-waist taper is substantially stronger.",
+          "photoOnlyStrategyImplication": "The photo evidence supports the current cut direction; it does not by itself establish body-composition quantities or a strategy change."
+        },
+        "unsupportedConclusions": [
+          "exact body-fat percentage or numerical body-composition change",
+          "pounds of fat, lean mass, or muscle gained or lost",
+          "substantial lat growth or hypertrophy",
+          "causation by training, nutrition, medication, supplements, or lifestyle",
+          "Visible Abs completion from a back view",
+          "front torso, chest, abdominal, glute, or leg change",
+          "health status, hydration state, or physiological mechanism"
+        ],
+        "photoOnlyInterpretation": "Across 35 days, the back-view comparison shows a major overall visual improvement after calibrated multi-region magnitude reconciliation. The strongest changes are a substantially tighter lower back and waist, clearer definition across the upper back, rear delts, lats, and triceps, and a much stronger back-to-waist taper. Different elbow height and scapular positioning make back-width and lat-size claims unreliable, but they do not erase the broad conditioning change. The result strongly supports progress toward Visible Abs without quantifying fat loss, muscle change, or causation.",
+        "exactPhotoBriefingCopy": "Your cut is showing clearly from the back. By July, your waist and lower back look noticeably tighter, and there is much more separation through your upper back, rear shoulders, lats, and triceps. That gives you a substantially stronger taper from shoulders to waist and is a major visual step toward Visible Abs. The higher elbow position changes how wide the back can look, so these photos do not prove lat growth—but the improvement in conditioning and overall shape is clear.",
+        "provenance": {
+          "producer": "canonical_photo_intelligence_service",
+          "producerVersion": "canonical_photo_intelligence_v1",
+          "calibrationVersion": "photo_magnitude_calibration_v2",
+          "evidenceClass": "photo_only",
+          "nonPhotoEvidenceUsed": false,
+          "resultLabel": "MULTI-VIEW ARCHITECTURE/CALIBRATION CASE — HUMAN REFERENCE PRE-FROZEN"
+        }
+      }
+    }
+  ],
+  "unmatchedViews": [],
+  "comparability": {
+    "overall": "moderate",
+    "matchedViewCount": 1,
+    "unmatchedViewCount": 0,
+    "perView": [
+      {
+        "viewComparisonId": "back_informal_double_biceps",
+        "view": "back",
+        "pose": "informal-back-double-biceps",
+        "rating": "moderate"
+      }
+    ]
+  },
+  "observations": [
+    {
+      "region": "overall_back_conditioning",
+      "metric": "conditioning_and_shape",
+      "direction": "improved",
+      "apparentMagnitude": "moderate",
+      "confidence": "high",
+      "observation": "The comparison shows a visibly leaner, sharper back with broader muscular separation and a cleaner transition into the waist.",
+      "basis": [
+        "more distinct upper-back contours",
+        "less diffuse lower-back softness",
+        "multiple rear regions change in the same direction"
+      ],
+      "confounders": [
+        "different elbow height",
+        "different lighting",
+        "different camera distance"
+      ],
+      "supportingViewIds": [
+        "back_informal_double_biceps"
+      ],
+      "sourceObservationRefs": [
+        "back_informal_double_biceps:0"
+      ]
+    },
+    {
+      "region": "lower_back_and_waist",
+      "metric": "apparent_leanness",
+      "direction": "increased",
+      "apparentMagnitude": "pronounced",
+      "confidence": "moderate_to_high",
+      "observation": "The lower back and waist look substantially tighter, with less apparent flank and lower-back softness above the waistband.",
+      "basis": [
+        "narrower-looking lower-back contour",
+        "cleaner taper into the waistband",
+        "less diffuse softness at both flanks"
+      ],
+      "confounders": [
+        "camera distance differs",
+        "minor pelvic and torso-position differences"
+      ],
+      "supportingViewIds": [
+        "back_informal_double_biceps"
+      ],
+      "sourceObservationRefs": [
+        "back_informal_double_biceps:1"
+      ]
+    },
+    {
+      "region": "upper_back",
+      "metric": "definition",
+      "direction": "increased",
+      "apparentMagnitude": "moderate",
+      "confidence": "moderate_to_high",
+      "observation": "Upper-back musculature and the borders around the shoulder blades are considerably easier to distinguish in July.",
+      "basis": [
+        "clearer scapular borders",
+        "stronger separation across the upper back",
+        "less visually diffuse tissue between shoulder blades"
+      ],
+      "confounders": [
+        "scapular positioning differs",
+        "directional lighting changes shadow depth"
+      ],
+      "supportingViewIds": [
+        "back_informal_double_biceps"
+      ],
+      "sourceObservationRefs": [
+        "back_informal_double_biceps:2"
+      ]
+    },
+    {
+      "region": "rear_delts",
+      "metric": "definition",
+      "direction": "increased",
+      "apparentMagnitude": "moderate",
+      "confidence": "moderate",
+      "observation": "Rear-delt contours are clearer and separate more distinctly from the upper arms and upper back.",
+      "basis": [
+        "more distinct rear-shoulder borders",
+        "cleaner transition into the upper arm"
+      ],
+      "confounders": [
+        "higher elbow position",
+        "different shoulder rotation"
+      ],
+      "supportingViewIds": [
+        "back_informal_double_biceps"
+      ],
+      "sourceObservationRefs": [
+        "back_informal_double_biceps:3"
+      ]
+    },
+    {
+      "region": "upper_arms_and_triceps",
+      "metric": "definition",
+      "direction": "increased",
+      "apparentMagnitude": "moderate",
+      "confidence": "moderate",
+      "observation": "Upper-arm and triceps contours appear sharper, especially along the rear and lower arm borders.",
+      "basis": [
+        "clearer triceps outline",
+        "more distinct separation between rear delts and upper arms"
+      ],
+      "confounders": [
+        "arm angle differs",
+        "flexing intensity is unverified"
+      ],
+      "supportingViewIds": [
+        "back_informal_double_biceps"
+      ],
+      "sourceObservationRefs": [
+        "back_informal_double_biceps:4"
+      ]
+    },
+    {
+      "region": "lats",
+      "metric": "definition",
+      "direction": "increased",
+      "apparentMagnitude": "moderate",
+      "confidence": "moderate",
+      "observation": "Lat borders and the transition from the upper back toward the waist are more clearly defined in July.",
+      "basis": [
+        "cleaner lateral back contours",
+        "stronger visual separation above the waist"
+      ],
+      "confounders": [
+        "elbow height and scapular position materially alter lat presentation"
+      ],
+      "supportingViewIds": [
+        "back_informal_double_biceps"
+      ],
+      "sourceObservationRefs": [
+        "back_informal_double_biceps:5"
+      ]
+    },
+    {
+      "region": "back_to_waist_taper",
+      "metric": "proportion",
+      "direction": "improved",
+      "apparentMagnitude": "pronounced",
+      "confidence": "moderate_to_high",
+      "observation": "The shoulder- and back-to-waist taper is substantially stronger, driven mainly by the tighter waist and clearer back definition.",
+      "basis": [
+        "narrower-looking waist relative to the upper back",
+        "more distinct muscular borders across the back",
+        "cleaner lower-back contour"
+      ],
+      "confounders": [
+        "pose changes can alter apparent back width",
+        "camera distance differs"
+      ],
+      "supportingViewIds": [
+        "back_informal_double_biceps"
+      ],
+      "sourceObservationRefs": [
+        "back_informal_double_biceps:6"
+      ]
+    },
+    {
+      "region": "lat_size",
+      "metric": "muscularity",
+      "direction": "unknown",
+      "apparentMagnitude": "none",
+      "confidence": "low",
+      "observation": "The photos do not reliably distinguish lat growth from the effects of leanness, elbow height, and scapular positioning.",
+      "basis": [],
+      "confounders": [
+        "material pose mismatch",
+        "different flexing mechanics",
+        "different framing"
+      ],
+      "supportingViewIds": [
+        "back_informal_double_biceps"
+      ],
+      "sourceObservationRefs": [
+        "back_informal_double_biceps:7"
+      ]
+    }
+  ],
+  "dominantVisualStory": "The comparison shows a visibly leaner and more defined back, led by a tighter lower back and waist plus clearer separation across the upper back, rear delts, lats, and arms, producing a substantially stronger back-to-waist taper.",
+  "overallMagnitude": "major",
+  "magnitudeReconciliation": {
+    "status": "consistent_across_views",
+    "strongestViewMagnitude": "major",
+    "viewMagnitudes": [
+      {
+        "viewComparisonId": "back_informal_double_biceps",
+        "magnitude": "major"
+      }
+    ]
+  },
+  "confidence": {
+    "overallReliability": "moderate_to_high",
+    "setInterpretationEffect": "unchanged",
+    "viewConfidenceChanged": false,
+    "globallyStrengthened": false
+  },
+  "goalRelativeInterpretation": {
+    "direction": "supportive",
+    "strength": "strong_visual_support",
+    "interpretation": "The back-view pair provides strong visual support for progress toward Visible Abs: the lower back and waist appear materially tighter, muscular definition is clearer across the back and rear arms, and the back-to-waist taper is substantially stronger.",
+    "photoOnlyStrategyImplication": "The reconciled photo set supports the Goal direction, but does not establish a strategy change without independent evidence.",
+    "goalContext": {
+      "name": "Visible Abs",
+      "source": "runtime_context_supplied_with_case",
+      "usedFor": [
+        "regional_relevance",
+        "goal_relative_interpretation",
+        "user_facing_narrative"
+      ],
+      "notUsedFor": [
+        "altering_visual_observations",
+        "increasing_visual_confidence",
+        "inferring_non_photo_evidence"
+      ]
+    }
+  },
+  "crossViewCorroboration": [],
+  "crossViewConflicts": [],
+  "unsupportedConclusions": [
+    "exact body-fat percentage or numerical body-composition change",
+    "pounds of fat, lean mass, or muscle gained or lost",
+    "substantial lat growth or hypertrophy",
+    "causation by training, nutrition, medication, supplements, or lifestyle",
+    "Visible Abs completion from a back view",
+    "front torso, chest, abdominal, glute, or leg change",
+    "health status, hydration state, or physiological mechanism"
+  ],
+  "photoOnlyInterpretation": "The comparison shows a visibly leaner and more defined back, led by a tighter lower back and waist plus clearer separation across the upper back, rear delts, lats, and arms, producing a substantially stronger back-to-waist taper.",
+  "exactPhotoBriefingCopy": "Your cut is showing clearly from the back. By July, your waist and lower back look noticeably tighter, and there is much more separation through your upper back, rear shoulders, lats, and triceps. That gives you a substantially stronger taper from shoulders to waist and is a major visual step toward Visible Abs. The higher elbow position changes how wide the back can look, so these photos do not prove lat growth—but the improvement in conditioning and overall shape is clear.",
+  "provenance": {
+    "producer": "canonical_photo_intelligence_set_service",
+    "producerVersion": "canonical_photo_intelligence_set_v1",
+    "viewProducerVersion": "canonical_photo_intelligence_v1",
+    "evidenceClass": "photo_only",
+    "nonPhotoEvidenceUsed": false,
+    "viewConfidenceChanged": false,
+    "unmatchedViewsTreatedAsNoChange": false,
+    "resultLabel": "MULTI-VIEW ARCHITECTURE/CALIBRATION CASE — HUMAN REFERENCE PRE-FROZEN"
+  }
+}

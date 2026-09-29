@@ -72,7 +72,8 @@ describe("Holistic Photo Briefing synthesis", () => {
     expect(result.convergence).toMatchObject({
       status: "convergent", visualConfidenceChanged: false, causalClaim: false,
     });
-    expect(result.userFacingCopy).toMatch(/photos did not measure tissue change/i);
+    expect(result.userFacingCopy).toMatch(/photos and measurement make the overall direction more convincing/i);
+    expect(result.userFacingCopy).not.toMatch(/independent evidence converges|photo-level direction|visual confidence field|canonical evidence/i);
     expect(result.provenance).toMatchObject({
       visualObservationAttribution: "photos",
       measurementAttribution: "DEXA",
@@ -117,7 +118,7 @@ describe("Holistic Photo Briefing synthesis", () => {
       confidenceEffect: "none",
       visualConfidenceChanged: false,
     });
-    expect(result.userFacingCopy).toMatch(/does not align/i);
+    expect(result.userFacingCopy).toMatch(/does not point in the same direction as the photos/i);
     expect(result.userFacingCopy).not.toMatch(/strengthens the overall interpretation/i);
   });
 

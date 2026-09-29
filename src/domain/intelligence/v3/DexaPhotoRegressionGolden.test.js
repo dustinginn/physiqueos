@@ -161,6 +161,83 @@ describe("Photo Event: unified V3 regression golden", () => {
     expect(JSON.stringify(result)).not.toMatch(/Legacy prose/);
   });
 
+  it("preserves set-view provenance when consuming canonical multi-view PI", () => {
+    const result = derivePhotoStructuredObservationsV3({
+      photoIntelligence: {
+        schemaVersion: "canonical_photo_intelligence_set_v1",
+        comparison: {
+          baselineDate: "2026-06-13", comparisonDate: "2026-07-18", daysElapsed: 35,
+        },
+        viewComparisons: [
+          {
+            id: "back-flexed", matchStatus: "like_for_like",
+            comparability: { overall: "moderate" },
+          },
+          {
+            id: "front-relaxed", matchStatus: "like_for_like",
+            comparability: { overall: "good" },
+          },
+        ],
+        comparability: { overall: "moderate" },
+        confidence: { limitations: ["Pose differs."] },
+        observations: [{
+          metric: "definition", region: "upper_back", direction: "increased",
+          apparentMagnitude: "moderate", confidence: "moderate",
+          observation: "Upper-back definition increased.",
+          confounders: ["Elbow height differs."],
+          supportingViewIds: ["back-flexed"],
+          sourceObservationRefs: ["back-flexed:2"],
+        }],
+      },
+    });
+    expect(result.producerSource).toBe("canonical_photo_intelligence_set");
+    expect(result.comparison_metadata.poseCount).toBe(2);
+    expect(result.structured_observations[0]).toMatchObject({
+      supportingViewIds: ["back-flexed"],
+      sourceObservationRefs: ["back-flexed:2"],
+      comparable: true,
+      comparabilityRatings: [{ viewComparisonId: "back-flexed", rating: "moderate" }],
+    });
+  });
+
+  it("uses each supporting view's comparability instead of the weakest set rating", () => {
+    const result = derivePhotoStructuredObservationsV3({
+      photoIntelligence: {
+        schemaVersion: "canonical_photo_intelligence_set_v1",
+        comparison: { baselineDate: null, comparisonDate: "2026-07-18", daysElapsed: null },
+        comparability: { overall: "insufficient" },
+        confidence: { limitations: [] },
+        viewComparisons: [
+          { id: "front", matchStatus: "like_for_like", comparability: { overall: "good" } },
+          { id: "back", matchStatus: "like_for_like", comparability: { overall: "insufficient" } },
+        ],
+        observations: [
+          {
+            metric: "definition", region: "abdomen", direction: "increased",
+            apparentMagnitude: "moderate", confidence: "moderate",
+            observation: "Abdominal definition increased.", supportingViewIds: ["front"],
+          },
+          {
+            metric: "definition", region: "upper_back", direction: "increased",
+            apparentMagnitude: "moderate", confidence: "low",
+            observation: "Upper-back definition may have increased.", supportingViewIds: ["back"],
+          },
+        ],
+      },
+    });
+    expect(result.comparison_metadata.comparable).toBe(false);
+    expect(result.structured_observations).toEqual([
+      expect.objectContaining({
+        region: "abdomen", comparable: true,
+        comparabilityRatings: [{ viewComparisonId: "front", rating: "good" }],
+      }),
+      expect.objectContaining({
+        region: "upper_back", comparable: false,
+        comparabilityRatings: [{ viewComparisonId: "back", rating: "insufficient" }],
+      }),
+    ]);
+  });
+
   it("does not pull a prior Weekly's Energy into a Photo Event (text, recommendation and Confidence equal the pristine base)", async () => {
     const { prepared, artifact } = await preparePhotoV3({ withPriorWeekly: true });
     expect(textDigest(artifact.briefing.narrativeV3)).toBe(BASE_WITH_PRIOR_WEEKLY_TEXT_SHA256);

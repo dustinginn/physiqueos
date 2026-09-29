@@ -16,8 +16,8 @@ import { resolveCommittedPhaseContext } from
   "./FounderPhaseCorrectionService";
 import { isResistanceTrainingSession } from "./TrainingEvidenceClassification.js";
 import {
-  createCanonicalPhotoIntelligenceFromSession,
-} from "./CanonicalPhotoIntelligenceService.js";
+  createCanonicalPhotoIntelligenceSetFromSession,
+} from "./CanonicalPhotoIntelligenceSetService.js";
 import {
   canonicalEvidenceCandidate,
   createPhotoBriefingHolisticSynthesis,
@@ -274,7 +274,7 @@ export function createPhotoEventNarrativeService({
         evidenceDate: session.captureDate,
       });
       const completionComparisons=session.confirmationIntent?.confirmationPurpose==="visible_abs_completion"?selectVisibleAbsCompletionComparisons({sessions,finalSession:session,goalStartDate:goal?.startDate}):null;
-      const photoIntelligence=createCanonicalPhotoIntelligenceFromSession({
+      const photoIntelligence=createCanonicalPhotoIntelligenceSetFromSession({
         session,
         goalContext: photoOnlyGoalContext(photoEventContext),
       });

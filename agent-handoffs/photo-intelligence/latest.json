@@ -1,11 +1,11 @@
 {
-  "schema_version": 2,
-  "generated_at_utc": "2026-09-29T16:04:00Z",
+  "schema_version": 3,
+  "generated_at_utc": "2026-09-29T16:30:00Z",
   "task": {
-    "id": "photo-intelligence-canonical-holistic-synthesis-20260929",
-    "title": "Canonical Photo Intelligence and time-causal holistic Photo Briefing candidate",
+    "id": "photo-intelligence-back-pose-case3-multiview-20260929",
+    "title": "Back Pose Case 3 and additive multi-view Photo Intelligence",
     "agent": "codex",
-    "status": "committed_ready_heldout_validation"
+    "status": "complete_review_approved"
   },
   "repository": "dustinginn/physiqueos",
   "frozen_blind_results": {
@@ -28,10 +28,21 @@
     "holistic_replay_report": "agent-handoffs/reports/20260929T153700Z-photo-intelligence-case2-holistic-replay.md",
     "implementation_review": "agent-handoffs/reports/20260929T160400Z-photo-intelligence-canonical-holistic-implementation-review.md"
   },
+  "multi_view_development": {
+    "case_3_result": "agent-handoffs/photo-intelligence/founder-cases/case-3-2026-06-13-to-2026-07-18-BACK-MULTIVIEW-DEVELOPMENT.json",
+    "case_3_report": "agent-handoffs/reports/20260929T163000Z-photo-intelligence-back-pose-case3-multiview.md",
+    "fresh_context_review": "agent-handoffs/reports/20260929T165500Z-photo-intelligence-case3-multiview-fresh-context-review.md",
+    "result_label": "MULTI-VIEW ARCHITECTURE/CALIBRATION CASE — HUMAN REFERENCE PRE-FROZEN",
+    "schema": "canonical_photo_intelligence_set_v1",
+    "human_reference_was_pre_frozen": true,
+    "blind_validation": false
+  },
   "calibration": {
     "case_1": "major",
     "case_2": "subtle",
-    "held_out_validation_required": true
+    "case_3_back": "major",
+    "third_unseen_case_blocks_initial_graduation": false,
+    "prospective_monthly_validation_planned": true
   },
   "safety": {
     "frozen_blind_results_changed": false,
@@ -41,5 +52,5 @@
     "deployed": false,
     "testflight_uploaded": false
   },
-  "next_step": "Run a genuinely held-out real-image case before graduation; do not treat the revealed Case 1/2 replays as blind validation."
+  "next_step": "Code review is approved; keep undeployed and use future monthly Founder photo sets for prospective production validation."
 }

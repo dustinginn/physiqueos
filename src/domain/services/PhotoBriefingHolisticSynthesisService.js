@@ -208,15 +208,15 @@ function buildCopy(pi, measured, convergence) {
     ? `${measured.bodyFatPercentage}% body fat` : null;
   const facts = [change, bodyFat].filter(Boolean).join(" and ");
   const evidenceSentence = convergence.status === "convergent"
-    ? `Independent evidence converges with that photo-level direction: the ${date} DEXA measured ${facts}.`
+    ? `That visual progress also lines up with your ${date} DEXA, which measured ${facts}.`
     : convergence.status === "divergent"
-      ? `Independent evidence does not align with that photo-level direction: the ${date} DEXA measured ${facts}.`
+      ? `Your ${date} DEXA measured ${facts}, which does not point in the same direction as the photos.`
       : convergence.status === "mixed"
-        ? `Independent evidence is mixed relative to the photo-level direction: the ${date} DEXA measured ${facts}.`
-        : `Independent evidence adds measurement context without confirming the photo-level direction: the ${date} DEXA measured ${facts}.`;
+        ? `Your ${date} DEXA measured ${facts}; some of that supports what is visible in the photos and some does not.`
+        : `Your ${date} DEXA adds useful context by measuring ${facts}, without changing what is visible in the photos.`;
   const interpretationSentence = convergence.status === "convergent"
-    ? "That strengthens the overall interpretation without making the visual observation more certain: the photos did not measure tissue change, and neither source by itself proves what caused it."
-    : "Keep the visual and measured findings separate: the photos did not measure tissue change, and the combined evidence does not support a stronger conclusion or a causal claim.";
+    ? "Together, the photos and measurement make the overall direction more convincing, while still not proving what caused the change."
+    : "Keep the visual and measured findings separate; together they do not support a stronger conclusion or explain what caused the change.";
   return [visual, facts ? evidenceSentence : null, interpretationSentence]
     .filter(Boolean).join(" ");
 }
