@@ -123,22 +123,15 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(pastPresentation.context, "2026-08-28 · 1 exercise")
     }
 
-    func testCompletionAchievementRequiresActualImprovementAgainstComparableHistory() async throws {
-        let config = try await configuration()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
-        var draft = draft()
-        draft.addExercise(bench)
-        draft.exercises[0].sets[0].isCompleted = true
-        XCTAssertTrue(draft.performanceAchievementLines.isEmpty)
-        draft.exercises[0].sets[0].load = 999
-        draft.exercises[0].sets[0].reps = 20
-        XCTAssertTrue(draft.performanceAchievementLines.isEmpty, "A load absent from prior history is not matched-load evidence.")
-        let comparableSet = try XCTUnwrap(draft.exercises[0].previousPerformance?.sets.first)
-        draft.exercises[0].sets[0].load = comparableSet.weight
-        draft.exercises[0].sets[0].reps = try XCTUnwrap(comparableSet.reps) + 1
-        XCTAssertEqual(draft.performanceAchievementLines, ["Bench Press · better reps at matched load"])
-        draft.exercises[0].previousPerformance = nil
-        XCTAssertTrue(draft.performanceAchievementLines.isEmpty, "No comparable context must never invent a PR.")
+    /// Performance records are canonical Server output; the Logger must never
+    /// compute its own "better performance" claims.
+    func testLoggerNoLongerComputesPerformanceClaims() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let model = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Contracts/TrainingLoggerReadModel.swift"), encoding: .utf8)
+        let view = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"), encoding: .utf8)
+        XCTAssertFalse(model.contains("performanceAchievementLines"))
+        XCTAssertFalse(view.contains("performanceAchievementLines"))
+        XCTAssertFalse(view.contains("\"Better performance\""))
     }
 
     func testPreviousPerformanceIsStrictlyBeforePastWorkoutDate() async throws {
@@ -848,6 +841,110 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertNotNil(store.loadAll().first { $0.id == id }?.leftAt)
         viewModel.resume(draftId: id)
         XCTAssertNil(viewModel.draft?.leftAt, "Resuming makes it the in-progress workout again.")
+    }
+
+    private static func record(_ id: String, exercise: String = "Bench Press", type: TrainingPerformanceEventType = .sessionVolumePR) -> TrainingPerformanceRecord {
+        TrainingPerformanceRecord(
+            id: "training_library_record_\(id)", canonicalExerciseId: "bench_press", canonicalExerciseName: exercise,
+            title: "Session volume record", value: "4,200 lb", previousBaseline: "Previous: 4,000 lb",
+            improvement: "Improved by 200 lb", detail: "Previous: 4,000 lb · Improved by 200 lb",
+            workoutDate: "2026-09-28", executionVariant: nil, relationshipContext: nil,
+            achievedValue: 4200, achievementType: type, sourceEventId: "training_performance_event_\(id)"
+        )
+    }
+
+    /// Durable commit whose result carries (or omits) the Server's records,
+    /// with a separate session read-back for the fallback path.
+    private actor RecordsTrainingWriteAPI: TrainingWriteAPI {
+        let resultRecords: TrainingSessionPerformanceRecords?
+        let readBackRecords: [TrainingPerformanceRecord]?
+        private(set) var readBacks = 0
+        init(resultRecords: TrainingSessionPerformanceRecords?, readBackRecords: [TrainingPerformanceRecord]?) {
+            self.resultRecords = resultRecords
+            self.readBackRecords = readBackRecords
+        }
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
+            TrainingCommitResult(status: "durable", reviewId: nil, reviewRevision: nil, sessionId: draft.id,
+                                 intendedDate: draft.workoutDate, exerciseIds: [], performanceRecords: resultRecords)
+        }
+        func sessionPerformanceRecords(for draft: TrainingLoggerDraft) async -> [TrainingPerformanceRecord]? {
+            readBacks += 1
+            return readBackRecords
+        }
+    }
+
+    @MainActor
+    func testCompletionShowsTheServersRecordsFromTheCommitResult() async throws {
+        let records = [Self.record("a"), Self.record("b", exercise: "Squat")]
+        let writeAPI = RecordsTrainingWriteAPI(resultRecords: .init(status: "completed", records: records), readBackRecords: nil)
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, draftStore: MemoryTrainingLoggerDraftStore(), authority: .founderProduction)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        await viewModel.submit()
+        XCTAssertEqual(viewModel.completedPerformanceRecords, records)
+        let readBacks = await writeAPI.readBacks
+        XCTAssertEqual(readBacks, 0, "An authoritative commit result needs no read-back.")
+    }
+
+    @MainActor
+    func testCompletionWithNoNewRecordShowsNothing() async throws {
+        let writeAPI = RecordsTrainingWriteAPI(resultRecords: .init(status: "completed", records: []), readBackRecords: [Self.record("x")])
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, draftStore: MemoryTrainingLoggerDraftStore(), authority: .founderProduction)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        await viewModel.submit()
+        XCTAssertTrue(viewModel.completedPerformanceRecords.isEmpty, "No record: no section, no confetti.")
+    }
+
+    @MainActor
+    func testCompletionFallsBackToTheSessionReadWhenTheResultHasNoRecords() async throws {
+        let writeAPI = RecordsTrainingWriteAPI(resultRecords: .init(status: "deferred", records: []), readBackRecords: [Self.record("late")])
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, draftStore: MemoryTrainingLoggerDraftStore(), authority: .founderProduction)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        await viewModel.submit()
+        for _ in 0..<50 where viewModel.completedPerformanceRecords.isEmpty { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertEqual(viewModel.completedPerformanceRecords.map(\.id), ["training_library_record_late"])
+    }
+
+    func testRecordsDecodeLossilyAndNeverBreakADurableCommitResult() throws {
+        let json = Data(#"""
+        {"status":"durable","sessionId":"d1","intendedDate":"2026-09-28","exerciseIds":[],
+         "performanceRecords":{"status":"completed","records":[
+           {"id":"r1","sourceEventId":"e1","canonicalExerciseId":"pull_up","canonicalExerciseName":"Pull-Ups","achievementType":"session_volume_pr",
+            "title":"Session volume record","value":"675 lb","previousBaseline":"Previous: 600 lb","improvement":"Improved by 75 lb",
+            "detail":"Previous: 600 lb · Improved by 75 lb","workoutDate":"2026-09-28","achievedValue":675,"orderingKey":"x"},
+           {"id":"r2","achievementType":"a_future_record_type","title":"?"},
+           42]}}
+        """#.utf8)
+        let result = try JSONDecoder().decode(TrainingCommitResult.self, from: json)
+        XCTAssertTrue(result.isDurable)
+        XCTAssertEqual(result.performanceRecords?.isAuthoritative, true)
+        XCTAssertEqual(result.performanceRecords?.records.map(\.id), ["r1"])
+        let older = try JSONDecoder().decode(TrainingCommitResult.self, from: Data(#"{"status":"durable","sessionId":"d1","intendedDate":"2026-09-28","exerciseIds":[]}"#.utf8))
+        XCTAssertNil(older.performanceRecords, "An older Server/receipt simply has no records field.")
+        let garbage = try JSONDecoder().decode(TrainingCommitResult.self, from: Data(#"{"status":"durable","sessionId":"d1","intendedDate":"2026-09-28","exerciseIds":[],"performanceRecords":"nope"}"#.utf8))
+        XCTAssertEqual(garbage.performanceRecords?.isAuthoritative, false)
+    }
+
+    func testRecordsCardShowsTheFirstFewAndSummarizesTheRest() {
+        let many = (1...5).map { Self.record("r\($0)") }
+        let presentation = NewPerformanceRecordsPresentation(records: many, visibleLimit: 3)
+        XCTAssertEqual(presentation.visible.map(\.id), ["training_library_record_r1", "training_library_record_r2", "training_library_record_r3"])
+        XCTAssertEqual(presentation.moreLabel, "+2 more records")
+        XCTAssertEqual(NewPerformanceRecordsPresentation(records: Array(many.prefix(4)), visibleLimit: 3).moreLabel, "+1 more record")
+        XCTAssertNil(NewPerformanceRecordsPresentation(records: [Self.record("one")], visibleLimit: 3).moreLabel)
+    }
+
+    func testCelebrationPlaysOnceAndNeverWithReduceMotion() {
+        let suite = "celebration-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        XCTAssertFalse(WorkoutCelebrationGate.claim(key: "k1", reduceMotion: true, defaults: defaults), "Reduce Motion: no confetti.")
+        XCTAssertTrue(WorkoutCelebrationGate.claim(key: "k1", reduceMotion: false, defaults: defaults))
+        XCTAssertFalse(WorkoutCelebrationGate.claim(key: "k1", reduceMotion: false, defaults: defaults), "Reappearing never celebrates again.")
+        XCTAssertTrue(WorkoutCelebrationGate.claim(key: "k2", reduceMotion: false, defaults: defaults), "Each session celebrates its own first presentation.")
+        XCTAssertFalse(WorkoutCelebrationGate.claim(key: nil, reduceMotion: false, defaults: defaults))
     }
 
     private struct StubSucceedingTrainingWriteAPI: TrainingWriteAPI {

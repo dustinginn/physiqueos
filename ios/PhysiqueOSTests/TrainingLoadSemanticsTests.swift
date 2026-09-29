@@ -47,23 +47,29 @@ final class TrainingLoadSemanticsTests: XCTestCase {
         ]))
         XCTAssertEqual(workout.exercises[0].previousPerformance?.workoutDate, "2026-09-13")
         workout.exercises[0].sets = [.init(id: "s1", setNumber: 1, reps: 7, load: 25, loadType: "external_load", durationSeconds: nil, isCompleted: true)]
-        let lines = workout.performanceAchievementLines
-        XCTAssertEqual(lines, ["Pull-Ups · better reps at matched load"])
-        XCTAssertFalse(lines.joined().contains("bodyweight rep best"))
+        let current = workout.exercises[0].sets[0].loadSemantics(defaultLoadType: bodyweightDefault)
+        XCTAssertEqual(current, .weightedBodyweight, "25 lb added to Pull-Ups is weighted, never a bodyweight set")
+        XCTAssertEqual(current.comparisonLoad(weight: 25), 25)
     }
 
     func testWeightedPullUpNeverComparesAgainstAnUnloadedBodyweightBest() {
         var workout = draft(date: "2026-09-20")
         workout.addExercise(pullUps(history: [record("2026-09-13", [set(1, reps: 10, weight: nil, unit: "bodyweight", loadType: "bodyweight")])]))
         workout.exercises[0].sets = [.init(id: "s1", setNumber: 1, reps: 7, load: 25, loadType: "external_load", durationSeconds: nil, isCompleted: true)]
-        XCTAssertTrue(workout.performanceAchievementLines.isEmpty, "7 reps at +25 lb has no matched prior load, so it is not a rep best")
+        let prior = TrainingSetLoadSemantics.classify(weight: nil, weightUnit: "bodyweight", loadType: "bodyweight", defaultLoadType: bodyweightDefault)
+        let current = workout.exercises[0].sets[0].loadSemantics(defaultLoadType: bodyweightDefault)
+        XCTAssertNotEqual(prior.comparisonLoad(weight: nil), current.comparisonLoad(weight: 25),
+                          "7 reps at +25 lb has no matched prior load against an unloaded bodyweight best")
     }
 
     func testUnweightedBodyweightRepBestStillDetectsAcrossNullAndZeroHistory() {
         var workout = draft(date: "2026-09-20")
         workout.addExercise(pullUps(history: [record("2026-09-13", [set(1, reps: 8, weight: 0, unit: "lb", loadType: "external_load")])]))
         workout.exercises[0].sets = [.init(id: "s1", setNumber: 1, reps: 9, load: nil, loadType: "bodyweight", durationSeconds: nil, isCompleted: true)]
-        XCTAssertEqual(workout.performanceAchievementLines, ["Pull-Ups · bodyweight rep best"])
+        let prior = TrainingSetLoadSemantics.classify(weight: 0, weightUnit: "lb", loadType: "external_load", defaultLoadType: bodyweightDefault)
+        let current = workout.exercises[0].sets[0].loadSemantics(defaultLoadType: bodyweightDefault)
+        XCTAssertEqual(current, .bodyweight)
+        XCTAssertEqual(prior.comparisonLoad(weight: 0), current.comparisonLoad(weight: nil), "null and zero history compare at the bodyweight baseline")
     }
 
     func testAddedLoadTypedOverAPrepopulatedBodyweightSetIsWeightedNotUnknown() {
@@ -80,7 +86,6 @@ final class TrainingLoadSemanticsTests: XCTestCase {
         workout.exercises[0].sets[1].isCompleted = true
         XCTAssertEqual(workout.exercises[0].sets[1].loadSemantics(defaultLoadType: bodyweightDefault), .weightedBodyweight)
         XCTAssertEqual(workout.exercises[0].sets[1].writeRepresentation(defaultLoadType: bodyweightDefault).loadType, "external_load")
-        XCTAssertEqual(workout.performanceAchievementLines, ["Pull-Ups · better reps at matched load"])
     }
 
     func testMachineRepsAtMatchedLoadStillWorks() {
@@ -93,7 +98,7 @@ final class TrainingLoadSemanticsTests: XCTestCase {
         var workout = draft(date: "2026-09-20")
         workout.addExercise(row)
         workout.exercises[0].sets = [.init(id: "s1", setNumber: 1, reps: 13, load: 110, loadType: "external_load", durationSeconds: nil, isCompleted: true)]
-        XCTAssertEqual(workout.performanceAchievementLines, ["Seated Cable Rows · better reps at matched load"])
+        XCTAssertEqual(workout.exercises[0].sets[0].loadSemantics(defaultLoadType: nil).comparisonLoad(weight: 110), 110)
     }
 
     // MARK: Unweighted bodyweight serialization

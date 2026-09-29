@@ -361,6 +361,8 @@ struct TrainingSessionDetailReadModel: Codable, Equatable, Identifiable {
     /// can render telemetry once and exercises once, never a duplicated
     /// backend-style summary on top of the structured breakdown.
     var telemetry: TrainingSessionTelemetryReadModel? = nil
+    /// Canonical performance records this session established (Server-owned).
+    var performanceRecords: TrainingSessionPerformanceRecords? = nil
     /// A Server-verified, one-to-one confirmed Apple workout attachment.
     /// Logger content remains authoritative; this carries HealthKit source
     /// and session telemetry only. Missing/unconfirmed relationships omit it.
@@ -836,6 +838,63 @@ struct TrainingPerformanceRecord: Identifiable, Codable, Equatable {
     var achievedValue: Double
     var achievementType: TrainingPerformanceEventType
     var sourceEventId: String
+}
+
+/// The canonical performance records one committed session established,
+/// exactly as the Server reports them (`training-session.commit.v1` result
+/// and the `training-session` read). Native never computes records itself.
+/// `status` is "completed" when `records` is authoritative (possibly empty);
+/// "deferred"/"skipped"/"failed" mean the records are not known yet. Decoding
+/// never fails: an unknown record shape is dropped, never fatal to a durable
+/// commit result.
+struct TrainingSessionPerformanceRecords: Codable, Equatable, Sendable {
+    var status: String
+    var records: [TrainingPerformanceRecord]
+
+    var isAuthoritative: Bool { status == "completed" }
+
+    init(status: String, records: [TrainingPerformanceRecord]) {
+        self.status = status
+        self.records = records
+    }
+
+    private enum CodingKeys: String, CodingKey { case status, records }
+
+    init(from decoder: Decoder) throws {
+        let container = try? decoder.container(keyedBy: CodingKeys.self)
+        status = (try? container?.decode(String.self, forKey: .status)) ?? "unknown"
+        let elements = (try? container?.decode([FailableRecord].self, forKey: .records)) ?? []
+        records = elements.compactMap(\.value)
+    }
+
+    private struct FailableRecord: Decodable {
+        let value: TrainingPerformanceRecord?
+        init(from decoder: Decoder) throws { value = try? TrainingPerformanceRecord(from: decoder) }
+    }
+}
+
+/// The Workout Complete card's content: the first few Server records in the
+/// Server's own order, and a "+N more records" summary for the rest.
+struct NewPerformanceRecordsPresentation {
+    var visible: [TrainingPerformanceRecord]
+    var moreLabel: String?
+
+    init(records: [TrainingPerformanceRecord], visibleLimit: Int) {
+        visible = Array(records.prefix(visibleLimit))
+        let hidden = records.count - visible.count
+        moreLabel = hidden > 0 ? "+\(hidden) more record\(hidden == 1 ? "" : "s")" : nil
+    }
+}
+
+/// One-shot celebration gate: the confetti plays once per completed
+/// session (never again on reappearance or a later revisit), and never when
+/// Reduce Motion is on.
+enum WorkoutCelebrationGate {
+    static func claim(key: String?, reduceMotion: Bool, defaults: UserDefaults = .standard) -> Bool {
+        guard !reduceMotion, let key, !defaults.bool(forKey: key) else { return false }
+        defaults.set(true, forKey: key)
+        return true
+    }
 }
 
 /// `createTrainingLibraryExerciseRecordsReadModel`'s return shape —
