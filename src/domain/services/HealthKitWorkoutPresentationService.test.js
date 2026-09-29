@@ -242,7 +242,22 @@ describe("confirmed HealthKit workout presentation", () => {
     expect(day.energyAnomaly).toBeNull();
   });
 
-  it("adds subtle Log provenance only after exact confirmation, without a duplicate row", () => {
+  // Logged Today provenance: Apple Health is a caption under the whole
+  // Training group (`row.context`), never a suffix on a line or the summary.
+  const provenanceRuntime = (fixture) => ({
+    canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
+    healthKitCanonicalWorkouts: fixture.canonicalWorkouts,
+    healthKitWorkoutLinks: fixture.workoutLinks,
+    healthKitWorkoutLinkClaims: fixture.workoutLinkClaims,
+  });
+  const demoteLinkToCandidate = (fixture) => {
+    fixture.workoutLinks[0].status = "candidate";
+    fixture.workoutLinks[0].statusHistory = [fixture.workoutLinks[0].statusHistory[0]];
+    fixture.workoutLinks[0].updatedAt = fixture.workoutLinks[0].createdAt;
+    fixture.workoutLinkClaims = [];
+  };
+
+  it("captions the Log Training group with Apple Health only after exact confirmation, without a duplicate row", () => {
     const fixture = createSep23StrengthPresentationFixture();
     const log = {
       localDate: fixture.day,
@@ -253,29 +268,20 @@ describe("confirmed HealthKit workout presentation", () => {
       ] },
       pendingEvidenceReviews: [],
     };
-    const projected = projectConfirmedHealthKitLogProvenance(log, {
-      canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
-      healthKitCanonicalWorkouts: fixture.canonicalWorkouts,
-      healthKitWorkoutLinks: fixture.workoutLinks,
-      healthKitWorkoutLinkClaims: fixture.workoutLinkClaims,
-    });
+    const projected = projectConfirmedHealthKitLogProvenance(log, provenanceRuntime(fixture));
     expect(projected.loggedToday.rows).toHaveLength(3);
-    expect(projected.loggedToday.rows[0].summary).toBe("Strength Training · Apple Health");
+    expect(projected.loggedToday.rows[0].summary).toBe("Strength Training logged");
+    expect(projected.loggedToday.rows[0].context).toBe("Apple Health");
+    expect(projected.loggedToday.rows.slice(1)).toEqual(log.loggedToday.rows.slice(1));
 
-    fixture.workoutLinks[0].status = "candidate";
-    fixture.workoutLinks[0].statusHistory = [fixture.workoutLinks[0].statusHistory[0]];
-    fixture.workoutLinks[0].updatedAt = fixture.workoutLinks[0].createdAt;
-    fixture.workoutLinkClaims = [];
-    const unconfirmed = projectConfirmedHealthKitLogProvenance(log, {
-      canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
-      healthKitCanonicalWorkouts: fixture.canonicalWorkouts,
-      healthKitWorkoutLinks: fixture.workoutLinks,
-      healthKitWorkoutLinkClaims: fixture.workoutLinkClaims,
-    });
+    demoteLinkToCandidate(fixture);
+    const unconfirmed = projectConfirmedHealthKitLogProvenance(log, provenanceRuntime(fixture));
+    expect(unconfirmed.loggedToday.rows[0]).toEqual(log.loggedToday.rows[0]);
     expect(unconfirmed.loggedToday.rows[0].summary).toBe("Strength Training logged");
+    expect(unconfirmed.loggedToday.rows[0].context).toBeNull();
   });
 
-  it("credits Apple Health on the Strength line only when the row also carries Cardio lines", () => {
+  it("captions a confirmed Strength + Cardio group once, leaving every line and the summary unsuffixed", () => {
     const fixture = createSep23StrengthPresentationFixture();
     const lines = [
       { id: "training:logger", kind: "logger", summary: "Strength Training · 50 min", href: "/x", recordId: fixture.ids.session },
@@ -284,21 +290,64 @@ describe("confirmed HealthKit workout presentation", () => {
     const log = { localDate: fixture.day, loggedToday: { dateKey: fixture.day, rows: [
       { id: "training", summary: "Strength Training · 50 min, 2 Outdoor Walks · 32 min", context: null, recordId: null, lines },
     ] }, pendingEvidenceReviews: [] };
-    const runtime = {
-      canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
-      healthKitCanonicalWorkouts: fixture.canonicalWorkouts,
-      healthKitWorkoutLinks: fixture.workoutLinks,
-      healthKitWorkoutLinkClaims: fixture.workoutLinkClaims,
-    };
+    const runtime = provenanceRuntime(fixture);
     const row = projectConfirmedHealthKitLogProvenance(log, runtime).loggedToday.rows[0];
-    expect(row.lines.map((line) => line.summary)).toEqual(["Strength Training · 50 min · Apple Health", "2 Outdoor Walks · 32 min"]);
-    expect(row.summary).toBe("Strength Training · 50 min · Apple Health, 2 Outdoor Walks · 32 min");
-    // Idempotent: projecting again changes nothing.
+    expect(row.lines.map((line) => line.summary)).toEqual(["Strength Training · 50 min", "2 Outdoor Walks · 32 min"]);
+    expect(row.lines).toEqual(lines);
+    expect(row.summary).toBe("Strength Training · 50 min, 2 Outdoor Walks · 32 min");
+    expect(row.context).toBe("Apple Health");
+    // Idempotent: projecting again changes nothing and never doubles the caption.
     const again = projectConfirmedHealthKitLogProvenance({ ...log, loggedToday: { ...log.loggedToday, rows: [row] } }, runtime);
-    expect(again.loggedToday.rows[0].summary).toBe(row.summary);
+    expect(again.loggedToday.rows[0]).toEqual(row);
+    expect(again.loggedToday.rows[0].context).toBe("Apple Health");
   });
 
-  it("preserves HealthKit provenance on an aggregate Log row with multiple Training sessions", () => {
+  it("leaves a Strength + Cardio group untouched while the Strength link is unconfirmed", () => {
+    // Deliberate product decision: a caption under the group would claim the
+    // unconfirmed Strength line, so the Cardio lines' provenance stays silent.
+    const fixture = createSep23StrengthPresentationFixture();
+    demoteLinkToCandidate(fixture);
+    const lines = [
+      { id: "training:logger", kind: "logger", summary: "Strength Training · 50 min", href: "/x", recordId: fixture.ids.session },
+      { id: "training:cardio:outdoor-walk", kind: "cardio", summary: "2 Outdoor Walks · 32 min", href: "/progress/training", recordId: null },
+    ];
+    const log = { localDate: fixture.day, loggedToday: { dateKey: fixture.day, rows: [
+      { id: "training", summary: "Strength Training · 50 min, 2 Outdoor Walks · 32 min", context: null, recordId: null, lines },
+    ] }, pendingEvidenceReviews: [] };
+    const row = projectConfirmedHealthKitLogProvenance(log, provenanceRuntime(fixture)).loggedToday.rows[0];
+    expect(row).toEqual(log.loggedToday.rows[0]);
+    expect(row.context).toBeNull();
+    expect(row.lines.map((line) => line.summary)).toEqual(["Strength Training · 50 min", "2 Outdoor Walks · 32 min"]);
+  });
+
+  it("joins Apple Health onto an existing Strength context caption", () => {
+    const fixture = createSep23StrengthPresentationFixture();
+    const lines = [
+      { id: "training:logger", kind: "logger", summary: "Strength Training · 50 min", href: "/x", recordId: fixture.ids.session },
+    ];
+    const log = { localDate: fixture.day, loggedToday: { dateKey: fixture.day, rows: [
+      { id: "training", summary: "Strength Training · 50 min", context: "Movements not added", recordId: fixture.ids.session, lines },
+    ] }, pendingEvidenceReviews: [] };
+    const row = projectConfirmedHealthKitLogProvenance(log, provenanceRuntime(fixture)).loggedToday.rows[0];
+    expect(row.summary).toBe("Strength Training · 50 min");
+    expect(row.lines).toEqual(lines);
+    expect(row.context).toBe("Movements not added · Apple Health");
+  });
+
+  it("keeps a Cardio-only row the domain already captioned unchanged", () => {
+    const fixture = createSep23StrengthPresentationFixture();
+    const lines = [
+      { id: "training:cardio:outdoor-walk", kind: "cardio", summary: "2 Outdoor Walks · 32 min", href: "/progress/training", recordId: null },
+    ];
+    const log = { localDate: fixture.day, loggedToday: { dateKey: fixture.day, rows: [
+      { id: "training", summary: "2 Outdoor Walks · 32 min", context: "Apple Health", href: "/progress/training", recordId: null, lines },
+    ] }, pendingEvidenceReviews: [] };
+    const row = projectConfirmedHealthKitLogProvenance(log, provenanceRuntime(fixture)).loggedToday.rows[0];
+    expect(row).toEqual(log.loggedToday.rows[0]);
+    expect(row.context).toBe("Apple Health");
+  });
+
+  it("captions an aggregate legacy Log row with multiple Training sessions without touching its summary", () => {
     const fixture = createSep23StrengthPresentationFixture();
     const second = structuredClone(fixture.canonicalEvidenceObjects
       .find((record) => record.canonicalId === fixture.ids.session));
@@ -321,15 +370,11 @@ describe("confirmed HealthKit workout presentation", () => {
       pendingEvidenceReviews: [],
     };
 
-    const projected = projectConfirmedHealthKitLogProvenance(log, {
-      canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
-      healthKitCanonicalWorkouts: fixture.canonicalWorkouts,
-      healthKitWorkoutLinks: fixture.workoutLinks,
-      healthKitWorkoutLinkClaims: fixture.workoutLinkClaims,
-    });
+    const projected = projectConfirmedHealthKitLogProvenance(log, provenanceRuntime(fixture));
 
     expect(projected.loggedToday.rows).toHaveLength(1);
-    expect(projected.loggedToday.rows[0].summary).toBe("Strength Training · Walking · Apple Health");
+    expect(projected.loggedToday.rows[0].summary).toBe("Strength Training · Walking");
+    expect(projected.loggedToday.rows[0].context).toBe("Apple Health");
   });
 
   it("attaches Apple telemetry to the one Logger-owned Workout Detail projection", async () => {
