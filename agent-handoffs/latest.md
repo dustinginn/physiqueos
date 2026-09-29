@@ -14,6 +14,8 @@ Production now runs `396e750d` (deployment `c0ad0cc9`). The build passed, the te
 - **A second sync** changed nothing: no duplicates and nothing reopened. The links, other reviews, workouts and evidence are unchanged.
 - **Seconds later** the app loaded Log and fired both "Workout needs review" notifications (your screenshot).
 
+**Your requirement is recorded:** the notification should fire when the review is ready, not when you open Log. The recommended Native change is to check for new reviews after every automatic HealthKit sync, on any tab. It needs a Native build and your go-ahead.
+
 **Worth knowing:**
 - The app only fires this notification when the Log screen loads; changing that needs a Native change.
 - The notification says "1 possible Logger sessions", a one-line server wording fix.

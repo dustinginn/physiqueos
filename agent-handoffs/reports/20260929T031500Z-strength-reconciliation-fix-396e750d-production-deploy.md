@@ -76,7 +76,14 @@ The Founder's lock-screen screenshot (7:58 PM PDT, "1m ago" at 7:59) shows both 
 
 ## Findings for the backlog (not changed in this task)
 
-1. **The notification only fires when the Log screen loads.** Build 68 runs the reconciliation notifier only from the Log view: on appear, on a day change or foreground while it is visible, and on pull-to-refresh. A review created while the Log isn't loaded notifies only on the next Log load. Tonight that happened within seconds, because the app was foregrounded on Log. A background- or Home-driven reconcile would make the alert independent of which tab is open. That needs a Native change.
+1. **Founder requirement (2026-09-29): "Those notifications should fire when the review is ready, not just when I open the log page so that the notification prompts me to go to the log page and confirm."** The Founder confirmed the notifications appeared only when they opened the Log page.
+
+   **Recommended design (Native, needs a build):**
+   - The reviews are created by the phone's own HealthKit ingest, and the ingest result already reports `workoutRelationships.reconciliationReviewsCreated` and `reconciliationReviewsReopened`.
+   - After every automatic HealthKit sync (foreground on any tab, and HealthKit background delivery), refresh the pending-review queue and run the same identity-diffed `WorkoutReconciliationReviewReadyNotifier.reconcile`. The notification then fires when the review becomes ready, whatever tab is open, and a tap deep-links to the review. No server push infrastructure is needed.
+   - Caveat: if iOS doesn't wake the app for background delivery, the alert waits for the next app open on any tab. Only APNs server push would remove that limit, and it is a larger piece of infrastructure.
+
+   **Current behaviour:** Build 68 runs the reconciliation notifier only from the Log view: on appear, on a day change or foreground while it is visible, and on pull-to-refresh. A review created while the Log isn't loaded notifies only on the next Log load. Tonight that happened within seconds, because the app was foregrounded on Log. A background- or Home-driven reconcile would make the alert independent of which tab is open. That needs a Native change.
 2. **Copy:** the pending-review summary pluralises wrongly: "1 possible Logger sessions". It comes from the server's `LogReadService.projectPendingReviews`. It is a one-line server fix.
 3. **Test nits from the fresh review:**
    - a pending-review assertion in the "predates activation" test;
