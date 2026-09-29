@@ -149,6 +149,51 @@ describe("controlled Workout window (policy enabled)", () => {
     expect(records.snapshot().healthKitCanonicalWorkouts).toHaveLength(1);
   });
 
+  it("a fully aligned (deterministic) match still gets a Founder review when automatic confirmation is off", async () => {
+    // Regression for Sep 27 and Sep 28, 2026: the Logger now records its completion, so a real
+    // session starts inside and ends with the Apple workout — CONFIDENT and eligible for the
+    // deterministic auto-confirm gate. With the policy's automatic confirmation OFF, the matcher
+    // wrote the candidate link but neither a review nor a confirmation: stranded, no notification.
+    const records = store({ evidence: [logger("session-a", "10:02", "10:59")] });
+    const first = await ingest(records, [workout()], "b1");
+    const snapshot = records.snapshot();
+    expect(snapshot.healthKitWorkoutLinks[0]).toMatchObject({ status: "candidate", loggerSessionCanonicalId: "session-a" });
+    expect(first.result.workoutRelationships).toMatchObject({ reconciliationReviewsCreated: 1, automaticallyConfirmed: 0 });
+    expect(snapshot.evidenceReviews).toHaveLength(1);
+    expect(snapshot.evidenceReviews[0]).toMatchObject({ reviewKind: "healthkit_workout_reconciliation", status: "pending",
+      candidates: [{ loggerSessionCanonicalId: "session-a" }] });
+  });
+
+  it("an already-stranded aligned candidate gets its review on the next ordinary batch", async () => {
+    // The stranded production shape (Sep 27/28): the candidate link exists, but no review.
+    // Rebuild exactly that state, then let an ordinary later batch re-assess it — the review is
+    // created by the matcher itself, nothing by hand.
+    const first = store({ evidence: [logger("session-a", "10:02", "10:59")] });
+    await ingest(first, [workout()], "b1");
+    const { evidenceReviews: _opened, ...stranded } = first.snapshot();
+    const records = createInMemoryCanonicalRecordStore(stranded);
+    expect(records.snapshot().healthKitWorkoutLinks[0]).toMatchObject({ status: "candidate" });
+    expect(records.snapshot().evidenceReviews ?? []).toEqual([]);
+    const replay = await ingest(records, [activity({ moveCalories: 900 })], "b2");
+    expect(replay.result.workoutRelationships).toMatchObject({ reconciliationReviewsCreated: 1, automaticallyConfirmed: 0 });
+    expect(records.snapshot().evidenceReviews).toEqual([expect.objectContaining({ status: "pending",
+      reviewKind: "healthkit_workout_reconciliation", candidates: [expect.objectContaining({ loggerSessionCanonicalId: "session-a" })] })]);
+    // Idempotent: a further batch neither duplicates nor bumps it.
+    const before = structuredClone(records.snapshot().evidenceReviews);
+    const again = await ingest(records, [activity({ moveCalories: 905, sourceRevision: 2 })], "b3");
+    expect(again.result.workoutRelationships.reconciliationReviewsCreated).toBe(0);
+    expect(records.snapshot().evidenceReviews).toEqual(before);
+  });
+
+  it("automatic confirmation, when on and effective, still confirms an aligned match without a Founder review", async () => {
+    const records = store({ evidence: [logger("session-a", "10:02", "10:59")],
+      workoutPolicyOverrides: { linkAutoConfirm: true, linkAutoConfirmEffectiveAt: "2026-09-23T00:00:00.000Z" } });
+    const result = await ingest(records, [workout()], "b1");
+    expect(result.result.workoutRelationships).toMatchObject({ automaticallyConfirmed: 1, reconciliationReviewsCreated: 0 });
+    expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("confirmed");
+    expect(records.snapshot().evidenceReviews).toEqual([expect.objectContaining({ status: "resolved_confirmed" })]);
+  });
+
   it("re-evaluates the link when the Logger session is committed AFTER the Apple workout arrived", async () => {
     const records = store();
     await ingest(records, [workout()], "b1");
@@ -300,10 +345,10 @@ describe("controlled Workout window (policy enabled)", () => {
     await ingest(records, [workout()], "history-collision-1");
     const canonicalWorkout = records.snapshot().healthKitCanonicalWorkouts[0];
     const reviewId = getHealthKitWorkoutReconciliationId(canonicalWorkout.id);
-    await records.putIfAbsent({
-      ownerUserId: OWNER, collection: "evidenceReviews", recordId: reviewId,
-      payload: { id: reviewId, userId: OWNER, status: "pending", reviewKind: "generic_evidence_review", version: 1 },
-    });
+    // The first batch has (correctly) opened a Founder review at this identity;
+    // an unexpected record now occupies it instead.
+    await occupyReviewIdentity(records, reviewId,
+      { id: reviewId, userId: OWNER, status: "pending", reviewKind: "generic_evidence_review", version: 1 });
     const currentPolicy = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID });
     await records.put({
       ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID,
@@ -328,9 +373,7 @@ describe("controlled Workout window (policy enabled)", () => {
     await ingest(records, [workout()], "history-identity-1");
     const canonicalWorkout = records.snapshot().healthKitCanonicalWorkouts[0];
     const reviewId = getHealthKitWorkoutReconciliationId(canonicalWorkout.id);
-    await records.putIfAbsent({
-      ownerUserId: OWNER, collection: "evidenceReviews", recordId: reviewId, sourceIdentity: reviewId,
-      payload: {
+    await occupyReviewIdentity(records, reviewId, {
         schemaVersion: "healthkit-workout-reconciliation-v1",
         reviewKind: "healthkit_workout_reconciliation",
         id: reviewId,
@@ -343,7 +386,6 @@ describe("controlled Workout window (policy enabled)", () => {
         strategicEvidenceEligibility: "quarantined",
         createdAt: "2026-09-23T23:30:00.000Z",
         updatedAt: "2026-09-23T23:30:00.000Z",
-      },
     });
     const currentPolicy = await records.get({ ownerUserId: OWNER, collection: "healthKitConfiguration", recordId: WORKOUT_POLICY_ID });
     await records.put({
@@ -862,6 +904,17 @@ describe("strategic quarantine", () => {
   });
 });
 
+// Put a record at a review identity whether or not the matcher already opened one there.
+async function occupyReviewIdentity(records, reviewId, payload) {
+  const existing = await records.get({ ownerUserId: OWNER, collection: "evidenceReviews", recordId: reviewId });
+  if (existing) {
+    await records.put({ ownerUserId: OWNER, collection: "evidenceReviews", recordId: reviewId, sourceIdentity: reviewId,
+      expectedVersion: existing.version, payload });
+  } else {
+    await records.putIfAbsent({ ownerUserId: OWNER, collection: "evidenceReviews", recordId: reviewId, sourceIdentity: reviewId, payload });
+  }
+}
+
 async function ingest(records, observations, batchId = "batch-one", { receivedAt = "2026-09-23T23:30:00.000Z" } = {}) {
   return createCanonicalPersistenceCommandPorts({ records, now: () => new Date(receivedAt) })
     .ingestHealthKitObservations({
@@ -925,13 +978,13 @@ function workout({
   };
 }
 
-function activity({ moveCalories = 800 } = {}) {
+function activity({ moveCalories = 800, sourceRevision = 1 } = {}) {
   return {
     observationType: "activity_summary",
     externalId: `activity-summary:${DAY}`,
     source: { bundleIdentifier: "com.apple.Health" },
     occurrence: { localDate: DAY, timeZone: "America/Los_Angeles" },
-    activitySummary: { aggregationScope: "daily_total_including_workouts", coverage: "complete_day", sourceRevision: 1, dailyActivity: { move_calories: moveCalories, exercise_minutes: 50, stand_hours: 11 } },
+    activitySummary: { aggregationScope: "daily_total_including_workouts", coverage: "complete_day", sourceRevision, dailyActivity: { move_calories: moveCalories, exercise_minutes: 50, stand_hours: 11 } },
   };
 }
 

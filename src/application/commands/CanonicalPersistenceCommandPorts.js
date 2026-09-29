@@ -969,15 +969,19 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           (terminalStatusPresent && !hasTerminalFounderResolution) ||
           !["pending", "superseded", "resolved_confirmed", "resolved_no_match"].includes(existingReview.status)
         );
-        const plausibleButNotDeterministic = assessment.outcome === HealthKitStrengthMatchOutcome.AMBIGUOUS ||
-          assessment.outcome === HealthKitStrengthMatchOutcome.POSSIBLE ||
-          (assessment.outcome === HealthKitStrengthMatchOutcome.CONFIDENT && autoGate?.eligible !== true);
-        const needsFounderResolution = isPrimary && !workoutAlreadyLinked &&
-          !hasTerminalFounderResolution && plausibleButNotDeterministic;
         const prospectiveAutoConfirm = workoutPolicy.linkAutoConfirm === true &&
           instantAtOrAfter(workout.createdAt, workoutPolicy.linkAutoConfirmEffectiveAt);
         const willAutomaticallyConfirm = prospectiveAutoConfirm && currentLink &&
           autoGate?.eligible === true && !hasTerminalFounderResolution && !reconciliationHistoryConflict;
+        // A deterministic (gate-eligible) match is left to automatic confirmation only
+        // when it will actually be confirmed now. With automatic confirmation off (or not
+        // yet effective, or refused), it needs the Founder like any other plausible match —
+        // otherwise it would be stranded as a candidate with neither a review nor a link.
+        const plausibleButNotDeterministic = assessment.outcome === HealthKitStrengthMatchOutcome.AMBIGUOUS ||
+          assessment.outcome === HealthKitStrengthMatchOutcome.POSSIBLE ||
+          (assessment.outcome === HealthKitStrengthMatchOutcome.CONFIDENT && !willAutomaticallyConfirm);
+        const needsFounderResolution = isPrimary && !workoutAlreadyLinked &&
+          !hasTerminalFounderResolution && plausibleButNotDeterministic;
         if (needsFounderResolution) {
           const desired = createHealthKitWorkoutReconciliationReview({
             ownerUserId: context.ownerUserId,
