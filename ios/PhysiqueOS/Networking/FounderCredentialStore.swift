@@ -82,6 +82,18 @@ enum FounderCredentialStoreError: Error, Equatable {
     case signatureFailed
 }
 
+enum SenderConstrainedRefreshRollout {
+    static let infoPlistKey = "PHYSIQUEOSSenderConstrainedRefreshEnrollment"
+
+    static var isEnabled: Bool {
+        isEnabled(infoDictionary: Bundle.main.infoDictionary ?? [:])
+    }
+
+    static func isEnabled(infoDictionary: [String: Any]) -> Bool {
+        (infoDictionary[infoPlistKey] as? NSNumber)?.boolValue == true
+    }
+}
+
 /// Long-lived Founder device material is stored only in the iOS Keychain.
 /// `WhenUnlockedThisDeviceOnly` prevents backup migration and keeps the
 /// credential unavailable while the device is locked. Access credentials
@@ -232,16 +244,7 @@ final class SecureEnclaveFounderInstallationSigningKey: FounderInstallationSigni
             }
             guard lookup == errSecItemNotFound else { throw FounderCredentialStoreError.keychain(lookup) }
 
-            let attributes: [String: Any] = [
-                kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-                kSecAttrKeySizeInBits as String: 256,
-                kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-                kSecPrivateKeyAttrs as String: [
-                    kSecAttrIsPermanent as String: true,
-                    kSecAttrApplicationTag as String: applicationTag,
-                    kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                ],
-            ]
+            let attributes = Self.privateKeyCreationAttributes(applicationTag: applicationTag)
             var error: Unmanaged<CFError>?
             guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
                 _ = error?.takeRetainedValue()
@@ -250,6 +253,19 @@ final class SecureEnclaveFounderInstallationSigningKey: FounderInstallationSigni
             cachedPrivateKey = key
             return key
         }
+    }
+
+    static func privateKeyCreationAttributes(applicationTag: Data) -> [String: Any] {
+        [
+                kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+                kSecAttrKeySizeInBits as String: 256,
+                kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
+                kSecPrivateKeyAttrs as String: [
+                    kSecAttrIsPermanent as String: true,
+                    kSecAttrApplicationTag as String: applicationTag,
+                    kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                ],
+        ]
     }
 }
 

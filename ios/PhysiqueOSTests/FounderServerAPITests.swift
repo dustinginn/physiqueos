@@ -1,10 +1,56 @@
 import Foundation
+import Security
 import XCTest
 import SwiftUI
 import UIKit
 @testable import PhysiqueOS
 
 final class FounderServerAPITests: XCTestCase {
+    func testSenderConstrainedEnrollmentRolloutIsLocallyDisabledByDefault() {
+        XCTAssertFalse(SenderConstrainedRefreshRollout.isEnabled(infoDictionary: [:]))
+        XCTAssertFalse(SenderConstrainedRefreshRollout.isEnabled(infoDictionary: [
+            SenderConstrainedRefreshRollout.infoPlistKey: false,
+        ]))
+        XCTAssertTrue(SenderConstrainedRefreshRollout.isEnabled(infoDictionary: [
+            SenderConstrainedRefreshRollout.infoPlistKey: true,
+        ]))
+    }
+
+    func testSecureEnclaveKeyAttributesAreNonExportableUnattendedAndDeviceOnly() throws {
+        let attributes = SecureEnclaveFounderInstallationSigningKey.privateKeyCreationAttributes(
+            applicationTag: Data("test-key".utf8)
+        )
+        XCTAssertEqual(attributes[kSecAttrTokenID as String] as? String, kSecAttrTokenIDSecureEnclave as String)
+        let privateAttributes = try XCTUnwrap(attributes[kSecPrivateKeyAttrs as String] as? [String: Any])
+        XCTAssertEqual(privateAttributes[kSecAttrIsPermanent as String] as? Bool, true)
+        XCTAssertEqual(
+            privateAttributes[kSecAttrAccessible as String] as? String,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String
+        )
+        XCTAssertNil(privateAttributes[kSecAttrAccessControl as String])
+    }
+
+    func testSwiftProofCanonicalizationMatchesProtocolVector() {
+        let refreshCredential = String(repeating: "a", count: 43)
+        let intent = String(repeating: "i", count: 43)
+        let successor = String(repeating: "b", count: 43)
+        let nonce = String(repeating: "n", count: 43)
+        let proofId = String(repeating: "p", count: 43)
+        let commitment = SenderConstrainedRefresh.successorCommitment(successor)
+        XCTAssertEqual(commitment, "jbaY_8twy8ui3RqbVNnLl36qQwcWwR5c2oS6kokaWEc")
+        XCTAssertEqual(
+            SenderConstrainedRefresh.proofMessage(
+                refreshCredential: refreshCredential,
+                rotationIntentId: intent,
+                successorRefreshCredential: successor,
+                successorCommitment: commitment,
+                nonce: nonce,
+                proofId: proofId
+            ).base64URLEncodedString(),
+            "cGh5c2lxdWVvcy1kZXZpY2UtcHJvb2YtdjEKUE9TVAovYXBpL3YxL25hdGl2ZS9hdXRoL3JlZnJlc2gKUmVhYnRCRWlSams2Y1VOZXdoOUZQT3VCU1VfVWpzWUdTcVdCUUp0Y2tZTQpubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5uCnBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA"
+        )
+    }
+
     @MainActor
     func testHomeHandsOffNotificationsBeforeSlowSpeculativePrefetch() async throws {
         let model = HomeViewModel(api: FixtureHomeAPI(), priorityStore: LoggingSandboxStore(), goalsSandboxStore: GoalsSandboxStore(), briefingStore: BriefingSandboxStore(), appliesSandboxProjections: false)
@@ -154,6 +200,36 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertNotNil(store.currentEnvelope()?.pendingRotation)
         let policyDenialState = await relaunched.sessionRecoveryState()
         XCTAssertEqual(policyDenialState, .recoveringSession)
+    }
+
+    func testExpiredOrReplayedProofKeepsPendingIntentAndRecoversWithFreshChallenge() async throws {
+        let store = MemoryEnvelopeCredentialStore()
+        let signer = RecordingInstallationSigningKey()
+        let transport = SenderConstrainedFounderTransport(refreshProblemCodes: ["DEVICE_PROOF_INVALID"])
+        let pairing = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        _ = try await pairing.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone"
+        )
+
+        let interrupted = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        await XCTAssertThrowsErrorAsync(try await interrupted.readProfile()) { error in
+            guard case ProductionNativeError.unauthenticated(let problem) = error else {
+                return XCTFail("Expected retryable proof rejection, got \(error)")
+            }
+            XCTAssertEqual(problem?.code, "DEVICE_PROOF_INVALID")
+        }
+        let pending = try XCTUnwrap(store.currentEnvelope()?.pendingRotation)
+        let interruptedState = await interrupted.sessionRecoveryState()
+        XCTAssertEqual(interruptedState, .recoveringSession)
+
+        let relaunched = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        _ = try await relaunched.readProfile()
+        let promoted = try XCTUnwrap(store.currentEnvelope())
+        XCTAssertNil(promoted.pendingRotation)
+        XCTAssertEqual(promoted.currentRefreshCredential, pending.proposedSuccessorRefreshCredential)
+        let snapshots = try await transport.refreshRequestSnapshots()
+        XCTAssertEqual(snapshots.count, 2)
+        XCTAssertNotEqual(snapshots[0].proofId, snapshots[1].proofId)
     }
 
     @MainActor
@@ -6356,12 +6432,17 @@ private struct RefreshRequestSnapshot: Sendable {
 private actor SenderConstrainedFounderTransport: FounderHTTPTransport {
     private var recordedRequests: [URLRequest] = []
     private var remainingRefreshFailures: Int
-    private let refreshProblemCode: String?
+    private var refreshProblemCodes: [String]
     private var challengeCount = 0
 
     init(refreshFailuresBeforeSuccess: Int = 0, refreshProblemCode: String? = nil) {
         remainingRefreshFailures = refreshFailuresBeforeSuccess
-        self.refreshProblemCode = refreshProblemCode
+        refreshProblemCodes = refreshProblemCode.map { [$0] } ?? []
+    }
+
+    init(refreshFailuresBeforeSuccess: Int = 0, refreshProblemCodes: [String]) {
+        remainingRefreshFailures = refreshFailuresBeforeSuccess
+        self.refreshProblemCodes = refreshProblemCodes
     }
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
@@ -6393,7 +6474,8 @@ private actor SenderConstrainedFounderTransport: FounderHTTPTransport {
                 remainingRefreshFailures -= 1
                 throw URLError(.networkConnectionLost)
             }
-            if let refreshProblemCode {
+            if !refreshProblemCodes.isEmpty {
+                let refreshProblemCode = refreshProblemCodes.removeFirst()
                 return response(
                     request,
                     status: 401,

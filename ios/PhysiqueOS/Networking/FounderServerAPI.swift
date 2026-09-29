@@ -1155,7 +1155,6 @@ actor ProductionNativeAPI {
             "REFRESH_CREDENTIAL_EXPIRED",
             "REFRESH_REUSE_DETECTED",
             "SESSION_REAUTHENTICATION_REQUIRED",
-            "DEVICE_PROOF_INVALID",
             "REFRESH_PROOF_UNAVAILABLE",
             "CREDENTIAL_MALFORMED",
         ].contains(code)
@@ -1487,7 +1486,7 @@ private struct SenderConstrainedRefreshRequest: Encodable {
     let proof: Proof
 }
 
-private enum SenderConstrainedRefresh {
+enum SenderConstrainedRefresh {
     static func randomValue() throws -> String {
         var bytes = [UInt8](repeating: 0, count: 32)
         guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
