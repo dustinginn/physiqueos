@@ -974,7 +974,7 @@ struct ProductionLogAPI: LogAPI {
     private static func destination(for row: RowPayload, localDate: String) -> AppDestination? {
         // A Training row summarizing several workouts (Strength with Cardio,
         // or Cardio alone) has no single record: it opens today's Training Day.
-        if row.id == .training, row.recordId == nil, !(row.lines?.values.isEmpty ?? true) {
+        if row.id == .training, (row.lines?.values.count ?? 0) > 1 || (row.recordId == nil && !(row.lines?.values.isEmpty ?? true)) {
             return .trainingDay(date: localDate)
         }
         guard let recordId = row.recordId else { return nil }

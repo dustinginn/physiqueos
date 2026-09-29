@@ -861,6 +861,19 @@ final class TrainingLoggerTests: XCTestCase {
     }
 
     @MainActor
+    func testSaveAndLeaveMarksTheDraftLeftAndResumingClearsIt() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: StubSucceedingTrainingWriteAPI(), draftStore: store, authority: .founderProduction)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        let id = try XCTUnwrap(viewModel.draft?.id)
+        viewModel.saveAndLeave()
+        XCTAssertNotNil(store.loadAll().first { $0.id == id }?.leftAt)
+        viewModel.resume(draftId: id)
+        XCTAssertNil(viewModel.draft?.leftAt, "Resuming makes it the in-progress workout again.")
+    }
+
+    @MainActor
     func testCompletionShowsTheServersRecordsFromTheCommitResult() async throws {
         let records = [Self.record("a"), Self.record("b", exercise: "Squat")]
         let writeAPI = RecordsTrainingWriteAPI(resultRecords: .init(status: "completed", records: records), readBackRecords: nil)

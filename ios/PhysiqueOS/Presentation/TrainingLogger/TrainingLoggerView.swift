@@ -47,7 +47,7 @@ struct TrainingLoggerView: View {
             if let viewModel, let draft = viewModel.draft, draft.step != .complete, draft.step != .workout {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save & Leave") {
-                        viewModel.persist()
+                        viewModel.saveAndLeave()
                         dismiss()
                     }
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
@@ -557,7 +557,7 @@ struct TrainingLoggerView: View {
 
                 HStack(spacing: 8) {
                     Button {
-                        viewModel.persist()
+                        viewModel.saveAndLeave()
                         dismiss()
                     } label: {
                         Label("Save & Leave", systemImage: "arrow.left")

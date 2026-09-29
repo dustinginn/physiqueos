@@ -1906,7 +1906,7 @@ final class FounderServerAPITests: XCTestCase {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),
             byResource: [
-                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-28","loggedToday":{"rows":[{"id":"training","summary":"Strength Training · 50 min · Apple Health, 2 Outdoor Walks · 32 min","context":null,"recordId":null,"lines":\#(lines)},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"171 active calories so far","context":"Apple Health","recordId":"activity_day|2026-09-28"}]},"pendingEvidenceReviews":[]}"#),
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: #"{"localDate":"2026-09-28","loggedToday":{"rows":[{"id":"training","summary":"Strength Training · 50 min · Apple Health, 2 Outdoor Walks · 32 min","context":null,"recordId":"s","lines":\#(lines)},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"171 active calories so far","context":"Apple Health","recordId":"activity_day|2026-09-28"}]},"pendingEvidenceReviews":[]}"#),
                 "weight": productionWeightForLogJSON(date: nil, value: nil),
             ]
         )
@@ -1919,6 +1919,7 @@ final class FounderServerAPITests: XCTestCase {
         // Malformed elements (a number, a line without a summary) are dropped, never fatal.
         XCTAssertEqual(trainingRow.displayLines.map(\.summary), ["Strength Training · 50 min · Apple Health", "2 Outdoor Walks · 32 min"])
         XCTAssertEqual(trainingRow.summary, "Strength Training · 50 min · Apple Health, 2 Outdoor Walks · 32 min")
+        // The row keeps the Strength record for single-line clients; a multi-line row opens Training Day here.
         XCTAssertEqual(trainingRow.destination, .trainingDay(date: "2026-09-28"))
         let activityRow = try XCTUnwrap(log.loggedToday.first { $0.kind == .activity })
         XCTAssertEqual(activityRow.summary, "171 active calories so far")

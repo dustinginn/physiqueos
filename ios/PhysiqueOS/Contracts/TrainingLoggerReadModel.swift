@@ -143,6 +143,10 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// This is presentation/recovery state only; the draft id and the
     /// persisted idempotency key remain the mutation identity.
     var submissionState: TrainingLoggerSubmissionState? = nil
+    /// When the Founder chose Save & Leave. A left workout stays resumable
+    /// from Log's saved workouts, but the Log tab no longer routes into it.
+    /// Cleared when the workout is resumed.
+    var leftAt: String? = nil
 
     static func fresh(mode: TrainingLoggerMode, workoutDate: String, startedAt: String? = nil) -> Self {
         .init(
@@ -200,7 +204,7 @@ extension TrainingLoggerDraft {
         return drafts
             .filter { draft in
                 guard draft.mode == .live, draft.step != .complete, draft.submissionState == nil,
-                      let start = started(draft) else { return false }
+                      draft.leftAt == nil, let start = started(draft) else { return false }
                 let age = now.timeIntervalSince(start)
                 return age >= -5 * 60 && age <= activeLiveSessionWindow
             }

@@ -244,9 +244,11 @@ struct ActivityMetricTile: Identifiable, Equatable {
 }
 
 extension ActivityDayRecord {
-    /// The day's totals are still accumulating in Apple Health.
+    /// The day's totals are still accumulating in Apple Health -- the
+    /// Server's own call (partial coverage AND its today). A past day left
+    /// partial is not "still updating".
     var isInProgress: Bool {
-        coverage == "partial_day" || (coverage == nil && isPartialDay == true)
+        isPartialDay == true
     }
 
     /// The workout-exceeds-daily gap is against a total still "so far".

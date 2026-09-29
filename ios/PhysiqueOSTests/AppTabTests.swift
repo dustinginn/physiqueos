@@ -90,6 +90,16 @@ final class AppTabTests: XCTestCase {
                      "Completed/abandoned/submitted sessions immediately restore normal Log behavior.")
     }
 
+    func testSaveAndLeaveEndsLogTabRoutingUntilTheWorkoutIsResumed() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        var left = draft("left", now: now)
+        left.leftAt = ISO8601DateFormatter().string(from: now)
+        XCTAssertNil(TrainingLoggerDraft.activeLiveSession(in: [left], now: now),
+                     "After Save & Leave the Log tab never re-traps the Founder.")
+        left.leftAt = nil
+        XCTAssertEqual(TrainingLoggerDraft.activeLiveSession(in: [left], now: now)?.id, "left")
+    }
+
     func testLogTabRoutesIntoTheActiveSessionOnlyWhenEnteringLogAtItsRoot() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let tabs = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Root/RootTabView.swift"), encoding: .utf8)

@@ -131,6 +131,7 @@ final class TrainingLoggerViewModel {
     func resume(draftId: String) {
         guard canWrite else { return }
         draft = savedDrafts.first { $0.id == draftId }
+        draft?.leftAt = nil
         if draft?.supportingEvidenceAssets.isEmpty == false,
            draft?.supportingWorkouts == nil {
             update { $0.addSupportingEvidence([]) }
@@ -344,6 +345,13 @@ final class TrainingLoggerViewModel {
         Task { [writeAPI] in
             await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
         }
+    }
+
+    /// Save & Leave: keep the workout, and stop the Log tab routing into it.
+    func saveAndLeave() {
+        guard canWrite, draft != nil, draft?.step != .complete else { return }
+        draft?.leftAt = ISO8601DateFormatter().string(from: now())
+        persist()
     }
 
     func persist() {
