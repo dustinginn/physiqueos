@@ -31,7 +31,7 @@ import {
 import { applyDexaReviewMeasurements } from "../../domain/services/DexaPdfIntakeService.js";
 import { assertValidDexaScan } from "../../domain/services/DEXAContract.js";
 import { createReminderRepository } from "../../data/repositories/ReminderRepository.js";
-import { findSuspensionWindow } from "../../domain/services/ExecutionPriorityProjectionService.js";
+import { findExecutionForProtocol, findSuspensionWindow } from "../../domain/services/ExecutionPriorityProjectionService.js";
 import {
   createPriorityOccurrenceKey,
   isPrioritySkipSupportedReminder,
@@ -257,10 +257,13 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     resolveWorkoutReconciliation,
     completePriority: completeCanonicalPriority,
     skipPriority: skipCanonicalPriority,
-    reconcilePreviousDay: async (context) => create(context, "dailyCheckIns", `reconciliation:${context.payload.localDate}`, {
-      id: `reconciliation:${context.payload.localDate}`, userId: context.ownerUserId,
-      localDate: context.payload.localDate, items: context.payload.items, status: "reconciled", provenance: commandProvenance(context),
-    }),
+    reconcilePreviousDay: async (context) => {
+      await assertReconciledOccurrencesNotPaused(context);
+      return create(context, "dailyCheckIns", `reconciliation:${context.payload.localDate}`, {
+        id: `reconciliation:${context.payload.localDate}`, userId: context.ownerUserId,
+        localDate: context.payload.localDate, items: context.payload.items, status: "reconciled", provenance: commandProvenance(context),
+      });
+    },
     editProtocol: edit("protocols", "protocolId"),
     editGoal: edit("goals", "goalId"),
     transitionGoal: async (context) => mutateExisting(context, "goals", context.payload.goalId, {
@@ -2051,17 +2054,15 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
   }
 
   // A peptide execution suspended on the occurrence date (a dated pause
-  // window on the execution item) refuses the completion. The execution is
-  // resolved by type and protocol root from the reminder's linked protocol;
-  // reminders with no execution, or executions without suspensions, are
-  // unaffected.
-  async function assertPriorityOccurrenceNotPaused(context, reminder, occurrenceDate) {
-    if (!reminder?.linkedEntityId) return;
-    const executionItems = await records.list({ ownerUserId: context.ownerUserId, collection: "executionItems" });
-    const window = findSuspensionWindow(
-      findPeptideExecutionForReminder(executionItems, reminder, context.ownerUserId),
-      occurrenceDate
-    );
+  // window on the execution item) refuses the completion. Only a dose-aware
+  // `protocol_reminder` can be execution-backed, so any other reminder never
+  // reads the execution items; the execution is resolved with the same rule
+  // the projection uses (findExecutionForProtocol). Reminders with no
+  // execution, or executions without suspensions, are unaffected.
+  async function assertPriorityOccurrenceNotPaused(context, reminder, occurrenceDate, executionItems = null) {
+    if (reminder?.type !== "protocol_reminder" || !reminder.linkedEntityId) return;
+    const items = executionItems ?? await records.list({ ownerUserId: context.ownerUserId, collection: "executionItems" });
+    const window = findSuspensionWindow(findExecutionForProtocol(items, reminder.linkedEntityId).executionItem, occurrenceDate);
     if (!window) return;
     throw new ApplicationProblem({
       status: 422,
@@ -2070,6 +2071,25 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       detail: "Resume it from the Operating Plan to record doses again.",
       recovery: { pausedFrom: window.pausedFrom, protocolId: reminder.linkedEntityId, workflow: "peptide_protocol" },
     });
+  }
+
+  // `previous-day.reconcile.v1` carries the same guard: an item whose
+  // occurrence (its own date, else the reconciled day) falls inside a peptide
+  // execution's pause window is refused before the reconciliation is written.
+  async function assertReconciledOccurrencesNotPaused(context) {
+    const items = Array.isArray(context.payload.items) ? context.payload.items : [];
+    const ids = [...new Set(items.map((item) => String(item?.priorityId ?? item?.reminderId ?? item?.id ?? "")).filter(Boolean))];
+    if (!ids.length) return;
+    const reminders = await records.list({ ownerUserId: context.ownerUserId, collection: "reminders" });
+    let executionItems = null;
+    for (const item of items) {
+      const id = String(item?.priorityId ?? item?.reminderId ?? item?.id ?? "");
+      const reminder = reminders.find((candidate) => String(candidate?.id) === id) ?? null;
+      if (reminder?.type !== "protocol_reminder") continue;
+      executionItems ??= await records.list({ ownerUserId: context.ownerUserId, collection: "executionItems" });
+      const occurrenceDate = /^\d{4}-\d{2}-\d{2}$/.test(String(item?.occurrenceDate ?? "")) ? String(item.occurrenceDate) : String(context.payload.localDate);
+      await assertPriorityOccurrenceNotPaused(context, reminder, occurrenceDate, executionItems);
+    }
   }
 
   // `priority.skip.v1`: marks TODAY's occurrence of an ordinary priority as
@@ -3301,15 +3321,6 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     };
   }
   function commandProvenance(context) { return { source: "phase4-application-command", commandId: context.metadata.commandId, deviceId: context.principal.deviceId, ...(context.canonicalStoreEpoch ? { canonicalStoreEpoch: context.canonicalStoreEpoch } : {}) }; }
-}
-
-function findPeptideExecutionForReminder(executionItems = [], reminder, ownerUserId) {
-  const matches = (executionItems ?? []).filter((item) =>
-    item?.type === "peptide" &&
-    item.protocolRootId === reminder.linkedEntityId &&
-    (item.userId == null || String(item.userId) === String(ownerUserId))
-  );
-  return matches.length === 1 ? matches[0] : null;
 }
 
 function createSupplementProtocolId(name, commandId) {

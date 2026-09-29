@@ -8,6 +8,7 @@ import {
 } from "../models/SupportScheduleModel";
 import {
   composeTimelineWithStrategy,
+  formatDecimal,
   generatePeptideDosingTimeline,
   hydratePeptideDosingStrategy,
   normalizePeptideDosingStrategy,
@@ -129,7 +130,12 @@ export function preparePeptideExecutionTransition(store, command = {}, at = new 
   }
   const timelineChanged = JSON.stringify(existingTimeline) !== JSON.stringify(nextTimeline);
   const today = isDateOnly(command.today) ? command.today : null;
-  if (strategyBearing && today && timelineChanged && draft.dosingStrategy.startDate < today && draft.rewriteHistory !== true) {
+  // S1 guard: only what the save would change BEFORE today rewrites history.
+  // A first-time configuration, a future-only edit (an end date, an upcoming
+  // step) or a re-save of a synthesized stay ("2.0" vs "2") passes; a
+  // backdated plan that alters a phase already taken is refused unless the
+  // draft carries rewriteHistory (the Advanced editor, after confirmation).
+  if (strategyBearing && today && draft.rewriteHistory !== true && rewritesHistoryBeforeDate(existingTimeline, nextTimeline, today)) {
     return rejectedTransition(
       PeptideExecutionOutcome.INVALID,
       "This plan starts before today and would rewrite your dose history. Start a new plan from today, or confirm the rewrite.",
@@ -552,6 +558,27 @@ export function createPeptideSupportHydrationModel({ executionItem, protocol, re
 function semantic(item) { return JSON.stringify({ cadence: item.cadence, preferredSchedule: item.preferredSchedule, timingContext: item.timingContext, reminderPreference: item.reminderPreference, priority: item.priority, notes: item.notes, timeline: item.timeline, dosingStrategy: item.dosingStrategy ?? null, scheduleSuspensions: normalizeScheduleSuspensions(item) }); }
 function archiveTimeline(existing, timestamp) { return [...(existing.timelineHistory ?? []), { archivedAt: timestamp, executionRevision: existing.executionRevision ?? 1, timeline: normalizeTimeline(existing.timeline ?? []) }].slice(-PEPTIDE_TIMELINE_HISTORY_LIMIT); }
 function normalizeCanonicalRecord(item){const draft=normalizePeptideExecutionDraft({...item,timelineOperation:"replace"});return{...item,...draft};}
+/// True when the stored record has a phase that started before `today` and the
+/// two timelines differ once both are clipped to the dates before today:
+/// phases starting on/after today are dropped, open or later end dates are
+/// truncated to yesterday, and dose amounts/notes are normalized so equal
+/// values written differently ("2.0" / "2") never count as a rewrite.
+function rewritesHistoryBeforeDate(storedTimeline, composedTimeline, today) {
+  const stored = clipTimelineBeforeDate(storedTimeline, today);
+  if (stored.length === 0) return false;
+  return JSON.stringify(stored) !== JSON.stringify(clipTimelineBeforeDate(composedTimeline, today));
+}
+function clipTimelineBeforeDate(timeline, today) {
+  const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  return normalizeTimeline(timeline)
+    .filter((phase) => !phase.malformed && phase.startDate < today)
+    .map((phase) => ({
+      startDate: phase.startDate,
+      endDate: !phase.endDate || phase.endDate >= today ? yesterday : phase.endDate,
+      dose: { amount: formatDecimal(phase.dose.amount), unit: phase.dose.unit },
+      notes: phase.notes,
+    }));
+}
 function normalizeTimeline(timeline) { return (Array.isArray(timeline)?timeline:[]).map((phase)=>phase?.malformed?{malformed:true}:({startDate:String(phase?.startDate??""),endDate:phase?.endDate?String(phase.endDate):null,dose:{amount:String(phase?.dose?.amount??"").trim(),unit:String(phase?.dose?.unit??"").trim()},notes:String(phase?.notes??"").trim().slice(0,500)})); }
 function isDateOnly(value) { if(!/^\d{4}-\d{2}-\d{2}$/.test(value??""))return false;const[year,month,day]=value.split("-").map(Number);if(month<1||month>12||day<1||day>31)return false;const daysInMonth=new Date(Date.UTC(year,month,0)).getUTCDate();return day<=daysInMonth; }
 function normalizeCadence(value) { const cadence=String(value??"").trim().toLowerCase().replace(/[\s-]+/g,"_"); return ["specific_weekdays","weekly_days"].includes(cadence)?"specific_days":cadence; }

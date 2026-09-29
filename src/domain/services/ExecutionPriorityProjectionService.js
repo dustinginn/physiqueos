@@ -137,12 +137,25 @@ export function projectExecutionPriority({
     });
   }
 
+  // The phase is resolved before the PAUSED early return so a paused Priority
+  // Detail keeps its dose/phase rows; eligibility and completability stay off.
+  const phaseResolution = resolveExecutionPhase(
+    executionItem,
+    resolvedLocalDate
+  );
+  const phaseDose = normalizeDose(phaseResolution.current?.dose);
+  const directDose = normalizeDose(executionItem.dose);
+  const currentDose = phaseDose ?? directDose;
+
   if (pauseContext) {
     return createProjection({
+      activePhase: phaseResolution.current,
+      currentDose,
       executionItem,
       executionHref,
       historyAnchorId,
       localDate: resolvedLocalDate,
+      nextPhase: phaseResolution.next,
       occurrenceEligible: false,
       occurrenceCompleted,
       operationalReason: ExecutionPriorityOperationalReason.EXECUTION_PAUSED,
@@ -178,13 +191,6 @@ export function projectExecutionPriority({
     });
   }
 
-  const phaseResolution = resolveExecutionPhase(
-    executionItem,
-    resolvedLocalDate
-  );
-  const phaseDose = normalizeDose(phaseResolution.current?.dose);
-  const directDose = normalizeDose(executionItem.dose);
-  const currentDose = phaseDose ?? directDose;
   const requiresActivePhase = executionItem.type === "peptide";
   const missingRequiredPhase = requiresActivePhase && !phaseResolution.current;
   const missingHistoryAnchor = !historyAnchorId;

@@ -805,6 +805,30 @@ describe("peptide Support S4 read contract (additive keys)", () => {
     });
   });
 
+  it("keeps tonight's dose due under a pause dated tomorrow and nulls it once today is inside the window", async () => {
+    // NOW is Saturday 2026-08-29; move the plan to Saturdays so tonight's dose is still open.
+    const { narrow, runtime } = peptideSupportServices();
+    runtime.executionItems[0].preferredSchedule = { ...runtime.executionItems[0].preferredSchedule, daysOfWeek: ["saturday"] };
+    runtime.reminders[0].schedule = { ...runtime.reminders[0].schedule, daysOfWeek: ["saturday"] };
+    runtime.executionItems[0].scheduleSuspensions = [{ pausedFrom: "2026-08-30", resumedOn: null, pausedAt: "2026-08-29T16:00:00.000Z" }];
+    await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({
+      lifecycle: { state: "paused", since: "2026-08-30" },
+      nextDue: "Aug 29, 2026 · 9:45 PM", nextDueDate: "2026-08-29", nextDueTime: "21:45",
+    });
+    expect((await narrow.getOperatingPlanProtocolDomain({ protocolId: "peptide-protocol" })).methods[0]).toMatchObject({
+      lifecycleState: "active", executionLifecycle: { state: "paused", since: "2026-08-30" }, currentDose: "0.5 mg",
+    });
+
+    runtime.executionItems[0].scheduleSuspensions = [{ pausedFrom: "2026-08-29", resumedOn: null, pausedAt: "2026-08-29T16:00:00.000Z" }];
+    await expect(narrow.getPeptideSupport({ protocolId: "peptide-protocol" })).resolves.toMatchObject({
+      lifecycle: { state: "paused", since: "2026-08-29" },
+      nextDue: null, nextDueDate: null, nextDueTime: null,
+    });
+    expect((await narrow.getOperatingPlanProtocolDomain({ protocolId: "peptide-protocol" })).methods[0]).toMatchObject({
+      executionLifecycle: { state: "paused", since: "2026-08-29" }, currentDose: "Paused",
+    });
+  });
+
   it("marks advancedPlan only for a generator plan with changes ahead and never for a future-dated stay", async () => {
     const { narrow, runtime } = peptideSupportServices();
     const execution = runtime.executionItems[0];

@@ -367,11 +367,14 @@ export function createCoreNavigationReadService({
         const dosing = projectPeptideDosingStrategy(hydration.dosingStrategy);
         // S4 (additive): the dose summary is derived from the FULL stored
         // timeline (history-preserving saves keep frozen phases), never from
-        // the generated tail. Everything is null while paused except history.
+        // the generated tail. The lifecycle reads `paused` from the record
+        // (since = pausedFrom, even when the window starts tomorrow); next
+        // due skips suspended dates and is null only while today is inside
+        // the window, so tonight's still-eligible dose shows until it starts.
         const summary = projectPeptideDosingSummary({
           timeline: hydration.legacyTimeline, localDate, dosingMode: hydration.dosingMode, pattern: dosing.pattern,
         });
-        const nextDue = hydration.lifecycle.state === "paused" ? null : resolveNextSupportDue({
+        const nextDue = resolveNextSupportDue({
           schedule: hydration.supportSchedule, reminder, localDate,
           suspensions: hydration.scheduleSuspensions,
         });
@@ -1080,11 +1083,12 @@ function resolveNextSupportDue({ schedule, reminder, localDate, suspensions = []
   // reminder delivery. Turning reminders off must hide the bell without
   // erasing when the Support itself is next due. Completion history still
   // comes from the reminder occurrence anchor when one exists. A suspended
-  // execution (peptide pause window) has no next due while the window is
-  // open; dates inside any closed window are skipped, not shifted.
+  // execution (peptide pause window) has no next due while today is inside
+  // a window; dates inside any window (a pause dated tomorrow included) are
+  // skipped, not shifted, so a pause starting tomorrow keeps tonight's dose.
   if (!schedule || !localDate) return null;
   const windows = normalizeScheduleSuspensions(suspensions);
-  if (windows.some((window) => window.resumedOn === null)) return null;
+  if (isDateSuspended(windows, localDate)) return null;
   const start = /^\d{4}-\d{2}-\d{2}$/.test(schedule.startDate ?? "") ? schedule.startDate : localDate;
   const end = /^\d{4}-\d{2}-\d{2}$/.test(schedule.endDate ?? "") ? schedule.endDate : null;
   for (let offset = 0; offset <= 370; offset += 1) {

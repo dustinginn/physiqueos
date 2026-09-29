@@ -200,6 +200,27 @@ describe("PriorityCompletionService honours peptide pause windows (S3)", () => {
     }));
   });
 
+  it("resolves the execution by protocol root or linked protocol id (the projection's rule) and skips the check for other reminder types", async () => {
+    const linked = candidateWith([{ pausedFrom: "2026-08-31", resumedOn: null }]);
+    linked.executionItems[0] = { ...linked.executionItems[0], protocolRootId: undefined, linkedProtocolId: "protocol" };
+    await expect(createPriorityCompletionService({
+      mutateCanonicalRuntime: async (options) => ({ result: await options.mutate(linked), changedCollections: [] }),
+      now: () => new Date("2026-08-31T16:00:00Z"),
+    }).complete({ priorityId: "reminder", occurrenceDate: "2026-08-31", dose: "0.25 mg", protocolId: "protocol" }))
+      .rejects.toMatchObject({ code: "PRIORITY_OCCURRENCE_PAUSED" });
+
+    const plain = candidateWith([{ pausedFrom: "2026-08-31", resumedOn: null }]);
+    plain.reminders[0] = { ...plain.reminders[0], type: "reminder" };
+    let executionItemsRead = false;
+    Object.defineProperty(plain, "executionItems", { get() { executionItemsRead = true; return []; } });
+    const result = await createPriorityCompletionService({
+      mutateCanonicalRuntime: async (options) => ({ result: await options.mutate(plain), changedCollections: ["reminders"] }),
+      now: () => new Date("2026-08-31T16:00:00Z"),
+    }).complete({ priorityId: "reminder", occurrenceDate: "2026-08-31" });
+    expect(result.status).toBe("completed");
+    expect(executionItemsRead).toBe(false);
+  });
+
   it("completes outside the window, on the resumedOn day, and when the record carries no windows", async () => {
     for (const [windows, date] of [
       [[{ pausedFrom: "2026-09-01", resumedOn: null }], "2026-08-31"],

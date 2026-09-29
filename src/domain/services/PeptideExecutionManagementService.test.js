@@ -93,16 +93,69 @@ describe("history-preserving peptide saves (S1/S2)",()=>{
     expect(item.timelineHistory).toHaveLength(2);
     expect(item.executionRevision).toBe(3);
   });
-  it("refuses a strategy that starts before today unless the draft rewrites history explicitly",()=>{
+  it("refuses a backdated plan that changes a phase already taken unless the draft rewrites history explicitly",()=>{
     const store=structuredStore();
-    const backdated=supportDraft({dosingStrategy:{...PLAN,landingDose:"0.5"}});
+    const backdated=supportDraft({dosingStrategy:{...PLAN,stepAmount:"0.5"}});
     const refused=prepare(store,{expectedRevision:1,today:TODAY,draft:backdated});
     expect(refused).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.INVALID,code:PeptideExecutionRejectionCode.PLAN_REWRITES_HISTORY});
     expect(store.executionItems[0].executionRevision).toBe(1);
     const item=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:{...backdated,rewriteHistory:true}}));
+    expect(item.timeline[1]).toMatchObject({startDate:"2026-05-28",dose:{amount:"0.75"}});
+    expect(item.timelineHistory).toHaveLength(1);
+  });
+  it("accepts a future-only change to a past-dated plan (landing dose) without rewriteHistory and archives one entry",()=>{
+    const store=structuredStore();const before=structuredClone(store.executionItems[0].timeline);
+    const prepared=prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:{...PLAN,landingDose:"0.5"}})});
+    expect(prepared.ok).toBe(true);
+    const item=commit(store,prepared);
+    expect(item.timeline.slice(0,5)).toEqual(before.slice(0,5));
     expect(item.timeline.at(-1)).toMatchObject({startDate:"2026-07-30",endDate:null,dose:{amount:"0.5"}});
     expect(item.timeline).toHaveLength(6);
     expect(item.timelineHistory).toHaveLength(1);
+    expect(hydratePeptideDosingStrategy(item).mode).toBe("structured");
+  });
+  it("accepts an end-date-only change on a past-dated plan without rewriteHistory and archives one entry",()=>{
+    const store=structuredStore();const before=structuredClone(store.executionItems[0].timeline);
+    const prepared=prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:{...PLAN,endDate:"2026-12-31"}})});
+    expect(prepared.ok).toBe(true);
+    const item=commit(store,prepared);
+    expect(item.timeline.slice(0,-1)).toEqual(before.slice(0,-1));
+    expect(item.timeline.at(-1)).toEqual({...before.at(-1),endDate:"2026-12-31"});
+    expect(item.timelineHistory).toHaveLength(1);
+    expect(hydratePeptideDosingStrategy(item).mode).toBe("structured");
+  });
+  it("accepts a first-time configuration with a past start date",()=>{
+    const store=structuredStore();store.executionItems=[];
+    const prepared=prepare(store,{expectedRevision:null,today:TODAY,draft:supportDraft()});
+    expect(prepared).toMatchObject({ok:true,created:true});
+    const item=commit(store,prepared);
+    expect(item.timeline).toEqual(generatePeptideDosingTimeline(PLAN));
+    expect(item.timelineHistory).toBeUndefined();
+  });
+  it("refuses a backdated stay that changes a past phase, and accepts it with rewriteHistory",()=>{
+    const store=structuredStore();
+    const backdated=supportDraft({dosingStrategy:stay("1.5","2026-07-01")});
+    expect(prepare(store,{expectedRevision:1,today:TODAY,draft:backdated})).toMatchObject({ok:false,outcome:PeptideExecutionOutcome.INVALID,code:PeptideExecutionRejectionCode.PLAN_REWRITES_HISTORY});
+    expect(store.executionItems[0].executionRevision).toBe(1);
+    const item=commit(store,prepare(store,{expectedRevision:1,today:TODAY,draft:{...backdated,rewriteHistory:true}}));
+    expect(item.timeline.at(-1)).toEqual({startDate:"2026-07-01",endDate:null,dose:{amount:"1.5",unit:"mg"},notes:""});
+    expect(item.timeline.at(-2).endDate).toBe("2026-06-30");
+    expect(item.timelineHistory).toHaveLength(1);
+  });
+  it("re-saves a single-phase record with amount 2.0 and no dosingStrategy (synthesized stay) as a notes-only edit that stays structured",()=>{
+    const store=structuredStore();
+    const record=store.executionItems[0];delete record.dosingStrategy;
+    record.timeline=[{startDate:"2026-05-21",endDate:null,dose:{amount:"2.0",unit:"mg"},notes:""}];
+    const hydration=createPeptideSupportHydrationModel({executionItem:record,protocol:store.protocols[0],reminder:store.reminders[0]});
+    expect(hydration.dosingMode).toBe("structured");
+    expect(hydration.dosingStrategy).toMatchObject({pattern:"stay",startingDose:{amount:"2",unit:"mg"},startDate:"2026-05-21"});
+    const prepared=prepare(store,{expectedRevision:1,today:TODAY,draft:supportDraft({dosingStrategy:hydration.dosingStrategy,notes:"Rotate injection sites"})});
+    expect(prepared.ok).toBe(true);
+    const item=commit(store,prepared);
+    expect(item.notes).toBe("Rotate injection sites");
+    expect(item.timeline).toEqual([{startDate:"2026-05-21",endDate:null,dose:{amount:"2",unit:"mg"},notes:""}]);
+    expect(hydratePeptideDosingStrategy(item).mode).toBe("structured");
+    expect(createPeptideSupportHydrationModel({executionItem:item,protocol:store.protocols[0],reminder:store.reminders[0]}).dosingMode).toBe("structured");
   });
   it("accepts a full save whose past-dated strategy reproduces the stored plan (notes-only edit)",()=>{
     const store=structuredStore();const before=structuredClone(store.executionItems[0].timeline);
@@ -163,7 +216,7 @@ describe("history-preserving peptide saves (S1/S2)",()=>{
   it("saves through the transaction service with the same composition and surfaces the rejection code",async()=>{
     const fixture=setup("Retatrutide",["thursday"],true);
     Object.assign(fixture.live.executionItems[0],structuredStore().executionItems[0]);fs.writeFileSync(fixture.file,JSON.stringify(fixture.live));
-    const refused=await fixture.service.save(command(fixture,{expectedRevision:1,today:TODAY,preserveTimelineHistory:true,draft:supportDraft({dosingStrategy:{...PLAN,landingDose:"0.5"}})}));
+    const refused=await fixture.service.save(command(fixture,{expectedRevision:1,today:TODAY,preserveTimelineHistory:true,draft:supportDraft({dosingStrategy:{...PLAN,stepAmount:"0.5"}})}));
     expect(refused).toMatchObject({outcome:"invalid",committed:false,code:PeptideExecutionRejectionCode.PLAN_REWRITES_HISTORY});
     const saved=await fixture.service.save(command(fixture,{expectedRevision:1,today:TODAY,preserveTimelineHistory:true,draft:supportDraft({dosingStrategy:stay("1.5",TODAY)})}));
     expect(saved).toMatchObject({outcome:"success",executionRevision:2});

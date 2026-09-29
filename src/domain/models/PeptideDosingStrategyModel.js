@@ -57,7 +57,9 @@ export function isDateSuspended(suspensions, date) {
 /// is frozen through the pause: the phase containing the pause extends through
 /// it and the following steps resume afterwards. Open windows and windows at
 /// or before the strategy start contribute nothing; `stay` plans have no later
-/// boundaries and are unaffected.
+/// boundaries and are unaffected (S3): an explicit stay end date is a literal
+/// date the Founder chose and is never shifted, while a fixed-duration
+/// titration's end date moves with its steps.
 export function generatePeptideDosingTimeline(value, { suspensions = [] } = {}) {
   const strategy = normalizePeptideDosingStrategy(value);
   if (strategy.pattern === "custom") return null;
@@ -79,7 +81,8 @@ export function generatePeptideDosingTimeline(value, { suspensions = [] } = {}) 
     }
   }
   let finalEndDate = strategy.endDate;
-  for (const window of applicableSuspensionWindows(suspensions, strategy.startDate)) {
+  const windows = strategy.pattern === "stay" ? [] : applicableSuspensionWindows(suspensions, strategy.startDate);
+  for (const window of windows) {
     const shift = daysBetween(window.pausedFrom, window.resumedOn);
     if (shift <= 0) continue;
     for (let index = 1; index < entries.length; index += 1) {
@@ -197,5 +200,7 @@ function decimal(value) { const parsed = Number(value); return Number.isFinite(p
 function number(value) { return Number(value); }
 function positiveInteger(value, fallback) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback; }
 function clamp(value) { return Math.round((value + Number.EPSILON) * 1000000) / 1000000; }
-function formatDecimal(value) { return String(clamp(Number(value))); }
+/// The one dose-amount normalization ("2.0" and "2" are the same dose); shared
+/// with the save guard so stored and generated amounts compare by value.
+export function formatDecimal(value) { return String(clamp(Number(value))); }
 function normalizeTimeline(value) { return (Array.isArray(value) ? value : []).map((phase) => ({ startDate: String(phase.startDate), endDate: phase.endDate ? String(phase.endDate) : null, dose: { amount: String(phase.dose?.amount ?? ""), unit: String(phase.dose?.unit ?? "") }, notes: String(phase.notes ?? "") })); }

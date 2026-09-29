@@ -370,7 +370,7 @@ function phase(startDate, endDate, amount) {
 describe("Execution priority projection honours pause windows (S3)", () => {
   const window = { pausedFrom: "2026-07-23", resumedOn: "2026-08-06" };
 
-  it("returns PAUSED and ineligible for every local date inside [pausedFrom, resumedOn)", () => {
+  it("returns PAUSED and ineligible for every local date inside [pausedFrom, resumedOn) while keeping the resolved phase and dose", () => {
     const item = peptideExecution({ scheduleSuspensions: [window] });
     for (const localDate of ["2026-07-23", "2026-07-30", "2026-08-05"]) {
       const result = projectExecutionPriority({ executionItem: item, localDate, protocol, reminder });
@@ -382,9 +382,30 @@ describe("Execution priority projection honours pause windows (S3)", () => {
         lifecycleState: "paused",
         pauseContext: { pausedFrom: "2026-07-23", resumedOn: "2026-08-06" },
         executionStatus: "active",
+        activePhase: { startDate: "2026-07-01", endDate: null, dose: { amount: "1", unit: "mg" } },
+        currentDose: "1",
+        doseUnit: "mg",
+        nextPhase: null,
       });
     }
     expect(ExecutionPriorityOperationalState.PAUSED).toBe("paused");
+  });
+
+  it("resolves the phase for the paused date itself, including the upcoming phase", () => {
+    const item = peptideExecution({
+      scheduleSuspensions: [window],
+      timeline: [phase("2026-07-01", "2026-07-29", "1"), phase("2026-07-30", null, "1.5")],
+    });
+    expect(projectExecutionPriority({ executionItem: item, localDate: "2026-07-23", protocol, reminder })).toMatchObject({
+      operationalState: ExecutionPriorityOperationalState.PAUSED,
+      currentDose: "1",
+      nextPhase: { startDate: "2026-07-30", dose: { amount: "1.5", unit: "mg" } },
+    });
+    expect(projectExecutionPriority({ executionItem: item, localDate: "2026-07-30", protocol, reminder })).toMatchObject({
+      operationalState: ExecutionPriorityOperationalState.PAUSED,
+      currentDose: "1.5",
+      activePhase: { startDate: "2026-07-30" },
+    });
   });
 
   it("makes the resumedOn day and the day before pausedFrom eligible again", () => {

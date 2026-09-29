@@ -6,7 +6,7 @@ import {
   resolveReminderOccurrenceDate,
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
 
-import { findSuspensionWindow } from "../../domain/services/ExecutionPriorityProjectionService.js";
+import { findExecutionForProtocol, findSuspensionWindow } from "../../domain/services/ExecutionPriorityProjectionService.js";
 
 export const PRIORITY_COMPLETION_COLLECTIONS = Object.freeze(["reminders"]);
 // Execution items are read (never written) so a peptide occurrence inside a
@@ -49,10 +49,15 @@ export function createPriorityCompletionService({ mutateCanonicalRuntime, now = 
               reminder: current,
             });
           }
-          const pauseWindow = findSuspensionWindow(
-            findPeptideExecutionForReminder(candidate.executionItems, current),
-            effectiveOccurrenceDate
-          );
+          // Only a dose-aware protocol_reminder can be execution-backed; the
+          // execution is resolved with the projection's rule so completion and
+          // Priority Detail can never disagree about which record is paused.
+          const pauseWindow = current.type === "protocol_reminder" && current.linkedEntityId
+            ? findSuspensionWindow(
+                findExecutionForProtocol(candidate.executionItems ?? [], current.linkedEntityId).executionItem,
+                effectiveOccurrenceDate
+              )
+            : null;
           if (pauseWindow) {
             throw Object.assign(new Error("This priority is paused. Resume it from the Operating Plan to record doses again."), {
               code: "PRIORITY_OCCURRENCE_PAUSED",
@@ -95,12 +100,4 @@ export function createPriorityCompletionService({ mutateCanonicalRuntime, now = 
       });
     },
   });
-}
-
-function findPeptideExecutionForReminder(executionItems, reminder) {
-  if (!reminder?.linkedEntityId || !Array.isArray(executionItems)) return null;
-  const matches = executionItems.filter((item) =>
-    item?.type === "peptide" && item.protocolRootId === reminder.linkedEntityId
-  );
-  return matches.length === 1 ? matches[0] : null;
 }

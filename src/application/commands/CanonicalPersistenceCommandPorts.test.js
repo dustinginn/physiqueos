@@ -1117,6 +1117,51 @@ describe("priority.complete.v1 honours peptide pause windows (S3)", () => {
     });
     expect((await complete(records, "2026-08-11", "already")).result.status).toBe("already_completed");
   });
+
+  it("never reads the execution items for a reminder that is not a protocol_reminder", async () => {
+    const records = pausedFixture([{ pausedFrom: "2026-08-11", resumedOn: null }], { type: "reminder" });
+    const reads = [];
+    const spied = { ...records, list: async (query) => { reads.push(query.collection); return records.list(query); } };
+    const result = await createCanonicalPersistenceCommandPorts({ records: spied, now }).completePriority(commandContext({
+      priorityId: "priority-peptide", occurrenceDate: "2026-08-11",
+    }, "1", "plain-reminder"));
+    expect(result.result.status).toBe("completed");
+    expect(reads).not.toContain("executionItems");
+  });
+
+  const reconcile = (records, localDate, items, commandId) =>
+    createCanonicalPersistenceCommandPorts({ records, now }).reconcilePreviousDay(commandContext({ localDate, items }, null, commandId));
+
+  it("previous-day.reconcile.v1 refuses an item whose occurrence falls inside a peptide pause window with 422 PRIORITY_OCCURRENCE_PAUSED and writes nothing", async () => {
+    for (const [windows, localDate] of [
+      [[{ pausedFrom: "2026-08-10", resumedOn: null }], "2026-08-10"],
+      [[{ pausedFrom: "2026-08-01", resumedOn: "2026-08-11" }], "2026-08-10"],
+    ]) {
+      const records = pausedFixture(windows);
+      await expect(reconcile(records, localDate, [{ id: "priority-peptide", complete: true }], `reconcile-${localDate}-${windows[0].resumedOn}`))
+        .rejects.toMatchObject({ status: 422, code: "PRIORITY_OCCURRENCE_PAUSED", recovery: { pausedFrom: windows[0].pausedFrom, protocolId: "protocol-peptide" } });
+      expect(records.snapshot().dailyCheckIns ?? []).toEqual([]);
+    }
+    // An item's own occurrence date is honoured over the reconciled day.
+    const records = pausedFixture([{ pausedFrom: "2026-08-10", resumedOn: null }]);
+    await expect(reconcile(records, "2026-08-09", [{ priorityId: "priority-peptide", occurrenceDate: "2026-08-10", complete: false }], "reconcile-own-date"))
+      .rejects.toMatchObject({ code: "PRIORITY_OCCURRENCE_PAUSED" });
+  });
+
+  it("previous-day.reconcile.v1 writes the reconciliation when the occurrence is outside every window, unlinked, or not a protocol_reminder", async () => {
+    for (const [windows, localDate, overrides] of [
+      [[{ pausedFrom: "2026-08-11", resumedOn: null }], "2026-08-10", {}],
+      [[{ pausedFrom: "2026-08-01", resumedOn: "2026-08-10" }], "2026-08-10", {}],
+      [undefined, "2026-08-10", {}],
+      [[{ pausedFrom: "2026-08-10", resumedOn: null }], "2026-08-10", { linkedEntityId: "protocol-other" }],
+      [[{ pausedFrom: "2026-08-10", resumedOn: null }], "2026-08-10", { type: "reminder" }],
+    ]) {
+      const records = pausedFixture(windows, overrides);
+      const result = await reconcile(records, localDate, [{ id: "priority-peptide", complete: true }, { id: "unknown-priority", complete: false }], `reconcile-ok-${JSON.stringify([windows, overrides])}`);
+      expect(result.result).toMatchObject({ status: "committed", record: { id: `reconciliation:${localDate}`, localDate, status: "reconciled" } });
+      expect(records.snapshot().dailyCheckIns).toHaveLength(1);
+    }
+  });
 });
 
 describe("operating-plan.peptide-lifecycle.change.v1 (S3 pause/resume port)", () => {

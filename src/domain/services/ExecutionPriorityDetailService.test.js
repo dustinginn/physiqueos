@@ -315,14 +315,28 @@ describe("Execution-backed priority detail honours pause windows (S3)", () => {
         workflow: "priority_detail",
         destination: `/priorities/${reminder.id}`,
       },
-      notificationAction: { classification: "open_only", completionCommand: null, destination: { priorityId: reminder.id, occurrenceDate: "2026-07-30" } },
+      // Open-only, but the workflow, scheduled time and destination survive
+      // so a delivered notification still routes to the same detail.
+      notificationAction: {
+        classification: "open_only",
+        completionCommand: null,
+        workflow: "peptide_protocol",
+        scheduledTime: "21:45",
+        destination: { priorityId: reminder.id, occurrenceDate: "2026-07-30" },
+      },
       action: { label: "View Execution" },
-      executionProjection: { operationalState: "paused", lifecycleState: "paused" },
+      executionProjection: { operationalState: "paused", lifecycleState: "paused", currentDose: "0.75", doseUnit: "mg" },
     });
     expect(section(detail, "What").items[0]).toEqual({
       label: "Shared Peptide is paused",
       detail: "Resume it from the Operating Plan to record doses again.",
     });
+    // The dose/phase rows stay on a paused detail; only eligibility is off.
+    expect(section(detail, "Dose").items[0]).toEqual({
+      label: "0.75 mg",
+      detail: "2026-07-01 – Until changed",
+    });
+    expect(section(detail, "When").items[0].label).toBe("Thu · 9:45 PM");
     expect(section(detail, "Completion")).toBeUndefined();
   });
 

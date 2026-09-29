@@ -99,15 +99,17 @@ describe("suspension-aware generation", () => {
     expect(onStart).toEqual(retatrutideShapedTimeline());
   });
 
-  it("leaves stay plans unaffected", () => {
+  it("leaves stay plans unaffected: an open stay and an explicit stay end date keep their literal dates", () => {
     const stay = base({ pattern: "stay", startDate: "2026-05-24" });
     expect(generatePeptideDosingTimeline(stay, { suspensions: [window("2026-06-01", "2026-06-10")] })).toEqual([
       phase("2026-05-24", null, "0.5"),
     ]);
     const stayWithEnd = base({ pattern: "stay", startDate: "2026-05-24", endDate: "2026-06-30" });
-    expect(generatePeptideDosingTimeline(stayWithEnd, { suspensions: [window("2026-06-01", "2026-06-10")] })).toEqual([
-      phase("2026-05-24", "2026-07-09", "0.5"),
-    ]);
+    const unshifted = [phase("2026-05-24", "2026-06-30", "0.5")];
+    expect(generatePeptideDosingTimeline(stayWithEnd, { suspensions: [window("2026-06-01", "2026-06-10")] })).toEqual(unshifted);
+    expect(generatePeptideDosingTimeline(stayWithEnd, { suspensions: [window("2026-06-01", "2026-06-10"), window("2026-06-20", "2026-06-25")] })).toEqual(unshifted);
+    expect(generatePeptideDosingTimeline(stayWithEnd, { suspensions: [window("2026-06-01", "2026-06-10")] })).toEqual(generatePeptideDosingTimeline(stayWithEnd));
+    expect(hydratePeptideDosingStrategy({ dosingStrategy: stayWithEnd, timeline: unshifted, scheduleSuspensions: [window("2026-06-01", "2026-06-10")] }).mode).toBe("structured");
   });
 
   it("shifts later starts by a 9-day closed window mid-hold and extends the hold phase through the pause with no gap", () => {

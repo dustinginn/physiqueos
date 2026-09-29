@@ -246,9 +246,10 @@ function withSkipDefaults(detail) {
 // is never completable: the execution contract keeps its identity
 // (priorityId/occurrenceDate/occurrenceKey/workflow/destination, which Build 69
 // needs to route the detail) but carries `expectedVersion: null`, the
-// notification action is open-only (no completion command), and the detail is
-// marked `paused` with the window's start. A completed occurrence wins over
-// the pause: it stays Completed and untouched.
+// notification action keeps its workflow, scheduled time and destination but
+// is open-only (no completion command), and the detail is marked `paused`
+// with the window's start. A completed occurrence wins over the pause: it
+// stays Completed and untouched.
 function withPausedOccurrence(detail, projection) {
   if (!detail) return null;
   const paused = projection?.operationalState === ExecutionPriorityOperationalState.PAUSED &&
@@ -262,10 +263,12 @@ function withPausedOccurrence(detail, projection) {
     completable: false,
     completionContext: null,
     executionContract,
-    notificationAction: openOnlyNotificationAction({
-      priorityId: projection.priorityId,
-      occurrenceDate: projection.localDate,
-    }),
+    notificationAction: detail.notificationAction
+      ? Object.freeze({ ...detail.notificationAction, classification: "open_only", completionCommand: null })
+      : openOnlyNotificationAction({
+          priorityId: projection.priorityId,
+          occurrenceDate: projection.localDate,
+        }),
     paused: true,
     pauseContext: { pausedFrom: projection.pauseContext?.pausedFrom ?? null },
   };
