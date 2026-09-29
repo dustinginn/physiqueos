@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-09-23T13:00:00Z",
+  "task": {
+    "id": "healthkit-strength-prospective-graduation-20260923",
+    "title": "Graduate Strength Workout prospectively from Sep 23",
+    "status": "completed"
+  },
+  "target": {
+    "agent": "claude",
+    "reasoning": "high",
+    "chat_preference": "continue_current_chat"
+  },
+  "repository": "dustinginn/physiqueos",
+  "authority": {
+    "expected_server_sha": "7c5710f2111e822caaf0d8992ce555f004d3c79b",
+    "expected_native_sha": "1c57556f",
+    "expected_production_deployment": "289c571c-e61b-4fab-bb59-acf3e63549dd",
+    "expected_base_sha": null
+  },
+  "prompt_path": "agent-handoffs/inbox/prompts/20260923T130000Z-healthkit-strength-prospective-graduation-20260923.md",
+  "instructions": {
+    "reverify_authority": true,
+    "publish_completion_handoff": true
+  },
+  "safety": {
+    "contains_secrets": false,
+    "contains_credentials": false,
+    "contains_production_exports": false,
+    "contains_founder_evidence": false,
+    "safe_for_agent_retrieval": true
+  },
+  "lifecycle": {
+    "claimed_by": "claude",
+    "claimed_at_utc": "2026-09-23T13:01:24Z",
+    "completed_at_utc": "2026-09-23T16:04:36Z",
+    "completion_status": "completed",
+    "completion_handoff_path": "agent-handoffs/reports/20260923T160419Z-healthkit-strength-prospective-graduation-yellow.md"
+  }
+}

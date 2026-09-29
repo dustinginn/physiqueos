@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-09-29T15:10:14Z",
+  "task": {
+    "id": "photo-intelligence-visual-change-magnitude-blind-founder-validation-20260929",
+    "title": "Founder Case 2 BLIND pre-human-reference Photo Intelligence result frozen",
+    "agent": "codex",
+    "status": "blind_case_frozen"
+  },
+  "repository": "dustinginn/physiqueos",
+  "case": {
+    "id": "founder_blind_case_2",
+    "baseline_date": "2026-07-19",
+    "comparison_date": "2026-09-19",
+    "goal_context": "Build Lean Mass with a body-fat guardrail"
+  },
+  "result": {
+    "overall_apparent_magnitude": "subtle",
+    "goal_relative_direction": "supportive",
+    "overall_confidence": "moderate",
+    "human_reference_seen": false,
+    "frozen_pre_human_reference": true
+  },
+  "artifacts": {
+    "report": "agent-handoffs/reports/20260929T151014Z-photo-intelligence-case-2-2026-07-19-to-2026-09-19-BLIND-pre-human-reference.md",
+    "raw_result": "agent-handoffs/photo-intelligence/founder-cases/case-2-2026-07-19-to-2026-09-19-BLIND-pre-human-reference.json"
+  },
+  "safety": {
+    "contains_photo_bytes": false,
+    "contains_local_private_paths": false,
+    "contains_human_reference": false,
+    "contains_non_photo_evidence": false,
+    "production_mutated": false,
+    "safe_for_chatgpt_retrieval": true
+  },
+  "next_step": "Stop. Await Founder human-reference reveal before any comparison or tuning."
+}
