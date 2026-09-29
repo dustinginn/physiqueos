@@ -35,7 +35,7 @@ function skippedCheckIn(priorityId = "reminder_stretch", date = TODAY, note = "r
   };
 }
 
-function detailService({ reminder, checkIn = null, protocols = [] }) {
+function detailService({ reminder, checkIn = null, protocols = [], executionItems = [] }) {
   const getCheckInForDate = vi.fn(async (_userId, date) => (checkIn?.date === date ? checkIn : null));
   const service = createPriorityDetailService({
     now: NOW,
@@ -44,13 +44,48 @@ function detailService({ reminder, checkIn = null, protocols = [] }) {
       goals: { listGoals: async () => [] },
       reminders: { getReminderById: async (id) => (reminder?.id === id ? reminder : null) },
       protocols: { listProtocols: async () => protocols },
-      executionItems: { listExecutionItems: async () => [] },
+      executionItems: { listExecutionItems: async () => executionItems },
       weightEntries: { listWeightEntries: async () => [] },
       dailyCheckIns: { getCheckInForDate },
     },
   });
   return { service, getCheckInForDate };
 }
+
+// Verified production shape for Foam Rolling: a `recovery_reminder` whose
+// linked protocol is category `recovery`, backed by a manual-completion
+// `recovery` Execution item. Synthetic version numbers only.
+const RECOVERY_PROTOCOL = {
+  id: "protocol-recovery", userId: "user", category: "recovery", status: "active", name: "Foam Rolling",
+};
+const RECOVERY_EXECUTION = {
+  id: "execution_foam_roll", userId: "user", type: "recovery", title: "Foam Rolling", active: true,
+  linkedProtocolId: "protocol-recovery", cadence: { type: "daily" },
+  preferredSchedule: { daysOfWeek: [], timeOfDay: "17:00", startDate: "2026-07-23" },
+  completionMethod: "manual", executionRevision: 1, notes: "", version: 1,
+};
+
+function recoveryReminder(overrides = {}) {
+  return {
+    id: "reminder_foam_roll_daily",
+    userId: "user",
+    title: "Foam Roll",
+    type: "recovery_reminder",
+    linkedEntityType: "protocol",
+    linkedEntityId: "protocol-recovery",
+    active: true,
+    schedule: { type: "daily", timeOfDay: "17:00" },
+    completionHistory: [],
+    version: 53,
+    ...overrides,
+  };
+}
+
+function recoveryDetailService({ reminder = recoveryReminder(), checkIn = null, executionItems = [RECOVERY_EXECUTION] } = {}) {
+  return detailService({ reminder, checkIn, protocols: [RECOVERY_PROTOCOL], executionItems });
+}
+
+const section = (detail, title) => detail.sections.find((item) => item.title === title);
 
 describe("Priority Detail skip contract", () => {
   it("offers the Server-owned skip command for today's open ordinary priority", async () => {
@@ -115,6 +150,91 @@ describe("Priority Detail skip contract", () => {
       const detail = await service.getPriorityDetail(reminder.id, "user");
       expect(detail, reminder.id).toMatchObject({ skippable: false, skipCommand: null, skipContext: null });
     }
+  });
+
+  describe("execution-backed recovery Support (Foam Rolling)", () => {
+    it("offers the Server-owned skip command for today's open recovery occurrence", async () => {
+      const { service, getCheckInForDate } = recoveryDetailService();
+      const detail = await service.getPriorityDetail("reminder_foam_roll_daily", "user");
+      expect(getCheckInForDate).toHaveBeenCalledWith("user", TODAY);
+      expect(detail).toMatchObject({
+        id: "reminder_foam_roll_daily",
+        status: "Open",
+        completable: true,
+        completionContext: { occurrenceDate: TODAY, dose: null, protocolId: "protocol-recovery" },
+        skippable: true,
+        skipContext: null,
+        skipCommand: {
+          commandType: "priority.skip.v1",
+          expectedVersion: 53,
+          payload: { priorityId: "reminder_foam_roll_daily", occurrenceDate: TODAY },
+        },
+        executionContract: { workflow: "priority_detail", occurrenceKey: `reminder_foam_roll_daily:${TODAY}` },
+        notificationAction: {
+          workflow: "priority_detail",
+          completionCommand: { commandType: "priority.complete.v1", expectedVersion: 53 },
+          scheduledTime: "17:00",
+        },
+      });
+      expect(section(detail, "Completion")).toBeDefined();
+    });
+
+    it("reads a skipped recovery occurrence as Skipped, non-completable, with no Completion section", async () => {
+      const { service } = recoveryDetailService({ checkIn: skippedCheckIn("reminder_foam_roll_daily", TODAY, "sore") });
+      const detail = await service.getPriorityDetail("reminder_foam_roll_daily", "user");
+      expect(detail).toMatchObject({
+        status: "Skipped",
+        completable: false,
+        completionContext: null,
+        skippable: false,
+        skipCommand: null,
+        skipContext: { occurrenceDate: TODAY, note: "sore", skippedAt: `${TODAY}T18:00:00.000Z` },
+        notificationAction: { workflow: "priority_detail", completionCommand: null },
+      });
+      expect(section(detail, "Completion")).toBeUndefined();
+      expect(section(detail, "What").items[0].label).toBe("Foam Rolling");
+    });
+
+    it("keeps Completed when a recovery occurrence is both completed and skipped", async () => {
+      const reminder = recoveryReminder({
+        completionHistory: [{ occurrenceDate: TODAY, completedAt: `${TODAY}T17:30:00.000Z` }],
+      });
+      const { service } = recoveryDetailService({ reminder, checkIn: skippedCheckIn("reminder_foam_roll_daily") });
+      const detail = await service.getPriorityDetail("reminder_foam_roll_daily", "user");
+      expect(detail).toMatchObject({
+        status: "Completed", completable: false, completionContext: null,
+        skippable: false, skipCommand: null, skipContext: null,
+      });
+      expect(section(detail, "Completion")).toBeUndefined();
+    });
+
+    it("is not skippable for a past recovery occurrence (Morning Check-In owns it)", async () => {
+      const { service, getCheckInForDate } = recoveryDetailService();
+      const detail = await service.getPriorityDetail("reminder_foam_roll_daily", "user", { occurrenceDate: "2026-09-15" });
+      expect(getCheckInForDate).toHaveBeenCalledWith("user", "2026-09-15");
+      expect(detail).toMatchObject({
+        status: "Open", completable: true, skippable: false, skipCommand: null, skipContext: null,
+        executionContract: { occurrenceDate: "2026-09-15" },
+      });
+    });
+
+    it("is not skippable when the recovery Support needs setup (missing Execution)", async () => {
+      const { service } = recoveryDetailService({ executionItems: [] });
+      const detail = await service.getPriorityDetail("reminder_foam_roll_daily", "user");
+      expect(detail).toMatchObject({
+        status: "Setup required", completable: false, completionContext: null,
+        skippable: false, skipCommand: null, skipContext: null,
+        action: { label: "Review Support" },
+      });
+    });
+
+    it("does not 500 when a Support reminder's linked protocol cannot be resolved", async () => {
+      const { service } = detailService({
+        reminder: recoveryReminder({ linkedEntityId: "protocol-gone" }),
+        protocols: [], executionItems: [RECOVERY_EXECUTION],
+      });
+      await expect(service.getPriorityDetail("reminder_foam_roll_daily", "user")).resolves.toBeNull();
+    });
   });
 
   it("carries the check-in through the Native navigation read store", async () => {

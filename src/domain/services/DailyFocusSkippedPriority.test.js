@@ -75,3 +75,64 @@ describe("Daily Focus honors today's canonical skip", () => {
     expect(ids(focus)).toContain("stretch");
   });
 });
+
+// Execution-backed recovery Support (Foam Rolling): `recovery_reminder` →
+// protocol category `recovery` → manual-completion `recovery` Execution item.
+// Its Home row is keyed on `executionContract.priorityId` (the reminder id),
+// so today's canonical skip removes it exactly like a plain reminder's.
+function recoveryInputs(checkIns = []) {
+  return {
+    checkIns,
+    protocols: [{ id: "protocol_foam", userId: "user", category: "recovery", name: "Foam Rolling", status: "active" }],
+    executionItems: [{
+      id: "execution_foam", userId: "user", type: "recovery", title: "Foam Rolling", active: true,
+      linkedProtocolId: "protocol_foam", cadence: { type: "daily" },
+      preferredSchedule: { daysOfWeek: [], timeOfDay: "17:00", startDate: "2026-07-23" },
+      completionMethod: "manual",
+    }],
+    reminders: [
+      reminder("reminder_foam", {
+        title: "Foam Rolling", type: "recovery_reminder",
+        linkedEntityType: "protocol", linkedEntityId: "protocol_foam",
+        schedule: { type: "daily", timeOfDay: "17:00" },
+      }),
+      reminder("read"),
+    ],
+    now: NOW,
+    timeZone: TIME_ZONE,
+  };
+}
+
+describe("Daily Focus honors today's canonical skip for an execution-backed recovery Support reminder", () => {
+  it("drops Foam Rolling skipped today from Home and keeps the others", () => {
+    const service = createDailyFocusService();
+    const before = service.getDailyFocus(recoveryInputs());
+    expect(ids(before)).toEqual(expect.arrayContaining(["reminder_foam", "read"]));
+    expect(before.find((item) => item.executionContract?.priorityId === "reminder_foam")).toMatchObject({
+      label: "Foam Rolling", completable: true, completionId: "reminder_foam", executionId: "execution_foam",
+    });
+
+    const focus = service.getDailyFocus(recoveryInputs([checkIn(TODAY, [["reminder_foam", "skipped"]])]));
+    expect(ids(focus)).not.toContain("reminder_foam");
+    expect(ids(focus)).toContain("read");
+  });
+
+  it("drops only today's Foam Rolling occurrence from the notification horizon", () => {
+    const service = createDailyFocusService();
+    const occurrences = service.getNotificationOccurrences(recoveryInputs([checkIn(TODAY, [["reminder_foam", "skipped"]])]));
+    const foamDates = occurrences
+      .filter((item) => item.executionContract?.priorityId === "reminder_foam")
+      .map((item) => item.occurrenceDate);
+    expect(foamDates).not.toContain(TODAY);
+    expect(foamDates).toContain("2026-09-17");
+    expect(occurrences.some((item) =>
+      item.executionContract?.priorityId === "read" && item.occurrenceDate === TODAY
+    )).toBe(true);
+  });
+
+  it("ignores a Foam Rolling skip recorded for yesterday (today's row remains)", () => {
+    const service = createDailyFocusService();
+    const focus = service.getDailyFocus(recoveryInputs([checkIn("2026-09-15", [["reminder_foam", "skipped"]])]));
+    expect(ids(focus)).toContain("reminder_foam");
+  });
+});
