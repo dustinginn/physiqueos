@@ -1074,28 +1074,42 @@ export function projectConfirmedHealthKitLogProvenance(log, runtime = {}) {
       ...log.loggedToday,
       rows: Object.freeze(log.loggedToday.rows.map((row) => {
         if (row.id !== "training") return row;
-        const withAppleHealth = (summary) => /Apple Health/i.test(String(summary ?? ""))
-          ? summary
-          : `${String(summary ?? "Workout").replace(/ logged$/i, "")} · Apple Health`;
-        // A Training row with Cardio carries one line per modality: only the
-        // Logger (Strength) line's provenance changes when its workout is confirmed.
+        // Apple Health provenance is a caption under the whole Training group
+        // (`row.context`), the same convention Nutrition and Activity use and
+        // the only channel native Build 69 renders: it draws `lines` and then
+        // `context` once under the group, and its LossyLines decoder drops any
+        // per-line extra field. So this projection never suffixes a line or
+        // the summary -- `summary` and `lines` stay byte-identical to the
+        // domain composer's output -- and it only sets the caption when every
+        // presented line is Apple-Health-backed. Cardio lines always are (they
+        // come from canonical HealthKit workouts); the Logger (Strength) line
+        // is only once its session has a CONFIRMED HealthKit link.
+        //
+        // Deliberate product decision: a Strength line whose link is still a
+        // candidate (or absent) leaves the row untouched -- no caption, no
+        // suffix -- even when Cardio lines sit beside it, because a caption
+        // under the group would claim the unconfirmed Strength line too.
+        const loggerConfirmed = (recordId) => recordId ? attachments.has(String(recordId)) : confirmedTrainingToday;
         if (Array.isArray(row.lines) && row.lines.length > 0) {
           const logger = row.lines.find((line) => line.kind === "logger");
-          const confirmed = logger && (logger.recordId ? attachments.has(String(logger.recordId)) : confirmedTrainingToday);
-          if (!confirmed) return row;
-          const lines = Object.freeze(row.lines.map((line) => line === logger
-            ? Object.freeze({ ...line, summary: withAppleHealth(line.summary) })
-            : line));
-          return Object.freeze({ ...row, lines, summary: lines.map((line) => line.summary).join(", ") });
+          if (logger && !loggerConfirmed(logger.recordId)) return row;
+          return Object.freeze({ ...row, context: joinAppleHealth(row.context) });
         }
-        const confirmed = row.recordId
-          ? attachments.has(String(row.recordId))
-          : confirmedTrainingToday;
-        if (!confirmed) return row;
-        return Object.freeze({ ...row, summary: withAppleHealth(row.summary) });
+        // Legacy single-summary row (no lines): the summary is the whole group.
+        if (!loggerConfirmed(row.recordId)) return row;
+        return Object.freeze({ ...row, context: joinAppleHealth(row.context) });
       })),
     }),
   });
+}
+
+// Appends the Apple Health caption to a row's context ("Movements not added"
+// -> "Movements not added · Apple Health"); idempotent, so re-projecting an
+// already-captioned row (or a Cardio-only row the domain already captioned)
+// never doubles it.
+function joinAppleHealth(context) {
+  if (/Apple Health/.test(String(context ?? ""))) return context;
+  return [context, "Apple Health"].filter(Boolean).join(" · ");
 }
 
 function createReadPrincipal(userId) {
