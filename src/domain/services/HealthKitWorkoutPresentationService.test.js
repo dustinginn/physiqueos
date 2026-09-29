@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { projectConfirmedHealthKitLogProvenance } from "../../application/core/CoreNavigationReadService.js";
 import { createProviderActivityEvidenceReport } from "./ProgressReportingService.js";
 import {
@@ -690,8 +690,12 @@ describe("same-day Activity truthfulness (Sep 28)", () => {
     fixture.canonicalEvidenceObjects[0].payload.metadata = { coverage: "partial_day" };
     return fixture;
   }
+  // The fixture's day is "today" for the in-progress cases.
+  const onFixtureDay = () => vi.useFakeTimers({ now: new Date("2026-09-25T20:00:00.000Z"), toFake: ["Date"] });
+  afterEach(() => vi.useRealTimers());
 
-  it("presents a partial Apple Health day as 'so far' and its energy gap as provisional", () => {
+  it("presents today's partial Apple Health day as 'so far' and its energy gap as provisional", () => {
+    onFixtureDay();
     const fixture = partialDay(createCardioWholeDayAttributionFixture({ dailyActiveCalories: 171, cardioActiveCalories: 211 }));
     const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
     expect(day.isPartialDay).toBe(true);
@@ -700,6 +704,32 @@ describe("same-day Activity truthfulness (Sep 28)", () => {
     expect(day.energyAnomaly).toMatchObject({ code: "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY", provisional: true });
     // Workout energy stays descriptive: never added, and the remainder never negative.
     expect(day.nonWorkoutActiveCalories).toBe(0);
+  });
+
+  it("a PAST day left partial is marked a partial day, never 'so far' or provisional", () => {
+    vi.useFakeTimers({ now: new Date("2026-09-29T20:00:00.000Z"), toFake: ["Date"] });
+    const fixture = partialDay(createCardioWholeDayAttributionFixture({ dailyActiveCalories: 171, cardioActiveCalories: 211 }));
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+    expect(day.isPartialDay).toBe(false);
+    expect(day.coverageState).toBe("incomplete");
+    expect(day.value).toBe("171 active cal / 30 min · partial day");
+    expect(day.energyAnomaly.provisional).toBe(false);
+  });
+
+  it("counts a Cardio workout that duplicates an existing screenshot workout once, as Training Day does", () => {
+    const fixture = createCardioWholeDayAttributionFixture();
+    const walk = fixture.canonicalWorkouts[0];
+    fixture.canonicalEvidenceObjects.push({
+      canonicalId: "walk-screenshot", quality: { status: "active" },
+      payload: { id: "walk-screenshot", evidence_type: "training", observed_at: fixture.day,
+        metadata: { activity_type: "Outdoor Walk", duration_seconds: 1800 }, quality: { status: "active" } },
+    });
+    const withoutDuplicateDecision = createProviderActivityEvidenceReport(structuredClone(fixture)).latestActivityDay;
+    walk.coexistence = { state: "matches_existing_evidence_workout", candidates: [{ canonicalId: "walk-screenshot" }] };
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+    expect(day.linkedWorkoutCount).toBe(1);
+    // Control: two distinct workouts when no duplicate decision exists (live reassessment finds none here).
+    expect(withoutDuplicateDecision.linkedWorkoutCount).toBe(2);
   });
 
   it("a complete day carries no 'so far' and a non-provisional anomaly", () => {
@@ -712,6 +742,7 @@ describe("same-day Activity truthfulness (Sep 28)", () => {
   });
 
   it("an ordinary partial day with workout energy inside the total shows no anomaly", () => {
+    onFixtureDay();
     const fixture = partialDay(createCardioWholeDayAttributionFixture({ dailyActiveCalories: 828, cardioActiveCalories: 211 }));
     const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
     expect(day.energyAnomaly).toBeNull();

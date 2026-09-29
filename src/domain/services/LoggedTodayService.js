@@ -129,15 +129,17 @@ function composeTrainingRow(sessions, healthKitStrengthPresentationBySession = n
   const cardioLines = composeCardioLines(cardioWorkouts);
   const lines = [strength, ...cardioLines].filter(Boolean).map(({ id, kind, summary, href, recordId }) =>
     Object.freeze({ id, kind, summary, href, recordId }));
-  const onlyStrength = strength && cardioLines.length === 0;
-
+  // With a Logger session the row keeps that session's own record, link and
+  // context (clients that render only `summary` still open the Strength
+  // session); clients that render `lines` open Training Day for a
+  // multi-line row. A Cardio-only row opens Training Day.
   return Object.freeze({
     id: "training",
     label: "Training",
     summary: lines.map((line) => line.summary).join(", "),
-    context: onlyStrength ? strength.context : strength ? null : APPLE_HEALTH_LABEL,
-    href: onlyStrength ? strength.href : "/progress/training",
-    recordId: onlyStrength ? strength.recordId : null,
+    context: strength ? strength.context : APPLE_HEALTH_LABEL,
+    href: strength ? strength.href : "/progress/training",
+    recordId: strength ? strength.recordId : null,
     lines: Object.freeze(lines),
   });
 }

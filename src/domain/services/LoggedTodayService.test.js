@@ -180,7 +180,7 @@ describe("LoggedTodayService", () => {
     // Strength and the day's two canonical walks, one line per modality.
     expect(result.rows[0]).toMatchObject({
       summary: "Strength Training · 28 min, 2 Walks · 33 min",
-      href: "/progress/training",
+      recordId: fixture.ids.session,
       lines: [
         { kind: "logger", summary: "Strength Training · 28 min", recordId: fixture.ids.session },
         { kind: "cardio", summary: "2 Walks · 33 min", recordId: null },
@@ -251,7 +251,8 @@ describe("Logged Today: Strength and Cardio together (Sep 28)", () => {
     const row = trainingRow([strength()], [cardio("walk-1", "Outdoor Walk", 17, "08:05"), cardio("walk-2", "Outdoor Walk", 15, "09:12")]);
     expect(row.lines.map((line) => line.summary)).toEqual(["Strength Training · 50 min", "2 Outdoor Walks · 32 min"]);
     expect(row.summary).toBe("Strength Training · 50 min, 2 Outdoor Walks · 32 min");
-    expect(row.href).toBe("/progress/training");
+    // The Strength session keeps its own link for single-line clients (Build 68).
+    expect(row).toMatchObject({ href: "/progress/training/session/strength-28", recordId: "strength-28", context: "Movements not added" });
     expect(row.lines[0]).toMatchObject({ kind: "logger", href: "/progress/training/session/strength-28", recordId: "strength-28" });
     expect(row.lines[1]).toMatchObject({ kind: "cardio", recordId: null });
   });

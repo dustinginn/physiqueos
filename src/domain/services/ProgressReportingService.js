@@ -33,6 +33,7 @@ import {
   isBodyweightSet,
 } from "../../presentation/trainingPresentation";
 import { orderEvidenceStreams } from "./EvidenceHubUsageService";
+import { projectPresentedHealthKitCardioTrainingRecords } from "./HealthKitCardioTrainingPresentation.js";
 import { reconcileEnergyDays } from "./EnergyDailyReconciliationService";
 import {
   assessWorkoutDuplicatePair,
@@ -991,6 +992,13 @@ export function createProviderActivityEvidenceReport({
     workoutLinks,
     workoutLinkClaims,
   });
+  // The Cardio workouts Training Day presents (same eligibility, same
+  // duplicate suppression against an existing screenshot/typed workout), so
+  // Activity's "Linked Workouts" counts exactly the workouts Training Day shows.
+  const presentedCardioWorkoutIds = new Set(projectPresentedHealthKitCardioTrainingRecords({
+    canonicalWorkouts,
+    existingEvidenceObjects: canonicalEvidenceObjects,
+  }).map((record) => record.id));
   const allActivityDays = getActivityDaysWithTrainingAggregates({
     explicitActivityDays: sortByDate(
       canonicalPayloads.filter(isActivityDay),
@@ -999,6 +1007,7 @@ export function createProviderActivityEvidenceReport({
     trainingSessions,
     confirmedHealthKitWorkoutsBySession,
     eligibleHealthKitWorkoutsByDate,
+    presentedCardioWorkoutIds,
   });
   const activityDays = dateWindow
     ? allActivityDays.filter((day) => isInsideDateWindow(day.observed_at, dateWindow))
@@ -1687,6 +1696,7 @@ function getActivityDaysWithTrainingAggregates({
   trainingSessions = [],
   confirmedHealthKitWorkoutsBySession = new Map(),
   eligibleHealthKitWorkoutsByDate = new Map(),
+  presentedCardioWorkoutIds = null,
 } = {}) {
   const activityByDate = new Map(
     explicitActivityDays
@@ -1712,6 +1722,7 @@ function getActivityDaysWithTrainingAggregates({
       trainingSessions: trainingByDate.get(date) ?? [],
       confirmedHealthKitWorkoutsBySession,
       eligibleHealthKitWorkouts: eligibleHealthKitWorkoutsByDate.get(date) ?? [],
+      presentedCardioWorkoutIds,
     });
 
     activityByDate.set(
@@ -1742,6 +1753,7 @@ function createTrainingBackedActivityDay({
   trainingSessions = [],
   confirmedHealthKitWorkoutsBySession = new Map(),
   eligibleHealthKitWorkouts = [],
+  presentedCardioWorkoutIds = null,
 } = {}) {
   const energy = composeWholeDayWorkoutEnergy({
     trainingSessions,
@@ -1754,11 +1766,16 @@ function createTrainingBackedActivityDay({
   const confirmedHealthKitWorkoutCount = new Set(trainingSessions
     .map((session) => confirmedHealthKitWorkoutsBySession.get(trainingSessionIdentity(session))?.canonicalWorkoutId)
     .filter(Boolean)).size;
-  // The day's workouts, counted as Training Day counts them: every eligible
-  // canonical workout (confirmed Strength, eligible Cardio) plus every Logger
-  // session that has no confirmed canonical workout of its own.
+  // The day's workouts, counted as Training Day counts them: each confirmed
+  // Strength workout, each Cardio workout Training Day presents (a canonical
+  // walk that duplicates an existing screenshot/typed workout is that same
+  // workout, not a second one), and each session without a confirmed
+  // canonical workout of its own.
   const unattachedLoggerSessionCount = trainingSessions.filter((session) =>
     !confirmedHealthKitWorkoutsBySession.get(trainingSessionIdentity(session))?.canonicalWorkoutId).length;
+  const linkedCanonicalWorkoutCount = energy.contributingWorkouts.filter((entry) =>
+    entry.eligibility?.basis !== "canonicalized_cardio" ||
+    !presentedCardioWorkoutIds || presentedCardioWorkoutIds.has(entry.canonicalWorkoutId)).length;
 
   return {
     id: `activity_training_partial_${date}`,
@@ -1797,7 +1814,7 @@ function createTrainingBackedActivityDay({
       healthkit_eligible_workout_count: energy.eligibleWorkoutCount,
       healthkit_eligible_workouts: energy.contributingWorkouts,
       healthkit_workout_energy_incomplete: energy.incomplete,
-      workouts_linked: energy.eligibleWorkoutCount + unattachedLoggerSessionCount,
+      workouts_linked: linkedCanonicalWorkoutCount + unattachedLoggerSessionCount,
     },
     references: {
       training_session_ids: trainingSessionIds,
@@ -1993,7 +2010,8 @@ function createActivityDayRecord(activityDay = {}) {
   const dateKey = getDateKey(activityDay.observed_at);
   const activeCalories = finiteNumberOrNull(activityDay.daily_activity?.move_calories);
   const workoutActiveCalories = finiteNumberOrNull(activityDay.derived_metrics?.workout_active_calories);
-  const partialDay = isPartialActivityDay(activityDay);
+  const coverageState = activityDayCoverageState(activityDay);
+  const partialDay = coverageState === "in_progress";
   const energyAnomaly = activeCalories !== null && workoutActiveCalories !== null && workoutActiveCalories > activeCalories
     ? Object.freeze({
         code: "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY",
@@ -2033,7 +2051,10 @@ function createActivityDayRecord(activityDay = {}) {
       linkedTrainingSessionCount: linkedWorkoutCount,
       linkedWorkoutCount,
       coverage: activityDay.metadata?.coverage ?? null,
+      // Still accumulating today ("so far"); a past day that never received
+      // Apple Health's complete summary is `incomplete`, never "so far".
       isPartialDay: partialDay,
+      coverageState,
       workoutEnergyAttribution: Object.freeze({
         policy: "workout_energy_is_descriptive_never_additive",
         confirmedHealthKitWorkoutCount: Number(activityDay.derived_metrics?.confirmed_healthkit_workouts_referenced ?? 0),
@@ -2919,16 +2940,22 @@ function pluralize(count, noun) {
   return `${formatWholeNumber(count)} ${noun}${Number(count) === 1 ? "" : "s"}`;
 }
 
-// Apple Health's summary for a day still in progress is a "so far" total.
-function isPartialActivityDay(activityDay) {
-  return activityDay?.metadata?.coverage === "partial_day";
+// Apple Health's partial summary is a "so far" total only for the Server's
+// today; a past day left partial (its complete summary never arrived) is
+// incomplete, not still updating.
+function activityDayCoverageState(activityDay) {
+  const coverage = activityDay?.metadata?.coverage;
+  if (coverage === "complete_day") return "complete";
+  if (coverage !== "partial_day") return null;
+  return getDateKey(activityDay.observed_at) === getTodayDateKey() ? "in_progress" : "incomplete";
 }
 
 function formatActivityDayValue(activityDay) {
   const dailyActivity = activityDay.daily_activity ?? {};
   const move = dailyActivity.move_calories;
   const exercise = dailyActivity.exercise_minutes;
-  const soFar = isPartialActivityDay(activityDay) ? " so far" : "";
+  const state = activityDayCoverageState(activityDay);
+  const soFar = state === "in_progress" ? " so far" : state === "incomplete" ? " · partial day" : "";
 
   if (Number.isFinite(move) && Number.isFinite(exercise)) {
     return `${formatWholeNumber(move)} active cal / ${formatWholeNumber(exercise)} min${soFar}`;
