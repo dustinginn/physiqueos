@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-29T00:30:00Z",
+  "generated_at_utc": "2026-09-29T02:00:00Z",
   "task": {
-    "id": "briefing-intelligence-7242043f-production-deploy-20260928",
-    "title": "DEPLOYED: Briefing Intelligence 7242043f to production (deployment e22b966b) — verified; no historical briefing changed",
+    "id": "strength-reconciliation-review-gap-diagnosis-20260928",
+    "title": "DIAGNOSED: Sep 27/28 Strength reviews never created \u2014 aligned match skipped Founder review while auto-confirm is off; fix ready, NOT deployed",
     "agent": "claude",
     "status": "completed"
   },
@@ -19,46 +19,50 @@
     "server_candidate_sha": "7242043f",
     "server_candidate_branch": "codex/weekly-v3-weekly-pattern-narrative",
     "production_deployment_id": "e22b966b-adfb-4da2-9cc1-dd2d65b0087b",
-    "previous_production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df"
+    "previous_production_server_sha": "49211870c552b104aaf7840939f55d9dc9ecc1df",
+    "fix_branch": "claude/strength-review-autoconfirm-gap-20260928",
+    "fix_sha": "396e750d"
   },
   "result": {
-    "summary": "Guarded deploy of the Founder-approved 7242043f: prod branch fast-forwarded 49211870→7242043f, 4-line spec stamp, force-rebuild deployment e22b966b ACTIVE 9/9. Verified: web+worker source_commit_hash and runtime log gitSha 7242043f, /live /ready 200 all checks ready, schema unchanged (000014), new code markers present in the running build and the old '· Phase 1' literal absent, zero-write data snapshot identical before/after (64 briefings, Monthly digests, 39 confidence, 581 evidence), Founder device reads (Home, briefing, Goals, You, Evidence) complete with 0 errors. September Monthly will be created by the normal Oct 1 cadence.",
+    "summary": "Both days share one Server root cause: a CONFIDENT, gate-eligible Strength match was excluded from Founder review on the assumption auto-confirm would handle it, but production policy v4 has linkAutoConfirm=false (since Sep 25). Links stayed 'candidate' with no evidenceReviews record, so Log had nothing pending and Native's local notifier had nothing to fire on. Fix: skip review only when auto-confirm will actually run now. After deploy, the next routine HealthKit ingest creates exactly two pending reviews (Sep 27, Sep 28); nothing else is stranded or reopened. No Native build needed.",
     "success": true,
     "production_mutated": false,
-    "deployed": true,
+    "deployed": false,
     "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Provider production build exit 0; full regression on exact SHA 9136/9444, same 303 environmental failures, 0 new."
+      "summary": "New tests RED on production, GREEN with fix; full regression 9139/9447, same 303 environmental failures as production baseline, 0 new."
     },
     "review": {
       "status": "passed",
-      "summary": "Candidate previously reviewed and Founder-approved; deploy diff scope = reviewed lane only (no migrations/deps/infra)."
+      "summary": "Fresh-context review: APPROVE WITH NITS (test-coverage nits only)."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "Post-deploy live verification: control plane, health, runtime gitSha, in-container code markers, zero-write data snapshot, real Native reads."
+      "summary": "Read-only production trace (READ ONLY, rolled back) of observations, canonical workouts, links, claims, reviews, Logger sessions, receipts and policy."
     }
   },
-  "decisions_required": [],
+  "decisions_required": [
+    "Authorize deploying fix 396e750d to production via the guarded workflow."
+  ],
   "blockers": [],
   "unexpected_findings": [],
   "backlog": [
-    "Sep 27 Strength reconciliation-review notification failure.",
     "Native backlog (Logged Today, Log-tab shortcut, Mark Skipped, PR celebration, routine icon, Baseline Read label).",
     "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
-    "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
+    "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window.",
+    "Reviewer nits: predates-activation pending-review assertion; resolve-then-reingest test for eligible matches; runner pending-review branch test."
   ],
-  "recommended_next_step": "Observe the next natural briefings (Midweek, Weekly, Oct 1 Monthly) on the deployed engine; next task per Founder.",
-  "full_report_path": "agent-handoffs/reports/20260929T003000Z-briefing-intelligence-7242043f-production-deploy.md",
+  "recommended_next_step": "Founder authorizes deploy of 396e750d; then read-only verify two pending reviews appear on next routine ingest and the Native notification fires.",
+  "full_report_path": "agent-handoffs/reports/20260929T020000Z-strength-reconciliation-review-gap-diagnosis.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260929T003000Z-briefing-intelligence-7242043f-production-deploy.md",
     "agent-handoffs/reports/20260928T200000Z-monthly-september-nutrition-phase-jargon-final.md",
     "agent-handoffs/reports/20260928T180000Z-monthly-structural-parity-september-preview.md",
-    "agent-handoffs/reports/20260928T160000Z-incident-native-home-session-revoked-refresh-reuse.md",
-    "agent-handoffs/reports/20260928T110000Z-briefing-intelligence-september-mtd-monthly-review-preview.md"
+    "agent-handoffs/reports/20260928T160000Z-incident-native-home-session-revoked-refresh-reuse.md"
   ],
   "safety": {
     "contains_secrets": false,
