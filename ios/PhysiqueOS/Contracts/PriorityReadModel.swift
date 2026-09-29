@@ -213,13 +213,25 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     var completable: Bool
     /// Canonical Reminder revision required by `priority.complete.v1`.
     var expectedVersion: Int? = nil
-    /// Today's occurrence was marked Skipped (canonical, terminal).
-    var skipped: Bool = false
-    /// The Server offers Mark Skipped for this occurrence (today, open,
-    /// ordinary reminder). Native never decides eligibility itself.
-    var skippable: Bool = false
+    /// Stored optionally so payloads and cached snapshots written before
+    /// skip existed still decode (a synthesized Bool would be a required key).
+    var skippedState: Bool? = nil
+    var skippableState: Bool? = nil
     /// Reminder revision the Server's skip command expects (If-Match).
     var skipExpectedVersion: Int? = nil
+
+    /// Today's occurrence was marked Skipped (canonical, terminal).
+    var skipped: Bool {
+        get { skippedState ?? false }
+        set { skippedState = newValue }
+    }
+
+    /// The Server offers Mark Skipped for this occurrence (today, open,
+    /// ordinary reminder). Native never decides eligibility itself.
+    var skippable: Bool {
+        get { skippableState ?? false }
+        set { skippableState = newValue }
+    }
     var actionLabel: String?
     var completionContext: PriorityCompletionContext?
     /// Server-owned composite/session children, such as Morning Check-In.

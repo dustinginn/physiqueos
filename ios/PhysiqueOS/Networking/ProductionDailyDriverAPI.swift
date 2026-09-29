@@ -1086,8 +1086,8 @@ struct ProductionPriorityAPI: PriorityAPI {
             completed: value.status == "Completed",
             completable: !["Completed", "Skipped"].contains(value.status) && value.executionContract?.expectedVersion != nil,
             expectedVersion: value.executionContract?.expectedVersion,
-            skipped: value.status == "Skipped",
-            skippable: value.skippable == true && value.skipCommand?.commandType == ProductionCommandType.skipPriority
+            skippedState: value.status == "Skipped",
+            skippableState: value.skippable == true && value.skipCommand?.commandType == ProductionCommandType.skipPriority
                 && value.skipCommand?.expectedVersion != nil,
             skipExpectedVersion: value.skipCommand?.expectedVersion,
             actionLabel: value.action?.label, completionContext: value.completionContext,

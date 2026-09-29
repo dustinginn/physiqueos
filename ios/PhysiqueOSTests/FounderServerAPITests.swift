@@ -1660,6 +1660,21 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(again.count, 1)
     }
 
+    func testPriorityOccurrencesCachedBeforeSkipExistedStillDecode() throws {
+        let occurrence = PriorityOccurrence(
+            id: "foam", executionItemId: "execution-foam", date: "2026-09-28", title: "Foam Rolling",
+            subtitle: nil, metadata: nil, changeLabel: nil, icon: .activity, color: .success, urgency: .available,
+            completed: false, completable: true, actionLabel: nil, completionContext: nil, continueActionDestination: nil
+        )
+        var object = try XCTUnwrap(try JSONSerialization.jsonObject(with: JSONEncoder().encode(occurrence)) as? [String: Any])
+        object.removeValue(forKey: "skippedState")
+        object.removeValue(forKey: "skippableState")
+        object.removeValue(forKey: "skipExpectedVersion")
+        let legacy = try JSONDecoder().decode(PriorityOccurrence.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertFalse(legacy.skipped)
+        XCTAssertFalse(legacy.skippable)
+    }
+
     @MainActor
     func testMarkSkippedIsNeverSentWhenTheServerDidNotOfferIt() async throws {
         let occurrence = PriorityOccurrence(
