@@ -330,6 +330,12 @@ dd_app_files = [
     ("Contracts", "DailyDriverLocalDay.swift"),
 ]
 
+# Peptide Support editor (Build 70). Allocated after every established
+# object (including the daily-driver files) so adding it renumbers nothing.
+peptide_app_files = [
+    ("Presentation/OperatingPlan", "PeptideSupportEditorViewModel.swift"),
+]
+
 late_test_files = [
     ("PhysiqueOSTests", "HealthKitCapabilityTests.swift"),
 ]
@@ -340,6 +346,10 @@ n1_test_files = [
     ("PhysiqueOSTests", "HealthKitAutomaticSynchronizationCoordinatorTests.swift"),
     ("PhysiqueOSTests", "HealthKitQueryClientDefaultBoundsTests.swift"),
     ("PhysiqueOSTests", "HealthKitWorkoutIndoorOutdoorFidelityTests.swift"),
+]
+
+peptide_test_files = [
+    ("PhysiqueOSTests", "PeptideSupportEditorViewModelTests.swift"),
 ]
 
 late_reference_only_files = [
@@ -458,7 +468,7 @@ for group, fname in test_files:
 # Groups (every distinct directory that needs a PBXGroup)
 group_names = sorted(set(
     ["App", "Contracts", "Networking", "SharedUI", "Resources", "Presentation", "Supporting"]
-    + [g for g, _ in app_files + late_app_files + n1_app_files + dd_app_files]
+    + [g for g, _ in app_files + late_app_files + n1_app_files + dd_app_files + peptide_app_files]
     + [g for g, _ in resource_files]
     + [g for g, _ in reference_only_files + late_reference_only_files]
 ), key=lambda g: (g.count("/"), g))
@@ -539,6 +549,12 @@ for group, fname in n1_test_files:
 for group, fname in dd_app_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:{group}/{fname}")
+for group, fname in peptide_app_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:{group}/{fname}")
+for group, fname in peptide_test_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:{group}/{fname}")
 
 # ---------------- PBXBuildFile ----------------
 buildfile_lines = []
@@ -563,10 +579,10 @@ for group, fname in late_app_files:
 for group, fname in late_test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
-for group, fname in n1_app_files + dd_app_files:
+for group, fname in n1_app_files + dd_app_files + peptide_app_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
-for group, fname in n1_test_files:
+for group, fname in n1_test_files + peptide_test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
 for framework in system_frameworks:
@@ -591,7 +607,7 @@ container_proxy = f"""\t\t{I('testContainerProxy')} /* PBXContainerItemProxy */ 
 
 # ---------------- PBXFileReference ----------------
 fileref_lines = []
-for group, fname in app_files + late_app_files + n1_app_files + dd_app_files + resource_files + late_resource_files + reference_only_files + late_reference_only_files + test_files + late_test_files + n1_test_files + ui_test_files:
+for group, fname in app_files + late_app_files + n1_app_files + dd_app_files + peptide_app_files + resource_files + late_resource_files + reference_only_files + late_reference_only_files + test_files + late_test_files + n1_test_files + peptide_test_files + ui_test_files:
     fr = I(f"fileref:{group}/{fname}")
     fileref_lines.append(f"\t\t{fr} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};")
 for framework in system_frameworks:
@@ -634,7 +650,7 @@ frameworks_phases = f"""\t\t{I('appFrameworksPhase')} /* Frameworks */ = {{
 
 # ---------------- PBXGroup ----------------
 all_members = (
-    [(g, f) for g, f in app_files + late_app_files + n1_app_files + dd_app_files]
+    [(g, f) for g, f in app_files + late_app_files + n1_app_files + dd_app_files + peptide_app_files]
     + [(g, f) for g, f in resource_files]
     + [(g, f) for g, f in late_resource_files]
     + [(g, f) for g, f in reference_only_files + late_reference_only_files]
@@ -688,7 +704,7 @@ for g in group_names:
 \t\t\tsourceTree = "<group>";
 \t\t}};""")
 
-test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files + late_test_files + n1_test_files)
+test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files + late_test_files + n1_test_files + peptide_test_files)
 group_lines.append(f"""\t\t{I('group:PhysiqueOSTests')} /* PhysiqueOSTests */ = {{
 \t\t\tisa = PBXGroup;
 \t\t\tchildren = (
@@ -731,12 +747,12 @@ group_lines.append(f"""\t\t{I('group:main')} /* Main */ = {{
 \t\t}};""")
 
 # ---------------- PBXNativeTarget ----------------
-app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files + late_app_files + n1_app_files + dd_app_files)
+app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files + late_app_files + n1_app_files + dd_app_files + peptide_app_files)
 app_resource_build_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Resources */,"
     for g, f in resource_files + late_resource_files
 )
-test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files + late_test_files + n1_test_files)
+test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files + late_test_files + n1_test_files + peptide_test_files)
 ui_test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in ui_test_files)
 
 sources_phases = f"""\t\t{I('appSourcesPhase')} /* Sources */ = {{
@@ -1175,7 +1191,7 @@ with open(f"{ROOT}/PhysiqueOS.xcodeproj/project.pbxproj", "w") as f:
 print("wrote project.pbxproj,", len(pbxproj), "bytes")
 print("appTarget id:", I('appTarget'))
 print("testTarget id:", I('testTarget'))
-print("app files:", len(app_files + late_app_files + n1_app_files + dd_app_files), "resources:", len(resource_files + late_resource_files),
+print("app files:", len(app_files + late_app_files + n1_app_files + dd_app_files + peptide_app_files), "resources:", len(resource_files + late_resource_files),
       "reference-only:", len(reference_only_files + late_reference_only_files),
-      "test files:", len(test_files + late_test_files + n1_test_files))
+      "test files:", len(test_files + late_test_files + n1_test_files + peptide_test_files))
 print("development team:", DEVELOPMENT_TEAM)

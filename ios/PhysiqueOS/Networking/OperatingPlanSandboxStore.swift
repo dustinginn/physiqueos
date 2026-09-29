@@ -27,6 +27,10 @@ final class OperatingPlanSandboxStore {
     private(set) var tracking: OperatingPlanTrackingReadModel
     private var supplements: [String: SupplementEditorReadModel]
     private var supplementLifecycle: [String: String]
+    /// The next-due projection a peptide had before a sandbox pause, so a
+    /// resume restores it (the fixture has no schedule engine to recompute
+    /// one; production takes it from the Server's read).
+    private var peptideNextDueBeforePause: [String: (nextDue: String?, date: String?, time: String?)] = [:]
     private let goalOptions: [OperatingPlanGoalLinkReadModel]
     private let goalTitle: String
 
@@ -353,10 +357,20 @@ final class OperatingPlanSandboxStore {
             return .failure(.init(message: error))
         }
         var saved = model
-        if let generated = PeptideDosingTimelineBuilder.build(from: model.dosing) {
-            saved.timeline = generated
+        let existing = peptideExecutions[model.protocolId]
+        let today = Self.todayDateKey()
+        // S1 parity: phases before the strategy's start are kept, the one
+        // containing it is closed the day before, and the generated phases
+        // follow — the sandbox never rewrites dated history either.
+        if let composed = PeptideDosingTimelineBuilder.compose(
+            existing: existing?.timeline ?? [], strategy: model.dosing, today: today
+        ) {
+            saved.timeline = composed
             saved.state = .canonical
         }
+        saved.executionRevision = (existing?.executionRevision ?? 0) + 1
+        saved.lifecycle = saved.lifecycle ?? existing?.lifecycle ?? PeptideLifecycleReadModel(state: "active")
+        Self.projectPeptideDoseSummary(into: &saved)
         peptideExecutions[saved.protocolId] = saved
         if let category = category(forProtocolId: saved.protocolId), var domain = protocolDomains[category],
            let index = domain.methods.firstIndex(where: { $0.protocolId == saved.protocolId }) {
@@ -379,6 +393,77 @@ final class OperatingPlanSandboxStore {
         }
         execution.dosing = model
         return savePeptideExecution(execution)
+    }
+
+    /// Sandbox projection of `operating-plan.peptide-lifecycle.change.v1`
+    /// (design S3): a dated suspension on the execution, nothing else
+    /// edited, revision bumped, next due cleared while paused. Pausing an
+    /// already-paused peptide (or resuming an active one) is a no-op, the
+    /// way the Server answers 409 without changing the record.
+    func setPeptidePaused(protocolId: String, paused: Bool) {
+        guard var execution = peptideExecutions[protocolId] else { return }
+        var lifecycle = execution.lifecycle ?? PeptideLifecycleReadModel(state: "active")
+        guard lifecycle.isPaused != paused else { return }
+        let today = Self.todayDateKey()
+        let at = ISO8601DateFormatter().string(from: Date())
+        if paused {
+            lifecycle.state = "paused"
+            lifecycle.since = today
+            lifecycle.history.append(.init(state: "paused", effectiveDate: today, at: at))
+            peptideNextDueBeforePause[protocolId] = (execution.nextDue, execution.nextDueDate, execution.nextDueTime)
+            execution.nextDue = nil
+            execution.nextDueDate = nil
+            execution.nextDueTime = nil
+        } else {
+            lifecycle.state = "active"
+            lifecycle.since = nil
+            lifecycle.history.append(.init(state: "active", effectiveDate: today, at: at))
+            if let stashed = peptideNextDueBeforePause.removeValue(forKey: protocolId) {
+                execution.nextDue = stashed.nextDue
+                execution.nextDueDate = stashed.date
+                execution.nextDueTime = stashed.time
+            }
+        }
+        execution.lifecycle = lifecycle
+        execution.executionRevision = (execution.executionRevision ?? 0) + 1
+        peptideExecutions[protocolId] = execution
+    }
+
+    func peptideLifecycleState(protocolId: String) -> String {
+        peptideExecutions[protocolId]?.lifecycle?.state ?? "active"
+    }
+
+    /// Derives the S4 dose summary (`currentDose`, `currentDoseLabel`,
+    /// `currentPhase`, `plannedChanges`, `dosingHistory`, `dosingMode`,
+    /// `advancedPlan`) from the stored timeline the way the Server's read
+    /// projects them from `resolveExecutionPhase(localDate)`.
+    private static func projectPeptideDoseSummary(into execution: inout OperatingPlanPeptideExecutionReadModel) {
+        let timeline = execution.timeline
+        let active = timeline.first { $0.status == "active" }
+        execution.currentDose = active.map { .init(amount: $0.doseAmount, unit: $0.doseUnit) }
+        execution.currentDoseLabel = active.map { formatDose($0.doseAmount, $0.doseUnit) }
+        execution.currentPhase = active.flatMap { phase in
+            phase.startDate.map { .init(startDate: $0, endDate: phase.endDate) }
+        }
+        execution.plannedChanges = timeline.compactMap { phase in
+            guard phase.status == "upcoming", let start = phase.startDate else { return nil }
+            return .init(
+                startDate: start,
+                dose: .init(amount: phase.doseAmount, unit: phase.doseUnit),
+                label: "\(formatDose(phase.doseAmount, phase.doseUnit)) on \(PeptideSupportPresentation.shortDate(start))"
+            )
+        }
+        execution.dosingHistory = timeline.reversed().compactMap { phase in
+            guard phase.status != "upcoming", let start = phase.startDate else { return nil }
+            return .init(
+                startDate: start,
+                endDate: phase.endDate,
+                dose: .init(amount: phase.doseAmount, unit: phase.doseUnit),
+                label: "\(formatDose(phase.doseAmount, phase.doseUnit)) · \(phase.window)"
+            )
+        }
+        execution.dosingMode = execution.dosing.pattern == .custom ? "legacy_custom" : "structured"
+        execution.advancedPlan = execution.dosing.pattern != .stay && !(execution.plannedChanges ?? []).isEmpty
     }
 
     // MARK: - Recovery support

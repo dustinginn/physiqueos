@@ -1526,6 +1526,115 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(draft["reminderPreference"] as? String, "remind")
     }
 
+    /// Design S4: the peptide-support read gains lifecycle, current dose,
+    /// planned changes, history, next-due parts and a priority id — all
+    /// optional, the lists lossy, and the simple editor feature-detected
+    /// from `lifecycle` + `currentDose` + `executionRevision`.
+    func testProductionPeptideSupportDecodesLifecycleCurrentDoseAndLossyLists() async throws {
+        let peptide = productionEnvelope(resource: "operating-plan-peptide-support", data: #"{"protocolId":"peptide-protocol","executionId":"execution-peptide","executionRevision":8,"name":"Retatrutide","purpose":"Support the active body-composition strategy.","state":"CANONICAL","supportSchedule":{"frequency":"specific_days","daysOfWeek":["thursday"],"intervalDays":1,"timing":"specific","specificTime":"21:45","startDate":"2026-05-21","endDate":null},"dosing":{"pattern":"up_hold_down","startingDoseAmount":0.5,"startingDoseUnit":"mg","startDate":"2026-05-21","stepAmount":0.25,"stepInterval":1,"stepUnit":"weeks","targetDoseAmount":2,"holdDuration":4,"holdUnit":"weeks","decreaseAmount":0.25,"decreaseInterval":1,"decreaseUnit":"weeks","landingDoseAmount":1.5,"endDate":null},"timeline":[{"id":"execution-peptide:phase:1:2026-05-21","label":"Phase 1","window":"May 21, 2026 – Aug 5, 2026","doseAmount":0.5,"doseUnit":"mg","status":"completed"},{"id":"execution-peptide:phase:2:2026-08-06","label":"Phase 2","window":"Aug 6, 2026 – Until changed","doseAmount":1.5,"doseUnit":"mg","status":"active"}],"reminderPreference":"remind","timingContext":"fasted_before_bed","notes":"Current plan","nextDue":null,"nextDueDate":null,"nextDueTime":null,"lifecycle":{"state":"paused","since":"2026-09-12","history":[{"state":"paused","effectiveDate":"2026-09-12","at":"2026-09-11T20:00:00.000Z","reason":null},{"state":"bogus"}]},"currentDose":{"amount":1.5,"unit":"mg"},"currentDoseLabel":"1.5 mg","currentPhase":{"startDate":"2026-08-06","endDate":null},"plannedChanges":[{"startDate":"2026-10-08","dose":{"amount":2.5,"unit":"mg"},"label":"Phase 3"},{"startDate":"2026-10-22","dose":"malformed","label":"Phase 4"}],"dosingHistory":[{"startDate":"2026-05-21","endDate":"2026-08-05","dose":{"amount":0.5,"unit":"mg"},"label":"0.5 mg · May 21 – Aug 5"},{"broken":true}],"dosingMode":"structured","advancedPlan":true,"priorityId":"reminder-peptide","localDate":"2026-09-29"}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, peptide),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionPeptideSupportAPI(
+            api: native,
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults())
+        ).fetchSupport(protocolId: "peptide-protocol")
+        let detail = try XCTUnwrap(fetched)
+
+        XCTAssertTrue(detail.supportsSimpleEditor)
+        XCTAssertTrue(detail.isPaused)
+        XCTAssertEqual(detail.lifecycle?.since, "2026-09-12")
+        XCTAssertEqual(detail.lifecycle?.history.count, 1, "A malformed lifecycle event is dropped, not fatal")
+        XCTAssertEqual(detail.currentDose, .init(amount: 1.5, unit: "mg"))
+        XCTAssertEqual(detail.currentDoseLabel, "1.5 mg")
+        XCTAssertEqual(detail.currentPhase?.startDate, "2026-08-06")
+        XCTAssertEqual(detail.plannedChanges?.count, 1, "A malformed planned change is dropped, not fatal")
+        XCTAssertEqual(detail.plannedChanges?.first?.dose.amount, 2.5)
+        XCTAssertEqual(detail.dosingHistory?.count, 1)
+        XCTAssertEqual(detail.dosingMode, "structured")
+        XCTAssertEqual(detail.advancedPlan, true)
+        XCTAssertEqual(detail.priorityId, "reminder-peptide")
+        XCTAssertEqual(detail.localDate, "2026-09-29")
+        XCTAssertNil(detail.nextDueDate)
+        XCTAssertEqual(detail.executionRevision, 8)
+
+        // A pre-S4 Server (and every cached snapshot) still decodes, and the
+        // simple editor stays off so no history-rewriting `stay` can be sent.
+        let legacy = try JSONDecoder().decode(PeptideSupportDetail.self, from: Data(#"{"protocolId":"peptide-protocol","executionId":"execution-peptide","executionRevision":3,"name":"Retatrutide","purpose":"Support.","state":"CANONICAL","supportSchedule":{"frequency":"weekly","daysOfWeek":["thursday"],"intervalDays":1,"timing":"specific","specificTime":"21:45","startDate":"2026-05-21","endDate":null},"dosing":{"pattern":"stay","startingDoseAmount":0.5,"startingDoseUnit":"mg","startDate":"2026-05-21","stepAmount":0,"stepInterval":1,"stepUnit":"weeks","targetDoseAmount":0,"holdDuration":1,"holdUnit":"weeks","decreaseAmount":0,"decreaseInterval":1,"decreaseUnit":"weeks","landingDoseAmount":0,"endDate":null},"timeline":[],"reminderPreference":"remind","timingContext":"fasted_before_bed","notes":"Current plan","nextDue":"Oct 1, 2026 · 9:45 PM"}"#.utf8))
+        XCTAssertFalse(legacy.supportsSimpleEditor)
+        XCTAssertFalse(legacy.isPaused)
+        XCTAssertNil(legacy.lifecycle)
+        XCTAssertNil(legacy.currentDose)
+        XCTAssertEqual(legacy.nextDue, "Oct 1, 2026 · 9:45 PM")
+    }
+
+    /// Design S3: `operating-plan.peptide-lifecycle.change.v1` carries
+    /// `If-Match = executionRevision`, a header-safe idempotency key whose
+    /// signature includes the revision target, and decodes the result.
+    func testProductionPeptideLifecycleCommandRoundTripsIfMatchPayloadAndRevisionScopedKey() async throws {
+        func result(_ status: String, revision: Int) -> String {
+            #"{"outcome":"committed","receipt":{"status":"committed","result":{"status":"\#(status)","protocolId":"peptide-protocol","executionId":"execution-peptide","executionRevision":\#(revision),"priorityId":"reminder-peptide","lifecycle":{"state":"\#(status == "paused" ? "paused" : "active")","since":"2026-09-30","history":[]}},"operationId":null,"commandId":"01911111-1111-7111-8111-111111111120"}}"#
+        }
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, result("paused", revision: 4)),
+            .json(200, result("paused", revision: 4)),
+            .json(200, result("resumed", revision: 5)),
+            .json(200, result("paused", revision: 6)),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionPeptideLifecycleAPI(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        let paused = try await api.pause(protocolId: "peptide-protocol", expectedRevision: 3, effectiveDate: .tomorrow)
+        XCTAssertEqual(paused.status, "paused")
+        XCTAssertEqual(paused.executionRevision, 4)
+        XCTAssertEqual(paused.priorityId, "reminder-peptide")
+        XCTAssertEqual(paused.lifecycle?.state, "paused")
+        _ = try await api.pause(protocolId: "peptide-protocol", expectedRevision: 3, effectiveDate: .tomorrow)
+        let resumed = try await api.resume(protocolId: "peptide-protocol", expectedRevision: 4)
+        XCTAssertEqual(resumed.status, "resumed")
+        XCTAssertEqual(resumed.executionRevision, 5)
+        _ = try await api.pause(protocolId: "peptide-protocol", expectedRevision: 5, effectiveDate: .today)
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 5)
+        let pauseRequest = requests[1]
+        XCTAssertEqual(pauseRequest.url?.path, "/api/v1/native/commands")
+        XCTAssertEqual(pauseRequest.value(forHTTPHeaderField: "If-Match"), "\"3\"", "If-Match is the executionRevision from the read")
+        let pauseKey = try XCTUnwrap(pauseRequest.value(forHTTPHeaderField: "Idempotency-Key"))
+        XCTAssertNotNil(pauseKey.range(of: #"^[A-Za-z0-9._:/-]{16,200}$"#, options: .regularExpression), "header-safe key")
+        let pauseBody = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(pauseRequest.httpBody)) as? [String: Any])
+        XCTAssertEqual(pauseBody["commandType"] as? String, "operating-plan.peptide-lifecycle.change.v1")
+        XCTAssertEqual(pauseBody["commandType"] as? String, ProductionCommandType.changePeptideLifecycle)
+        XCTAssertEqual((pauseBody["metadata"] as? [String: Any])?["expectedVersion"] as? String, "3")
+        XCTAssertEqual(pauseBody["payload"] as? [String: String], ["protocolId": "peptide-protocol", "operation": "pause", "effectiveDate": "tomorrow"])
+
+        XCTAssertEqual(requests[2].value(forHTTPHeaderField: "Idempotency-Key"), pauseKey, "The same pause against the same revision replays under the same key")
+
+        let resumeRequest = requests[3]
+        XCTAssertEqual(resumeRequest.value(forHTTPHeaderField: "If-Match"), "\"4\"")
+        let resumeBody = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(resumeRequest.httpBody)) as? [String: Any])
+        XCTAssertEqual(resumeBody["payload"] as? [String: String], ["protocolId": "peptide-protocol", "operation": "resume"], "Resume never carries an effectiveDate")
+        XCTAssertNotEqual(resumeRequest.value(forHTTPHeaderField: "Idempotency-Key"), pauseKey)
+
+        let laterPause = requests[4]
+        XCTAssertEqual(laterPause.value(forHTTPHeaderField: "If-Match"), "\"5\"")
+        XCTAssertNotEqual(laterPause.value(forHTTPHeaderField: "Idempotency-Key"), pauseKey, "A different revision target is a different logical write")
+        let laterBody = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(laterPause.httpBody)) as? [String: Any])
+        XCTAssertEqual((laterBody["payload"] as? [String: String])?["effectiveDate"], "today")
+
+        let signature = ProductionIdempotentSubmission.signature([
+            ProductionCommandType.changePeptideLifecycle, "peptide-protocol", "pause", "tomorrow", "3",
+        ])
+        XCTAssertTrue(signature.contains("\u{1F}3"), "The signature ends in the expected revision")
+        XCTAssertNoThrow(try NativeProductWriteGuard.authorize(.operatingPlan, in: .founderProduction))
+    }
+
     /// Build 21 item 11 (Priority Detail timing parity): confirmed against
     /// the server's own `PriorityDetailService.js` — when a reminder's
     /// `schedule.timeOfDay` is an explicit `HH:MM` clock value (not a

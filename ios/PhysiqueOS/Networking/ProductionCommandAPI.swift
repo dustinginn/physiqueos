@@ -32,6 +32,120 @@ enum ProductionCommandType {
     static let saveSupplementStrategy = "operating-plan.supplement-strategy.save.v1"
     static let changeSupplementLifecycle = "operating-plan.supplement-lifecycle.change.v1"
     static let saveCoachingUpdates = "operating-plan.coaching-updates.save.v1"
+    static let changePeptideLifecycle = "operating-plan.peptide-lifecycle.change.v1"
+}
+
+// MARK: - Peptide lifecycle (pause / resume)
+
+/// The pause-only boundary rule: a pause takes effect on the user's canonical
+/// local date (`today`), or on `tomorrow` when today's dose is still open so
+/// an already-taken dose can be logged first. Resume always takes effect today.
+enum PeptideLifecycleEffectiveDate: String, Sendable, Equatable {
+    case today, tomorrow
+}
+
+/// `operating-plan.peptide-lifecycle.change.v1` — a dated suspension window on
+/// the peptide execution item (design S3). `If-Match` carries the
+/// `executionRevision` from the peptide-support read (contract-required):
+/// a stale token is a 412 the caller re-reads from; 409 means the record is
+/// not in the state the operation expects. Native never derives "today"
+/// itself — the Server resolves `effectiveDate` on its canonical local date.
+protocol PeptideLifecycleAPI: Sendable {
+    func pause(
+        protocolId: String,
+        expectedRevision: Int,
+        effectiveDate: PeptideLifecycleEffectiveDate
+    ) async throws -> PeptideLifecycleChangeResult
+    func resume(protocolId: String, expectedRevision: Int) async throws -> PeptideLifecycleChangeResult
+}
+
+struct PeptideLifecycleChangeResult: Decodable, Equatable, Sendable {
+    var status: String
+    var protocolId: String?
+    var executionId: String?
+    var executionRevision: Int?
+    var priorityId: String?
+    var lifecycle: PeptideLifecycleReadModel?
+}
+
+struct ProductionPeptideLifecycleAPI: PeptideLifecycleAPI {
+    let api: ProductionNativeAPI
+    let idempotencyStore: ProductionIdempotencyKeyStore
+
+    func pause(
+        protocolId: String,
+        expectedRevision: Int,
+        effectiveDate: PeptideLifecycleEffectiveDate
+    ) async throws -> PeptideLifecycleChangeResult {
+        try await change(
+            protocolId: protocolId,
+            operation: "pause",
+            effectiveDate: effectiveDate.rawValue,
+            expectedRevision: expectedRevision
+        )
+    }
+
+    func resume(protocolId: String, expectedRevision: Int) async throws -> PeptideLifecycleChangeResult {
+        try await change(protocolId: protocolId, operation: "resume", effectiveDate: nil, expectedRevision: expectedRevision)
+    }
+
+    private func change(
+        protocolId: String,
+        operation: String,
+        effectiveDate: String?,
+        expectedRevision: Int
+    ) async throws -> PeptideLifecycleChangeResult {
+        try NativeProductWriteGuard.authorize(.operatingPlan, in: .founderProduction)
+        // The revision target is part of the write's identity: the same
+        // operation against a newer revision is a genuinely new write and
+        // must never replay the earlier receipt.
+        let signature = ProductionIdempotentSubmission.signature([
+            ProductionCommandType.changePeptideLifecycle, protocolId, operation, effectiveDate ?? "", String(expectedRevision),
+        ])
+        let idempotencyKey = idempotencyStore.resolvedKey(
+            scope: "operating-plan.peptide-lifecycle.\(protocolId)", signature: signature
+        )
+        let payload = PeptideLifecyclePayload(protocolId: protocolId, operation: operation, effectiveDate: effectiveDate)
+        for attempt in 0..<2 {
+            do {
+                let outcome: ProductionCommandOutcome<PeptideLifecycleChangeResult> = try await api.submitCommand(
+                    ProductionCommandType.changePeptideLifecycle,
+                    idempotencyKey: idempotencyKey,
+                    expectedVersion: String(expectedRevision),
+                    payload: payload
+                )
+                guard outcome.isConfirmed, let result = outcome.receipt.result else {
+                    throw ProductionNativeError.invalidResponse
+                }
+                return result
+            } catch {
+                guard attempt == 0,
+                      ProductionEvidenceIntakePipeline.acceptanceIsUncertain(after: error)
+                else { throw error }
+                // A lost response may follow a durable commit. Repeating the
+                // exact envelope identity asks the Server for the original
+                // receipt and cannot open a second suspension window.
+            }
+        }
+        throw ProductionNativeError.invalidResponse
+    }
+}
+
+private struct PeptideLifecyclePayload: Encodable {
+    var protocolId: String
+    var operation: String
+    /// Pause only (`today` | `tomorrow`); omitted for resume.
+    var effectiveDate: String?
+}
+
+struct NotAvailablePeptideLifecycleAPI: PeptideLifecycleAPI {
+    struct NotAvailable: Error {}
+    func pause(
+        protocolId: String,
+        expectedRevision: Int,
+        effectiveDate: PeptideLifecycleEffectiveDate
+    ) async throws -> PeptideLifecycleChangeResult { throw NotAvailable() }
+    func resume(protocolId: String, expectedRevision: Int) async throws -> PeptideLifecycleChangeResult { throw NotAvailable() }
 }
 
 struct ProductionCommandRequestMetadata: Encodable {

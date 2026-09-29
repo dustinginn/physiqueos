@@ -352,6 +352,16 @@ final class AppEnvironment {
         }
     }
 
+    /// Pause/Resume for peptides (`operating-plan.peptide-lifecycle.change.v1`).
+    /// Sandbox pauses through OperatingPlanSandboxStore; production never
+    /// falls back to it.
+    var peptideLifecycleAPI: PeptideLifecycleAPI {
+        switch nativeAuthority {
+        case .sandbox: NotAvailablePeptideLifecycleAPI()
+        case .founderProduction: ProductionPeptideLifecycleAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
+        }
+    }
+
     var operatingPlanProtocolDomainAPI: OperatingPlanProtocolDomainAPI {
         switch nativeAuthority {
         case .sandbox: NotAvailableOperatingPlanProtocolDomainAPI()

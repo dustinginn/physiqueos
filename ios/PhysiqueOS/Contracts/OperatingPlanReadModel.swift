@@ -444,6 +444,105 @@ struct PeptideDoseTimelinePhaseReadModel: Codable, Equatable, Identifiable {
     var doseAmount: Double
     var doseUnit: String
     var status: String
+    /// Calendar dates of the phase (`YYYY-MM-DD`). Optional: the production
+    /// read projects only the presentation `window`, while the sandbox
+    /// fixture carries them so the local save can keep dated history the
+    /// same way the Server's history-preserving composition does (S1).
+    var startDate: String? = nil
+    var endDate: String? = nil
+}
+
+// MARK: - Peptide lifecycle / current dose (S4 read additions)
+
+/// `operating-plan-peptide-support.lifecycle` — a dated suspension window on
+/// the execution item (`scheduleSuspensions`). `state` is a closed
+/// `active|paused` vocabulary on the wire, decoded as a String so an
+/// unexpected value degrades to "not paused" instead of failing the read.
+struct PeptideLifecycleReadModel: Codable, Equatable, Sendable {
+    var state: String
+    var since: String?
+    var history: [PeptideLifecycleEventReadModel]
+
+    init(state: String, since: String? = nil, history: [PeptideLifecycleEventReadModel] = []) {
+        self.state = state
+        self.since = since
+        self.history = history
+    }
+
+    private enum CodingKeys: String, CodingKey { case state, since, history }
+
+    /// `history` decodes lossily: one malformed event never fails the read.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        state = try container.decode(String.self, forKey: .state)
+        since = try container.decodeIfPresent(String.self, forKey: .since)
+        history = try container.decodeIfPresent(LossyDecodableArray<PeptideLifecycleEventReadModel>.self, forKey: .history)?.elements ?? []
+    }
+
+    var isPaused: Bool { state == "paused" }
+}
+
+struct PeptideLifecycleEventReadModel: Codable, Equatable, Sendable {
+    var state: String
+    var effectiveDate: String
+    var at: String
+    var reason: String? = nil
+}
+
+/// `{ amount, unit }` as the Server emits `currentDose`, `plannedChanges[].dose`
+/// and `dosingHistory[].dose`.
+struct PeptideDoseValueReadModel: Codable, Equatable, Sendable {
+    var amount: Double
+    var unit: String
+}
+
+/// `currentPhase` — the dated window the current dose belongs to.
+struct PeptideDosePhaseWindowReadModel: Codable, Equatable, Sendable {
+    var startDate: String
+    var endDate: String? = nil
+}
+
+/// One future dose change (`plannedChanges[]`), Server-labelled.
+struct PeptidePlannedChangeReadModel: Codable, Equatable, Sendable {
+    var startDate: String
+    var dose: PeptideDoseValueReadModel
+    var label: String
+}
+
+/// One past phase (`dosingHistory[]`, newest first).
+struct PeptideDosingHistoryEntryReadModel: Codable, Equatable, Sendable {
+    var startDate: String
+    var endDate: String? = nil
+    var dose: PeptideDoseValueReadModel
+    var label: String
+}
+
+/// Decodes an unkeyed container element by element, dropping the elements
+/// that fail to decode instead of failing the whole array. Used for every
+/// additive peptide list so one malformed Server element can never take
+/// the peptide screen down.
+struct LossyDecodableArray<Element: Decodable>: Decodable {
+    var elements: [Element]
+
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var decoded: [Element] = []
+        while !container.isAtEnd {
+            if let element = try? container.decode(Element.self) {
+                decoded.append(element)
+            } else {
+                // Advance past the malformed element; without this the
+                // container would never reach its end.
+                _ = try? container.decode(LossyDecodableSkip.self)
+            }
+        }
+        elements = decoded
+    }
+}
+
+/// Accepts any JSON value so a malformed element can be consumed and skipped.
+struct LossyDecodableSkip: Decodable {
+    init(from decoder: Decoder) throws {}
 }
 
 struct OperatingPlanPeptideExecutionReadModel: Codable, Equatable {
@@ -457,6 +556,20 @@ struct OperatingPlanPeptideExecutionReadModel: Codable, Equatable {
     var reminderPreference: OperatingPlanReminderPreference
     var notes: String
     var nextDue: String? = nil
+    // S4 additions. Every key is optional with a default so the bundled
+    // fixture and any older sandbox snapshot keep decoding unchanged.
+    var executionRevision: Int? = nil
+    var lifecycle: PeptideLifecycleReadModel? = nil
+    var currentDose: PeptideDoseValueReadModel? = nil
+    var currentDoseLabel: String? = nil
+    var currentPhase: PeptideDosePhaseWindowReadModel? = nil
+    var plannedChanges: [PeptidePlannedChangeReadModel]? = nil
+    var dosingHistory: [PeptideDosingHistoryEntryReadModel]? = nil
+    var dosingMode: String? = nil
+    var advancedPlan: Bool? = nil
+    var nextDueDate: String? = nil
+    var nextDueTime: String? = nil
+    var priorityId: String? = nil
 }
 
 // MARK: - Recovery support (generic execution item)
@@ -634,9 +747,65 @@ enum PeptideDosingTimelineBuilder {
                 window: window,
                 doseAmount: rounded(entry.dose),
                 doseUnit: model.startingDoseUnit,
-                status: index == entries.count - 1 ? "active" : "completed"
+                status: index == entries.count - 1 ? "active" : "completed",
+                startDate: dateFormatter.string(from: entry.date),
+                endDate: end.map { dateFormatter.string(from: $0) }
             )
         }
+    }
+
+    /// Sandbox projection of the Server's history-preserving composition
+    /// (design S1): the stored timeline becomes the frozen phases before
+    /// `strategy.startDate` plus the phases the strategy generates, in this
+    /// order — (a) drop every existing phase with `start >= startDate`;
+    /// (b) if the last remaining phase is open or ends on/after `startDate`,
+    /// close it at `startDate − 1`; (c) append the generated phases. Phase
+    /// statuses are then resolved against `today`. Returns nil when the
+    /// strategy cannot generate (custom / invalid), exactly like `build`.
+    /// Existing phases without dates cannot be frozen honestly, so a legacy
+    /// undated timeline falls back to the generated phases alone.
+    static func compose(
+        existing: [PeptideDoseTimelinePhaseReadModel],
+        strategy: PeptideDosingStrategyReadModel,
+        today: String
+    ) -> [PeptideDoseTimelinePhaseReadModel]? {
+        guard let generated = build(from: strategy) else { return nil }
+        guard existing.allSatisfy({ $0.startDate != nil }) else {
+            return generated.map { resolveStatus($0, today: today) }
+        }
+        let cut = strategy.startDate
+        var frozen = existing.filter { ($0.startDate ?? "") < cut }
+        if let lastIndex = frozen.indices.last {
+            let last = frozen[lastIndex]
+            if last.endDate == nil || (last.endDate ?? "") >= cut,
+               let cutDate = date(from: cut) {
+                let closedOn = add(-1, unit: .days, to: cutDate)
+                frozen[lastIndex].endDate = dateFormatter.string(from: closedOn)
+                frozen[lastIndex].window = "\(display(date(from: last.startDate ?? "") ?? closedOn)) – \(display(closedOn))"
+            }
+        }
+        let renumbered = generated.enumerated().map { index, phase -> PeptideDoseTimelinePhaseReadModel in
+            var copy = phase
+            copy.id = "generated-phase-\(frozen.count + index + 1)"
+            if copy.label.hasPrefix("Phase ") { copy.label = "Phase \(frozen.count + index + 1)" }
+            return copy
+        }
+        return (frozen + renumbered).map { resolveStatus($0, today: today) }
+    }
+
+    /// `upcoming` / `active` / `completed` by calendar date, mirroring the
+    /// Server's `projectPeptideTimeline` status vocabulary.
+    static func resolveStatus(_ phase: PeptideDoseTimelinePhaseReadModel, today: String) -> PeptideDoseTimelinePhaseReadModel {
+        guard let start = phase.startDate else { return phase }
+        var copy = phase
+        if start > today {
+            copy.status = "upcoming"
+        } else if let end = phase.endDate, end < today {
+            copy.status = "completed"
+        } else {
+            copy.status = "active"
+        }
+        return copy
     }
 
     private static func addSteps(

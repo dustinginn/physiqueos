@@ -171,8 +171,158 @@ final class OperatingPlanReadModelTests: XCTestCase {
         XCTAssertTrue(execution.dosing.pattern.usesTarget)
         XCTAssertTrue(execution.dosing.pattern.usesStep)
         XCTAssertTrue(execution.dosing.pattern.usesHold)
-        XCTAssertEqual(execution.timeline.count, 3)
+        XCTAssertEqual(execution.timeline.count, 4)
         XCTAssertEqual(execution.timeline.filter { $0.status == "completed" }.count, 2)
+        XCTAssertEqual(execution.timeline.filter { $0.status == "upcoming" }.count, 1, "One planned change so Advanced/next-dose paths are exercised in the sandbox")
+    }
+
+    // MARK: - Peptide S4 parity (lifecycle, current dose, history-preserving saves)
+
+    func testSandboxPeptideFixtureCarriesLifecycleCurrentDoseAndRevision() throws {
+        let store = makeStore()
+        let retatrutide = try XCTUnwrap(store.peptideExecution(protocolId: "protocol_fixture_peptide_retatrutide"))
+        XCTAssertEqual(retatrutide.lifecycle?.state, "active")
+        XCTAssertEqual(retatrutide.executionRevision, 7)
+        XCTAssertEqual(retatrutide.currentDose, .init(amount: 3, unit: "mg"))
+        XCTAssertEqual(retatrutide.currentDoseLabel, "3 mg")
+        XCTAssertEqual(retatrutide.currentPhase?.startDate, "2026-06-29")
+        XCTAssertEqual(retatrutide.plannedChanges?.map(\.startDate), ["2026-10-13"])
+        XCTAssertEqual(retatrutide.dosingHistory?.count, 2)
+        XCTAssertEqual(retatrutide.advancedPlan, true)
+        XCTAssertEqual(retatrutide.nextDueDate, "2026-10-05")
+        XCTAssertEqual(retatrutide.priorityId, "reminder_fixture_peptide_retatrutide")
+        XCTAssertEqual(store.peptideLifecycleState(protocolId: "protocol_fixture_peptide_retatrutide"), "active")
+
+        let detail = PeptideSupportDetail(sandbox: retatrutide)
+        XCTAssertTrue(detail.supportsSimpleEditor, "The sandbox path exercises the simple editor")
+        XCTAssertFalse(detail.isPaused)
+        XCTAssertEqual(detail.timingContext, "")
+        XCTAssertNil(detail.localDate)
+
+        let tesamorelin = try XCTUnwrap(store.peptideExecution(protocolId: "protocol_fixture_peptide_tesamorelin"))
+        XCTAssertEqual(tesamorelin.executionRevision, 3)
+        XCTAssertEqual(tesamorelin.nextDueTime, "21:45")
+        XCTAssertEqual(tesamorelin.advancedPlan, false)
+        XCTAssertTrue(PeptideSupportDetail(sandbox: tesamorelin).supportsSimpleEditor)
+    }
+
+    func testSandboxChangeDosePreservesPhasesBeforeTheNewStart() throws {
+        let store = makeStore()
+        let protocolId = "protocol_fixture_peptide_retatrutide"
+        let before = try XCTUnwrap(store.peptideExecution(protocolId: protocolId))
+        let stay = PeptideDosingStrategyReadModel(
+            pattern: .stay, startingDoseAmount: 4, startingDoseUnit: "mg", startDate: "2026-10-01",
+            stepAmount: 0, stepInterval: 1, stepUnit: .weeks, targetDoseAmount: 0,
+            holdDuration: 1, holdUnit: .weeks, decreaseAmount: 0, decreaseInterval: 1,
+            decreaseUnit: .weeks, landingDoseAmount: 0, endDate: nil
+        )
+        guard case .success = store.savePeptideDosing(protocolId: protocolId, model: stay) else { return XCTFail("Expected save to succeed") }
+        let after = try XCTUnwrap(store.peptideExecution(protocolId: protocolId))
+
+        XCTAssertEqual(after.timeline.count, 4, "Jun 1, Jun 15, Jun 29 (closed) + the new steady phase; Oct 13 dropped")
+        XCTAssertEqual(after.timeline[0], before.timeline[0], "Phases before the start are byte-identical")
+        XCTAssertEqual(after.timeline[1], before.timeline[1])
+        XCTAssertEqual(after.timeline[2].doseAmount, before.timeline[2].doseAmount)
+        XCTAssertEqual(after.timeline[2].startDate, "2026-06-29")
+        XCTAssertEqual(after.timeline[2].endDate, "2026-09-30", "The containing phase closes at startDate − 1")
+        XCTAssertEqual(after.timeline[2].window, "Jun 29 – Sep 30")
+        XCTAssertEqual(after.timeline[3].startDate, "2026-10-01")
+        XCTAssertNil(after.timeline[3].endDate)
+        XCTAssertEqual(after.timeline[3].doseAmount, 4)
+        XCTAssertEqual(after.executionRevision, 8, "Every sandbox save bumps the revision the way the Server does")
+        XCTAssertEqual(after.lifecycle?.state, "active", "A save never touches the suspension")
+        XCTAssertEqual(after.dosingMode, "structured")
+        XCTAssertEqual(after.state, .canonical)
+
+        // A save dated before every existing phase replaces them all (the
+        // Server would refuse it without rewriteHistory; the sandbox mirrors
+        // the composed result of an accepted rewrite).
+        var rewrite = stay
+        rewrite.startDate = "2026-05-01"
+        guard case .success = store.savePeptideDosing(protocolId: protocolId, model: rewrite) else { return XCTFail("Expected save to succeed") }
+        let rewritten = try XCTUnwrap(store.peptideExecution(protocolId: protocolId))
+        XCTAssertEqual(rewritten.timeline.count, 1)
+        XCTAssertEqual(rewritten.timeline.first?.startDate, "2026-05-01")
+        XCTAssertEqual(rewritten.executionRevision, 9)
+    }
+
+    func testPeptideTimelineComposeClosesTheContainingPhaseAndResolvesStatusByDate() throws {
+        let existing = [
+            PeptideDoseTimelinePhaseReadModel(id: "a", label: "Phase 1", window: "Jun 1 – Jun 14", doseAmount: 2, doseUnit: "mg", status: "completed", startDate: "2026-06-01", endDate: "2026-06-14"),
+            PeptideDoseTimelinePhaseReadModel(id: "b", label: "Phase 2", window: "Jun 15 – Until changed", doseAmount: 2.5, doseUnit: "mg", status: "active", startDate: "2026-06-15", endDate: nil),
+        ]
+        let stay = PeptideDosingStrategyReadModel(
+            pattern: .stay, startingDoseAmount: 3, startingDoseUnit: "mg", startDate: "2026-09-29",
+            stepAmount: 0, stepInterval: 1, stepUnit: .weeks, targetDoseAmount: 0,
+            holdDuration: 1, holdUnit: .weeks, decreaseAmount: 0, decreaseInterval: 1,
+            decreaseUnit: .weeks, landingDoseAmount: 0, endDate: nil
+        )
+        let composed = try XCTUnwrap(PeptideDosingTimelineBuilder.compose(existing: existing, strategy: stay, today: "2026-09-29"))
+        XCTAssertEqual(composed.map(\.status), ["completed", "completed", "active"])
+        XCTAssertEqual(composed[1].endDate, "2026-09-28")
+        XCTAssertEqual(composed[2].startDate, "2026-09-29")
+        XCTAssertEqual(composed[2].label, "Phase 3", "Generated phases are renumbered after the frozen ones")
+
+        let future = try XCTUnwrap(PeptideDosingTimelineBuilder.compose(existing: existing, strategy: stay, today: "2026-09-20"))
+        XCTAssertEqual(future.map(\.status), ["completed", "active", "upcoming"])
+
+        // A phase that starts exactly on the strategy start is replaced, and
+        // one that ends before it is left open-ended as it was.
+        let boundary = [
+            PeptideDoseTimelinePhaseReadModel(id: "a", label: "Phase 1", window: "Jun 1 – Sep 28", doseAmount: 2, doseUnit: "mg", status: "completed", startDate: "2026-06-01", endDate: "2026-09-28"),
+            PeptideDoseTimelinePhaseReadModel(id: "b", label: "Phase 2", window: "Sep 29 – Until changed", doseAmount: 2.5, doseUnit: "mg", status: "active", startDate: "2026-09-29", endDate: nil),
+        ]
+        let replaced = try XCTUnwrap(PeptideDosingTimelineBuilder.compose(existing: boundary, strategy: stay, today: "2026-09-29"))
+        XCTAssertEqual(replaced.count, 2)
+        XCTAssertEqual(replaced[0].endDate, "2026-09-28")
+        XCTAssertEqual(replaced[1].doseAmount, 3)
+
+        // Undated legacy phases cannot be frozen honestly: generated only.
+        let undated = [PeptideDoseTimelinePhaseReadModel(id: "x", label: "Ongoing", window: "Started May 15", doseAmount: 2, doseUnit: "mg", status: "active")]
+        XCTAssertEqual(PeptideDosingTimelineBuilder.compose(existing: undated, strategy: stay, today: "2026-09-29")?.count, 1)
+        var custom = stay
+        custom.pattern = .custom
+        XCTAssertNil(PeptideDosingTimelineBuilder.compose(existing: existing, strategy: custom, today: "2026-09-29"))
+    }
+
+    func testSandboxPeptidePauseAndResumeMirrorTheLifecycleCommand() throws {
+        let store = makeStore()
+        let protocolId = "protocol_fixture_peptide_retatrutide"
+        let before = try XCTUnwrap(store.peptideExecution(protocolId: protocolId))
+
+        store.setPeptidePaused(protocolId: protocolId, paused: true)
+        let paused = try XCTUnwrap(store.peptideExecution(protocolId: protocolId))
+        XCTAssertEqual(store.peptideLifecycleState(protocolId: protocolId), "paused")
+        XCTAssertEqual(paused.lifecycle?.state, "paused")
+        XCTAssertNotNil(paused.lifecycle?.since)
+        XCTAssertEqual(paused.lifecycle?.history.map(\.state), ["paused"])
+        XCTAssertNil(paused.nextDue, "Next due is null while paused")
+        XCTAssertNil(paused.nextDueDate)
+        XCTAssertEqual(paused.executionRevision, 8, "Pause bumps the revision")
+        XCTAssertEqual(paused.timeline, before.timeline, "Nothing else is edited")
+        XCTAssertEqual(paused.supportSchedule, before.supportSchedule)
+        XCTAssertEqual(paused.reminderPreference, before.reminderPreference)
+        XCTAssertTrue(PeptideSupportDetail(sandbox: paused).isPaused)
+        XCTAssertTrue(PeptideSupportDetail(sandbox: paused).supportsSimpleEditor)
+
+        store.setPeptidePaused(protocolId: protocolId, paused: true)
+        XCTAssertEqual(store.peptideExecution(protocolId: protocolId)?.executionRevision, 8, "Pausing a paused peptide changes nothing (409 on the Server)")
+
+        // Saves while paused are allowed and keep the suspension.
+        var edited = paused
+        edited.notes = "Moved the time before resuming."
+        guard case .success = store.savePeptideExecution(edited) else { return XCTFail("Expected save to succeed") }
+        XCTAssertEqual(store.peptideExecution(protocolId: protocolId)?.lifecycle?.state, "paused")
+        XCTAssertEqual(store.peptideExecution(protocolId: protocolId)?.executionRevision, 9)
+
+        store.setPeptidePaused(protocolId: protocolId, paused: false)
+        let resumed = try XCTUnwrap(store.peptideExecution(protocolId: protocolId))
+        XCTAssertEqual(resumed.lifecycle?.state, "active")
+        XCTAssertNil(resumed.lifecycle?.since)
+        XCTAssertEqual(resumed.lifecycle?.history.map(\.state), ["paused", "active"])
+        XCTAssertEqual(resumed.nextDueDate, before.nextDueDate, "Resume restores the projection")
+        XCTAssertEqual(resumed.executionRevision, 10)
+        XCTAssertEqual(store.peptideLifecycleState(protocolId: "protocol_fixture_peptide_tesamorelin"), "active", "Other peptides are untouched")
     }
 
     func testTesamorelinDosingMatchesStayPattern() throws {
