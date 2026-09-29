@@ -218,7 +218,10 @@ async function productionShapedWorld({ liveLogger = true } = {}) {
       metadata: { clientOccurredAt: NOW, clientTimeZone: "America/Los_Angeles", idempotencyKey: "sep23-fixture" },
       payload: { batchId: "sep23-fixture", observations: [workout()] },
     });
-  return records;
+  // The Sep 23 production state this bounded runner was built for: a deterministic candidate
+  // link with no reconciliation review (ingest now opens that review, so rebuild the state).
+  const { evidenceReviews: _opened, ...stranded } = records.snapshot();
+  return createInMemoryCanonicalRecordStore({ ...stranded, evidenceReviews: [] });
 }
 
 function policy() {
