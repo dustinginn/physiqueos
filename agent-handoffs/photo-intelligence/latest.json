@@ -1,11 +1,11 @@
 {
   "schema_version": 3,
-  "generated_at_utc": "2026-09-29T16:30:00Z",
+  "generated_at_utc": "2026-09-29T17:47:24Z",
   "task": {
-    "id": "photo-intelligence-back-pose-case3-multiview-20260929",
-    "title": "Back Pose Case 3 and additive multi-view Photo Intelligence",
+    "id": "photo-intelligence-guarded-production-deploy-20260929",
+    "title": "Guarded production deployment of canonical Photo Intelligence",
     "agent": "codex",
-    "status": "complete_review_approved"
+    "status": "deployed_verified"
   },
   "repository": "dustinginn/physiqueos",
   "frozen_blind_results": {
@@ -44,13 +44,23 @@
     "third_unseen_case_blocks_initial_graduation": false,
     "prospective_monthly_validation_planned": true
   },
+  "production_deployment": {
+    "reviewed_candidate": "dd05ef2ba619bf4f11e0f77c1e33bda4d1215b45",
+    "deployed_integration_descendant": "446bc964dc31318ea48261400e8b243cdd1d4ab1",
+    "deployment_id": "3e87b8a7-8af6-4280-9cfd-b7437ff5f995",
+    "build_id": "physiqueos-446bc964-20260929",
+    "report": "agent-handoffs/reports/20260929T174724Z-photo-intelligence-446bc964-production-deploy.md",
+    "health": "ready",
+    "historical_immutability_verified": true,
+    "zero_unintended_data_drift": true
+  },
   "safety": {
     "frozen_blind_results_changed": false,
     "contains_photo_bytes": false,
     "contains_local_private_paths": false,
-    "production_mutated": false,
-    "deployed": false,
+    "production_mutated": true,
+    "deployed": true,
     "testflight_uploaded": false
   },
-  "next_step": "Code review is approved; keep undeployed and use future monthly Founder photo sets for prospective production validation."
+  "next_step": "Use future monthly Founder photo sets for prospective production validation; do not regenerate historical briefings."
 }
