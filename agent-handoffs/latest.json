@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-29T03:15:00Z",
+  "generated_at_utc": "2026-09-29T04:00:00Z",
   "task": {
-    "id": "strength-reconciliation-fix-396e750d-production-deploy-20260929",
-    "title": "DEPLOYED: Strength reconciliation fix 396e750d (deployment c0ad0cc9) \u2014 Sep 27/28 reviews recovered naturally; both Native notifications fired",
+    "id": "native-consolidated-daily-driver-build-after-briefings-20260928",
+    "title": "IN PROGRESS: Phase A diagnosed — Sep 28 Activity froze at 171 because re-pair changed deliveryDeviceId and cross-device equal-coverage precedence rejected 27 later revisions",
     "agent": "claude",
-    "status": "completed"
+    "status": "in_progress"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -22,10 +22,10 @@
     "previous_production_server_sha": "7242043fd11825b49788839bd99a41d983f04c6e"
   },
   "result": {
-    "summary": "Guarded deploy of the approved 396e750d (prod branch fast-forward 7242043f\u2192396e750d, 4-line spec stamp, force-rebuild c0ad0cc9 ACTIVE 9/9). Verified source_commit_hash, runtime gitSha, /live /ready 200, schema 000014 unchanged. The first ordinary HealthKit ingest after deploy (02:58:03Z) created exactly two pending reconciliation reviews (Sep 27, Sep 28) through the matcher; a second ingest left them unchanged; links still candidate, claims/other reviews/canonical workouts/evidence byte-identical. Device read core.navigation.log at 02:58:07Z and the Native notifier fired both 'Workout needs review' notifications (Founder screenshot).",
+    "summary": "Root cause: canonical-day precedence keeps existing on equal coverage from a different delivery device; the Founder's mid-day re-pair (15:35Z) gave the same phone a new device id, so revisions 11–37 (to 828 cal) were superseded and the day froze at 171.405 (v10, 15:32Z). 212 workout cal = the two walks (Strength link was still candidate). 'Linked Workouts' counts Logger sessions, not canonical workouts. Logged Today excludes Cardio by an old design decision. Self-heals at next-morning complete_day; recurs on any mid-day re-pair.",
     "success": true,
     "production_mutated": false,
-    "deployed": true,
+    "deployed": false,
     "testflight_uploaded": false,
     "founder_device_operated": false
   },
@@ -50,20 +50,20 @@
     "Pending-review summary reads '1 possible Logger sessions' (server pluralization)."
   ],
   "backlog": [
-    "FOUNDER REQUIREMENT: reconciliation-review notification must fire when the review is ready (not on Log load) \u2014 Native: reconcile after every automatic HealthKit sync/background delivery on any tab; requires a Native build.",
+    "FOUNDER REQUIREMENT: reconciliation-review notification must fire when the review is ready (not on Log load) — Native: reconcile after every automatic HealthKit sync/background delivery on any tab; requires a Native build.",
     "Native backlog (Logged Today, Log-tab shortcut, Mark Skipped, PR celebration, routine icon, Baseline Read label).",
     "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window.",
     "Pluralize pending reconciliation summary (Server, one line).",
     "Reviewer test nits from the Strength fix review."
   ],
-  "recommended_next_step": "Founder resolves the two pending Strength reviews in Log; Founder to authorize the Native 'notify when review is ready' change (needs a Native build).",
-  "full_report_path": "agent-handoffs/reports/20260929T031500Z-strength-reconciliation-fix-396e750d-production-deploy.md",
+  "recommended_next_step": "Implement Server fix (separately gated) and the consolidated Native build.",
+  "full_report_path": "agent-handoffs/reports/20260929T040000Z-activity-sep28-consistency-diagnosis.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260929T031500Z-strength-reconciliation-fix-396e750d-production-deploy.md",
     "agent-handoffs/reports/20260929T020000Z-strength-reconciliation-review-gap-diagnosis.md",
     "agent-handoffs/reports/20260929T003000Z-briefing-intelligence-7242043f-production-deploy.md",
-    "agent-handoffs/reports/20260928T200000Z-monthly-september-nutrition-phase-jargon-final.md",
-    "agent-handoffs/reports/20260928T180000Z-monthly-structural-parity-september-preview.md"
+    "agent-handoffs/reports/20260928T200000Z-monthly-september-nutrition-phase-jargon-final.md"
   ],
   "safety": {
     "contains_secrets": false,

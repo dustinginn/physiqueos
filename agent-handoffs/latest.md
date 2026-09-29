@@ -2,26 +2,22 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: production deploy of the Strength reconciliation fix `396e750d`
+- Task: consolidated Native daily-driver build, Phase A (Activity diagnosis)
 - Agent: claude
-- Status: **DEPLOYED and verified end to end**
-- Generated (UTC): 2026-09-29T03:15:00Z
+- Status: **DIAGNOSED, implementation in progress**
+- Generated (UTC): 2026-09-29T04:00:00Z
 
-Production now runs `396e750d` (deployment `c0ad0cc9`). The build passed, the tests passed with 0 new failures, health is green and the schema is unchanged.
+**Why Activity looked wrong on Sep 28:** when you re-paired the app this morning, the Server started treating your phone as a second device. Its rule for two devices at equal partial coverage is "keep the first one", so it froze Activity at 171 cal (8:32 AM) and set aside 27 later updates (up to 828 cal).
 
-**The Sep 27 and Sep 28 reviews recovered on their own:**
-- **02:58Z:** your phone's first ordinary HealthKit sync after the deploy created exactly two pending reviews through the normal matcher.
-- **A second sync** changed nothing: no duplicates and nothing reopened. The links, other reviews, workouts and evidence are unchanged.
-- **Seconds later** the app loaded Log and fired both "Workout needs review" notifications (your screenshot).
+It will fix itself tomorrow morning when the full-day summary arrives. Without a fix it would happen again after any mid-day re-pair.
 
-**Your requirement is recorded:** the notification should fire when the review is ready, not when you open Log. The recommended Native change is to check for new reviews after every automatic HealthKit sync, on any tab. It needs a Native build and your go-ahead.
+**What else followed from that:**
+- The 212 vs 171 warning: 212 is just the two walks, measured against a total frozen at 8:32 AM.
+- "Linked workouts 1": it counts Logger sessions, not workouts.
+- Walks missing from Logged Today: an old design decision left Cardio out.
 
-**Worth knowing:**
-- The app only fires this notification when the Log screen loads; changing that needs a Native change.
-- The notification says "1 possible Logger sessions", a one-line server wording fix.
+**Plan:**
+- A Server fix, gated separately: newer, higher totals from a re-paired phone are accepted; the Activity count uses the same workouts as Training Day; Logged Today shows Strength and Cardio together; the Activity total says "so far" before the day is complete.
+- The rest of the Native build scope.
 
-Both are in the backlog.
-
-**Next:** resolve the two reviews in Log.
-
-Full report: `agent-handoffs/reports/20260929T031500Z-strength-reconciliation-fix-396e750d-production-deploy.md`
+Full report: `agent-handoffs/reports/20260929T040000Z-activity-sep28-consistency-diagnosis.md`
