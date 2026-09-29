@@ -6,13 +6,13 @@ export function createPriorityNavigationReadService({ store } = {}) {
     async getPriorityDetail(priorityId, { occurrenceDate = null } = {}) {
       const input = await store.load({ priorityId, occurrenceDate });
       if (!input.user) return null;
-      return createPriorityDetailService({ repositories: repositoriesFrom(input) })
+      return createPriorityDetailService({ repositories: repositoriesFrom(input, store) })
         .getPriorityDetail(priorityId, input.user.id, { occurrenceDate });
     },
   });
 }
 
-function repositoriesFrom(input) {
+function repositoriesFrom(input, store) {
   return Object.freeze({
     users: { getUserById: async () => input.user },
     goals: { listGoals: async () => input.goals },
@@ -22,5 +22,11 @@ function repositoriesFrom(input) {
     operatingRhythm: { getOperatingRhythm: async () => input.operatingRhythm },
     executionItems: { listExecutionItems: async () => input.executionItems },
     weightEntries: { listWeightEntries: async () => input.weightEntries ?? [] },
+    // One targeted read of the resolved occurrence day's check-in: its
+    // canonical reconciliation entries carry a same-day skip.
+    dailyCheckIns: {
+      getCheckInForDate: async (_userId, date) =>
+        (await store.loadCheckInForDate?.({ date })) ?? null,
+    },
   });
 }

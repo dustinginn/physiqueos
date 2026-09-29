@@ -1,4 +1,5 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
+import { createPriorityReconciliationCheckInId } from "../../domain/services/PriorityOccurrenceReconciliation.js";
 
 export function createPostgresPriorityNavigationReadStore({ pool, ownerUserId, onComplete = null } = {}) {
   if (!pool?.query || !ownerUserId) throw new Error("Priority navigation storage requires a PostgreSQL pool and owner.");
@@ -50,6 +51,11 @@ export function createPostgresPriorityNavigationReadStore({ pool, ownerUserId, o
         });
       }
     },
+    async loadCheckInForDate({ date }) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ""))) return null;
+      return await createPhase4CanonicalRecordStore({ query: (text, values) => pool.query(text, values) })
+        .get({ ownerUserId, collection: "dailyCheckIns", recordId: createPriorityReconciliationCheckInId(date) }) ?? null;
+    },
   });
 }
 
@@ -67,6 +73,10 @@ export function createRepositoryPriorityNavigationReadStore({ repositories } = {
         repositories.weightEntries?.listWeightEntries?.(user?.id) ?? [],
       ]);
       return Object.freeze({ user, goals, reminder, protocols, operatingPlan, operatingRhythm, executionItems, weightEntries });
+    },
+    async loadCheckInForDate({ date }) {
+      const user = await repositories.users.getCurrentUser();
+      return (await repositories.dailyCheckIns?.getCheckInForDate?.(user?.id, date)) ?? null;
     },
   });
 }

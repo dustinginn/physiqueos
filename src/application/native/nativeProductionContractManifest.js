@@ -102,6 +102,7 @@ const writes = Object.freeze([
   write(Phase3Command.SUBMIT_WEIGHT, ["localDate", "value"], "If-Match required only when replacing a changed same-day Weight"),
   write(Phase3Command.SUBMIT_CHECK_IN, ["localDate", "value"], "If-Match required only when replacing a changed same-day Weight"),
   write(Phase3Command.COMPLETE_PRIORITY, ["priorityId", "occurrenceDate"], "If-Match required for the first occurrence completion; exact replay is a no-op"),
+  write(Phase3Command.SKIP_PRIORITY, ["priorityId", "occurrenceDate"], "today's occurrence only (Server-owned skippable/skipCommand); If-Match required for the first skip; exact replay is a no-op; a completed occurrence stays completed"),
   write(Phase3Command.COMMIT_TRAINING_SESSION, ["sessionId", "localDate", "exercises"], "If-Match required when correcting an existing canonical Training session"),
   write(Phase3Command.UPSERT_NUTRITION_DAY, ["localDate", "dailyTotals"], "semantic fingerprint protects replacements; server assigns Goal and Phase"),
   write(Phase3Command.UPSERT_ACTIVITY_DAY, ["localDate", "dailyActivity", "sourceIdentity", "source"], "manual, typed, or screenshot provenance only; direct device-health sync is forbidden"),

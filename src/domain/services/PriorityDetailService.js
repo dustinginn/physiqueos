@@ -25,8 +25,14 @@ import {
 } from "./TrackingSupportService";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
 import {
+  findPriorityOccurrenceReconciliation,
+  isPriorityOccurrenceSkipped,
+} from "./PriorityOccurrenceReconciliation.js";
+import {
+  isPrioritySkipSupportedReminder,
   isReminderOccurrenceCompleted,
   openOnlyNotificationAction,
+  prioritySkipCommand,
   resolveNotificationAction,
   resolvePriorityExecutionContract,
   specializedNotificationAction,
@@ -40,7 +46,12 @@ import { canonicalWeightEntries } from "../weight/canonicalWeight.js";
 
 export function createPriorityDetailService({ repositories, now = () => new Date() }) {
   return scopeRepositoryReadService({ repositories, namespace: "priority-detail", service: {
-    async getPriorityDetail(priorityId, userId, { occurrenceDate: requestedOccurrenceDate = null } = {}) {
+    async getPriorityDetail(priorityId, userId, options = {}) {
+      return withSkipDefaults(await resolvePriorityDetail(priorityId, userId, options));
+    },
+  }});
+
+  async function resolvePriorityDetail(priorityId, userId, { occurrenceDate: requestedOccurrenceDate = null } = {}) {
       const user = userId
         ? await repositories.users.getUserById(userId)
         : await repositories.users.getCurrentUser();
@@ -49,7 +60,8 @@ export function createPriorityDetailService({ repositories, now = () => new Date
       if (!resolvedUserId) return null;
 
       const timeZone = resolveLocalTimeZone(user?.timeZone ?? user?.timezone);
-      const occurrenceDate = requestedOccurrenceDate ?? getLocalDateKey(now(), timeZone);
+      const today = getLocalDateKey(now(), timeZone);
+      const occurrenceDate = requestedOccurrenceDate ?? today;
 
       const [
         goals,
@@ -59,6 +71,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
         operatingRhythm,
         executionItems,
         weightEntries,
+        occurrenceCheckIn,
       ] =
         await Promise.all([
           repositories.goals.listGoals(resolvedUserId),
@@ -68,6 +81,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           repositories.operatingRhythm?.getOperatingRhythm(resolvedUserId) ?? null,
           repositories.executionItems?.listExecutionItems?.(resolvedUserId) ?? [],
           repositories.weightEntries?.listWeightEntries?.(resolvedUserId) ?? [],
+          repositories.dailyCheckIns?.getCheckInForDate?.(resolvedUserId, occurrenceDate) ?? null,
         ]);
 
       const dexaPriority = parseDexaPriorityId(priorityId);
@@ -186,18 +200,44 @@ export function createPriorityDetailService({ repositories, now = () => new Date
       }
 
       if (reminder) {
-        return withExecutionContractAndNotificationAction(createReminderPriorityDetail({
+        const completed = isReminderOccurrenceCompleted(reminder, { occurrenceDate, timeZone });
+        // Completed wins over a skip; either is terminal for the occurrence.
+        const skipEntry = completed
+          ? null
+          : isPriorityOccurrenceSkipped(occurrenceCheckIn, reminder.id, occurrenceDate)
+            ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, reminder.id, occurrenceDate)
+            : null;
+        const open = !completed && !skipEntry;
+        const detail = withExecutionContractAndNotificationAction(createReminderPriorityDetail({
           reminder,
           goals,
           operatingPlan,
           occurrenceDate,
-          timeZone,
-        }), reminder, occurrenceDate, !isReminderOccurrenceCompleted(reminder, { occurrenceDate, timeZone }));
+          completed,
+          skipEntry,
+        }), reminder, occurrenceDate, open);
+        const skippable = open &&
+          occurrenceDate === today &&
+          detail.executionContract.workflow === "priority_detail" &&
+          isPrioritySkipSupportedReminder(reminder);
+        const skipCommand = skippable ? prioritySkipCommand(detail.executionContract) : null;
+        return { ...detail, skippable: Boolean(skipCommand), skipCommand };
       }
 
       return createFallbackPriorityDetail(priorityId, goals, occurrenceDate);
-    },
-  }});
+  }
+}
+
+// Every Priority Detail carries the Server-owned skip contract. Only the
+// ordinary reminder path above can ever set `skippable: true`.
+function withSkipDefaults(detail) {
+  if (!detail) return detail;
+  return {
+    ...detail,
+    skippable: detail.skippable === true,
+    skipCommand: detail.skippable === true ? detail.skipCommand ?? null : null,
+    skipContext: detail.skipContext ?? null,
+  };
 }
 
 function withExecutionContract(detail, reminder, occurrenceDate) {
@@ -919,16 +959,23 @@ function formatProgressPhotoScheduleSubtitle(schedule = {}) {
   return "Scheduled for today.";
 }
 
-function createReminderPriorityDetail({ reminder, goals, operatingPlan, occurrenceDate, timeZone }) {
-  const completed = isReminderOccurrenceCompleted(reminder, { occurrenceDate, timeZone });
+function createReminderPriorityDetail({ reminder, goals, operatingPlan, occurrenceDate, completed, skipEntry = null }) {
+  const open = !completed && !skipEntry;
   return {
     id: reminder.id,
     title: reminder.title,
     eyebrow: "Priority Detail",
     subtitle: formatSchedule(reminder.schedule),
-    status: completed ? "Completed" : "Open",
-    completable: !completed,
-    completionContext: completed ? null : { occurrenceDate, dose: null, protocolId: null },
+    status: completed ? "Completed" : skipEntry ? "Skipped" : "Open",
+    completable: open,
+    completionContext: open ? { occurrenceDate, dose: null, protocolId: null } : null,
+    skipContext: skipEntry
+      ? {
+          occurrenceDate,
+          note: skipEntry.note ?? null,
+          skippedAt: skipEntry.recordedAt ?? null,
+        }
+      : null,
     action: {
       label: "Continue",
       href: "/",

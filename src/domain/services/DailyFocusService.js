@@ -290,7 +290,7 @@ function buildDailyFocusCandidates({
         ...(morningWeightItem ? [MORNING_WEIGH_IN_REMINDER_ID] : []),
       ]),
     }),
-  ].filter(Boolean);
+  ].filter((item) => item && !isOccurrenceTerminallyReconciled(checkIns, today, item));
   const sessions = getDailySessionsFromItems(highPriorityItems);
   const sessionItemIds = new Set(
     sessions.flatMap((session) => session.items.map((item) => item.id))
@@ -470,6 +470,15 @@ function isPriorityRecordOpen(reminder) {
   return !TERMINAL_PRIORITY_STATUSES.has(
     String(reminder.status ?? reminder.resolution ?? "").toLowerCase()
   );
+}
+
+// A priority occurrence resolved by its canonical dated reconciliation entry
+// (e.g. today's `priority.skip.v1` skip, written in the same shape Morning
+// Check-In writes) is terminal for Home and the notification horizon exactly
+// like a completion is.
+function isOccurrenceTerminallyReconciled(checkIns, date, item) {
+  const priorityId = item.executionContract?.priorityId ?? item.completionId ?? item.id;
+  return Boolean(priorityId) && hasTerminalReconciliation(checkIns, date, priorityId);
 }
 
 function hasTerminalReconciliation(checkIns, date, reminderId) {
