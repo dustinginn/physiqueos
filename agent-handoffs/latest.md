@@ -2,19 +2,27 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: final integration of Native Build 69 (Claude + Codex)
+- Task: Server `98534bf8` deploy and Native Build 69 TestFlight upload
 - Agent: claude
-- Status: **FINAL CANDIDATE READY. Not uploaded.**
-- Generated (UTC): 2026-09-29T06:00:00Z
+- Status: **DONE. Build 69 is ready for you to test.**
+- Generated (UTC): 2026-09-29T05:00:00Z
 
-**Build 69 (`efa65db1`)** is the accepted Build 69 plus Codex's Workout Complete celebration: a "New performance records" card from the Server's own records, with a small one-time confetti. It also includes one integration fix: an in-progress workout now wins over an older recovered Workout Complete screen.
+**Server `98534bf8` is live** (deployment `ab7fe481`).
+- **Checks:** health is green, the new code is what's running, and the schema is unchanged.
+- **New:** workout performance records are now available to the app.
+- **Data:** no data changed; all 47 collections are identical before and after.
 
-**Validation:** 1501/1501 tests pass, the Release build succeeds, and the independent review approved it with no must-fixes.
+**Build 69 (`efa65db1`) was uploaded through Xcode**, with no browser login.
+- **Status:** delivery `91831873`; Apple processing is **VALID**, so it's available in TestFlight.
+- **What's in it:**
+  - Activity says "so far" / "Still updating", and re-pairing no longer freezes the day.
+  - Logged Today shows Strength and Cardio together.
+  - Tapping Log opens a workout in progress.
+  - "Workout needs review" arrives after the sync, on any tab.
+  - Mark Skipped.
+  - Workout Complete shows new performance records with a small confetti.
+  - Monthly cleanup: "What it means" and Routine/Recovery icons.
 
-**The records card needs one Server change** that isn't live yet. It's ready as `98534bf8`: 0 new test failures, build passes, not deployed. Until it's deployed the card simply doesn't appear.
+The test checklist is in the full report.
 
-**Decisions:**
-- accept Build 69 and authorize the TestFlight upload;
-- authorize the Server records deploy (`98534bf8`).
-
-Full report: `agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md`
+Full report: `agent-handoffs/reports/20260929T050000Z-server-98534bf8-and-native-build69-distribution.md`

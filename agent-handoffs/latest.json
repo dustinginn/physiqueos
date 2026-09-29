@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-29T06:00:00Z",
+  "generated_at_utc": "2026-09-29T05:00:00Z",
   "task": {
-    "id": "native-build69-final-integration-20260929",
-    "title": "FINAL CANDIDATE READY: integrated Native Build 69 efa65db1 (Claude + Codex records celebration); Server records candidate 98534bf8 gated",
+    "id": "server-98534bf8-native-build69-distribution-20260929",
+    "title": "DISTRIBUTED: Server 98534bf8 live (ab7fe481, zero drift) + Native Build 69 efa65db1 uploaded (delivery 91831873, VALID) — ready for Founder testing",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "production_server_sha": "faa9151a8118acf48fda6541e8e23898f1148246",
+    "production_server_sha": "98534bf8e91dd48da62fc807beae5d14c282aa04",
     "native_build67_final_sha": "8359bdcb",
     "native_reviewed_candidate_sha": "dc7763e5",
     "native_build68_final_sha": "537f538b",
@@ -18,40 +18,42 @@
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
     "server_candidate_sha": "98534bf8",
     "server_candidate_branch": "claude/server-records-on-prod-20260929",
-    "production_deployment_id": "76c3d8aa-fbfd-4809-9e14-569c67af969b",
-    "previous_production_server_sha": "396e750d7a2c9c4cb4971b8936c56e4476805e07",
+    "production_deployment_id": "ab7fe481-abd9-4334-bfcd-f224560bb801",
+    "previous_production_server_sha": "faa9151a8118acf48fda6541e8e23898f1148246",
     "native_candidate_sha": "efa65db1",
     "native_candidate_branch": "claude/native-build69-integrated-20260929",
     "native_recommended_build": "69",
     "codex_celebration_branch": "codex/native-workout-complete-record-celebration-20260928",
-    "codex_celebration_sha": "ef54e482"
+    "codex_celebration_sha": "ef54e482",
+    "native_build69_final_sha": "efa65db1",
+    "native_build69_delivery_id": "91831873-845e-46af-aa6a-bb9629cf9999",
+    "native_build69_processing_status": "VALID",
+    "native_build69_dsym_uuid": "A621757F-1B2A-31FF-9D2D-62FD831781E6",
+    "last_uploaded_build": "69"
   },
   "result": {
-    "summary": "Integrated Codex's Workout Complete records celebration (1fa66457 + ef54e482, cherry-picked -x) onto the accepted base c2b43091; conflicts resolved preserving both sides; integration fix efa65db1 makes the Log-tab resume win over a relaunch-recovered earlier completion. Full suite 1501/1501, Release BUILD SUCCEEDED (no new warnings), fresh review APPROVE WITH NITS. Card needs Server records change: candidate 98534bf8 (= prod faa9151a + aaa0d675) validated, 0 new regressions, build ok, not deployed.",
+    "summary": "Server 98534bf8 deployed via guarded workflow (deployment ab7fe481 ACTIVE 9/9): source_commit_hash + runtime gitSha verified, /live /ready 200, schema 000014 unchanged, additive performanceRecords contract present in running build, zero drift across 47 collections and all receipts. Native Build 69 (efa65db1: Claude base + Codex records celebration + integration fix) archived and uploaded via Xcode exportArchive with the App Store Connect API key (no browser login): delivery 91831873-845e-46af-aa6a-bb9629cf9999, processing VALID.",
     "success": true,
     "production_mutated": false,
-    "deployed": false,
-    "testflight_uploaded": false,
+    "deployed": true,
+    "testflight_uploaded": true,
     "founder_device_operated": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Native 1501/1501, Release compile ok; Server 98534bf8 regression 0 new, build ok."
+      "summary": "Server 0 new regressions + build ok; Native 1501/1501, Release ok; upload dry run all PASS."
     },
     "review": {
       "status": "passed",
-      "summary": "Fresh review of integrated candidate APPROVE WITH NITS; its one low-medium finding fixed (efa65db1)."
+      "summary": "Fresh reviews approved (Server + integrated Native)."
     },
     "replay_fidelity": {
       "status": "passed",
-      "summary": "No production change in this step."
+      "summary": "Read-only drift snapshots identical; in-container contract markers verified."
     }
   },
-  "decisions_required": [
-    "Accept final integrated Build 69 efa65db1, then authorize the TestFlight upload.",
-    "Authorize guarded Server deploy of 98534bf8 (records) so the Workout Complete card appears."
-  ],
+  "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
     "Sep 28 Activity is still frozen in production (supersedes continue to 837 cal); self-heals at the next-morning complete_day summary."
@@ -63,13 +65,13 @@
     "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
   ],
-  "recommended_next_step": "Founder/ChatGPT acceptance of the final integrated Build 69 and the Server records deploy decision.",
-  "full_report_path": "agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md",
+  "recommended_next_step": "Founder tests Build 69 in TestFlight per the acceptance checklist in the distribution report.",
+  "full_report_path": "agent-handoffs/reports/20260929T050000Z-server-98534bf8-and-native-build69-distribution.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md",
     "agent-handoffs/reports/20260929T043000Z-daily-driver-server-faa9151a-production-deploy.md",
     "agent-handoffs/reports/20260929T050000Z-native-consolidated-daily-driver-candidate-build69.md",
-    "agent-handoffs/reports/20260929T040000Z-activity-sep28-consistency-diagnosis.md",
-    "agent-handoffs/reports/20260929T031500Z-strength-reconciliation-fix-396e750d-production-deploy.md"
+    "agent-handoffs/reports/20260929T040000Z-activity-sep28-consistency-diagnosis.md"
   ],
   "safety": {
     "contains_secrets": false,
@@ -77,6 +79,5 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_chatgpt_retrieval": true
-  },
-  "review_request_path": "agent-handoffs/inbox/review-requests/20260929T051500Z-chatgpt-review-native-build69-candidate.md"
+  }
 }
