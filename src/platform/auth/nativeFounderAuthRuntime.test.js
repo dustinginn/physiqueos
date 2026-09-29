@@ -15,6 +15,7 @@ function runtime(overrides = {}) {
   const founderAuthService = {
     registerDeviceWithPairing: vi.fn(async () => ({ accessToken: access, refreshCredential: "r".repeat(43) })),
     authenticateAccessToken: vi.fn(async () => principal),
+    issueRefreshProofChallenge: vi.fn(async () => ({ challengeId: "challenge", nonce: "n".repeat(43) })),
     rotateRefreshCredential: vi.fn(async () => ({ accessToken: "b".repeat(43), refreshCredential: "s".repeat(43) })),
     revokeSession: vi.fn(async () => true),
     ...overrides.founderAuthService,
@@ -31,14 +32,28 @@ describe("Native Founder auth runtime", () => {
     const logger = { info: vi.fn() };
     const current = runtime({ logger });
     await current.subject.pair({ pairingCredential: "p".repeat(43), platform: "ios", displayName: "Founder iPhone", requestId: "request-1" });
-    expect(current.founderAuthService.registerDeviceWithPairing).toHaveBeenCalledWith({ pairingCredential: "p".repeat(43), platform: "ios", displayName: "Founder iPhone" });
+    expect(current.founderAuthService.registerDeviceWithPairing).toHaveBeenCalledWith({ pairingCredential: "p".repeat(43), platform: "ios", displayName: "Founder iPhone", refreshProof: null });
     expect(JSON.stringify(logger.info.mock.calls)).not.toContain("p".repeat(43));
   });
 
   it("rotates refresh credentials through FounderAuthService", async () => {
     const current = runtime();
-    await current.subject.refresh({ refreshCredential: "r".repeat(43) });
-    expect(current.founderAuthService.rotateRefreshCredential).toHaveBeenCalledWith("r".repeat(43));
+    const request = { refreshCredential: "r".repeat(43) };
+    await current.subject.refresh({ request });
+    expect(current.founderAuthService.rotateRefreshCredential).toHaveBeenCalledWith(request);
+  });
+
+  it("issues a refresh challenge without logging proof material", async () => {
+    const logger = { info: vi.fn() };
+    const current = runtime({ logger });
+    await current.subject.refreshChallenge({
+      refreshCredential: "r".repeat(43),
+      rotationIntentId: "i".repeat(43),
+      successorCommitment: "c".repeat(43),
+      requestId: "request-proof",
+    });
+    expect(current.founderAuthService.issueRefreshProofChallenge).toHaveBeenCalledOnce();
+    expect(JSON.stringify(logger.info.mock.calls)).not.toContain("r".repeat(43));
   });
 
   it("authenticates and scope-checks the narrow Weight read", async () => {

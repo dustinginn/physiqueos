@@ -16,18 +16,38 @@ export function createNativeFounderAuthRuntime({ founderAuthService, weightSumma
   return Object.freeze({
     buildIdentity: foundationBuildIdentity,
     logger,
-    async pair({ pairingCredential, platform, displayName, requestId = null }) {
+    async pair({ pairingCredential, platform, displayName, refreshProof = null, requestId = null }) {
       if (platform !== "ios" || !String(displayName ?? "").trim() || String(displayName).trim().length > 80) {
         throw invalidRequest("The iPhone device description is invalid.");
       }
       const startedAt = clock();
-      const session = await founderAuthService.registerDeviceWithPairing({ pairingCredential, platform, displayName: String(displayName).trim() });
+      const session = await founderAuthService.registerDeviceWithPairing({
+        pairingCredential,
+        platform,
+        displayName: String(displayName).trim(),
+        refreshProof,
+      });
       logger?.info("native.auth.device_registered", { requestId, durationMs: elapsed(clock, startedAt), route: "/api/v1/native/auth/pair", status: 200 });
       return session;
     },
-    async refresh({ refreshCredential, requestId = null }) {
+    async refreshChallenge({ refreshCredential, rotationIntentId, successorCommitment, requestId = null }) {
       const startedAt = clock();
-      const session = await founderAuthService.rotateRefreshCredential(refreshCredential);
+      const challenge = await founderAuthService.issueRefreshProofChallenge({
+        refreshCredential,
+        rotationIntentId,
+        successorCommitment,
+      });
+      logger?.info("native.auth.refresh_challenge_issued", {
+        requestId,
+        durationMs: elapsed(clock, startedAt),
+        route: "/api/v1/native/auth/refresh-challenge",
+        status: 200,
+      });
+      return challenge;
+    },
+    async refresh({ request, requestId = null }) {
+      const startedAt = clock();
+      const session = await founderAuthService.rotateRefreshCredential(request);
       logger?.info("native.auth.refresh_succeeded", { requestId, durationMs: elapsed(clock, startedAt), route: "/api/v1/native/auth/refresh", status: 200 });
       return session;
     },

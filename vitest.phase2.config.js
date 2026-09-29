@@ -5,7 +5,10 @@ export default defineConfig({
     environment: "node",
     include: [
       "src/platform/database/phase2PostgresFoundation.test.js",
+      "src/platform/database/PostgresIdentityStore.senderConstrained.test.js",
       "src/platform/auth/FounderAuthService.test.js",
+      "src/platform/auth/FounderAuthService.senderConstrained.test.js",
+      "db/migrations/000015_sender_constrained_refresh_recovery.test.js",
       "src/platform/auth/PasskeyLifecycleService.test.js",
       "src/platform/object-storage/SpacesPrivateObjectProvider.test.js",
       "src/platform/object-storage/SpacesBucketProvisioner.test.js",
