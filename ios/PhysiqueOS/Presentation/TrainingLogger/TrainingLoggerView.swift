@@ -1047,18 +1047,24 @@ struct TrainingLoggerView: View {
                     Label("New performance records", systemImage: "trophy.fill")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                         .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                    ForEach(presentation.visible) { record in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(record.canonicalExerciseName)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(presentation.groups) { group in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(group.canonicalExerciseName)
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            Text("\(record.title) · \(record.value)")
-                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            if let detail = record.detail {
-                                Text(detail)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            ForEach(group.records) { record in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(record.title) · \(record.value)")
+                                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    if let detail = record.detail {
+                                        Text(detail)
+                                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    }
+                                }
+                                .accessibilityElement(children: .combine)
                             }
                         }
                         .accessibilityElement(children: .combine)
@@ -1075,28 +1081,32 @@ struct TrainingLoggerView: View {
                 if celebrate { ConfettiBurst().allowsHitTesting(false).accessibilityHidden(true) }
             }
             .onAppear {
-                guard WorkoutCelebrationGate.claim(key: celebrationKey, reduceMotion: reduceMotion) else { return }
+                guard WorkoutCelebrationGate.claim(
+                    key: celebrationKey,
+                    hasRecords: !records.isEmpty,
+                    reduceMotion: reduceMotion
+                ) else { return }
                 celebrate = true
             }
         }
     }
 
-    /// A short, self-contained confetti pop (about 1.4 s), then gone.
+    /// A short, self-contained confetti pop (under one second), then gone.
     private struct ConfettiBurst: View {
         private struct Piece: Identifiable {
             let id: Int
             let dx: CGFloat, dy: CGFloat, spin: Double, color: Color, size: CGFloat
         }
         @State private var launched = false
-        private let pieces: [Piece] = (0..<28).map { index in
+        private let pieces: [Piece] = (0..<20).map { index in
             let colors: [Color] = [PhysiqueOSTheme.chartSuccess, PhysiqueOSTheme.accent, PhysiqueOSTheme.chartEvidence, PhysiqueOSTheme.chartEffort]
-            let angle = Double(index) / 28 * 2 * .pi
+            let angle = Double(index) / 20 * 2 * .pi
             return Piece(id: index,
-                         dx: CGFloat(cos(angle)) * CGFloat(70 + (index * 37) % 90),
-                         dy: CGFloat(sin(angle)) * CGFloat(40 + (index * 53) % 70) + 90,
+                         dx: CGFloat(cos(angle)) * CGFloat(55 + (index * 37) % 65),
+                         dy: CGFloat(sin(angle)) * CGFloat(35 + (index * 53) % 50) + 70,
                          spin: Double((index * 97) % 360),
                          color: colors[index % colors.count],
-                         size: CGFloat(5 + index % 4))
+                         size: CGFloat(4 + index % 3))
         }
 
         var body: some View {
@@ -1112,7 +1122,7 @@ struct TrainingLoggerView: View {
             }
             .frame(maxWidth: .infinity)
             .onAppear {
-                withAnimation(.easeOut(duration: 1.4)) { launched = true }
+                withAnimation(.easeOut(duration: 0.9)) { launched = true }
             }
         }
     }

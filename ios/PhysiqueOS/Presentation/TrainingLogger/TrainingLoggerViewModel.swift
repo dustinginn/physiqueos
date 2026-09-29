@@ -82,6 +82,7 @@ final class TrainingLoggerViewModel {
             savedDrafts = canWrite ? draftStore.loadAll() : []
             if authority == .founderProduction {
                 var remaining: [TrainingLoggerDraft] = []
+                var recoveredCompletions: [TrainingLoggerDraft] = []
                 for candidate in savedDrafts {
                     if await writeAPI.isDraftAlreadyDurable(candidate) {
                         // Exact deterministic identity/fingerprint proof
@@ -99,6 +100,7 @@ final class TrainingLoggerViewModel {
                             }
                         }
                         draftStore.discard(id: candidate.id)
+                        recoveredCompletions.append(candidate)
                     } else {
                         remaining.append(candidate)
                         if candidate.submissionState != nil {
@@ -107,6 +109,15 @@ final class TrainingLoggerViewModel {
                     }
                 }
                 savedDrafts = Self.sortDrafts(remaining)
+                if let recovered = Self.sortDrafts(recoveredCompletions).first {
+                    var completed = recovered
+                    completed.step = .complete
+                    completed.submissionState = nil
+                    draft = completed
+                    completedPerformanceRecords = []
+                    processingMessage = nil
+                    loadCompletedPerformanceRecords(for: completed, commitResult: nil)
+                }
             }
             loadState = .loaded
         } catch {
@@ -118,6 +129,7 @@ final class TrainingLoggerViewModel {
         guard canWrite else { return }
         let workoutDate = Self.dateKey(date)
         let startedAt = mode == .live ? ISO8601DateFormatter().string(from: date) : nil
+        completedPerformanceRecords = []
         draft = .fresh(mode: mode, workoutDate: workoutDate, startedAt: startedAt)
         validationMessage = nil
         persist()
@@ -130,6 +142,7 @@ final class TrainingLoggerViewModel {
 
     func resume(draftId: String) {
         guard canWrite else { return }
+        completedPerformanceRecords = []
         draft = savedDrafts.first { $0.id == draftId }
         if draft?.supportingEvidenceAssets.isEmpty == false,
            draft?.supportingWorkouts == nil {
@@ -160,6 +173,7 @@ final class TrainingLoggerViewModel {
             savedDrafts.removeAll { $0.id == draftId }
         }
         draft = nil
+        completedPerformanceRecords = []
         validationMessage = nil
     }
 
@@ -270,17 +284,7 @@ final class TrainingLoggerViewModel {
         // as failed or resurrect the local draft — nothing after this point
         // is authoritative over that.
         completeLocalCapture()
-        if let records = committed.performanceRecords, records.isAuthoritative {
-            completedPerformanceRecords = records.records
-        } else {
-            // The commit result did not carry them (read-back recovery, an
-            // older receipt, or deferred derivation): read the Server's own
-            // session records once, without blocking the completion screen.
-            Task { [weak self, writeAPI] in
-                guard let records = await writeAPI.sessionPerformanceRecords(for: submittedDraft) else { return }
-                self?.completedPerformanceRecords = records
-            }
-        }
+        loadCompletedPerformanceRecords(for: submittedDraft, commitResult: committed)
         // Reconciling any attached supporting evidence happens entirely in
         // the background, after the durable commit above and after
         // navigation to the completion screen — never blocking either one.
@@ -319,7 +323,7 @@ final class TrainingLoggerViewModel {
                 // an ambiguous acknowledgement. This can only replay the
                 // original command; it cannot create a sibling session.
                 if attempt > 0, let result = try? await writeAPI.commit(candidate), result.isDurable {
-                    self?.resolveDurableDraft(candidate)
+                    self?.resolveDurableDraft(candidate, commitResult: result)
                     return
                 }
                 do { try await Task.sleep(for: recoveryDelay) }
@@ -328,7 +332,10 @@ final class TrainingLoggerViewModel {
         }
     }
 
-    private func resolveDurableDraft(_ candidate: TrainingLoggerDraft) {
+    private func resolveDurableDraft(
+        _ candidate: TrainingLoggerDraft,
+        commitResult: TrainingCommitResult? = nil
+    ) {
         if candidate.supportingEvidenceAssets.isEmpty {
             attachmentStore.removeAll(draftId: candidate.id)
         }
@@ -339,11 +346,38 @@ final class TrainingLoggerViewModel {
             completed.step = .complete
             completed.submissionState = nil
             draft = completed
+            completedPerformanceRecords = []
             processingMessage = nil
+            loadCompletedPerformanceRecords(for: candidate, commitResult: commitResult)
         }
         Task { [writeAPI] in
             await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
         }
+    }
+
+    /// Uses only the authoritative commit/read contract. The draft identity
+    /// guard prevents a late read for an earlier completion from leaking its
+    /// records into a newly started or resumed workout.
+    private func loadCompletedPerformanceRecords(
+        for completedDraft: TrainingLoggerDraft,
+        commitResult: TrainingCommitResult?
+    ) {
+        if let records = commitResult?.performanceRecords, records.isAuthoritative {
+            applyCompletedPerformanceRecords(records.records, draftId: completedDraft.id)
+            return
+        }
+        Task { [weak self, writeAPI] in
+            guard let records = await writeAPI.sessionPerformanceRecords(for: completedDraft) else { return }
+            self?.applyCompletedPerformanceRecords(records, draftId: completedDraft.id)
+        }
+    }
+
+    private func applyCompletedPerformanceRecords(
+        _ records: [TrainingPerformanceRecord],
+        draftId: String
+    ) {
+        guard draft?.id == draftId, draft?.step == .complete else { return }
+        completedPerformanceRecords = records
     }
 
     func persist() {
