@@ -241,6 +241,69 @@ describe("Logger command performance events", () => {
   });
 });
 
+describe("Logger command performance records result", () => {
+  it("returns the canonical records the committed session established", async () => {
+    const records = store();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await founderPullUpHistory(ports, { includeSep13: false });
+    const committed = await logSession(ports, { localDate: "2026-09-13", sets: four(weighted, 6, 7, 7, 7) });
+    const stored = eventsOf(records);
+    expect(stored).toHaveLength(2);
+    expect(committed.result.performanceRecords.status).toBe("completed");
+    expect(committed.result.performanceRecords.records.map((item) => item.sourceEventId).sort())
+      .toEqual(stored.map((event) => event.id).sort());
+    expect(committed.result.performanceRecords.records.map((item) => [item.achievementType, item.value, item.previousBaseline]))
+      .toEqual([
+        ["session_volume_pr", "675 lb", "Previous: 600 lb"],
+        ["reps_at_load_pr", "7 reps at 25 lb", "Previous: 6 reps at this load"],
+      ]);
+    expect(committed.result.performanceRecords.records[0]).toMatchObject({
+      id: `training_library_record_${committed.result.performanceRecords.records[0].sourceEventId}`,
+      canonicalExerciseId: "pull_up",
+      workoutDate: "2026-09-13",
+      improvement: "Improved by 75 lb",
+    });
+    // Existing result fields are unchanged.
+    expect(committed.result).toMatchObject({ status: "durable", trainingSessionDurable: true, sessionId: expect.any(String) });
+  });
+
+  it("returns an empty completed list for a session that set no record", async () => {
+    const records = store();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const first = await logSession(ports, { localDate: "2026-08-16", sets: four(weighted, 6, 6, 6, 6) });
+    const tie = await logSession(ports, { localDate: "2026-08-23", sets: four(weighted, 6, 6, 6, 6) });
+    expect(first.result.performanceRecords).toEqual({ status: "completed", records: [] });
+    expect(tie.result.performanceRecords).toEqual({ status: "completed", records: [] });
+  });
+
+  it("returns the identical list when the same session is committed again", async () => {
+    const records = store();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await founderPullUpHistory(ports, { includeSep13: false });
+    const payload = { localDate: "2026-09-13", sessionId: "session-replayed", sets: four(weighted, 6, 7, 7, 7) };
+    const first = await logSession(ports, payload);
+    const replay = await logSession(ports, payload);
+    expect(first.result.performanceRecords.records).toHaveLength(2);
+    expect(replay.result.performanceRecords).toEqual(first.result.performanceRecords);
+    expect(eventsOf(records)).toHaveLength(2);
+  });
+
+  it("reports a deferred derivation with no records and still commits the session", async () => {
+    const records = store();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await founderPullUpHistory(ports, { includeSep13: false });
+    const payload = { localDate: "2026-09-13", sessionId: "session-collided", sets: four(weighted, 6, 7, 7, 7) };
+    await logSession(ports, payload);
+    const seeded = eventsOf(records);
+    expect(seeded).toHaveLength(2);
+    const collided = { ...seeded[0], previousBaselineValue: seeded[0].previousBaselineValue - 1, improvement: seeded[0].improvement + 1 };
+    await records.put({ ownerUserId, collection: "trainingPerformanceEvents", recordId: collided.id, payload: collided, expectedVersion: 1 });
+    const replay = await logSession(ports, payload);
+    expect(replay.result).toMatchObject({ status: "durable", trainingSessionDurable: true });
+    expect(replay.result.performanceRecords).toEqual({ status: "deferred", records: [] });
+  });
+});
+
 describe("performance event liveness", () => {
   it("resolves events against active canonical sessions without deleting anything", async () => {
     const records = store();
