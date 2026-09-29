@@ -126,6 +126,41 @@ describe("Photo Event: unified V3 regression golden", () => {
     expect(enriched.poseInterpretations).toEqual(narrative.poseInterpretations);
   });
 
+  it("prefers the canonical photo-only producer when a prospective Photo Event carries it", () => {
+    const narrative = {
+      poseInterpretations: [{
+        observations: ["Legacy prose should not become the source."],
+        priorMatchFound: true,
+        comparisonMode: "historical_comparison",
+      }],
+      photoIntelligence: {
+        schemaVersion: "canonical_photo_intelligence_v1",
+        comparison: {
+          baselineDate: "2026-07-19", comparisonDate: "2026-09-19",
+          daysElapsed: 62,
+        },
+        captureAssessment: { views: [{ poseId: "front-relaxed" }] },
+        comparability: { overall: "moderate" },
+        confidence: { limitations: ["Lighting differs."] },
+        observations: [{
+          metric: "muscularity", region: "chest", direction: "increased",
+          apparentMagnitude: "subtle", confidence: "moderate",
+          observation: "The chest appears somewhat fuller.",
+          confounders: ["Arm position differs."],
+        }],
+      },
+    };
+    const result = derivePhotoStructuredObservationsV3(narrative);
+    expect(result.producerSource).toBe("canonical_photo_intelligence");
+    expect(result.structured_observations).toEqual([
+      expect.objectContaining({
+        metric: "muscularity", region: "chest", direction: "increased",
+        magnitude: "subtle", factualSummary: "The chest appears somewhat fuller.",
+      }),
+    ]);
+    expect(JSON.stringify(result)).not.toMatch(/Legacy prose/);
+  });
+
   it("does not pull a prior Weekly's Energy into a Photo Event (text, recommendation and Confidence equal the pristine base)", async () => {
     const { prepared, artifact } = await preparePhotoV3({ withPriorWeekly: true });
     expect(textDigest(artifact.briefing.narrativeV3)).toBe(BASE_WITH_PRIOR_WEEKLY_TEXT_SHA256);

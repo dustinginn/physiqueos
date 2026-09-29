@@ -1,37 +1,45 @@
 {
-  "schema_version": 1,
-  "generated_at_utc": "2026-09-29T15:10:14Z",
+  "schema_version": 2,
+  "generated_at_utc": "2026-09-29T16:04:00Z",
   "task": {
-    "id": "photo-intelligence-visual-change-magnitude-blind-founder-validation-20260929",
-    "title": "Founder Case 2 BLIND pre-human-reference Photo Intelligence result frozen",
+    "id": "photo-intelligence-canonical-holistic-synthesis-20260929",
+    "title": "Canonical Photo Intelligence and time-causal holistic Photo Briefing candidate",
     "agent": "codex",
-    "status": "blind_case_frozen"
+    "status": "committed_ready_heldout_validation"
   },
   "repository": "dustinginn/physiqueos",
-  "case": {
-    "id": "founder_blind_case_2",
-    "baseline_date": "2026-07-19",
-    "comparison_date": "2026-09-19",
-    "goal_context": "Build Lean Mass with a body-fat guardrail"
+  "frozen_blind_results": {
+    "case_1": {
+      "commit": "54e625c1efd9129ce0c3481fba2f88f5fa3a36d3",
+      "sha256": "52f45d6261b81528873c62575eee40117709fd7d63fdc69e1d9965472aba3a7d",
+      "artifact": "agent-handoffs/photo-intelligence/founder-cases/case-1-2026-05-21-to-2026-07-18-BLIND-pre-human-reference.json"
+    },
+    "case_2": {
+      "commit": "e75005a0610da34854922cc556cf58f0b5e595fb",
+      "sha256": "255249d13d49f6e99c261bf283f161ee7cce88a6c5064954d2c0623657899f03",
+      "artifact": "agent-handoffs/photo-intelligence/founder-cases/case-2-2026-07-19-to-2026-09-19-BLIND-pre-human-reference.json"
+    }
   },
-  "result": {
-    "overall_apparent_magnitude": "subtle",
-    "goal_relative_direction": "supportive",
-    "overall_confidence": "moderate",
-    "human_reference_seen": false,
-    "frozen_pre_human_reference": true
+  "post_reveal_artifacts": {
+    "comparison_report": "agent-handoffs/reports/20260929T153600Z-photo-intelligence-case1-case2-post-reveal-comparison.md",
+    "case_1_second_pass": "agent-handoffs/photo-intelligence/founder-cases/case-1-2026-05-21-to-2026-07-18-SECOND-PASS-POST-REVEAL.json",
+    "case_2_second_pass": "agent-handoffs/photo-intelligence/founder-cases/case-2-2026-07-19-to-2026-09-19-SECOND-PASS-POST-REVEAL.json",
+    "case_2_holistic_replay": "agent-handoffs/photo-intelligence/founder-cases/case-2-2026-09-19-HOLISTIC-REPLAY-POST-REVEAL.json",
+    "holistic_replay_report": "agent-handoffs/reports/20260929T153700Z-photo-intelligence-case2-holistic-replay.md",
+    "implementation_review": "agent-handoffs/reports/20260929T160400Z-photo-intelligence-canonical-holistic-implementation-review.md"
   },
-  "artifacts": {
-    "report": "agent-handoffs/reports/20260929T151014Z-photo-intelligence-case-2-2026-07-19-to-2026-09-19-BLIND-pre-human-reference.md",
-    "raw_result": "agent-handoffs/photo-intelligence/founder-cases/case-2-2026-07-19-to-2026-09-19-BLIND-pre-human-reference.json"
+  "calibration": {
+    "case_1": "major",
+    "case_2": "subtle",
+    "held_out_validation_required": true
   },
   "safety": {
+    "frozen_blind_results_changed": false,
     "contains_photo_bytes": false,
     "contains_local_private_paths": false,
-    "contains_human_reference": false,
-    "contains_non_photo_evidence": false,
     "production_mutated": false,
-    "safe_for_chatgpt_retrieval": true
+    "deployed": false,
+    "testflight_uploaded": false
   },
-  "next_step": "Stop. Await Founder human-reference reveal before any comparison or tuning."
+  "next_step": "Run a genuinely held-out real-image case before graduation; do not treat the revealed Case 1/2 replays as blind validation."
 }

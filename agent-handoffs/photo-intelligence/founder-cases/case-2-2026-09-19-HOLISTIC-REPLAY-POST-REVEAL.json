@@ -1,0 +1,131 @@
+{
+  "schemaVersion": "photo_briefing_holistic_v1",
+  "resultLabel": "HOLISTIC REPLAY — POST-REVEAL",
+  "eventDate": "2026-09-19",
+  "evidenceCutoff": "2026-09-20T17:51:47.391Z",
+  "goalContext": {
+    "name": "Build Lean Mass with a body-fat guardrail",
+    "source": "runtime_context_supplied_with_case",
+    "used_for": [
+      "regional_relevance",
+      "goal_relative_interpretation",
+      "user_facing_narrative"
+    ],
+    "not_used_for": [
+      "altering_source_observations",
+      "increasing_visual_confidence",
+      "inferring_measured_body_composition",
+      "assuming_muscle_gain_or_guardrail_compliance"
+    ]
+  },
+  "visualEvidence": {
+    "source": "canonical_photo_intelligence",
+    "schemaVersion": "canonical_photo_intelligence_v1",
+    "comparison": {
+      "caseId": "founder_blind_case_2",
+      "baselineDate": "2026-07-19",
+      "comparisonDate": "2026-09-19",
+      "daysElapsed": 62,
+      "goalContext": {
+        "name": "Build Lean Mass with a body-fat guardrail",
+        "source": "runtime_context_supplied_with_case",
+        "used_for": [
+          "regional_relevance",
+          "goal_relative_interpretation",
+          "user_facing_narrative"
+        ],
+        "not_used_for": [
+          "altering_source_observations",
+          "increasing_visual_confidence",
+          "inferring_measured_body_composition",
+          "assuming_muscle_gain_or_guardrail_compliance"
+        ]
+      }
+    },
+    "overallMagnitude": "subtle",
+    "dominantVisualStory": "The comparison suggests a subtly fuller upper torso, most apparent through the chest and shoulder outline, while the waist and midsection remain broadly stable and lean-looking.",
+    "confidence": {
+      "overallReliability": "moderate",
+      "rationale": "Confidence is moderate that the comparison shows a subtle increase in apparent upper-body fullness with a broadly stable waist. Confidence is moderate-to-high that there is no obvious large waist increase in this front-view pair. Confidence is low-to-moderate for isolated chest, shoulder, and arm size changes because pose, posture, lighting, and pump are not standardized.",
+      "limitations": [
+        "The baseline has one arm raised while the comparison has both arms down.",
+        "Shoulder set, chest expansion, breathing, abdominal bracing, flexing, and pump are unknown.",
+        "Lighting direction and rear daylight differ.",
+        "Camera distance and framing differ slightly.",
+        "Hydration, food intake, and time of day are unknown.",
+        "Only one front view is available at each date."
+      ]
+    }
+  },
+  "independentEvidence": [
+    {
+      "id": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+      "type": "dexa_scan",
+      "observedAt": "2026-08-15T23:59:59.999Z",
+      "availableAt": "2026-08-15T19:00:05.436Z",
+      "attribution": "measured_by_dexa"
+    },
+    {
+      "id": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+      "type": "dexa_scan",
+      "observedAt": "2026-09-12T23:59:59.999Z",
+      "availableAt": "2026-09-13T02:08:43.147Z",
+      "attribution": "measured_by_dexa"
+    }
+  ],
+  "evidenceSelection": {
+    "schemaVersion": "canonical_evidence_cutoff_v1",
+    "eventDate": "2026-09-19",
+    "cutoff": "2026-09-20T17:51:47.391Z",
+    "eligible": [
+      {
+        "id": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+        "type": "dexa_scan",
+        "observedAt": "2026-08-15T23:59:59.999Z",
+        "availableAt": "2026-08-15T19:00:05.436Z",
+        "lastUpdatedAt": "2026-08-15T19:02:52.508Z"
+      },
+      {
+        "id": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+        "type": "dexa_scan",
+        "observedAt": "2026-09-12T23:59:59.999Z",
+        "availableAt": "2026-09-13T02:08:43.147Z",
+        "lastUpdatedAt": "2026-09-13T05:51:51.983Z"
+      }
+    ],
+    "excluded": []
+  },
+  "measuredEvidence": {
+    "sourceId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+    "sourceIds": [
+      "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+      "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+    ],
+    "measuredAt": "2026-09-12T23:59:59.999Z",
+    "availableAt": "2026-09-13T02:08:43.147Z",
+    "leanMassLb": 153.3,
+    "comparisonLeanMassLb": 148.3,
+    "comparisonMeasuredAt": "2026-08-15T23:59:59.999Z",
+    "leanMassChangeLb": 5,
+    "bodyFatPercentage": 8.1,
+    "comparisonBodyFatPercentage": 7.6,
+    "bodyFatPercentageChange": 0.5,
+    "attribution": "DEXA measured these values; photos did not."
+  },
+  "convergence": {
+    "status": "convergent",
+    "confidenceEffect": "holistic_interpretation_strengthened",
+    "visualConfidenceChanged": false,
+    "causalClaim": false
+  },
+  "userFacingCopy": "Encouraging direction: the September photo presents a somewhat fuller chest, shoulders, and arms while your waist remains broadly similar and there is no clear visual increase in midsection softness. That combination is consistent with movement toward Build Lean Mass while respecting the body-fat guardrail, but the visible change is subtle—not enough for photos alone to establish muscle gain or a body-composition change. The arm-position and lighting differences make small upper-body comparisons less certain. Independent evidence converges with that photo-level direction: the September 12, 2026 DEXA measured +5.0 lb of lean-mass change and 8.1% body fat. That strengthens the overall interpretation without making the visual observation more certain: the photos did not measure tissue change, and neither source by itself proves what caused it.",
+  "provenance": {
+    "producer": "photo_briefing_holistic_synthesis_service",
+    "producerVersion": "photo_briefing_holistic_v1",
+    "photoIntelligenceProducerVersion": "canonical_photo_intelligence_v1",
+    "evidenceCutoffVersion": "canonical_evidence_cutoff_v1",
+    "visualObservationAttribution": "photos",
+    "measurementAttribution": "DEXA",
+    "synthesisAttribution": "PhysiqueOS"
+  }
+}

@@ -65,7 +65,7 @@ export function createPostgresPhotoEventReadStore({
           confidenceRows, briefingRows, metadataRows, protocolRows,
           priorCadenceRows] = await Promise.all([
           query(
-            `SELECT collection_name,record_id,payload,version
+            `SELECT collection_name,record_id,payload,version,created_at,updated_at
                FROM physiqueos.canonical_evidence_records
               WHERE owner_user_id=$1 AND (
                 collection_name IN ('progressPhotos','dexaScans')
@@ -82,7 +82,7 @@ export function createPostgresPhotoEventReadStore({
             [ownerUserId, windowStart, eventDate],
           ),
           query(
-            `SELECT payload,version FROM physiqueos.canonical_checkin_records
+            `SELECT record_id,payload,version,created_at,updated_at FROM physiqueos.canonical_checkin_records
               WHERE owner_user_id=$1 AND collection_name='weightEntries'
               ORDER BY occurrence_date,record_id`,
             [ownerUserId],
@@ -96,7 +96,7 @@ export function createPostgresPhotoEventReadStore({
             [ownerUserId],
           ),
           query(
-            `SELECT payload,version FROM physiqueos.canonical_execution_records
+            `SELECT record_id,payload,version,created_at,updated_at FROM physiqueos.canonical_execution_records
               WHERE owner_user_id=$1 AND collection_name='executionItems'
               ORDER BY record_id`,
             [ownerUserId],
@@ -157,6 +157,9 @@ export function createPostgresPhotoEventReadStore({
         });
         const legacyPhotos = byCollection(evidenceRows, "progressPhotos");
         const dexaScans = byCollection(evidenceRows, "dexaScans");
+        const evidenceAvailability = availabilityIndex([
+          ...evidenceRows, ...weightRows, ...executionRows,
+        ]);
         // A Goal is handed to the Goal Contract V3 adapter, which derives its
         // `contractVersion` from `goal.goalContractVersion ?? goal.version`. The
         // stored Goal payload carries neither, and the repository read path has
@@ -214,6 +217,7 @@ export function createPostgresPhotoEventReadStore({
           executionItems: payloads(executionRows),
           dexaScans,
           artifacts,
+          evidenceAvailability,
           publicationStore,
         });
       } finally {
@@ -256,4 +260,26 @@ function shiftDate(value, days) {
 
 function iso(value) {
   return value?.toISOString?.() ?? value ?? new Date(0).toISOString();
+}
+
+function availabilityIndex(rows) {
+  const entries = [];
+  for (const row of rows) {
+    const availableAt = row.created_at ? iso(row.created_at) : null;
+    const ids = [...new Set([
+      row.record_id,
+      row.payload?.id,
+      row.payload?.canonicalId,
+      row.payload?.canonical_id,
+    ].filter(Boolean).map(String))];
+    for (const id of ids) {
+      entries.push(Object.freeze({
+        id,
+        availableAt,
+        lastUpdatedAt: row.updated_at ? iso(row.updated_at) : null,
+        source: "canonical_record_created_at",
+      }));
+    }
+  }
+  return Object.freeze(entries.sort((left, right) => left.id.localeCompare(right.id)));
 }

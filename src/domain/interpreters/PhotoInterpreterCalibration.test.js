@@ -45,4 +45,28 @@ describe("Photo Interpreter V2 calibration contract", () => {
       else process.env.OPENAI_API_KEY = originalKey;
     }
   });
+
+  it("removes routine capture coaching from displayed fallback fields", async () => {
+    const originalKey = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const result = await interpretPhotoSetWithVision({
+        captureDate: "2026-08-08",
+        photos: [{ fileName: "current.jpg", view: "front", pose: "relaxed" }],
+        previousPhotoSet: {
+          captureDate: "2026-07-25",
+          photos: [{ fileName: "prior.jpg", view: "front", pose: "relaxed" }],
+        },
+      });
+      expect(result.interpretation.suggested_priorities.join(" ")).not.toMatch(
+        /collect|capture|comparable photo/i
+      );
+      expect(result.interpretation.briefing_summary.next_step).not.toMatch(
+        /collect|capture|comparable photo/i
+      );
+    } finally {
+      if (originalKey == null) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = originalKey;
+    }
+  });
 });

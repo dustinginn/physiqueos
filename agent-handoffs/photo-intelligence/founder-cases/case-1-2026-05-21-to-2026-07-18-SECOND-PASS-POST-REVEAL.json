@@ -1,0 +1,365 @@
+{
+  "schemaVersion": "canonical_photo_intelligence_v1",
+  "resultLabel": "SECOND PASS — POST-REVEAL CALIBRATED REPLAY",
+  "comparison": {
+    "caseId": "founder_blind_case_1",
+    "baselineDate": "2026-05-21",
+    "comparisonDate": "2026-07-18",
+    "daysElapsed": 58,
+    "goalContext": {
+      "name": "Visible Abs",
+      "source": "runtime_context_supplied_with_case",
+      "used_for": [
+        "regional_relevance",
+        "goal_relative_interpretation",
+        "user_facing_narrative"
+      ],
+      "not_used_for": [
+        "altering_source_observations",
+        "increasing_visual_confidence",
+        "inferring_non_photo_evidence"
+      ]
+    }
+  },
+  "source": {
+    "images": [
+      {
+        "role": "baseline",
+        "source_image_id": "sha256:31ca07ac5291139c2ec68f49d926579cf4e5d7dc0cf8b57872fbd7ed0565fc2f",
+        "captured_at": "2026-05-21",
+        "mime_type": "image/jpeg",
+        "pixel_width": 2880,
+        "pixel_height": 3840,
+        "provenance": "Founder-supplied exact attachment; inspected in place; bytes not copied into the repository"
+      },
+      {
+        "role": "comparison",
+        "source_image_id": "sha256:fce2ab4929bcbb1e4ba2615dac4fd6216a1d19837d2634179ccf8a75605032ec",
+        "captured_at": "2026-07-18",
+        "mime_type": "image/jpeg",
+        "pixel_width": 2880,
+        "pixel_height": 3840,
+        "provenance": "Founder-supplied exact attachment; inspected in place; bytes not copied into the repository"
+      }
+    ],
+    "runtime_context_available": [
+      "image bytes",
+      "date and order",
+      "Visible Abs goal context",
+      "ordinary image dimensions and MIME type"
+    ],
+    "runtime_context_excluded": [
+      "weight",
+      "DEXA",
+      "training",
+      "nutrition",
+      "activity",
+      "sleep",
+      "human reference assessment",
+      "prior conclusions about this pair"
+    ]
+  },
+  "captureAssessment": {
+    "baseline": {
+      "view": "front",
+      "pose": "informal_front_mostly_relaxed",
+      "body_orientation": "mostly_frontal",
+      "visible_regions": [
+        "waist",
+        "abdomen",
+        "obliques",
+        "chest",
+        "shoulders",
+        "upper_arms",
+        "forearms"
+      ],
+      "not_reliably_visible": [
+        "back",
+        "glutes",
+        "legs"
+      ],
+      "occlusions": [
+        "phone and phone-holding hand obscure part of one arm and reduce shoulder/chest symmetry assessment"
+      ],
+      "capture_notes": [
+        "Mirror selfie with both arms raised or bent",
+        "Torso is shirtless and visible from shoulders through the waistband",
+        "Bright, comparatively even bathroom lighting"
+      ]
+    },
+    "comparison": {
+      "view": "front",
+      "pose": "informal_front_mostly_relaxed",
+      "body_orientation": "mostly_frontal",
+      "visible_regions": [
+        "waist",
+        "abdomen",
+        "obliques",
+        "chest",
+        "shoulders",
+        "upper_arms",
+        "forearms"
+      ],
+      "not_reliably_visible": [
+        "back",
+        "glutes",
+        "legs"
+      ],
+      "occlusions": [
+        "raised thumbs-up hand partially overlaps the right-side torso outline"
+      ],
+      "capture_notes": [
+        "Direct camera photo with one arm down and one arm raised",
+        "Torso is shirtless and visible from shoulders through the waistband",
+        "Strong backlight and more directional front/side illumination"
+      ]
+    }
+  },
+  "comparability": {
+    "overall": "moderate",
+    "usable_for": [
+      "overall torso silhouette",
+      "waist and midsection appearance",
+      "abdominal and oblique definition",
+      "broad upper-body preservation context"
+    ],
+    "not_reliable_for": [
+      "small changes in chest size",
+      "small changes in shoulder or arm size",
+      "fine-grained left-right symmetry",
+      "lower-body change",
+      "back change"
+    ],
+    "dimensions": {
+      "pose": {
+        "rating": "moderate",
+        "reason": "Both are mostly frontal and appear broadly relaxed, but the arm positions differ and abdominal bracing or flexing is unknown."
+      },
+      "framing_and_distance": {
+        "rating": "moderate",
+        "reason": "Both include the full torso, but the comparison is more tightly framed and the body occupies more of the image."
+      },
+      "camera_angle": {
+        "rating": "moderate_to_good",
+        "reason": "Both are near frontal, though the baseline is a mirror selfie with mild perspective and centering differences."
+      },
+      "lighting": {
+        "rating": "limited",
+        "reason": "The baseline has brighter, more even bathroom illumination; the comparison is backlit with more directional modeling across the torso."
+      },
+      "clothing_and_occlusion": {
+        "rating": "good_for_torso",
+        "reason": "Both are shirtless with the waistline visible; the baseline phone/hand and comparison hand mainly limit arm and symmetry judgments."
+      },
+      "body_orientation": {
+        "rating": "good",
+        "reason": "The torso is mostly frontal in both images without a large rotational mismatch."
+      },
+      "flexing_and_posture": {
+        "rating": "limited_to_moderate",
+        "reason": "Arm elevation and shoulder position differ, and neither abdominal bracing nor flexing state is verified."
+      }
+    },
+    "regional_reliability": {
+      "overall_silhouette": "moderate_to_high",
+      "waist_and_midsection": "moderate_to_high",
+      "abdominal_definition": "moderate",
+      "oblique_definition": "moderate",
+      "chest_definition": "moderate",
+      "chest_fullness_or_size": "low",
+      "shoulder_and_arm_fullness_or_size": "low",
+      "symmetry": "low",
+      "back": "insufficient",
+      "legs": "insufficient"
+    }
+  },
+  "observations": [
+    {
+      "region": "overall_silhouette",
+      "metric": "conditioning_and_shape",
+      "direction": "improved",
+      "apparentMagnitude": "moderate",
+      "confidence": "high",
+      "observation": "The torso appears leaner and more tapered in the comparison, with less visual softness through the waist and abdomen.",
+      "basis": [
+        "waist occupies less width relative to the ribcage and shoulders",
+        "abdomen presents flatter and with more visible structure",
+        "multiple midsection details move in the same direction"
+      ],
+      "confounders": [
+        "different lighting",
+        "different framing and distance",
+        "different arm position"
+      ]
+    },
+    {
+      "region": "waist_and_midsection",
+      "metric": "apparent_leanness",
+      "direction": "increased",
+      "apparentMagnitude": "moderate",
+      "confidence": "moderate_to_high",
+      "observation": "The waist looks noticeably tighter and the transition from ribcage to waistband is cleaner in the comparison.",
+      "basis": [
+        "narrower-looking lateral waist contour",
+        "less diffuse softness across the central torso",
+        "clearer taper into the waistband"
+      ],
+      "confounders": [
+        "non-identical camera distance",
+        "unknown breathing or abdominal bracing"
+      ]
+    },
+    {
+      "region": "upper_and_mid_abdomen",
+      "metric": "abdominal_definition",
+      "direction": "increased",
+      "apparentMagnitude": "moderate",
+      "confidence": "moderate",
+      "observation": "Upper- and mid-abdominal separation is clearer, and the central abdominal line is more continuously visible in the comparison.",
+      "basis": [
+        "more distinct upper abdominal contours",
+        "stronger vertical center-line visibility",
+        "cleaner separation through the mid-abdomen"
+      ],
+      "confounders": [
+        "directional comparison lighting increases shadow contrast",
+        "abdominal bracing state is unknown"
+      ]
+    },
+    {
+      "region": "lower_abdomen",
+      "metric": "flatness_and_definition",
+      "direction": "improved",
+      "apparentMagnitude": "moderate",
+      "confidence": "moderate",
+      "observation": "The lower abdomen appears flatter with less softness above the waistband, although distinct lower-ab separation remains limited.",
+      "basis": [
+        "cleaner lower-torso contour",
+        "reduced rounded appearance above the waistband"
+      ],
+      "confounders": [
+        "waistband height and fabric differ",
+        "posture and abdominal tension are unverified"
+      ]
+    },
+    {
+      "region": "obliques_and_sidewall",
+      "metric": "definition",
+      "direction": "increased",
+      "apparentMagnitude": "moderate",
+      "confidence": "moderate",
+      "observation": "Oblique and lateral abdominal contours are easier to distinguish in the comparison, contributing to a sharper waist outline.",
+      "basis": [
+        "clearer diagonal contour alongside the abdomen",
+        "cleaner separation between the abdominal wall and flank"
+      ],
+      "confounders": [
+        "directional lighting",
+        "minor torso-position difference"
+      ]
+    },
+    {
+      "region": "chest",
+      "metric": "definition",
+      "direction": "increased",
+      "apparentMagnitude": "subtle",
+      "confidence": "moderate",
+      "observation": "Chest borders and the lower-chest transition appear somewhat cleaner in the comparison.",
+      "basis": [
+        "slightly clearer lower-chest outline",
+        "cleaner chest-to-upper-ab transition"
+      ],
+      "confounders": [
+        "lighting differs materially",
+        "arm and shoulder positions differ"
+      ]
+    },
+    {
+      "region": "upper_body_fullness",
+      "metric": "apparent_muscular_fullness",
+      "direction": "broadly_stable",
+      "apparentMagnitude": "none",
+      "confidence": "low_to_moderate",
+      "observation": "Chest, shoulders, and arms remain broadly substantial relative to the torso; no clear large loss of upper-body size is visible.",
+      "basis": [
+        "upper-body silhouette remains broad while the waist looks tighter"
+      ],
+      "confounders": [
+        "arm elevation differs substantially",
+        "one arm is partly occluded in the baseline",
+        "framing and lighting differ",
+        "pump state is unknown"
+      ]
+    },
+    {
+      "region": "shoulder_to_waist_proportion",
+      "metric": "v_taper",
+      "direction": "improved",
+      "apparentMagnitude": "moderate",
+      "confidence": "moderate",
+      "observation": "The shoulder-to-waist relationship appears stronger, driven primarily by the tighter-looking waist rather than demonstrable shoulder growth.",
+      "basis": [
+        "upper-torso width is broadly maintained",
+        "waist contour is visibly narrower and cleaner"
+      ],
+      "confounders": [
+        "arm and shoulder position differ",
+        "camera distance differs"
+      ]
+    },
+    {
+      "region": "back_and_lower_body",
+      "metric": "change",
+      "direction": "insufficient",
+      "apparentMagnitude": "unknown",
+      "confidence": "insufficient",
+      "observation": "Back, glute, and leg change cannot be evaluated from this pair.",
+      "basis": [],
+      "confounders": [
+        "regions are not shown in a usable view"
+      ]
+    }
+  ],
+  "dominantVisualStory": "The comparison presents a meaningfully leaner, tighter torso, led by a smaller-looking waist and clearer abdominal and oblique structure while broad upper-body size appears maintained.",
+  "overallMagnitude": "major",
+  "magnitudeCalibration": {
+    "magnitude": "major",
+    "reportedMagnitude": "moderate",
+    "promotionApplied": true,
+    "rule": "meaningful_global_anchor_plus_four_reliable_directional_regions",
+    "alignedDirection": "positive",
+    "reliableDirectionalRegionCount": 5,
+    "subtleFindingsCannotPromote": true
+  },
+  "confidence": {
+    "overallReliability": "moderate_to_high",
+    "rationale": "Confidence is high that the comparison shows a meaningful improvement in overall torso conditioning and waist appearance. Confidence is moderate for specific abdominal and oblique details because lighting and bracing may amplify them. Confidence is low for small chest, shoulder, arm, symmetry, back, or leg changes.",
+    "limitations": [
+      "Lighting differs materially and the comparison has stronger directional contrast.",
+      "Camera distance and framing differ.",
+      "The baseline is a mirror selfie; the comparison is a direct camera image.",
+      "Arm and shoulder positions differ.",
+      "Breathing, abdominal bracing, flexing, pump, hydration, food intake, and time of day are unknown.",
+      "Only one front view is available at each date."
+    ]
+  },
+  "goalRelativeInterpretation": {
+    "direction": "supportive",
+    "strength": "strong_visual_support",
+    "interpretation": "The pair provides strong visual support that the physique moved materially toward Visible Abs: the waist is tighter, upper- and mid-abdominal structure is clearer, oblique contour is more visible, and the lower abdomen appears flatter. The photos support meaningful progress but do not by themselves establish an exact body-composition change or prove that the goal threshold was reached under standardized relaxed conditions.",
+    "photoOnlyStrategyImplication": ""
+  },
+  "unsupportedConclusions": [
+    "[object Object]"
+  ],
+  "photoOnlyInterpretation": "Across 58 days, the front-view comparison shows a major and unmistakable improvement in torso conditioning. The strongest evidence is a tighter waist, clearer upper- and mid-abdominal structure, more visible oblique contour, a flatter lower-abdominal appearance, and a stronger shoulder-to-waist proportion. These changes provide strong visual support for progress toward Visible Abs. Different lighting, framing, arm position, and unverified bracing lower confidence in small regional details, especially upper-body size, but do not erase the larger midsection change. Photos alone cannot quantify fat or muscle change, establish causation, or confirm a standardized at-rest completion threshold.",
+  "exactPhotoBriefingCopy": "Visible progress: your waist looks noticeably tighter, and the July photo shows clearer upper- and mid-ab separation, a stronger center line, and more visible oblique contour than May. Together, those changes create a leaner torso and a stronger shoulder-to-waist shape—a clear visual transformation toward Visible Abs. Your upper body still appears broadly maintained, but the different lighting, framing, and arm position make small chest, shoulder, or arm changes less reliable. The photos support real visual progress; they cannot measure how much fat changed or prove muscle gain or loss.",
+  "provenance": {
+    "producer": "canonical_photo_intelligence_service",
+    "producerVersion": "canonical_photo_intelligence_v1",
+    "calibrationVersion": "photo_magnitude_calibration_v2",
+    "evidenceClass": "photo_only",
+    "nonPhotoEvidenceUsed": false,
+    "resultLabel": "SECOND PASS — POST-REVEAL CALIBRATED REPLAY"
+  }
+}

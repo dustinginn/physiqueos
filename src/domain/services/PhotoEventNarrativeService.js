@@ -2,7 +2,7 @@ import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService
 import { semanticDeduplicate } from "./GalleryInterpretationService";
 import { evaluatePhotoGoalConfirmation, selectVisibleAbsCompletionComparisons } from "./PhotoGoalConfirmationService";
 import { getProgressPhotoDisplayLabel, getProgressPhotoProseLabel } from "../models/progressPhotoPoseVocabulary";
-import { composePhotoEventContext, resolvePhotoEventContext } from "./PhotoEventContextService";
+import { composePhotoEventContext } from "./PhotoEventContextService";
 import { createCanonicalBriefingConfidencePublicationService } from
   "./CanonicalBriefingConfidencePublicationService";
 import {
@@ -15,6 +15,14 @@ import {
 import { resolveCommittedPhaseContext } from
   "./FounderPhaseCorrectionService";
 import { isResistanceTrainingSession } from "./TrainingEvidenceClassification.js";
+import {
+  createCanonicalPhotoIntelligenceFromSession,
+} from "./CanonicalPhotoIntelligenceService.js";
+import {
+  canonicalEvidenceCandidate,
+  createPhotoBriefingHolisticSynthesis,
+  selectPhotoBriefingEvidence,
+} from "./PhotoBriefingHolisticSynthesisService.js";
 
 const EVENT_VERSION = "photo_event_v4_0_0";
 
@@ -23,7 +31,7 @@ export function classifyPhotoAnalysis(view = {}) {
   return /fallback|deterministic/i.test(view.analysisMode) ? "deterministic_fallback" : "vision_backed";
 }
 
-export function composePhotoEventNarrative({ session, goal = null, goalContext = null, latestDexa = null, priorDexa = null, baselineDexa = null, milestone = null, executionSupport = {}, confirmationIntent = null, completionComparisons = null, visualCriterionComplete = "uncertain", generatedAt = new Date().toISOString() } = {}) {
+export function composePhotoEventNarrative({ session, goal = null, goalContext = null, latestDexa = null, priorDexa = null, baselineDexa = null, milestone = null, executionSupport = {}, confirmationIntent = null, completionComparisons = null, visualCriterionComplete = "uncertain", photoIntelligence = null, holisticSynthesis = null, generatedAt = new Date().toISOString() } = {}) {
   if (!session || session.sourceMode !== "canonical") return null;
   const goalCompletionHandoff = evaluatePhotoGoalConfirmation({
     ...confirmationIntent,
@@ -94,6 +102,9 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
         `${left.poseId}|${left.photoId}`.localeCompare(`${right.poseId}|${right.photoId}`)),
     },
     sourceMode: "canonical_photo_session",
+    evidenceCutoff: holisticSynthesis?.evidenceCutoff ?? generatedAt,
+    photoIntelligence,
+    holisticSynthesis,
     completion: session.completionLabel,
     activeViews,
     poseInterpretations: activeViews.map((view)=>({currentViewId:view.id,currentPhotoSessionId:session.id,poseIdentity:session.views.find((item)=>item.canonicalViewId===view.id)?.poseIdentity??{poseId:view.poseId,label:view.label},priorMatchFound:!view.establishesBaseline,priorViewId:session.views.find((item)=>item.canonicalViewId===view.id)?.comparison?.previousCanonicalViewId??null,priorPhotoSessionId:session.views.find((item)=>item.canonicalViewId===view.id)?.comparison?.previousSessionId??null,comparisonMode:view.comparisonMode,goalId:confirmationIntent?.goalId??goal?.id??null,goalRelevance:view.goalRelevance,contributesToGoalValidation:view.contributesToGoalValidation,observations:view.findings,limitingFactors:[],confidence:view.analysisQuality==="vision_backed"?"moderate":"limited",establishesBaseline:view.establishesBaseline})),
@@ -132,7 +143,7 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
       hero: { id:`${narrativeId}_hero`, title:completionCopy?.title ?? ordinaryCopy.title, body:completionCopy?.summary ?? ordinaryCopy.summary },
       snapshot: { id:`${narrativeId}_snapshot`, title:"This photo session", poses:activeViews.map((view)=>view.label), conditions:describeSessionConditions(session.sessionConditions) },
       progress: { id:`${narrativeId}_progress`, title:completionCopy ? "The visual journey" : "What visibly changed", body:completionCopy?.progress ?? mixedModeSummary(comparedViews,newBaselineViews), comparisons:comparedViews, newBaselines:newBaselineViews },
-      interpretation: { id:`${narrativeId}_interpretation`, title:completionCopy ? "The result" : "What the complete evidence means", paragraphs:completionCopy?.interpretation ?? [ordinaryCopy.interpretation,supportingEvidenceSentence(session.weight,latestDexa,executionSupport),ordinaryCopy.limitation].filter(Boolean), support:[session.weight, latestDexa ? formatDexa(latestDexa) : null, ...Object.values(executionSupport)].filter(Boolean) },
+      interpretation: { id:`${narrativeId}_interpretation`, title:completionCopy ? "The result" : "What the complete evidence means", paragraphs:completionCopy?.interpretation ?? [ordinaryCopy.interpretation,holisticSynthesis?.userFacingCopy ?? supportingEvidenceSentence(session.weight,latestDexa,executionSupport),ordinaryCopy.limitation].filter(Boolean), support:[session.weight, latestDexa ? formatDexa(latestDexa) : null, ...Object.values(executionSupport)].filter(Boolean) },
       coachInsight: { id:`${narrativeId}_coach`, title:"Coach’s Insight", body:completionCopy?.coach ?? ordinaryCopy.coach },
     },
     evidenceReferences: activeViews.map((view)=>view.id),
@@ -188,7 +199,7 @@ export function createPhotoEventNarrativeService({
         : await loadRepositoryInputs({ repositories, userId });
       const {
         canonicalObjects, legacyPhotos, weights, analyses, goal, goals = [],
-        executionItems = [], dexaScans, artifacts,
+        executionItems = [], dexaScans, artifacts, evidenceAvailability = [],
       } = inputs;
       const sessions = createPhotoSessionReadModels({ canonicalObjects, legacyPhotos, weights, analyses });
       const session = sessions.find((item)=>item.id===sessionId || item.hiddenProvenanceAliases?.includes(sessionId));
@@ -207,29 +218,74 @@ export function createPhotoEventNarrativeService({
           !ignoreExisting) return {
         status: "completed", artifact: existing, artifactId: existing.id, sessionId: session.id, created: false,
       };
-      const sortedDexa=[...dexaScans].sort((a,b)=>String(a.measuredAt).localeCompare(String(b.measuredAt)));
+      const generatedAt=now().toISOString();
+      const availability = new Map(evidenceAvailability.map((item) => [item.id, item]));
+      const candidates = [
+        ...dexaScans.map((item) => canonicalEvidenceCandidate(item, {
+          type: "dexa_scan",
+          availableAt: availability.get(item.id)?.availableAt ?? null,
+          lastUpdatedAt: availability.get(item.id)?.lastUpdatedAt ?? null,
+        })),
+        ...weights.map((item) => canonicalEvidenceCandidate(item, {
+          type: "weight",
+          availableAt: availability.get(item.id)?.availableAt ?? null,
+          lastUpdatedAt: availability.get(item.id)?.lastUpdatedAt ?? null,
+        })),
+        ...canonicalObjects.map((item) => canonicalEvidenceCandidate(item, {
+          type: item.evidence_type,
+          availableAt: availability.get(item.canonicalId ?? item.id)?.availableAt ?? null,
+          lastUpdatedAt: availability.get(item.canonicalId ?? item.id)?.lastUpdatedAt ?? null,
+        })),
+      ];
+      const causalEvidence = selectPhotoBriefingEvidence({
+        evidence: candidates,
+        eventDate: session.captureDate,
+        cutoff: generatedAt,
+      });
+      const eligibleIds = new Set(causalEvidence.eligible.map((item) => item.id));
+      const eligibleDexa=dexaScans.filter((item)=>eligibleIds.has(String(item.id ?? item.canonicalId)));
+      const eligibleCanonicalObjects=canonicalObjects.filter((item)=>
+        eligibleIds.has(String(item.canonicalId ?? item.id)));
+      const eligibleWeights=weights.filter((item)=>eligibleIds.has(String(item.id ?? item.canonicalId)));
+      const eligibleExecutionItems=executionItems.filter((item) =>
+        recordAvailableByCutoff(item, availability, generatedAt));
+      const sortedDexa=[...eligibleDexa].sort((a,b)=>String(a.measuredAt).localeCompare(String(b.measuredAt)));
       const latestDexa=sortedDexa.at(-1)??null;
       const priorDexa=sortedDexa.filter((item)=>String(item.measuredAt)<String(latestDexa?.measuredAt)).at(-1)??null;
       const baselineDexa=sortedDexa.find((item)=>String(item.measuredAt).slice(0,10)==="2026-05-24")??null;
-      const executionSupport=deriveExecutionSupport(canonicalObjects,session.captureDate);
+      const executionSupport=deriveExecutionSupport(eligibleCanonicalObjects,session.captureDate);
       const confidenceDomainStates=derivePhotoConfidenceDomainStates({
-        canonicalObjects,
-        weights,
-        dexaScans,
+        canonicalObjects: eligibleCanonicalObjects,
+        weights: eligibleWeights,
+        dexaScans: eligibleDexa,
         eventDate: session.captureDate,
       });
-      const photoEventContext=loadInputs
-        ? composePhotoEventContext({ activeGoal: goal, goals, executionItems, dexaScans,
-          evidenceDate: session.captureDate, evidenceAttribution: session })
-        : await resolvePhotoEventContext({repositories,userId,evidenceDate:session.captureDate,
-          evidenceAttribution: session});
+      const photoEventContext=composePhotoEventContext({
+        activeGoal: goal,
+        goals: goals.length ? goals : [goal].filter(Boolean),
+        executionItems: eligibleExecutionItems,
+        dexaScans: eligibleDexa,
+        evidenceDate: session.captureDate,
+        evidenceAttribution: session,
+      });
       const publicationContext=createPhotoEventPublicationContext({
         goal,
         photoEventContext,
         evidenceDate: session.captureDate,
       });
       const completionComparisons=session.confirmationIntent?.confirmationPurpose==="visible_abs_completion"?selectVisibleAbsCompletionComparisons({sessions,finalSession:session,goalStartDate:goal?.startDate}):null;
-      const narrative=composePhotoEventNarrative({session,goal,goalContext:photoEventContext,latestDexa,priorDexa,baselineDexa,executionSupport,confirmationIntent:session.confirmationIntent,completionComparisons,milestone:photoEventContext.futureMilestone,generatedAt:now().toISOString()});
+      const photoIntelligence=createCanonicalPhotoIntelligenceFromSession({
+        session,
+        goalContext: photoOnlyGoalContext(photoEventContext),
+      });
+      const holisticSynthesis=photoIntelligence?createPhotoBriefingHolisticSynthesis({
+        photoIntelligence,
+        evidence: candidates,
+        eventDate: session.captureDate,
+        cutoff: generatedAt,
+        goalContext: photoEventContext,
+      }):null;
+      const narrative=composePhotoEventNarrative({session,goal,goalContext:photoEventContext,latestDexa,priorDexa,baselineDexa,executionSupport,confirmationIntent:session.confirmationIntent,completionComparisons,milestone:photoEventContext.futureMilestone,photoIntelligence,holisticSynthesis,generatedAt});
       if (!narrative) return {
         status: "blocked",
         code: "photo_event_narrative_unavailable",
@@ -254,8 +310,9 @@ export function createPhotoEventNarrativeService({
           periodEvidence: {
             window: { startDate: session.captureDate, endDate: session.captureDate },
             timeZone: "America/Los_Angeles",
-            canonicalObjects: inputs.canonicalObjects ?? [], weightEntries: inputs.weights ?? [],
-            dexaScans: inputs.dexaScans ?? [],
+            canonicalObjects: eligibleCanonicalObjects,
+            weightEntries: eligibleWeights,
+            dexaScans: eligibleDexa,
           },
         });
         if (!result.committed && result.status !== "matched") return {
@@ -303,16 +360,30 @@ export function createPhotoEventNarrativeService({
 }
 
 async function loadRepositoryInputs({ repositories, userId }) {
-  const [canonicalObjects, legacyPhotos, weights, analyses, goal, dexaScans, artifacts] = await Promise.all([
+  const [canonicalObjects, legacyPhotos, weights, analyses, goal, goals,
+    executionItems, dexaScans, artifacts] = await Promise.all([
     repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
     repositories.progressPhotos.listPhotos(userId),
     repositories.weights.listWeightEntries(userId),
     repositories.analyses.listAnalyses(),
     repositories.goals.getActiveGoal(userId),
+    repositories.goals.listGoals?.(userId) ?? [],
+    repositories.executionItems?.listExecutionItems?.(userId) ?? [],
     repositories.dexaScans.listDEXAScans(userId),
     repositories.dailyBriefings.listDailyBriefings(userId),
   ]);
-  return { canonicalObjects, legacyPhotos, weights, analyses, goal, dexaScans, artifacts };
+  return {
+    canonicalObjects,
+    legacyPhotos,
+    weights,
+    analyses,
+    goal,
+    goals: goals.length ? goals : [goal].filter(Boolean),
+    executionItems,
+    dexaScans,
+    artifacts,
+    evidenceAvailability: [],
+  };
 }
 
 function createPhotoEventPublicationContext({
@@ -331,6 +402,39 @@ function createPhotoEventPublicationContext({
       ? structuredClone(phaseContext.activePhase)
       : photoEventContext.activePhase,
   };
+}
+
+function photoOnlyGoalContext(context = {}) {
+  const goal = context.activeGoal;
+  const phase = context.activePhase;
+  return {
+    activeGoal: goal ? {
+      id: goal.id ?? null,
+      title: goal.title ?? null,
+      type: goal.type ?? null,
+      target: goal.target ? structuredClone(goal.target) : null,
+      guardrails: Array.isArray(goal.guardrails)
+        ? structuredClone(goal.guardrails) : [],
+    } : null,
+    activePhase: phase ? {
+      id: phase.id ?? null,
+      name: phase.name ?? null,
+      status: phase.status ?? null,
+      startDate: phase.startDate ?? null,
+    } : null,
+    operatingState: context.operatingState?.value ? {
+      value: context.operatingState.value,
+    } : null,
+  };
+}
+
+function recordAvailableByCutoff(record, availability, cutoff) {
+  const id = String(record?.id ?? record?.canonicalId ?? "");
+  const metadata = availability.get(id);
+  const availableAt = metadata?.availableAt ?? record?.createdAt ?? record?.created_at ?? null;
+  const lastUpdatedAt = metadata?.lastUpdatedAt ?? record?.updatedAt ?? record?.updated_at ?? null;
+  if (!availableAt || Date.parse(availableAt) > Date.parse(cutoff)) return false;
+  return !lastUpdatedAt || Date.parse(lastUpdatedAt) <= Date.parse(cutoff);
 }
 
 function find(values,pattern){return values.find((value)=>pattern.test(value));}
@@ -431,15 +535,15 @@ function ordinaryEventCopy({goalContext,limitation,milestone}){
     goalMeaning:"The photos fit what we would expect while you settle into maintenance. One week is far too soon to claim new muscle.",
     interpretation:"Across the matched views, your current physique remains lean and upper-body muscularity appears maintained. These photos are most useful as an early maintenance and lean-gain baseline, not proof of new tissue gain.",
     limitation:`${limitation} Interpret small changes cautiously over this short interval.${milestoneSentence}`,
-    coach:`No strategy change is warranted from these photos. Continue the current approach and keep photo conditions consistent.${milestone?.label?` Use ${milestone.label} as the next useful comparison.`:""}`,
+    coach:`No strategy change is warranted from these photos. Continue the current approach.${milestone?.label?` Reassess alongside ${milestone.label}.`:""}`,
   };
   if(activeCut)return{
     title:"Today’s photos add a new check-in on your current goal.",
     summary:"The matched views add current visual evidence without overstating change from a single interval.",
     goalMeaning:"The photos add a useful visual check on your cut, while weight, training, and body composition tell us whether the change is meaningful.",
-    interpretation:"The matched views should be weighed alongside weight, training, nutrition, and body-composition evidence. Only changes supported by those records should be treated as progress.",
+    interpretation:"The matched views describe visible stability or change. Weight, training, nutrition, and body-composition evidence may independently strengthen the broader interpretation without changing what the photos show.",
     limitation:`${limitation}${milestoneSentence}`,
-    coach:`Keep the next photo session as consistent as possible.${milestone?.label?` Reassess alongside ${milestone.label}.`:""}`,
+    coach:`No strategy change is warranted from these photos alone.${milestone?.label?` Reassess alongside ${milestone.label}.`:""}`,
   };
   return{
     title:"Today’s photos add a new physique check-in.",
@@ -447,7 +551,7 @@ function ordinaryEventCopy({goalContext,limitation,milestone}){
     goalMeaning:"The photos establish current visual evidence. Goal meaning remains neutral until an authoritative active goal and phase are available.",
     interpretation:"The comparison can describe visible stability or change, but it does not establish fat loss, lean-mass gain, or goal completion on its own.",
     limitation,
-    coach:"Keep the next photo session as consistent as possible so changes are easier to judge.",
+    coach:"No strategy change is warranted from these photos alone.",
   };
 }
 function completionEventCopy(status,{latestDexa,priorDexa,baselineDexa},result){

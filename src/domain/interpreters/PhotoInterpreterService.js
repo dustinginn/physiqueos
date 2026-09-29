@@ -32,14 +32,14 @@ export async function interpretPhotoSetWithVision({
       provider: "fallback",
       warning:
         "OPENAI_API_KEY is not configured. Showing deterministic Founder Alpha photo interpretation fallback.",
-      interpretation: withStructuredObservations(createFallbackPhotoInterpretation({
+      interpretation: withStructuredObservations(removeRoutineCaptureCoaching(createFallbackPhotoInterpretation({
         captureDate,
         goalContext,
         photoSetId,
         photos: normalizedPhotos,
         previousPhotoSet: normalizedPrevious,
         comparisonMetadata,
-      })),
+      }))),
     };
   }
 
@@ -68,14 +68,14 @@ export async function interpretPhotoSetWithVision({
     return {
       provider: "fallback",
       warning: `OpenAI photo interpretation failed. Showing deterministic fallback. ${error.message}`,
-      interpretation: withStructuredObservations(createFallbackPhotoInterpretation({
+      interpretation: withStructuredObservations(removeRoutineCaptureCoaching(createFallbackPhotoInterpretation({
         captureDate,
         goalContext,
         photoSetId,
         photos: normalizedPhotos,
         previousPhotoSet: normalizedPrevious,
         comparisonMetadata,
-      })),
+      }))),
     };
   }
 }
@@ -193,7 +193,7 @@ export function getSystemPrompt() {
     "PhotoInterpreter exists to interpret reality. Confidence qualifies the interpretation; confidence must not suppress an otherwise well-supported coaching assessment.",
     "Think like a careful coach: first ask whether the photos are comparable, then whether any difference is large enough to characterize, then describe direction, then qualify certainty.",
     "Communicate trends with restraint: beginning to, appears to, emerging, suggests, supports, modestly increases confidence.",
-    "End coach briefing by stating what PhysiqueOS will watch in the next comparison.",
+    "Do not routinely end the user-facing briefing with photo-taking instructions or what to capture next. Surface capture guidance only when the current pair is too limited to answer the user's question.",
     "Use natural coaching language instead of system language. Do not say typical threshold, assessment clarity reduced, interval below threshold, or pose mismatch limits comparability.",
     "When photos are close together, say: these photos are only a few days apart, so only subtle visual changes would be expected.",
     "When poses or conditions differ, say: because the poses or conditions differ slightly, it is harder to make a confident comparison.",
@@ -202,6 +202,7 @@ export function getSystemPrompt() {
     "When describing supported changes, lead with overall silhouette and visual shape before individual regions.",
     "Before confidence or body parts, identify the dominant visual story: noticeably leaner, better conditioned, more muscular, visibly larger, no meaningful change, or possible regression.",
     "Select the dominant visual story only after the magnitude pass. Then inspect the strongest supporting and conflicting evidence and determine confidence.",
+    "Magnitude calibration: an unmistakable whole-physique or multi-region transformation may be pronounced when a strong global silhouette or conditioning anchor and at least four independent reliable regional findings agree. Do not promote a collection of subtle or pose-sensitive findings; those remain subtle.",
     "Do not let uncertainty about one body part erase an obvious whole-body trend.",
     "If the abs, chest, or shoulders are individually hard to evaluate but the whole physique clearly appears leaner, preserve the overall conclusion and lower confidence rather than reversing the interpretation.",
     "Before regional analysis, always answer: if these photos were shown to an experienced physique coach with no additional context, would they say the overall physique appears meaningfully improved?",
@@ -351,6 +352,8 @@ export function getUserPrompt({
           "Populate briefing_summary only after detailed_interpretation exists. It should distill the biggest changes, why they matter, goal impact, and next step without repeating every observation.",
         accumulated_small_changes:
           "For standard and long intervals, multiple subtle improvements can combine into meaningful overall progress even when no single body region changed dramatically.",
+        major_transformation_calibration:
+          "Use pronounced only when an already meaningful global change remains obvious across capture differences and at least four independent, reliable regional findings align. Multiple subtle findings alone cannot become pronounced.",
         regional_support:
           "Use regional observations to explain the overall conclusion. Do not let one unchanged region erase meaningful overall improvement.",
       },
@@ -392,11 +395,11 @@ export function getUserPrompt({
       voice_rules: {
         tone: "Professional, calm, evidence-based, optimistic without exaggeration.",
         structure:
-          "Answer the biggest takeaway, why, confidence, strategy impact, whether anything should change, and what to watch next.",
+          "Answer the biggest takeaway, why, confidence, strategy impact, and whether anything should change.",
         strategy_language:
           "Recommendations must emerge from evidence. Prefer 'current evidence supports continuing your existing strategy' over generic exercise or nutrition advice.",
         ending:
-          "End with what PhysiqueOS will watch in the next comparison, not generic fitness advice.",
+          "End with the decision-relevant interpretation. Do not append routine photo-capture coaching.",
       },
       pose_lenses: {
         front_relaxed:
@@ -653,7 +656,7 @@ function createFallbackPhotoInterpretation({
       ? "Photo evidence is ready for same-view comparison, but fallback mode cannot review the images closely enough to call a visual change."
       : "Photo evidence saved. This creates a baseline for future visual comparison.",
     coach_briefing_insert:
-      "Progress photos now add visual context. Treat this as supporting evidence, not a reason to change the plan. Continue collecting comparable photos so future analysis can separate real change from normal visual variation.",
+      "Progress photos now add visual context. Treat this as supporting evidence, not a reason to change the plan.",
   };
 }
 
@@ -676,11 +679,42 @@ function normalizeInterpreterOutput(output, fallback) {
       : getViewsDetected(fallback.photos),
   }))));
 
-  return withStructuredObservations({
+  return withStructuredObservations(removeRoutineCaptureCoaching({
     ...normalized,
     briefing_summary:
       normalized.briefing_summary ?? createBriefingSummaryFromLegacyFields(normalized),
-  });
+  }));
+}
+
+function removeRoutineCaptureCoaching(output) {
+  const isRoutineCaptureInstruction = (value) => typeof value === "string" &&
+    /(?:collect|capture|take|use)\b[^.?!]*(?:photo|set|comparison|conditions?)\b/i.test(value);
+  const strip = (value) => typeof value === "string"
+    ? value
+      .replace(/\s*In the next comparison, PhysiqueOS will watch[^.?!]*[.?!]?\s*$/i, "")
+      .replace(/\s*(?:Stay the course,? and )?(?:collect|use|take|capture) (?:(?:a|the|another) )?(?:next )?(?:comparable |matched )?(?:rear and front |front[- ]relaxed |front )?(?:photo set|photos|photo|setup|capture|comparison)\b[^.?!]*[.?!]?\s*$/i, "")
+      .trim()
+    : value;
+  const nonRoutinePriorities = Array.isArray(output.suggested_priorities)
+    ? output.suggested_priorities.filter((value) =>
+        !isRoutineCaptureInstruction(value)).map(strip).filter(Boolean)
+    : output.suggested_priorities;
+  const rawNextStep = output.briefing_summary?.next_step;
+  const strategy = output.strategy_recommendation;
+  const nextStep = (!isRoutineCaptureInstruction(rawNextStep) && strip(rawNextStep)) ||
+    (!isRoutineCaptureInstruction(strategy) && strip(strategy)) ||
+    "Continue the current strategy.";
+  return {
+    ...output,
+    user_facing_summary: strip(output.user_facing_summary),
+    coach_briefing_insert: strip(output.coach_briefing_insert),
+    suggested_priorities: nonRoutinePriorities,
+    briefing_summary: output.briefing_summary ? {
+      ...output.briefing_summary,
+      summary: strip(output.briefing_summary.summary),
+      next_step: nextStep,
+    } : output.briefing_summary,
+  };
 }
 
 function withStructuredObservations(interpretation) {
@@ -1320,7 +1354,7 @@ export function applyReasoningGuardrails(output) {
       user_facing_summary:
         `There are a few subtle signs you are moving in the right direction. Your upper back, shoulders, and arms look maintained, and your rear waist and lower back look a little tighter. There are early signs of improving back definition, but it is still too early to be confident. Based on these photos, I would stay the course.`,
       coach_briefing_insert:
-        `This rear comparison modestly supports the direction of your goal. Your upper back, shoulders, and arms appear well maintained. Your rear waist and lower back look slightly tighter. Back definition may be starting to show, but it is still early. Nothing here suggests we should change your plan. In the next comparison, PhysiqueOS will watch whether the tighter waistline becomes a consistent trend while your upper back remains well maintained.`,
+        `This rear comparison modestly supports the direction of your goal. Your upper back, shoulders, and arms appear well maintained. Your rear waist and lower back look slightly tighter. Back definition may be starting to show, but it is still early. Nothing here suggests we should change your plan.`,
     };
   }
 
@@ -1499,7 +1533,7 @@ export function applyReasoningGuardrails(output) {
       user_facing_summary:
         `There are a few subtle signs you are moving in the right direction. Your overall shape looks a little cleaner, with the clearest change around the waist. Your upper body appears maintained, and your shoulder-to-waist ratio looks slightly sharper. It is still too early to call this a meaningful visual change, but the comparison modestly supports your current plan. I would stay the course.`,
       coach_briefing_insert:
-        `This front comparison modestly supports the direction of your goal. The useful takeaway is your overall silhouette first: your waist looks modestly tighter, your shoulder-to-waist ratio looks slightly cleaner, and your upper body appears well maintained. These are small changes, not a confirmed transformation. Nothing here suggests we should change your plan. In the next comparison, PhysiqueOS will watch whether the tighter waist and cleaner front silhouette become a consistent trend.`,
+        `This front comparison modestly supports the direction of your goal. The useful takeaway is your overall silhouette first: your waist looks modestly tighter, your shoulder-to-waist ratio looks slightly cleaner, and your upper body appears well maintained. These are small changes, not a confirmed transformation. Nothing here suggests we should change your plan.`,
     };
   }
 
@@ -1567,7 +1601,7 @@ export function applyReasoningGuardrails(output) {
     user_facing_summary:
       `There are small signs pointing in the right direction, but not enough to call this a clear visual change yet. Treat this as an early trend to watch, not a reason to change course. Based on these photos, I would keep the plan the same.`,
     coach_briefing_insert:
-      `This comparison modestly supports the current trajectory, but it does not prove a clear change yet. That is still useful coaching signal: small aligned signs can build confidence without requiring a plan change. Nothing here suggests we should change your strategy. In the next comparison, PhysiqueOS will watch whether these small differences become a consistent trend or simply normalize.`,
+      `This comparison modestly supports the current trajectory, but it does not prove a clear change yet. That is still useful coaching signal: small aligned signs can build confidence without requiring a plan change. Nothing here suggests we should change your strategy.`,
   };
 }
 
@@ -1946,7 +1980,7 @@ function applyAccumulatedOverallProgressGuardrail(output) {
     user_facing_summary:
       "Your physique looks noticeably leaner than at the start of this comparison. The biggest change is a tighter waist and sharper midsection while your upper body stays well maintained. That is the goal of a successful cut: reveal the muscle you have already built without giving up shape. Based on these photos, I would stay the course.",
     coach_briefing_insert:
-      "This comparison shows meaningful conditioning progress. Your waist is tighter, your midsection is sharper, your proportions look cleaner, and your upper body still looks well maintained. Nothing here suggests changing the plan. In the next comparison, PhysiqueOS will watch for continued lower-ab definition while your shoulders, arms, and chest stay preserved.",
+      "This comparison shows meaningful conditioning progress. Your waist is tighter, your midsection is sharper, your proportions look cleaner, and your upper body still looks well maintained. Nothing here suggests changing the plan.",
   };
 }
 

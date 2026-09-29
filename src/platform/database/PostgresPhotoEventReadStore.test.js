@@ -23,6 +23,18 @@ describe("PostgresPhotoEventReadStore", () => {
     ]);
     expect(result.goal?.id).toBe("active-goal");
     expect(result.artifacts).toEqual([]);
+    expect(result.evidenceAvailability).toContainEqual({
+      id: "dexa",
+      availableAt: "2026-08-20T15:00:00.000Z",
+      lastUpdatedAt: "2026-08-20T16:00:00.000Z",
+      source: "canonical_record_created_at",
+    });
+    expect(result.evidenceAvailability).toContainEqual({
+      id: "scheduled-dexa",
+      availableAt: "2026-08-20T15:00:00.000Z",
+      lastUpdatedAt: "2026-08-20T16:00:00.000Z",
+      source: "canonical_record_created_at",
+    });
     expect(result.publicationStore).toMatchObject({
       revision: 29,
       lastCommitId: "prior-command",
@@ -113,14 +125,18 @@ function fakePool() {
       row("dexaScans", "dexa", { id: "dexa" }),
     ] };
     if (sql.includes("canonical_checkin_records")) return { rows: [
-      { payload: { id: "weight" }, version: 1 },
+      row("weightEntries", "weight", { id: "weight" }),
     ] };
     if (sql.includes("canonical_goal_records")) return { rows: [
       row("goals", "active-goal", {
         id: "active-goal", userId: "user_founder_001", primary: true, status: "active",
       }),
     ] };
-    if (sql.includes("canonical_execution_records")) return { rows: [] };
+    if (sql.includes("canonical_execution_records")) return { rows: [
+      row("executionItems", "scheduled-dexa", {
+        id: "scheduled-dexa", type: "dexa_appointment", status: "scheduled",
+      }),
+    ] };
     if (sql.includes("canonical_confidence_records")) return { rows: [
       row("goalConfidenceSnapshots", "snapshot", { id: "snapshot" }),
       row("goalConfidenceHistory", "history", { id: "history" }),
@@ -143,5 +159,9 @@ function fakePool() {
 }
 
 function row(collection_name, record_id, payload) {
-  return { collection_name, record_id, payload, version: 1 };
+  return {
+    collection_name, record_id, payload, version: 1,
+    created_at: new Date("2026-08-20T15:00:00.000Z"),
+    updated_at: new Date("2026-08-20T16:00:00.000Z"),
+  };
 }

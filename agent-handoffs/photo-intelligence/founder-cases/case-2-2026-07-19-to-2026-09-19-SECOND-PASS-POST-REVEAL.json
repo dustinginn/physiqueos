@@ -1,0 +1,369 @@
+{
+  "schemaVersion": "canonical_photo_intelligence_v1",
+  "resultLabel": "SECOND PASS — POST-REVEAL CALIBRATED REPLAY",
+  "comparison": {
+    "caseId": "founder_blind_case_2",
+    "baselineDate": "2026-07-19",
+    "comparisonDate": "2026-09-19",
+    "daysElapsed": 62,
+    "goalContext": {
+      "name": "Build Lean Mass with a body-fat guardrail",
+      "source": "runtime_context_supplied_with_case",
+      "used_for": [
+        "regional_relevance",
+        "goal_relative_interpretation",
+        "user_facing_narrative"
+      ],
+      "not_used_for": [
+        "altering_source_observations",
+        "increasing_visual_confidence",
+        "inferring_measured_body_composition",
+        "assuming_muscle_gain_or_guardrail_compliance"
+      ]
+    }
+  },
+  "source": {
+    "images": [
+      {
+        "role": "baseline",
+        "source_image_id": "sha256:fce2ab4929bcbb1e4ba2615dac4fd6216a1d19837d2634179ccf8a75605032ec",
+        "captured_at": "2026-07-19",
+        "mime_type": "image/jpeg",
+        "pixel_width": 2880,
+        "pixel_height": 3840,
+        "provenance": "Founder-supplied exact attachment; inspected in place; bytes not copied into the repository"
+      },
+      {
+        "role": "comparison",
+        "source_image_id": "sha256:78ad7dc061bed2c03d58855d3aea95706e02bf2def269c540cc4fe838c8a61d4",
+        "captured_at": "2026-09-19",
+        "mime_type": "image/jpeg",
+        "pixel_width": 2880,
+        "pixel_height": 3840,
+        "provenance": "Founder-supplied exact attachment; inspected in place; bytes not copied into the repository"
+      }
+    ],
+    "runtime_context_available": [
+      "image bytes",
+      "date and order",
+      "Build Lean Mass with a body-fat guardrail Goal context",
+      "ordinary image dimensions and MIME type"
+    ],
+    "runtime_context_excluded": [
+      "DEXA",
+      "weight",
+      "training",
+      "nutrition",
+      "activity",
+      "sleep",
+      "other body-composition or performance evidence",
+      "Case 1 human-reference conclusions and review findings",
+      "Case 2 human reference assessment",
+      "prior conclusions about this pair"
+    ]
+  },
+  "captureAssessment": {
+    "baseline": {
+      "view": "front",
+      "pose": "informal_front_mostly_relaxed",
+      "body_orientation": "mostly_frontal",
+      "visible_regions": [
+        "waist",
+        "abdomen",
+        "obliques",
+        "chest",
+        "shoulders",
+        "upper_arms",
+        "forearms"
+      ],
+      "not_reliably_visible": [
+        "back",
+        "glutes",
+        "legs"
+      ],
+      "occlusions": [
+        "raised thumbs-up hand partially overlaps one side of the torso outline"
+      ],
+      "capture_notes": [
+        "Direct camera photo with one arm down and one arm raised",
+        "Torso is shirtless and visible from shoulders through the waistband",
+        "Strong rear daylight with directional front/side illumination"
+      ]
+    },
+    "comparison": {
+      "view": "front",
+      "pose": "informal_front_mostly_relaxed",
+      "body_orientation": "mostly_frontal",
+      "visible_regions": [
+        "waist",
+        "abdomen",
+        "obliques",
+        "chest",
+        "shoulders",
+        "upper_arms",
+        "forearms"
+      ],
+      "not_reliably_visible": [
+        "back",
+        "glutes",
+        "legs"
+      ],
+      "occlusions": [],
+      "capture_notes": [
+        "Direct camera photo with both arms down",
+        "Torso is shirtless and visible from shoulders through the waistband",
+        "Same general setting with less rear backlight and directional side illumination"
+      ]
+    }
+  },
+  "comparability": {
+    "overall": "moderate_to_good",
+    "usable_for": [
+      "overall torso silhouette",
+      "broad chest and shoulder presentation",
+      "waist and midsection stability",
+      "abdominal and oblique definition",
+      "broad upper-body fullness context"
+    ],
+    "not_reliable_for": [
+      "small isolated changes in shoulder or arm size",
+      "fine-grained left-right symmetry",
+      "measured muscle gain",
+      "measured body-fat guardrail status",
+      "lower-body change",
+      "back change"
+    ],
+    "dimensions": {
+      "pose": {
+        "rating": "moderate",
+        "reason": "Both are mostly frontal and appear broadly relaxed, but the baseline has one arm raised while the comparison has both arms down; abdominal bracing and chest expansion are unknown."
+      },
+      "framing_and_distance": {
+        "rating": "moderate_to_good",
+        "reason": "Both show the full torso at a similar scale, though the comparison is framed slightly farther back and includes more of the upper legs."
+      },
+      "camera_angle": {
+        "rating": "good",
+        "reason": "Both cameras are near torso height and close to frontal without a large perspective mismatch."
+      },
+      "lighting": {
+        "rating": "moderate",
+        "reason": "The setting is similar, but the baseline has stronger rear daylight and the comparison has different side-to-side shadow placement."
+      },
+      "clothing_and_occlusion": {
+        "rating": "good_for_torso",
+        "reason": "Both are shirtless with a similar waistband and unobstructed midsection; the baseline raised hand mainly affects one upper-body outline."
+      },
+      "body_orientation": {
+        "rating": "good",
+        "reason": "The torso is mostly frontal in both images with only small stance differences."
+      },
+      "flexing_and_posture": {
+        "rating": "limited_to_moderate",
+        "reason": "Arm placement, shoulder set, chest expansion, breathing, and abdominal tension are not standardized."
+      }
+    },
+    "regional_reliability": {
+      "overall_silhouette": "moderate",
+      "chest_fullness": "moderate",
+      "shoulder_fullness": "low_to_moderate",
+      "arm_fullness": "low_to_moderate",
+      "waist_and_midsection": "moderate_to_high",
+      "abdominal_definition": "moderate",
+      "oblique_definition": "moderate",
+      "symmetry": "low_to_moderate",
+      "back": "insufficient",
+      "legs": "insufficient"
+    }
+  },
+  "observations": [
+    {
+      "region": "overall_silhouette",
+      "metric": "apparent_muscular_fullness",
+      "direction": "increased",
+      "apparentMagnitude": "subtle",
+      "confidence": "moderate",
+      "observation": "The comparison presents a slightly broader and fuller-looking upper torso while overall body shape remains similar.",
+      "basis": [
+        "chest occupies slightly more visual depth and width",
+        "shoulder outline appears somewhat rounder",
+        "waist remains narrow relative to the upper torso"
+      ],
+      "confounders": [
+        "both arms are down only in the comparison",
+        "shoulder set and chest expansion may differ",
+        "lighting differs"
+      ]
+    },
+    {
+      "region": "chest",
+      "metric": "apparent_muscular_fullness",
+      "direction": "increased",
+      "apparentMagnitude": "subtle",
+      "confidence": "moderate",
+      "observation": "The chest appears somewhat fuller, particularly through the upper and outer chest, without a clearly measurable size change.",
+      "basis": [
+        "slightly more substantial chest silhouette",
+        "fuller transition from clavicle and shoulder into the chest"
+      ],
+      "confounders": [
+        "arm position changes chest presentation",
+        "chest expansion and posture are unverified",
+        "shadow placement differs"
+      ]
+    },
+    {
+      "region": "shoulders",
+      "metric": "apparent_muscular_fullness",
+      "direction": "increased",
+      "apparentMagnitude": "subtle",
+      "confidence": "low_to_moderate",
+      "observation": "The shoulders look slightly rounder and more substantial in the comparison.",
+      "basis": [
+        "somewhat fuller shoulder caps",
+        "slightly broader upper-torso outline"
+      ],
+      "confounders": [
+        "baseline arm elevation changes shoulder geometry",
+        "comparison posture may set the shoulders differently",
+        "lighting differs"
+      ]
+    },
+    {
+      "region": "arms",
+      "metric": "apparent_muscular_fullness",
+      "direction": "increased",
+      "apparentMagnitude": "subtle",
+      "confidence": "low_to_moderate",
+      "observation": "The relaxed arms appear slightly more substantial overall, but the pose mismatch prevents a confident isolated size conclusion.",
+      "basis": [
+        "comparison arms present a somewhat fuller relaxed outline"
+      ],
+      "confounders": [
+        "one baseline arm is raised and bent",
+        "camera distance differs slightly",
+        "pump state is unknown"
+      ]
+    },
+    {
+      "region": "waist_and_midsection",
+      "metric": "visual_stability",
+      "direction": "stable",
+      "apparentMagnitude": "none",
+      "confidence": "moderate_to_high",
+      "observation": "The waist remains broadly similar in width and contour, with no clear visual evidence of a material waist increase.",
+      "basis": [
+        "lateral waist outline remains narrow",
+        "ribcage-to-waist transition remains clean",
+        "lower torso does not show an obvious broad increase"
+      ],
+      "confounders": [
+        "small stance and framing differences",
+        "breathing and abdominal tension are unverified"
+      ]
+    },
+    {
+      "region": "abdomen_and_obliques",
+      "metric": "abdominal_definition",
+      "direction": "stable",
+      "apparentMagnitude": "none",
+      "confidence": "moderate",
+      "observation": "Abdominal and oblique structure remains broadly comparable; no clear meaningful loss of definition or broad increase in softness is visible.",
+      "basis": [
+        "central abdominal line remains visible",
+        "upper and mid-ab contours remain present",
+        "oblique and sidewall contour remains lean-looking"
+      ],
+      "confounders": [
+        "side-to-side lighting changes definition contrast",
+        "abdominal bracing state is unknown"
+      ]
+    },
+    {
+      "region": "lower_abdomen",
+      "metric": "whole_body_softness",
+      "direction": "stable",
+      "apparentMagnitude": "none",
+      "confidence": "moderate",
+      "observation": "The lower abdomen appears broadly stable without a clear material increase in softness above the waistband.",
+      "basis": [
+        "lower-torso contour remains relatively flat",
+        "waistband transition remains similar"
+      ],
+      "confounders": [
+        "waistband tension and height may differ slightly",
+        "posture and abdominal tension are unverified"
+      ]
+    },
+    {
+      "region": "shoulder_to_waist_proportion",
+      "metric": "v_taper",
+      "direction": "improved",
+      "apparentMagnitude": "subtle",
+      "confidence": "low_to_moderate",
+      "observation": "The shoulder-to-waist relationship may be slightly stronger because the upper torso appears fuller while the waist remains broadly stable.",
+      "basis": [
+        "slightly fuller upper-torso presentation",
+        "stable-looking waist contour"
+      ],
+      "confounders": [
+        "arm and shoulder position differ",
+        "small framing difference"
+      ]
+    },
+    {
+      "region": "back_and_lower_body",
+      "metric": "change",
+      "direction": "insufficient",
+      "apparentMagnitude": "unknown",
+      "confidence": "insufficient",
+      "observation": "Back, glute, and leg change cannot be evaluated from this pair.",
+      "basis": [],
+      "confounders": [
+        "regions are not shown in a usable view"
+      ]
+    }
+  ],
+  "dominantVisualStory": "The comparison suggests a subtly fuller upper torso, most apparent through the chest and shoulder outline, while the waist and midsection remain broadly stable and lean-looking.",
+  "overallMagnitude": "subtle",
+  "magnitudeCalibration": {
+    "magnitude": "subtle",
+    "reportedMagnitude": "subtle",
+    "promotionApplied": false,
+    "rule": "preserve_reported_photo_magnitude",
+    "alignedDirection": null,
+    "reliableDirectionalRegionCount": 0,
+    "subtleFindingsCannotPromote": true
+  },
+  "confidence": {
+    "overallReliability": "moderate",
+    "rationale": "Confidence is moderate that the comparison shows a subtle increase in apparent upper-body fullness with a broadly stable waist. Confidence is moderate-to-high that there is no obvious large waist increase in this front-view pair. Confidence is low-to-moderate for isolated chest, shoulder, and arm size changes because pose, posture, lighting, and pump are not standardized.",
+    "limitations": [
+      "The baseline has one arm raised while the comparison has both arms down.",
+      "Shoulder set, chest expansion, breathing, abdominal bracing, flexing, and pump are unknown.",
+      "Lighting direction and rear daylight differ.",
+      "Camera distance and framing differ slightly.",
+      "Hydration, food intake, and time of day are unknown.",
+      "Only one front view is available at each date."
+    ]
+  },
+  "goalRelativeInterpretation": {
+    "direction": "supportive",
+    "strength": "emerging_visual_support",
+    "interpretation": "The pair provides emerging visual support for the Goal direction: the upper torso appears subtly fuller through the chest, shoulders, and arms while the waist and midsection remain broadly stable and lean-looking. This is consistent with the desired visual pattern, but photographs alone cannot establish new muscle tissue, quantify body-fat change, or verify the guardrail numerically.",
+    "photoOnlyStrategyImplication": ""
+  },
+  "unsupportedConclusions": [
+    "[object Object]"
+  ],
+  "photoOnlyInterpretation": "Across 62 days, the front-view comparison suggests a subtle increase in apparent upper-body fullness, led by a somewhat fuller chest and slightly rounder shoulder and arm presentation. The waist, lower abdomen, and abdominal/oblique definition remain broadly stable, with no clear visual evidence of a material increase in midsection softness. This is an emerging photo-level pattern supportive of Build Lean Mass with a body-fat guardrail, but the change is small and pose-sensitive. The photos cannot establish muscle gain, quantify body-fat change, prove guardrail compliance, or determine causation.",
+  "exactPhotoBriefingCopy": "Encouraging direction: the September photo presents a somewhat fuller chest, shoulders, and arms while your waist remains broadly similar and there is no clear visual increase in midsection softness. That combination is consistent with movement toward Build Lean Mass while respecting the body-fat guardrail, but the visible change is subtle—not enough for photos alone to establish muscle gain or a body-composition change. The arm-position and lighting differences make small upper-body comparisons less certain.",
+  "provenance": {
+    "producer": "canonical_photo_intelligence_service",
+    "producerVersion": "canonical_photo_intelligence_v1",
+    "calibrationVersion": "photo_magnitude_calibration_v2",
+    "evidenceClass": "photo_only",
+    "nonPhotoEvidenceUsed": false,
+    "resultLabel": "SECOND PASS — POST-REVEAL CALIBRATED REPLAY"
+  }
+}

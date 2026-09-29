@@ -8,6 +8,37 @@
 export const PHOTO_EVENT_STRUCTURED_OBSERVATIONS_VERSION = "photo_event_structured_observations_v1";
 
 export function derivePhotoStructuredObservationsV3(narrative = {}) {
+  const canonical = narrative.photoIntelligence;
+  if (canonical?.schemaVersion === "canonical_photo_intelligence_v1") {
+    const comparable = !["insufficient", "unknown"].includes(
+      String(canonical.comparability?.overall ?? "unknown").toLowerCase()
+    );
+    return {
+      schemaVersion: PHOTO_EVENT_STRUCTURED_OBSERVATIONS_VERSION,
+      producerSource: "canonical_photo_intelligence",
+      structured_observations: (canonical.observations ?? []).map((item) => ({
+        metric: item.metric,
+        region: item.region,
+        direction: item.direction,
+        magnitude: item.apparentMagnitude,
+        comparability: comparable ? "comparable" : "not_comparable",
+        comparable,
+        factualSummary: item.observation,
+        confidence: item.confidence,
+        limitations: [...(item.confounders ?? [])],
+      })),
+      comparison_metadata: {
+        comparable,
+        poseCount: canonical.captureAssessment?.views?.length ?? 0,
+        interval_days: canonical.comparison?.daysElapsed ?? null,
+        window: {
+          startDate: canonical.comparison?.baselineDate ?? null,
+          endDate: canonical.comparison?.comparisonDate ?? null,
+        },
+      },
+      limitations: [...(canonical.confidence?.limitations ?? [])],
+    };
+  }
   const poses = Array.isArray(narrative?.poseInterpretations) ? narrative.poseInterpretations : [];
   const structured = poses.flatMap((pose) => {
     const observations = (pose.observations ?? []).filter((item) => typeof item === "string" && item.trim());
