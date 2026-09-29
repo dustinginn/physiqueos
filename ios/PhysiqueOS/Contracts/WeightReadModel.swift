@@ -27,8 +27,16 @@ struct WeightReportReadModel: Codable, Equatable {
     /// the selected scope (see `WeightEvidenceCalculator.summary`).
     var summary: [WeightSummaryCard]
     var chart: WeightChartData
-    /// `report.weeklyAverages` — newest-first (`orderWeeklyAveragesNewestFirst`),
-    /// capped to the last 6 weeks server-side.
+    /// `report.weeklyAverages` — newest-first (`orderWeeklyAveragesNewestFirst`).
+    /// Under Founder Production the server returns every calendar week
+    /// inside the selected Goal window (there is no six-week cap), so a
+    /// long Goal can produce dozens of rows whose year-less labels repeat
+    /// across years — which is why `WeightWeeklyAverage.id` keys on the
+    /// server's `sortDate`, never on the label. Native carries the full
+    /// array as delivered — the Weekly Averages card's collapsed preview
+    /// is the only trimming, and expanding it shows every row. Only the
+    /// Sandbox fixture path (`WeightEvidenceCalculator.weeklyAverages`)
+    /// still keeps the last 6.
     var weeklyAverages: [WeightWeeklyAverage]
     /// `report.history` — every scoped weight point, reversed (newest
     /// first), matching the web's own `[...points].reverse()`.
@@ -157,14 +165,23 @@ struct WeightChartData: Codable, Equatable {
 /// "Base" label for the oldest week shown (`weekOverWeek == nil`), kept as
 /// its own explicit flag rather than inferring "oldest" from array order,
 /// since `weeklyAverages` here is already newest-first for display.
+///
+/// `week` is the display label only (`"Jul 19"`, year-less). Row identity
+/// comes from `sortDate` — the server's `YYYY-MM-DD` week start — because
+/// once a Goal window spans more than a year two rows can legitimately
+/// carry the same label, and a label-keyed `ForEach` would collide.
+/// `sortDate` is `nil` only for the Sandbox calculator path, whose
+/// six-week window can never repeat a label, so the label is a safe
+/// fallback identity there.
 struct WeightWeeklyAverage: Codable, Equatable, Identifiable {
     var week: String
     var average: Double
     var weekOverWeek: Double?
     var isBaseWeek: Bool
     var entryCount: Int
+    var sortDate: String? = nil
 
-    var id: String { week }
+    var id: String { sortDate ?? week }
 }
 
 /// A `history` row — plain (non-navigating) on the web, matching

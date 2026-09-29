@@ -562,6 +562,92 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(report.scope.options.contains { $0.label == "Build Lean Mass" && $0.selected })
     }
 
+    /// The server no longer caps Weekly Averages to six weeks: every
+    /// calendar week inside the selected Goal window comes back, newest-
+    /// first, each carrying its `YYYY-MM-DD` `sortDate`. Native must carry
+    /// the whole array (no re-capping) and key each row by `sortDate`, not
+    /// by the year-less label. `page` still describes the paged `history`
+    /// honestly even when the requested window is larger than one page.
+    func testProductionWeeklyAveragesCoverTheFullGoalWindowKeyedBySortDate() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["weight": productionWeightElevenWeekJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let report = try await ProductionWeightEvidenceAPI(api: native).fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
+
+        XCTAssertEqual(report.weeklyAverages.count, 11)
+        XCTAssertEqual(report.weeklyAverages.first?.week, "Sep 27")
+        XCTAssertEqual(report.weeklyAverages.first?.isBaseWeek, false)
+        let oldest = try XCTUnwrap(report.weeklyAverages.last)
+        XCTAssertEqual(oldest.week, "Jul 19")
+        XCTAssertTrue(oldest.isBaseWeek)
+        XCTAssertNil(oldest.weekOverWeek)
+        XCTAssertTrue(report.weeklyAverages.dropLast().allSatisfy { !$0.isBaseWeek && $0.weekOverWeek != nil })
+
+        // Identity is the server's sortDate — decoded verbatim, distinct per
+        // row, and never the label (see the cross-year test below).
+        XCTAssertEqual(report.weeklyAverages.map(\.sortDate), productionElevenWeekSortDates)
+        XCTAssertEqual(report.weeklyAverages.map(\.id), productionElevenWeekSortDates)
+        XCTAssertEqual(Set(report.weeklyAverages.map(\.id)).count, 11)
+
+        XCTAssertEqual(report.page?.limit, 365)
+        XCTAssertEqual(report.page?.hasMore, true)
+    }
+
+    /// Year-less labels legitimately repeat once a window spans more than
+    /// a year ("Jul 19" 2025 and "Jul 19" 2026) — a label-keyed `ForEach`
+    /// would collide and drop or misrender rows. `sortDate` is the
+    /// identity; the label only stands in when a row carries none.
+    func testProductionWeeklyAverageRowsSharingALabelAcrossYearsKeepDistinctIdentities() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["weight": productionWeightRepeatedLabelJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let report = try await ProductionWeightEvidenceAPI(api: native).fetchWeightReport(scope: .all)
+
+        XCTAssertEqual(report.weeklyAverages.map(\.week), ["Jul 19", "Jul 19", "Jul 12"])
+        XCTAssertEqual(report.weeklyAverages.map(\.id), ["2026-07-19", "2025-07-19", "Jul 12"])
+        XCTAssertEqual(Set(report.weeklyAverages.map(\.id)).count, 3)
+        XCTAssertNil(report.weeklyAverages.last?.sortDate)
+    }
+
+    /// History and the Native-built Trend chart are both derived from the
+    /// paged `history` array, while Weekly Averages are not paged at all.
+    /// Requesting the server's bounded maximum keeps all three sections
+    /// over the same window once a Goal exceeds the default 90
+    /// observations — for goal-scoped and all-weight reads alike.
+    func testProductionWeightReportRequestsTheFullBoundedHistoryWindow() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["weight": productionWeightFullJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let weightAPI = ProductionWeightEvidenceAPI(api: native)
+
+        let goalReport = try await weightAPI.fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
+        _ = try await weightAPI.fetchWeightReport(scope: .all)
+
+        let weightRequests = await transport.requests.filter { $0.url?.path.hasSuffix("/read/weight") == true }
+        XCTAssertEqual(weightRequests.count, 2)
+        let queries = weightRequests.map { request -> [String: String] in
+            let items = request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems } ?? []
+            return Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
+        }
+        XCTAssertEqual(queries.first, ["context": "build-lean-mass", "limit": "365"])
+        XCTAssertEqual(queries.last, ["context": "all", "limit": "365"])
+
+        // `page` is still decoded and honoured, not assumed exhausted.
+        XCTAssertEqual(goalReport.page?.hasMore, false)
+        XCTAssertEqual(goalReport.page?.count, 2)
+    }
+
     func testEnvelopeFailsClosedOnAuthorityAndResourceMismatch() async throws {
         for (resource, authority, expected) in [
             ("weight", "founder-sandbox", "authority"),
@@ -5979,6 +6065,45 @@ private func activityLandingFixtureJSON(latest: String, history: [String]) -> St
 private let productionEnergyJSON = productionEnvelope(resource: "energy", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Energy","selected":true}]},"summary":{"averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDays":1,"evidenceDays":2},"days":[{"date":"2026-09-10","nutritionDayId":null,"activityDayId":"activity-1","calorieIntake":null,"activeCalories":500,"rmr":1700,"estimatedExpenditure":2200,"energyBalance":null,"completeness":"activity-only","sources":{"nutrition":[],"activity":["Activity"]}},{"date":"2026-09-09","nutritionDayId":"nutrition-1","activityDayId":"activity-2","calorieIntake":0,"activeCalories":600,"rmr":1700,"estimatedExpenditure":2300,"energyBalance":-2300,"completeness":"complete","sources":{"nutrition":["Web"],"activity":["Activity"]}}],"weeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"recentFourWeeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"latestEvidenceDate":"2026-09-10","dataSources":[{"name":"Nutrition","status":"Connected"}],"audit":{"nutritionDays":1,"activityDays":2,"overlappingDates":1}}"#)
 
 private let productionWeightFullJSON = productionEnvelope(resource: "weight", data: #"{"schemaVersion":"1","context":{"contextId":"build-lean-mass","type":"active_goal","goalId":"goal-canonical","goalRevision":null,"phaseId":"phase-canonical","phaseRevision":null,"startDate":"2026-07-19","endDate":null},"current":{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null,"label":"168.3 lb","detail":"Morning weight"},"recentWeighIns":[{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null,"label":"168.3 lb","detail":"Morning weight"},{"id":"weight-1","date":"2026-09-09","value":167.7,"unit":"lb","revision":null,"label":"167.7 lb","detail":"Morning weight"}],"rollingAverages":{"threeDay":{"requestedDays":3,"observationCount":2,"startDate":"2026-09-08","endDate":"2026-09-10","value":168.0,"unit":"lb"},"sevenDay":{"requestedDays":7,"observationCount":2,"startDate":"2026-09-04","endDate":"2026-09-10","value":167.7,"unit":"lb"}},"weeklyAverages":[{"week":"Sep 8","sortDate":"2026-09-08","average":168.0,"weekOverWeek":null,"entries":2}],"extrema":{"goalRelevant":["highest"],"highest":{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null},"lowest":{"id":"weight-1","date":"2026-09-09","value":167.7,"unit":"lb","revision":null}},"dexaContext":{"latest":{"id":"dexa-scan-1","date":"2026-09-01","label":"DEXA"},"markers":[{"id":"dexa-scan-1","date":"2026-09-01","label":"DEXA"}]},"history":[{"id":"weight-2","date":"2026-09-10","value":168.3,"unit":"lb","revision":null,"label":"168.3 lb","detail":"Morning weight"},{"id":"weight-1","date":"2026-09-09","value":167.7,"unit":"lb","revision":null,"label":"167.7 lb","detail":"Morning weight"}],"page":{"limit":90,"count":2,"hasMore":false}}"#)
+
+/// Wraps a `weeklyAverages` array (and `page`) in an otherwise minimal but
+/// complete Founder Production `weight` payload, so a test can vary only
+/// the weekly rows. All values synthetic.
+private func productionWeightWindowJSON(contextId: String, weeklyAverages: String, page: String) -> String {
+    productionEnvelope(resource: "weight", data: #"{"schemaVersion":"1","context":{"contextId":"\#(contextId)","type":"active_goal","goalId":"goal-canonical","goalRevision":null,"phaseId":"phase-canonical","phaseRevision":null,"startDate":"2026-07-19","endDate":null},"current":{"id":"weight-newest","date":"2026-09-27","value":152.2,"unit":"lb","revision":null,"label":"152.2 lb","detail":"Morning weight"},"recentWeighIns":[],"rollingAverages":null,"weeklyAverages":\#(weeklyAverages),"extrema":null,"dexaContext":{"latest":null,"markers":[]},"history":[{"id":"weight-newest","date":"2026-09-27","value":152.2,"unit":"lb","revision":null,"label":"152.2 lb","detail":"Morning weight"},{"id":"weight-oldest","date":"2026-07-19","value":150.0,"unit":"lb","revision":null,"label":"150.0 lb","detail":"Morning weight"}],"page":\#(page)}"#)
+}
+
+/// Eleven consecutive calendar weeks, newest-first, spanning a Goal that
+/// started 2026-07-19 — more than the old six-week cap. Oldest is the base
+/// week (no delta); every later week gained a synthetic +0.2 lb.
+private let productionElevenWeekSortDates = [
+    "2026-09-27", "2026-09-20", "2026-09-13", "2026-09-06", "2026-08-30", "2026-08-23",
+    "2026-08-16", "2026-08-09", "2026-08-02", "2026-07-26", "2026-07-19",
+]
+
+private let productionWeightElevenWeekJSON: String = {
+    let labels = ["Sep 27", "Sep 20", "Sep 13", "Sep 6", "Aug 30", "Aug 23", "Aug 16", "Aug 9", "Aug 2", "Jul 26", "Jul 19"]
+    precondition(labels.count == productionElevenWeekSortDates.count)
+    let rows = zip(labels, productionElevenWeekSortDates).enumerated().map { index, row -> String in
+        let weeksAboveBase = labels.count - 1 - index
+        let average = String(format: "%.1f", 150.0 + Double(weeksAboveBase) * 0.2)
+        let weekOverWeek = weeksAboveBase == 0 ? "null" : "0.2"
+        return #"{"week":"\#(row.0)","sortDate":"\#(row.1)","average":\#(average),"weekOverWeek":\#(weekOverWeek),"entries":\#(weeksAboveBase == 0 ? 3 : 7)}"#
+    }
+    return productionWeightWindowJSON(
+        contextId: "build-lean-mass",
+        weeklyAverages: "[" + rows.joined(separator: ",") + "]",
+        page: #"{"limit":365,"count":365,"hasMore":true}"#
+    )
+}()
+
+/// Two rows one year apart share the label "Jul 19"; a third carries no
+/// `sortDate` at all (the label-fallback path).
+private let productionWeightRepeatedLabelJSON = productionWeightWindowJSON(
+    contextId: "all",
+    weeklyAverages: #"[{"week":"Jul 19","sortDate":"2026-07-19","average":151.4,"weekOverWeek":0.3,"entries":7},{"week":"Jul 19","sortDate":"2025-07-19","average":149.1,"weekOverWeek":-0.2,"entries":6},{"week":"Jul 12","average":149.3,"weekOverWeek":null,"entries":4}]"#,
+    page: #"{"limit":365,"count":2,"hasMore":false}"#
+)
 
 private let productionPhotosJSON = productionEnvelope(resource: "photos", data: #"{"schemaVersion":"1","context":{"contextId":"build-lean-mass","type":"active_goal","goalId":"goal-canonical","goalRevision":null,"phaseId":"phase-canonical","phaseRevision":null,"startDate":"2026-07-19","endDate":null},"sessions":[{"sessionId":"session-2","revision":1,"intendedCaptureDate":"2026-09-01","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"1/2 poses have prior comparisons","photos":[{"photoId":"photo-front-2","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"comparable","media":{"mediaId":"media-front-2","deliveryPath":"/api/v1/native/media/media-front-2"},"galleryInterpretation":{"summary":"Canonical interpretation.","comparisonBullets":["Waist looks tighter."],"conditionSummary":"Comparable light and distance."},"sourceHistory":"Compared Aug 15 and Sep 1.","prior":{"sessionId":"session-1","photoId":"photo-front-1","poseId":"front-relaxed","intendedCaptureDate":"2026-08-15","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"}}},{"photoId":"photo-backflexed-2","poseId":"back-flexed","pose":{"id":"back-flexed","label":"Back Flexed","view":"back","pose":"flexed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-backflexed-2","deliveryPath":"/api/v1/native/media/media-backflexed-2"},"prior":null}]},{"sessionId":"session-1","revision":1,"intendedCaptureDate":"2026-08-15","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"0/1 poses have prior comparisons","photos":[{"photoId":"photo-front-1","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-08-15","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"},"prior":null}]}],"page":{"limit":12,"count":2,"hasMore":false}}"#)
 
