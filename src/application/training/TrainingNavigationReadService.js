@@ -10,7 +10,10 @@ import {
   createTrainingEvidenceContext,
   mergeTrainingBreakdowns,
 } from "../../domain/services/TrainingEvidenceContextService.js";
-import { createTrainingLibraryExerciseRecordsReadModel } from "../../domain/services/TrainingLibraryExerciseRecordsService.js";
+import {
+  createSessionPerformanceRecordsReadModel,
+  createTrainingLibraryExerciseRecordsReadModel,
+} from "../../domain/services/TrainingLibraryExerciseRecordsService.js";
 import { resolveTrainingExerciseIdentity } from "../../domain/models/trainingExerciseIdentity.js";
 import { getPrimaryTrainingNavigationGroup } from "../../navigation/trainingNavigationMapping.js";
 import {
@@ -245,14 +248,14 @@ export function createTrainingNavigationReadService({
           if (cardio) return cardio;
         }
         const exact = await store.getCanonicalEvidenceObject(sessionId);
-        if (exact) return withHealthKitPresentation(
+        if (exact) return withSessionPerformanceRecords(store, withHealthKitPresentation(
           withSupportingMedia(
             findSession(createTrainingNavigationReport({ canonicalEvidenceObjects: [exact] }), sessionId),
             exact,
           ),
           exact,
           await loadHealthKitRelationshipState(store),
-        );
+        ), exact);
         const canonicalEvidenceObjects = await store.listCanonicalTrainingEvidenceObjects();
         let session = findSession(createTrainingNavigationReport({ canonicalEvidenceObjects }), sessionId);
         if (session || canonicalEvidenceObjects.length > 0) {
@@ -260,11 +263,11 @@ export function createTrainingNavigationReadService({
             item.canonicalId, item.id, item.payload?.id,
             ...(item.provenance?.contributing_evidence_object_ids ?? []),
           ].some((candidate) => String(candidate) === String(sessionId)));
-          return withHealthKitPresentation(
+          return withSessionPerformanceRecords(store, withHealthKitPresentation(
             withSupportingMedia(session, record),
             record,
             await loadHealthKitRelationshipState(store),
-          );
+          ), record);
         }
         session = findSession(createTrainingNavigationReport({
           evidencePackages: await store.listEvidencePackages(),
@@ -374,6 +377,26 @@ function warnHealthKitCardioFailure(logger, event, error) {
   const fields = { errorName: String(error?.name ?? "Error").slice(0, 80), errorCode: String(error?.code ?? "UNCLASSIFIED").slice(0, 80) };
   if (logger?.warn) logger.warn(event, fields);
   else console.warn(event, JSON.stringify(fields));
+}
+
+// The canonical performance records this session established (Workout
+// Complete fallback and session detail). Only durable events attributed to
+// this canonical session (or to its session identity, the lineage a correction
+// revision keeps) and still live against THIS session's canonical object are
+// presented; a superseded session presents none. Native never computes them.
+async function withSessionPerformanceRecords(store, session, record) {
+  if (!session || !record || typeof store.listTrainingPerformanceEventsBySession !== "function") return session;
+  const canonicalId = String(record.canonicalId ?? "");
+  const payloadSessionId = String((record.payload ?? record).id ?? "");
+  if (!canonicalId && !payloadSessionId) return session;
+  const events = await store.listTrainingPerformanceEventsBySession({
+    canonicalId: canonicalId || null,
+    sessionId: payloadSessionId || null,
+  });
+  const records = createSessionPerformanceRecordsReadModel({
+    events: selectLiveTrainingPerformanceEvents(events ?? [], [record]),
+  });
+  return Object.freeze({ ...session, performanceRecords: Object.freeze({ status: "completed", records }) });
 }
 
 function withSupportingMedia(session, record) {
